@@ -15,6 +15,13 @@
 
 
 
+
+## 0.2.7
+
+### Patch Changes
+
+- Force Vercel Nitro output for release builds.
+
 ## 0.2.6
 
 ### Patch Changes
