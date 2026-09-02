@@ -1,0 +1,18 @@
+{
+  "source": "https://github.com/pocket-trash/skills",
+  "version": "0.1.1",
+  "agents": ["codex", "claude-code"],
+  "skills": [
+    "bunny-audit",
+    "commit",
+    "db-migration-conflicts",
+    "figjam",
+    "grill-me",
+    "implement-linear-ticket",
+    "logger",
+    "pr-create",
+    "pr-review",
+    "pr-update",
+    "update-scopes"
+  ]
+}

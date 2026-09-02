@@ -66,6 +66,12 @@ corepack enable
 pnpm install
 ```
 
+Install the shared Pocket Trash agent skills from GitHub:
+
+```sh
+pnpm agent-skills:update
+```
+
 Run the baseline checks before starting app work:
 
 ```sh
@@ -86,12 +92,12 @@ pnpm dev:web
 
 | Task | Claude | Codex | What it does |
 | --- | --- | --- | --- |
-| Commit | `/commit` | `$commit` | Uses `.agents/skills/commit/SKILL.md` to write conventional commits for this monorepo. |
-| Create PR | `/pr-create` | `$pr-create` | Uses `.agents/skills/pr-create/SKILL.md` to create a GitHub PR from the current branch and commits. |
+| Commit | `/commit` | `$commit` | Uses the shared `commit` skill to write conventional commits for this monorepo. |
+| Create PR | `/pr-create` | `$pr-create` | Uses the shared `pr-create` skill to create a GitHub PR from the current branch and commits. |
 | FigJam | `/figjam` | `$figjam` | Uses shared FigJam tooling to read allowed FigJam/Figma files, generate plugin payloads, and update planning/design boards through the private plugin bridge. |
-| Grill me | `/grill-me` | `$grill-me` | Uses `.agents/skills/grill-me/SKILL.md` to stress-test a plan or design by walking through decision-tree questions one at a time. |
-| Update PR | `/pr-update` | `$pr-update` | Uses `.agents/skills/pr-update/SKILL.md` to refresh an existing PR title and description from branch commits and changes. |
-| Review PR | `/pr-review` | `$pr-review` | Uses `.agents/skills/pr-review/SKILL.md` to review a PR: run the repo checks, review the diff for real defects, and report findings scoped to that PR. |
+| Grill me | `/grill-me` | `$grill-me` | Uses the shared `grill-me` skill to stress-test a plan or design by walking through decision-tree questions one at a time. |
+| Update PR | `/pr-update` | `$pr-update` | Uses the shared `pr-update` skill to refresh an existing PR title and description from branch commits and changes. |
+| Review PR | `/pr-review` | `$pr-review` | Uses the shared `pr-review` skill to review a PR: run the repo checks, review the diff for real defects, and report findings scoped to that PR. |
 
 ## Running apps
 
