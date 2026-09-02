@@ -13,6 +13,27 @@
 
 
 
+
+
+
+## 0.2.7
+
+### Patch Changes
+
+- Force Vercel Nitro output for release builds.
+
+## 0.2.6
+
+### Patch Changes
+
+- Continue Vercel release output fixes.
+
+## 0.2.5
+
+### Patch Changes
+
+- Fix Vercel release output handling.
+
 ## 0.2.4
 
 ### Patch Changes
