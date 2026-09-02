@@ -27,7 +27,6 @@ const versionPackagePaths = [
 ].map((path) => join(repoRoot, path));
 const bumpOrder = ["patch", "minor", "major"];
 const initialVersion = "0.0.1";
-const branchReleaseEnv = "POCKET_TRASH_RELEASE_FROM_BRANCH";
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -59,9 +58,7 @@ function assertMainMatchesOrigin() {
   const branch = git(["branch", "--show-current"], { capture: true });
 
   if (branch !== "main") {
-    throw new Error(
-      `Release must be run from main. Set ${branchReleaseEnv}=1 for temporary branch release testing.`,
-    );
+    throw new Error("Release must be run from main.");
   }
 
   git(["fetch", "origin", "main", "--tags"]);
@@ -71,32 +68,6 @@ function assertMainMatchesOrigin() {
 
   if (headSha !== originMainSha) {
     throw new Error("Release requires HEAD to match origin/main.");
-  }
-
-  return branch;
-}
-
-function assertBranchMatchesUpstream() {
-  const branch = git(["branch", "--show-current"], { capture: true });
-
-  if (!branch || branch === "main") {
-    throw new Error(`${branchReleaseEnv}=1 requires a non-main branch.`);
-  }
-
-  const upstream = git(
-    ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
-    {
-      capture: true,
-    },
-  );
-
-  git(["fetch", "origin", branch, "--tags"]);
-
-  const headSha = git(["rev-parse", "HEAD"], { capture: true });
-  const upstreamSha = git(["rev-parse", upstream], { capture: true });
-
-  if (headSha !== upstreamSha) {
-    throw new Error(`Branch release requires HEAD to match ${upstream}.`);
   }
 
   return branch;
@@ -364,11 +335,7 @@ function main() {
   const initial = process.argv.includes("--initial");
 
   assertCleanWorktree();
-
-  const releaseBranch =
-    process.env[branchReleaseEnv] === "1"
-      ? assertBranchMatchesUpstream()
-      : assertMainMatchesOrigin();
+  const releaseBranch = assertMainMatchesOrigin();
 
   run("pnpm", ["format"]);
   run("pnpm", ["test"]);

@@ -887,15 +887,6 @@ jobs:
           rm -rf .vercel/output apps/web/.vercel/output
           pnpm build:ci --filter=@app/web
 
-          for output_directory in .vercel/output apps/web/.vercel/output; do
-            if [[ -d "$output_directory" ]]; then
-              echo "Found $output_directory:"
-              find "$output_directory" -maxdepth 2 -type f | sort
-            else
-              echo "Missing $output_directory"
-            fi
-          done
-
           if [[ -f .vercel/output/config.json ]]; then
             echo "Using .vercel/output"
           elif [[ -f apps/web/.vercel/output/config.json ]]; then
