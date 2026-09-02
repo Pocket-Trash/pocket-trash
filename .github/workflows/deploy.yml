@@ -778,29 +778,29 @@ jobs:
         run: |
           set -euo pipefail
 
-          latest_deployment="$(
+          expected_message="Production release for $RELEASE_TAG"
+          release_deployment="$(
             pnpm dlx @railway/cli deployment list \
               --project "$RAILWAY_PROJECT_ID" \
               --environment production \
               --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
-              --limit 1 \
-              --json
+              --limit 10 \
+              --json |
+              jq --arg expected_message "$expected_message" \
+                '[.[] | select((.meta.message // .meta.commitMessage // "") == $expected_message)] | first // empty'
           )"
-          status="$(jq -r '.[0].status // empty' <<< "$latest_deployment")"
-          message="$(jq -r '.[0].meta.message // .[0].meta.commitMessage // empty' <<< "$latest_deployment")"
+
+          if [[ -z "$release_deployment" ]]; then
+            echo "Railway production release deployment was not found." >&2
+            echo "Expected message: $expected_message" >&2
+            exit 1
+          fi
+
+          status="$(jq -r '.status // empty' <<< "$release_deployment")"
 
           if [[ "$status" != "SUCCESS" ]]; then
             echo "Railway production deployment did not succeed. Status: ${status:-<empty>}" >&2
             exit 1
-          fi
-
-          expected_message="Production release for $RELEASE_TAG"
-          if [[ -z "$message" ]]; then
-            echo "Railway production deployment message was empty; status is SUCCESS." >&2
-          elif [[ "$message" != "$expected_message" ]]; then
-            echo "Railway production deployment message did not match; status is SUCCESS." >&2
-            echo "Expected: $expected_message" >&2
-            echo "Actual: $message" >&2
           fi
 
   web-production:
