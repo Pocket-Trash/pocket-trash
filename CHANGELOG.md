@@ -16,6 +16,13 @@
 
 
 
+
+## 0.2.8
+
+### Patch Changes
+
+- Remove temporary branch release testing hooks.
+
 ## 0.2.7
 
 ### Patch Changes
