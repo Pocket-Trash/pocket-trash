@@ -69,6 +69,8 @@ function assertMainMatchesOrigin() {
   if (headSha !== originMainSha) {
     throw new Error("Release requires HEAD to match origin/main.");
   }
+
+  return branch;
 }
 
 function readJson(path) {
@@ -261,7 +263,7 @@ function createGitHubRelease(tagName, notes) {
   }
 }
 
-function createInitialRelease(changesets) {
+function createInitialRelease(changesets, releaseBranch) {
   const tagName = `v${initialVersion}`;
 
   if (tagExists(tagName)) {
@@ -287,7 +289,7 @@ function createInitialRelease(changesets) {
 
   if (git(["status", "--porcelain"], { capture: true })) {
     git(["commit", "-m", `chore(release): ${tagName}`]);
-    git(["push", "origin", "main"]);
+    git(["push", "origin", releaseBranch]);
   }
 
   git(["tag", "-a", tagName, "-m", tagName]);
@@ -295,7 +297,7 @@ function createInitialRelease(changesets) {
   createGitHubRelease(tagName, createReleaseNotes(initialVersion));
 }
 
-function createChangesetRelease(changesets) {
+function createChangesetRelease(changesets, releaseBranch) {
   const nextVersion = bumpVersion(
     getLatestReleaseVersion(),
     getHighestBump(changesets),
@@ -323,7 +325,7 @@ function createChangesetRelease(changesets) {
       .filter((path) => path !== "package.json"),
   ]);
   git(["commit", "-m", `chore(release): ${tagName}`]);
-  git(["push", "origin", "main"]);
+  git(["push", "origin", releaseBranch]);
   git(["tag", "-a", tagName, "-m", tagName]);
   git(["push", "origin", tagName]);
   createGitHubRelease(tagName, createReleaseNotes(nextVersion));
@@ -333,7 +335,7 @@ function main() {
   const initial = process.argv.includes("--initial");
 
   assertCleanWorktree();
-  assertMainMatchesOrigin();
+  const releaseBranch = assertMainMatchesOrigin();
 
   run("pnpm", ["format"]);
   run("pnpm", ["test"]);
@@ -345,7 +347,7 @@ function main() {
   const changesets = readChangesets();
 
   if (initial) {
-    createInitialRelease(changesets);
+    createInitialRelease(changesets, releaseBranch);
     return;
   }
 
@@ -355,7 +357,7 @@ function main() {
     );
   }
 
-  createChangesetRelease(changesets);
+  createChangesetRelease(changesets, releaseBranch);
 }
 
 try {
