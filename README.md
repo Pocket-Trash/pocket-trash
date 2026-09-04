@@ -88,6 +88,42 @@ Run the TanStack Start web app from the repo root:
 pnpm dev:web
 ```
 
+### Testing localizations locally with yalc
+
+Install yalc once:
+
+```sh
+pnpm add -g yalc
+```
+
+Build and publish the sibling `localizations` repo:
+
+```sh
+cd ../localizations
+pnpm install
+pnpm build
+yalc publish
+```
+
+Add it in Pocket Trash:
+
+```sh
+cd ../pocket-trash
+yalc add @pocket-trash/localizations --link
+pnpm install
+```
+
+After localization changes:
+
+```sh
+cd ../localizations
+pnpm build
+yalc push
+```
+
+For further information, see
+[Localizations Local Dev With yalc](docs/localizations-yalc-local-dev.md).
+
 ## AI commands
 
 | Task | Claude | Codex | What it does |
