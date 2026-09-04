@@ -1,4 +1,0 @@
-interface:
-  display_name: "Commit"
-  short_description: "Create conventional git commits"
-  default_prompt: "Use $commit to stage specific files and create a conventional commit for the current changes."

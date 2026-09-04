@@ -1,1 +1,0 @@
-../../.agents/skills/logger/SKILL.md

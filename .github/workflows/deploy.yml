@@ -172,7 +172,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for name in NEON_API_KEY NEON_PROJECT_ID NEON_DATABASE_NAME NEON_DATABASE_USER VERCEL_TEAM_ID VERCEL_PROJECT_ID VERCEL_TOKEN RAILWAY_API_TOKEN RAILWAY_PROJECT_ID RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME; do
+          for name in NEON_API_KEY NEON_PROJECT_ID NEON_DATABASE_NAME NEON_DATABASE_USER VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_TOKEN RAILWAY_API_TOKEN RAILWAY_PROJECT_ID RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME; do
             if [[ -z "${!name:-}" ]]; then
               echo "$name is required." >&2
               exit 1
@@ -778,29 +778,29 @@ jobs:
         run: |
           set -euo pipefail
 
-          latest_deployment="$(
+          expected_message="Production release for $RELEASE_TAG"
+          release_deployment="$(
             pnpm dlx @railway/cli deployment list \
               --project "$RAILWAY_PROJECT_ID" \
               --environment production \
               --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
-              --limit 1 \
-              --json
+              --limit 10 \
+              --json |
+              jq --arg expected_message "$expected_message" \
+                '[.[] | select((.meta.message // .meta.commitMessage // "") == $expected_message)] | first // empty'
           )"
-          status="$(jq -r '.[0].status // empty' <<< "$latest_deployment")"
-          message="$(jq -r '.[0].meta.message // .[0].meta.commitMessage // empty' <<< "$latest_deployment")"
+
+          if [[ -z "$release_deployment" ]]; then
+            echo "Railway production release deployment was not found." >&2
+            echo "Expected message: $expected_message" >&2
+            exit 1
+          fi
+
+          status="$(jq -r '.status // empty' <<< "$release_deployment")"
 
           if [[ "$status" != "SUCCESS" ]]; then
             echo "Railway production deployment did not succeed. Status: ${status:-<empty>}" >&2
             exit 1
-          fi
-
-          expected_message="Production release for $RELEASE_TAG"
-          if [[ -z "$message" ]]; then
-            echo "Railway production deployment message was empty; status is SUCCESS." >&2
-          elif [[ "$message" != "$expected_message" ]]; then
-            echo "Railway production deployment message did not match; status is SUCCESS." >&2
-            echo "Expected: $expected_message" >&2
-            echo "Actual: $message" >&2
           fi
 
   web-production:
@@ -844,7 +844,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for name in VERCEL_PROJECT_ID VERCEL_TEAM_ID VERCEL_TOKEN; do
+          for name in VERCEL_PROJECT_ID VERCEL_ORG_ID VERCEL_TOKEN; do
             if [[ -z "${!name:-}" ]]; then
               echo "$name is required." >&2
               exit 1
@@ -857,26 +857,46 @@ jobs:
           pnpm --filter @app/web run lint
           pnpm exec turbo run typecheck --filter=@app/web
 
-      - name: Align Vercel production build settings
+      - name: Align Vercel production framework
         env:
           NO_COLOR: "1"
         run: |
           pnpm dlx vercel project update "$VERCEL_PROJECT_ID" \
             --framework tanstack-start \
-            --auto-detect output-directory \
-            --scope "$VERCEL_TEAM_ID" \
+            --scope "$VERCEL_ORG_ID" \
             --token "$VERCEL_TOKEN" \
             --non-interactive
 
       - name: Pull Vercel production environment
         env:
           NO_COLOR: "1"
-        run: pnpm dlx vercel pull --cwd apps/web --yes --environment=production --scope "$VERCEL_TEAM_ID"
+        run: pnpm dlx vercel pull --yes --environment=production --scope "$VERCEL_ORG_ID"
 
       - name: Build Vercel production output
+        shell: bash
         env:
+          NITRO_PRESET: vercel
           NO_COLOR: "1"
-        run: pnpm dlx vercel build --cwd apps/web --prod --scope "$VERCEL_TEAM_ID"
+        run: |
+          set -euo pipefail
+
+          set -a
+          source .vercel/.env.production.local
+          set +a
+
+          rm -rf .vercel/output apps/web/.vercel/output
+          pnpm build:ci --filter=@app/web
+
+          if [[ -f .vercel/output/config.json ]]; then
+            echo "Using .vercel/output"
+          elif [[ -f apps/web/.vercel/output/config.json ]]; then
+            mkdir -p .vercel
+            mv apps/web/.vercel/output .vercel/output
+            echo "Moved apps/web/.vercel/output to .vercel/output"
+          else
+            echo "No Vercel Build Output API config found." >&2
+            exit 1
+          fi
 
       - name: Deploy Vercel production
         id: vercel_deploy
@@ -886,7 +906,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          deployment_url="$(pnpm dlx vercel deploy --cwd apps/web --prebuilt --archive=tgz --prod --scope "$VERCEL_TEAM_ID")"
+          deployment_url="$(pnpm dlx vercel deploy --prebuilt --archive=tgz --prod --scope "$VERCEL_ORG_ID")"
           echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
           printf 'Vercel production deployment: %s\n' "$deployment_url"
 

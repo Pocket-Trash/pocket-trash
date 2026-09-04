@@ -1,4 +1,0 @@
-interface:
-  display_name: "DB Migration Conflicts"
-  short_description: "Resolve Drizzle migration history conflicts"
-  default_prompt: "Use $db-migration-conflicts to resolve Drizzle migration conflicts on the current branch."

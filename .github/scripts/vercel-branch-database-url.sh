@@ -29,7 +29,7 @@ require_env() {
 
 require_vercel_env() {
   require_env VERCEL_TOKEN
-  require_env VERCEL_TEAM_ID
+  require_env VERCEL_ORG_ID
   require_env VERCEL_PROJECT_ID
   require_env BRANCH_NAME
 }
@@ -71,8 +71,8 @@ api() {
       echo "Vercel API response body omitted to avoid leaking environment variable values." >&2
     fi
     if [[ "$status" == "401" || "$status" == "403" ]]; then
-      echo "Check that VERCEL_TOKEN was created for the Vercel team in VERCEL_TEAM_ID and can access VERCEL_PROJECT_ID." >&2
-      echo "Current Vercel identifiers: VERCEL_TEAM_ID=${VERCEL_TEAM_ID}, VERCEL_PROJECT_ID=${VERCEL_PROJECT_ID}." >&2
+      echo "Check that VERCEL_TOKEN was created for the Vercel org in VERCEL_ORG_ID and can access VERCEL_PROJECT_ID." >&2
+      echo "Current Vercel identifiers: VERCEL_ORG_ID=${VERCEL_ORG_ID}, VERCEL_PROJECT_ID=${VERCEL_PROJECT_ID}." >&2
     fi
     rm -f "$response_file"
     return 22
@@ -95,7 +95,7 @@ write_output() {
 }
 
 team_query_prefix() {
-  printf '?teamId=%s' "$(jq -rn --arg value "$VERCEL_TEAM_ID" '$value | @uri')"
+  printf '?teamId=%s' "$(jq -rn --arg value "$VERCEL_ORG_ID" '$value | @uri')"
 }
 
 branch_query_value() {

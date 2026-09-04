@@ -1,4 +1,0 @@
-interface:
-  display_name: "Logger"
-  short_description: "Use the shared logger consistently"
-  default_prompt: "Use $logger to audit code changes for logger usage, centralized messages, and console-free app/package code."

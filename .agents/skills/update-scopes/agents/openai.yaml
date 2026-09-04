@@ -1,4 +1,0 @@
-interface:
-  display_name: "Update Scopes"
-  short_description: "Suggest commitlint scope updates"
-  default_prompt: "Use $update-scopes to analyze this repo and propose commitlint scope updates."

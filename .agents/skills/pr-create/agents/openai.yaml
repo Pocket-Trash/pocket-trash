@@ -1,4 +1,0 @@
-interface:
-  display_name: "PR Create"
-  short_description: "Create GitHub PRs from branch commits"
-  default_prompt: "Use $pr-create to create a GitHub pull request for the current branch from its commits."

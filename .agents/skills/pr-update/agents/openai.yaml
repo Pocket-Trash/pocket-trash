@@ -1,4 +1,0 @@
-interface:
-  display_name: "PR Update"
-  short_description: "Update GitHub PR title and body"
-  default_prompt: "Update the current branch pull request title and description based on commits and changes."

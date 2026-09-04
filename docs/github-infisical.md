@@ -42,7 +42,7 @@ logger, and Discord jobs. Use `prod` for release and manual main deploy jobs.
 | `RAILWAY_API_TOKEN` | Required | Required |
 | `RAILWAY_PROJECT_ID` | Required | Required |
 | `VERCEL_PROJECT_ID` | Required | Required |
-| `VERCEL_TEAM_ID` | Required | Required |
+| `VERCEL_ORG_ID` | Required | Required |
 | `VERCEL_TOKEN` | Required | Required |
 
 ## Machine Identity

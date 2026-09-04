@@ -1,4 +1,0 @@
-interface:
-  display_name: "PR Review"
-  short_description: "Review a GitHub PR: run checks, review the diff, report scoped findings"
-  default_prompt: "Use $pr-review to review the target GitHub pull request — run the repo checks, review the diff for real defects, and report findings scoped to that PR."

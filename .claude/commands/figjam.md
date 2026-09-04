@@ -1,1 +1,0 @@
-../../.agents/skills/figjam/SKILL.md

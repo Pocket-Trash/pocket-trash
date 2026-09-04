@@ -1,1 +1,0 @@
-../../.agents/skills/linear-implement-ticket/SKILL.md

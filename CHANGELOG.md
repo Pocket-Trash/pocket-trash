@@ -8,6 +8,81 @@
 
 
 
+
+
+
+
+
+
+
+
+
+## 0.2.8
+
+### Patch Changes
+
+- Remove temporary branch release testing hooks.
+
+## 0.2.7
+
+### Patch Changes
+
+- Force Vercel Nitro output for release builds.
+
+## 0.2.6
+
+### Patch Changes
+
+- Continue Vercel release output fixes.
+
+## 0.2.5
+
+### Patch Changes
+
+- Fix Vercel release output handling.
+
+## 0.2.4
+
+### Patch Changes
+
+- Fix Vercel release build output.
+
+## 0.2.3
+
+### Patch Changes
+
+- Move repo agent skills to the shared skills repo.
+
+## 0.2.2
+
+### Patch Changes
+
+- Removed mutation output directory in release workflow
+
+## 0.2.1
+
+### Patch Changes
+
+- Use Vercel org IDs in release automation.
+
+## 0.2.0
+
+### Minor Changes
+
+- Sync user settings across web, mobile, and the API.
+- Remove the mobile and API runtimes from the repository.
+- Rename repo-owned references to Pocket Trash.
+
+### Patch Changes
+
+- Add typecheck to pull request CI.
+- Send CI database logs to Axiom.
+- ENG-69: add expiring Neon preview branches and document preview cleanup.
+  ENG-70: record Neon compute cap targets, restart risk, monitoring, and rollback.
+  ENG-71: skip unchanged scraper maker, Grimsmo product, variation, and image writes.
+  ENG-72: skip empty queue processor run rows and prune scraper run history.
+- Point GitHub notification secrets at the shared GitHub Actions Infisical path.
+
 ## 0.1.7
 
 ### Patch Changes
@@ -98,4 +173,3 @@
 ### Minor Changes
 
 - Add release automation and API versioning.
-

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Linear Implement Ticket"
-  short_description: "Read Linear tickets and prepare implementation branches"
-  default_prompt: "Use $linear-implement-ticket ENG-17 to read a Linear ticket, create the requested branch or worktree, install dependencies, and implement the ticket spec."

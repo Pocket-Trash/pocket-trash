@@ -7,13 +7,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const changesetDirectory = join(repoRoot, ".changeset");
 const changelogPath = join(repoRoot, "CHANGELOG.md");
 const versionPackagePaths = [
   "package.json",
+  "packages/repo/package.json",
   "apps/web/package.json",
   "packages/database/package.json",
   "packages/eslint/package.json",
@@ -69,6 +70,8 @@ function assertMainMatchesOrigin() {
   if (headSha !== originMainSha) {
     throw new Error("Release requires HEAD to match origin/main.");
   }
+
+  return branch;
 }
 
 function readJson(path) {
@@ -87,10 +90,17 @@ function parseChangeset(filePath) {
     throw new Error(`${filePath} is missing Changeset frontmatter.`);
   }
 
-  const bumps = match[1]
-    .split("\n")
-    .map((line) => line.match(/:\s*(major|minor|patch)\s*$/)?.[1])
-    .filter(Boolean);
+  const packages = [];
+  const bumps = match[1].split("\n").flatMap((line) => {
+    const lineMatch = line.match(/^["']?(.+?)["']?:\s*(major|minor|patch)\s*$/);
+
+    if (!lineMatch) {
+      return [];
+    }
+
+    packages.push(lineMatch[1]);
+    return [lineMatch[2]];
+  });
 
   if (bumps.length === 0) {
     throw new Error(`${filePath} must include major, minor, or patch.`);
@@ -104,6 +114,7 @@ function parseChangeset(filePath) {
     }, "patch"),
     description: match[2].trim(),
     filePath,
+    packages,
   };
 }
 
@@ -193,10 +204,15 @@ function formatBullets(changesets, bump) {
   const bullets = entries
     .map((entry) => {
       const description = entry.description || "No description provided.";
+      const packagePrefix =
+        entry.packages?.length > 0 ? `**${entry.packages.join(", ")}**: ` : "";
+
       return description
         .split("\n")
         .filter(Boolean)
-        .map((line, index) => (index === 0 ? `- ${line}` : `  ${line}`))
+        .map((line, index) =>
+          index === 0 ? `- ${packagePrefix}${line}` : `  ${line}`,
+        )
         .join("\n");
     })
     .join("\n");
@@ -261,7 +277,7 @@ function createGitHubRelease(tagName, notes) {
   }
 }
 
-function createInitialRelease(changesets) {
+function createInitialRelease(changesets, releaseBranch) {
   const tagName = `v${initialVersion}`;
 
   if (tagExists(tagName)) {
@@ -287,7 +303,7 @@ function createInitialRelease(changesets) {
 
   if (git(["status", "--porcelain"], { capture: true })) {
     git(["commit", "-m", `chore(release): ${tagName}`]);
-    git(["push", "origin", "main"]);
+    git(["push", "origin", releaseBranch]);
   }
 
   git(["tag", "-a", tagName, "-m", tagName]);
@@ -295,7 +311,7 @@ function createInitialRelease(changesets) {
   createGitHubRelease(tagName, createReleaseNotes(initialVersion));
 }
 
-function createChangesetRelease(changesets) {
+function createChangesetRelease(changesets, releaseBranch) {
   const nextVersion = bumpVersion(
     getLatestReleaseVersion(),
     getHighestBump(changesets),
@@ -323,7 +339,7 @@ function createChangesetRelease(changesets) {
       .filter((path) => path !== "package.json"),
   ]);
   git(["commit", "-m", `chore(release): ${tagName}`]);
-  git(["push", "origin", "main"]);
+  git(["push", "origin", releaseBranch]);
   git(["tag", "-a", tagName, "-m", tagName]);
   git(["push", "origin", tagName]);
   createGitHubRelease(tagName, createReleaseNotes(nextVersion));
@@ -333,7 +349,7 @@ function main() {
   const initial = process.argv.includes("--initial");
 
   assertCleanWorktree();
-  assertMainMatchesOrigin();
+  const releaseBranch = assertMainMatchesOrigin();
 
   run("pnpm", ["format"]);
   run("pnpm", ["test"]);
@@ -345,7 +361,7 @@ function main() {
   const changesets = readChangesets();
 
   if (initial) {
-    createInitialRelease(changesets);
+    createInitialRelease(changesets, releaseBranch);
     return;
   }
 
@@ -355,12 +371,19 @@ function main() {
     );
   }
 
-  createChangesetRelease(changesets);
+  createChangesetRelease(changesets, releaseBranch);
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
+export { createChangelogEntry, parseChangeset };
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  try {
+    main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
 }
