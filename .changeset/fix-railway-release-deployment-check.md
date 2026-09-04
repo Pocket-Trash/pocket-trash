@@ -1,5 +1,5 @@
 ---
-"pocket-trash.app": patch
+"@pocket-trash/repo": patch
 ---
 
 Fix Railway release deployment verification.

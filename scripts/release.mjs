@@ -7,13 +7,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const changesetDirectory = join(repoRoot, ".changeset");
 const changelogPath = join(repoRoot, "CHANGELOG.md");
 const versionPackagePaths = [
   "package.json",
+  "packages/repo/package.json",
   "apps/web/package.json",
   "packages/database/package.json",
   "packages/eslint/package.json",
@@ -89,10 +90,17 @@ function parseChangeset(filePath) {
     throw new Error(`${filePath} is missing Changeset frontmatter.`);
   }
 
-  const bumps = match[1]
-    .split("\n")
-    .map((line) => line.match(/:\s*(major|minor|patch)\s*$/)?.[1])
-    .filter(Boolean);
+  const packages = [];
+  const bumps = match[1].split("\n").flatMap((line) => {
+    const lineMatch = line.match(/^["']?(.+?)["']?:\s*(major|minor|patch)\s*$/);
+
+    if (!lineMatch) {
+      return [];
+    }
+
+    packages.push(lineMatch[1]);
+    return [lineMatch[2]];
+  });
 
   if (bumps.length === 0) {
     throw new Error(`${filePath} must include major, minor, or patch.`);
@@ -106,6 +114,7 @@ function parseChangeset(filePath) {
     }, "patch"),
     description: match[2].trim(),
     filePath,
+    packages,
   };
 }
 
@@ -195,10 +204,15 @@ function formatBullets(changesets, bump) {
   const bullets = entries
     .map((entry) => {
       const description = entry.description || "No description provided.";
+      const packagePrefix =
+        entry.packages?.length > 0 ? `**${entry.packages.join(", ")}**: ` : "";
+
       return description
         .split("\n")
         .filter(Boolean)
-        .map((line, index) => (index === 0 ? `- ${line}` : `  ${line}`))
+        .map((line, index) =>
+          index === 0 ? `- ${packagePrefix}${line}` : `  ${line}`,
+        )
         .join("\n");
     })
     .join("\n");
@@ -360,9 +374,16 @@ function main() {
   createChangesetRelease(changesets, releaseBranch);
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
+export { createChangelogEntry, parseChangeset };
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  try {
+    main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
 }
