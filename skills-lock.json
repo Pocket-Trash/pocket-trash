@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "pocket-trash": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.1.1",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash/SKILL.md",
+      "computedHash": "f9b12b4fef41b1abbdad615afdba7dbde27b540dd6eb6779b027a5eaeef083a3"
+    }
+  }
+}

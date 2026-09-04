@@ -1,0 +1,5 @@
+interface:
+  display_name: "Pocket Trash"
+  short_description: "Pocket Trash repo workflow router"
+  default_prompt:
+    "Use $pocket-trash to list or run Pocket Trash repo workflow subcommands."

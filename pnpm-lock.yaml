@@ -345,6 +345,8 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
+  packages/repo: {}
+
   packages/services:
     dependencies:
       '@package/database':
