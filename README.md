@@ -92,12 +92,13 @@ pnpm dev:web
 
 | Task | Claude | Codex | What it does |
 | --- | --- | --- | --- |
-| Commit | `/commit` | `$commit` | Uses the shared `commit` skill to write conventional commits for this monorepo. |
-| Create PR | `/pr-create` | `$pr-create` | Uses the shared `pr-create` skill to create a GitHub PR from the current branch and commits. |
-| FigJam | `/figjam` | `$figjam` | Uses shared FigJam tooling to read allowed FigJam/Figma files, generate plugin payloads, and update planning/design boards through the private plugin bridge. |
-| Grill me | `/grill-me` | `$grill-me` | Uses the shared `grill-me` skill to stress-test a plan or design by walking through decision-tree questions one at a time. |
-| Update PR | `/pr-update` | `$pr-update` | Uses the shared `pr-update` skill to refresh an existing PR title and description from branch commits and changes. |
-| Review PR | `/pr-review` | `$pr-review` | Uses the shared `pr-review` skill to review a PR: run the repo checks, review the diff for real defects, and report findings scoped to that PR. |
+| List workflows | `/pocket-trash` | `$pocket-trash` | Lists Pocket Trash workflow subcommands. |
+| Commit | `/pocket-trash commit` | `$pocket-trash commit` | Uses the shared `pocket-trash` router to write conventional commits for this monorepo. |
+| Create PR | `/pocket-trash pr-create` | `$pocket-trash pr-create` | Uses the shared `pocket-trash` router to create a GitHub PR from the current branch and commits. |
+| FigJam | `/pocket-trash figjam` | `$pocket-trash figjam` | Uses shared FigJam tooling to read allowed FigJam/Figma files, generate plugin payloads, and update planning/design boards through the private plugin bridge. |
+| Grill me | `/pocket-trash grill-me` | `$pocket-trash grill-me` | Uses the shared `pocket-trash` router to stress-test a plan or design by walking through decision-tree questions one at a time. |
+| Update PR | `/pocket-trash pr-update` | `$pocket-trash pr-update` | Uses the shared `pocket-trash` router to refresh an existing PR title and description from branch commits and changes. |
+| Review PR | `/pocket-trash pr-review` | `$pocket-trash pr-review` | Uses the shared `pocket-trash` router to review a PR: run the repo checks, review the diff for real defects, and report findings scoped to that PR. |
 
 ## Running apps
 
