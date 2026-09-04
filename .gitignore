@@ -38,4 +38,7 @@ assets/
 /bunny-audit/
 plans/
 pr-summarys/
-.agent-skills-installed.json
+
+# Local tool config
+.linear.toml
+
