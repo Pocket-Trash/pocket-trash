@@ -287,6 +287,6 @@ Print the Codex prompt for this repair flow with:
 pnpm db:resolve-conflicts
 ```
 
-The prompt uses the shared `$db-migration-conflicts` skill and instructs
+The prompt uses the shared `$pocket-trash db-migration-conflicts` skill and instructs
 Codex to preserve schema intent, preserve hand-written SQL, remove stale
 generated artifacts, regenerate migrations, and run `drizzle-kit check`.
