@@ -1,4 +1,4 @@
-import { bigint, pgEnum, pgTable } from "drizzle-orm/pg-core";
+import { bigint, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
 import {
   currencyCodes,
   dimensionUnits,
@@ -18,6 +18,7 @@ export const userSettings = pgTable("user_settings", {
     .references(() => users.id, { onDelete: "cascade" }),
   currencyCode: currencyCodeEnum("currency_code").notNull().default("USD"),
   dimensionUnit: dimensionUnitEnum("dimension_unit").notNull().default("in"),
+  locale: text("locale"),
   theme: themeModeEnum("theme").notNull().default("system"),
   weightUnit: weightUnitEnum("weight_unit").notNull().default("g"),
 });

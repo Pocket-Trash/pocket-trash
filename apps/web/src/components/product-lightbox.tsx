@@ -30,7 +30,9 @@ import {
   formatWeight,
   type WeightUnit,
 } from "@/lib/pen-formatters";
+import { webText } from "@/lib/ui-text";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
 
 type ProductLightboxProps = {
   currency: CurrencyCode;
@@ -61,6 +63,8 @@ export function ProductLightbox({
   weight,
 }: ProductLightboxProps) {
   const isMobile = useIsMobile();
+  const { locale } = useLocale();
+  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
 
   // The drawer stays mounted through its slide-out animation, so hold the last
   // product to keep the sheet's content intact after `product` clears from the
@@ -120,29 +124,36 @@ export function ProductLightbox({
 
   const image = images[imageIndex] ?? images[0] ?? "";
 
-  const specs = [
+  type LightboxSpec = {
+    icon?: typeof Scale;
+    label: string;
+    value: string | null;
+  };
+
+  const allSpecs: LightboxSpec[] = [
     {
-      label: "Price",
+      label: t("Price"),
       value: formatPrice(shown.price_min, shown.price_max, currency, rates),
     },
     {
-      label: "Model",
+      label: t("Model"),
       value: shown.sizes.length > 0 ? shown.sizes.join(" / ") : null,
     },
-    { icon: Scale, label: "Weight", value: formatWeight(shown, weight) },
+    { icon: Scale, label: t("Weight"), value: formatWeight(shown, weight) },
     {
       icon: CircleGauge,
-      label: "Diameter",
+      label: t("Diameter"),
       value: formatDiameter(shown, units),
     },
     {
       icon: MoveHorizontal,
-      label: "Length",
+      label: t("Length"),
       value: formatLength(shown, units),
     },
-  ].filter(
-    (spec): spec is { icon?: typeof Scale; label: string; value: string } =>
-      Boolean(spec.value),
+  ];
+
+  const specs = allSpecs.filter(
+    (spec): spec is LightboxSpec & { value: string } => Boolean(spec.value),
   );
 
   const imagePane = (
@@ -160,7 +171,7 @@ export function ProductLightbox({
       {images.length > 1 ? (
         <>
           <Button
-            aria-label="Previous image"
+            aria-label={t("Previous image")}
             className="absolute top-1/2 left-3 rounded-full bg-card/75 backdrop-blur"
             onClick={() =>
               onImageChange(wrapIndex(imageIndex - 1, images.length))
@@ -172,7 +183,7 @@ export function ProductLightbox({
             <ChevronLeft />
           </Button>
           <Button
-            aria-label="Next image"
+            aria-label={t("Next image")}
             className="absolute top-1/2 right-3 rounded-full bg-card/75 backdrop-blur"
             onClick={() =>
               onImageChange(wrapIndex(imageIndex + 1, images.length))
@@ -194,14 +205,14 @@ export function ProductLightbox({
   const infoPane = (
     <div className="flex min-w-0 flex-col gap-4 overflow-y-auto p-5 min-[601px]:p-8">
       <div className="text-[11px] tracking-[1px] text-muted-foreground uppercase">
-        Released · {formatDate(shown.published_at)}
+        {t("Released")} - {formatDate(shown.published_at)}
       </div>
       <h2 className="text-[22px] leading-[1.15] font-bold min-[601px]:text-[28px]">
         {shown.title}
       </h2>
       {shown.archived ? (
         <Badge className="w-fit rounded-full bg-accent text-accent-foreground">
-          Archived - no longer listed
+          {t("Archived - no longer listed")}
         </Badge>
       ) : null}
 
@@ -254,7 +265,7 @@ export function ProductLightbox({
           nativeButton={false}
           render={<a href={shown.url} rel="noopener" target="_blank" />}
         >
-          Visit product page
+          {t("Visit product page")}
           <ExternalLink />
         </Button>
       </div>
@@ -273,7 +284,7 @@ export function ProductLightbox({
           <DrawerHeader className="sr-only">
             <DrawerTitle>{shown.title}</DrawerTitle>
             <DrawerDescription>
-              Specs, materials, and release details for {shown.title}.
+              {t("Specs, materials, and release details for this product.")}
             </DrawerDescription>
           </DrawerHeader>
           <div className="flex min-h-0 flex-col overflow-y-auto">
@@ -292,7 +303,7 @@ export function ProductLightbox({
       role="dialog"
     >
       <button
-        aria-label="Close product details"
+        aria-label={t("Close product details")}
         className="absolute inset-0 cursor-default"
         onClick={onClose}
         type="button"
@@ -304,7 +315,7 @@ export function ProductLightbox({
         variant="outline"
       >
         <X />
-        Close
+        {t("Close")}
       </Button>
       <div className="relative z-[101] grid w-full max-w-[1280px] overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-2xl md:grid-cols-[1.1fr_1fr]">
         {imagePane}

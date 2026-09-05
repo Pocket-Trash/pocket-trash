@@ -1,9 +1,10 @@
-import { useClerk, useUser } from "@clerk/tanstack-react-start";
+import { useAuth, useClerk, useUser } from "@clerk/tanstack-react-start";
 import { Link } from "@tanstack/react-router";
 import {
   ChevronsUpDown,
   FlaskConical,
   Folder,
+  Languages,
   LogOut,
   User,
 } from "lucide-react";
@@ -15,13 +16,25 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { localeLabel, supportedLocales } from "@/lib/locale";
+import { updateLocaleSetting } from "@/lib/locale-api";
+import { webText } from "@/lib/ui-text";
+import { useLocale } from "@/providers/locale-provider";
 
 export function UserMenu({ compact = false }: { compact?: boolean }) {
+  const { isSignedIn } = useAuth();
   const clerk = useClerk();
+  const { locale, setLocale } = useLocale();
+  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
   const { isLoaded, user } = useUser();
 
   if (!isLoaded) {
@@ -41,7 +54,7 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
   if (!user) {
     return compact ? (
       <Button
-        aria-label="Sign in"
+        aria-label={t("Sign in")}
         className="rounded-full"
         nativeButton={false}
         render={<Link params={{ _splat: "" }} to="/sign-in/$" />}
@@ -57,7 +70,7 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
         render={<Link params={{ _splat: "" }} to="/sign-in/$" />}
         variant="outline"
       >
-        Sign in
+        {t("Sign in")}
       </Button>
     );
   }
@@ -70,7 +83,7 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
         render={
           compact ? (
             <Button
-              aria-label="Account menu"
+              aria-label={t("Account menu")}
               className="rounded-full p-0"
               size="icon"
               type="button"
@@ -96,7 +109,7 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
                 {username}
               </span>
               <span className="block truncate text-xs text-muted-foreground">
-                Account
+                {t("Account")}
               </span>
             </span>
             <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
@@ -127,16 +140,41 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link to="/user/account" />}>
           <User />
-          Account
+          {t("Account")}
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/collections" />}>
           <Folder />
-          Collections
+          {t("Collections")}
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/settings/beta-features" />}>
           <FlaskConical />
-          Beta features
+          {t("Beta features")}
         </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Languages />
+            {t("Language")}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuRadioGroup
+              onValueChange={(value) => {
+                const nextLocale = value as typeof locale;
+                setLocale(nextLocale);
+
+                if (isSignedIn) {
+                  void updateLocaleSetting(nextLocale);
+                }
+              }}
+              value={locale}
+            >
+              {supportedLocales.map((code) => (
+                <DropdownMenuRadioItem key={code} value={code}>
+                  {localeLabel(code)}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {
@@ -144,7 +182,7 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
           }}
         >
           <LogOut />
-          Log out
+          {t("Log out")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

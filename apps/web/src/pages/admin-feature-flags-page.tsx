@@ -22,6 +22,8 @@ import {
   setAdminFeatureFlagForUser,
   updateAdminFeatureFlag,
 } from "@/lib/feature-flags";
+import { webText } from "@/lib/ui-text";
+import { useLocale } from "@/providers/locale-provider";
 
 type AdminFlag = Awaited<ReturnType<typeof listAdminFeatureFlags>>[number];
 type TargetFlag = Awaited<ReturnType<typeof listAdminTargetingForUser>>[number];
@@ -29,6 +31,9 @@ type TargetFlag = Awaited<ReturnType<typeof listAdminTargetingForUser>>[number];
 const audiences: FeatureFlagAudience[] = ["global", "admin", "user"];
 
 export function AdminFeatureFlagsPage() {
+  const { locale } = useLocale();
+  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
+  const failedToLoadText = t("Failed to load.");
   const [flags, setFlags] = useState<AdminFlag[]>([]);
   const [form, setForm] = useState({
     audience: "user" as FeatureFlagAudience,
@@ -60,9 +65,9 @@ export function AdminFeatureFlagsPage() {
 
   useEffect(() => {
     loadFlags().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Failed to load.");
+      setStatus(error instanceof Error ? error.message : failedToLoadText);
     });
-  }, []);
+  }, [failedToLoadText]);
 
   async function saveFlag() {
     if (editingSlug) {
@@ -102,14 +107,14 @@ export function AdminFeatureFlagsPage() {
   }
 
   return (
-    <AppShell sidebarContent={null} title="Feature flags">
+    <AppShell sidebarContent={null} title={t("Feature flags")}>
       <main className="mx-auto grid w-full max-w-6xl gap-5 px-4 py-6 md:grid-cols-[minmax(0,1fr)_360px] md:px-6">
         <section className="min-w-0">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="m-0 text-base font-semibold">Flags</h2>
+              <h2 className="m-0 text-base font-semibold">{t("Flags")}</h2>
               <p className="m-0 text-sm text-muted-foreground">
-                Boolean controls for global, private, and beta surfaces.
+                {t("Boolean controls for global, private, and beta surfaces.")}
               </p>
             </div>
             {status ? (
@@ -118,9 +123,9 @@ export function AdminFeatureFlagsPage() {
           </div>
           <div className="overflow-hidden rounded-lg border border-border bg-card">
             <div className="grid grid-cols-[1fr_auto_auto] gap-3 border-b border-border px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-              <span>Flag</span>
-              <span>Audience</span>
-              <span>Actions</span>
+              <span>{t("Flag")}</span>
+              <span>{t("Audience")}</span>
+              <span>{t("Actions")}</span>
             </div>
             {flags.map((flag) => (
               <div
@@ -131,7 +136,7 @@ export function AdminFeatureFlagsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{flag.name}</span>
                     {flag.archivedAt ? (
-                      <Badge variant="outline">Archived</Badge>
+                      <Badge variant="outline">{t("Archived")}</Badge>
                     ) : null}
                   </div>
                   <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
@@ -150,7 +155,7 @@ export function AdminFeatureFlagsPage() {
                 </Badge>
                 <div className="flex items-center gap-2">
                   <Button
-                    aria-label={`Edit ${flag.slug}`}
+                    aria-label={`${t("Edit")} ${flag.slug}`}
                     onClick={() => {
                       setEditingSlug(flag.slug);
                       setForm({
@@ -168,7 +173,7 @@ export function AdminFeatureFlagsPage() {
                     <Settings2 />
                   </Button>
                   <Button
-                    aria-label={`Archive ${flag.slug}`}
+                    aria-label={`${t("Archive")} ${flag.slug}`}
                     disabled={Boolean(flag.archivedAt)}
                     onClick={async () => {
                       await archiveAdminFeatureFlag({
@@ -191,7 +196,7 @@ export function AdminFeatureFlagsPage() {
         <aside className="grid content-start gap-5">
           <section className="rounded-lg border border-border bg-card p-4">
             <h2 className="m-0 mb-3 text-sm font-semibold">
-              {editingSlug ? "Edit flag" : "New flag"}
+              {editingSlug ? t("Edit flag") : t("New flag")}
             </h2>
             <div className="grid gap-3">
               <Input
@@ -212,7 +217,7 @@ export function AdminFeatureFlagsPage() {
                     name: event.target.value,
                   }))
                 }
-                placeholder="Display name"
+                placeholder={t("Display name")}
                 value={form.name}
               />
               <Input
@@ -222,7 +227,7 @@ export function AdminFeatureFlagsPage() {
                     description: event.target.value,
                   }))
                 }
-                placeholder="Description"
+                placeholder={t("Description")}
                 value={form.description}
               />
               <select
@@ -254,27 +259,27 @@ export function AdminFeatureFlagsPage() {
                   }
                   type="checkbox"
                 />
-                Global default enabled
+                {t("Global default enabled")}
               </label>
               <Button onClick={saveFlag} type="button">
                 <Check />
-                Save flag
+                {t("Save flag")}
               </Button>
             </div>
           </section>
 
           <section className="rounded-lg border border-border bg-card p-4">
             <h2 className="m-0 mb-3 text-sm font-semibold">
-              Admin-only targeting
+              {t("Admin-only targeting")}
             </h2>
             <div className="flex gap-2">
               <Input
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Email, username, or name"
+                placeholder={t("Email, username, or name")}
                 value={query}
               />
               <Button
-                aria-label="Search users"
+                aria-label={t("Search users")}
                 onClick={searchUsers}
                 size="icon"
                 type="button"
@@ -328,7 +333,7 @@ export function AdminFeatureFlagsPage() {
                       <span>{flag.name}</span>
                       <span className="flex items-center gap-2 text-xs">
                         <ToggleLeft />
-                        {flag.enabled ? "Enabled" : "Disabled"}
+                        {flag.enabled ? t("Enabled") : t("Disabled")}
                       </span>
                     </Button>
                   ))}

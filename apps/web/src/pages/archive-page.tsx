@@ -34,6 +34,8 @@ import {
   sortProducts,
 } from "@/lib/pen-filters";
 import { decodePenParam, penParam } from "@/lib/pen-links";
+import { webText } from "@/lib/ui-text";
+import { useLocale } from "@/providers/locale-provider";
 
 const sortOptions: Array<{ label: string; value: SortKey }> = [
   { label: "Newest drop", value: "date_desc" },
@@ -60,6 +62,8 @@ const browseState = {
 
 export function ArchivePage() {
   const navigate = useNavigate();
+  const { locale } = useLocale();
+  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
   // `/` and `/pens/$penId` both render this page, so the open pen is read from
   // the URL rather than local state — that is what makes each pen shareable.
   const { penId } = useParams({ strict: false });
@@ -78,6 +82,14 @@ export function ArchivePage() {
     () => browseState.matchModes,
   );
   const searchInputId = React.useId();
+  const localizedSortOptions = React.useMemo(
+    () =>
+      sortOptions.map((option) => ({
+        ...option,
+        label: t(option.label as Parameters<typeof webText>[1]),
+      })),
+    [t],
+  );
 
   const selectedProduct = React.useMemo<PenProduct | null>(
     () => (penId ? decodePenParam(penId) : null),
@@ -171,7 +183,7 @@ export function ArchivePage() {
           products={products}
           query={query}
           sort={sort}
-          sortOptions={sortOptions}
+          sortOptions={localizedSortOptions}
           units={units}
           weight={weight}
         />
@@ -184,26 +196,26 @@ export function ArchivePage() {
           >
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              aria-label="Search pens by title, specs, or description"
+              aria-label={t("Search pens by title, specs, or description")}
               autoComplete="off"
               className="pr-3 pl-9"
               id={searchInputId}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search..."
+              placeholder={t("Search...")}
               type="search"
               value={query}
             />
           </label>
           <Select
-            items={sortOptions}
+            items={localizedSortOptions}
             onValueChange={(value) => setSort(value as SortKey)}
             value={sort}
           >
-            <SelectTrigger aria-label="Sort pens" className="w-[180px]">
+            <SelectTrigger aria-label={t("Sort pens")} className="w-[180px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {sortOptions.map((option) => (
+              {localizedSortOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -259,7 +271,7 @@ export function ArchivePage() {
             ))
           ) : (
             <div className="col-span-full rounded-lg border border-dashed border-border p-16 text-center text-muted-foreground">
-              No items match these filters.
+              {t("No items match these filters.")}
             </div>
           )}
         </section>

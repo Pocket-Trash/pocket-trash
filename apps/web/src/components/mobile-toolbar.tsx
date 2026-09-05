@@ -32,7 +32,9 @@ import type {
   DimensionUnit,
   WeightUnit,
 } from "@/lib/pen-formatters";
+import { webText } from "@/lib/ui-text";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
 
 // Height of the bar itself (excludes the safe-area padding below it). Kept in
 // sync with the reserved bottom padding in `app-shell.tsx`.
@@ -88,6 +90,8 @@ export function MobileToolbar({
   units,
   weight,
 }: MobileToolbarProps) {
+  const { locale } = useLocale();
+  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [sortOpen, setSortOpen] = React.useState(false);
   // Distinct from the desktop header search field so the two inputs never share
@@ -125,19 +129,19 @@ export function MobileToolbar({
           >
             <Search className="pointer-events-none absolute left-3 size-4 text-muted-foreground" />
             <Input
-              aria-label="Search pens by title, specs, or description"
+              aria-label={t("Search pens by title, specs, or description")}
               autoComplete="off"
               className="pr-3 pl-9"
               id={searchInputId}
               onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="Search..."
+              placeholder={t("Search...")}
               ref={searchRef}
               type="search"
               value={query}
             />
           </label>
           <button
-            aria-label="Close search"
+            aria-label={t("Close search")}
             className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
             onClick={() => setSearchOpen(false)}
             type="button"
@@ -148,14 +152,14 @@ export function MobileToolbar({
       ) : null}
 
       <nav
-        aria-label="Archive controls"
+        aria-label={t("Archive controls")}
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
         style={{ height: `calc(${BAR_HEIGHT} + env(safe-area-inset-bottom))` }}
       >
         <ToolbarButton
           active={searchOpen || query.length > 0}
           icon={Search}
-          label="Search"
+          label={t("Search")}
           onClick={() => setSearchOpen((open) => !open)}
         />
 
@@ -165,14 +169,14 @@ export function MobileToolbar({
               active={filterCount > 0}
               badge={filterCount}
               icon={SlidersHorizontal}
-              label="Filters"
+              label={t("Filters")}
             />
           </DrawerTrigger>
           <DrawerContent>
             <DrawerHeader>
-              <DrawerTitle>Filters</DrawerTitle>
+              <DrawerTitle>{t("Filters")}</DrawerTitle>
               <DrawerDescription className="sr-only">
-                Filter the archive by category, size, material, and more.
+                {t("Filter the archive by category, size, material, and more.")}
               </DrawerDescription>
             </DrawerHeader>
             <div className="overflow-y-auto px-2 pb-4">
@@ -190,13 +194,13 @@ export function MobileToolbar({
 
         <Drawer onOpenChange={setSortOpen} open={sortOpen}>
           <DrawerTrigger asChild>
-            <ToolbarButton icon={ArrowUpDown} label="Sort" />
+            <ToolbarButton icon={ArrowUpDown} label={t("Sort")} />
           </DrawerTrigger>
           <DrawerContent>
             <DrawerHeader>
-              <DrawerTitle>Sort</DrawerTitle>
+              <DrawerTitle>{t("Sort")}</DrawerTitle>
               <DrawerDescription className="sr-only">
-                Choose how the archive is ordered.
+                {t("Choose how the archive is ordered.")}
               </DrawerDescription>
             </DrawerHeader>
             <div className="overflow-y-auto p-2">
@@ -226,13 +230,13 @@ export function MobileToolbar({
 
         <Drawer>
           <DrawerTrigger asChild>
-            <ToolbarButton icon={Settings} label="Settings" />
+            <ToolbarButton icon={Settings} label={t("Settings")} />
           </DrawerTrigger>
           <DrawerContent>
             <DrawerHeader>
-              <DrawerTitle>Settings</DrawerTitle>
+              <DrawerTitle>{t("Settings")}</DrawerTitle>
               <DrawerDescription className="sr-only">
-                Display preferences for the archive.
+                {t("Display preferences for the archive.")}
               </DrawerDescription>
             </DrawerHeader>
             <SettingsPanel

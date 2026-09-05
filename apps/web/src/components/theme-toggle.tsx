@@ -6,6 +6,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { ThemeMode } from "@/lib/theme";
+import { webText } from "@/lib/ui-text";
+import { useLocale } from "@/providers/locale-provider";
 import { useTheme } from "@/providers/theme-provider";
 
 const themeOptions: Array<{
@@ -20,10 +22,12 @@ const themeOptions: Array<{
 
 export function ThemeToggle() {
   const { saving, setTheme, theme } = useTheme();
+  const { locale } = useLocale();
+  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
 
   return (
     <ToggleGroup
-      aria-label="Theme"
+      aria-label={t("Theme")}
       className="mx-auto h-9 w-fit gap-0.5 rounded-full border-sidebar-border bg-secondary/20 p-1"
       onValueChange={(value) => {
         if (value) setTheme(value as ThemeMode);
@@ -33,13 +37,14 @@ export function ThemeToggle() {
     >
       {themeOptions.map((option) => {
         const Icon = option.icon;
+        const label = t(option.label as Parameters<typeof webText>[1]);
 
         return (
           <Tooltip key={option.value}>
             <TooltipTrigger
               render={
                 <ToggleGroupItem
-                  aria-label={option.label}
+                  aria-label={label}
                   className="size-7 flex-none rounded-full p-0 text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[pressed]:bg-background data-[pressed]:text-foreground data-[pressed]:shadow-sm [&_svg]:size-4"
                   disabled={saving}
                   value={option.value}
@@ -48,7 +53,7 @@ export function ThemeToggle() {
             >
               <Icon />
             </TooltipTrigger>
-            <TooltipContent side="top">{option.label}</TooltipContent>
+            <TooltipContent side="top">{label}</TooltipContent>
           </Tooltip>
         );
       })}

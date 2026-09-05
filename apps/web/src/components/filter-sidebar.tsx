@@ -9,7 +9,9 @@ import {
   type MatchModes,
   valuesFor,
 } from "@/lib/pen-filters";
+import { webText } from "@/lib/ui-text";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
 
 type FilterSidebarProps = {
   active: ActiveFilters;
@@ -28,6 +30,9 @@ export function FilterSidebar({
   onToggleFilter,
   products,
 }: FilterSidebarProps) {
+  const { locale } = useLocale();
+  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
+
   return (
     <div className="px-2 py-1 text-sidebar-foreground">
       {filterGroups.map((group) => (
@@ -50,10 +55,10 @@ export function FilterSidebar({
                 value={matchModes[group.key]}
               >
                 <ToggleGroupItem className="h-5 px-2 text-[10px]" value="any">
-                  any
+                  {t("any")}
                 </ToggleGroupItem>
                 <ToggleGroupItem className="h-5 px-2 text-[10px]" value="all">
-                  all
+                  {t("all")}
                 </ToggleGroupItem>
               </ToggleGroup>
             ) : null}
@@ -83,7 +88,7 @@ export function FilterSidebar({
       ))}
 
       <Button className="mt-4 w-full" onClick={onClear} variant="outline">
-        Clear all filters
+        {t("Clear all filters")}
       </Button>
     </div>
   );

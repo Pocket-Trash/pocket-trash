@@ -5,10 +5,15 @@ import {
 } from "@clerk/tanstack-react-start";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserPageShell } from "@/components/user-page-shell";
+import { webText } from "@/lib/ui-text";
+import { useLocale } from "@/providers/locale-provider";
 
 export function UserAccountPage() {
+  const { locale } = useLocale();
+  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
+
   return (
-    <UserPageShell title="Account">
+    <UserPageShell title={t("Account")}>
       <ClerkLoading>
         <UserProfileSkeleton />
       </ClerkLoading>

@@ -1,0 +1,240 @@
+import type { SupportedLocale } from "@pocket-trash/localizations";
+
+export const webUiMessages = {
+  "en-US": {
+    Account: "Account",
+    "Account menu": "Account menu",
+    Actions: "Actions",
+    "Admin-only targeting": "Admin-only targeting",
+    "Archive controls": "Archive controls",
+    Archive: "Archive",
+    "A resource for": "A resource for",
+    Audience: "Audience",
+    Archived: "Archived",
+    "Archived - no longer listed": "Archived - no longer listed",
+    "Beta features": "Beta features",
+    "Clear all filters": "Clear all filters",
+    "Close product details": "Close product details",
+    "Close search": "Close search",
+    "Close sidebar": "Close sidebar",
+    Close: "Close",
+    Collections: "Collections",
+    "Collections will be available later.":
+      "Collections will be available later.",
+    "Choose how the archive is ordered.": "Choose how the archive is ordered.",
+    Currency: "Currency",
+    Dark: "Dark",
+    Description: "Description",
+    Diameter: "Diameter",
+    "Dimension units": "Dimension units",
+    Dimensions: "Dimensions",
+    "Display currency": "Display currency",
+    "Display preferences for the Machined Pens archive.":
+      "Display preferences for the Machined Pens archive.",
+    "Display preferences for the archive.":
+      "Display preferences for the archive.",
+    "Display name": "Display name",
+    "Displays the mobile sidebar.": "Displays the mobile sidebar.",
+    Disabled: "Disabled",
+    Enabled: "Enabled",
+    "Email, username, or name": "Email, username, or name",
+    Edit: "Edit",
+    "Edit flag": "Edit flag",
+    "Made by a fan; not affiliated with any maker.":
+      "Made by a fan; not affiliated with any maker.",
+    "Failed to load.": "Failed to load.",
+    "Feature flags": "Feature flags",
+    "Filter the archive by category, size, material, and more.":
+      "Filter the archive by category, size, material, and more.",
+    Flag: "Flag",
+    Flags: "Flags",
+    Filters: "Filters",
+    "Global default enabled": "Global default enabled",
+    Grams: "Grams",
+    Inches: "Inches",
+    Language: "Language",
+    Length: "Length",
+    Light: "Light",
+    "Log out": "Log out",
+    Millimeters: "Millimeters",
+    Model: "Model",
+    "New flag": "New flag",
+    "Next image": "Next image",
+    "Newest drop": "Newest drop",
+    "No items match these filters.": "No items match these filters.",
+    "No beta features are available.": "No beta features are available.",
+    "Oldest drop": "Oldest drop",
+    "Not found": "Not found",
+    Ounces: "Ounces",
+    "Page unavailable": "Page unavailable",
+    "Previous image": "Previous image",
+    Price: "Price",
+    Released: "Released",
+    "Price high to low": "Price high to low",
+    "Price low to high": "Price low to high",
+    "Return to archive": "Return to archive",
+    Search: "Search",
+    "Search pens by title, specs, or description":
+      "Search pens by title, specs, or description",
+    "Search users": "Search users",
+    "Search...": "Search...",
+    Settings: "Settings",
+    "Sign in": "Sign in",
+    "Save flag": "Save flag",
+    Sidebar: "Sidebar",
+    Sort: "Sort",
+    "Sort pens": "Sort pens",
+    "Boolean controls for global, private, and beta surfaces.":
+      "Boolean controls for global, private, and beta surfaces.",
+    "Specs, materials, and release details for this product.":
+      "Specs, materials, and release details for this product.",
+    "Product names, images, and descriptions remain the property of their respective owners.":
+      "Product names, images, and descriptions remain the property of their respective owners.",
+    "Suggestions or contact:": "Suggestions or contact:",
+    System: "System",
+    Theme: "Theme",
+    "This page does not exist or is no longer available.":
+      "This page does not exist or is no longer available.",
+    "Title A to Z": "Title A to Z",
+    "Toggle sidebar": "Toggle sidebar",
+    "Visit product page": "Visit product page",
+    Weight: "Weight",
+    "Weight heavy to light": "Weight heavy to light",
+    "Weight light to heavy": "Weight light to heavy",
+    "Weight units": "Weight units",
+    "and the Machined Pens Discord.": "and the Machined Pens Discord.",
+    "Diameter thick to thin": "Diameter thick to thin",
+    "Diameter thin to thick": "Diameter thin to thick",
+    any: "any",
+    all: "all",
+  },
+  "es-MX": {
+    Account: "Cuenta",
+    "Account menu": "Menu de cuenta",
+    Actions: "Acciones",
+    "Admin-only targeting": "Segmentacion solo para admins",
+    "Archive controls": "Controles del archivo",
+    Archive: "Archivar",
+    "A resource for": "Un recurso para",
+    Audience: "Audiencia",
+    Archived: "Archivada",
+    "Archived - no longer listed": "Archivada - ya no esta listada",
+    "Beta features": "Funciones beta",
+    "Clear all filters": "Borrar todos los filtros",
+    "Close product details": "Cerrar detalles del producto",
+    "Close search": "Cerrar busqueda",
+    "Close sidebar": "Cerrar barra lateral",
+    Close: "Cerrar",
+    Collections: "Colecciones",
+    "Collections will be available later.":
+      "Las colecciones estaran disponibles mas adelante.",
+    "Choose how the archive is ordered.": "Elige como ordenar el archivo.",
+    Currency: "Moneda",
+    Dark: "Oscuro",
+    Description: "Descripcion",
+    Diameter: "Diametro",
+    "Dimension units": "Unidades de dimensiones",
+    Dimensions: "Dimensiones",
+    "Display currency": "Moneda de visualizacion",
+    "Display preferences for the Machined Pens archive.":
+      "Preferencias de visualizacion para el archivo de plumas maquinadas.",
+    "Display preferences for the archive.":
+      "Preferencias de visualizacion para el archivo.",
+    "Display name": "Nombre visible",
+    "Displays the mobile sidebar.": "Muestra la barra lateral movil.",
+    Disabled: "Desactivada",
+    Enabled: "Activada",
+    "Email, username, or name": "Email, usuario o nombre",
+    Edit: "Editar",
+    "Edit flag": "Editar bandera",
+    "Made by a fan; not affiliated with any maker.":
+      "Hecho por un fan; sin afiliacion con ningun fabricante.",
+    "Failed to load.": "No se pudo cargar.",
+    "Feature flags": "Banderas de funciones",
+    "Filter the archive by category, size, material, and more.":
+      "Filtra el archivo por categoria, tamano, material y mas.",
+    Flag: "Bandera",
+    Flags: "Banderas",
+    Filters: "Filtros",
+    "Global default enabled": "Valor global activado",
+    Grams: "Gramos",
+    Inches: "Pulgadas",
+    Language: "Idioma",
+    Length: "Longitud",
+    Light: "Claro",
+    "Log out": "Cerrar sesion",
+    Millimeters: "Milimetros",
+    Model: "Modelo",
+    "New flag": "Nueva bandera",
+    "Next image": "Siguiente imagen",
+    "Newest drop": "Lanzamiento mas reciente",
+    "No beta features are available.": "No hay funciones beta disponibles.",
+    "No items match these filters.":
+      "Ningun articulo coincide con estos filtros.",
+    "Not found": "No encontrado",
+    "Oldest drop": "Lanzamiento mas antiguo",
+    Ounces: "Onzas",
+    "Page unavailable": "Pagina no disponible",
+    "Previous image": "Imagen anterior",
+    Price: "Precio",
+    Released: "Publicado",
+    "Price high to low": "Precio de mayor a menor",
+    "Price low to high": "Precio de menor a mayor",
+    "Return to archive": "Volver al archivo",
+    Search: "Buscar",
+    "Search pens by title, specs, or description":
+      "Buscar plumas por titulo, especificaciones o descripcion",
+    "Search users": "Buscar usuarios",
+    "Search...": "Buscar...",
+    Settings: "Ajustes",
+    "Sign in": "Iniciar sesion",
+    "Save flag": "Guardar bandera",
+    Sidebar: "Barra lateral",
+    Sort: "Ordenar",
+    "Sort pens": "Ordenar plumas",
+    "Boolean controls for global, private, and beta surfaces.":
+      "Controles booleanos para superficies globales, privadas y beta.",
+    "Specs, materials, and release details for this product.":
+      "Especificaciones, materiales y detalles de lanzamiento de este producto.",
+    "Product names, images, and descriptions remain the property of their respective owners.":
+      "Los nombres, imagenes y descripciones de productos siguen siendo propiedad de sus respectivos duenos.",
+    "Suggestions or contact:": "Sugerencias o contacto:",
+    System: "Sistema",
+    Theme: "Tema",
+    "This page does not exist or is no longer available.":
+      "Esta pagina no existe o ya no esta disponible.",
+    "Title A to Z": "Titulo A a Z",
+    "Toggle sidebar": "Alternar barra lateral",
+    "Visit product page": "Visitar pagina del producto",
+    Weight: "Peso",
+    "Weight heavy to light": "Peso de mayor a menor",
+    "Weight light to heavy": "Peso de menor a mayor",
+    "Weight units": "Unidades de peso",
+    "and the Machined Pens Discord.": "y el Discord de Machined Pens.",
+    "Diameter thick to thin": "Diametro de grueso a delgado",
+    "Diameter thin to thick": "Diametro de delgado a grueso",
+    any: "cualquiera",
+    all: "todos",
+  },
+} as const satisfies Record<SupportedLocale, Record<string, string>>;
+
+export type WebUiMessageKey = keyof (typeof webUiMessages)["en-US"];
+
+export function webText(locale: SupportedLocale, key: WebUiMessageKey) {
+  return webUiMessages[locale][key];
+}
+
+assertCompleteCatalogs();
+
+function assertCompleteCatalogs() {
+  const expected = Object.keys(webUiMessages["en-US"]);
+
+  for (const [locale, messages] of Object.entries(webUiMessages)) {
+    const missing = expected.filter((key) => !(key in messages));
+    if (missing.length) {
+      throw new Error(
+        `${locale} web UI catalog missing: ${missing.join(", ")}`,
+      );
+    }
+  }
+}

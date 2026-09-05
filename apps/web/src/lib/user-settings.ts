@@ -3,6 +3,11 @@ import {
   defaultUserSettings as serviceDefaultUserSettings,
   type UpsertUserSettingsInput,
 } from "@package/services";
+import {
+  type LocalePreference,
+  resolveLocale,
+  type SupportedLocale,
+} from "@pocket-trash/localizations";
 import { createServerFn } from "@tanstack/react-start";
 import {
   type CurrencyCode,
@@ -16,6 +21,7 @@ import { isThemeMode, type ThemeMode } from "@/lib/theme";
 export type UserSettingsPreferences = UpsertUserSettingsInput & {
   currencyCode: CurrencyCode;
   dimensionUnit: DimensionUnit;
+  locale: SupportedLocale | null;
   theme: ThemeMode;
   weightUnit: WeightUnit;
 };
@@ -27,8 +33,10 @@ export type UserSettingsState = {
   settings: UserSettingsPreferences;
 };
 
-export const defaultUserSettings: UserSettingsPreferences =
-  serviceDefaultUserSettings;
+export const defaultUserSettings: UserSettingsPreferences = {
+  ...serviceDefaultUserSettings,
+  locale: serviceDefaultUserSettings.locale ?? null,
+};
 
 export const userSettingsStorageKey = "pocket-trash.settings";
 export const userSettingsSaveFailureMessage =
@@ -108,6 +116,13 @@ function parseUserSettingsPatch(input: unknown): UserSettingsPatch {
     patch.theme = value.theme;
   }
 
+  if ("locale" in value) {
+    if (value.locale !== null && !isSupportedLocale(value.locale)) {
+      throw new Error("Expected a valid locale.");
+    }
+    patch.locale = value.locale;
+  }
+
   if ("weightUnit" in value) {
     if (!isWeightUnit(value.weightUnit)) {
       throw new Error("Expected a valid weight unit.");
@@ -130,10 +145,21 @@ function isWeightUnit(value: unknown): value is WeightUnit {
   return value === "g" || value === "oz";
 }
 
-function toUserSettingsPreferences(settings: UserSettingsPreferences) {
+function isSupportedLocale(value: unknown): value is SupportedLocale {
+  return resolveLocale(value as LocalePreference) === value;
+}
+
+function toUserSettingsPreferences(settings: {
+  currencyCode: CurrencyCode;
+  dimensionUnit: DimensionUnit;
+  locale?: LocalePreference | null;
+  theme: ThemeMode;
+  weightUnit: WeightUnit;
+}) {
   return {
     currencyCode: settings.currencyCode,
     dimensionUnit: settings.dimensionUnit,
+    locale: settings.locale ? resolveLocale(settings.locale) : null,
     theme: settings.theme,
     weightUnit: settings.weightUnit,
   };

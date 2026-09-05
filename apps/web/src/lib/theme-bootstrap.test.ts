@@ -10,6 +10,7 @@ const defaultSettingsState: UserSettingsState = {
   settings: {
     currencyCode: "USD",
     dimensionUnit: "in",
+    locale: null,
     theme: "system",
     weightUnit: "g",
   },

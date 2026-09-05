@@ -12,7 +12,9 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { UserMenu } from "@/components/user-menu";
+import { webText } from "@/lib/ui-text";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
 
 type AppShellProps = {
   bottomBar?: React.ReactNode;
@@ -37,6 +39,9 @@ export function AppShell({
   sidebarOpen,
   title,
 }: AppShellProps) {
+  const { locale } = useLocale();
+  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
+
   // When a bottom bar is supplied (the archive on compact screens), the header
   // hamburger and inline controls move into the bottom toolbar, and account
   // moves to a top-bar avatar. Pages without a bottom bar keep the original
@@ -55,7 +60,7 @@ export function AppShell({
     >
       <Sidebar className="border-sidebar-border">
         <SidebarHeader className="items-end border-b border-sidebar-border md:hidden">
-          <SidebarTrigger aria-label="Close sidebar" />
+          <SidebarTrigger aria-label={t("Close sidebar")} />
         </SidebarHeader>
         <SidebarContent className="scrollbar-none px-2 py-3">
           {sidebarContent}
@@ -76,7 +81,7 @@ export function AppShell({
         >
           <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-background/90 px-3.5 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2.5 backdrop-blur md:px-5 md:pt-[max(0.875rem,env(safe-area-inset-top))] md:pb-3.5">
             <SidebarTrigger
-              aria-label="Toggle sidebar"
+              aria-label={t("Toggle sidebar")}
               className={cn(hasBottomBar && "hidden md:inline-flex")}
             />
             <h1 className="m-0 text-[16px] font-bold tracking-[0.5px] md:text-lg">

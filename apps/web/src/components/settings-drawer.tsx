@@ -1,5 +1,7 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import { Settings } from "lucide-react";
 import * as React from "react";
+import { LanguageSelect } from "@/components/language-select";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,12 +19,15 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { updateLocaleSetting } from "@/lib/locale-api";
 import {
   type CurrencyCode,
   currencies,
   type DimensionUnit,
   type WeightUnit,
 } from "@/lib/pen-formatters";
+import { webText } from "@/lib/ui-text";
+import { useLocale } from "@/providers/locale-provider";
 
 type SettingsDrawerProps = {
   currency: CurrencyCode;
@@ -44,15 +49,17 @@ export function SettingsDrawer({
   weight,
 }: SettingsDrawerProps) {
   const [open, setOpen] = React.useState(false);
+  const { locale } = useLocale();
+  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
 
   return (
     <Sheet onOpenChange={setOpen} open={open}>
       <Button
-        aria-label="Settings"
+        aria-label={t("Settings")}
         aria-expanded={open}
         onClick={() => setOpen(true)}
         size="icon"
-        title="Settings"
+        title={t("Settings")}
         type="button"
         variant="outline"
       >
@@ -60,9 +67,9 @@ export function SettingsDrawer({
       </Button>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>Settings</SheetTitle>
+          <SheetTitle>{t("Settings")}</SheetTitle>
           <SheetDescription className="sr-only">
-            Display preferences for the Machined Pens archive.
+            {t("Display preferences for the Machined Pens archive.")}
           </SheetDescription>
         </SheetHeader>
         <SettingsPanel
@@ -91,17 +98,36 @@ export function SettingsPanel({
   units,
   weight,
 }: SettingsDrawerProps & { showTheme?: boolean }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { locale, setLocale } = useLocale();
+  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
+
+  const onLocaleChange = React.useCallback(
+    (nextLocale: typeof locale) => {
+      setLocale(nextLocale);
+
+      if (isLoaded && isSignedIn) {
+        void updateLocaleSetting(nextLocale);
+      }
+    },
+    [isLoaded, isSignedIn, setLocale],
+  );
+
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-6 py-5">
       {showTheme ? (
-        <SettingGroup label="Theme">
+        <SettingGroup label={t("Theme")}>
           <ThemeToggle />
         </SettingGroup>
       ) : null}
 
-      <SettingGroup label="Dimensions">
+      <SettingGroup label={t("Language")}>
+        <LanguageSelect locale={locale} onLocaleChange={onLocaleChange} />
+      </SettingGroup>
+
+      <SettingGroup label={t("Dimensions")}>
         <ToggleGroup
-          aria-label="Dimension units"
+          aria-label={t("Dimension units")}
           onValueChange={(value) => {
             if (value) onUnitsChange(value as DimensionUnit);
           }}
@@ -109,17 +135,17 @@ export function SettingsPanel({
           value={units}
         >
           <ToggleGroupItem disabled={disabled} value="in">
-            Inches
+            {t("Inches")}
           </ToggleGroupItem>
           <ToggleGroupItem disabled={disabled} value="mm">
-            Millimeters
+            {t("Millimeters")}
           </ToggleGroupItem>
         </ToggleGroup>
       </SettingGroup>
 
-      <SettingGroup label="Weight">
+      <SettingGroup label={t("Weight")}>
         <ToggleGroup
-          aria-label="Weight units"
+          aria-label={t("Weight units")}
           onValueChange={(value) => {
             if (value) onWeightChange(value as WeightUnit);
           }}
@@ -127,15 +153,15 @@ export function SettingsPanel({
           value={weight}
         >
           <ToggleGroupItem disabled={disabled} value="g">
-            Grams
+            {t("Grams")}
           </ToggleGroupItem>
           <ToggleGroupItem disabled={disabled} value="oz">
-            Ounces
+            {t("Ounces")}
           </ToggleGroupItem>
         </ToggleGroup>
       </SettingGroup>
 
-      <SettingGroup label="Currency">
+      <SettingGroup label={t("Currency")}>
         <Select
           items={currencies.map((code) => ({
             label: currencyLabel(code),
@@ -145,7 +171,7 @@ export function SettingsPanel({
           value={currency}
         >
           <SelectTrigger
-            aria-label="Display currency"
+            aria-label={t("Display currency")}
             className="w-full"
             disabled={disabled}
           >

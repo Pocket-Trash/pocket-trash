@@ -540,6 +540,10 @@ export const schemaDescriptions = {
         description: "Preferred dimension unit for display.",
         example: "in",
       },
+      locale: {
+        description: "Explicit supported locale for localized app text.",
+        example: "es-MX",
+      },
       theme: {
         description: "Preferred interface theme.",
         example: "dark",
