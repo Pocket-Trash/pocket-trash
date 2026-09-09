@@ -1,12 +1,24 @@
 {
   "version": 1,
   "skills": {
+    "i-have-adhd": {
+      "source": "ayghri/i-have-adhd",
+      "sourceType": "github",
+      "skillPath": "skills/i-have-adhd/SKILL.md",
+      "computedHash": "8a95bc49a1ac2224fa227081a5cbe386f7d2b3edee6e5324120b9555d9fbd55f"
+    },
     "pocket-trash": {
       "source": "pocket-trash/skills",
       "ref": "v0.1.1",
       "sourceType": "github",
       "skillPath": "skills/pocket-trash/SKILL.md",
       "computedHash": "f9b12b4fef41b1abbdad615afdba7dbde27b540dd6eb6779b027a5eaeef083a3"
+    },
+    "ponytail": {
+      "source": "dietrichgebert/ponytail",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail/SKILL.md",
+      "computedHash": "210fa0831f649ce9f8a305f7b7c8cf2a0dd09ac4dd53067109941b96e7811d4e"
     }
   }
 }
