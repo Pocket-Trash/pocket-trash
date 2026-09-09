@@ -6,9 +6,7 @@ import type {
   UserBetaFeatureFlag,
 } from "@package/services";
 import { createServerFn } from "@tanstack/react-start";
-import { serverEnv } from "@/env/server";
 import { localizedServerError } from "@/lib/server-errors";
-import { s } from "@/lib/services";
 
 export type ClerkUserSearchResult = {
   clerkId: string;
@@ -32,6 +30,7 @@ export const listAdminFeatureFlags = createServerFn().handler(
   async (): Promise<FeatureFlagListItem[]> => {
     await requireFeatureFlagAdmin();
 
+    const { s } = await import("@/lib/services");
     return await s.flags.listAdmin();
   },
 );
@@ -41,6 +40,7 @@ export const createAdminFeatureFlag = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<FeatureFlagListItem> => {
     const actorClerkId = await requireFeatureFlagAdmin();
 
+    const { s } = await import("@/lib/services");
     return await s.flags.create({
       actorClerkId,
       audience: data.audience,
@@ -56,6 +56,7 @@ export const updateAdminFeatureFlag = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<FeatureFlagListItem> => {
     const actorClerkId = await requireFeatureFlagAdmin();
 
+    const { s } = await import("@/lib/services");
     return await s.flags.update({
       actorClerkId,
       defaultEnabled: data.defaultEnabled,
@@ -70,6 +71,7 @@ export const archiveAdminFeatureFlag = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<void> => {
     const actorClerkId = await requireFeatureFlagAdmin();
 
+    const { s } = await import("@/lib/services");
     await s.flags.archive({
       actorClerkId,
       slug: data.slug,
@@ -81,6 +83,7 @@ export const searchFeatureFlagUsers = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<ClerkUserSearchResult[]> => {
     await requireFeatureFlagAdmin();
 
+    const { serverEnv } = await import("@/env/server");
     const response = await fetch(
       `https://api.clerk.com/v1/users?${new URLSearchParams({
         limit: "10",
@@ -107,6 +110,7 @@ export const listAdminTargetingForUser = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<AdminTargetingFeatureFlag[]> => {
     await requireFeatureFlagAdmin();
 
+    const { s } = await import("@/lib/services");
     return await s.flags.listAdminTargetingForUser(data.targetClerkId);
   });
 
@@ -115,6 +119,7 @@ export const setAdminFeatureFlagForUser = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actorClerkId = await requireFeatureFlagAdmin();
 
+    const { s } = await import("@/lib/services");
     await s.flags.setAdminOverride({
       actorClerkId,
       enabled: data.enabled,
@@ -127,6 +132,7 @@ export const listUserBetaFeatureFlags = createServerFn().handler(
   async (): Promise<UserBetaFeatureFlag[]> => {
     const clerkId = await requireAuthenticatedUser();
 
+    const { s } = await import("@/lib/services");
     return await s.flags.listUserBeta(clerkId);
   },
 );
@@ -136,6 +142,7 @@ export const setUserBetaFeatureFlag = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actorClerkId = await requireAuthenticatedUser();
 
+    const { s } = await import("@/lib/services");
     await s.flags.setUserPreference({
       actorClerkId,
       enabled: data.enabled,

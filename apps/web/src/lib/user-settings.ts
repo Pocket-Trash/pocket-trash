@@ -1,8 +1,5 @@
 import { auth } from "@clerk/tanstack-react-start/server";
-import {
-  defaultUserSettings as serviceDefaultUserSettings,
-  type UpsertUserSettingsInput,
-} from "@package/services";
+import type { UpsertUserSettingsInput } from "@package/services";
 import {
   formatTranslation,
   type LocalePreference,
@@ -16,7 +13,6 @@ import {
   type DimensionUnit,
   type WeightUnit,
 } from "@/lib/pen-formatters";
-import { s } from "@/lib/services";
 import { isThemeMode, type ThemeMode } from "@/lib/theme";
 
 export type UserSettingsPreferences = UpsertUserSettingsInput & {
@@ -35,8 +31,11 @@ export type UserSettingsState = {
 };
 
 export const defaultUserSettings: UserSettingsPreferences = {
-  ...serviceDefaultUserSettings,
-  locale: serviceDefaultUserSettings.locale ?? null,
+  currencyCode: "USD",
+  dimensionUnit: "in",
+  locale: null,
+  theme: "system",
+  weightUnit: "g",
 };
 
 export const userSettingsStorageKey = "pocket-trash.settings";
@@ -49,6 +48,7 @@ export const getCurrentUserSettings = createServerFn({ method: "GET" }).handler(
       return null;
     }
 
+    const { s } = await import("@/lib/services");
     const settings = await s.db.userSettings.getByClerkId(userId);
 
     return toUserSettingsPreferences(settings ?? defaultUserSettings);
@@ -64,6 +64,7 @@ export const getCurrentUserSettingsState = createServerFn({
     return null;
   }
 
+  const { s } = await import("@/lib/services");
   const settings = await s.db.userSettings.getByClerkId(userId);
 
   return {
@@ -81,6 +82,7 @@ export const patchCurrentUserSettings = createServerFn({ method: "POST" })
       return null;
     }
 
+    const { s } = await import("@/lib/services");
     const settings = await s.db.userSettings.patchForClerkId(userId, data);
 
     return toUserSettingsPreferences(settings);

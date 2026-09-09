@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import { loggerMessages } from "@package/logger";
 import { formatTranslation } from "@pocket-trash/localizations";
 import * as React from "react";
@@ -45,6 +46,7 @@ export function ThemeProvider({
   children: React.ReactNode;
   initialSettingsState: UserSettingsState | null;
 }) {
+  const { isLoaded, isSignedIn } = useAuth();
   const { locale } = useLocale();
   const settingsSaveFailureMessage = formatTranslation(
     "web.error.settingsSaveFailed",
@@ -83,6 +85,8 @@ export function ThemeProvider({
   React.useEffect(() => {
     let cancelled = false;
     const requestVersion = mutationVersionRef.current;
+
+    if (!isLoaded || !isSignedIn) return;
 
     if (initialSettingsState) {
       const stored = window.localStorage.getItem(themeStorageKey);
@@ -137,7 +141,7 @@ export function ThemeProvider({
     return () => {
       cancelled = true;
     };
-  }, [initialSettingsState, settingsSaveFailureMessage]);
+  }, [initialSettingsState, isLoaded, isSignedIn, settingsSaveFailureMessage]);
 
   const setTheme = React.useCallback(
     (nextTheme: ThemeMode) => {
@@ -148,6 +152,10 @@ export function ThemeProvider({
       setThemeState(nextTheme);
       window.localStorage.setItem(themeStorageKey, nextTheme);
       applyTheme(nextTheme);
+
+      if (!isLoaded || !isSignedIn) {
+        return;
+      }
 
       setSaving(true);
       patchCurrentUserSettings({ data: { theme: nextTheme } })
@@ -176,7 +184,7 @@ export function ThemeProvider({
           }
         });
     },
-    [settingsSaveFailureMessage, theme],
+    [isLoaded, isSignedIn, settingsSaveFailureMessage, theme],
   );
 
   const value = React.useMemo(
