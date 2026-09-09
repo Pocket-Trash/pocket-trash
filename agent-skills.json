@@ -1,6 +1,11 @@
 {
   "source": "https://github.com/pocket-trash/skills",
-  "version": "0.1.1",
-  "agents": ["codex", "claude-code"],
-  "skills": ["pocket-trash"]
+  "version": "0.1.2",
+  "agents": [
+    "codex",
+    "claude-code"
+  ],
+  "skills": [
+    "pocket-trash"
+  ]
 }
