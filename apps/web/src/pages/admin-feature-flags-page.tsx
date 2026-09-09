@@ -1,5 +1,9 @@
 import type { FeatureFlagAudience } from "@package/feature-flags";
 import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
+import {
   Archive,
   Check,
   Search,
@@ -22,7 +26,6 @@ import {
   setAdminFeatureFlagForUser,
   updateAdminFeatureFlag,
 } from "@/lib/feature-flags";
-import { webText } from "@/lib/ui-text";
 import { useLocale } from "@/providers/locale-provider";
 
 type AdminFlag = Awaited<ReturnType<typeof listAdminFeatureFlags>>[number];
@@ -32,8 +35,8 @@ const audiences: FeatureFlagAudience[] = ["global", "admin", "user"];
 
 export function AdminFeatureFlagsPage() {
   const { locale } = useLocale();
-  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
-  const failedToLoadText = t("Failed to load.");
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
+  const failedToLoadText = t("web.status.failedToLoad");
   const [flags, setFlags] = useState<AdminFlag[]>([]);
   const [form, setForm] = useState({
     audience: "user" as FeatureFlagAudience,
@@ -107,14 +110,19 @@ export function AdminFeatureFlagsPage() {
   }
 
   return (
-    <AppShell sidebarContent={null} title={t("Feature flags")}>
+    <AppShell
+      sidebarContent={null}
+      title={t("web.admin.featureFlags.featureFlags")}
+    >
       <main className="mx-auto grid w-full max-w-6xl gap-5 px-4 py-6 md:grid-cols-[minmax(0,1fr)_360px] md:px-6">
         <section className="min-w-0">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="m-0 text-base font-semibold">{t("Flags")}</h2>
+              <h2 className="m-0 text-base font-semibold">
+                {t("web.admin.featureFlags.flags")}
+              </h2>
               <p className="m-0 text-sm text-muted-foreground">
-                {t("Boolean controls for global, private, and beta surfaces.")}
+                {t("web.admin.featureFlags.booleanControls")}
               </p>
             </div>
             {status ? (
@@ -123,9 +131,9 @@ export function AdminFeatureFlagsPage() {
           </div>
           <div className="overflow-hidden rounded-lg border border-border bg-card">
             <div className="grid grid-cols-[1fr_auto_auto] gap-3 border-b border-border px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-              <span>{t("Flag")}</span>
-              <span>{t("Audience")}</span>
-              <span>{t("Actions")}</span>
+              <span>{t("web.admin.featureFlags.flag")}</span>
+              <span>{t("web.admin.featureFlags.audience")}</span>
+              <span>{t("web.admin.featureFlags.actions")}</span>
             </div>
             {flags.map((flag) => (
               <div
@@ -136,7 +144,9 @@ export function AdminFeatureFlagsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{flag.name}</span>
                     {flag.archivedAt ? (
-                      <Badge variant="outline">{t("Archived")}</Badge>
+                      <Badge variant="outline">
+                        {t("web.archive.state.archived")}
+                      </Badge>
                     ) : null}
                   </div>
                   <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
@@ -155,7 +165,7 @@ export function AdminFeatureFlagsPage() {
                 </Badge>
                 <div className="flex items-center gap-2">
                   <Button
-                    aria-label={`${t("Edit")} ${flag.slug}`}
+                    aria-label={`${t("web.action.edit")} ${flag.slug}`}
                     onClick={() => {
                       setEditingSlug(flag.slug);
                       setForm({
@@ -173,7 +183,7 @@ export function AdminFeatureFlagsPage() {
                     <Settings2 />
                   </Button>
                   <Button
-                    aria-label={`${t("Archive")} ${flag.slug}`}
+                    aria-label={`${t("web.action.archive")} ${flag.slug}`}
                     disabled={Boolean(flag.archivedAt)}
                     onClick={async () => {
                       await archiveAdminFeatureFlag({
@@ -196,7 +206,9 @@ export function AdminFeatureFlagsPage() {
         <aside className="grid content-start gap-5">
           <section className="rounded-lg border border-border bg-card p-4">
             <h2 className="m-0 mb-3 text-sm font-semibold">
-              {editingSlug ? t("Edit flag") : t("New flag")}
+              {editingSlug
+                ? t("web.admin.featureFlags.editFlag")
+                : t("web.admin.featureFlags.newFlag")}
             </h2>
             <div className="grid gap-3">
               <Input
@@ -207,7 +219,7 @@ export function AdminFeatureFlagsPage() {
                     slug: event.target.value,
                   }))
                 }
-                placeholder="new-library-ui"
+                placeholder={t("web.admin.featureFlags.slugPlaceholder")}
                 value={form.slug}
               />
               <Input
@@ -217,7 +229,7 @@ export function AdminFeatureFlagsPage() {
                     name: event.target.value,
                   }))
                 }
-                placeholder={t("Display name")}
+                placeholder={t("web.admin.featureFlags.displayName")}
                 value={form.name}
               />
               <Input
@@ -227,7 +239,7 @@ export function AdminFeatureFlagsPage() {
                     description: event.target.value,
                   }))
                 }
-                placeholder={t("Description")}
+                placeholder={t("web.admin.featureFlags.description")}
                 value={form.description}
               />
               <select
@@ -259,27 +271,27 @@ export function AdminFeatureFlagsPage() {
                   }
                   type="checkbox"
                 />
-                {t("Global default enabled")}
+                {t("web.admin.featureFlags.globalDefaultEnabled")}
               </label>
               <Button onClick={saveFlag} type="button">
                 <Check />
-                {t("Save flag")}
+                {t("web.action.saveFlag")}
               </Button>
             </div>
           </section>
 
           <section className="rounded-lg border border-border bg-card p-4">
             <h2 className="m-0 mb-3 text-sm font-semibold">
-              {t("Admin-only targeting")}
+              {t("web.admin.featureFlags.adminOnlyTargeting")}
             </h2>
             <div className="flex gap-2">
               <Input
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder={t("Email, username, or name")}
+                placeholder={t("web.admin.featureFlags.emailUsernameOrName")}
                 value={query}
               />
               <Button
-                aria-label={t("Search users")}
+                aria-label={t("web.admin.featureFlags.searchUsers")}
                 onClick={searchUsers}
                 size="icon"
                 type="button"
@@ -333,7 +345,9 @@ export function AdminFeatureFlagsPage() {
                       <span>{flag.name}</span>
                       <span className="flex items-center gap-2 text-xs">
                         <ToggleLeft />
-                        {flag.enabled ? t("Enabled") : t("Disabled")}
+                        {flag.enabled
+                          ? t("web.status.enabled")
+                          : t("web.status.disabled")}
                       </span>
                     </Button>
                   ))}

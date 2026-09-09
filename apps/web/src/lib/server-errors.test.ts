@@ -1,3 +1,4 @@
+import { formatTranslation } from "@pocket-trash/localizations";
 import { describe, expect, it } from "vitest";
 import { LocalizedServerError, localizedServerError } from "./server-errors";
 
@@ -7,6 +8,6 @@ describe("localizedServerError", () => {
 
     expect(error).toBeInstanceOf(LocalizedServerError);
     expect(error.key).toBe("error.generic");
-    expect(error.message).toBe("Algo salio mal.");
+    expect(error.message).toBe(formatTranslation("error.generic", {}, "es-MX"));
   });
 });

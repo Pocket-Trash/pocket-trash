@@ -34,6 +34,10 @@ yarn-error.log*
 .figjam/inbox/
 .figjam/outbox/
 .figjam/payload-input/
+.yalc/
+**/.yalc/
+yalc.lock
+**/yalc.lock
 assets/
 /bunny-audit/
 plans/

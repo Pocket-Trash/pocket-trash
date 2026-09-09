@@ -2,4 +2,4 @@
 "pocket-trash.app": minor
 ---
 
-Add localized web settings.
+Move web UI text to shared localizations.

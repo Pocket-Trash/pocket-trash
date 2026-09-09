@@ -1,4 +1,8 @@
 import { useAuth } from "@clerk/tanstack-react-start";
+import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
 import { Settings } from "lucide-react";
 import * as React from "react";
 import { LanguageSelect } from "@/components/language-select";
@@ -26,7 +30,6 @@ import {
   type DimensionUnit,
   type WeightUnit,
 } from "@/lib/pen-formatters";
-import { webText } from "@/lib/ui-text";
 import { useLocale } from "@/providers/locale-provider";
 
 type SettingsDrawerProps = {
@@ -50,16 +53,16 @@ export function SettingsDrawer({
 }: SettingsDrawerProps) {
   const [open, setOpen] = React.useState(false);
   const { locale } = useLocale();
-  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   return (
     <Sheet onOpenChange={setOpen} open={open}>
       <Button
-        aria-label={t("Settings")}
+        aria-label={t("web.settings.settings")}
         aria-expanded={open}
         onClick={() => setOpen(true)}
         size="icon"
-        title={t("Settings")}
+        title={t("web.settings.settings")}
         type="button"
         variant="outline"
       >
@@ -67,9 +70,9 @@ export function SettingsDrawer({
       </Button>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>{t("Settings")}</SheetTitle>
+          <SheetTitle>{t("web.settings.settings")}</SheetTitle>
           <SheetDescription className="sr-only">
-            {t("Display preferences for the Machined Pens archive.")}
+            {t("web.settings.displayPreferencesMachinedPens")}
           </SheetDescription>
         </SheetHeader>
         <SettingsPanel
@@ -100,7 +103,7 @@ export function SettingsPanel({
 }: SettingsDrawerProps & { showTheme?: boolean }) {
   const { isLoaded, isSignedIn } = useAuth();
   const { locale, setLocale } = useLocale();
-  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   const onLocaleChange = React.useCallback(
     (nextLocale: typeof locale) => {
@@ -116,18 +119,18 @@ export function SettingsPanel({
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-6 py-5">
       {showTheme ? (
-        <SettingGroup label={t("Theme")}>
+        <SettingGroup label={t("web.settings.theme")}>
           <ThemeToggle />
         </SettingGroup>
       ) : null}
 
-      <SettingGroup label={t("Language")}>
+      <SettingGroup label={t("web.settings.language")}>
         <LanguageSelect locale={locale} onLocaleChange={onLocaleChange} />
       </SettingGroup>
 
-      <SettingGroup label={t("Dimensions")}>
+      <SettingGroup label={t("web.settings.dimensions")}>
         <ToggleGroup
-          aria-label={t("Dimension units")}
+          aria-label={t("web.settings.dimensionUnits")}
           onValueChange={(value) => {
             if (value) onUnitsChange(value as DimensionUnit);
           }}
@@ -135,17 +138,17 @@ export function SettingsPanel({
           value={units}
         >
           <ToggleGroupItem disabled={disabled} value="in">
-            {t("Inches")}
+            {t("web.settings.inches")}
           </ToggleGroupItem>
           <ToggleGroupItem disabled={disabled} value="mm">
-            {t("Millimeters")}
+            {t("web.settings.millimeters")}
           </ToggleGroupItem>
         </ToggleGroup>
       </SettingGroup>
 
-      <SettingGroup label={t("Weight")}>
+      <SettingGroup label={t("web.settings.weight")}>
         <ToggleGroup
-          aria-label={t("Weight units")}
+          aria-label={t("web.settings.weightUnits")}
           onValueChange={(value) => {
             if (value) onWeightChange(value as WeightUnit);
           }}
@@ -153,25 +156,25 @@ export function SettingsPanel({
           value={weight}
         >
           <ToggleGroupItem disabled={disabled} value="g">
-            {t("Grams")}
+            {t("web.settings.grams")}
           </ToggleGroupItem>
           <ToggleGroupItem disabled={disabled} value="oz">
-            {t("Ounces")}
+            {t("web.settings.ounces")}
           </ToggleGroupItem>
         </ToggleGroup>
       </SettingGroup>
 
-      <SettingGroup label={t("Currency")}>
+      <SettingGroup label={t("web.settings.currency")}>
         <Select
           items={currencies.map((code) => ({
-            label: currencyLabel(code),
+            label: currencyLabel(code, t),
             value: code,
           }))}
           onValueChange={(value) => onCurrencyChange(value as CurrencyCode)}
           value={currency}
         >
           <SelectTrigger
-            aria-label={t("Display currency")}
+            aria-label={t("web.settings.displayCurrency")}
             className="w-full"
             disabled={disabled}
           >
@@ -180,7 +183,7 @@ export function SettingsPanel({
           <SelectContent>
             {currencies.map((code) => (
               <SelectItem key={code} value={code}>
-                {currencyLabel(code)}
+                {currencyLabel(code, t)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -189,12 +192,10 @@ export function SettingsPanel({
 
       <div className="mt-auto border-t border-sidebar-border pt-5">
         <h3 className="mb-2 text-[11px] font-semibold tracking-[0.8px] text-muted-foreground uppercase">
-          About
+          {t("web.settings.about")}
         </h3>
         <p className="text-[12.5px] leading-6 text-muted-foreground">
-          An unofficial archive of machined pen drops, with filters, specs,
-          descriptions, and local image backups. Made by a fan; not affiliated
-          with any maker.
+          {t("web.settings.aboutDescription")}
         </p>
       </div>
     </div>
@@ -218,23 +219,23 @@ function SettingGroup({
   );
 }
 
-function currencyLabel(code: CurrencyCode) {
+function currencyLabel(code: CurrencyCode, t: (key: TranslationKey) => string) {
   switch (code) {
     case "CAD":
-      return "$ CAD (native)";
+      return t("web.currency.cad");
     case "USD":
-      return "$ USD";
+      return t("web.currency.usd");
     case "EUR":
-      return "EUR EUR";
+      return t("web.currency.eur");
     case "GBP":
-      return "GBP GBP";
+      return t("web.currency.gbp");
     case "AUD":
-      return "$ AUD";
+      return t("web.currency.aud");
     case "JPY":
-      return "JPY JPY";
+      return t("web.currency.jpy");
     case "CHF":
-      return "CHF";
+      return t("web.currency.chf");
     case "NZD":
-      return "$ NZD";
+      return t("web.currency.nzd");
   }
 }

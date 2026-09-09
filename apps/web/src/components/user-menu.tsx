@@ -1,4 +1,8 @@
 import { useAuth, useClerk, useUser } from "@clerk/tanstack-react-start";
+import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
 import {
   ChevronsUpDown,
@@ -27,14 +31,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { localeLabel, supportedLocales } from "@/lib/locale";
 import { updateLocaleSetting } from "@/lib/locale-api";
-import { webText } from "@/lib/ui-text";
 import { useLocale } from "@/providers/locale-provider";
 
 export function UserMenu({ compact = false }: { compact?: boolean }) {
   const { isSignedIn } = useAuth();
   const clerk = useClerk();
   const { locale, setLocale } = useLocale();
-  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const { isLoaded, user } = useUser();
 
   if (!isLoaded) {
@@ -54,7 +57,7 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
   if (!user) {
     return compact ? (
       <Button
-        aria-label={t("Sign in")}
+        aria-label={t("web.action.signIn")}
         className="rounded-full"
         nativeButton={false}
         render={<Link params={{ _splat: "" }} to="/sign-in/$" />}
@@ -70,12 +73,12 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
         render={<Link params={{ _splat: "" }} to="/sign-in/$" />}
         variant="outline"
       >
-        {t("Sign in")}
+        {t("web.action.signIn")}
       </Button>
     );
   }
 
-  const username = user.username ?? "User";
+  const username = user.username ?? t("web.navigation.user");
 
   return (
     <DropdownMenu>
@@ -83,7 +86,7 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
         render={
           compact ? (
             <Button
-              aria-label={t("Account menu")}
+              aria-label={t("web.navigation.accountMenu")}
               className="rounded-full p-0"
               size="icon"
               type="button"
@@ -109,7 +112,7 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
                 {username}
               </span>
               <span className="block truncate text-xs text-muted-foreground">
-                {t("Account")}
+                {t("web.navigation.account")}
               </span>
             </span>
             <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
@@ -140,20 +143,20 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link to="/user/account" />}>
           <User />
-          {t("Account")}
+          {t("web.navigation.account")}
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/collections" />}>
           <Folder />
-          {t("Collections")}
+          {t("web.navigation.collections")}
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/settings/beta-features" />}>
           <FlaskConical />
-          {t("Beta features")}
+          {t("web.navigation.betaFeatures")}
         </DropdownMenuItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             <Languages />
-            {t("Language")}
+            {t("web.navigation.language")}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
             <DropdownMenuRadioGroup
@@ -169,7 +172,7 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
             >
               {supportedLocales.map((code) => (
                 <DropdownMenuRadioItem key={code} value={code}>
-                  {localeLabel(code)}
+                  {localeLabel(code, t)}
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
@@ -182,7 +185,7 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
           }}
         >
           <LogOut />
-          {t("Log out")}
+          {t("web.navigation.logOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

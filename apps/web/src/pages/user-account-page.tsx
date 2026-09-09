@@ -3,17 +3,20 @@ import {
   ClerkLoading,
   UserProfile,
 } from "@clerk/tanstack-react-start";
+import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserPageShell } from "@/components/user-page-shell";
-import { webText } from "@/lib/ui-text";
 import { useLocale } from "@/providers/locale-provider";
 
 export function UserAccountPage() {
   const { locale } = useLocale();
-  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   return (
-    <UserPageShell title={t("Account")}>
+    <UserPageShell title={t("web.navigation.account")}>
       <ClerkLoading>
         <UserProfileSkeleton />
       </ClerkLoading>

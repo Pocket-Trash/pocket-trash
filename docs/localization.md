@@ -1,26 +1,71 @@
 # Localization
 
-Locale-prefixed URLs are not needed for this release. The archive content is
-the same for every supported locale, and the selected language is resolved from
-saved account settings, local preference, and browser/device language.
+Pocket Trash user-visible text lives in `@pocket-trash/localizations`. Use that
+package for UI labels, component text, document metadata, API responses, toast
+messages, and errors shown to users.
 
-## QA Record
+The app can use the published package from npm, or developers can clone the
+localizations repo and link it for local development. See
+[Localizations Local Dev With yalc](./localizations-yalc-local-dev.md) for the
+local clone/link workflow.
 
-Checked on 2026-08-10 for ENG-62.
+## Implement Text
 
-- Web: app-owned archive, settings, account, admin feature-flag, lightbox,
-  drawer, sheet, and sidebar labels route through the local web UI catalog.
-- Fallback: unsupported browser/device languages are passed through
-  `resolveLocale(...)`, which falls back to `en-US`.
-- Stored legacy `en` locale values are normalized to `en-US` before browser
-  preferences are considered.
-- Clerk: the web `ClerkProvider` maps app locales to Clerk localizations locally.
+Do not add hard-coded user-visible strings in Pocket Trash code. Add the key and
+translations in the localizations repo, then consume the key here.
 
-## Third-Party Surfaces
+Use semantic keys, not English text, as localization keys. Do not add app-local
+catalogs such as `apps/web/src/lib/ui-text.ts`.
 
-- Clerk owns hosted/sign-in/sign-up/account profile component copy; this release
-  passes Clerk's localization object and does not override individual Clerk
-  strings.
-- Base UI and Vaul drawer/sheet primitives do not own visible copy in this app;
-  app wrappers provide localized titles, descriptions, close text, and ARIA
-  labels.
+Use a local `t(...)` helper for new localized strings and migrations. In React
+components, define it after reading the current locale:
+
+```tsx
+import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
+import { useLocale } from "@/providers/locale-provider";
+
+function SaveButton() {
+  const { locale } = useLocale();
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
+
+  return <button type="button">{t("action.save")}</button>;
+}
+```
+
+When a string has placeholders, keep the same local helper shape and pass the
+values through:
+
+```ts
+import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
+
+const t = (
+  key: TranslationKey,
+  values: Readonly<Record<string, unknown>> = {},
+) => formatTranslation(key, values, locale);
+
+const message = t("web.archive.itemCount", { visible, total });
+```
+
+Use placeholders instead of building translated sentences from pieces:
+
+```ts
+t("locale.current", { locale });
+```
+
+Use the same `t(...)` pattern outside React anywhere a locale is already
+available.
+
+Use `localizedServerError` for server errors that can be shown to users. It is
+the app wrapper around package localization:
+
+```ts
+import { localizedServerError } from "@/lib/server-errors";
+
+throw localizedServerError("error.generic", locale);
+```

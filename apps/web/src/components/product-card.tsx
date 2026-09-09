@@ -1,3 +1,7 @@
+import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
 import { CircleGauge, MoveHorizontal, Scale } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { PenProduct } from "@/lib/pen-data";
@@ -13,6 +17,7 @@ import {
   type WeightUnit,
 } from "@/lib/pen-formatters";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
 
 type ProductCardProps = {
   currency: CurrencyCode;
@@ -31,25 +36,29 @@ export function ProductCard({
   units,
   weight,
 }: ProductCardProps) {
+  const { locale } = useLocale();
+  const t = (
+    key: TranslationKey,
+    values: Readonly<Record<string, unknown>> = {},
+  ) => formatTranslation(key, values, locale);
   const { detail } = splitTitle(product.title);
   const year = product.published_at
     ? `'${product.published_at.slice(2, 4)}`
     : "";
   const dimensions = [
-    { icon: Scale, label: "Weight", value: formatWeight(product, weight) },
+    { id: "weight", icon: Scale, value: formatWeight(product, weight) },
     {
+      id: "diameter",
       icon: CircleGauge,
-      label: "Diameter",
       value: formatDiameter(product, units),
     },
     {
+      id: "length",
       icon: MoveHorizontal,
-      label: "Length",
       value: formatLength(product, units),
     },
-  ].filter(
-    (item): item is { icon: typeof Scale; label: string; value: string } =>
-      Boolean(item.value),
+  ].filter((item): item is { icon: typeof Scale; id: string; value: string } =>
+    Boolean(item.value),
   );
 
   return (
@@ -70,7 +79,7 @@ export function ProductCard({
       </div>
       <div className="flex flex-1 flex-col gap-2 p-3.5">
         <h2 className="line-clamp-2 min-h-[39px] text-[15px] leading-[1.3] font-semibold">
-          {normalizedHeadline(product)}
+          {normalizedHeadline(product, t)}
         </h2>
         <div className="flex min-h-[79px] flex-col gap-0.5 overflow-hidden text-[12.5px] leading-[1.45] text-muted-foreground">
           {detail
@@ -90,15 +99,15 @@ export function ProductCard({
               className="rounded-sm bg-accent px-2 py-0.5 text-[10.5px] tracking-[0.5px] text-accent-foreground"
               variant="secondary"
             >
-              Archived
+              {t("web.archive.state.archived")}
             </Badge>
           ) : null}
         </div>
         <div className="flex min-h-[17px] flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          {dimensions.map(({ icon: Icon, label, value }) => (
+          {dimensions.map(({ icon: Icon, id, value }) => (
             <span
               className="inline-flex items-center gap-1 whitespace-nowrap"
-              key={label}
+              key={id}
             >
               <Icon className="size-3.5" />
               {value}

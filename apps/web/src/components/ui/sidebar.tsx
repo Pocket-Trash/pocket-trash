@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTranslation } from "@pocket-trash/localizations";
 import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
 import * as React from "react";
@@ -21,7 +22,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { webText } from "@/lib/ui-text";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -165,6 +165,8 @@ function Sidebar({
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
   const { locale } = useLocale();
+  const t = (key: Parameters<typeof formatTranslation>[0]) =>
+    formatTranslation(key, {}, locale);
 
   if (collapsible === "none") {
     return (
@@ -202,10 +204,8 @@ function Sidebar({
           side={side}
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>{webText(locale, "Sidebar")}</SheetTitle>
-            <SheetDescription>
-              {webText(locale, "Displays the mobile sidebar.")}
-            </SheetDescription>
+            <SheetTitle>{t("web.sidebar.sidebar")}</SheetTitle>
+            <SheetDescription>{t("web.sidebar.description")}</SheetDescription>
           </SheetHeader>
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetContent>
@@ -268,6 +268,7 @@ function SidebarTrigger({
 }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar } = useSidebar();
   const { locale } = useLocale();
+  const label = formatTranslation("web.sidebar.toggle", {}, locale);
 
   return (
     <Button
@@ -283,7 +284,7 @@ function SidebarTrigger({
       {...props}
     >
       <PanelLeftIcon />
-      <span className="sr-only">{webText(locale, "Toggle sidebar")}</span>
+      <span className="sr-only">{label}</span>
     </Button>
   );
 }
@@ -291,7 +292,7 @@ function SidebarTrigger({
 function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   const { toggleSidebar } = useSidebar();
   const { locale } = useLocale();
-  const label = webText(locale, "Toggle sidebar");
+  const label = formatTranslation("web.sidebar.toggle", {}, locale);
 
   return (
     <button

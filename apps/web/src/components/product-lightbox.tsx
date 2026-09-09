@@ -1,4 +1,8 @@
 import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
+import {
   ChevronLeft,
   ChevronRight,
   CircleGauge,
@@ -30,7 +34,6 @@ import {
   formatWeight,
   type WeightUnit,
 } from "@/lib/pen-formatters";
-import { webText } from "@/lib/ui-text";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -64,7 +67,10 @@ export function ProductLightbox({
 }: ProductLightboxProps) {
   const isMobile = useIsMobile();
   const { locale } = useLocale();
-  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
+  const t = (
+    key: TranslationKey,
+    values: Readonly<Record<string, unknown>> = {},
+  ) => formatTranslation(key, values, locale);
 
   // The drawer stays mounted through its slide-out animation, so hold the last
   // product to keep the sheet's content intact after `product` clears from the
@@ -132,22 +138,26 @@ export function ProductLightbox({
 
   const allSpecs: LightboxSpec[] = [
     {
-      label: t("Price"),
+      label: t("web.archive.spec.price"),
       value: formatPrice(shown.price_min, shown.price_max, currency, rates),
     },
     {
-      label: t("Model"),
+      label: t("web.archive.spec.model"),
       value: shown.sizes.length > 0 ? shown.sizes.join(" / ") : null,
     },
-    { icon: Scale, label: t("Weight"), value: formatWeight(shown, weight) },
+    {
+      icon: Scale,
+      label: t("web.archive.spec.weight"),
+      value: formatWeight(shown, weight),
+    },
     {
       icon: CircleGauge,
-      label: t("Diameter"),
+      label: t("web.archive.spec.diameter"),
       value: formatDiameter(shown, units),
     },
     {
       icon: MoveHorizontal,
-      label: t("Length"),
+      label: t("web.archive.spec.length"),
       value: formatLength(shown, units),
     },
   ];
@@ -171,7 +181,7 @@ export function ProductLightbox({
       {images.length > 1 ? (
         <>
           <Button
-            aria-label={t("Previous image")}
+            aria-label={t("web.archive.lightbox.previousImage")}
             className="absolute top-1/2 left-3 rounded-full bg-card/75 backdrop-blur"
             onClick={() =>
               onImageChange(wrapIndex(imageIndex - 1, images.length))
@@ -183,7 +193,7 @@ export function ProductLightbox({
             <ChevronLeft />
           </Button>
           <Button
-            aria-label={t("Next image")}
+            aria-label={t("web.archive.lightbox.nextImage")}
             className="absolute top-1/2 right-3 rounded-full bg-card/75 backdrop-blur"
             onClick={() =>
               onImageChange(wrapIndex(imageIndex + 1, images.length))
@@ -205,14 +215,14 @@ export function ProductLightbox({
   const infoPane = (
     <div className="flex min-w-0 flex-col gap-4 overflow-y-auto p-5 min-[601px]:p-8">
       <div className="text-[11px] tracking-[1px] text-muted-foreground uppercase">
-        {t("Released")} - {formatDate(shown.published_at)}
+        {t("web.archive.lightbox.released")} - {formatDate(shown.published_at)}
       </div>
       <h2 className="text-[22px] leading-[1.15] font-bold min-[601px]:text-[28px]">
         {shown.title}
       </h2>
       {shown.archived ? (
         <Badge className="w-fit rounded-full bg-accent text-accent-foreground">
-          {t("Archived - no longer listed")}
+          {t("web.archive.lightbox.archived")}
         </Badge>
       ) : null}
 
@@ -256,7 +266,7 @@ export function ProductLightbox({
       </div>
 
       <p className="whitespace-pre-wrap text-[13.5px] leading-[1.6] text-muted-foreground italic">
-        {shown.body_text || "(no description on file)"}
+        {shown.body_text || t("web.archive.noDescription")}
       </p>
 
       <div className="border-t border-border pt-3">
@@ -265,7 +275,7 @@ export function ProductLightbox({
           nativeButton={false}
           render={<a href={shown.url} rel="noopener" target="_blank" />}
         >
-          {t("Visit product page")}
+          {t("web.action.visitProductPage")}
           <ExternalLink />
         </Button>
       </div>
@@ -284,7 +294,7 @@ export function ProductLightbox({
           <DrawerHeader className="sr-only">
             <DrawerTitle>{shown.title}</DrawerTitle>
             <DrawerDescription>
-              {t("Specs, materials, and release details for this product.")}
+              {t("web.archive.lightbox.specsDescription")}
             </DrawerDescription>
           </DrawerHeader>
           <div className="flex min-h-0 flex-col overflow-y-auto">
@@ -303,7 +313,7 @@ export function ProductLightbox({
       role="dialog"
     >
       <button
-        aria-label={t("Close product details")}
+        aria-label={t("web.archive.lightbox.closeProductDetails")}
         className="absolute inset-0 cursor-default"
         onClick={onClose}
         type="button"
@@ -315,7 +325,7 @@ export function ProductLightbox({
         variant="outline"
       >
         <X />
-        {t("Close")}
+        {t("web.action.close")}
       </Button>
       <div className="relative z-[101] grid w-full max-w-[1280px] overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-2xl md:grid-cols-[1.1fr_1fr]">
         {imagePane}

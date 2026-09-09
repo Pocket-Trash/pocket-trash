@@ -1,4 +1,5 @@
 import { loggerMessages } from "@package/logger";
+import { formatTranslation } from "@pocket-trash/localizations";
 import * as React from "react";
 import { toast } from "sonner";
 import { compactMediaQuery } from "@/lib/breakpoints";
@@ -17,9 +18,9 @@ import {
   getCurrentUserSettingsState,
   patchCurrentUserSettings,
   type UserSettingsPatch,
-  userSettingsSaveFailureMessage,
   userSettingsStorageKey,
 } from "@/lib/user-settings";
+import { useLocale } from "@/providers/locale-provider";
 
 const filtersClosedStorageKey = "pocket-trash.filtersClosed";
 const rateStorageKey = `pocket-trash.fxRates.${baseCurrency}`;
@@ -77,6 +78,12 @@ function writeStoredPenSettings(settings: PenSettings): void {
 }
 
 export function usePenSettings() {
+  const { locale } = useLocale();
+  const settingsSaveFailureMessage = formatTranslation(
+    "web.error.settingsSaveFailed",
+    {},
+    locale,
+  );
   const initialSettings = React.useMemo(readStoredPenSettings, []);
   const [units, setUnitsState] = React.useState<DimensionUnit>(
     initialSettings.dimensionUnit,
@@ -145,7 +152,7 @@ export function usePenSettings() {
           if (mutationVersion !== mutationVersionRef.current) return;
 
           applyPenSettings(previousSettings);
-          toast.error(userSettingsSaveFailureMessage);
+          toast.error(settingsSaveFailureMessage);
         })
         .finally(() => {
           if (mutationVersion === mutationVersionRef.current) {
@@ -153,7 +160,7 @@ export function usePenSettings() {
           }
         });
     },
-    [applyPenSettings],
+    [applyPenSettings, settingsSaveFailureMessage],
   );
 
   const setUnits = React.useCallback(

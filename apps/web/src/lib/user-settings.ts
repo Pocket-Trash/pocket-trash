@@ -4,6 +4,7 @@ import {
   type UpsertUserSettingsInput,
 } from "@package/services";
 import {
+  formatTranslation,
   type LocalePreference,
   resolveLocale,
   type SupportedLocale,
@@ -39,8 +40,6 @@ export const defaultUserSettings: UserSettingsPreferences = {
 };
 
 export const userSettingsStorageKey = "pocket-trash.settings";
-export const userSettingsSaveFailureMessage =
-  "We couldn't save your settings. Please try again.";
 
 export const getCurrentUserSettings = createServerFn({ method: "GET" }).handler(
   async (): Promise<UserSettingsPreferences | null> => {
@@ -89,7 +88,7 @@ export const patchCurrentUserSettings = createServerFn({ method: "POST" })
 
 function parseUserSettingsPatch(input: unknown): UserSettingsPatch {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    throw new Error("Expected a user settings object.");
+    throw new Error(formatTranslation("web.error.userSettingsObject"));
   }
 
   const value = input as Record<string, unknown>;
@@ -97,41 +96,41 @@ function parseUserSettingsPatch(input: unknown): UserSettingsPatch {
 
   if ("currencyCode" in value) {
     if (!currencies.includes(value.currencyCode as CurrencyCode)) {
-      throw new Error("Expected a valid currency code.");
+      throw new Error(formatTranslation("web.error.invalidCurrencyCode"));
     }
     patch.currencyCode = value.currencyCode as CurrencyCode;
   }
 
   if ("dimensionUnit" in value) {
     if (!isDimensionUnit(value.dimensionUnit)) {
-      throw new Error("Expected a valid dimension unit.");
+      throw new Error(formatTranslation("web.error.invalidDimensionUnit"));
     }
     patch.dimensionUnit = value.dimensionUnit;
   }
 
   if ("theme" in value) {
     if (typeof value.theme !== "string" || !isThemeMode(value.theme)) {
-      throw new Error("Expected a valid theme.");
+      throw new Error(formatTranslation("web.error.invalidTheme"));
     }
     patch.theme = value.theme;
   }
 
   if ("locale" in value) {
     if (value.locale !== null && !isSupportedLocale(value.locale)) {
-      throw new Error("Expected a valid locale.");
+      throw new Error(formatTranslation("web.error.invalidLocale"));
     }
     patch.locale = value.locale;
   }
 
   if ("weightUnit" in value) {
     if (!isWeightUnit(value.weightUnit)) {
-      throw new Error("Expected a valid weight unit.");
+      throw new Error(formatTranslation("web.error.invalidWeightUnit"));
     }
     patch.weightUnit = value.weightUnit;
   }
 
   if (Object.keys(patch).length === 0) {
-    throw new Error("Expected at least one setting.");
+    throw new Error(formatTranslation("web.error.missingSetting"));
   }
 
   return patch;

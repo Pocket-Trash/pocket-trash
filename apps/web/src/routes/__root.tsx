@@ -1,3 +1,4 @@
+import { formatTranslation } from "@pocket-trash/localizations";
 import {
   createRootRoute,
   HeadContent,
@@ -5,7 +6,6 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import type * as React from "react";
-import { SITE_NAME } from "@/lib/constants";
 import { themeStorageKey } from "@/lib/theme";
 import type { ThemeBootstrapState } from "@/lib/theme-bootstrap";
 import { resolveServerThemeBootstrap } from "@/lib/theme-bootstrap";
@@ -38,7 +38,7 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
       {
-        title: SITE_NAME,
+        title: formatTranslation("web.site.name"),
       },
     ],
   }),

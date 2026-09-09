@@ -1,9 +1,11 @@
 import {
   DEFAULT_LOCALE,
+  formatTranslation,
   type LocalePreference,
   resolveLocale,
   SUPPORTED_LOCALES,
   type SupportedLocale,
+  type TranslationKey,
 } from "@pocket-trash/localizations";
 
 export const localeStorageKey = "field-log.locale";
@@ -21,12 +23,15 @@ export function normalizeSavedLocale(
     : resolved;
 }
 
-export function localeLabel(locale: SupportedLocale) {
+export function localeLabel(
+  locale: SupportedLocale,
+  t: (key: TranslationKey) => string = (key) => formatTranslation(key),
+) {
   switch (locale) {
     case "en-US":
-      return "English";
+      return t("web.locale.enUS");
     case "es-MX":
-      return "Español (México)";
+      return t("web.locale.esMX");
   }
 }
 

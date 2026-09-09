@@ -3,6 +3,7 @@ import {
   loggerValues,
   parseClientLogEvents,
 } from "@package/logger";
+import { formatTranslation } from "@pocket-trash/localizations";
 
 export async function handleLogIngestionRequest({
   clientLogKey,
@@ -19,7 +20,10 @@ export async function handleLogIngestionRequest({
     );
 
     if (providedClientKey !== clientLogKey) {
-      return json({ error: "Invalid log client key." }, 401);
+      return json(
+        { error: formatTranslation("web.error.invalidLogClientKey") },
+        401,
+      );
     }
   }
 
@@ -28,7 +32,10 @@ export async function handleLogIngestionRequest({
   try {
     body = await request.json();
   } catch {
-    return json({ error: "Expected a JSON request body." }, 400);
+    return json(
+      { error: formatTranslation("web.error.expectedJsonRequestBody") },
+      400,
+    );
   }
 
   const events = parseClientLogEvents(body);

@@ -1,7 +1,7 @@
 import { Drawer as SheetPrimitive } from "@base-ui/react/drawer";
+import { formatTranslation } from "@pocket-trash/localizations";
 import { XIcon } from "lucide-react";
-import * as React from "react";
-import { webText } from "@/lib/ui-text";
+import type * as React from "react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -83,7 +83,9 @@ function SheetContent({
           </SheetPrimitive.Content>
           <SheetPrimitive.Close className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none disabled:pointer-events-none">
             <XIcon className="size-4" />
-            <span className="sr-only">{webText(locale, "Close")}</span>
+            <span className="sr-only">
+              {formatTranslation("web.action.close", {}, locale)}
+            </span>
           </SheetPrimitive.Close>
         </SheetPrimitive.Popup>
       </SheetPrimitive.Viewport>

@@ -1,4 +1,8 @@
-import type { SupportedLocale } from "@pocket-trash/localizations";
+import {
+  formatTranslation,
+  type SupportedLocale,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
 import {
   Select,
   SelectContent,
@@ -7,7 +11,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { localeLabel, supportedLocales } from "@/lib/locale";
-import { webText } from "@/lib/ui-text";
 
 type LanguageSelectProps = {
   locale: SupportedLocale;
@@ -18,24 +21,24 @@ export function LanguageSelect({
   locale,
   onLocaleChange,
 }: LanguageSelectProps) {
-  const t = (key: Parameters<typeof webText>[1]) => webText(locale, key);
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   return (
     <Select
       items={supportedLocales.map((code) => ({
-        label: localeLabel(code),
+        label: localeLabel(code, t),
         value: code,
       }))}
       onValueChange={(value) => onLocaleChange(value as SupportedLocale)}
       value={locale}
     >
-      <SelectTrigger aria-label={t("Language")} className="w-full">
+      <SelectTrigger aria-label={t("web.settings.language")} className="w-full">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
         {supportedLocales.map((code) => (
           <SelectItem key={code} value={code}>
-            {localeLabel(code)}
+            {localeLabel(code, t)}
           </SelectItem>
         ))}
       </SelectContent>
