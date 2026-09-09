@@ -126,6 +126,7 @@ describe("database service logging", () => {
     const settings: UserSettings = {
       currencyCode: "CAD",
       dimensionUnit: "in",
+      locale: null,
       theme: "dark",
       userId: 1000,
       weightUnit: "g",
@@ -169,6 +170,7 @@ describe("database service logging", () => {
     } as const;
     const userSettings: UserSettings = {
       ...settings,
+      locale: null,
       userId: user.id,
     };
     const db = createDbMock({
@@ -203,6 +205,7 @@ describe("database service logging", () => {
     const existingSettings: UserSettings = {
       currencyCode: "CAD",
       dimensionUnit: "in",
+      locale: null,
       theme: "dark",
       userId: 1000,
       weightUnit: "g",
@@ -242,6 +245,7 @@ describe("database service logging", () => {
     expect(db.insertValues[1]).toEqual({
       currencyCode: "CAD",
       dimensionUnit: "in",
+      locale: null,
       theme: "system",
       userId: user.id,
       weightUnit: "g",
@@ -249,6 +253,7 @@ describe("database service logging", () => {
     expect(db.conflictSets[1]).toEqual({
       currencyCode: "CAD",
       dimensionUnit: "in",
+      locale: null,
       theme: "system",
       weightUnit: "g",
     });
@@ -266,6 +271,7 @@ describe("database service logging", () => {
     const patchedSettings: UserSettings = {
       currencyCode: "USD",
       dimensionUnit: "in",
+      locale: null,
       theme: "light",
       userId: user.id,
       weightUnit: "g",
@@ -297,6 +303,7 @@ describe("database service logging", () => {
     expect(db.insertValues[1]).toEqual({
       currencyCode: "USD",
       dimensionUnit: "in",
+      locale: null,
       theme: "light",
       userId: user.id,
       weightUnit: "g",
@@ -304,9 +311,87 @@ describe("database service logging", () => {
     expect(db.conflictSets[1]).toEqual({
       currencyCode: "USD",
       dimensionUnit: "in",
+      locale: null,
       theme: "light",
       weightUnit: "g",
     });
     expect(JSON.stringify(events)).not.toContain(clerkId);
+  });
+
+  it("persists a resolved locale when settings have no saved locale", async () => {
+    const events: LogEvent[] = [];
+    const clerkId = "clerk-locale-1";
+    const logger = captureLogger(events);
+    const existingSettings: UserSettings = {
+      currencyCode: "CAD",
+      dimensionUnit: "mm",
+      locale: null,
+      theme: "light",
+      userId: 1000,
+      weightUnit: "oz",
+    };
+    const savedSettings: UserSettings = {
+      ...existingSettings,
+      locale: "es-MX",
+    };
+    const user: User = {
+      clerkId,
+      id: existingSettings.userId,
+    };
+    const db = createDbMock({
+      insertRows: [[user], [savedSettings]],
+      selectRows: [[existingSettings]],
+    });
+    const users = createUsersService(db, logger);
+    const service = createUserSettingsService(db, users, logger);
+
+    await expect(
+      service.resolveLocaleForClerkId(clerkId, ["fr-CA", "es-MX"]),
+    ).resolves.toBe("es-MX");
+    await logger.flush();
+
+    expect(events.map((event) => event.message)).toEqual([
+      `${loggerMessages.database.userSettings.getByClerkId}.succeeded`,
+      `${loggerMessages.database.users.ensure}.succeeded`,
+      `${loggerMessages.database.userSettings.upsertForClerkId}.succeeded`,
+    ]);
+    expect(db.insertValues[1]).toEqual({
+      currencyCode: "CAD",
+      dimensionUnit: "mm",
+      locale: "es-MX",
+      theme: "light",
+      userId: user.id,
+      weightUnit: "oz",
+    });
+    expect(JSON.stringify(events)).not.toContain(clerkId);
+  });
+
+  it("treats a legacy saved English locale as English", async () => {
+    const events: LogEvent[] = [];
+    const clerkId = "clerk-locale-legacy-1";
+    const logger = captureLogger(events);
+    const existingSettings = {
+      currencyCode: "USD",
+      dimensionUnit: "in",
+      locale: "en",
+      theme: "system",
+      userId: 1000,
+      weightUnit: "g",
+    };
+    const db = createDbMock({
+      selectRows: [[existingSettings]],
+    });
+    const users = createUsersService(db, logger);
+    const service = createUserSettingsService(db, users, logger);
+
+    await expect(
+      service.resolveLocaleForClerkId(clerkId, ["es-MX"]),
+    ).resolves.toBe("en-US");
+    await logger.flush();
+
+    expect(events.map((event) => event.message)).toEqual([
+      `${loggerMessages.database.userSettings.getByClerkId}.succeeded`,
+    ]);
+    expect(db.insertValues).toEqual([]);
   });
 });

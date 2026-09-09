@@ -1,4 +1,6 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import { loggerMessages } from "@package/logger";
+import { formatTranslation } from "@pocket-trash/localizations";
 import * as React from "react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
@@ -13,8 +15,8 @@ import {
   getCurrentUserSettingsState,
   patchCurrentUserSettings,
   type UserSettingsState,
-  userSettingsSaveFailureMessage,
 } from "@/lib/user-settings";
+import { useLocale } from "@/providers/locale-provider";
 
 type ThemeProviderValue = {
   saving: boolean;
@@ -44,6 +46,13 @@ export function ThemeProvider({
   children: React.ReactNode;
   initialSettingsState: UserSettingsState | null;
 }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { locale } = useLocale();
+  const settingsSaveFailureMessage = formatTranslation(
+    "web.error.settingsSaveFailed",
+    {},
+    locale,
+  );
   const [theme, setThemeState] = React.useState<ThemeMode>(() =>
     readTheme(initialSettingsState),
   );
@@ -77,6 +86,8 @@ export function ThemeProvider({
     let cancelled = false;
     const requestVersion = mutationVersionRef.current;
 
+    if (!isLoaded || !isSignedIn) return;
+
     if (initialSettingsState) {
       const stored = window.localStorage.getItem(themeStorageKey);
       const localTheme = isThemeMode(stored) ? stored : null;
@@ -86,7 +97,7 @@ export function ThemeProvider({
         patchCurrentUserSettings({ data: { theme: next.theme } }).catch(
           (error: unknown) => {
             logger.warn(loggerMessages.web.userSettingsSaveFailed, { error });
-            toast.error(userSettingsSaveFailureMessage);
+            toast.error(settingsSaveFailureMessage);
           },
         );
       }
@@ -119,7 +130,7 @@ export function ThemeProvider({
         patchCurrentUserSettings({ data: { theme: next.theme } }).catch(
           (error: unknown) => {
             logger.warn(loggerMessages.web.userSettingsSaveFailed, { error });
-            toast.error(userSettingsSaveFailureMessage);
+            toast.error(settingsSaveFailureMessage);
           },
         );
       })
@@ -130,7 +141,7 @@ export function ThemeProvider({
     return () => {
       cancelled = true;
     };
-  }, [initialSettingsState]);
+  }, [initialSettingsState, isLoaded, isSignedIn, settingsSaveFailureMessage]);
 
   const setTheme = React.useCallback(
     (nextTheme: ThemeMode) => {
@@ -141,6 +152,10 @@ export function ThemeProvider({
       setThemeState(nextTheme);
       window.localStorage.setItem(themeStorageKey, nextTheme);
       applyTheme(nextTheme);
+
+      if (!isLoaded || !isSignedIn) {
+        return;
+      }
 
       setSaving(true);
       patchCurrentUserSettings({ data: { theme: nextTheme } })
@@ -161,7 +176,7 @@ export function ThemeProvider({
           setThemeState(previousTheme);
           window.localStorage.setItem(themeStorageKey, previousTheme);
           applyTheme(previousTheme);
-          toast.error(userSettingsSaveFailureMessage);
+          toast.error(settingsSaveFailureMessage);
         })
         .finally(() => {
           if (mutationVersion === mutationVersionRef.current) {
@@ -169,7 +184,7 @@ export function ThemeProvider({
           }
         });
     },
-    [theme],
+    [isLoaded, isSignedIn, settingsSaveFailureMessage, theme],
   );
 
   const value = React.useMemo(

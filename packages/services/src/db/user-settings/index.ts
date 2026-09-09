@@ -8,6 +8,11 @@ import type {
 } from "@package/database";
 import { schema } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
+import {
+  type LocalePreference,
+  resolveLocale,
+  type SupportedLocale,
+} from "@pocket-trash/localizations";
 import { eq } from "drizzle-orm";
 import { hashLogIdentifier } from "../../logging.js";
 import type { UsersService } from "../users/index.js";
@@ -15,6 +20,7 @@ import type { UsersService } from "../users/index.js";
 export type UpsertUserSettingsInput = {
   currencyCode: CurrencyCode;
   dimensionUnit: DimensionUnit;
+  locale?: SupportedLocale | null;
   theme: ThemeMode;
   weightUnit: WeightUnit;
 };
@@ -27,6 +33,14 @@ export type UserSettingsService = {
     clerkId: string,
     settings: PatchUserSettingsInput,
   ): Promise<UserSettings>;
+  resolveLocaleForClerkId(
+    clerkId: string,
+    preferences: readonly LocalePreference[],
+  ): Promise<SupportedLocale>;
+  updateLocaleForClerkId(
+    clerkId: string,
+    locale: SupportedLocale | null,
+  ): Promise<SupportedLocale | null>;
   upsertForClerkId(
     clerkId: string,
     settings: UpsertUserSettingsInput,
@@ -36,9 +50,28 @@ export type UserSettingsService = {
 export const defaultUserSettings: UpsertUserSettingsInput = {
   currencyCode: "USD",
   dimensionUnit: "in",
+  locale: null,
   theme: "system",
   weightUnit: "g",
 };
+
+function mergeLocaleSettings(
+  settings: UserSettings | null,
+  locale: SupportedLocale | null,
+): UpsertUserSettingsInput {
+  return {
+    currencyCode: settings?.currencyCode ?? defaultUserSettings.currencyCode,
+    dimensionUnit: settings?.dimensionUnit ?? defaultUserSettings.dimensionUnit,
+    locale,
+    theme: settings?.theme ?? defaultUserSettings.theme,
+    weightUnit: settings?.weightUnit ?? defaultUserSettings.weightUnit,
+  };
+}
+
+function normalizeSavedLocale(locale: string | null | undefined) {
+  if (locale === "en") return "en-US";
+  return locale ? resolveLocale(locale) : null;
+}
 
 export function createUserSettingsService(
   db: Database,
@@ -54,6 +87,7 @@ export function createUserSettingsService(
             .select({
               currencyCode: schema.userSettings.currencyCode,
               dimensionUnit: schema.userSettings.dimensionUnit,
+              locale: schema.userSettings.locale,
               theme: schema.userSettings.theme,
               userId: schema.userSettings.userId,
               weightUnit: schema.userSettings.weightUnit,
@@ -89,6 +123,11 @@ export function createUserSettingsService(
               settings.dimensionUnit ??
               existing?.dimensionUnit ??
               defaultUserSettings.dimensionUnit,
+            locale:
+              settings.locale !== undefined
+                ? settings.locale
+                : (normalizeSavedLocale(existing?.locale) ??
+                  defaultUserSettings.locale),
             theme:
               settings.theme ?? existing?.theme ?? defaultUserSettings.theme,
             weightUnit:
@@ -125,6 +164,32 @@ export function createUserSettingsService(
           },
         },
       );
+    },
+    async resolveLocaleForClerkId(clerkId, preferences) {
+      const settings = await this.getByClerkId(clerkId);
+      const savedLocale = normalizeSavedLocale(settings?.locale);
+      const locale = savedLocale ?? resolveLocale(...preferences);
+
+      if (savedLocale === locale) {
+        return locale;
+      }
+
+      await this.upsertForClerkId(
+        clerkId,
+        mergeLocaleSettings(settings, locale),
+      );
+
+      return locale;
+    },
+    async updateLocaleForClerkId(clerkId, locale) {
+      const settings = await this.getByClerkId(clerkId);
+
+      await this.upsertForClerkId(
+        clerkId,
+        mergeLocaleSettings(settings, locale),
+      );
+
+      return locale;
     },
     async upsertForClerkId(clerkId, settings) {
       return await logger.operation(

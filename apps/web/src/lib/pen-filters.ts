@@ -1,16 +1,36 @@
+import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
 import type { PenProduct } from "./pen-data";
 
 export const filterGroups = [
-  { key: "category", label: "Category", andable: false },
-  { key: "sizes", label: "Size", andable: false },
-  { key: "materials", label: "Material", andable: true },
-  { key: "refills", label: "Refill", andable: true },
-  { key: "mechanisms", label: "Mechanism", andable: true },
-  { key: "clips", label: "Clip", andable: false },
-  { key: "body_details", label: "Body details", andable: true },
-  { key: "noses", label: "Tip / Nose", andable: true },
-  { key: "finishes", label: "Finish", andable: false },
-] as const;
+  {
+    key: "category",
+    labelKey: "web.archive.filter.category",
+    andable: false,
+  },
+  { key: "sizes", labelKey: "web.archive.filter.size", andable: false },
+  { key: "materials", labelKey: "web.archive.filter.material", andable: true },
+  { key: "refills", labelKey: "web.archive.filter.refill", andable: true },
+  {
+    key: "mechanisms",
+    labelKey: "web.archive.filter.mechanism",
+    andable: true,
+  },
+  { key: "clips", labelKey: "web.archive.filter.clip", andable: false },
+  {
+    key: "body_details",
+    labelKey: "web.archive.filter.bodyDetails",
+    andable: true,
+  },
+  { key: "noses", labelKey: "web.archive.filter.tipNose", andable: true },
+  { key: "finishes", labelKey: "web.archive.filter.finish", andable: false },
+] as const satisfies readonly {
+  andable: boolean;
+  key: keyof PenProduct;
+  labelKey: TranslationKey;
+}[];
 
 export type FilterKey = (typeof filterGroups)[number]["key"];
 export type MatchMode = "any" | "all";
@@ -173,7 +193,13 @@ export function sortProducts(products: PenProduct[], sort: SortKey) {
   return rows;
 }
 
-export function normalizedHeadline(product: PenProduct) {
+export function normalizedHeadline(
+  product: PenProduct,
+  t: (
+    key: TranslationKey,
+    values?: Readonly<Record<string, unknown>>,
+  ) => string = formatTranslation,
+) {
   if (product.category === "Accessory") return product.title;
 
   const clip = product.clips[0];
@@ -183,12 +209,17 @@ export function normalizedHeadline(product: PenProduct) {
   if (product.sizes.length === 2) {
     const grip = product.sizes[0];
     const mechanismSize = product.sizes[1];
-    size = `${grip} Grip - ${mechanismSize} Mechanism`;
+    size = [
+      t("web.archive.headline.grip", { size: grip }),
+      t("web.archive.headline.mechanism", { size: mechanismSize }),
+    ].join(" - ");
   } else if (product.sizes.length === 1) {
     size = product.sizes[0] ?? "";
   }
 
-  return [size, clip, mechanism, "Pen"].filter(Boolean).join(" ");
+  return [size, clip, mechanism, t("web.archive.headline.pen")]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function splitTitle(title: string) {

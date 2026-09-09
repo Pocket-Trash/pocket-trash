@@ -1,5 +1,5 @@
+import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
-import { SITE_NAME } from "@/lib/constants";
 import type { PenProduct } from "@/lib/pen-data";
 import { decodePenParam, penParam } from "@/lib/pen-links";
 import { absoluteUrl } from "@/lib/site-url";
@@ -48,11 +48,12 @@ export const Route = createFileRoute("/pens/$penId")({
   head: ({ loaderData }) => {
     if (!loaderData) return {};
     const { title, description, imageUrl, imageAlt, pageUrl } = loaderData;
+    const siteName = formatTranslation("web.site.name");
     return {
       meta: [
-        { title: `${title} · ${SITE_NAME}` },
+        { title: `${title} · ${siteName}` },
         { name: "description", content: description },
-        { property: "og:site_name", content: SITE_NAME },
+        { property: "og:site_name", content: siteName },
         { property: "og:type", content: "product" },
         { property: "og:title", content: title },
         { property: "og:description", content: description },
@@ -87,5 +88,9 @@ function buildDescription(product: PenProduct): string {
           : ""
       } CAD`
     : "";
-  return [specs, price].filter(Boolean).join(" — ") || `${SITE_NAME} pen.`;
+  const siteName = formatTranslation("web.site.name");
+  return (
+    [specs, price].filter(Boolean).join(" — ") ||
+    formatTranslation("web.archive.defaultPenDescription", { siteName })
+  );
 }

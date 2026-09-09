@@ -1,3 +1,4 @@
+import { formatTranslation } from "@pocket-trash/localizations";
 import {
   createRootRoute,
   HeadContent,
@@ -5,11 +6,13 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import type * as React from "react";
-import { SITE_NAME } from "@/lib/constants";
 import { themeStorageKey } from "@/lib/theme";
 import type { ThemeBootstrapState } from "@/lib/theme-bootstrap";
 import { resolveServerThemeBootstrap } from "@/lib/theme-bootstrap";
-import { getCurrentUserSettingsState } from "@/lib/user-settings";
+import {
+  getCurrentUserSettingsState,
+  type UserSettingsState,
+} from "@/lib/user-settings";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { AppProviders } from "@/providers/app-providers";
 import "../styles.css";
@@ -35,7 +38,7 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
       {
-        title: SITE_NAME,
+        title: formatTranslation("web.site.name"),
       },
     ],
   }),
@@ -54,7 +57,10 @@ function RootDocument({ children }: { children?: React.ReactNode }) {
         <HeadContent />
         <script
           dangerouslySetInnerHTML={{
-            __html: themeBootstrapScript(themeBootstrap),
+            __html: bootstrapScript(
+              themeBootstrap,
+              loaderData?.settingsState ?? null,
+            ),
           }}
         />
       </head>
@@ -80,17 +86,24 @@ function RootNotFoundDocument() {
   );
 }
 
-function themeBootstrapScript(themeBootstrap: ThemeBootstrapState) {
+function bootstrapScript(
+  themeBootstrap: ThemeBootstrapState,
+  settingsState: UserSettingsState | null,
+) {
   return `
 (() => {
   try {
     const serverTheme = ${JSON.stringify(themeBootstrap.serverTheme)};
     const shouldUseServerTheme = ${JSON.stringify(themeBootstrap.shouldUseServerTheme)};
+    const serverLocale = ${JSON.stringify(settingsState?.settings.locale ?? null)};
     const theme = shouldUseServerTheme
       ? serverTheme
       : localStorage.getItem(${JSON.stringify(themeStorageKey)}) || "system";
     const dark = theme === "dark" || (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", dark);
+    const storedLocale = localStorage.getItem("field-log.locale");
+    const locale = serverLocale || (storedLocale === "en" || storedLocale === "en-US" ? "en-US" : storedLocale === "es-MX" ? "es-MX" : "en-US");
+    document.documentElement.lang = locale;
   } catch {}
 })();
 `;

@@ -1,3 +1,7 @@
+import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { PenProduct } from "@/lib/pen-data";
@@ -10,6 +14,7 @@ import {
   valuesFor,
 } from "@/lib/pen-filters";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
 
 type FilterSidebarProps = {
   active: ActiveFilters;
@@ -28,17 +33,28 @@ export function FilterSidebar({
   onToggleFilter,
   products,
 }: FilterSidebarProps) {
+  const { locale } = useLocale();
+  const t = (
+    key: TranslationKey,
+    values: Readonly<Record<string, unknown>> = {},
+  ) => formatTranslation(key, values, locale);
+
   return (
     <div className="px-2 py-1 text-sidebar-foreground">
       {filterGroups.map((group) => (
         <section key={group.key} className="mt-5 first:mt-0">
+          {/*
+            Product tag values come from catalog data; group labels are app UI.
+          */}
           <div className="mb-2 flex min-h-[26px] items-center justify-between gap-2 border-b border-sidebar-border pb-1.5">
             <h2 className="text-[12.5px] font-bold tracking-[1.2px] uppercase">
-              {group.label}
+              {t(group.labelKey)}
             </h2>
             {group.andable ? (
               <ToggleGroup
-                aria-label={`${group.label} match mode`}
+                aria-label={t("web.archive.filter.matchMode", {
+                  label: t(group.labelKey),
+                })}
                 className={cn(
                   "h-[25px] w-auto gap-0 p-0.5",
                   active[group.key].size < 2 && "invisible",
@@ -50,10 +66,10 @@ export function FilterSidebar({
                 value={matchModes[group.key]}
               >
                 <ToggleGroupItem className="h-5 px-2 text-[10px]" value="any">
-                  any
+                  {t("web.archive.filter.any")}
                 </ToggleGroupItem>
                 <ToggleGroupItem className="h-5 px-2 text-[10px]" value="all">
-                  all
+                  {t("web.archive.filter.all")}
                 </ToggleGroupItem>
               </ToggleGroup>
             ) : null}
@@ -83,7 +99,7 @@ export function FilterSidebar({
       ))}
 
       <Button className="mt-4 w-full" onClick={onClear} variant="outline">
-        Clear all filters
+        {t("web.action.clearAllFilters")}
       </Button>
     </div>
   );

@@ -1,8 +1,17 @@
+import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
+import { useLocale } from "@/providers/locale-provider";
+
 export function PageFooter() {
+  const { locale } = useLocale();
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
+
   return (
     <footer className="mx-auto mt-9 mb-7 max-w-[720px] border-t border-border px-6 pt-4 text-center text-[12.5px] leading-7 text-muted-foreground">
       <div>
-        A resource for{" "}
+        {t("web.archive.footer.resourceFor")}{" "}
         <a
           className="text-primary underline underline-offset-2"
           href="https://www.reddit.com/r/machinedpens/"
@@ -11,10 +20,10 @@ export function PageFooter() {
         >
           r/machinedpens
         </a>{" "}
-        and the Machined Pens Discord.
+        {t("web.archive.footer.discord")}
       </div>
       <div>
-        Suggestions or contact:{" "}
+        {t("web.archive.footer.suggestionsOrContact")}{" "}
         <a
           className="text-primary underline underline-offset-2"
           href="https://www.reddit.com/user/BVG_Digital/"
@@ -25,8 +34,8 @@ export function PageFooter() {
         </a>
       </div>
       <div className="mx-auto mt-3 max-w-[640px] border-t border-border pt-3 text-[11.5px] leading-5 opacity-70">
-        Product names, images, and descriptions remain the property of their
-        respective owners. Made by a fan; not affiliated with any maker.
+        {t("web.archive.footer.productOwnership")}{" "}
+        {t("web.archive.footer.fanMade")}
       </div>
     </footer>
   );

@@ -1,4 +1,8 @@
 import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
+import {
   ArrowUpDown,
   Check,
   Search,
@@ -33,6 +37,7 @@ import type {
   WeightUnit,
 } from "@/lib/pen-formatters";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
 
 // Height of the bar itself (excludes the safe-area padding below it). Kept in
 // sync with the reserved bottom padding in `app-shell.tsx`.
@@ -88,6 +93,8 @@ export function MobileToolbar({
   units,
   weight,
 }: MobileToolbarProps) {
+  const { locale } = useLocale();
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [sortOpen, setSortOpen] = React.useState(false);
   // Distinct from the desktop header search field so the two inputs never share
@@ -125,19 +132,19 @@ export function MobileToolbar({
           >
             <Search className="pointer-events-none absolute left-3 size-4 text-muted-foreground" />
             <Input
-              aria-label="Search pens by title, specs, or description"
+              aria-label={t("web.archive.searchProducts")}
               autoComplete="off"
               className="pr-3 pl-9"
               id={searchInputId}
               onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="Search..."
+              placeholder={t("web.archive.searchPlaceholder")}
               ref={searchRef}
               type="search"
               value={query}
             />
           </label>
           <button
-            aria-label="Close search"
+            aria-label={t("web.archive.closeSearch")}
             className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
             onClick={() => setSearchOpen(false)}
             type="button"
@@ -148,14 +155,14 @@ export function MobileToolbar({
       ) : null}
 
       <nav
-        aria-label="Archive controls"
+        aria-label={t("web.archive.controls")}
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
         style={{ height: `calc(${BAR_HEIGHT} + env(safe-area-inset-bottom))` }}
       >
         <ToolbarButton
           active={searchOpen || query.length > 0}
           icon={Search}
-          label="Search"
+          label={t("web.action.search")}
           onClick={() => setSearchOpen((open) => !open)}
         />
 
@@ -165,14 +172,14 @@ export function MobileToolbar({
               active={filterCount > 0}
               badge={filterCount}
               icon={SlidersHorizontal}
-              label="Filters"
+              label={t("web.archive.filters")}
             />
           </DrawerTrigger>
           <DrawerContent>
             <DrawerHeader>
-              <DrawerTitle>Filters</DrawerTitle>
+              <DrawerTitle>{t("web.archive.filters")}</DrawerTitle>
               <DrawerDescription className="sr-only">
-                Filter the archive by category, size, material, and more.
+                {t("web.archive.filterDescription")}
               </DrawerDescription>
             </DrawerHeader>
             <div className="overflow-y-auto px-2 pb-4">
@@ -190,13 +197,16 @@ export function MobileToolbar({
 
         <Drawer onOpenChange={setSortOpen} open={sortOpen}>
           <DrawerTrigger asChild>
-            <ToolbarButton icon={ArrowUpDown} label="Sort" />
+            <ToolbarButton
+              icon={ArrowUpDown}
+              label={t("web.archive.sortLabel")}
+            />
           </DrawerTrigger>
           <DrawerContent>
             <DrawerHeader>
-              <DrawerTitle>Sort</DrawerTitle>
+              <DrawerTitle>{t("web.archive.sortLabel")}</DrawerTitle>
               <DrawerDescription className="sr-only">
-                Choose how the archive is ordered.
+                {t("web.archive.sortDescription")}
               </DrawerDescription>
             </DrawerHeader>
             <div className="overflow-y-auto p-2">
@@ -226,13 +236,13 @@ export function MobileToolbar({
 
         <Drawer>
           <DrawerTrigger asChild>
-            <ToolbarButton icon={Settings} label="Settings" />
+            <ToolbarButton icon={Settings} label={t("web.settings.settings")} />
           </DrawerTrigger>
           <DrawerContent>
             <DrawerHeader>
-              <DrawerTitle>Settings</DrawerTitle>
+              <DrawerTitle>{t("web.settings.settings")}</DrawerTitle>
               <DrawerDescription className="sr-only">
-                Display preferences for the archive.
+                {t("web.settings.displayPreferences")}
               </DrawerDescription>
             </DrawerHeader>
             <SettingsPanel

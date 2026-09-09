@@ -1,3 +1,7 @@
+import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,12 +10,16 @@ import {
   listUserBetaFeatureFlags,
   setUserBetaFeatureFlag,
 } from "@/lib/feature-flags";
+import { useLocale } from "@/providers/locale-provider";
 
 type BetaFlag = Awaited<ReturnType<typeof listUserBetaFeatureFlags>>[number];
 
 export function UserBetaFeaturesPage() {
+  const { locale } = useLocale();
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const [flags, setFlags] = useState<BetaFlag[]>([]);
   const [status, setStatus] = useState<string | null>(null);
+  const failedToLoadText = t("web.status.failedToLoad");
 
   async function loadFlags() {
     setFlags(await listUserBetaFeatureFlags());
@@ -19,12 +27,12 @@ export function UserBetaFeaturesPage() {
 
   useEffect(() => {
     loadFlags().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Failed to load.");
+      setStatus(error instanceof Error ? error.message : failedToLoadText);
     });
-  }, []);
+  }, [failedToLoadText]);
 
   return (
-    <UserPageShell title="Beta features">
+    <UserPageShell title={t("web.navigation.betaFeatures")}>
       <div className="mx-auto grid max-w-3xl gap-3">
         {status ? (
           <Badge className="bg-destructive text-white">{status}</Badge>
@@ -32,7 +40,7 @@ export function UserBetaFeaturesPage() {
         <div className="overflow-hidden rounded-lg border border-border bg-card">
           {flags.length === 0 ? (
             <div className="px-4 py-6 text-sm text-muted-foreground">
-              No beta features are available.
+              {t("web.page.betaFeatures.empty")}
             </div>
           ) : null}
           {flags.map((flag) => (
@@ -64,7 +72,9 @@ export function UserBetaFeaturesPage() {
                 type="button"
                 variant={flag.enabled ? "default" : "outline"}
               >
-                {flag.enabled ? "Enabled" : "Disabled"}
+                {flag.enabled
+                  ? t("web.status.enabled")
+                  : t("web.status.disabled")}
               </Button>
             </div>
           ))}
