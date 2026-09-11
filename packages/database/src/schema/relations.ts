@@ -1,4 +1,11 @@
 import { relations } from "drizzle-orm";
+import {
+  collectionItem,
+  collectionSpinner,
+  collectionSpinnerButton,
+  productSpinner,
+  productSpinnerButton,
+} from "./collection.js";
 import { featureFlags, featureFlagUserOverrides } from "./feature-flags.js";
 import {
   makers,
@@ -58,10 +65,14 @@ export const makersRelations = relations(makers, ({ many }) => ({
   autmogPens: many(tmpAutmogPens),
   grimsmoKnives: many(tmpGrimsmoKnives),
   grimsmoPens: many(tmpGrimsmoPens),
+  spinnerButtons: many(productSpinnerButton),
+  spinners: many(productSpinner),
 }));
 
 export const materialsRelations = relations(materials, ({ many }) => ({
   autmogPens: many(tmpAutmogPenMaterials),
+  spinnerButtons: many(productSpinnerButton),
+  spinners: many(productSpinner),
 }));
 
 export const mechanismsRelations = relations(mechanisms, ({ many }) => ({
@@ -70,9 +81,99 @@ export const mechanismsRelations = relations(mechanisms, ({ many }) => ({
 
 export const productTypesRelations = relations(productTypes, ({ many }) => ({
   products: many(tmpProductProductTypes),
+  spinnerButtons: many(productSpinnerButton),
+  spinners: many(productSpinner),
 }));
 
 export const scraperRunsRelations = relations(scraperRuns, () => ({}));
+
+export const collectionItemRelations = relations(collectionItem, ({ one }) => ({
+  owner: one(users, {
+    fields: [collectionItem.ownerId],
+    references: [users.id],
+  }),
+  purchasedFromUser: one(users, {
+    fields: [collectionItem.purchasedFromUserId],
+    references: [users.id],
+  }),
+  soldToUser: one(users, {
+    fields: [collectionItem.soldToUserId],
+    references: [users.id],
+  }),
+  spinner: one(collectionSpinner, {
+    fields: [collectionItem.id],
+    references: [collectionSpinner.id],
+  }),
+  spinnerButton: one(collectionSpinnerButton, {
+    fields: [collectionItem.id],
+    references: [collectionSpinnerButton.id],
+  }),
+}));
+
+export const productSpinnerRelations = relations(productSpinner, ({ one }) => ({
+  maker: one(makers, {
+    fields: [productSpinner.makerId],
+    references: [makers.id],
+  }),
+  material: one(materials, {
+    fields: [productSpinner.materialId],
+    references: [materials.id],
+  }),
+  productType: one(productTypes, {
+    fields: [productSpinner.productTypeId],
+    references: [productTypes.id],
+  }),
+}));
+
+export const productSpinnerButtonRelations = relations(
+  productSpinnerButton,
+  ({ one }) => ({
+    maker: one(makers, {
+      fields: [productSpinnerButton.makerId],
+      references: [makers.id],
+    }),
+    material: one(materials, {
+      fields: [productSpinnerButton.materialId],
+      references: [materials.id],
+    }),
+    productType: one(productTypes, {
+      fields: [productSpinnerButton.productTypeId],
+      references: [productTypes.id],
+    }),
+  }),
+);
+
+export const collectionSpinnerRelations = relations(
+  collectionSpinner,
+  ({ one }) => ({
+    item: one(collectionItem, {
+      fields: [collectionSpinner.id],
+      references: [collectionItem.id],
+    }),
+    product: one(productSpinner, {
+      fields: [collectionSpinner.productSpinnerId],
+      references: [productSpinner.id],
+    }),
+    installedButton: one(collectionSpinnerButton, {
+      fields: [collectionSpinner.installedButtonId],
+      references: [collectionSpinnerButton.id],
+    }),
+  }),
+);
+
+export const collectionSpinnerButtonRelations = relations(
+  collectionSpinnerButton,
+  ({ one }) => ({
+    item: one(collectionItem, {
+      fields: [collectionSpinnerButton.id],
+      references: [collectionItem.id],
+    }),
+    product: one(productSpinnerButton, {
+      fields: [collectionSpinnerButton.productSpinnerButtonId],
+      references: [productSpinnerButton.id],
+    }),
+  }),
+);
 
 export const tmpAutmogPensRelations = relations(
   tmpAutmogPens,

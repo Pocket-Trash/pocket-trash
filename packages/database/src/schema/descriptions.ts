@@ -10,7 +10,7 @@ export type SchemaDescription = {
 };
 
 export const schemaDescriptions = {
-  makers: {
+  maker: {
     description:
       "Canonical source makers that scraped or user-created products can belong to.",
     columns: {
@@ -36,7 +36,7 @@ export const schemaDescriptions = {
       },
     },
   },
-  materials: {
+  material: {
     description:
       "Canonical material values shared across scraped and user-created products.",
     columns: {
@@ -62,7 +62,7 @@ export const schemaDescriptions = {
       },
     },
   },
-  mechanisms: {
+  mechanism: {
     description:
       "Canonical pen mechanism values shared across scraped and user-created products.",
     columns: {
@@ -88,7 +88,7 @@ export const schemaDescriptions = {
       },
     },
   },
-  product_types: {
+  product_type: {
     description:
       "Canonical product type values used to classify product aggregate rows.",
     columns: {
@@ -111,6 +111,193 @@ export const schemaDescriptions = {
       updated_at: {
         description: "Timestamp when the product type row was last updated.",
         example: "2026-07-17T20:45:00.000Z",
+      },
+    },
+  },
+  collection_item: {
+    description:
+      "Shared ownership and lifecycle row for user collection items.",
+    columns: {
+      id: {
+        description: "Internal collection item row identifier.",
+        example: 1000,
+      },
+      owner_id: {
+        description: "User who owns or owned the collection item.",
+        example: 1000,
+      },
+      purchased_at: {
+        description: "Timestamp when the item was purchased.",
+        example: "2026-07-17T20:45:00.000Z",
+      },
+      sold_at: {
+        description: "Timestamp when the item was sold.",
+        example: "2026-08-17T20:45:00.000Z",
+      },
+      purchased_from_user_id: {
+        description: "Known application user the item was purchased from.",
+        example: 1001,
+      },
+      purchased_from_user: {
+        description:
+          "Free-text seller name when no application user row exists.",
+        example: "KAP EDC",
+      },
+      sold_to_user_id: {
+        description: "Known application user the item was sold to.",
+        example: 1002,
+      },
+      sold_to_user: {
+        description:
+          "Free-text buyer name when no application user row exists.",
+        example: "Private buyer",
+      },
+      owned: {
+        description: "Whether the item is currently owned by the owner.",
+        example: true,
+      },
+    },
+  },
+  product_spinner: {
+    description: "Catalog spinner product row.",
+    columns: {
+      id: {
+        description: "Internal product spinner row identifier.",
+        example: 1000,
+      },
+      maker_id: {
+        description: "Maker that produced the spinner.",
+        example: 1000,
+      },
+      name: {
+        description: "Human-readable spinner product name.",
+        example: "Standard Katla",
+      },
+      slug: {
+        description: "Stable slug for spinner deduplication and lookups.",
+        example: "standard-katla",
+      },
+      product_type_id: {
+        description: "Product type classification for the spinner.",
+        example: 1000,
+      },
+      material_id: {
+        description: "Primary material for this spinner product row.",
+        example: 1000,
+      },
+      weight_g: {
+        description: "Spinner weight in grams.",
+        example: "72.5",
+      },
+      length_mm: {
+        description: "Spinner length in millimeters.",
+        example: "50.0",
+      },
+      width_mm: {
+        description: "Spinner width in millimeters.",
+        example: "24.5",
+      },
+      thickness_mm: {
+        description: "Spinner body thickness in millimeters.",
+        example: "10.0",
+      },
+      thickness_with_button_mm: {
+        description:
+          "Spinner thickness including installed buttons in millimeters.",
+        example: "17.0",
+      },
+      button_diameter_mm: {
+        description: "Compatible button diameter in millimeters.",
+        example: "24.5",
+      },
+      created_at: {
+        description: "Timestamp when the spinner row was created.",
+        example: "2026-07-17T20:45:00.000Z",
+      },
+      updated_at: {
+        description: "Timestamp when the spinner row was last updated.",
+        example: "2026-07-17T20:45:00.000Z",
+      },
+    },
+  },
+  product_spinner_button: {
+    description: "Catalog spinner button product row.",
+    columns: {
+      id: {
+        description: "Internal product spinner button row identifier.",
+        example: 1000,
+      },
+      maker_id: {
+        description: "Maker that produced the spinner button.",
+        example: 1000,
+      },
+      name: {
+        description: "Human-readable spinner button product name.",
+        example: "Whirl Button",
+      },
+      slug: {
+        description:
+          "Stable slug for spinner button deduplication and lookups.",
+        example: "whirl-button-24-5mm",
+      },
+      product_type_id: {
+        description: "Product type classification for the spinner button.",
+        example: 1001,
+      },
+      material_id: {
+        description: "Primary material for this spinner button product row.",
+        example: 1000,
+      },
+      weight_g: {
+        description: "Spinner button weight in grams.",
+        example: "8.4",
+      },
+      diameter_mm: {
+        description: "Spinner button diameter in millimeters.",
+        example: "24.5",
+      },
+      thickness_mm: {
+        description: "Spinner button thickness in millimeters.",
+        example: "7.0",
+      },
+      created_at: {
+        description: "Timestamp when the spinner button row was created.",
+        example: "2026-07-17T20:45:00.000Z",
+      },
+      updated_at: {
+        description: "Timestamp when the spinner button row was last updated.",
+        example: "2026-07-17T20:45:00.000Z",
+      },
+    },
+  },
+  collection_spinner: {
+    description: "User collection row for a spinner.",
+    columns: {
+      id: {
+        description: "Collection item row identifier for this spinner.",
+        example: 1000,
+      },
+      product_spinner_id: {
+        description: "Catalog spinner this collection item represents.",
+        example: 1000,
+      },
+      installed_button_id: {
+        description:
+          "Owned spinner button currently installed on this spinner.",
+        example: 1001,
+      },
+    },
+  },
+  collection_spinner_button: {
+    description: "User collection row for a spinner button.",
+    columns: {
+      id: {
+        description: "Collection item row identifier for this spinner button.",
+        example: 1001,
+      },
+      product_spinner_button_id: {
+        description: "Catalog spinner button this collection item represents.",
+        example: 1000,
       },
     },
   },
@@ -554,7 +741,7 @@ export const schemaDescriptions = {
       },
     },
   },
-  users: {
+  user: {
     description: "Application users mirrored from Clerk identity records.",
     columns: {
       id: {

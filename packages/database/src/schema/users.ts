@@ -1,6 +1,6 @@
 import { bigint, pgTable, text } from "drizzle-orm/pg-core";
 
-export const users = pgTable("users", {
+export const users = pgTable("user", {
   id: bigint("id", { mode: "number" })
     .primaryKey()
     .generatedAlwaysAsIdentity({ startWith: 1000 }),
