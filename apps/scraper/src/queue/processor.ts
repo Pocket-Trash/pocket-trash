@@ -253,7 +253,7 @@ async function processItemJob({
   job: Job<ScraperItemJob>;
   logger: Logger;
   queues: ScraperQueues;
-}) {
+}): Promise<undefined> {
   const startedAt = Date.now();
 
   try {
@@ -1035,7 +1035,7 @@ async function drainQueue<TJobData>({
   batchSize: number;
   concurrency: number;
   connection: Redis;
-  handler: (job: Job<TJobData>) => Promise<"completed" | "skipped" | void>;
+  handler: (job: Job<TJobData>) => Promise<"completed" | "skipped" | undefined>;
   logger: Logger;
   queueName: string;
 }): Promise<QueueDrainStats> {
