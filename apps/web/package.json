@@ -10,13 +10,16 @@
     "build:ci": "vite build",
     "start": "vite preview",
     "start:ci": "node .output/server/index.mjs",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
     "check": "biome check .",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx ../../packages/infisical-runner/src/cli.ts web test -- vitest run --passWithNoTests",
-    "test:ci": "vitest run --passWithNoTests",
-    "test:watch": "tsx ../../packages/infisical-runner/src/cli.ts web test:watch -- vitest --passWithNoTests",
-    "test:watch:no-infisical": "vitest --passWithNoTests"
+    "test": "tsx ../../packages/infisical-runner/src/cli.ts web test -- vitest run --project=unit --passWithNoTests",
+    "test:ci": "vitest run --project=unit --passWithNoTests",
+    "test-storybook": "vitest run --project=storybook",
+    "test:watch": "tsx ../../packages/infisical-runner/src/cli.ts web test:watch -- vitest --project=unit --passWithNoTests",
+    "test:watch:no-infisical": "vitest --project=unit --passWithNoTests"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -47,9 +50,17 @@
   "devDependencies": {
     "@package/eslint": "workspace:*",
     "@package/tsconfig": "workspace:*",
+    "@storybook/addon-a11y": "10.6.0",
+    "@storybook/addon-vitest": "10.6.0",
+    "@storybook/tanstack-react": "10.6.0",
+    "@types/node": "26.1.0",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "^6.0.3",
-    "vite": "latest"
+    "@vitest/browser-playwright": "4.1.10",
+    "playwright": "1.63.0",
+    "storybook": "10.6.0",
+    "vite": "latest",
+    "vitest": "4.1.10"
   }
 }

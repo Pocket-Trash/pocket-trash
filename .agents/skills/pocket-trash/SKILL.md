@@ -38,15 +38,26 @@ list the available subcommands with one-line descriptions and tell them to use
   Read [references/figjam.md](references/figjam.md).
 - `bunny-audit`: audit Pocket Trash Bunny account services, billing, and usage.
   Read [references/bunny-audit.md](references/bunny-audit.md).
+- `localize`: add or track Pocket Trash user-visible text through
+  `@pocket-trash/localizations`. Read
+  [references/localize.md](references/localize.md).
+- `localizations-merge`: merge planned localization files into the localizations
+  repo. Read
+  [references/localizations-merge.md](references/localizations-merge.md).
+- `localization-audit`: audit Pocket Trash code for user-visible hard-coded
+  strings. Read
+  [references/localization-audit.md](references/localization-audit.md).
 
 Match obvious aliases to the same subcommands, for example `pr`, `pull request`,
 `review`, `linear`, `ticket`, `database conflicts`, `migrations`, `figma`,
-`figjam`, `bunny`, and `logging`.
+`figjam`, `bunny`, `logging`, `localization`, `localize`, `translations`,
+`i18n`, and `copy audit`.
 
 ## Repo Scope
 
-The `logger`, `db-migration-conflicts`, `figjam`, and `bunny-audit` subcommands
-are only intended for the `Pocket-Trash/pocket-trash` repo.
+The `logger`, `db-migration-conflicts`, `figjam`, `bunny-audit`, `localize`, and
+`localization-audit` subcommands are only intended for the
+`Pocket-Trash/pocket-trash` repo.
 
 Before using one of those subcommands, check the current repo:
 
@@ -61,6 +72,14 @@ If the current repo is not Pocket Trash, stop before running commands or making
 changes. Tell the user the selected subcommand is only supposed to be used in
 the Pocket Trash repo, name the repo you detected when possible, and ask whether
 they truly want to continue even though it might not work.
+
+The `localizations-merge` subcommand is only intended for the
+`Pocket-Trash/localizations` repo. Before using it, check the current repo with
+the same remote/package-name method. Treat the repo as localizations only when
+the origin is `Pocket-Trash/localizations` or the root package name is
+`@pocket-trash/localizations`. If the current repo is not localizations, stop
+before running commands or making changes and ask whether the user wants to
+continue.
 
 If the request does not map to a listed subcommand, explain that `$pocket-trash`
 only covers the listed Pocket Trash workflows and ask for the intended
