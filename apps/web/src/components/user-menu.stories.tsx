@@ -91,6 +91,9 @@ export const SignedOut: Story = {
 export const CompactSignedOut: Story = {
   args: { compact: true },
   beforeEach: SignedOut.beforeEach,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("button", { name: "Sign in" })).toBeVisible();
+  },
 };
 
 export const BasicSignedInUser: Story = {
@@ -124,6 +127,14 @@ export const AdminUser: Story = {
     mocked(useAuth).mockReturnValue(adminAuth);
     mocked(useUser).mockReturnValue(signedInUser);
   },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /Ada Lovelace/ }));
+
+    const page = within(canvasElement.ownerDocument.body);
+    await expect(
+      await page.findByRole("menuitem", { name: "Beta features" }),
+    ).toBeVisible();
+  },
 };
 
 export const SignOut: Story = {
@@ -141,6 +152,23 @@ export const SignOut: Story = {
     await expect(signOut).toHaveBeenCalledWith({ redirectUrl: "/" });
     await waitFor(() => {
       expect(page.querySelector("[data-base-ui-focus-guard]")).toBeNull();
+    });
+  },
+};
+
+export const KeyboardDismiss: Story = {
+  beforeEach: BasicSignedInUser.beforeEach,
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /Ada Lovelace/ }));
+
+    const page = canvasElement.ownerDocument.body;
+    await expect(
+      await within(page).findByRole("menuitem", { name: "Log out" }),
+    ).toBeVisible();
+
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => {
+      expect(page.querySelector('[role="menu"]')).toBeNull();
     });
   },
 };

@@ -48,5 +48,15 @@ export const Small: Story = { args: { size: "sm" } };
 export const Large: Story = { args: { size: "lg" } };
 export const Icon: Story = {
   args: { "aria-label": "Add item", children: <Plus />, size: "icon" },
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("button", { name: "Add item" }),
+    ).toBeVisible();
+  },
 };
-export const Disabled: Story = { args: { disabled: true } };
+export const Disabled: Story = {
+  args: { disabled: true },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("button", { name: "Button" })).toBeDisabled();
+  },
+};
