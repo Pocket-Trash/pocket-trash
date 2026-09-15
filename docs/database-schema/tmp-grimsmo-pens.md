@@ -10,7 +10,7 @@ No table description has been added yet.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | yes | PK |  |  |  |  |
 | `product_id` | `bigint` | yes | unique, FK |  | `tmp_products.id` (on delete cascade) |  |  |
-| `maker_id` | `bigint` | yes | FK |  | `makers.id` (on delete restrict) |  |  |
+| `maker_id` | `bigint` | yes | FK |  | `maker.id` (on delete restrict) |  |  |
 | `product_handle` | `text` | yes | unique |  |  |  |  |
 | `title` | `text` | yes |  |  |  |  |  |
 | `product_url` | `text` | yes |  |  |  |  |  |

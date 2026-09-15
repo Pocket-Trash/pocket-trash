@@ -9,7 +9,7 @@ Join table connecting Autmog pens to canonical material values.
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `pen_id` | `bigint` | yes | FK |  | `tmp_autmog_pens.id` (on delete cascade) | Autmog pen row that uses the material. | `1000` |
-| `material_id` | `bigint` | yes | FK |  | `materials.id` (on delete restrict) | Canonical material assigned to the pen. | `1000` |
+| `material_id` | `bigint` | yes | FK |  | `material.id` (on delete restrict) | Canonical material assigned to the pen. | `1000` |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the material assignment was created. | `2026-07-17T20:45:00.000Z` |
 
 ## Indexes

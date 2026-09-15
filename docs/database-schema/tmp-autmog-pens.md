@@ -10,8 +10,8 @@ Latest normalized Autmog pen product records.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | yes | PK |  |  | Internal Autmog pen row identifier. | `1000` |
 | `product_id` | `bigint` | yes | unique, FK |  | `tmp_products.id` (on delete cascade) | Generic temporary product row for this source-specific Autmog pen row. | `1000` |
-| `maker_id` | `bigint` | yes | FK |  | `makers.id` (on delete restrict) | Maker row for Autmog. | `1000` |
-| `mechanism_id` | `bigint` | no | FK |  | `mechanisms.id` (on delete restrict) | Canonical mechanism assigned to the pen. | `1000` |
+| `maker_id` | `bigint` | yes | FK |  | `maker.id` (on delete restrict) | Maker row for Autmog. | `1000` |
+| `mechanism_id` | `bigint` | no | FK |  | `mechanism.id` (on delete restrict) | Canonical mechanism assigned to the pen. | `1000` |
 | `source_product_id` | `text` | yes | unique |  |  | Shopify product ID from Autmog. | `8383420301499` |
 | `source_handle` | `text` | yes |  |  |  | Shopify product handle from Autmog. | `36-click-pen-6al-4v-titanium` |
 | `title` | `text` | yes |  |  |  | Normalized product title. | `36 Click Pen - 6Al-4V Titanium` |

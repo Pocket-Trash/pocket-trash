@@ -10,7 +10,7 @@ No table description has been added yet.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | yes | PK | `gen_random_uuid()` |  |  |  |
 | `flag_id` | `uuid` | yes | FK |  | `feature_flags.id` (on delete cascade) |  |  |
-| `user_id` | `bigint` | yes | FK |  | `users.id` (on delete cascade) |  |  |
+| `user_id` | `bigint` | yes | FK |  | `user.id` (on delete cascade) |  |  |
 | `source` | `feature_flag_override_source` | yes |  |  |  |  |  |
 | `enabled` | `boolean` | yes |  |  |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |

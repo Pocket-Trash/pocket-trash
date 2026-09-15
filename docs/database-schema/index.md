@@ -4,12 +4,17 @@
 
 Generated schema documentation for committed Drizzle tables.
 
+- [`collection_item`](./collection-item.md)
+- [`collection_spinner`](./collection-spinner.md)
+- [`collection_spinner_button`](./collection-spinner-button.md)
 - [`feature_flag_user_overrides`](./feature-flag-user-overrides.md)
 - [`feature_flags`](./feature-flags.md)
-- [`makers`](./makers.md)
-- [`materials`](./materials.md)
-- [`mechanisms`](./mechanisms.md)
-- [`product_types`](./product-types.md)
+- [`maker`](./maker.md)
+- [`material`](./material.md)
+- [`mechanism`](./mechanism.md)
+- [`product_spinner`](./product-spinner.md)
+- [`product_spinner_button`](./product-spinner-button.md)
+- [`product_type`](./product-type.md)
 - [`scraper_runs`](./scraper-runs.md)
 - [`tmp_autmog_pen_materials`](./tmp-autmog-pen-materials.md)
 - [`tmp_autmog_pen_versions`](./tmp-autmog-pen-versions.md)
@@ -26,5 +31,5 @@ Generated schema documentation for committed Drizzle tables.
 - [`tmp_product_product_types`](./tmp-product-product-types.md)
 - [`tmp_product_variations`](./tmp-product-variations.md)
 - [`tmp_products`](./tmp-products.md)
+- [`user`](./user.md)
 - [`user_settings`](./user-settings.md)
-- [`users`](./users.md)

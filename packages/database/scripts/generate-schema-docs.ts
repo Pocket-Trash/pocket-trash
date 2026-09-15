@@ -272,8 +272,8 @@ function escapeTableCell(value: string): string {
   return value.replaceAll("|", "\\|").replaceAll("\n", "<br>");
 }
 
-function escapeMarkdown(value: string): string {
-  return value.replaceAll("|", "\\|");
+function escapeMarkdown(value: unknown): string {
+  return String(value).replaceAll("|", "\\|");
 }
 
 await main();
