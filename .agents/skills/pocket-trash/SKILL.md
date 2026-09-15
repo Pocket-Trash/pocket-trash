@@ -47,16 +47,18 @@ list the available subcommands with one-line descriptions and tell them to use
 - `localization-audit`: audit Pocket Trash code for user-visible hard-coded
   strings. Read
   [references/localization-audit.md](references/localization-audit.md).
+- `storybook`: add or update Pocket Trash Storybook stories. Read
+  [references/storybook.md](references/storybook.md).
 
 Match obvious aliases to the same subcommands, for example `pr`, `pull request`,
 `review`, `linear`, `ticket`, `database conflicts`, `migrations`, `figma`,
 `figjam`, `bunny`, `logging`, `localization`, `localize`, `translations`,
-`i18n`, and `copy audit`.
+`i18n`, `copy audit`, and `stories`.
 
 ## Repo Scope
 
-The `logger`, `db-migration-conflicts`, `figjam`, `bunny-audit`, `localize`, and
-`localization-audit` subcommands are only intended for the
+The `logger`, `db-migration-conflicts`, `figjam`, `bunny-audit`, `localize`,
+`localization-audit`, and `storybook` subcommands are only intended for the
 `Pocket-Trash/pocket-trash` repo.
 
 Before using one of those subcommands, check the current repo:
