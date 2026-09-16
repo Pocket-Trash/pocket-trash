@@ -7,8 +7,8 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { makers, materials, productTypes } from "./scraper.js";
-import { users } from "./users.js";
+import { maker, material, productType } from "./scraper.js";
+import { user } from "./users.js";
 
 export const collectionItem = pgTable("collection_item", {
   id: bigint("id", { mode: "number" })
@@ -16,15 +16,15 @@ export const collectionItem = pgTable("collection_item", {
     .generatedAlwaysAsIdentity({ startWith: 1000 }),
   ownerId: bigint("owner_id", { mode: "number" })
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => user.id, { onDelete: "cascade" }),
   purchasedAt: timestamp("purchased_at", { withTimezone: true }),
   soldAt: timestamp("sold_at", { withTimezone: true }),
   purchasedFromUserId: bigint("purchased_from_user_id", {
     mode: "number",
-  }).references(() => users.id, { onDelete: "set null" }),
+  }).references(() => user.id, { onDelete: "set null" }),
   purchasedFromUser: text("purchased_from_user"),
   soldToUserId: bigint("sold_to_user_id", { mode: "number" }).references(
-    () => users.id,
+    () => user.id,
     { onDelete: "set null" },
   ),
   soldToUser: text("sold_to_user"),
@@ -39,14 +39,14 @@ export const productSpinner = pgTable(
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
     makerId: bigint("maker_id", { mode: "number" })
       .notNull()
-      .references(() => makers.id, { onDelete: "restrict" }),
+      .references(() => maker.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     productTypeId: bigint("product_type_id", { mode: "number" })
       .notNull()
-      .references(() => productTypes.id, { onDelete: "restrict" }),
+      .references(() => productType.id, { onDelete: "restrict" }),
     materialId: bigint("material_id", { mode: "number" }).references(
-      () => materials.id,
+      () => material.id,
       { onDelete: "restrict" },
     ),
     weightG: decimal("weight_g"),
@@ -75,14 +75,14 @@ export const productSpinnerButton = pgTable(
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
     makerId: bigint("maker_id", { mode: "number" })
       .notNull()
-      .references(() => makers.id, { onDelete: "restrict" }),
+      .references(() => maker.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     productTypeId: bigint("product_type_id", { mode: "number" })
       .notNull()
-      .references(() => productTypes.id, { onDelete: "restrict" }),
+      .references(() => productType.id, { onDelete: "restrict" }),
     materialId: bigint("material_id", { mode: "number" }).references(
-      () => materials.id,
+      () => material.id,
       { onDelete: "restrict" },
     ),
     weightG: decimal("weight_g"),

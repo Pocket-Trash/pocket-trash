@@ -9,7 +9,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { featureFlagAudiences, featureFlagOverrideSources } from "./enums.js";
-import { users } from "./users.js";
+import { user } from "./users.js";
 
 export const featureFlagAudienceEnum = pgEnum(
   "feature_flag_audience",
@@ -48,7 +48,7 @@ export const featureFlagUserOverrides = pgTable(
       .references(() => featureFlags.id, { onDelete: "cascade" }),
     userId: bigint("user_id", { mode: "number" })
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => user.id, { onDelete: "cascade" }),
     source: featureFlagOverrideSourceEnum("source").notNull(),
     enabled: boolean("enabled").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })

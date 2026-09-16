@@ -8,10 +8,10 @@ import {
 } from "./collection.js";
 import { featureFlags, featureFlagUserOverrides } from "./feature-flags.js";
 import {
-  makers,
-  materials,
-  mechanisms,
-  productTypes,
+  maker,
+  material,
+  mechanism,
+  productType,
   scraperRuns,
   tmpAutmogPenMaterials,
   tmpAutmogPens,
@@ -30,16 +30,16 @@ import {
   tmpProductVariations,
 } from "./scraper.js";
 import { userSettings } from "./user-settings.js";
-import { users } from "./users.js";
+import { user } from "./users.js";
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(user, ({ one }) => ({
   settings: one(userSettings),
 }));
 
 export const userSettingsRelations = relations(userSettings, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userSettings.userId],
-    references: [users.id],
+    references: [user.id],
   }),
 }));
 
@@ -54,14 +54,14 @@ export const featureFlagUserOverridesRelations = relations(
       fields: [featureFlagUserOverrides.flagId],
       references: [featureFlags.id],
     }),
-    user: one(users, {
+    user: one(user, {
       fields: [featureFlagUserOverrides.userId],
-      references: [users.id],
+      references: [user.id],
     }),
   }),
 );
 
-export const makersRelations = relations(makers, ({ many }) => ({
+export const makersRelations = relations(maker, ({ many }) => ({
   autmogPens: many(tmpAutmogPens),
   grimsmoKnives: many(tmpGrimsmoKnives),
   grimsmoPens: many(tmpGrimsmoPens),
@@ -69,17 +69,17 @@ export const makersRelations = relations(makers, ({ many }) => ({
   spinners: many(productSpinner),
 }));
 
-export const materialsRelations = relations(materials, ({ many }) => ({
+export const materialsRelations = relations(material, ({ many }) => ({
   autmogPens: many(tmpAutmogPenMaterials),
   spinnerButtons: many(productSpinnerButton),
   spinners: many(productSpinner),
 }));
 
-export const mechanismsRelations = relations(mechanisms, ({ many }) => ({
+export const mechanismsRelations = relations(mechanism, ({ many }) => ({
   autmogPens: many(tmpAutmogPens),
 }));
 
-export const productTypesRelations = relations(productTypes, ({ many }) => ({
+export const productTypesRelations = relations(productType, ({ many }) => ({
   products: many(tmpProductProductTypes),
   spinnerButtons: many(productSpinnerButton),
   spinners: many(productSpinner),
@@ -88,17 +88,17 @@ export const productTypesRelations = relations(productTypes, ({ many }) => ({
 export const scraperRunsRelations = relations(scraperRuns, () => ({}));
 
 export const collectionItemRelations = relations(collectionItem, ({ one }) => ({
-  owner: one(users, {
+  owner: one(user, {
     fields: [collectionItem.ownerId],
-    references: [users.id],
+    references: [user.id],
   }),
-  purchasedFromUser: one(users, {
+  purchasedFromUser: one(user, {
     fields: [collectionItem.purchasedFromUserId],
-    references: [users.id],
+    references: [user.id],
   }),
-  soldToUser: one(users, {
+  soldToUser: one(user, {
     fields: [collectionItem.soldToUserId],
-    references: [users.id],
+    references: [user.id],
   }),
   spinner: one(collectionSpinner, {
     fields: [collectionItem.id],
@@ -111,34 +111,34 @@ export const collectionItemRelations = relations(collectionItem, ({ one }) => ({
 }));
 
 export const productSpinnerRelations = relations(productSpinner, ({ one }) => ({
-  maker: one(makers, {
+  maker: one(maker, {
     fields: [productSpinner.makerId],
-    references: [makers.id],
+    references: [maker.id],
   }),
-  material: one(materials, {
+  material: one(material, {
     fields: [productSpinner.materialId],
-    references: [materials.id],
+    references: [material.id],
   }),
-  productType: one(productTypes, {
+  productType: one(productType, {
     fields: [productSpinner.productTypeId],
-    references: [productTypes.id],
+    references: [productType.id],
   }),
 }));
 
 export const productSpinnerButtonRelations = relations(
   productSpinnerButton,
   ({ one }) => ({
-    maker: one(makers, {
+    maker: one(maker, {
       fields: [productSpinnerButton.makerId],
-      references: [makers.id],
+      references: [maker.id],
     }),
-    material: one(materials, {
+    material: one(material, {
       fields: [productSpinnerButton.materialId],
-      references: [materials.id],
+      references: [material.id],
     }),
-    productType: one(productTypes, {
+    productType: one(productType, {
       fields: [productSpinnerButton.productTypeId],
-      references: [productTypes.id],
+      references: [productType.id],
     }),
   }),
 );
@@ -178,14 +178,14 @@ export const collectionSpinnerButtonRelations = relations(
 export const tmpAutmogPensRelations = relations(
   tmpAutmogPens,
   ({ many, one }) => ({
-    maker: one(makers, {
+    maker: one(maker, {
       fields: [tmpAutmogPens.makerId],
-      references: [makers.id],
+      references: [maker.id],
     }),
     materials: many(tmpAutmogPenMaterials),
-    mechanism: one(mechanisms, {
+    mechanism: one(mechanism, {
       fields: [tmpAutmogPens.mechanismId],
-      references: [mechanisms.id],
+      references: [mechanism.id],
     }),
     product: one(tmpProducts, {
       fields: [tmpAutmogPens.productId],
@@ -198,9 +198,9 @@ export const tmpAutmogPensRelations = relations(
 export const tmpAutmogPenMaterialsRelations = relations(
   tmpAutmogPenMaterials,
   ({ one }) => ({
-    material: one(materials, {
+    material: one(material, {
       fields: [tmpAutmogPenMaterials.materialId],
-      references: [materials.id],
+      references: [material.id],
     }),
     pen: one(tmpAutmogPens, {
       fields: [tmpAutmogPenMaterials.penId],
@@ -253,9 +253,9 @@ export const tmpProductProductTypesRelations = relations(
       fields: [tmpProductProductTypes.productId],
       references: [tmpProducts.id],
     }),
-    productType: one(productTypes, {
+    productType: one(productType, {
       fields: [tmpProductProductTypes.productTypeId],
-      references: [productTypes.id],
+      references: [productType.id],
     }),
   }),
 );
@@ -284,9 +284,9 @@ export const tmpAutmogPenVersionsRelations = relations(
 export const tmpGrimsmoPensRelations = relations(
   tmpGrimsmoPens,
   ({ many, one }) => ({
-    maker: one(makers, {
+    maker: one(maker, {
       fields: [tmpGrimsmoPens.makerId],
-      references: [makers.id],
+      references: [maker.id],
     }),
     product: one(tmpProducts, {
       fields: [tmpGrimsmoPens.productId],
@@ -335,9 +335,9 @@ export const tmpGrimsmoPenVariationVersionsRelations = relations(
 export const tmpGrimsmoKnivesRelations = relations(
   tmpGrimsmoKnives,
   ({ many, one }) => ({
-    maker: one(makers, {
+    maker: one(maker, {
       fields: [tmpGrimsmoKnives.makerId],
-      references: [makers.id],
+      references: [maker.id],
     }),
     product: one(tmpProducts, {
       fields: [tmpGrimsmoKnives.productId],

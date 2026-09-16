@@ -28,11 +28,11 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
           assertClerkId(clerkId);
 
           const [user] = await db
-            .insert(schema.users)
+            .insert(schema.user)
             .values({ clerkId })
             .onConflictDoUpdate({
               set: { clerkId },
-              target: schema.users.clerkId,
+              target: schema.user.clerkId,
             })
             .returning();
 
@@ -57,8 +57,8 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
 
           const [user] = await db
             .select()
-            .from(schema.users)
-            .where(eq(schema.users.clerkId, clerkId))
+            .from(schema.user)
+            .where(eq(schema.user.clerkId, clerkId))
             .limit(1);
 
           return user ?? null;

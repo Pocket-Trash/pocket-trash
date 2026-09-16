@@ -391,16 +391,16 @@ async function syncAutmogPenMaterials(
   for (const name of names) {
     const slug = slugifyCanonicalName(name);
     const [material] = await db
-      .insert(schema.materials)
+      .insert(schema.material)
       .values({
         name,
         slug,
       })
       .onConflictDoNothing({
-        target: schema.materials.slug,
+        target: schema.material.slug,
       })
       .returning({
-        id: schema.materials.id,
+        id: schema.material.id,
       });
     const materialRow =
       material ?? (await getMaterialBySlug(db, slug, `material ${name}`));
@@ -436,16 +436,16 @@ async function ensureAutmogMechanism(
 
   const slug = slugifyCanonicalName(name);
   const [mechanism] = await db
-    .insert(schema.mechanisms)
+    .insert(schema.mechanism)
     .values({
       name,
       slug,
     })
     .onConflictDoNothing({
-      target: schema.mechanisms.slug,
+      target: schema.mechanism.slug,
     })
     .returning({
-      id: schema.mechanisms.id,
+      id: schema.mechanism.id,
     });
 
   return mechanism ?? (await getMechanismBySlug(db, slug, `mechanism ${name}`));
@@ -453,9 +453,9 @@ async function ensureAutmogMechanism(
 
 async function getMaterialBySlug(db: Database, slug: string, label: string) {
   const [material] = await db
-    .select({ id: schema.materials.id })
-    .from(schema.materials)
-    .where(eq(schema.materials.slug, slug))
+    .select({ id: schema.material.id })
+    .from(schema.material)
+    .where(eq(schema.material.slug, slug))
     .limit(1);
 
   if (!material) {
@@ -467,9 +467,9 @@ async function getMaterialBySlug(db: Database, slug: string, label: string) {
 
 async function getMechanismBySlug(db: Database, slug: string, label: string) {
   const [mechanism] = await db
-    .select({ id: schema.mechanisms.id })
-    .from(schema.mechanisms)
-    .where(eq(schema.mechanisms.slug, slug))
+    .select({ id: schema.mechanism.id })
+    .from(schema.mechanism)
+    .where(eq(schema.mechanism.slug, slug))
     .limit(1);
 
   if (!mechanism) {
@@ -481,9 +481,9 @@ async function getMechanismBySlug(db: Database, slug: string, label: string) {
 
 async function getProductTypeBySlug(db: Database, slug: string, label: string) {
   const [productType] = await db
-    .select({ id: schema.productTypes.id })
-    .from(schema.productTypes)
-    .where(eq(schema.productTypes.slug, slug))
+    .select({ id: schema.productType.id })
+    .from(schema.productType)
+    .where(eq(schema.productType.slug, slug))
     .limit(1);
 
   if (!productType) {
@@ -506,16 +506,16 @@ async function syncTmpProductProductTypes(
   for (const name of names) {
     const slug = slugifyCanonicalName(name);
     const [productType] = await db
-      .insert(schema.productTypes)
+      .insert(schema.productType)
       .values({
         name,
         slug,
       })
       .onConflictDoNothing({
-        target: schema.productTypes.slug,
+        target: schema.productType.slug,
       })
       .returning({
-        id: schema.productTypes.id,
+        id: schema.productType.id,
       });
     const productTypeRow =
       productType ??
@@ -552,10 +552,10 @@ function slugifyCanonicalName(name: string): string {
 
 async function ensureAutmogMaker(db: Database) {
   const [maker] = await db
-    .insert(schema.makers)
+    .insert(schema.maker)
     .values(autmogMaker)
     .onConflictDoNothing({
-      target: schema.makers.rootUrl,
+      target: schema.maker.rootUrl,
     })
     .returning();
 
@@ -571,8 +571,8 @@ async function ensureAutmogMaker(db: Database) {
 async function getMakerByRootUrl(db: Database, rootUrl: string) {
   const [maker] = await db
     .select()
-    .from(schema.makers)
-    .where(eq(schema.makers.rootUrl, rootUrl))
+    .from(schema.maker)
+    .where(eq(schema.maker.rootUrl, rootUrl))
     .limit(1);
 
   return maker;

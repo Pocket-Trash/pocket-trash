@@ -135,7 +135,7 @@ export type ScraperRunStats = {
   updatedCount?: number;
 };
 
-export const makers = pgTable(
+export const maker = pgTable(
   "maker",
   {
     id: bigint("id", { mode: "number" })
@@ -188,7 +188,7 @@ export const scraperRuns = pgTable(
   }),
 );
 
-export const materials = pgTable(
+export const material = pgTable(
   "material",
   {
     id: bigint("id", { mode: "number" })
@@ -208,7 +208,7 @@ export const materials = pgTable(
   }),
 );
 
-export const mechanisms = pgTable(
+export const mechanism = pgTable(
   "mechanism",
   {
     id: bigint("id", { mode: "number" })
@@ -228,7 +228,7 @@ export const mechanisms = pgTable(
   }),
 );
 
-export const productTypes = pgTable(
+export const productType = pgTable(
   "product_type",
   {
     id: bigint("id", { mode: "number" })
@@ -372,9 +372,9 @@ export const tmpAutmogPens = pgTable(
       .references(() => tmpProducts.id, { onDelete: "cascade" }),
     makerId: bigint("maker_id", { mode: "number" })
       .notNull()
-      .references(() => makers.id, { onDelete: "restrict" }),
+      .references(() => maker.id, { onDelete: "restrict" }),
     mechanismId: bigint("mechanism_id", { mode: "number" }).references(
-      () => mechanisms.id,
+      () => mechanism.id,
       { onDelete: "restrict" },
     ),
     sourceProductId: text("source_product_id").notNull(),
@@ -436,7 +436,7 @@ export const tmpAutmogPenMaterials = pgTable(
       .references(() => tmpAutmogPens.id, { onDelete: "cascade" }),
     materialId: bigint("material_id", { mode: "number" })
       .notNull()
-      .references(() => materials.id, { onDelete: "restrict" }),
+      .references(() => material.id, { onDelete: "restrict" }),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -463,7 +463,7 @@ export const tmpGrimsmoPens = pgTable(
       .references(() => tmpProducts.id, { onDelete: "cascade" }),
     makerId: bigint("maker_id", { mode: "number" })
       .notNull()
-      .references(() => makers.id, { onDelete: "restrict" }),
+      .references(() => maker.id, { onDelete: "restrict" }),
     productHandle: text("product_handle").notNull(),
     title: text("title").notNull(),
     productUrl: text("product_url").notNull(),
@@ -595,7 +595,7 @@ export const tmpGrimsmoKnives = pgTable(
       .references(() => tmpProducts.id, { onDelete: "cascade" }),
     makerId: bigint("maker_id", { mode: "number" })
       .notNull()
-      .references(() => makers.id, { onDelete: "restrict" }),
+      .references(() => maker.id, { onDelete: "restrict" }),
     knifeType: text("knife_type").notNull(),
     productHandle: text("product_handle").notNull(),
     title: text("title").notNull(),
@@ -734,7 +734,7 @@ export const tmpProductProductTypes = pgTable(
       .references(() => tmpProducts.id, { onDelete: "cascade" }),
     productTypeId: bigint("product_type_id", { mode: "number" })
       .notNull()
-      .references(() => productTypes.id, { onDelete: "restrict" }),
+      .references(() => productType.id, { onDelete: "restrict" }),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -901,14 +901,14 @@ export const tmpGrimsmoKnifeVariationVersions = pgTable(
   }),
 );
 
-export type Maker = typeof makers.$inferSelect;
-export type NewMaker = typeof makers.$inferInsert;
-export type Material = typeof materials.$inferSelect;
-export type NewMaterial = typeof materials.$inferInsert;
-export type Mechanism = typeof mechanisms.$inferSelect;
-export type NewMechanism = typeof mechanisms.$inferInsert;
-export type ProductType = typeof productTypes.$inferSelect;
-export type NewProductType = typeof productTypes.$inferInsert;
+export type Maker = typeof maker.$inferSelect;
+export type NewMaker = typeof maker.$inferInsert;
+export type Material = typeof material.$inferSelect;
+export type NewMaterial = typeof material.$inferInsert;
+export type Mechanism = typeof mechanism.$inferSelect;
+export type NewMechanism = typeof mechanism.$inferInsert;
+export type ProductType = typeof productType.$inferSelect;
+export type NewProductType = typeof productType.$inferInsert;
 export type ScraperRun = typeof scraperRuns.$inferSelect;
 export type NewScraperRun = typeof scraperRuns.$inferInsert;
 export type TmpImage = typeof tmpImages.$inferSelect;

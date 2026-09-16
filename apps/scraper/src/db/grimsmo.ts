@@ -414,10 +414,10 @@ export async function reconcileGrimsmoKnifeVariationBatch(
 
 async function ensureGrimsmoMaker(db: Database) {
   const [maker] = await db
-    .insert(schema.makers)
+    .insert(schema.maker)
     .values(grimsmoMaker)
     .onConflictDoNothing({
-      target: schema.makers.rootUrl,
+      target: schema.maker.rootUrl,
     })
     .returning();
 
@@ -433,8 +433,8 @@ async function ensureGrimsmoMaker(db: Database) {
 async function getMakerByRootUrl(db: Database, rootUrl: string) {
   const [maker] = await db
     .select()
-    .from(schema.makers)
-    .where(eq(schema.makers.rootUrl, rootUrl))
+    .from(schema.maker)
+    .where(eq(schema.maker.rootUrl, rootUrl))
     .limit(1);
 
   return maker;
