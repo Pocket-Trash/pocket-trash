@@ -435,7 +435,12 @@ export function createCollectionsService(
           schema.collectionSpinnerButton,
           eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
         )
-        .where(eq(schema.collectionItem.ownerId, owner.id))
+        .where(
+          and(
+            eq(schema.collectionItem.ownerId, owner.id),
+            eq(schema.collectionItem.owned, true),
+          ),
+        )
         .groupBy(
           schema.collectionSpinner.productSpinnerId,
           schema.collectionSpinnerButton.productSpinnerButtonId,
@@ -478,9 +483,12 @@ export function createCollectionsService(
           eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
         )
         .where(
-          or(
-            isNotNull(schema.collectionSpinner.id),
-            isNotNull(schema.collectionSpinnerButton.id),
+          and(
+            eq(schema.collectionItem.owned, true),
+            or(
+              isNotNull(schema.collectionSpinner.id),
+              isNotNull(schema.collectionSpinnerButton.id),
+            ),
           ),
         )
         .groupBy(schema.user.id)
@@ -505,6 +513,7 @@ export function createCollectionsService(
                 and(
                   eq(schema.collectionSpinnerButton.id, installedButtonId),
                   eq(schema.collectionItem.ownerId, owner.id),
+                  eq(schema.collectionItem.owned, true),
                 ),
               )
               .limit(1);
@@ -522,6 +531,7 @@ export function createCollectionsService(
               and(
                 eq(schema.collectionSpinner.id, collectionItemId),
                 eq(schema.collectionItem.ownerId, owner.id),
+                eq(schema.collectionItem.owned, true),
               ),
             )
             .limit(1);
@@ -655,7 +665,10 @@ async function queryOwnedItems(
   actorClerkId: string,
   collectionItemId?: number,
 ): Promise<UserCollectionItem[]> {
-  const conditions = [eq(schema.user.clerkId, actorClerkId)];
+  const conditions = [
+    eq(schema.user.clerkId, actorClerkId),
+    eq(schema.collectionItem.owned, true),
+  ];
   if (collectionItemId !== undefined) {
     conditions.push(eq(schema.collectionItem.id, collectionItemId));
   }

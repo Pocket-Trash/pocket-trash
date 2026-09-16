@@ -2,7 +2,7 @@ import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
 import { describe, expect, it, vi } from "vitest";
-import { createCollectionsService } from "./index.js";
+import { createCatalogService, createCollectionsService } from "./index.js";
 
 function setup(returningRows: unknown[][]) {
   const writes: Array<{ table: unknown; value: unknown }> = [];
@@ -86,5 +86,44 @@ describe("collection catalog writes", () => {
         },
       },
     ]);
+  });
+});
+
+describe("catalog lookup writes", () => {
+  it.each([
+    "maker",
+    "material",
+  ] as const)("rejects a case-insensitive duplicate %s name", async (kind) => {
+    const insert = vi.fn();
+    const db = {
+      insert,
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn().mockResolvedValue([{ id: 1000 }]),
+          })),
+        })),
+      })),
+    } as unknown as Database;
+    const service = createCatalogService(
+      db,
+      createLogger({ app: "api", environment: "test" }),
+    );
+
+    const result =
+      kind === "maker"
+        ? service.createMaker({
+            actorClerkId: "user-secret",
+            name: "bronze",
+            rootUrl: null,
+          })
+        : service.createMaterial({
+            actorClerkId: "user-secret",
+            name: "bronze",
+            slug: "bronze-2",
+          });
+
+    await expect(result).rejects.toThrow(/already exists/i);
+    expect(insert).not.toHaveBeenCalled();
   });
 });

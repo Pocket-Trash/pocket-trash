@@ -1,4 +1,5 @@
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { createDb } from "../src/client.js";
 import { createDatabaseEnv } from "../src/env.schema.js";
@@ -89,4 +90,4 @@ async function main() {
   console.log("Product catalog seed complete.");
 }
 
-await main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main();

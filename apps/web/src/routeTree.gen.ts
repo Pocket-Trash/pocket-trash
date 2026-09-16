@@ -27,7 +27,7 @@ import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.sett
 import { Route as ProductsProductTypeSlugProductSlugRouteImport } from './routes/products.$productTypeSlug.$productSlug'
 import { Route as CollectionsEditCollectionItemIdRouteImport } from './routes/collections.edit.$collectionItemId'
 import { Route as AdminSettingsFeatureFlagsRouteImport } from './routes/admin.settings.feature-flags'
-import { Route as ProductsProductTypeSlugProductSlugEditRouteImport } from './routes/products.$productTypeSlug.$productSlug.edit'
+import { Route as ProductsProductTypeSlugProductSlugEditRouteImport } from './routes/products.$productTypeSlug.$productSlug_.edit'
 
 const UserRoute = UserRouteImport.update({
   id: '/user',
@@ -125,9 +125,9 @@ const AdminSettingsFeatureFlagsRoute =
   } as any)
 const ProductsProductTypeSlugProductSlugEditRoute =
   ProductsProductTypeSlugProductSlugEditRouteImport.update({
-    id: '/edit',
-    path: '/edit',
-    getParentRoute: () => ProductsProductTypeSlugProductSlugRoute,
+    id: '/products/$productTypeSlug/$productSlug_/edit',
+    path: '/products/$productTypeSlug/$productSlug/edit',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -147,7 +147,7 @@ export interface FileRoutesByFullPath {
   '/products/': typeof ProductsIndexRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
   '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
-  '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRouteWithChildren
+  '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
 }
@@ -168,7 +168,7 @@ export interface FileRoutesByTo {
   '/products': typeof ProductsIndexRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
   '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
-  '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRouteWithChildren
+  '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
 }
@@ -190,9 +190,9 @@ export interface FileRoutesById {
   '/products/': typeof ProductsIndexRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
   '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
-  '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRouteWithChildren
+  '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
-  '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
+  '/products/$productTypeSlug/$productSlug_/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -257,7 +257,7 @@ export interface FileRouteTypes {
     | '/collections/edit/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug'
     | '/user/settings/beta-features'
-    | '/products/$productTypeSlug/$productSlug/edit'
+    | '/products/$productTypeSlug/$productSlug_/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -274,7 +274,8 @@ export interface RootRouteChildren {
   ProductsIndexRoute: typeof ProductsIndexRoute
   AdminSettingsFeatureFlagsRoute: typeof AdminSettingsFeatureFlagsRoute
   CollectionsEditCollectionItemIdRoute: typeof CollectionsEditCollectionItemIdRoute
-  ProductsProductTypeSlugProductSlugRoute: typeof ProductsProductTypeSlugProductSlugRouteWithChildren
+  ProductsProductTypeSlugProductSlugRoute: typeof ProductsProductTypeSlugProductSlugRoute
+  ProductsProductTypeSlugProductSlugEditRoute: typeof ProductsProductTypeSlugProductSlugEditRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -405,12 +406,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsFeatureFlagsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/products/$productTypeSlug/$productSlug/edit': {
-      id: '/products/$productTypeSlug/$productSlug/edit'
-      path: '/edit'
+    '/products/$productTypeSlug/$productSlug_/edit': {
+      id: '/products/$productTypeSlug/$productSlug_/edit'
+      path: '/products/$productTypeSlug/$productSlug/edit'
       fullPath: '/products/$productTypeSlug/$productSlug/edit'
       preLoaderRoute: typeof ProductsProductTypeSlugProductSlugEditRouteImport
-      parentRoute: typeof ProductsProductTypeSlugProductSlugRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -440,21 +441,6 @@ const UserRouteChildren: UserRouteChildren = {
 
 const UserRouteWithChildren = UserRoute._addFileChildren(UserRouteChildren)
 
-interface ProductsProductTypeSlugProductSlugRouteChildren {
-  ProductsProductTypeSlugProductSlugEditRoute: typeof ProductsProductTypeSlugProductSlugEditRoute
-}
-
-const ProductsProductTypeSlugProductSlugRouteChildren: ProductsProductTypeSlugProductSlugRouteChildren =
-  {
-    ProductsProductTypeSlugProductSlugEditRoute:
-      ProductsProductTypeSlugProductSlugEditRoute,
-  }
-
-const ProductsProductTypeSlugProductSlugRouteWithChildren =
-  ProductsProductTypeSlugProductSlugRoute._addFileChildren(
-    ProductsProductTypeSlugProductSlugRouteChildren,
-  )
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AutmogRoute: AutmogRouteWithChildren,
@@ -470,7 +456,9 @@ const rootRouteChildren: RootRouteChildren = {
   AdminSettingsFeatureFlagsRoute: AdminSettingsFeatureFlagsRoute,
   CollectionsEditCollectionItemIdRoute: CollectionsEditCollectionItemIdRoute,
   ProductsProductTypeSlugProductSlugRoute:
-    ProductsProductTypeSlugProductSlugRouteWithChildren,
+    ProductsProductTypeSlugProductSlugRoute,
+  ProductsProductTypeSlugProductSlugEditRoute:
+    ProductsProductTypeSlugProductSlugEditRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

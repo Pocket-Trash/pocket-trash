@@ -343,6 +343,9 @@ function LookupDialog(props: LookupDialogProps) {
   const titleId = React.useId();
   const [name, setName] = React.useState("");
   const [rootUrl, setRootUrl] = React.useState("");
+  const [fieldErrors, setFieldErrors] = React.useState<
+    Record<string, string[] | undefined>
+  >({});
   const [error, setError] = React.useState<string | null>(null);
   const action =
     kind === "maker" ? "web.action.addMaker" : "web.action.addMaterial";
@@ -351,6 +354,7 @@ function LookupDialog(props: LookupDialogProps) {
     if (props.kind === "maker") {
       const result = await createCatalogMaker({ data: { name, rootUrl } });
       if (!result.ok) {
+        setFieldErrors(result.fieldErrors);
         setError(result.formError);
         return;
       }
@@ -358,6 +362,7 @@ function LookupDialog(props: LookupDialogProps) {
     } else {
       const result = await createCatalogMaterial({ data: { name } });
       if (!result.ok) {
+        setFieldErrors(result.fieldErrors);
         setError(result.formError);
         return;
       }
@@ -365,6 +370,8 @@ function LookupDialog(props: LookupDialogProps) {
     }
     setName("");
     setRootUrl("");
+    setFieldErrors({});
+    setError(null);
     ref.current?.close();
   };
 
@@ -373,7 +380,11 @@ function LookupDialog(props: LookupDialogProps) {
       <Button
         aria-controls={dialogId}
         aria-haspopup="dialog"
-        onClick={() => ref.current?.showModal()}
+        onClick={() => {
+          setFieldErrors({});
+          setError(null);
+          ref.current?.showModal();
+        }}
         type="button"
         variant="outline"
       >
@@ -385,13 +396,7 @@ function LookupDialog(props: LookupDialogProps) {
         id={dialogId}
         ref={ref}
       >
-        <form
-          className="grid gap-4 p-6"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void create();
-          }}
-        >
+        <div className="grid gap-4 p-6">
           <h2 className="text-lg font-semibold" id={titleId}>
             {t(action)}
           </h2>
@@ -402,6 +407,7 @@ function LookupDialog(props: LookupDialogProps) {
               required
               value={name}
             />
+            <FieldError error={fieldErrors.name?.[0]} t={t} />
           </Field>
           {kind === "maker" ? (
             <Field label={t("web.catalog.field.rootUrl")}>
@@ -411,6 +417,7 @@ function LookupDialog(props: LookupDialogProps) {
                 type="url"
                 value={rootUrl}
               />
+              <FieldError error={fieldErrors.rootUrl?.[0]} t={t} />
             </Field>
           ) : (
             <Field label={t("web.catalog.field.slug")}>
@@ -430,9 +437,11 @@ function LookupDialog(props: LookupDialogProps) {
             >
               {t("action.cancel")}
             </Button>
-            <Button type="submit">{t(action)}</Button>
+            <Button onClick={() => void create()} type="button">
+              {t(action)}
+            </Button>
           </div>
-        </form>
+        </div>
       </dialog>
     </>
   );
@@ -507,7 +516,7 @@ export function CollectionAddPage({
         {slug && !productTypeIsSupported(slug) ? (
           <Notice>{t("web.catalog.notImplemented")}</Notice>
         ) : null}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
           {matchingProducts.map((candidate) => (
             <Button
               className="h-auto justify-start p-5 text-left"
