@@ -1,5 +1,4 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle } from "drizzle-orm/neon-serverless";
 import * as schema from "./schema/index.js";
 
 export type DatabaseConfig = {
@@ -11,10 +10,8 @@ export function createDb({ databaseUrl }: DatabaseConfig) {
     throw new Error("Database configuration requires databaseUrl.");
   }
 
-  const client = neon(databaseUrl);
-
   return drizzle({
-    client,
+    connection: databaseUrl,
     schema,
   });
 }
