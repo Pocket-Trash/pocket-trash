@@ -17,6 +17,10 @@ User-uploaded resources and their optional preview images.
 | `preview_image_size` | `integer` | no |  |  |  |  |  |
 | `preview_image_object_path` | `text` | no |  |  |  |  |  |
 | `preview_image_url` | `text` | no |  |  |  |  |  |
+| `is_private` | `boolean` | yes |  |  |  |  |  |
+| `private_reason` | `text` | no |  |  |  |  |  |
+| `privated_at` | `timestamp with time zone` | no |  |  |  |  |  |
+| `privated_by_clerk_id` | `text` | no |  |  |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 | `updated_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   check,
   index,
   integer,
@@ -30,6 +31,10 @@ export const resources = pgTable(
     previewImageSize: integer("preview_image_size"),
     previewImageObjectPath: text("preview_image_object_path"),
     previewImageUrl: text("preview_image_url"),
+    isPrivate: boolean("is_private").default(false).notNull(),
+    privateReason: text("private_reason"),
+    privatedAt: timestamp("privated_at", { mode: "date", withTimezone: true }),
+    privatedByClerkId: text("privated_by_clerk_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -43,6 +48,10 @@ export const resources = pgTable(
     check(
       "resources_preview_metadata_consistent",
       sql`num_nonnulls(${table.previewImageFileName}, ${table.previewImageContentType}, ${table.previewImageSize}, ${table.previewImageObjectPath}, ${table.previewImageUrl}) in (0, 5)`,
+    ),
+    check(
+      "resources_private_metadata_consistent",
+      sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 3) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
     ),
   ],
 );

@@ -4,8 +4,8 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { Check } from "lucide-react";
-import { useState } from "react";
+import { Check, ShieldMinus } from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import type { listResourceNotifications } from "@/lib/resources";
 import {
   markResourceNotificationRead,
+  markResourcePrivate,
   listResourceNotifications as reloadResourceNotifications,
 } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
@@ -29,6 +30,10 @@ export function AdminResourceNotificationsPage({
   const { locale } = useLocale();
   const [notifications, setNotifications] = useState(initialNotifications);
   const [acceptingId, setAcceptingId] = useState<number>();
+  const [markingPrivate, setMarkingPrivate] = useState(false);
+  const [moderating, setModerating] = useState<Notification | null>(null);
+  const [reason, setReason] = useState("");
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -119,22 +124,117 @@ export function AdminResourceNotificationsPage({
                     })}
                   </span>
                 </div>
-                <Button
-                  disabled={
-                    Boolean(notification.readAt) ||
-                    acceptingId === notification.id
-                  }
-                  onClick={() => void accept(notification.id)}
-                  type="button"
-                  variant="outline"
-                >
-                  <Check />
-                  {t("web.resources.action.accept")}
-                </Button>
+                <div className="flex flex-wrap gap-2 md:flex-col">
+                  <Button
+                    disabled={
+                      Boolean(notification.readAt) ||
+                      acceptingId === notification.id
+                    }
+                    onClick={() => void accept(notification.id)}
+                    type="button"
+                    variant="outline"
+                  >
+                    <Check />
+                    {t("web.resources.action.accept")}
+                  </Button>
+                  {!notification.isPrivate ? (
+                    <Button
+                      onClick={() => {
+                        setModerating(notification);
+                        setReason("");
+                        dialogRef.current?.showModal();
+                      }}
+                      type="button"
+                      variant="destructive"
+                    >
+                      <ShieldMinus />
+                      {t("web.resources.action.markPrivate")}
+                    </Button>
+                  ) : null}
+                </div>
               </article>
             ))}
           </div>
         )}
+        <dialog
+          aria-labelledby="mark-resource-private-title"
+          className="m-auto w-[min(32rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
+          ref={dialogRef}
+        >
+          <form
+            className="grid gap-5 p-6"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (!moderating || !reason.trim()) {
+                toast.error(t("web.resources.moderation.reasonRequired"));
+                return;
+              }
+              setMarkingPrivate(true);
+              try {
+                await markResourcePrivate({
+                  data: { reason, resourceId: moderating.resourceId },
+                });
+                setNotifications(await reloadResourceNotifications());
+                toast.success(
+                  t("web.resources.moderation.success", {
+                    name: moderating.resourceName,
+                  }),
+                );
+                dialogRef.current?.close();
+              } catch {
+                toast.error(t("web.resources.moderation.failure"));
+              } finally {
+                setMarkingPrivate(false);
+              }
+            }}
+          >
+            <div className="grid gap-2">
+              <h2
+                className="m-0 text-xl font-semibold"
+                id="mark-resource-private-title"
+              >
+                {t("web.resources.moderation.confirmationTitle")}
+              </h2>
+              <p className="m-0 text-sm text-muted-foreground">
+                {t("web.resources.moderation.confirmationDescription", {
+                  name: moderating?.resourceName ?? "",
+                })}
+              </p>
+            </div>
+            <label
+              className="grid gap-2 text-sm font-medium"
+              htmlFor="private-resource-reason"
+            >
+              {t("web.resources.moderation.reasonLabel")}
+              <textarea
+                className="min-h-28 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                id="private-resource-reason"
+                maxLength={1000}
+                onChange={(event) => setReason(event.target.value)}
+                placeholder={t("web.resources.moderation.reasonPlaceholder")}
+                required
+                value={reason}
+              />
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button
+                disabled={markingPrivate}
+                onClick={() => dialogRef.current?.close()}
+                type="button"
+                variant="outline"
+              >
+                {t("action.cancel")}
+              </Button>
+              <Button
+                disabled={markingPrivate || !reason.trim()}
+                type="submit"
+                variant="destructive"
+              >
+                {t("web.resources.action.markPrivate")}
+              </Button>
+            </div>
+          </form>
+        </dialog>
       </main>
     </AppShell>
   );

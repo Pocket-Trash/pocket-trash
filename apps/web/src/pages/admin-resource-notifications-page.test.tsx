@@ -33,6 +33,7 @@ describe("admin resource notifications", () => {
             categoryName: null,
             createdAt,
             id: 1000,
+            isPrivate: false,
             readAt: null,
             readByClerkId: null,
             resourceId: 1000,
@@ -45,6 +46,7 @@ describe("admin resource notifications", () => {
             categoryName: "3D printing",
             createdAt,
             id: 1001,
+            isPrivate: false,
             readAt: createdAt,
             readByClerkId: "admin_123",
             resourceId: 1000,
@@ -61,6 +63,9 @@ describe("admin resource notifications", () => {
     expect(html).toContain("Resource: Pocket clip");
     expect(html).toContain("Category: 3D printing");
     expect(html).toContain("Uploader: user_123");
+    expect(html).toContain("Mark private");
+    expect(html).toContain("Reason for delisting");
+    expect(html).toContain("Delist");
     expect(html).toContain('href="/resources/1000"');
   });
 });

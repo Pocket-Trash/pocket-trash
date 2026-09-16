@@ -1,7 +1,7 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { getAuthState } from "@/lib/auth";
-import { getOwnedResourceDetail } from "@/lib/resources";
+import { getEditableResourceDetail } from "@/lib/resources";
 import { ResourceEditPage } from "@/pages/resource-management-pages";
 
 export const Route = createFileRoute("/resources/$resourceId/edit")({
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/resources/$resourceId/edit")({
   },
   component: ResourceEditRoute,
   loader: async ({ params }) => {
-    const detail = await getOwnedResourceDetail({
+    const detail = await getEditableResourceDetail({
       data: { resourceId: Number(params.resourceId) },
     });
     if (!detail) throw notFound();

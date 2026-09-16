@@ -11,6 +11,7 @@ import {
   FileArchive,
   FileDown,
   FileText,
+  Pencil,
   Upload,
 } from "lucide-react";
 import { useState } from "react";
@@ -119,6 +120,11 @@ export function ResourcesPage({
                       {resource.name}
                     </h2>
                     <div className="flex flex-wrap gap-1.5">
+                      {resource.isPrivate ? (
+                        <Badge variant="destructive">
+                          {t("web.resources.moderation.privateBadge")}
+                        </Badge>
+                      ) : null}
                       {resource.categories.map((category) => (
                         <Badge key={category.id} variant="secondary">
                           {category.name}
@@ -128,6 +134,13 @@ export function ResourcesPage({
                   </div>
 
                   <div className="mt-auto grid gap-1 text-sm text-muted-foreground">
+                    {resource.isPrivate && resource.privateReason ? (
+                      <span>
+                        {t("web.resources.moderation.privateReason", {
+                          reason: resource.privateReason,
+                        })}
+                      </span>
+                    ) : null}
                     <span>
                       {t("web.resources.detail.totalDownloadCount", {
                         count: resource.downloadCount,
@@ -140,8 +153,9 @@ export function ResourcesPage({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
+                      className="flex-1"
                       disabled={
                         downloadingVersionId === resource.currentVersion.id
                       }
@@ -171,6 +185,7 @@ export function ResourcesPage({
                       {t("web.resources.action.download")}
                     </Button>
                     <Button
+                      className="flex-1"
                       nativeButton={false}
                       render={
                         <Link
@@ -182,6 +197,22 @@ export function ResourcesPage({
                     >
                       {t("web.resources.action.details")}
                     </Button>
+                    {resource.canEdit ? (
+                      <Button
+                        className="flex-1"
+                        nativeButton={false}
+                        render={
+                          <Link
+                            params={{ resourceId: String(resource.id) }}
+                            to="/resources/$resourceId/edit"
+                          />
+                        }
+                        variant="outline"
+                      >
+                        <Pencil />
+                        {t("web.resources.action.edit")}
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </article>

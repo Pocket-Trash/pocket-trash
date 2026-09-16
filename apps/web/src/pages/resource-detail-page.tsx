@@ -3,7 +3,8 @@ import {
   type SupportedLocale,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { File, FileDown } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { File, FileDown, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
@@ -63,6 +64,11 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
           <div className="grid gap-4 p-5">
             <p className="m-0 text-sm leading-6">{detail.description}</p>
             <div className="flex flex-wrap gap-2">
+              {detail.isPrivate ? (
+                <Badge variant="destructive">
+                  {t("web.resources.moderation.privateBadge")}
+                </Badge>
+              ) : null}
               {detail.categories.map((category) => (
                 <Badge key={category.id} variant="secondary">
                   {category.name}
@@ -70,6 +76,20 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
               ))}
             </div>
             <dl className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+              {detail.isPrivate && detail.privateReason ? (
+                <DetailRow
+                  label={t("web.resources.moderation.privateReason", {
+                    reason: detail.privateReason,
+                  })}
+                />
+              ) : null}
+              {detail.isPrivate && detail.privatedAt ? (
+                <DetailRow
+                  label={t("web.resources.moderation.privateSince", {
+                    date: formatDate(detail.privatedAt, locale),
+                  })}
+                />
+              ) : null}
               <DetailRow
                 label={t("web.resources.detail.uploadedBy", {
                   uploader: detail.uploaderClerkId,
@@ -130,6 +150,22 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
             <FileDown />
             {t("web.resources.action.download")}
           </Button>
+          {detail.canEdit ? (
+            <Button
+              className="mt-2 w-full"
+              nativeButton={false}
+              render={
+                <Link
+                  params={{ resourceId: String(detail.id) }}
+                  to="/resources/$resourceId/edit"
+                />
+              }
+              variant="outline"
+            >
+              <Pencil />
+              {t("web.resources.action.edit")}
+            </Button>
+          ) : null}
         </aside>
 
         <section className="rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:col-span-2">

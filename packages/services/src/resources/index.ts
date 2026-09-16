@@ -21,12 +21,18 @@ export type CreateResourceInput = {
 };
 
 export type UpdateResourceInput = {
+  actorClerkId: string;
+  actorIsAdmin: boolean;
   categories: string[];
   description: string;
   name: string;
   preview?: ResourceUploadInput;
   resourceId: number;
-  uploaderClerkId: string;
+};
+
+export type ResourceViewer = {
+  clerkId?: string;
+  isAdmin?: boolean;
 };
 
 export type UploadResourceVersionInput = {
@@ -52,7 +58,10 @@ export type ResourceDetail = {
   description: string;
   downloadCount: number;
   id: number;
+  isPrivate: boolean;
   name: string;
+  privateReason: string | null;
+  privatedAt: Date | null;
   previewImageUrl: string | null;
   uploaderClerkId: string;
   versions: ResourceVersionDetail[];
@@ -73,8 +82,11 @@ export type ResourceDirectoryItem = {
   };
   downloadCount: number;
   id: number;
+  isPrivate: boolean;
   name: string;
+  privateReason: string | null;
   previewImageUrl: string | null;
+  uploaderClerkId: string;
 };
 
 export type ResourceNotificationItem = {
@@ -82,6 +94,7 @@ export type ResourceNotificationItem = {
   categoryName: string | null;
   createdAt: Date;
   id: number;
+  isPrivate: boolean;
   readAt: Date | null;
   readByClerkId: string | null;
   resourceId: number;
@@ -95,13 +108,30 @@ export type ResourcesService = {
     input: UploadResourceVersionInput,
   ): Promise<{ id: number; version: number }>;
   create(input: CreateResourceInput): Promise<{ id: number }>;
-  download(resourceId: number, versionId: number): Promise<string | null>;
-  getDetail(resourceId: number): Promise<ResourceDetail | null>;
-  listDirectory(categorySlugs?: string[]): Promise<ResourceDirectory>;
+  download(
+    resourceId: number,
+    versionId: number,
+    viewer?: ResourceViewer,
+  ): Promise<string | null>;
+  getDetail(
+    resourceId: number,
+    viewer?: ResourceViewer,
+  ): Promise<ResourceDetail | null>;
+  listDirectory(
+    categorySlugs?: string[],
+    viewer?: ResourceViewer,
+  ): Promise<ResourceDirectory>;
   listNotifications(): Promise<ResourceNotificationItem[]>;
-  listOwned(
-    uploaderClerkId: string,
-  ): Promise<{ id: number; name: string; updatedAt: Date; version: number }[]>;
+  listOwned(uploaderClerkId: string): Promise<
+    {
+      id: number;
+      isPrivate: boolean;
+      name: string;
+      privateReason: string | null;
+      updatedAt: Date;
+      version: number;
+    }[]
+  >;
   listCategories(
     search?: string,
   ): Promise<{ id: number; name: string; slug: string }[]>;
@@ -109,6 +139,11 @@ export type ResourcesService = {
     notificationId: number,
     actorClerkId: string,
   ): Promise<void>;
+  markPrivate(input: {
+    actorClerkId: string;
+    reason: string;
+    resourceId: number;
+  }): Promise<void>;
   update(input: UpdateResourceInput): Promise<{ id: number }>;
 };
 
@@ -218,7 +253,7 @@ export function createResourcesService(
         },
       );
     },
-    async download(resourceId, versionId) {
+    async download(resourceId, versionId, viewer = {}) {
       return await logger.operation(
         loggerMessages.resources.download,
         async () => {
@@ -231,8 +266,16 @@ export function createResourcesService(
               url: schema.resourceVersions.url,
             })
             .from(schema.resourceVersions)
+            .innerJoin(
+              schema.resources,
+              eq(schema.resources.id, schema.resourceVersions.resourceId),
+            )
             .where(
-              sql`${schema.resourceVersions.id} = ${versionId} and ${schema.resourceVersions.resourceId} = ${resourceId}`,
+              sql`${schema.resourceVersions.id} = ${versionId}
+                and ${schema.resourceVersions.resourceId} = ${resourceId}
+                and (${schema.resources.isPrivate} = false
+                  or ${Boolean(viewer.isAdmin)}
+                  or ${schema.resources.uploaderClerkId} = ${viewer.clerkId ?? ""})`,
             )
             .limit(1);
 
@@ -246,7 +289,7 @@ export function createResourcesService(
         { attributes: { resourceId, versionId } },
       );
     },
-    async getDetail(resourceId) {
+    async getDetail(resourceId, viewer = {}) {
       return await logger.operation(
         loggerMessages.resources.getDetail,
         async () => {
@@ -257,7 +300,7 @@ export function createResourcesService(
             .where(eq(schema.resources.id, resourceId))
             .limit(1);
 
-          if (!resource) return null;
+          if (!resource || !canViewResource(resource, viewer)) return null;
 
           const [versions, categories, totals] = await Promise.all([
             db
@@ -319,7 +362,10 @@ export function createResourcesService(
             description: resource.description,
             downloadCount: totals[0]?.downloadCount ?? 0,
             id: resource.id,
+            isPrivate: resource.isPrivate,
             name: resource.name,
+            privateReason: resource.privateReason,
+            privatedAt: resource.privatedAt,
             previewImageUrl: resource.previewImageUrl,
             uploaderClerkId: resource.uploaderClerkId,
             versions,
@@ -328,7 +374,7 @@ export function createResourcesService(
         { attributes: { resourceId } },
       );
     },
-    async listDirectory(categorySlugs = []) {
+    async listDirectory(categorySlugs = [], viewer = {}) {
       return await logger.operation(
         loggerMessages.resources.listDirectory,
         async () => {
@@ -370,6 +416,9 @@ export function createResourcesService(
             select
               resources.id,
               resources.name,
+              resources.uploader_clerk_id as "uploaderClerkId",
+              resources.is_private as "isPrivate",
+              resources.private_reason as "privateReason",
               resources.created_at as "createdAt",
               resources.preview_image_url as "previewImageUrl",
               jsonb_build_object(
@@ -403,7 +452,10 @@ export function createResourcesService(
               on resources_to_categories.resource_id = resources.id
             left join resource_categories
               on resource_categories.id = resources_to_categories.category_id
-            where ${filter}
+            where (${schema.resources.isPrivate} = false
+                or ${Boolean(viewer.isAdmin)}
+                or ${schema.resources.uploaderClerkId} = ${viewer.clerkId ?? ""})
+              and ${filter}
             group by resources.id, current_version.id, current_version.file_name
             order by resources.created_at desc
           `);
@@ -425,11 +477,14 @@ export function createResourcesService(
           if (!owner) throw new Error("uploaderClerkId is required.");
           const result = await db.execute<{
             id: number;
+            isPrivate: boolean;
             name: string;
+            privateReason: string | null;
             updatedAt: Date;
             version: number;
           }>(sql`
-            select resources.id, resources.name,
+            select resources.id, resources.name, resources.is_private as "isPrivate",
+              resources.private_reason as "privateReason",
               resources.updated_at as "updatedAt",
               current_version.version
             from resources
@@ -462,6 +517,7 @@ export function createResourcesService(
               resource_notifications.type,
               resource_notifications.resource_id as "resourceId",
               resources.name as "resourceName",
+              resources.is_private as "isPrivate",
               notification_category.name as "categoryName",
               coalesce(
                 array_agg(
@@ -536,6 +592,32 @@ export function createResourcesService(
         },
       );
     },
+    async markPrivate(input) {
+      await logger.operation(
+        loggerMessages.resources.markPrivate,
+        async () => {
+          assertPositiveInteger(input.resourceId, "resourceId");
+          const actorClerkId = input.actorClerkId.trim();
+          const reason = input.reason.trim();
+          if (!actorClerkId || !reason || reason.length > 1000) {
+            throw new Error("Private resource metadata is invalid.");
+          }
+          await db.execute(sql`
+            update resources
+            set is_private = true, private_reason = ${reason},
+              privated_at = now(), privated_by_clerk_id = ${actorClerkId},
+              updated_at = now()
+            where id = ${input.resourceId} and is_private = false
+          `);
+        },
+        {
+          attributes: {
+            actorClerkIdHash: hashLogIdentifier(input.actorClerkId),
+            resourceId: input.resourceId,
+          },
+        },
+      );
+    },
     async update(input) {
       return await logger.operation(
         loggerMessages.resources.update,
@@ -548,7 +630,9 @@ export function createResourcesService(
             })
             .from(schema.resources)
             .where(
-              sql`${schema.resources.id} = ${normalized.resourceId} and ${schema.resources.uploaderClerkId} = ${normalized.uploaderClerkId}`,
+              sql`${schema.resources.id} = ${normalized.resourceId}
+                and (${schema.resources.uploaderClerkId} = ${normalized.actorClerkId}
+                  or ${normalized.actorIsAdmin})`,
             )
             .limit(1);
           if (!ownedResource) throw new Error("Resource owner is required.");
@@ -580,7 +664,7 @@ export function createResourcesService(
             categoryCount: input.categories.length,
             hasPreview: Boolean(input.preview),
             resourceId: input.resourceId,
-            uploaderClerkIdHash: hashLogIdentifier(input.uploaderClerkId),
+            actorClerkIdHash: hashLogIdentifier(input.actorClerkId),
           },
         },
       );
@@ -700,7 +784,7 @@ async function persistResourceUpdate(
         preview_image_url = coalesce(${preview?.url ?? null}, preview_image_url),
         updated_at = now()
       where id = ${input.resourceId}
-        and uploader_clerk_id = ${input.uploaderClerkId}
+        and (uploader_clerk_id = ${input.actorClerkId} or ${input.actorIsAdmin})
       returning id
     ),
     upserted_categories as (
@@ -735,7 +819,13 @@ function normalizeCreateInput(input: CreateResourceInput) {
 
 function normalizeUpdateInput(input: UpdateResourceInput) {
   assertPositiveInteger(input.resourceId, "resourceId");
-  return { ...input, ...normalizeMetadata(input) };
+  return {
+    ...input,
+    ...normalizeMetadata({
+      ...input,
+      uploaderClerkId: input.actorClerkId,
+    }),
+  };
 }
 
 function normalizeMetadata(input: {
@@ -798,4 +888,15 @@ function assertPositiveInteger(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive integer.`);
   }
+}
+
+export function canViewResource(
+  resource: { isPrivate: boolean; uploaderClerkId: string },
+  viewer: ResourceViewer,
+): boolean {
+  return (
+    !resource.isPrivate ||
+    Boolean(viewer.isAdmin) ||
+    resource.uploaderClerkId === viewer.clerkId
+  );
 }

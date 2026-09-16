@@ -15,6 +15,8 @@ describe("resource schema", () => {
     expect(getTableName(resources)).toBe("resources");
     expect(resources.id.dataType).toBe("number");
     expect(resources.uploaderClerkId.notNull).toBe(true);
+    expect(resources.isPrivate.notNull).toBe(true);
+    expect(resources.isPrivate.default).toBe(false);
     expect("downloadCount" in resources).toBe(false);
 
     const versionConfig = getTableConfig(resourceVersions);

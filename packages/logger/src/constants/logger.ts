@@ -85,6 +85,7 @@ export const loggerMessages = {
     listNotifications: "resources.listNotifications",
     listOwned: "resources.listOwned",
     markNotificationRead: "resources.markNotificationRead",
+    markPrivate: "resources.markPrivate",
     update: "resources.update",
   },
   scraper: {

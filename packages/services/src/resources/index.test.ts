@@ -10,7 +10,7 @@ import type { ResourceStorage } from "@package/resources";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 import { hashLogIdentifier } from "../logging.js";
-import { createResourcesService } from "./index.js";
+import { canViewResource, createResourcesService } from "./index.js";
 
 function captureLogger(events: LogEvent[]) {
   const transport: LogTransport = {
@@ -27,6 +27,36 @@ function captureLogger(events: LogEvent[]) {
 }
 
 describe("resources service", () => {
+  it("enforces the private resource visibility matrix", () => {
+    const privateResource = {
+      isPrivate: true,
+      uploaderClerkId: "user_owner",
+    };
+
+    expect(canViewResource({ ...privateResource, isPrivate: false }, {})).toBe(
+      true,
+    );
+    expect(canViewResource(privateResource, {})).toBe(false);
+    expect(
+      canViewResource(privateResource, {
+        clerkId: "user_other",
+        isAdmin: false,
+      }),
+    ).toBe(false);
+    expect(
+      canViewResource(privateResource, {
+        clerkId: "user_owner",
+        isAdmin: false,
+      }),
+    ).toBe(true);
+    expect(
+      canViewResource(privateResource, {
+        clerkId: "admin_123",
+        isAdmin: true,
+      }),
+    ).toBe(true);
+  });
+
   it("creates one resource notification and one per newly created category", async () => {
     const execute = vi.fn().mockResolvedValue({ rows: [{ id: 1000 }] });
     const storage: ResourceStorage = {
@@ -151,13 +181,20 @@ describe("resources service", () => {
         return {
           from() {
             return {
-              where() {
+              innerJoin() {
                 return {
-                  async limit() {
-                    calls.push("selected");
-                    return [
-                      { id: 1001, url: "https://cdn.example.test/file.stl" },
-                    ];
+                  where() {
+                    return {
+                      async limit() {
+                        calls.push("selected");
+                        return [
+                          {
+                            id: 1001,
+                            url: "https://cdn.example.test/file.stl",
+                          },
+                        ];
+                      },
+                    };
                   },
                 };
               },
@@ -200,7 +237,10 @@ describe("resources service", () => {
                 createdAt,
                 description: "A useful clip.",
                 id: 1000,
+                isPrivate: false,
                 name: "Pocket clip",
+                privateReason: null,
+                privatedAt: null,
                 previewImageUrl: null,
                 uploaderClerkId: "user_123",
               },
@@ -246,11 +286,40 @@ describe("resources service", () => {
       description: "A useful clip.",
       downloadCount: 3,
       id: 1000,
+      isPrivate: false,
       name: "Pocket clip",
+      privateReason: null,
+      privatedAt: null,
       previewImageUrl: null,
       uploaderClerkId: "user_123",
       versions: [currentVersion],
     });
+  });
+
+  it("returns no detail for a private resource viewed by an unrelated user", async () => {
+    const select = vi.fn().mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: async () => [
+            {
+              id: 1000,
+              isPrivate: true,
+              uploaderClerkId: "user_owner",
+            },
+          ],
+        }),
+      }),
+    });
+    const service = createResourcesService(
+      { select } as unknown as Database,
+      {} as ResourceStorage,
+      createNoopLogger({ app: "web", environment: "test" }),
+    );
+
+    await expect(
+      service.getDetail(1000, { clerkId: "user_other" }),
+    ).resolves.toBeNull();
+    expect(select).toHaveBeenCalledTimes(1);
   });
 
   it("lists directory cards and rejects unknown category filters", async () => {
@@ -293,7 +362,7 @@ describe("resources service", () => {
     expect(execute).toHaveBeenCalledTimes(3);
     const query = new PgDialect().sqlToQuery(execute.mock.calls[1]?.[0]);
     expect(query.sql).toContain("order by resources.created_at desc");
-    expect(query.params).toEqual(["3d-printing"]);
+    expect(query.params).toEqual([false, "", "3d-printing"]);
   });
 
   it("lists notifications newest first and marks unread rows globally", async () => {
@@ -302,6 +371,7 @@ describe("resources service", () => {
       categoryName: null,
       createdAt: new Date("2026-09-16T12:00:00Z"),
       id: 1000,
+      isPrivate: false,
       readAt: null,
       readByClerkId: null,
       resourceId: 1001,
@@ -333,6 +403,28 @@ describe("resources service", () => {
     expect(updateQuery.params).toEqual(["admin_123", 1000]);
   });
 
+  it("records private moderation metadata", async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const service = createResourcesService(
+      { execute } as unknown as Database,
+      {} as ResourceStorage,
+      createNoopLogger({ app: "web", environment: "test" }),
+    );
+
+    await expect(
+      service.markPrivate({
+        actorClerkId: "admin_123",
+        reason: "Inappropriate content",
+        resourceId: 1000,
+      }),
+    ).resolves.toBeUndefined();
+
+    const query = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
+    expect(query.sql).toContain("set is_private = true");
+    expect(query.sql).toContain("privated_at = now()");
+    expect(query.params).toEqual(["Inappropriate content", "admin_123", 1000]);
+  });
+
   it("rejects non-owner mutations before uploading files", async () => {
     const upload = vi.fn();
     const db = {
@@ -359,14 +451,49 @@ describe("resources service", () => {
     ).rejects.toThrow("Resource owner is required.");
     await expect(
       service.update({
+        actorClerkId: "user_other",
+        actorIsAdmin: false,
         categories: ["3D printing"],
         description: "Updated.",
         name: "Updated clip",
         resourceId: 1000,
-        uploaderClerkId: "user_other",
       }),
     ).rejects.toThrow("Resource owner is required.");
     expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("allows admins to update non-owned metadata", async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [{ id: 1000 }] });
+    const db = {
+      execute,
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [{ id: 1000, previewObjectPath: null }],
+          }),
+        }),
+      }),
+    } as unknown as Database;
+    const service = createResourcesService(
+      db,
+      {} as ResourceStorage,
+      createNoopLogger({ app: "web", environment: "test" }),
+    );
+
+    await expect(
+      service.update({
+        actorClerkId: "admin_123",
+        actorIsAdmin: true,
+        categories: ["3D printing"],
+        description: "Updated.",
+        name: "Updated clip",
+        resourceId: 1000,
+      }),
+    ).resolves.toEqual({ id: 1000 });
+
+    const query = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
+    expect(query.params).toContain(true);
+    expect(query.params).toContain("admin_123");
   });
 
   it("derives the next immutable version number in the database", async () => {
@@ -453,6 +580,8 @@ describe("resources service", () => {
 
     await expect(
       service.update({
+        actorClerkId: "user_123",
+        actorIsAdmin: false,
         categories: ["3D printing"],
         description: "Updated description.",
         name: "Updated clip",
@@ -462,7 +591,6 @@ describe("resources service", () => {
           fileName: "preview.webp",
         },
         resourceId: 1000,
-        uploaderClerkId: "user_123",
       }),
     ).resolves.toEqual({ id: 1000 });
     expect(deleted).toEqual(["dev/old-preview.webp"]);

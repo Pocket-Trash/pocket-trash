@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  getResourceViewer,
+  parseMarkPrivate,
   parseResourceDirectoryInput,
   parseResourceUpdate,
   parseResourceUpload,
@@ -43,6 +45,31 @@ describe("resource server functions", () => {
           }) as never,
       ),
     ).resolves.toBe("admin_123");
+  });
+
+  it("derives resource visibility from the signed-in role", async () => {
+    await expect(
+      getResourceViewer(
+        async () =>
+          ({
+            isAuthenticated: true,
+            sessionClaims: { role: "admin" },
+            userId: "admin_123",
+          }) as never,
+      ),
+    ).resolves.toEqual({ clerkId: "admin_123", isAdmin: true });
+  });
+
+  it("requires a trimmed moderation reason", () => {
+    expect(
+      parseMarkPrivate({
+        reason: "  Inappropriate content  ",
+        resourceId: 1000,
+      }),
+    ).toEqual({ reason: "Inappropriate content", resourceId: 1000 });
+    expect(() =>
+      parseMarkPrivate({ reason: "   ", resourceId: 1000 }),
+    ).toThrow();
   });
 
   it("accepts upload metadata only when a file and category are present", () => {

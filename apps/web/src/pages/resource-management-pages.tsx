@@ -63,6 +63,20 @@ export function ResourceManagementPage({
                   <h2 className="m-0 truncate text-lg font-semibold">
                     {resource.name}
                   </h2>
+                  {resource.isPrivate ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="destructive">
+                        {t("web.resources.moderation.privateBadge")}
+                      </Badge>
+                      {resource.privateReason ? (
+                        <span className="text-sm text-muted-foreground">
+                          {t("web.resources.moderation.privateReason", {
+                            reason: resource.privateReason,
+                          })}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <p className="mt-1 mb-0 text-sm text-muted-foreground">
                     {t("web.resources.detail.version", {
                       version: resource.version,
