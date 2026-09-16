@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import {
   formatTranslation,
   type TranslationKey,
@@ -5,10 +6,12 @@ import {
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, Home } from "lucide-react";
 import type * as React from "react";
+import { toast } from "sonner";
 import { LanguageSelect } from "@/components/language-select";
 import { PageFooter } from "@/components/page-footer";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
+import { updateLocaleSetting } from "@/lib/locale-api";
 import { useLocale } from "@/providers/locale-provider";
 
 type AppShellProps = {
@@ -29,9 +32,19 @@ export function AppShell({
   meta,
   title,
 }: AppShellProps) {
+  const { isLoaded, isSignedIn } = useAuth();
   const { locale, setLocale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const siteName = t("web.site.name");
+  const onLocaleChange = (nextLocale: typeof locale) => {
+    setLocale(nextLocale);
+
+    if (isLoaded && isSignedIn) {
+      void updateLocaleSetting(nextLocale).catch(() => {
+        toast.error(t("web.error.settingsSaveFailed"));
+      });
+    }
+  };
 
   return (
     <div className="flex min-h-svh flex-col bg-background text-foreground">
@@ -73,7 +86,7 @@ export function AppShell({
           <LanguageSelect
             className="w-[9.5rem] max-sm:w-[8.5rem]"
             locale={locale}
-            onLocaleChange={setLocale}
+            onLocaleChange={onLocaleChange}
           />
           <ThemeToggle />
           <UserMenu />

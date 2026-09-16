@@ -40,21 +40,6 @@ export const defaultUserSettings: UserSettingsPreferences = {
 
 export const userSettingsStorageKey = "pocket-trash.settings";
 
-export const getCurrentUserSettings = createServerFn({ method: "GET" }).handler(
-  async (): Promise<UserSettingsPreferences | null> => {
-    const { isAuthenticated, userId } = await auth();
-
-    if (!isAuthenticated || !userId) {
-      return null;
-    }
-
-    const { s } = await import("@/lib/services");
-    const settings = await s.db.userSettings.getByClerkId(userId);
-
-    return toUserSettingsPreferences(settings ?? defaultUserSettings);
-  },
-);
-
 export const getCurrentUserSettingsState = createServerFn({
   method: "GET",
 }).handler(async (): Promise<UserSettingsState | null> => {

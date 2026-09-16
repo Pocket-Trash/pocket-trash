@@ -87,7 +87,7 @@ export function UserMenu() {
           <Folder />
           {t("web.navigation.collections")}
         </DropdownMenuItem>
-        <DropdownMenuItem render={<Link to="/user/settings/beta-features" />}>
+        <DropdownMenuItem render={<Link to="/user/settings" />}>
           <Settings />
           {t("web.settings.settings")}
         </DropdownMenuItem>

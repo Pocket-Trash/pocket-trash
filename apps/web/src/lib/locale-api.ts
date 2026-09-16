@@ -2,16 +2,16 @@ import { loggerMessages } from "@package/logger";
 import type { SupportedLocale } from "@pocket-trash/localizations";
 import { logger } from "@/lib/logger";
 import {
-  getCurrentUserSettings,
+  getCurrentUserSettingsState,
   patchCurrentUserSettings,
 } from "@/lib/user-settings";
 
-export async function fetchLocaleSetting() {
+export async function fetchLocaleSettingsState() {
   try {
-    return (await getCurrentUserSettings())?.locale ?? null;
+    return await getCurrentUserSettingsState();
   } catch (error) {
     logger.warn(loggerMessages.web.localeSyncFailed, { error });
-    return null;
+    throw error;
   }
 }
 
@@ -20,5 +20,6 @@ export async function updateLocaleSetting(locale: SupportedLocale) {
     await patchCurrentUserSettings({ data: { locale } });
   } catch (error) {
     logger.warn(loggerMessages.web.localeSyncFailed, { error });
+    throw error;
   }
 }

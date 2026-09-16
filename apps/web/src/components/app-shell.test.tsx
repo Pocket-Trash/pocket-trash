@@ -2,6 +2,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "./app-shell";
 
+vi.mock("@clerk/tanstack-react-start", () => ({
+  useAuth: () => ({ isLoaded: true, isSignedIn: false }),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: React.ReactNode }) => (
     <a href="/">{children}</a>

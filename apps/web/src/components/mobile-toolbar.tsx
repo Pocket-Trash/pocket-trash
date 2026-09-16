@@ -2,17 +2,9 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import {
-  ArrowUpDown,
-  Check,
-  Search,
-  Settings,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { ArrowUpDown, Check, Search, SlidersHorizontal, X } from "lucide-react";
 import * as React from "react";
 import { FilterSidebar } from "@/components/filter-sidebar";
-import { SettingsPanel } from "@/components/settings-drawer";
 import {
   Drawer,
   DrawerContent,
@@ -31,11 +23,6 @@ import type {
   MatchModes,
   SortKey,
 } from "@/lib/pen-filters";
-import type {
-  CurrencyCode,
-  DimensionUnit,
-  WeightUnit,
-} from "@/lib/pen-formatters";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -45,53 +32,39 @@ const BAR_HEIGHT = "3.5rem";
 
 type MobileToolbarProps = {
   active: ActiveFilters;
-  currency: CurrencyCode;
   filterCount: number;
   matchModes: MatchModes;
   onClearFilters: () => void;
-  onCurrencyChange: (currency: CurrencyCode) => void;
   onMatchModeChange: (key: FilterKey, mode: MatchMode) => void;
   onQueryChange: (query: string) => void;
   onSortChange: (sort: SortKey) => void;
   onToggleFilter: (key: FilterKey, value: string) => void;
-  onUnitsChange: (unit: DimensionUnit) => void;
-  onWeightChange: (unit: WeightUnit) => void;
   products: PenProduct[];
   query: string;
-  settingsDisabled?: boolean;
   sort: SortKey;
   sortOptions: Array<{ label: string; value: SortKey }>;
-  units: DimensionUnit;
-  weight: WeightUnit;
 };
 
 /**
  * Compact-only (`< md`) bottom toolbar. It is a toolbar, not a nav bar: each
- * item opens a sheet or field rather than switching screens. Filters / Sort /
- * Settings are vaul bottom sheets (swipe-to-dismiss); Search expands a field
- * docked above the bar. Hidden at `md` and up, where the persistent sidebar and
- * header controls take over.
+ * item opens a sheet or field rather than switching screens. Filters and Sort
+ * are vaul bottom sheets (swipe-to-dismiss); Search expands a field docked
+ * above the bar. Hidden at `md` and up, where the persistent sidebar and header
+ * controls take over.
  */
 export function MobileToolbar({
   active,
-  currency,
   filterCount,
   matchModes,
   onClearFilters,
-  onCurrencyChange,
   onMatchModeChange,
   onQueryChange,
   onSortChange,
   onToggleFilter,
-  onUnitsChange,
-  onWeightChange,
   products,
   query,
-  settingsDisabled = false,
   sort,
   sortOptions,
-  units,
-  weight,
 }: MobileToolbarProps) {
   const { locale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
@@ -156,7 +129,7 @@ export function MobileToolbar({
 
       <nav
         aria-label={t("web.archive.controls")}
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
         style={{ height: `calc(${BAR_HEIGHT} + env(safe-area-inset-bottom))` }}
       >
         <ToolbarButton
@@ -231,30 +204,6 @@ export function MobileToolbar({
                 );
               })}
             </div>
-          </DrawerContent>
-        </Drawer>
-
-        <Drawer>
-          <DrawerTrigger asChild>
-            <ToolbarButton icon={Settings} label={t("web.settings.settings")} />
-          </DrawerTrigger>
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>{t("web.settings.settings")}</DrawerTitle>
-              <DrawerDescription className="sr-only">
-                {t("web.settings.displayPreferences")}
-              </DrawerDescription>
-            </DrawerHeader>
-            <SettingsPanel
-              currency={currency}
-              disabled={settingsDisabled}
-              onCurrencyChange={onCurrencyChange}
-              onUnitsChange={onUnitsChange}
-              onWeightChange={onWeightChange}
-              showTheme
-              units={units}
-              weight={weight}
-            />
           </DrawerContent>
         </Drawer>
       </nav>

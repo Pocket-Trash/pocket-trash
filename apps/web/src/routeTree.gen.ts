@@ -15,6 +15,7 @@ import { Route as AutmogRouteImport } from './routes/autmog'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProductsIndexRouteImport } from './routes/products.index'
 import { Route as CollectionsIndexRouteImport } from './routes/collections.index'
+import { Route as UserSettingsRouteImport } from './routes/user.settings_'
 import { Route as UserCollectionsRouteImport } from './routes/user.collections'
 import { Route as UserAccountRouteImport } from './routes/user.account'
 import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
@@ -58,6 +59,11 @@ const CollectionsIndexRoute = CollectionsIndexRouteImport.update({
   id: '/collections/',
   path: '/collections/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const UserSettingsRoute = UserSettingsRouteImport.update({
+  id: '/settings_',
+  path: '/settings',
+  getParentRoute: () => UserRoute,
 } as any)
 const UserCollectionsRoute = UserCollectionsRouteImport.update({
   id: '/collections',
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/user/settings': typeof UserSettingsRoute
   '/collections/': typeof CollectionsIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
@@ -164,6 +171,7 @@ export interface FileRoutesByTo {
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/user/settings': typeof UserSettingsRoute
   '/collections': typeof CollectionsIndexRoute
   '/products': typeof ProductsIndexRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
@@ -186,6 +194,7 @@ export interface FileRoutesById {
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/user/settings_': typeof UserSettingsRoute
   '/collections/': typeof CollectionsIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
@@ -209,6 +218,7 @@ export interface FileRouteTypes {
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/user/settings'
     | '/collections/'
     | '/products/'
     | '/admin/settings/feature-flags'
@@ -230,6 +240,7 @@ export interface FileRouteTypes {
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/user/settings'
     | '/collections'
     | '/products'
     | '/admin/settings/feature-flags'
@@ -251,6 +262,7 @@ export interface FileRouteTypes {
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/user/settings_'
     | '/collections/'
     | '/products/'
     | '/admin/settings/feature-flags'
@@ -321,6 +333,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/collections/'
       preLoaderRoute: typeof CollectionsIndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/user/settings_': {
+      id: '/user/settings_'
+      path: '/settings'
+      fullPath: '/user/settings'
+      preLoaderRoute: typeof UserSettingsRouteImport
+      parentRoute: typeof UserRoute
     }
     '/user/collections': {
       id: '/user/collections'
@@ -430,12 +449,14 @@ const AutmogRouteWithChildren =
 interface UserRouteChildren {
   UserAccountRoute: typeof UserAccountRoute
   UserCollectionsRoute: typeof UserCollectionsRoute
+  UserSettingsRoute: typeof UserSettingsRoute
   UserSettingsBetaFeaturesRoute: typeof UserSettingsBetaFeaturesRoute
 }
 
 const UserRouteChildren: UserRouteChildren = {
   UserAccountRoute: UserAccountRoute,
   UserCollectionsRoute: UserCollectionsRoute,
+  UserSettingsRoute: UserSettingsRoute,
   UserSettingsBetaFeaturesRoute: UserSettingsBetaFeaturesRoute,
 }
 

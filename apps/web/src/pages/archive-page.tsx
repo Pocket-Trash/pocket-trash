@@ -11,7 +11,6 @@ import { MobileToolbar } from "@/components/mobile-toolbar";
 import { ProductCard } from "@/components/product-card";
 import { ProductLightbox } from "@/components/product-lightbox";
 import { PullToRefresh } from "@/components/pull-to-refresh";
-import { SettingsDrawer } from "@/components/settings-drawer";
 import { ProductGridSkeleton } from "@/components/skeletons/product-grid-skeleton";
 import { Input } from "@/components/ui/input";
 import {
@@ -70,8 +69,7 @@ export function ArchivePage() {
   const { penId } = useParams({ strict: false });
   const { img } = useSearch({ strict: false }) as { img?: number };
 
-  const { currency, saving, setCurrency, setUnits, setWeight, units, weight } =
-    usePenSettings();
+  const { currency, units, weight } = usePenSettings();
   const { rates, refreshRates } = useCurrencyRates();
   const [refreshing, setRefreshing] = React.useState(false);
   const [query, setQuery] = React.useState(browseState.query);
@@ -166,24 +164,17 @@ export function ArchivePage() {
   const mobileToolbar = (
     <MobileToolbar
       active={active}
-      currency={currency}
-      settingsDisabled={saving}
       filterCount={filterCount}
       matchModes={matchModes}
       onClearFilters={clearFilters}
-      onCurrencyChange={setCurrency}
       onMatchModeChange={setMatchMode}
       onQueryChange={setQuery}
       onSortChange={setSort}
       onToggleFilter={toggleFilter}
-      onUnitsChange={setUnits}
-      onWeightChange={setWeight}
       products={products}
       query={query}
       sort={sort}
       sortOptions={localizedSortOptions}
-      units={units}
-      weight={weight}
     />
   );
 
@@ -226,15 +217,6 @@ export function ArchivePage() {
               ))}
             </SelectContent>
           </Select>
-          <SettingsDrawer
-            currency={currency}
-            disabled={saving}
-            onCurrencyChange={setCurrency}
-            onUnitsChange={setUnits}
-            onWeightChange={setWeight}
-            units={units}
-            weight={weight}
-          />
         </>
       }
       meta={t("web.archive.itemCount", {

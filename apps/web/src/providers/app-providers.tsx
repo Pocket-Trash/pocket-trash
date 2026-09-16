@@ -16,7 +16,7 @@ export function AppProviders({
   return (
     <LocaleProvider initialSettingsState={initialSettingsState}>
       <ClerkProvider>
-        <AuthenticatedLocaleSync />
+        <AuthenticatedLocaleSync initialSettingsState={initialSettingsState} />
         <ThemeProvider initialSettingsState={initialSettingsState}>
           <TooltipProvider>
             {children}

@@ -1,8 +1,20 @@
 import { useAuth } from "@clerk/tanstack-react-start";
-import type { SupportedLocale } from "@pocket-trash/localizations";
+import {
+  formatTranslation,
+  type SupportedLocale,
+} from "@pocket-trash/localizations";
 import * as React from "react";
-import { resolveBrowserLocale, writeStoredLocale } from "@/lib/locale";
-import { fetchLocaleSetting } from "@/lib/locale-api";
+import { toast } from "sonner";
+import {
+  readStoredLocale,
+  resolveAuthenticatedLocale,
+  resolveBrowserLocale,
+  writeStoredLocale,
+} from "@/lib/locale";
+import {
+  fetchLocaleSettingsState,
+  updateLocaleSetting,
+} from "@/lib/locale-api";
 import type { UserSettingsState } from "@/lib/user-settings";
 
 type LocaleProviderValue = {
@@ -45,23 +57,47 @@ export function LocaleProvider({
   );
 }
 
-export function AuthenticatedLocaleSync() {
+export function AuthenticatedLocaleSync({
+  initialSettingsState,
+}: {
+  initialSettingsState: UserSettingsState | null;
+}) {
   const { isLoaded, isSignedIn } = useAuth();
   const { setLocale } = useLocale();
+  const initialStateRef = React.useRef(initialSettingsState);
 
   React.useEffect(() => {
-    if (!isLoaded) return;
-
-    if (!isSignedIn) {
-      setLocale(resolveBrowserLocale());
-      return;
-    }
+    if (!isLoaded || !isSignedIn) return;
 
     let canceled = false;
 
-    void fetchLocaleSetting().then((locale) => {
-      if (!canceled && locale) setLocale(locale);
-    });
+    void (async () => {
+      const settingsState =
+        initialStateRef.current ?? (await fetchLocaleSettingsState());
+      initialStateRef.current = null;
+      const next = resolveAuthenticatedLocale(
+        settingsState,
+        readStoredLocale(),
+      );
+
+      if (canceled || !next.locale) return;
+
+      setLocale(next.locale);
+
+      if (next.shouldPersist) {
+        await updateLocaleSetting(next.locale).catch(() => {
+          if (!canceled) {
+            toast.error(
+              formatTranslation(
+                "web.error.settingsSaveFailed",
+                {},
+                next.locale,
+              ),
+            );
+          }
+        });
+      }
+    })().catch(() => undefined);
 
     return () => {
       canceled = true;
