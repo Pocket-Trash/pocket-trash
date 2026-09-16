@@ -6,6 +6,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import {
   ChevronsUpDown,
+  Files,
   FlaskConical,
   Folder,
   Languages,
@@ -148,6 +149,10 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
         <DropdownMenuItem render={<Link to="/user/collections" />}>
           <Folder />
           {t("web.navigation.collections")}
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link to="/user/resources" />}>
+          <Files />
+          {t("web.resources.management.title")}
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/settings/beta-features" />}>
           <FlaskConical />

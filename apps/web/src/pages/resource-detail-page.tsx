@@ -18,11 +18,29 @@ type ResourceDetail = NonNullable<
 
 export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
   const { locale } = useLocale();
-  const [downloading, setDownloading] = useState(false);
+  const [downloadingVersionId, setDownloadingVersionId] = useState<number>();
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
+
+  async function startDownload(version: ResourceDetail["currentVersion"]) {
+    setDownloadingVersionId(version.id);
+    try {
+      const url = await downloadResource({
+        data: { resourceId: detail.id, versionId: version.id },
+      });
+      if (!url) throw new Error("missing download");
+      window.location.assign(url);
+    } catch {
+      toast.error(
+        t("web.resources.error.downloadUnavailable", {
+          filename: version.fileName,
+        }),
+      );
+      setDownloadingVersionId(undefined);
+    }
+  }
 
   return (
     <AppShell title={detail.name}>
@@ -105,33 +123,67 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
           </dl>
           <Button
             className="mt-5 w-full"
-            disabled={downloading}
-            onClick={async () => {
-              setDownloading(true);
-              try {
-                const url = await downloadResource({
-                  data: {
-                    resourceId: detail.id,
-                    versionId: detail.currentVersion.id,
-                  },
-                });
-                if (!url) throw new Error("missing download");
-                window.location.assign(url);
-              } catch {
-                toast.error(
-                  t("web.resources.error.downloadUnavailable", {
-                    filename: detail.currentVersion.fileName,
-                  }),
-                );
-                setDownloading(false);
-              }
-            }}
+            disabled={downloadingVersionId === detail.currentVersion.id}
+            onClick={() => void startDownload(detail.currentVersion)}
             type="button"
           >
             <FileDown />
             {t("web.resources.action.download")}
           </Button>
         </aside>
+
+        <section className="rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:col-span-2">
+          <h2 className="m-0 text-xl font-semibold">
+            {t("web.resources.detail.versionHistory")}
+          </h2>
+          <div className="mt-4 grid gap-3">
+            {detail.versions.map((version) => (
+              <article
+                className="grid gap-3 rounded-md border border-border p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                key={version.id}
+              >
+                <div className="grid gap-1 text-sm text-muted-foreground">
+                  <h3 className="m-0 text-base font-semibold text-foreground">
+                    {t("web.resources.detail.version", {
+                      version: version.version,
+                    })}
+                  </h3>
+                  <span>
+                    {t("web.resources.detail.filename", {
+                      filename: version.fileName,
+                    })}
+                  </span>
+                  <span>{version.contentType}</span>
+                  <span>
+                    {t("web.resources.detail.fileSize", {
+                      size: formatFileSize(version.size, locale),
+                    })}
+                  </span>
+                  <span>
+                    {t("web.resources.detail.downloadCount", {
+                      count: version.downloadCount,
+                    })}
+                  </span>
+                  <span>
+                    {t("web.resources.detail.versionUploadedOn", {
+                      date: formatDate(version.createdAt, locale),
+                      version: version.version,
+                    })}
+                  </span>
+                </div>
+                <Button
+                  disabled={downloadingVersionId === version.id}
+                  onClick={() => void startDownload(version)}
+                  type="button"
+                  variant="outline"
+                >
+                  <FileDown />
+                  {t("web.resources.action.download")}
+                </Button>
+              </article>
+            ))}
+          </div>
+        </section>
       </main>
     </AppShell>
   );

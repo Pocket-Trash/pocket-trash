@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   parseResourceDirectoryInput,
+  parseResourceUpdate,
   parseResourceUpload,
+  parseResourceVersionUpload,
   requireResourceUploader,
 } from "./resources.js";
 
@@ -55,5 +57,36 @@ describe("resource server functions", () => {
         ),
       }),
     ).toThrow();
+  });
+
+  it("parses metadata edits separately from immutable version uploads", () => {
+    const update = new FormData();
+    update.set("resourceId", "1000");
+    update.set("name", "Updated clip");
+    update.set("description", "Updated description.");
+    update.append("categories", "3D printing");
+    update.set(
+      "preview",
+      new File([], "", { type: "application/octet-stream" }),
+    );
+
+    expect(parseResourceUpdate(update)).toEqual({
+      categories: ["3D printing"],
+      description: "Updated description.",
+      name: "Updated clip",
+      preview: undefined,
+      resourceId: 1000,
+    });
+
+    const version = new FormData();
+    version.set("resourceId", "1000");
+    version.set(
+      "file",
+      new File([new Uint8Array([1])], "clip.stl", { type: "model/stl" }),
+    );
+    expect(parseResourceVersionUpload(version)).toMatchObject({
+      file: expect.any(File),
+      resourceId: 1000,
+    });
   });
 });

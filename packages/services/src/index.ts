@@ -176,6 +176,9 @@ export type {
   ResourceDirectory,
   ResourceDirectoryItem,
   ResourcesService,
+  ResourceVersionDetail,
+  UpdateResourceInput,
+  UploadResourceVersionInput,
 } from "./resources/index.js";
 export {
   createConfiguredResourcesService,

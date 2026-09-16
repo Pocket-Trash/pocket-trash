@@ -76,11 +76,14 @@ export const loggerMessages = {
     upload: "images.upload",
   },
   resources: {
+    addVersion: "resources.addVersion",
     create: "resources.create",
     download: "resources.download",
     getDetail: "resources.getDetail",
     listCategories: "resources.listCategories",
     listDirectory: "resources.listDirectory",
+    listOwned: "resources.listOwned",
+    update: "resources.update",
   },
   scraper: {
     autmog: {

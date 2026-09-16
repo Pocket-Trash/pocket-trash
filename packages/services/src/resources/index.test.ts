@@ -174,7 +174,7 @@ describe("resources service", () => {
           leftJoin: () => ({
             where: () => ({
               groupBy: () => ({
-                orderBy: () => ({ limit: async () => [currentVersion] }),
+                orderBy: async () => [currentVersion],
               }),
             }),
           }),
@@ -210,6 +210,7 @@ describe("resources service", () => {
       name: "Pocket clip",
       previewImageUrl: null,
       uploaderClerkId: "user_123",
+      versions: [currentVersion],
     });
   });
 
@@ -254,5 +255,143 @@ describe("resources service", () => {
     const query = new PgDialect().sqlToQuery(execute.mock.calls[1]?.[0]);
     expect(query.sql).toContain("order by resources.created_at desc");
     expect(query.params).toEqual(["3d-printing"]);
+  });
+
+  it("rejects non-owner mutations before uploading files", async () => {
+    const upload = vi.fn();
+    const db = {
+      select: () => ({
+        from: () => ({ where: () => ({ limit: async () => [] }) }),
+      }),
+    } as unknown as Database;
+    const service = createResourcesService(
+      db,
+      { upload } as unknown as ResourceStorage,
+      createNoopLogger({ app: "web", environment: "test" }),
+    );
+
+    await expect(
+      service.addVersion({
+        file: {
+          bytes: new Uint8Array([1]),
+          contentType: "model/stl",
+          fileName: "clip.stl",
+        },
+        resourceId: 1000,
+        uploaderClerkId: "user_other",
+      }),
+    ).rejects.toThrow("Resource owner is required.");
+    await expect(
+      service.update({
+        categories: ["3D printing"],
+        description: "Updated.",
+        name: "Updated clip",
+        resourceId: 1000,
+        uploaderClerkId: "user_other",
+      }),
+    ).rejects.toThrow("Resource owner is required.");
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("derives the next immutable version number in the database", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      rows: [{ id: 1002, version: 2 }],
+    });
+    const storage: ResourceStorage = {
+      delete: vi.fn(),
+      upload: async (input) => ({
+        ...input,
+        objectPath: "dev/version-2.stl",
+        size: input.bytes.byteLength,
+        url: "https://cdn.example.test/dev/version-2.stl",
+      }),
+      uploadPreview: vi.fn(),
+    };
+    const db = {
+      execute,
+      select: () => ({
+        from: () => ({
+          where: () => ({ limit: async () => [{ id: 1000 }] }),
+        }),
+      }),
+    } as unknown as Database;
+    const service = createResourcesService(
+      db,
+      storage,
+      createNoopLogger({ app: "web", environment: "test" }),
+    );
+
+    await expect(
+      service.addVersion({
+        file: {
+          bytes: new Uint8Array([1]),
+          contentType: "model/stl",
+          fileName: "clip.stl",
+        },
+        resourceId: 1000,
+        uploaderClerkId: "user_123",
+      }),
+    ).resolves.toEqual({ id: 1002, version: 2 });
+    const query = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
+    expect(query.sql).toContain(
+      "coalesce(max(resource_versions.version), 0) + 1",
+    );
+    expect(query.sql).toContain("returning id, resource_id, version");
+  });
+
+  it("updates owner metadata and replaces its preview", async () => {
+    const deleted: string[] = [];
+    const execute = vi.fn().mockResolvedValue({ rows: [{ id: 1000 }] });
+    const storage: ResourceStorage = {
+      async delete(objectPath) {
+        deleted.push(objectPath);
+        return "deleted";
+      },
+      upload: vi.fn(),
+      async uploadPreview(input) {
+        return {
+          ...input,
+          objectPath: "dev/new-preview.webp",
+          size: input.bytes.byteLength,
+          url: "https://cdn.example.test/dev/new-preview.webp",
+        };
+      },
+    };
+    const db = {
+      execute,
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [
+              { id: 1000, previewObjectPath: "dev/old-preview.webp" },
+            ],
+          }),
+        }),
+      }),
+    } as unknown as Database;
+    const service = createResourcesService(
+      db,
+      storage,
+      createNoopLogger({ app: "web", environment: "test" }),
+    );
+
+    await expect(
+      service.update({
+        categories: ["3D printing"],
+        description: "Updated description.",
+        name: "Updated clip",
+        preview: {
+          bytes: new Uint8Array([1]),
+          contentType: "image/webp",
+          fileName: "preview.webp",
+        },
+        resourceId: 1000,
+        uploaderClerkId: "user_123",
+      }),
+    ).resolves.toEqual({ id: 1000 });
+    expect(deleted).toEqual(["dev/old-preview.webp"]);
+    const query = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
+    expect(query.sql).toContain("update resources");
+    expect(query.sql).toContain("on conflict do nothing");
   });
 });

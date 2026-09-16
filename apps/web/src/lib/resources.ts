@@ -26,6 +26,15 @@ export const getResourceDetail = createServerFn({ method: "GET" })
     return await s.resources.getDetail(data.resourceId);
   });
 
+export const getOwnedResourceDetail = createServerFn({ method: "GET" })
+  .validator(parseResourceId)
+  .handler(async ({ data }) => {
+    const userId = await requireResourceUploader();
+    const { s } = await import("@/lib/services");
+    const detail = await s.resources.getDetail(data.resourceId);
+    return detail?.uploaderClerkId === userId ? detail : null;
+  });
+
 export const listResourceCategories = createServerFn({ method: "GET" })
   .validator((input: unknown) => {
     if (input === undefined) return { search: "" };
@@ -48,6 +57,38 @@ export const listResourceDirectory = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { s } = await import("@/lib/services");
     return await s.resources.listDirectory(data.categorySlugs);
+  });
+
+export const listOwnedResources = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const userId = await requireResourceUploader();
+    const { s } = await import("@/lib/services");
+    return await s.resources.listOwned(userId);
+  },
+);
+
+export const updateResource = createServerFn({ method: "POST" })
+  .validator(parseResourceUpdate)
+  .handler(async ({ data }) => {
+    const userId = await requireResourceUploader();
+    const { s } = await import("@/lib/services");
+    return await s.resources.update({
+      ...data,
+      preview: data.preview ? await toUploadInput(data.preview) : undefined,
+      uploaderClerkId: userId,
+    });
+  });
+
+export const uploadResourceVersion = createServerFn({ method: "POST" })
+  .validator(parseResourceVersionUpload)
+  .handler(async ({ data }) => {
+    const userId = await requireResourceUploader();
+    const { s } = await import("@/lib/services");
+    return await s.resources.addVersion({
+      file: await toUploadInput(data.file),
+      resourceId: data.resourceId,
+      uploaderClerkId: userId,
+    });
   });
 
 export function parseResourceDirectoryInput(input: unknown) {
@@ -108,6 +149,46 @@ export function parseResourceUpload(input: unknown) {
     name,
     preview: preview ?? undefined,
   };
+}
+
+export function parseResourceUpdate(input: unknown) {
+  if (!(input instanceof FormData)) throw invalidResourceRequest();
+  const resourceId = Number(input.get("resourceId"));
+  const name = input.get("name");
+  const description = input.get("description");
+  const previewValue = input.get("preview");
+  const preview = isEmptyFile(previewValue) ? undefined : previewValue;
+  const categories = input.getAll("categories");
+
+  if (
+    !Number.isSafeInteger(resourceId) ||
+    resourceId <= 0 ||
+    typeof name !== "string" ||
+    typeof description !== "string" ||
+    (preview !== null && preview !== undefined && !isFile(preview)) ||
+    categories.length === 0 ||
+    categories.some((category) => typeof category !== "string")
+  ) {
+    throw invalidResourceRequest();
+  }
+
+  return {
+    categories: categories as string[],
+    description,
+    name,
+    preview: preview ?? undefined,
+    resourceId,
+  };
+}
+
+export function parseResourceVersionUpload(input: unknown) {
+  if (!(input instanceof FormData)) throw invalidResourceRequest();
+  const resourceId = Number(input.get("resourceId"));
+  const file = input.get("file");
+  if (!Number.isSafeInteger(resourceId) || resourceId <= 0 || !isFile(file)) {
+    throw invalidResourceRequest();
+  }
+  return { file, resourceId };
 }
 
 function parseResourceId(input: unknown): ResourceIdInput {

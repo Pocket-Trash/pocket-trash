@@ -13,6 +13,7 @@ import { Route as UserRouteImport } from './routes/user'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
+import { Route as UserResourcesRouteImport } from './routes/user.resources'
 import { Route as UserCollectionsRouteImport } from './routes/user.collections'
 import { Route as UserAccountRouteImport } from './routes/user.account'
 import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
@@ -21,7 +22,9 @@ import { Route as ResourcesUploadRouteImport } from './routes/resources.upload'
 import { Route as ResourcesResourceIdRouteImport } from './routes/resources.$resourceId'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
+import { Route as ResourcesResourceIdEditRouteImport } from './routes/resources.$resourceId.edit'
 import { Route as AdminSettingsFeatureFlagsRouteImport } from './routes/admin.settings.feature-flags'
+import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId.versions.new'
 
 const UserRoute = UserRouteImport.update({
   id: '/user',
@@ -42,6 +45,11 @@ const ResourcesIndexRoute = ResourcesIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => ResourcesRoute,
+} as any)
+const UserResourcesRoute = UserResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => UserRoute,
 } as any)
 const UserCollectionsRoute = UserCollectionsRouteImport.update({
   id: '/collections',
@@ -84,11 +92,22 @@ const UserSettingsBetaFeaturesRoute =
     path: '/settings/beta-features',
     getParentRoute: () => UserRoute,
   } as any)
+const ResourcesResourceIdEditRoute = ResourcesResourceIdEditRouteImport.update({
+  id: '/edit',
+  path: '/edit',
+  getParentRoute: () => ResourcesResourceIdRoute,
+} as any)
 const AdminSettingsFeatureFlagsRoute =
   AdminSettingsFeatureFlagsRouteImport.update({
     id: '/admin/settings/feature-flags',
     path: '/admin/settings/feature-flags',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const ResourcesResourceIdVersionsNewRoute =
+  ResourcesResourceIdVersionsNewRouteImport.update({
+    id: '/versions/new',
+    path: '/versions/new',
+    getParentRoute: () => ResourcesResourceIdRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -96,29 +115,35 @@ export interface FileRoutesByFullPath {
   '/resources': typeof ResourcesRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
-  '/resources/$resourceId': typeof ResourcesResourceIdRoute
+  '/resources/$resourceId': typeof ResourcesResourceIdRouteWithChildren
   '/resources/upload': typeof ResourcesUploadRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/user/resources': typeof UserResourcesRoute
   '/resources/': typeof ResourcesIndexRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
+  '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
-  '/resources/$resourceId': typeof ResourcesResourceIdRoute
+  '/resources/$resourceId': typeof ResourcesResourceIdRouteWithChildren
   '/resources/upload': typeof ResourcesUploadRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/user/resources': typeof UserResourcesRoute
   '/resources': typeof ResourcesIndexRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
+  '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -126,15 +151,18 @@ export interface FileRoutesById {
   '/resources': typeof ResourcesRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
-  '/resources/$resourceId': typeof ResourcesResourceIdRoute
+  '/resources/$resourceId': typeof ResourcesResourceIdRouteWithChildren
   '/resources/upload': typeof ResourcesUploadRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/user/resources': typeof UserResourcesRoute
   '/resources/': typeof ResourcesIndexRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
+  '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -149,9 +177,12 @@ export interface FileRouteTypes {
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/user/resources'
     | '/resources/'
     | '/admin/settings/feature-flags'
+    | '/resources/$resourceId/edit'
     | '/user/settings/beta-features'
+    | '/resources/$resourceId/versions/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -163,9 +194,12 @@ export interface FileRouteTypes {
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/user/resources'
     | '/resources'
     | '/admin/settings/feature-flags'
+    | '/resources/$resourceId/edit'
     | '/user/settings/beta-features'
+    | '/resources/$resourceId/versions/new'
   id:
     | '__root__'
     | '/'
@@ -178,9 +212,12 @@ export interface FileRouteTypes {
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/user/resources'
     | '/resources/'
     | '/admin/settings/feature-flags'
+    | '/resources/$resourceId/edit'
     | '/user/settings/beta-features'
+    | '/resources/$resourceId/versions/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -222,6 +259,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/resources/'
       preLoaderRoute: typeof ResourcesIndexRouteImport
       parentRoute: typeof ResourcesRoute
+    }
+    '/user/resources': {
+      id: '/user/resources'
+      path: '/resources'
+      fullPath: '/user/resources'
+      preLoaderRoute: typeof UserResourcesRouteImport
+      parentRoute: typeof UserRoute
     }
     '/user/collections': {
       id: '/user/collections'
@@ -279,6 +323,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserSettingsBetaFeaturesRouteImport
       parentRoute: typeof UserRoute
     }
+    '/resources/$resourceId/edit': {
+      id: '/resources/$resourceId/edit'
+      path: '/edit'
+      fullPath: '/resources/$resourceId/edit'
+      preLoaderRoute: typeof ResourcesResourceIdEditRouteImport
+      parentRoute: typeof ResourcesResourceIdRoute
+    }
     '/admin/settings/feature-flags': {
       id: '/admin/settings/feature-flags'
       path: '/admin/settings/feature-flags'
@@ -286,17 +337,37 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsFeatureFlagsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/resources/$resourceId/versions/new': {
+      id: '/resources/$resourceId/versions/new'
+      path: '/versions/new'
+      fullPath: '/resources/$resourceId/versions/new'
+      preLoaderRoute: typeof ResourcesResourceIdVersionsNewRouteImport
+      parentRoute: typeof ResourcesResourceIdRoute
+    }
   }
 }
 
+interface ResourcesResourceIdRouteChildren {
+  ResourcesResourceIdEditRoute: typeof ResourcesResourceIdEditRoute
+  ResourcesResourceIdVersionsNewRoute: typeof ResourcesResourceIdVersionsNewRoute
+}
+
+const ResourcesResourceIdRouteChildren: ResourcesResourceIdRouteChildren = {
+  ResourcesResourceIdEditRoute: ResourcesResourceIdEditRoute,
+  ResourcesResourceIdVersionsNewRoute: ResourcesResourceIdVersionsNewRoute,
+}
+
+const ResourcesResourceIdRouteWithChildren =
+  ResourcesResourceIdRoute._addFileChildren(ResourcesResourceIdRouteChildren)
+
 interface ResourcesRouteChildren {
-  ResourcesResourceIdRoute: typeof ResourcesResourceIdRoute
+  ResourcesResourceIdRoute: typeof ResourcesResourceIdRouteWithChildren
   ResourcesUploadRoute: typeof ResourcesUploadRoute
   ResourcesIndexRoute: typeof ResourcesIndexRoute
 }
 
 const ResourcesRouteChildren: ResourcesRouteChildren = {
-  ResourcesResourceIdRoute: ResourcesResourceIdRoute,
+  ResourcesResourceIdRoute: ResourcesResourceIdRouteWithChildren,
   ResourcesUploadRoute: ResourcesUploadRoute,
   ResourcesIndexRoute: ResourcesIndexRoute,
 }
@@ -308,12 +379,14 @@ const ResourcesRouteWithChildren = ResourcesRoute._addFileChildren(
 interface UserRouteChildren {
   UserAccountRoute: typeof UserAccountRoute
   UserCollectionsRoute: typeof UserCollectionsRoute
+  UserResourcesRoute: typeof UserResourcesRoute
   UserSettingsBetaFeaturesRoute: typeof UserSettingsBetaFeaturesRoute
 }
 
 const UserRouteChildren: UserRouteChildren = {
   UserAccountRoute: UserAccountRoute,
   UserCollectionsRoute: UserCollectionsRoute,
+  UserResourcesRoute: UserResourcesRoute,
   UserSettingsBetaFeaturesRoute: UserSettingsBetaFeaturesRoute,
 }
 
