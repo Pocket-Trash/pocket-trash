@@ -115,20 +115,29 @@ export type CatalogService = {
 
 export type UserCollectionItem = {
   collectionItemId: number;
+  finishOption: CatalogFinishOption | null;
   installedButtonId: number | null;
+  material: CatalogLookup | null;
   name: string;
   productId: number;
   productTypeSlug: CatalogProductType;
+  sourceProductFinishOptionId: number | null;
 };
 
 export type CollectionsService = {
   addSpinner(input: {
     actorClerkId: string;
+    buttonFinishOptionId: number | null;
+    buttonMaterialId: number | null;
     buttonProductId: number | null;
+    spinnerFinishOptionId: number;
+    spinnerMaterialId: number;
     spinnerProductId: number;
   }): Promise<{ buttonItemId: number | null; spinnerItemId: number }>;
   addSpinnerButton(input: {
     actorClerkId: string;
+    finishOptionId: number;
+    materialId: number;
     productId: number;
   }): Promise<number>;
   countOwnedProducts(input: {
@@ -143,10 +152,12 @@ export type CollectionsService = {
   listOwners(): Promise<
     Array<{ clerkId: string; itemCount: number; userId: number }>
   >;
-  updateSpinner(input: {
+  updateItem(input: {
     actorClerkId: string;
     collectionItemId: number;
-    installedButtonId: number | null;
+    finishOptionId: number | null;
+    installedButtonId?: number | null;
+    materialId: number;
   }): Promise<void>;
 };
 
@@ -483,64 +494,112 @@ export function createCollectionsService(
   logger: Logger,
 ): CollectionsService {
   return {
-    async addSpinner({ actorClerkId, buttonProductId, spinnerProductId }) {
+    async addSpinner(input) {
       return await logger.operation(
         loggerMessages.database.collections.addSpinner,
         async () => {
-          const owner = await users.ensure({ clerkId: actorClerkId });
+          const owner = await users.ensure({ clerkId: input.actorClerkId });
           return await db.transaction(async (tx) => {
             let buttonItemId: number | null = null;
-            if (buttonProductId !== null) {
+            if (
+              input.buttonProductId === null &&
+              (input.buttonMaterialId !== null ||
+                input.buttonFinishOptionId !== null)
+            ) {
+              throw new Error("Button product is required.");
+            }
+            if (input.buttonProductId !== null) {
+              if (
+                input.buttonMaterialId === null ||
+                input.buttonFinishOptionId === null
+              ) {
+                throw new Error("Button material and finish are required.");
+              }
+              await assertProductMaterial(
+                tx,
+                input.buttonProductId,
+                input.buttonMaterialId,
+              );
               const [buttonItem] = await tx
                 .insert(schema.collectionItem)
-                .values({ ownerId: owner.id })
+                .values({
+                  materialId: input.buttonMaterialId,
+                  ownerId: owner.id,
+                })
                 .returning({ id: schema.collectionItem.id });
               if (!buttonItem) throw new Error("Failed to create button item.");
               await tx.insert(schema.collectionSpinnerButton).values({
                 id: buttonItem.id,
-                productSpinnerButtonId: buttonProductId,
+                productSpinnerButtonId: input.buttonProductId,
               });
+              await copyProductFinishOption(
+                tx,
+                input.buttonProductId,
+                input.buttonFinishOptionId,
+                buttonItem.id,
+              );
               buttonItemId = buttonItem.id;
             }
 
+            await assertProductMaterial(
+              tx,
+              input.spinnerProductId,
+              input.spinnerMaterialId,
+            );
             const [spinnerItem] = await tx
               .insert(schema.collectionItem)
-              .values({ ownerId: owner.id })
+              .values({
+                materialId: input.spinnerMaterialId,
+                ownerId: owner.id,
+              })
               .returning({ id: schema.collectionItem.id });
             if (!spinnerItem) throw new Error("Failed to create spinner item.");
             await tx.insert(schema.collectionSpinner).values({
               id: spinnerItem.id,
               installedButtonId: buttonItemId,
-              productSpinnerId: spinnerProductId,
+              productSpinnerId: input.spinnerProductId,
             });
+            await copyProductFinishOption(
+              tx,
+              input.spinnerProductId,
+              input.spinnerFinishOptionId,
+              spinnerItem.id,
+            );
             return { buttonItemId, spinnerItemId: spinnerItem.id };
           });
         },
-        actorAttributes(actorClerkId, {
-          buttonProductId,
-          spinnerProductId,
+        actorAttributes(input.actorClerkId, {
+          buttonProductId: input.buttonProductId,
+          spinnerProductId: input.spinnerProductId,
         }),
       );
     },
-    async addSpinnerButton({ actorClerkId, productId }) {
+    async addSpinnerButton(input) {
       return await logger.operation(
         loggerMessages.database.collections.addSpinnerButton,
         async () => {
-          const owner = await users.ensure({ clerkId: actorClerkId });
+          const owner = await users.ensure({ clerkId: input.actorClerkId });
           return await db.transaction(async (tx) => {
+            await assertProductMaterial(tx, input.productId, input.materialId);
             const [item] = await tx
               .insert(schema.collectionItem)
-              .values({ ownerId: owner.id })
+              .values({ materialId: input.materialId, ownerId: owner.id })
               .returning({ id: schema.collectionItem.id });
             if (!item) throw new Error("Failed to create collection item.");
             await tx.insert(schema.collectionSpinnerButton).values({
               id: item.id,
-              productSpinnerButtonId: productId,
+              productSpinnerButtonId: input.productId,
             });
+            await copyProductFinishOption(
+              tx,
+              input.productId,
+              input.finishOptionId,
+              item.id,
+            );
             return item.id;
           });
         },
-        actorAttributes(actorClerkId, { productId }),
+        actorAttributes(input.actorClerkId, { productId: input.productId }),
       );
     },
     async countOwnedProducts({ actorClerkId, productIds }) {
@@ -621,57 +680,118 @@ export function createCollectionsService(
         .groupBy(schema.user.id)
         .orderBy(asc(schema.user.clerkId));
     },
-    async updateSpinner({ actorClerkId, collectionItemId, installedButtonId }) {
+    async updateItem(input) {
       await logger.operation(
-        loggerMessages.database.collections.updateSpinner,
+        loggerMessages.database.collections.updateItem,
         async () => {
-          const owner = await users.getByClerkId(actorClerkId);
+          const owner = await users.getByClerkId(input.actorClerkId);
           if (!owner) throw new Error("Collection item does not exist.");
-
-          if (installedButtonId !== null) {
-            const [button] = await db
-              .select({ id: schema.collectionSpinnerButton.id })
-              .from(schema.collectionSpinnerButton)
-              .innerJoin(
-                schema.collectionItem,
-                eq(schema.collectionSpinnerButton.id, schema.collectionItem.id),
+          await db.transaction(async (tx) => {
+            const [item] = await tx
+              .select({
+                buttonProductId:
+                  schema.collectionSpinnerButton.productSpinnerButtonId,
+                spinnerProductId: schema.collectionSpinner.productSpinnerId,
+              })
+              .from(schema.collectionItem)
+              .leftJoin(
+                schema.collectionSpinner,
+                eq(schema.collectionItem.id, schema.collectionSpinner.id),
+              )
+              .leftJoin(
+                schema.collectionSpinnerButton,
+                eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
               )
               .where(
                 and(
-                  eq(schema.collectionSpinnerButton.id, installedButtonId),
+                  eq(schema.collectionItem.id, input.collectionItemId),
                   eq(schema.collectionItem.ownerId, owner.id),
                   eq(schema.collectionItem.owned, true),
                 ),
               )
               .limit(1);
-            if (!button) throw new Error("Installed button does not exist.");
-          }
+            const productId =
+              item?.spinnerProductId ?? item?.buttonProductId ?? null;
+            if (!item || productId === null) {
+              throw new Error("Collection item does not exist.");
+            }
 
-          const [item] = await db
-            .select({ id: schema.collectionSpinner.id })
-            .from(schema.collectionSpinner)
-            .innerJoin(
-              schema.collectionItem,
-              eq(schema.collectionSpinner.id, schema.collectionItem.id),
-            )
-            .where(
-              and(
-                eq(schema.collectionSpinner.id, collectionItemId),
-                eq(schema.collectionItem.ownerId, owner.id),
-                eq(schema.collectionItem.owned, true),
-              ),
-            )
-            .limit(1);
-          if (!item) throw new Error("Collection item does not exist.");
+            await assertProductMaterial(tx, productId, input.materialId);
+            await tx
+              .update(schema.collectionItem)
+              .set({ materialId: input.materialId })
+              .where(eq(schema.collectionItem.id, input.collectionItemId));
 
-          await db
-            .update(schema.collectionSpinner)
-            .set({ installedButtonId })
-            .where(eq(schema.collectionSpinner.id, collectionItemId));
+            if (input.finishOptionId !== null) {
+              await tx
+                .delete(schema.finishOption)
+                .where(
+                  eq(
+                    schema.finishOption.collectionItemId,
+                    input.collectionItemId,
+                  ),
+                );
+              await copyProductFinishOption(
+                tx,
+                productId,
+                input.finishOptionId,
+                input.collectionItemId,
+              );
+            } else {
+              const [finish] = await tx
+                .select({ id: schema.finishOption.id })
+                .from(schema.finishOption)
+                .where(
+                  eq(
+                    schema.finishOption.collectionItemId,
+                    input.collectionItemId,
+                  ),
+                )
+                .limit(1);
+              if (!finish) throw new Error("A finish is required.");
+            }
+
+            if (input.installedButtonId !== undefined) {
+              if (item.spinnerProductId === null) {
+                throw new Error("Collection item is not a spinner.");
+              }
+              if (input.installedButtonId !== null) {
+                const [button] = await tx
+                  .select({ id: schema.collectionSpinnerButton.id })
+                  .from(schema.collectionSpinnerButton)
+                  .innerJoin(
+                    schema.collectionItem,
+                    eq(
+                      schema.collectionSpinnerButton.id,
+                      schema.collectionItem.id,
+                    ),
+                  )
+                  .where(
+                    and(
+                      eq(
+                        schema.collectionSpinnerButton.id,
+                        input.installedButtonId,
+                      ),
+                      eq(schema.collectionItem.ownerId, owner.id),
+                      eq(schema.collectionItem.owned, true),
+                    ),
+                  )
+                  .limit(1);
+                if (!button) {
+                  throw new Error("Installed button does not exist.");
+                }
+              }
+              await tx
+                .update(schema.collectionSpinner)
+                .set({ installedButtonId: input.installedButtonId })
+                .where(eq(schema.collectionSpinner.id, input.collectionItemId));
+            }
+          });
         },
-        actorAttributes(actorClerkId, {
-          collectionItemId,
-          installedButtonId,
+        actorAttributes(input.actorClerkId, {
+          collectionItemId: input.collectionItemId,
+          installedButtonId: input.installedButtonId,
+          materialId: input.materialId,
         }),
       );
     },
@@ -827,6 +947,30 @@ async function loadFinishOptions(db: Database, products: CatalogProduct[]) {
     .orderBy(asc(schema.finishOption.position));
 
   if (!options.length) return;
+  const loadedOptions = await loadFinishOptionComponents(db, options);
+  const productsById = new Map(
+    products.map((product) => [product.id, product]),
+  );
+
+  for (const option of options) {
+    const product = option.productId
+      ? productsById.get(option.productId)
+      : undefined;
+    const loaded = loadedOptions.get(option.id);
+    if (product && loaded) product.finishOptions.push(loaded);
+  }
+}
+
+async function loadFinishOptionComponents(
+  db: Database,
+  options: Array<{
+    colorEffectId: number | null;
+    colorEffectName: string | null;
+    colorEffectSlug: string | null;
+    id: number;
+  }>,
+): Promise<Map<number, CatalogFinishOption>> {
+  if (!options.length) return new Map();
   const optionIds = options.map(({ id }) => id);
   const [finishes, colors] = await Promise.all([
     db
@@ -858,16 +1002,10 @@ async function loadFinishOptions(db: Database, products: CatalogProduct[]) {
       .where(inArray(schema.finishOptionColor.finishOptionId, optionIds))
       .orderBy(asc(schema.finishOptionColor.position)),
   ]);
-  const productsById = new Map(
-    products.map((product) => [product.id, product]),
-  );
+  const result = new Map<number, CatalogFinishOption>();
 
   for (const option of options) {
-    const product = option.productId
-      ? productsById.get(option.productId)
-      : undefined;
-    if (!product) continue;
-    product.finishOptions.push({
+    result.set(option.id, {
       colorEffect:
         option.colorEffectId && option.colorEffectName && option.colorEffectSlug
           ? {
@@ -885,6 +1023,7 @@ async function loadFinishOptions(db: Database, products: CatalogProduct[]) {
       id: option.id,
     });
   }
+  return result;
 }
 
 async function queryOwnedItems(
@@ -902,14 +1041,35 @@ async function queryOwnedItems(
   const rows = await db
     .select({
       collectionItemId: schema.collectionItem.id,
+      colorEffectId: schema.colorEffect.id,
+      colorEffectName: schema.colorEffect.name,
+      colorEffectSlug: schema.colorEffect.slug,
+      finishOptionId: schema.finishOption.id,
       installedButtonId: schema.collectionSpinner.installedButtonId,
+      materialId: schema.material.id,
+      materialName: schema.material.name,
+      materialSlug: schema.material.slug,
       name: schema.product.name,
       productId: schema.product.id,
+      sourceProductFinishOptionId:
+        schema.finishOption.sourceProductFinishOptionId,
       spinnerId: schema.collectionSpinner.id,
       buttonId: schema.collectionSpinnerButton.id,
     })
     .from(schema.collectionItem)
     .innerJoin(schema.user, eq(schema.collectionItem.ownerId, schema.user.id))
+    .leftJoin(
+      schema.material,
+      eq(schema.collectionItem.materialId, schema.material.id),
+    )
+    .leftJoin(
+      schema.finishOption,
+      eq(schema.collectionItem.id, schema.finishOption.collectionItemId),
+    )
+    .leftJoin(
+      schema.colorEffect,
+      eq(schema.finishOption.colorEffectId, schema.colorEffect.id),
+    )
     .leftJoin(
       schema.collectionSpinner,
       eq(schema.collectionItem.id, schema.collectionSpinner.id),
@@ -927,16 +1087,127 @@ async function queryOwnedItems(
     )
     .where(and(...conditions))
     .orderBy(asc(schema.product.name));
+  const finishOptions = await loadFinishOptionComponents(
+    db,
+    rows.flatMap((row) =>
+      row.finishOptionId
+        ? [
+            {
+              colorEffectId: row.colorEffectId,
+              colorEffectName: row.colorEffectName,
+              colorEffectSlug: row.colorEffectSlug,
+              id: row.finishOptionId,
+            },
+          ]
+        : [],
+    ),
+  );
   return rows.map((row) => ({
     collectionItemId: row.collectionItemId,
+    finishOption: row.finishOptionId
+      ? (finishOptions.get(row.finishOptionId) ?? null)
+      : null,
     installedButtonId: row.installedButtonId,
+    material:
+      row.materialId && row.materialName && row.materialSlug
+        ? {
+            id: row.materialId,
+            name: row.materialName,
+            slug: row.materialSlug,
+          }
+        : null,
     name: row.name,
     productId: row.productId,
     productTypeSlug: row.spinnerId ? "spinner" : "spinner-button",
+    sourceProductFinishOptionId: row.sourceProductFinishOptionId,
   }));
 }
 
 type CatalogTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+async function assertProductMaterial(
+  tx: CatalogTransaction,
+  productId: number,
+  materialId: number,
+) {
+  const [row] = await tx
+    .select({ materialId: schema.productMaterial.materialId })
+    .from(schema.productMaterial)
+    .where(
+      and(
+        eq(schema.productMaterial.productId, productId),
+        eq(schema.productMaterial.materialId, materialId),
+      ),
+    )
+    .limit(1);
+  if (!row) throw new Error("Material is not available for this product.");
+}
+
+async function copyProductFinishOption(
+  tx: CatalogTransaction,
+  productId: number,
+  sourceFinishOptionId: number,
+  collectionItemId: number,
+) {
+  const [source] = await tx
+    .select({ colorEffectId: schema.finishOption.colorEffectId })
+    .from(schema.finishOption)
+    .where(
+      and(
+        eq(schema.finishOption.id, sourceFinishOptionId),
+        eq(schema.finishOption.productId, productId),
+      ),
+    )
+    .limit(1);
+  if (!source)
+    throw new Error("Finish option is not available for this product.");
+
+  const finishes = await tx
+    .select({
+      finishId: schema.finishOptionFinish.finishId,
+      position: schema.finishOptionFinish.position,
+    })
+    .from(schema.finishOptionFinish)
+    .where(eq(schema.finishOptionFinish.finishOptionId, sourceFinishOptionId))
+    .orderBy(asc(schema.finishOptionFinish.position));
+  const colors = await tx
+    .select({
+      colorId: schema.finishOptionColor.colorId,
+      position: schema.finishOptionColor.position,
+    })
+    .from(schema.finishOptionColor)
+    .where(eq(schema.finishOptionColor.finishOptionId, sourceFinishOptionId))
+    .orderBy(asc(schema.finishOptionColor.position));
+  if (!finishes.length) throw new Error("Finish option has no finishes.");
+
+  const [snapshot] = await tx
+    .insert(schema.finishOption)
+    .values({
+      collectionItemId,
+      colorEffectId: source.colorEffectId,
+      position: 0,
+      sourceProductFinishOptionId: sourceFinishOptionId,
+    })
+    .returning({ id: schema.finishOption.id });
+  if (!snapshot) throw new Error("Failed to create finish snapshot.");
+
+  await tx.insert(schema.finishOptionFinish).values(
+    finishes.map(({ finishId, position }) => ({
+      finishId,
+      finishOptionId: snapshot.id,
+      position,
+    })),
+  );
+  if (colors.length) {
+    await tx.insert(schema.finishOptionColor).values(
+      colors.map(({ colorId, position }) => ({
+        colorId,
+        finishOptionId: snapshot.id,
+        position,
+      })),
+    );
+  }
+}
 
 async function replaceProductFinishOptions(
   tx: CatalogTransaction,

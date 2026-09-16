@@ -1,4 +1,8 @@
-import type { CatalogProduct, UserCollectionItem } from "@package/services";
+import type {
+  CatalogFinishOption,
+  CatalogProduct,
+  UserCollectionItem,
+} from "@package/services";
 import {
   formatTranslation,
   type TranslationKey,
@@ -144,22 +148,7 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
             <Detail label={t("web.catalog.field.finishOptions")}>
               <ul className="grid gap-1">
                 {product.finishOptions.map((option) => (
-                  <li key={option.id}>
-                    {finishOptionLabel({
-                      ...option,
-                      colorEffect: option.colorEffect
-                        ? {
-                            ...option.colorEffect,
-                            name:
-                              option.colorEffect.slug === "fade"
-                                ? t("web.catalog.colorEffect.fade")
-                                : option.colorEffect.slug === "solid"
-                                  ? t("web.catalog.colorEffect.solid")
-                                  : option.colorEffect.name,
-                          }
-                        : null,
-                    })}
-                  </li>
+                  <li key={option.id}>{localizedFinishLabel(option, t)}</li>
                 ))}
               </ul>
             </Detail>
@@ -249,7 +238,17 @@ export function UserCollectionPage({ items }: { items: UserCollectionItem[] }) {
               params={{ collectionItemId: item.collectionItemId }}
               to="/collections/edit/$collectionItemId"
             >
-              {item.name}
+              <span>{item.name}</span>
+              {item.material ? (
+                <span className="mt-2 block text-xs font-normal text-muted-foreground">
+                  {item.material.name}
+                </span>
+              ) : null}
+              {item.finishOption ? (
+                <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                  {localizedFinishLabel(item.finishOption, t)}
+                </span>
+              ) : null}
             </Link>
           ))
         ) : (
@@ -328,4 +327,24 @@ function EmptyState({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   );
+}
+
+function localizedFinishLabel(
+  option: CatalogFinishOption,
+  t: ReturnType<typeof useCatalogCopy>,
+) {
+  return finishOptionLabel({
+    ...option,
+    colorEffect: option.colorEffect
+      ? {
+          ...option.colorEffect,
+          name:
+            option.colorEffect.slug === "fade"
+              ? t("web.catalog.colorEffect.fade")
+              : option.colorEffect.slug === "solid"
+                ? t("web.catalog.colorEffect.solid")
+                : option.colorEffect.name,
+        }
+      : null,
+  });
 }

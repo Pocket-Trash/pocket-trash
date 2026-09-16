@@ -10,6 +10,7 @@ Shared ownership and lifecycle row for user collection items.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | yes | PK |  |  | Internal collection item row identifier. | `1000` |
 | `owner_id` | `bigint` | yes | FK |  | `user.id` (on delete cascade) | User who owns or owned the collection item. | `1000` |
+| `material_id` | `bigint` | no | FK |  | `material.id` (on delete restrict) | Exact material of the owned physical item. | `1000` |
 | `purchased_at` | `timestamp with time zone` | no |  |  |  | Timestamp when the item was purchased. | `2026-07-17T20:45:00.000Z` |
 | `sold_at` | `timestamp with time zone` | no |  |  |  | Timestamp when the item was sold. | `2026-08-17T20:45:00.000Z` |
 | `purchased_from_user_id` | `bigint` | no | FK |  | `user.id` (on delete set null) | Known application user the item was purchased from. | `1001` |

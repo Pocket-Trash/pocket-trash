@@ -20,8 +20,12 @@ export const Route = createFileRoute("/collections/edit/$collectionItemId")({
   loader: async ({ params }) => {
     if (!Number.isInteger(params.collectionItemId)) throw notFound();
     const data = await getCollectionEditData({ data: params });
-    if (!data.item) throw notFound();
-    return { item: data.item, ownedButtons: data.ownedButtons };
+    if (!data.item || !data.product) throw notFound();
+    return {
+      item: data.item,
+      ownedButtons: data.ownedButtons,
+      product: data.product,
+    };
   },
   component: CollectionEditRoute,
 });

@@ -147,16 +147,40 @@ type CatalogLookupMutationResult<K extends string> =
       ok: false;
     };
 
-const collectionAddSchema = z.object({
-  buttonProductId: idSchema.nullable(),
-  confirmed: z.boolean(),
-  productId: idSchema,
-  productTypeSlug: productTypeSchema,
-});
+const collectionAddSchema = z
+  .object({
+    buttonFinishOptionId: idSchema.nullable(),
+    buttonMaterialId: idSchema.nullable(),
+    buttonProductId: idSchema.nullable(),
+    confirmed: z.boolean(),
+    finishOptionId: idSchema,
+    materialId: idSchema,
+    productId: idSchema,
+    productTypeSlug: productTypeSchema,
+  })
+  .superRefine((input, context) => {
+    const selectedButtonValues = [
+      input.buttonProductId,
+      input.buttonMaterialId,
+      input.buttonFinishOptionId,
+    ].filter((value) => value !== null).length;
+    if (
+      (selectedButtonValues !== 0 && selectedButtonValues !== 3) ||
+      (input.productTypeSlug !== "spinner" && selectedButtonValues > 0)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: requiredMessage,
+        path: ["buttonProductId"],
+      });
+    }
+  });
 
 const collectionEditSchema = z.object({
   collectionItemId: idSchema,
-  installedButtonId: idSchema.nullable(),
+  finishOptionId: idSchema.nullable(),
+  installedButtonId: idSchema.nullable().optional(),
+  materialId: idSchema,
 });
 
 export type ProductFormInput = z.input<typeof productFormSchema>;
@@ -426,12 +450,18 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
           ? (
               await s.db.collections.addSpinner({
                 actorClerkId,
+                buttonFinishOptionId: parsed.data.buttonFinishOptionId,
+                buttonMaterialId: parsed.data.buttonMaterialId,
                 buttonProductId: parsed.data.buttonProductId,
+                spinnerFinishOptionId: parsed.data.finishOptionId,
+                spinnerMaterialId: parsed.data.materialId,
                 spinnerProductId: parsed.data.productId,
               })
             ).spinnerItemId
           : await s.db.collections.addSpinnerButton({
               actorClerkId,
+              finishOptionId: parsed.data.finishOptionId,
+              materialId: parsed.data.materialId,
               productId: parsed.data.productId,
             });
       return { collectionItemId, ok: true as const };
@@ -462,19 +492,25 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const actorClerkId = await requireActor();
     const { s } = await import("@/lib/services");
-    const [item, items] = await Promise.all([
-      s.db.collections.getOwnedItem(actorClerkId, data.collectionItemId),
+    const item = await s.db.collections.getOwnedItem(
+      actorClerkId,
+      data.collectionItemId,
+    );
+    if (!item) return { item: null, ownedButtons: [], product: null };
+    const [items, products] = await Promise.all([
       s.db.collections.listOwned(actorClerkId),
+      s.db.catalog.listProducts(item.productTypeSlug),
     ]);
     return {
       item,
       ownedButtons: items.filter(
         (candidate) => candidate.productTypeSlug === "spinner-button",
       ),
+      product: products.find(({ id }) => id === item.productId) ?? null,
     };
   });
 
-export const updateCollectionSpinner = createServerFn({ method: "POST" })
+export const updateCollectionItem = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
     const actorClerkId = await requireActor();
@@ -483,7 +519,7 @@ export const updateCollectionSpinner = createServerFn({ method: "POST" })
 
     const { s } = await import("@/lib/services");
     try {
-      await s.db.collections.updateSpinner({ actorClerkId, ...parsed.data });
+      await s.db.collections.updateItem({ actorClerkId, ...parsed.data });
       return { ok: true as const };
     } catch (error) {
       return mutationFailure(error);

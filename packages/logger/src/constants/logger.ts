@@ -56,7 +56,7 @@ export const loggerMessages = {
     collections: {
       addSpinner: "database.collections.addSpinner",
       addSpinnerButton: "database.collections.addSpinnerButton",
-      updateSpinner: "database.collections.updateSpinner",
+      updateItem: "database.collections.updateItem",
     },
     featureFlags: {
       archive: "database.featureFlags.archive",

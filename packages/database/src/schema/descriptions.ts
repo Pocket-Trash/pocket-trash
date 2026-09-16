@@ -126,6 +126,10 @@ export const schemaDescriptions = {
         description: "User who owns or owned the collection item.",
         example: 1000,
       },
+      material_id: {
+        description: "Exact material of the owned physical item.",
+        example: 1000,
+      },
       purchased_at: {
         description: "Timestamp when the item was purchased.",
         example: "2026-07-17T20:45:00.000Z",

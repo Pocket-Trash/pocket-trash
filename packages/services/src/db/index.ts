@@ -32,6 +32,7 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
 }
 
 export type {
+  CatalogFinishOption,
   CatalogLookup,
   CatalogProduct,
   CatalogProductType,

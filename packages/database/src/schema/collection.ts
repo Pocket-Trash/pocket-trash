@@ -22,6 +22,10 @@ export const collectionItem = pgTable("collection_item", {
   ownerId: bigint("owner_id", { mode: "number" })
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  materialId: bigint("material_id", { mode: "number" }).references(
+    () => material.id,
+    { onDelete: "restrict" },
+  ),
   purchasedAt: timestamp("purchased_at", { withTimezone: true }),
   soldAt: timestamp("sold_at", { withTimezone: true }),
   purchasedFromUserId: bigint("purchased_from_user_id", {

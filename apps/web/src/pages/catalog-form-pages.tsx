@@ -1,4 +1,5 @@
 import type {
+  CatalogFinishOption,
   CatalogLookup,
   CatalogProduct,
   CatalogProductType,
@@ -34,7 +35,7 @@ import {
   productSlugPreview,
   productTypeIsSupported,
   saveCatalogProduct,
-  updateCollectionSpinner,
+  updateCollectionItem,
 } from "@/lib/catalog-api";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -772,7 +773,16 @@ export function CollectionAddPage({
   const navigate = useNavigate();
   const [type, setType] = React.useState<ComboboxOption | null>(null);
   const [product, setProduct] = React.useState<CatalogProduct | null>(null);
-  const [button, setButton] = React.useState<ComboboxOption | null>(null);
+  const [material, setMaterial] = React.useState<CatalogLookup | null>(null);
+  const [finish, setFinish] = React.useState<ComboboxOption | null>(null);
+  const [button, setButton] = React.useState<
+    CatalogProduct | ComboboxOption | null
+  >(null);
+  const [buttonMaterial, setButtonMaterial] =
+    React.useState<CatalogLookup | null>(null);
+  const [buttonFinish, setButtonFinish] = React.useState<ComboboxOption | null>(
+    null,
+  );
   const [duplicateCounts, setDuplicateCounts] = React.useState<
     Record<number, number>
   >({});
@@ -781,16 +791,29 @@ export function CollectionAddPage({
   const matchingProducts = products.filter(
     ({ productTypeSlug }) => productTypeSlug === slug,
   );
+  const selectedButton =
+    typeof button?.id === "number"
+      ? (options.spinnerButtons.find(({ id }) => id === button.id) ?? null)
+      : null;
 
   const submit = async (confirmed: boolean) => {
-    if (!product || !productTypeIsSupported(product.productTypeSlug)) return;
+    if (
+      !product ||
+      !material ||
+      !finish ||
+      !productTypeIsSupported(product.productTypeSlug) ||
+      (selectedButton && (!buttonMaterial || !buttonFinish))
+    ) {
+      return;
+    }
     const result = await addCollectionProduct({
       data: {
-        buttonProductId:
-          product.productTypeSlug === "spinner" && button?.id !== "default"
-            ? Number(button?.id ?? 0) || null
-            : null,
+        buttonFinishOptionId: selectedButton ? Number(buttonFinish?.id) : null,
+        buttonMaterialId: selectedButton ? (buttonMaterial?.id ?? null) : null,
+        buttonProductId: selectedButton?.id ?? null,
         confirmed,
+        finishOptionId: Number(finish.id),
+        materialId: material.id,
         productId: product.id,
         productTypeSlug: product.productTypeSlug,
       },
@@ -813,7 +836,7 @@ export function CollectionAddPage({
       ]}
       title={t("web.action.addToCollection")}
     >
-      <main className="mx-auto grid max-w-5xl gap-6 p-6">
+      <main className="grid max-w-5xl gap-6 p-6">
         <Field label={t("web.catalog.field.productType")}>
           <CatalogCombobox
             ariaLabel={t("web.catalog.field.productType")}
@@ -821,7 +844,11 @@ export function CollectionAddPage({
             onValueChange={(value) => {
               setType(value);
               setProduct(null);
+              setMaterial(null);
+              setFinish(null);
               setButton(null);
+              setButtonMaterial(null);
+              setButtonFinish(null);
               setDuplicateCounts({});
               setFormError(null);
             }}
@@ -839,7 +866,11 @@ export function CollectionAddPage({
               key={candidate.id}
               onClick={() => {
                 setProduct(candidate);
+                setMaterial(null);
+                setFinish(null);
                 setButton(null);
+                setButtonMaterial(null);
+                setButtonFinish(null);
                 setDuplicateCounts({});
                 setFormError(null);
               }}
@@ -850,6 +881,16 @@ export function CollectionAddPage({
             </Button>
           ))}
         </div>
+        {product ? (
+          <CollectionProductFields
+            finish={finish}
+            material={material}
+            onFinishChange={setFinish}
+            onMaterialChange={setMaterial}
+            product={product}
+            t={t}
+          />
+        ) : null}
         {product?.productTypeSlug === "spinner" ? (
           <Field label={t("web.catalog.field.button")}>
             <CatalogCombobox
@@ -859,7 +900,15 @@ export function CollectionAddPage({
                 ...options.spinnerButtons,
               ]}
               onValueChange={(value) => {
-                setButton(value);
+                setButton(
+                  typeof value?.id === "number"
+                    ? (options.spinnerButtons.find(
+                        ({ id }) => id === value.id,
+                      ) ?? null)
+                    : value,
+                );
+                setButtonMaterial(null);
+                setButtonFinish(null);
                 setDuplicateCounts({});
               }}
               placeholder={t("web.catalog.defaultButton")}
@@ -868,6 +917,16 @@ export function CollectionAddPage({
               value={button}
             />
           </Field>
+        ) : null}
+        {selectedButton ? (
+          <CollectionProductFields
+            finish={buttonFinish}
+            material={buttonMaterial}
+            onFinishChange={setButtonFinish}
+            onMaterialChange={setButtonMaterial}
+            product={selectedButton}
+            t={t}
+          />
         ) : null}
         {Object.keys(duplicateCounts).length ? (
           <Notice>
@@ -892,8 +951,11 @@ export function CollectionAddPage({
           </Notice>
         ) : null}
         {formError ? <Notice>{t(formError)}</Notice> : null}
-        {product ? (
+        {product && material && finish ? (
           <Button
+            disabled={Boolean(
+              selectedButton && (!buttonMaterial || !buttonFinish),
+            )}
             onClick={() => void submit(Object.keys(duplicateCounts).length > 0)}
             type="button"
           >
@@ -907,16 +969,106 @@ export function CollectionAddPage({
   );
 }
 
+export function CollectionProductFields({
+  currentFinish,
+  finish,
+  material,
+  onFinishChange,
+  onMaterialChange,
+  product,
+  t,
+}: {
+  currentFinish?: CatalogFinishOption | null;
+  finish: ComboboxOption | null;
+  material: CatalogLookup | null;
+  onFinishChange: (value: ComboboxOption | null) => void;
+  onMaterialChange: (value: CatalogLookup | null) => void;
+  product: CatalogProduct;
+  t: ReturnType<typeof useCatalogCopy>;
+}) {
+  const finishItems: ComboboxOption[] = [
+    ...(currentFinish
+      ? [{ id: "current", name: localizedFinishLabel(currentFinish, t) }]
+      : []),
+    ...product.finishOptions.map((option) => ({
+      id: option.id,
+      name: localizedFinishLabel(option, t),
+    })),
+  ];
+
+  return (
+    <fieldset className="grid gap-5 rounded-lg border border-border p-4">
+      <legend className="px-1 text-sm font-semibold">{product.name}</legend>
+      <Field label={t("web.catalog.field.materials")}>
+        <CatalogCombobox
+          ariaLabel={t("web.catalog.field.materials")}
+          items={product.materials}
+          onValueChange={(value) =>
+            onMaterialChange(
+              product.materials.find(({ id }) => id === value?.id) ?? null,
+            )
+          }
+          placeholder={t("web.catalog.selectMaterial")}
+          removeLabel={t("web.action.close")}
+          showSelectedPill
+          value={material}
+        />
+      </Field>
+      <Field label={t("web.catalog.field.finishOptions")}>
+        <CatalogCombobox
+          ariaLabel={t("web.catalog.field.finishOptions")}
+          items={finishItems}
+          onValueChange={onFinishChange}
+          placeholder={t("web.catalog.selectFinishOption")}
+          removeLabel={t("web.action.close")}
+          showSelectedPill
+          value={finish}
+        />
+      </Field>
+    </fieldset>
+  );
+}
+
+function localizedFinishLabel(
+  option: CatalogFinishOption,
+  t: ReturnType<typeof useCatalogCopy>,
+) {
+  return finishOptionLabel({
+    ...option,
+    colorEffect: option.colorEffect
+      ? {
+          ...option.colorEffect,
+          name:
+            option.colorEffect.slug === "fade"
+              ? t("web.catalog.colorEffect.fade")
+              : option.colorEffect.slug === "solid"
+                ? t("web.catalog.colorEffect.solid")
+                : option.colorEffect.name,
+        }
+      : null,
+  });
+}
+
 export function CollectionEditPage({
   item,
   ownedButtons,
+  product,
 }: {
   item: UserCollectionItem;
   ownedButtons: UserCollectionItem[];
+  product: CatalogProduct;
 }) {
   const t = useCatalogCopy();
   const navigate = useNavigate();
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [material, setMaterial] = React.useState<CatalogLookup | null>(
+    item.material,
+  );
+  const [finish, setFinish] = React.useState<ComboboxOption | null>(() =>
+    item.finishOption
+      ? { id: "current", name: localizedFinishLabel(item.finishOption, t) }
+      : null,
+  );
   const [button, setButton] = React.useState<ComboboxOption | null>(() => {
     const selected = ownedButtons.find(
       ({ collectionItemId }) => collectionItemId === item.installedButtonId,
@@ -926,21 +1078,6 @@ export function CollectionEditPage({
       : { id: "default", name: t("web.catalog.defaultButton") };
   });
 
-  if (item.productTypeSlug === "spinner-button") {
-    return (
-      <AppShell
-        breadcrumbItems={[
-          { label: t("web.navigation.collections"), to: "/collections" },
-        ]}
-        title={item.name}
-      >
-        <main className="mx-auto max-w-xl p-6">
-          <Notice>{t("web.collections.edit.noFields")}</Notice>
-        </main>
-      </AppShell>
-    );
-  }
-
   return (
     <AppShell
       breadcrumbItems={[
@@ -948,31 +1085,51 @@ export function CollectionEditPage({
       ]}
       title={item.name}
     >
-      <main className="mx-auto grid max-w-xl gap-5 p-6">
-        <Field label={t("web.catalog.field.button")}>
-          <CatalogCombobox
-            ariaLabel={t("web.catalog.field.button")}
-            items={[
-              { id: "default", name: t("web.catalog.defaultButton") },
-              ...ownedButtons.map(({ collectionItemId, name }) => ({
-                id: collectionItemId,
-                name,
-              })),
-            ]}
-            onValueChange={setButton}
-            placeholder={t("web.catalog.defaultButton")}
-            removeLabel={t("web.action.close")}
-            showSelectedPill
-            value={button}
-          />
-        </Field>
+      <main className="grid max-w-xl gap-5 p-6">
+        <CollectionProductFields
+          currentFinish={item.finishOption}
+          finish={finish}
+          material={material}
+          onFinishChange={setFinish}
+          onMaterialChange={setMaterial}
+          product={product}
+          t={t}
+        />
+        {item.productTypeSlug === "spinner" ? (
+          <Field label={t("web.catalog.field.button")}>
+            <CatalogCombobox
+              ariaLabel={t("web.catalog.field.button")}
+              items={[
+                { id: "default", name: t("web.catalog.defaultButton") },
+                ...ownedButtons.map(({ collectionItemId, name }) => ({
+                  id: collectionItemId,
+                  name,
+                })),
+              ]}
+              onValueChange={setButton}
+              placeholder={t("web.catalog.defaultButton")}
+              removeLabel={t("web.action.close")}
+              showSelectedPill
+              value={button}
+            />
+          </Field>
+        ) : null}
         <Button
+          disabled={!material || !finish}
           onClick={async () => {
-            const result = await updateCollectionSpinner({
+            if (!material || !finish) return;
+            const result = await updateCollectionItem({
               data: {
                 collectionItemId: item.collectionItemId,
-                installedButtonId:
-                  button?.id === "default" ? null : Number(button?.id),
+                finishOptionId:
+                  finish.id === "current" ? null : Number(finish.id),
+                ...(item.productTypeSlug === "spinner"
+                  ? {
+                      installedButtonId:
+                        button?.id === "default" ? null : Number(button?.id),
+                    }
+                  : {}),
+                materialId: material.id,
               },
             });
             if (result.ok) {

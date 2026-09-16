@@ -79,6 +79,7 @@ export const makersRelations = relations(maker, ({ many }) => ({
 
 export const materialsRelations = relations(material, ({ many }) => ({
   autmogPens: many(tmpAutmogPenMaterials),
+  collectionItems: many(collectionItem),
   products: many(productMaterial),
 }));
 
@@ -95,6 +96,10 @@ export const scraperRunsRelations = relations(scraperRuns, () => ({}));
 
 export const collectionItemRelations = relations(collectionItem, ({ one }) => ({
   finishOption: one(finishOption),
+  material: one(material, {
+    fields: [collectionItem.materialId],
+    references: [material.id],
+  }),
   owner: one(user, {
     fields: [collectionItem.ownerId],
     references: [user.id],

@@ -1,0 +1,2 @@
+ALTER TABLE "collection_item" ADD COLUMN "material_id" bigint;--> statement-breakpoint
+ALTER TABLE "collection_item" ADD CONSTRAINT "collection_item_material_id_material_id_fk" FOREIGN KEY ("material_id") REFERENCES "public"."material"("id") ON DELETE restrict ON UPDATE no action;

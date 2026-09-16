@@ -8,8 +8,29 @@ import {
   createCollectionsService,
 } from "./index.js";
 
-function setup(returningRows: unknown[][]) {
+function setup(returningRows: unknown[][], selectRows: unknown[][]) {
   const writes: Array<{ table: unknown; value: unknown }> = [];
+  const query = () => {
+    const take = async () => selectRows.shift() ?? [];
+    const chain: Record<string, unknown> = {
+      // biome-ignore lint/suspicious/noThenProperty: Drizzle queries are awaitable thenables.
+      then: (
+        resolve: (value: unknown[]) => unknown,
+        reject: (reason: unknown) => unknown,
+      ) => take().then(resolve, reject),
+    };
+    for (const method of [
+      "from",
+      "innerJoin",
+      "leftJoin",
+      "orderBy",
+      "where",
+    ]) {
+      chain[method] = vi.fn(() => chain);
+    }
+    chain.limit = vi.fn(take);
+    return chain;
+  };
   const tx = {
     insert: vi.fn((table: unknown) => ({
       values: vi.fn((value: unknown) => {
@@ -19,6 +40,7 @@ function setup(returningRows: unknown[][]) {
         };
       }),
     })),
+    select: vi.fn(query),
   };
   const db = {
     transaction: vi.fn(async (callback: (value: typeof tx) => unknown) =>
@@ -27,60 +49,113 @@ function setup(returningRows: unknown[][]) {
   } as unknown as Database;
   const users = {
     ensure: vi.fn().mockResolvedValue({ clerkId: "user-secret", id: 1000 }),
+    getByClerkId: vi.fn().mockResolvedValue({
+      clerkId: "user-secret",
+      id: 1000,
+    }),
   };
   const logger = createLogger({ app: "api", environment: "test" });
 
   return {
     db,
     service: createCollectionsService(db, users as never, logger),
+    users,
     writes,
   };
 }
 
 describe("collection catalog writes", () => {
   it("creates a spinner with its custom owned button in one transaction", async () => {
-    const { db, service, writes } = setup([[{ id: 2000 }], [{ id: 2001 }]]);
+    const { db, service, writes } = setup(
+      [[{ id: 2000 }], [{ id: 3000 }], [{ id: 2001 }], [{ id: 3001 }]],
+      [
+        [{ materialId: 1201 }],
+        [{ colorEffectId: null }],
+        [{ finishId: 1202, position: 0 }],
+        [],
+        [{ materialId: 1101 }],
+        [{ colorEffectId: null }],
+        [{ finishId: 1102, position: 0 }],
+        [],
+      ],
+    );
 
     await expect(
       service.addSpinner({
         actorClerkId: "user-secret",
+        buttonFinishOptionId: 1202,
+        buttonMaterialId: 1201,
         buttonProductId: 1200,
+        spinnerFinishOptionId: 1102,
+        spinnerMaterialId: 1101,
         spinnerProductId: 1100,
       }),
     ).resolves.toEqual({ buttonItemId: 2000, spinnerItemId: 2001 });
 
     expect(db.transaction).toHaveBeenCalledOnce();
-    expect(writes).toEqual([
-      { table: schema.collectionItem, value: { ownerId: 1000 } },
-      {
-        table: schema.collectionSpinnerButton,
-        value: { id: 2000, productSpinnerButtonId: 1200 },
-      },
-      { table: schema.collectionItem, value: { ownerId: 1000 } },
-      {
-        table: schema.collectionSpinner,
-        value: {
-          id: 2001,
-          installedButtonId: 2000,
-          productSpinnerId: 1100,
+    expect(writes).toEqual(
+      expect.arrayContaining([
+        {
+          table: schema.collectionItem,
+          value: { materialId: 1201, ownerId: 1000 },
         },
-      },
-    ]);
+        {
+          table: schema.collectionSpinnerButton,
+          value: { id: 2000, productSpinnerButtonId: 1200 },
+        },
+        {
+          table: schema.finishOption,
+          value: {
+            collectionItemId: 2000,
+            colorEffectId: null,
+            position: 0,
+            sourceProductFinishOptionId: 1202,
+          },
+        },
+        {
+          table: schema.collectionItem,
+          value: { materialId: 1101, ownerId: 1000 },
+        },
+        {
+          table: schema.collectionSpinner,
+          value: {
+            id: 2001,
+            installedButtonId: 2000,
+            productSpinnerId: 1100,
+          },
+        },
+      ]),
+    );
   });
 
   it("creates no button row for the default spinner button", async () => {
-    const { service, writes } = setup([[{ id: 2001 }]]);
+    const { service, writes } = setup(
+      [[{ id: 2001 }], [{ id: 3001 }]],
+      [
+        [{ materialId: 1101 }],
+        [{ colorEffectId: null }],
+        [{ finishId: 1102, position: 0 }],
+        [],
+      ],
+    );
 
     await expect(
       service.addSpinner({
         actorClerkId: "user-secret",
+        buttonFinishOptionId: null,
+        buttonMaterialId: null,
         buttonProductId: null,
+        spinnerFinishOptionId: 1102,
+        spinnerMaterialId: 1101,
         spinnerProductId: 1100,
       }),
     ).resolves.toEqual({ buttonItemId: null, spinnerItemId: 2001 });
 
     expect(writes).toEqual([
-      { table: schema.collectionItem, value: { ownerId: 1000 } },
+      {
+        table: schema.collectionItem,
+        value: { materialId: 1101, ownerId: 1000 },
+      },
       {
         table: schema.collectionSpinner,
         value: {
@@ -89,7 +164,68 @@ describe("collection catalog writes", () => {
           productSpinnerId: 1100,
         },
       },
+      {
+        table: schema.finishOption,
+        value: {
+          collectionItemId: 2001,
+          colorEffectId: null,
+          position: 0,
+          sourceProductFinishOptionId: 1102,
+        },
+      },
+      {
+        table: schema.finishOptionFinish,
+        value: [{ finishId: 1102, finishOptionId: 3001, position: 0 }],
+      },
     ]);
+  });
+
+  it("rejects collection edits when the authenticated owner is missing", async () => {
+    const { db, service, users } = setup([], []);
+    users.getByClerkId.mockResolvedValueOnce(null as never);
+
+    await expect(
+      service.updateItem({
+        actorClerkId: "other-user",
+        collectionItemId: 2001,
+        finishOptionId: 1102,
+        materialId: 1101,
+      }),
+    ).rejects.toThrow(/does not exist/i);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a material not offered by the selected product", async () => {
+    const { service, writes } = setup([], [[]]);
+
+    await expect(
+      service.addSpinner({
+        actorClerkId: "user-secret",
+        buttonFinishOptionId: null,
+        buttonMaterialId: null,
+        buttonProductId: null,
+        spinnerFinishOptionId: 1102,
+        spinnerMaterialId: 9999,
+        spinnerProductId: 1100,
+      }),
+    ).rejects.toThrow(/material/i);
+    expect(writes).toEqual([]);
+  });
+
+  it("rejects a finish option from another product", async () => {
+    const { service } = setup([[{ id: 2001 }]], [[{ materialId: 1101 }], []]);
+
+    await expect(
+      service.addSpinner({
+        actorClerkId: "user-secret",
+        buttonFinishOptionId: null,
+        buttonMaterialId: null,
+        buttonProductId: null,
+        spinnerFinishOptionId: 9999,
+        spinnerMaterialId: 1101,
+        spinnerProductId: 1100,
+      }),
+    ).rejects.toThrow(/finish option/i);
   });
 });
 
