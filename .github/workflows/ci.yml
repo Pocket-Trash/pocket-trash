@@ -109,7 +109,7 @@ jobs:
         run: pnpm --filter @app/web exec playwright install --with-deps chromium
 
       - name: Run Storybook tests
-        run: pnpm --filter @app/web test-storybook
+        run: pnpm exec turbo run test-storybook --filter=@app/web
 
   drizzle-check:
     name: Drizzle Migration Check
