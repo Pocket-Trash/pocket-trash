@@ -201,6 +201,20 @@ set_image_folder_prefix() {
     "ci.vercel.preview.imageFolderPrefix.removed"
 }
 
+delete_existing_resource_folder_prefix() {
+  delete_existing_env_var RESOURCE_FOLDER_PREFIX \
+    "ci.vercel.preview.resourceFolderPrefix.missing" \
+    "ci.vercel.preview.resourceFolderPrefix.removed"
+}
+
+set_resource_folder_prefix() {
+  require_env RESOURCE_FOLDER_PREFIX
+  set_branch_env_var RESOURCE_FOLDER_PREFIX "$RESOURCE_FOLDER_PREFIX" \
+    "ci.vercel.preview.resourceFolderPrefix.set" \
+    "ci.vercel.preview.resourceFolderPrefix.missing" \
+    "ci.vercel.preview.resourceFolderPrefix.removed"
+}
+
 latest_preview_url() {
   local branch_query
   branch_query="$(branch_query_value)"
@@ -257,8 +271,16 @@ case "${1:-}" in
     delete_existing_image_folder_prefix
     latest_preview_url
     ;;
+  set-resource-folder-prefix)
+    set_resource_folder_prefix
+    latest_preview_url
+    ;;
+  remove-resource-folder-prefix)
+    delete_existing_resource_folder_prefix
+    latest_preview_url
+    ;;
   *)
-    echo "Usage: $0 {set|remove|set-image-folder-prefix|remove-image-folder-prefix}" >&2
+    echo "Usage: $0 {set|remove|set-image-folder-prefix|remove-image-folder-prefix|set-resource-folder-prefix|remove-resource-folder-prefix}" >&2
     exit 1
     ;;
 esac

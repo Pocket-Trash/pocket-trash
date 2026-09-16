@@ -71,11 +71,23 @@ jobs:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
         run: bash .github/scripts/vercel-branch-database-url.sh remove-image-folder-prefix
 
+      - name: Remove Vercel branch resource folder prefix
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: bash .github/scripts/vercel-branch-database-url.sh remove-resource-folder-prefix
+
       - name: Delete image PR preview folder
         id: image_cleanup
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: pnpm --filter @package/images run cleanup:preview-folder
+
+      - name: Delete resource PR preview folder
+        id: resource_cleanup
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: pnpm --filter @package/resources run cleanup:preview-folder
 
       - name: Remove db-change label
         uses: actions/github-script@v8
@@ -111,6 +123,8 @@ jobs:
           CLEANUP_PERFORMED: ${{ steps.neon_cleanup.outputs.cleanup_performed }}
           IMAGE_CLEANUP_STATUS: ${{ steps.image_cleanup.outputs.status }}
           IMAGE_FOLDER_PATH: ${{ steps.image_cleanup.outputs.folder_path }}
+          RESOURCE_CLEANUP_STATUS: ${{ steps.resource_cleanup.outputs.status }}
+          RESOURCE_FOLDER_PATH: ${{ steps.resource_cleanup.outputs.folder_path }}
           TARGET_BRANCH: ${{ steps.neon_cleanup.outputs.target_branch }}
         with:
           github-token: ${{ steps.db-preview-comment-token.outputs.token }}
@@ -125,7 +139,8 @@ jobs:
               "",
               `Neon cleanup: ${cleanup} for \`${process.env.TARGET_BRANCH}\``,
               `Image cleanup: ${process.env.IMAGE_CLEANUP_STATUS} for \`${process.env.IMAGE_FOLDER_PATH}\``,
-              "Vercel branch-specific `DATABASE_URL` and `IMAGE_FOLDER_PREFIX` cleanup was attempted.",
+              `Resource cleanup: ${process.env.RESOURCE_CLEANUP_STATUS} for \`${process.env.RESOURCE_FOLDER_PATH}\``,
+              "Vercel branch-specific `DATABASE_URL`, `IMAGE_FOLDER_PREFIX`, and `RESOURCE_FOLDER_PREFIX` cleanup was attempted.",
             ].join("\n");
 
             const { owner, repo } = context.repo;

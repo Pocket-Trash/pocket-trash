@@ -96,6 +96,11 @@ describe("web server env", () => {
       LOG_DEPLOYMENT_TARGET: "web-server",
       LOG_LEVEL: "debug",
       LOG_PROXY_CLIENT_KEY: "client-key",
+      RESOURCE_CDN_BASE_URL: "https://pocket-trash-resources.b-cdn.net",
+      RESOURCE_FOLDER_PREFIX: "preview/pr-52",
+      RESOURCE_STORAGE_ACCESS_KEY: "resource-storage-key",
+      RESOURCE_STORAGE_ENDPOINT: "https://ny.storage.bunnycdn.com",
+      RESOURCE_STORAGE_ZONE_NAME: "pocket-trash-resources",
     });
 
     expect(env.AXIOM_DATASET).toBe("development");
@@ -111,6 +116,15 @@ describe("web server env", () => {
     expect(env.LOG_DEPLOYMENT_TARGET).toBe("web-server");
     expect(env.LOG_LEVEL).toBe("debug");
     expect(env.LOG_PROXY_CLIENT_KEY).toBe("client-key");
+    expect(env.RESOURCE_CDN_BASE_URL).toBe(
+      "https://pocket-trash-resources.b-cdn.net",
+    );
+    expect(env.RESOURCE_FOLDER_PREFIX).toBe("preview/pr-52");
+    expect(env.RESOURCE_STORAGE_ACCESS_KEY).toBe("resource-storage-key");
+    expect(env.RESOURCE_STORAGE_ENDPOINT).toBe(
+      "https://ny.storage.bunnycdn.com",
+    );
+    expect(env.RESOURCE_STORAGE_ZONE_NAME).toBe("pocket-trash-resources");
   });
 
   it("rejects missing server values", () => {

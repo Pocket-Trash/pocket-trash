@@ -30,6 +30,10 @@ logger, and Discord jobs. Use `prod` for release and manual main deploy jobs.
 | `BUNNY_STORAGE_ACCESS_KEY` | Required | - |
 | `BUNNY_STORAGE_ENDPOINT` | Required | - |
 | `BUNNY_STORAGE_ZONE_NAME` | Required | - |
+| `RESOURCE_CDN_BASE_URL` | Required | - |
+| `RESOURCE_STORAGE_ACCESS_KEY` | Required | - |
+| `RESOURCE_STORAGE_ENDPOINT` | Required | - |
+| `RESOURCE_STORAGE_ZONE_NAME` | Required | - |
 | `DISCORD_GITHUB_WEBHOOK_URL` | Required | - |
 | `IMAGE_CDN_BASE_URL` | Required | - |
 | `LOG_PROXY_CLIENT_KEY` | Required | - |

@@ -13,6 +13,11 @@ export type WebServerRuntimeEnv = {
   LOG_DEPLOYMENT_TARGET?: string;
   LOG_LEVEL?: string;
   LOG_PROXY_CLIENT_KEY?: string;
+  RESOURCE_CDN_BASE_URL?: string;
+  RESOURCE_FOLDER_PREFIX?: string;
+  RESOURCE_STORAGE_ACCESS_KEY?: string;
+  RESOURCE_STORAGE_ENDPOINT?: string;
+  RESOURCE_STORAGE_ZONE_NAME?: string;
 };
 
 export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
@@ -31,6 +36,11 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
       LOG_DEPLOYMENT_TARGET: runtimeEnv.LOG_DEPLOYMENT_TARGET,
       LOG_LEVEL: runtimeEnv.LOG_LEVEL,
       LOG_PROXY_CLIENT_KEY: runtimeEnv.LOG_PROXY_CLIENT_KEY,
+      RESOURCE_CDN_BASE_URL: runtimeEnv.RESOURCE_CDN_BASE_URL,
+      RESOURCE_FOLDER_PREFIX: runtimeEnv.RESOURCE_FOLDER_PREFIX,
+      RESOURCE_STORAGE_ACCESS_KEY: runtimeEnv.RESOURCE_STORAGE_ACCESS_KEY,
+      RESOURCE_STORAGE_ENDPOINT: runtimeEnv.RESOURCE_STORAGE_ENDPOINT,
+      RESOURCE_STORAGE_ZONE_NAME: runtimeEnv.RESOURCE_STORAGE_ZONE_NAME,
     },
     server: {
       AXIOM_DATASET: z.string().min(1).optional(),
@@ -46,6 +56,14 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
         .enum(["trace", "debug", "verbose", "info", "warn", "error", "fatal"])
         .optional(),
       LOG_PROXY_CLIENT_KEY: z.string().min(1).optional(),
+      RESOURCE_CDN_BASE_URL: z.string().url().optional(),
+      RESOURCE_FOLDER_PREFIX: z
+        .string()
+        .regex(/^(?:dev|files|preview(?:\/pr-[1-9]\d*)?)$/u)
+        .optional(),
+      RESOURCE_STORAGE_ACCESS_KEY: z.string().min(1).optional(),
+      RESOURCE_STORAGE_ENDPOINT: z.string().url().optional(),
+      RESOURCE_STORAGE_ZONE_NAME: z.string().min(1).optional(),
     },
   });
 }
