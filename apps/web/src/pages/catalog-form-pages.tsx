@@ -73,6 +73,9 @@ export function ProductFormPage({
 
   return (
     <AppShell
+      breadcrumbItems={[
+        { label: t("web.navigation.products"), to: "/products" },
+      ]}
       sidebarContent={null}
       title={initialProduct ? initialProduct.name : t("web.action.addProduct")}
     >
@@ -161,6 +164,7 @@ function ProductEditor({
   return (
     <form
       className="grid gap-5 rounded-xl border border-border bg-card p-6"
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
         void form.handleSubmit();
@@ -238,6 +242,7 @@ function ProductEditor({
                   field.handleChange(values.map(({ id }) => Number(id)))
                 }
                 placeholder={t("web.catalog.selectMaterials")}
+                removeLabel={t("web.action.close")}
                 value={selected}
               />
               <LookupDialog
@@ -334,6 +339,8 @@ function ProductEditor({
                         )
                       }
                       placeholder={t("web.catalog.defaultButton")}
+                      removeLabel={t("web.action.close")}
+                      showSelectedPill
                       value={selected}
                     />
                     <FieldError
@@ -532,7 +539,13 @@ export function CollectionAddPage({
   };
 
   return (
-    <AppShell sidebarContent={null} title={t("web.action.addToCollection")}>
+    <AppShell
+      breadcrumbItems={[
+        { label: t("web.navigation.collections"), to: "/collections" },
+      ]}
+      sidebarContent={null}
+      title={t("web.action.addToCollection")}
+    >
       <main className="mx-auto grid max-w-5xl gap-6 p-6">
         <Field label={t("web.catalog.field.productType")}>
           <CatalogCombobox
@@ -583,6 +596,8 @@ export function CollectionAddPage({
                 setDuplicateCounts({});
               }}
               placeholder={t("web.catalog.defaultButton")}
+              removeLabel={t("web.action.close")}
+              showSelectedPill
               value={button}
             />
           </Field>
@@ -646,7 +661,13 @@ export function CollectionEditPage({
 
   if (item.productTypeSlug === "spinner-button") {
     return (
-      <AppShell sidebarContent={null} title={item.name}>
+      <AppShell
+        breadcrumbItems={[
+          { label: t("web.navigation.collections"), to: "/collections" },
+        ]}
+        sidebarContent={null}
+        title={item.name}
+      >
         <main className="mx-auto max-w-xl p-6">
           <Notice>{t("web.collections.edit.noFields")}</Notice>
         </main>
@@ -655,7 +676,13 @@ export function CollectionEditPage({
   }
 
   return (
-    <AppShell sidebarContent={null} title={item.name}>
+    <AppShell
+      breadcrumbItems={[
+        { label: t("web.navigation.collections"), to: "/collections" },
+      ]}
+      sidebarContent={null}
+      title={item.name}
+    >
       <main className="mx-auto grid max-w-xl gap-5 p-6">
         <Field label={t("web.catalog.field.button")}>
           <CatalogCombobox
@@ -669,6 +696,8 @@ export function CollectionEditPage({
             ]}
             onValueChange={setButton}
             placeholder={t("web.catalog.defaultButton")}
+            removeLabel={t("web.action.close")}
+            showSelectedPill
             value={button}
           />
         </Field>

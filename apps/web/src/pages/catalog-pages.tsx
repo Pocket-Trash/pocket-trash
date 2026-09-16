@@ -78,7 +78,13 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
     product.productTypeSlug !== "spinner-button"
   ) {
     return (
-      <AppShell sidebarContent={null} title={product.name}>
+      <AppShell
+        breadcrumbItems={[
+          { label: t("web.navigation.products"), to: "/products" },
+        ]}
+        sidebarContent={null}
+        title={product.name}
+      >
         <main className="mx-auto max-w-3xl p-6">
           <EmptyState>{t("web.catalog.notImplemented")}</EmptyState>
         </main>
@@ -107,6 +113,9 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
 
   return (
     <AppShell
+      breadcrumbItems={[
+        { label: t("web.navigation.products"), to: "/products" },
+      ]}
       headerActions={
         <Link
           className={buttonVariants({ variant: "outline" })}
