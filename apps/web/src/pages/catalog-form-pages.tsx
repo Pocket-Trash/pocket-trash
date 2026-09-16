@@ -6,6 +6,7 @@ import type {
 import {
   formatTranslation,
   type TranslationKey,
+  translationKeys,
 } from "@pocket-trash/localizations";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
@@ -33,10 +34,20 @@ import {
 } from "@/lib/catalog-api";
 import { useLocale } from "@/providers/locale-provider";
 
+const translationKeySet: ReadonlySet<string> = new Set(translationKeys);
+
+function isTranslationKey(key: string): key is TranslationKey {
+  return translationKeySet.has(key);
+}
+
 function useCatalogCopy() {
   const { locale } = useLocale();
   return (key: string, values: Readonly<Record<string, unknown>> = {}) =>
-    formatTranslation(key as TranslationKey, values, locale);
+    formatTranslation(
+      isTranslationKey(key) ? key : "error.generic",
+      values,
+      locale,
+    );
 }
 
 export function ProductFormPage({

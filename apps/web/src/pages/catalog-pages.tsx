@@ -12,8 +12,10 @@ import { useLocale } from "@/providers/locale-provider";
 
 function useCatalogCopy() {
   const { locale } = useLocale();
-  return (key: string, values: Readonly<Record<string, unknown>> = {}) =>
-    formatTranslation(key as TranslationKey, values, locale);
+  return (
+    key: TranslationKey,
+    values: Readonly<Record<string, unknown>> = {},
+  ) => formatTranslation(key, values, locale);
 }
 
 export function HomePage() {
@@ -83,7 +85,7 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
       </AppShell>
     );
   }
-  const specs: Array<[string, string | null, string]> =
+  const specs: Array<[TranslationKey, string | null, string]> =
     product.productTypeSlug === "spinner"
       ? [
           ["web.archive.spec.weight", product.weightG, "g"],
