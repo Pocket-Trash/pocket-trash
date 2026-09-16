@@ -210,6 +210,10 @@ export const schemaDescriptions = {
         description: "Compatible button diameter in millimeters.",
         example: "24.5",
       },
+      compatible_button_id: {
+        description: "Catalog spinner button selected for this spinner.",
+        example: 1001,
+      },
       created_at: {
         description: "Timestamp when the spinner row was created.",
         example: "2026-07-17T20:45:00.000Z",

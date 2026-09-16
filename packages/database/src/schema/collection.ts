@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   decimal,
@@ -78,6 +79,11 @@ export const productSpinner = pgTable("product_spinner", {
   thicknessMm: decimal("thickness_mm"),
   thicknessWithButtonMm: decimal("thickness_with_button_mm"),
   buttonDiameterMm: decimal("button_diameter_mm"),
+  compatibleButtonId: bigint("compatible_button_id", {
+    mode: "number",
+  }).references((): AnyPgColumn => productSpinnerButton.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

@@ -15,5 +15,6 @@ Catalog spinner product row.
 | `thickness_mm` | `numeric` | no |  |  |  | Spinner body thickness in millimeters. | `10.0` |
 | `thickness_with_button_mm` | `numeric` | no |  |  |  | Spinner thickness including installed buttons in millimeters. | `17.0` |
 | `button_diameter_mm` | `numeric` | no |  |  |  | Compatible button diameter in millimeters. | `24.5` |
+| `compatible_button_id` | `bigint` | no | FK |  | `product_spinner_button.id` (on delete set null) | Catalog spinner button selected for this spinner. | `1001` |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the spinner row was created. | `2026-07-17T20:45:00.000Z` |
 | `updated_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the spinner row was last updated. | `2026-07-17T20:45:00.000Z` |

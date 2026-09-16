@@ -1,0 +1,2 @@
+ALTER TABLE "product_spinner" ADD COLUMN "compatible_button_id" bigint;--> statement-breakpoint
+ALTER TABLE "product_spinner" ADD CONSTRAINT "product_spinner_compatible_button_id_product_spinner_button_id_fk" FOREIGN KEY ("compatible_button_id") REFERENCES "public"."product_spinner_button"("id") ON DELETE set null ON UPDATE no action;

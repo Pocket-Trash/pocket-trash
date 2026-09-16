@@ -134,6 +134,13 @@
       "when": 1789541900319,
       "tag": "0018_stormy_red_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789544646143,
+      "tag": "0019_cold_vertigo",
+      "breakpoints": true
     }
   ]
 }

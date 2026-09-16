@@ -87,7 +87,6 @@ async function main() {
   }
 
   await seedCatalog(createDb({ databaseUrl: env.DATABASE_URL }));
-  console.log("Product catalog seed complete.");
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main();

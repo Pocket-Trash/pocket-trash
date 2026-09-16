@@ -108,12 +108,10 @@ function ProductEditor({
     Record<string, string[] | undefined>
   >({});
   const [formError, setFormError] = React.useState<string | null>(null);
-  const [compatibleButton, setCompatibleButton] =
-    React.useState<ComboboxOption | null>(null);
-
   const form = useForm({
     defaultValues: {
       buttonDiameterMm: initialProduct?.buttonDiameterMm ?? null,
+      compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
       diameterMm: initialProduct?.diameterMm ?? null,
       lengthMm: initialProduct?.lengthMm ?? null,
       makerId: initialProduct?.makerId ?? 0,
@@ -275,7 +273,7 @@ function ProductEditor({
               <Field label={t(labels[name])}>
                 <Input
                   aria-label={t(labels[name])}
-                  min="0.01"
+                  min="0"
                   onBlur={field.handleBlur}
                   onChange={(event) =>
                     field.handleChange(event.target.value || null)
@@ -293,18 +291,41 @@ function ProductEditor({
       {productTypeSlug === "spinner" ? (
         <form.Subscribe selector={(state) => state.values.buttonDiameterMm}>
           {(diameter) => (
-            <Field label={t("web.catalog.field.button")}>
-              <CatalogCombobox
-                ariaLabel={t("web.catalog.field.button")}
-                items={[
-                  { id: "default", name: t("web.catalog.defaultButton") },
-                  ...filterButtonsByDiameter(options.spinnerButtons, diameter),
-                ]}
-                onValueChange={setCompatibleButton}
-                placeholder={t("web.catalog.defaultButton")}
-                value={compatibleButton}
-              />
-            </Field>
+            <form.Field name="compatibleButtonId">
+              {(field) => {
+                const selected = field.state.value
+                  ? (options.spinnerButtons.find(
+                      ({ id }) => id === field.state.value,
+                    ) ?? null)
+                  : { id: "default", name: t("web.catalog.defaultButton") };
+                return (
+                  <Field label={t("web.catalog.field.button")}>
+                    <CatalogCombobox
+                      ariaLabel={t("web.catalog.field.button")}
+                      items={[
+                        {
+                          id: "default",
+                          name: t("web.catalog.defaultButton"),
+                        },
+                        ...filterButtonsByDiameter(
+                          options.spinnerButtons,
+                          diameter,
+                        ),
+                      ]}
+                      onValueChange={(value) =>
+                        field.handleChange(
+                          value && value.id !== "default"
+                            ? Number(value.id)
+                            : null,
+                        )
+                      }
+                      placeholder={t("web.catalog.defaultButton")}
+                      value={selected}
+                    />
+                  </Field>
+                );
+              }}
+            </form.Field>
           )}
         </form.Subscribe>
       ) : null}
@@ -459,7 +480,9 @@ export function CollectionAddPage({
   const [type, setType] = React.useState<ComboboxOption | null>(null);
   const [product, setProduct] = React.useState<CatalogProduct | null>(null);
   const [button, setButton] = React.useState<ComboboxOption | null>(null);
-  const [duplicateCount, setDuplicateCount] = React.useState(0);
+  const [duplicateCounts, setDuplicateCounts] = React.useState<
+    Record<number, number>
+  >({});
   const [formError, setFormError] = React.useState<string | null>(null);
   const slug = options.productTypes.find(({ id }) => id === type?.id)?.slug;
   const matchingProducts = products.filter(
@@ -480,12 +503,7 @@ export function CollectionAddPage({
       },
     });
     if (!result.ok && result.requiresConfirmation) {
-      setDuplicateCount(
-        Object.values(result.duplicateCounts).reduce(
-          (sum, count) => sum + count,
-          0,
-        ),
-      );
+      setDuplicateCounts(result.duplicateCounts);
       return;
     }
     if (!result.ok) {
@@ -506,7 +524,7 @@ export function CollectionAddPage({
               setType(value);
               setProduct(null);
               setButton(null);
-              setDuplicateCount(0);
+              setDuplicateCounts({});
               setFormError(null);
             }}
             placeholder={t("web.catalog.selectProductType")}
@@ -524,7 +542,7 @@ export function CollectionAddPage({
               onClick={() => {
                 setProduct(candidate);
                 setButton(null);
-                setDuplicateCount(0);
+                setDuplicateCounts({});
                 setFormError(null);
               }}
               type="button"
@@ -548,18 +566,35 @@ export function CollectionAddPage({
             />
           </Field>
         ) : null}
-        {duplicateCount ? (
+        {Object.keys(duplicateCounts).length ? (
           <Notice>
-            {t("web.collections.duplicateWarning", { count: duplicateCount })}
+            <ul className="grid gap-1">
+              {[product, button?.id === "default" ? null : button]
+                .filter(
+                  (candidate): candidate is NonNullable<typeof candidate> =>
+                    Boolean(candidate),
+                )
+                .map((candidate) => ({
+                  count: duplicateCounts[Number(candidate.id)] ?? 0,
+                  id: candidate.id,
+                  name: candidate.name,
+                }))
+                .filter(({ count }) => count > 0)
+                .map(({ count, id, name }) => (
+                  <li key={id}>
+                    {name}: {t("web.collections.duplicateWarning", { count })}
+                  </li>
+                ))}
+            </ul>
           </Notice>
         ) : null}
         {formError ? <Notice>{t(formError)}</Notice> : null}
         {product ? (
           <Button
-            onClick={() => void submit(Boolean(duplicateCount))}
+            onClick={() => void submit(Object.keys(duplicateCounts).length > 0)}
             type="button"
           >
-            {duplicateCount
+            {Object.keys(duplicateCounts).length
               ? t("web.action.confirmAdd")
               : t("web.action.addToCollection")}
           </Button>

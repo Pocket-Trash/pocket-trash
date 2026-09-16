@@ -23,8 +23,14 @@ describe("catalog schema", () => {
     expect(productType.columns.map(({ name }) => name)).toEqual(
       expect.arrayContaining(["image_url", "image_alt"]),
     );
-    expect(
-      getTableConfig(schema.productSpinner).columns.map(({ name }) => name),
-    ).not.toEqual(expect.arrayContaining(["name", "slug", "maker_id"]));
+    const spinnerColumns = getTableConfig(schema.productSpinner).columns.map(
+      ({ name }) => name,
+    );
+    expect(spinnerColumns).toEqual(
+      expect.arrayContaining(["compatible_button_id"]),
+    );
+    expect(spinnerColumns).not.toEqual(
+      expect.arrayContaining(["name", "slug", "maker_id"]),
+    );
   });
 });

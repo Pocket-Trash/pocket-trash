@@ -32,6 +32,7 @@ const slugNameSchema = z
 
 export const productFormSchema = z.object({
   buttonDiameterMm: numericSpecSchema,
+  compatibleButtonId: idSchema.nullable(),
   diameterMm: numericSpecSchema,
   lengthMm: numericSpecSchema,
   makerId: idSchema,
@@ -197,6 +198,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       slug,
       specs: {
         buttonDiameterMm: parsed.data.buttonDiameterMm,
+        compatibleButtonId: parsed.data.compatibleButtonId,
         diameterMm: parsed.data.diameterMm,
         lengthMm: parsed.data.lengthMm,
         thicknessMm: parsed.data.thicknessMm,

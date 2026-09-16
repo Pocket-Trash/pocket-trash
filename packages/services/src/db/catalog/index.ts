@@ -2,6 +2,7 @@ import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
 import { and, asc, count, eq, isNotNull, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { hashLogIdentifier } from "../../logging.js";
 import type { UsersService } from "../users/index.js";
 
@@ -9,6 +10,8 @@ export type CatalogProductType = "spinner" | "spinner-button";
 
 export type CatalogProduct = {
   buttonDiameterMm: string | null;
+  compatibleButtonId: number | null;
+  compatibleButtonName: string | null;
   createdAt: Date;
   diameterMm: string | null;
   id: number;
@@ -18,6 +21,8 @@ export type CatalogProduct = {
   materials: Array<{ id: number; name: string; slug: string }>;
   name: string;
   productTypeId: number;
+  productTypeImageAlt: string | null;
+  productTypeImageUrl: string | null;
   productTypeName: string;
   productTypeSlug: string;
   slug: string;
@@ -37,6 +42,7 @@ export type ProductWriteInput = {
   slug: string;
   specs: {
     buttonDiameterMm?: string | null;
+    compatibleButtonId?: number | null;
     diameterMm?: string | null;
     lengthMm?: string | null;
     thicknessMm?: string | null;
@@ -556,6 +562,10 @@ async function queryProducts(
   productTypeSlug?: string,
   productSlug?: string,
 ): Promise<CatalogProduct[]> {
+  const compatibleButtonProduct = alias(
+    schema.product,
+    "compatible_button_product",
+  );
   const conditions = [];
   if (productTypeSlug) {
     conditions.push(eq(schema.productType.slug, productTypeSlug));
@@ -565,6 +575,8 @@ async function queryProducts(
   const rows = await db
     .select({
       buttonDiameterMm: schema.productSpinner.buttonDiameterMm,
+      compatibleButtonId: schema.productSpinner.compatibleButtonId,
+      compatibleButtonName: compatibleButtonProduct.name,
       createdAt: sql<Date>`coalesce(${schema.productSpinner.createdAt}, ${schema.productSpinnerButton.createdAt})`,
       diameterMm: schema.productSpinnerButton.diameterMm,
       id: schema.product.id,
@@ -576,6 +588,8 @@ async function queryProducts(
       materialSlug: schema.material.slug,
       name: schema.product.name,
       productTypeId: schema.productType.id,
+      productTypeImageAlt: schema.productType.imageAlt,
+      productTypeImageUrl: schema.productType.imageUrl,
       productTypeName: schema.productType.name,
       productTypeSlug: schema.productType.slug,
       slug: schema.product.slug,
@@ -611,6 +625,10 @@ async function queryProducts(
       schema.productSpinnerButton,
       eq(schema.product.id, schema.productSpinnerButton.id),
     )
+    .leftJoin(
+      compatibleButtonProduct,
+      eq(schema.productSpinner.compatibleButtonId, compatibleButtonProduct.id),
+    )
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(asc(schema.product.name), asc(schema.material.name));
 
@@ -629,6 +647,8 @@ async function queryProducts(
     }
     products.set(row.id, {
       buttonDiameterMm: row.buttonDiameterMm,
+      compatibleButtonId: row.compatibleButtonId,
+      compatibleButtonName: row.compatibleButtonName,
       createdAt: row.createdAt,
       diameterMm: row.diameterMm,
       id: row.id,
@@ -647,6 +667,8 @@ async function queryProducts(
           : [],
       name: row.name,
       productTypeId: row.productTypeId,
+      productTypeImageAlt: row.productTypeImageAlt,
+      productTypeImageUrl: row.productTypeImageUrl,
       productTypeName: row.productTypeName,
       productTypeSlug: row.productTypeSlug,
       slug: row.slug,
@@ -712,6 +734,7 @@ async function queryOwnedItems(
 function spinnerSpecs(specs: ProductWriteInput["specs"]) {
   return {
     buttonDiameterMm: specs.buttonDiameterMm ?? null,
+    compatibleButtonId: specs.compatibleButtonId ?? null,
     lengthMm: specs.lengthMm ?? null,
     thicknessMm: specs.thicknessMm ?? null,
     thicknessWithButtonMm: specs.thicknessWithButtonMm ?? null,
