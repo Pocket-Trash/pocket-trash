@@ -137,8 +137,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/services
       '@pocket-trash/localizations':
-        specifier: ^0.3.1
-        version: 0.3.1
+        specifier: ^0.4.0
+        version: 0.4.0
       '@t3-oss/env-core':
         specifier: ^0.13.11
         version: 0.13.11(typescript@6.0.3)(zod@4.4.3)
@@ -2216,8 +2216,8 @@ packages:
     resolution: {integrity: sha512-YSnuDE+b+olBOy3rUIxglm/qDYQgiYlDIxXCwPsmFpo6LMFsSIAhYOUkuCL7qMwat6Wsl7LDzuHzm5an3GRxdw==}
     engines: {node: '>=20'}
 
-  '@pocket-trash/localizations@0.3.1':
-    resolution: {integrity: sha512-bqbQLmFu262qIdpPJuuTYf8xxfSX0qtiGfiyOUi1Yq9uEo4XykL3vCCLPfuWE2lsnXWkc6hLq25y9xrvwE1Yww==}
+  '@pocket-trash/localizations@0.4.0':
+    resolution: {integrity: sha512-AwJoRbZrP//Dpak4tANKpPYzhTkud96qtYqT65QdUscud79ijwalYLUrXZB9BIGCsIAtfuxBMkZ7jyGfi52K3g==}
     engines: {node: '>=20'}
 
   '@radix-ui/primitive@1.1.5':
@@ -10181,7 +10181,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@pocket-trash/localizations@0.3.1':
+  '@pocket-trash/localizations@0.4.0':
     dependencies:
       lts: 2.0.0
     transitivePeerDependencies:
