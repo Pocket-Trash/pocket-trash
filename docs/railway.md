@@ -1,14 +1,13 @@
 # Railway
 
 `apps/scraper` runs as one TypeScript cron service on Railway. Railway starts the
-service on a cron schedule, the scraper runs due source and queue jobs, then the
-process exits. The scraper is separate from the web app because scraper runs may
-exceed web request time limits.
+service on a cron schedule, the scraper runs every source producer and the queue
+processor, then the process exits. The scraper is separate from the web app
+because scraper runs may exceed web request time limits.
 
 Railway hosts the scheduled scraper service and Redis. Postgres remains the
 durable source of truth for scraped rows, image state, run records, and version
-history. Redis is the BullMQ work queue and stores lightweight cron state, such
-as the last successful source run time.
+history. Redis is the BullMQ work queue.
 
 ## Services
 
@@ -30,7 +29,7 @@ Create these Railway services/resources:
 
 | Service | Type | Command | Schedule |
 | --- | --- | --- | --- |
-| `pocket-trash` / `apps-scraper` | Cron service | `pnpm --filter @app/scraper run cron:run` | Railway cron `0 * * * *`; runs due source jobs and queue processing, then exits. |
+| `pocket-trash` / `apps-scraper` | Cron service | `pnpm --filter @app/scraper run cron:run` | Railway cron `0 * * * *`; runs every source producer and the queue processor, then exits. |
 | `redis` | Redis database | Railway Redis template | Always available to the scraper service. |
 
 Do not create one Railway service per scraped site. Adding Autmog, Grimsmo, FH,
@@ -67,9 +66,9 @@ runs the service once per hour with:
 0 * * * *
 ```
 
-Each cron execution runs `cron:run`. The queue processor runs every execution.
-Autmog runs when its configured interval has elapsed; by default that is hourly.
-The first cron execution after a fresh Redis state runs Autmog immediately.
+Each cron execution runs every source sequentially, then runs the queue
+processor. Railway owns the hourly cadence, so launch jitter cannot defer a
+source until the following hour.
 
 `railway.json` sets `deploy.cronSchedule`, so the value applies through
 Railway's config-as-code path. Railway's docs note that config-as-code values do
@@ -81,13 +80,9 @@ Railway cron services must exit after the job finishes. If a previous cron
 execution is still active when the next schedule is due, Railway skips the new
 execution.
 
-Source due state is stored in Redis. Keep handlers idempotent anyway; BullMQ
-delivery is at-least-once, and clearing Redis can cause a source producer to run
-earlier than its usual interval.
+Keep handlers idempotent; BullMQ delivery is at-least-once.
 
-Future source schedules should be added in `apps/scraper` and staggered in code
-or configuration inside the `cron:run` command. Do not add one Railway service
-per scraped site.
+Do not add one Railway service per scraped site.
 
 Preview cron runs are gated by `SCRAPER_CRON_ENABLED`. When `APP_ENV=preview`,
 `cron:run` exits before opening DB or Redis connections unless
@@ -110,8 +105,8 @@ pnpm scraper:cron
 ```
 
 This starts or reuses local Docker/OrbStack Redis, injects `/apps/scraper`
-secrets, runs due source jobs and queue processing once, then exits. It does not
-start a local timer.
+secrets, runs every source producer and the queue processor once, then exits. It
+does not start a local timer.
 
 Inside a Railway shell, the service already has its environment variables, so
 the package command can be used directly:
@@ -204,9 +199,10 @@ Required groups:
 - Grimsmo proxying: try direct fetches without `GRIMSMO_PROXY_URL` first; add
   `GRIMSMO_PROXY_URL` only if Railway/direct IP fetches are blocked
 
-Grimsmo producers run sequentially at the top of each hour. Their configurable
-start delays remain available for the in-process scheduler, but default to zero
-so the hourly Railway cron does not skip a source.
+Railway runs all producers sequentially at the top of each hour. The
+configurable Grimsmo start delays apply only to the in-process scheduler, which
+staggers Saga, Rask, Fjell, and Norseman at `:00`, `:15`, `:30`, and `:45` by
+default.
 
 ## Production Deploys
 

@@ -144,29 +144,55 @@ describe("runGrimsmoProducer", () => {
     expect(result.enqueuedCount).toBe(1);
   });
 
-  it("fetches inventory and archive listings as variation jobs", async () => {
+  it("re-enqueues an A → B → A transition despite its completed job", async () => {
     const addBulk = vi.fn().mockResolvedValue([]);
+    const completedJob = {
+      getState: vi.fn().mockResolvedValue("completed"),
+      remove: vi.fn().mockResolvedValue(undefined),
+    };
+    const getJob = vi
+      .fn()
+      .mockResolvedValueOnce(completedJob)
+      .mockResolvedValue(null);
     const queues = {
       close: vi.fn(),
       images: { addBulk: vi.fn() },
       items: {
         addBulk,
-        getJob: vi.fn(async () => null),
+        getJob,
       },
     } as unknown as ScraperQueues;
+    const inventoryProduct = createProduct({ handle: "saga-1", id: 1 });
+    const archiveProduct = createProduct({
+      available: false,
+      handle: "saga-2",
+      id: 2,
+    });
+    const inventoryItem = normalizeGrimsmoPenVariation({
+      collectionKind: "inventory",
+      product: inventoryProduct,
+      source: scraperSources.grimsmoSaga,
+    });
+    vi.mocked(getGrimsmoVariationSyncState).mockResolvedValue([
+      {
+        archivedAt: null,
+        detailsHash: "sha256:state-b",
+        imageSetHash: inventoryItem.imageSetHash,
+        parentDetailsHash: inventoryItem.product.detailsHash,
+        sourceCollection: inventoryItem.sourceCollection,
+        sourceHandle: inventoryItem.sourceHandle,
+      },
+    ]);
     const fetcher = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
       const url = input instanceof URL ? input : new URL(String(input));
       const handle = url.pathname.split("/").at(-2);
 
       if (handle === "saga-inventory") {
-        return jsonResponse([createProduct({ handle: "saga-1", id: 1 })]);
+        return jsonResponse([inventoryProduct]);
       }
 
       if (handle === "saga") {
-        return jsonResponse([
-          createProduct({ handle: "saga-1", id: 1 }),
-          createProduct({ available: false, handle: "saga-2", id: 2 }),
-        ]);
+        return jsonResponse([inventoryProduct, archiveProduct]);
       }
 
       return jsonResponse([]);
@@ -182,8 +208,10 @@ describe("runGrimsmoProducer", () => {
     });
 
     expect(result.fetchedCount).toBe(2);
+    expect(result.removedCompletedItemJobs).toBe(1);
     expect(result.inventoryFetchedCount).toBe(1);
     expect(result.archivedFetchedCount).toBe(1);
+    expect(completedJob.remove).toHaveBeenCalledOnce();
     expect(addBulk).toHaveBeenCalledTimes(1);
     const [jobs] = addBulk.mock.calls[0] ?? [];
     expect(jobs).toHaveLength(3);
