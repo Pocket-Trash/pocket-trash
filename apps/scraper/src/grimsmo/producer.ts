@@ -1,4 +1,6 @@
+import type { Database } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
+import { getGrimsmoVariationSyncState } from "../db/grimsmo.js";
 import {
   getGrimsmoKnifeVariationJobId,
   getGrimsmoPenVariationJobId,
@@ -26,6 +28,7 @@ import {
 } from "./source.js";
 
 export type RunGrimsmoProducerOptions = FetchGrimsmoProductsOptions & {
+  db: Database;
   logger: Logger;
   queues: ScraperQueues;
   skipArchiveReconciliation?: boolean;
@@ -41,6 +44,7 @@ export type RunGrimsmoProducerResult = {
 };
 
 export async function runGrimsmoProducer({
+  db,
   logger,
   queues,
   skipArchiveReconciliation = false,
@@ -82,7 +86,33 @@ export async function runGrimsmoProducer({
     const archiveItems = items.filter(
       (item) => item.sourceCollection === "archive",
     );
-    const jobs = createJobs({ items, skipArchiveReconciliation, source });
+    const syncStateBySourceHandle = new Map(
+      (
+        await getGrimsmoVariationSyncState(
+          db,
+          source,
+          items.map((item) => item.sourceHandle),
+        )
+      ).map((state) => [state.sourceHandle, state]),
+    );
+    const changedItems = items.filter((item) => {
+      const state = syncStateBySourceHandle.get(item.sourceHandle);
+
+      return (
+        !state ||
+        Boolean(state.archivedAt) !== (item.sourceCollection === "archive") ||
+        state.detailsHash !== item.detailsHash ||
+        state.imageSetHash !== item.imageSetHash ||
+        state.parentDetailsHash !== item.product.detailsHash ||
+        state.sourceCollection !== item.sourceCollection
+      );
+    });
+    const jobs = createJobs({
+      changedItems,
+      items,
+      skipArchiveReconciliation,
+      source,
+    });
     const removedCompletedItemJobs = await removeCompletedJobsById(
       queues.items,
       jobs.map((job) => job.opts.jobId).filter(Boolean),
@@ -101,7 +131,8 @@ export async function runGrimsmoProducer({
     });
     logger.info(loggerMessages.scraper.queue.enqueueCompleted, {
       attributes: {
-        enqueuedItemJobs: jobs.length,
+        archiveReconciliationJobs: skipArchiveReconciliation ? 0 : 1,
+        enqueuedItemJobs: changedItems.length,
         queue: "scraper-items",
         removedCompletedItemJobs,
         source,
@@ -110,19 +141,21 @@ export async function runGrimsmoProducer({
     logger.info(loggerMessages.scraper.grimsmo.producerCompleted, {
       attributes: {
         archivedFetchedCount: archiveItems.length,
+        archiveReconciliationJobs: skipArchiveReconciliation ? 0 : 1,
         durationMs: Date.now() - startedAt,
-        enqueuedItemJobs: jobs.length,
+        enqueuedItemJobs: changedItems.length,
         fetchedCount: items.length,
         inventoryFetchedCount: inventoryItems.length,
         removedCompletedItemJobs,
         skipArchiveReconciliation,
         source,
+        skippedUnchangedItems: items.length - changedItems.length,
       },
     });
 
     return {
       archivedFetchedCount: archiveItems.length,
-      enqueuedCount: jobs.length,
+      enqueuedCount: changedItems.length,
       fetchedCount: items.length,
       inventoryFetchedCount: inventoryItems.length,
       items,
@@ -147,15 +180,20 @@ export async function runGrimsmoProducer({
 }
 
 function createJobs({
+  changedItems,
   items,
   skipArchiveReconciliation,
   source,
 }: {
+  changedItems: (
+    | NormalizedGrimsmoKnifeVariation
+    | NormalizedGrimsmoPenVariation
+  )[];
   items: (NormalizedGrimsmoKnifeVariation | NormalizedGrimsmoPenVariation)[];
   skipArchiveReconciliation: boolean;
   source: GrimsmoSourceName;
 }) {
-  const itemJobs = items.map((item) => {
+  const itemJobs = changedItems.map((item) => {
     if (source === scraperSources.grimsmoSaga) {
       const penItem = item as NormalizedGrimsmoPenVariation;
       return {

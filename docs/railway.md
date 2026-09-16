@@ -30,7 +30,7 @@ Create these Railway services/resources:
 
 | Service | Type | Command | Schedule |
 | --- | --- | --- | --- |
-| `pocket-trash` / `apps-scraper` | Cron service | `pnpm --filter @app/scraper run cron:run` | Railway cron `*/5 * * * *`; runs due source jobs and queue processing, then exits. |
+| `pocket-trash` / `apps-scraper` | Cron service | `pnpm --filter @app/scraper run cron:run` | Railway cron `0 * * * *`; runs due source jobs and queue processing, then exits. |
 | `redis` | Redis database | Railway Redis template | Always available to the scraper service. |
 
 Do not create one Railway service per scraped site. Adding Autmog, Grimsmo, FH,
@@ -61,10 +61,10 @@ only for the non-cron server command.
 ## Schedule Behavior
 
 The scraper service uses Railway cron instead of in-process schedules. Railway
-runs the service every 5 minutes with:
+runs the service once per hour with:
 
 ```cron
-*/5 * * * *
+0 * * * *
 ```
 
 Each cron execution runs `cron:run`. The queue processor runs every execution.
@@ -74,7 +74,7 @@ The first cron execution after a fresh Redis state runs Autmog immediately.
 `railway.json` sets `deploy.cronSchedule`, so the value applies through
 Railway's config-as-code path. Railway's docs note that config-as-code values do
 not backfill the Settings form; verify the cron value in the deployment details,
-or set the same `*/5 * * * *` value manually in the Railway Settings page if you
+or set the same `0 * * * *` value manually in the Railway Settings page if you
 want the form itself populated.
 
 Railway cron services must exit after the job finishes. If a previous cron
@@ -204,10 +204,9 @@ Required groups:
 - Grimsmo proxying: try direct fetches without `GRIMSMO_PROXY_URL` first; add
   `GRIMSMO_PROXY_URL` only if Railway/direct IP fetches are blocked
 
-Grimsmo producers run hourly and are staggered by default: Saga at the top of
-the hour, Rask around `:15`, Fjell around `:30`, and Norseman around `:45`.
-Railway still invokes the single cron service every 5 minutes; the scraper
-checks Redis state and runs only due producers.
+Grimsmo producers run sequentially at the top of each hour. Their configurable
+start delays remain available for the in-process scheduler, but default to zero
+so the hourly Railway cron does not skip a source.
 
 ## Production Deploys
 
@@ -280,7 +279,7 @@ from the preview database workflow.
 
 - Keep one Railway service for `apps/scraper`.
 - Run the scheduled service with `pnpm --filter @app/scraper run cron:run`.
-- Set the Railway cron schedule to `*/5 * * * *`.
+- Set the Railway cron schedule to `0 * * * *`.
 - Do not configure a Railway healthcheck for the cron service.
 - Set `DATABASE_URL` and `REDIS_URL` before enabling the cron service; cron
   executions validate job dependencies before running.

@@ -109,6 +109,7 @@ export async function runAutmogProducerJob({
     db: context.db,
     execute: async (signal) => {
       const result = await runAutmogProducer({
+        db: context.db,
         logger,
         limit: sourceLimit,
         pageLimit: sourceLimit ? 1 : undefined,
@@ -192,6 +193,7 @@ export async function runGrimsmoProducerJob({
     db: context.db,
     execute: async (signal) => {
       const result = await runGrimsmoProducer({
+        db: context.db,
         logger,
         maxProducts: sourceLimit,
         proxyUrl,

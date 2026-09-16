@@ -141,7 +141,7 @@ export function createScraperJobEnv(runtimeEnv: ScraperRuntimeEnv) {
         .int()
         .min(0)
         .max(60 * 60)
-        .default(30 * 60),
+        .default(0),
       SCRAPER_GRIMSMO_INTERVAL_MINUTES: z.coerce
         .number()
         .int()
@@ -153,13 +153,13 @@ export function createScraperJobEnv(runtimeEnv: ScraperRuntimeEnv) {
         .int()
         .min(0)
         .max(60 * 60)
-        .default(45 * 60),
+        .default(0),
       SCRAPER_GRIMSMO_RASK_START_DELAY_SECONDS: z.coerce
         .number()
         .int()
         .min(0)
         .max(60 * 60)
-        .default(15 * 60),
+        .default(0),
       SCRAPER_GRIMSMO_SAGA_START_DELAY_SECONDS: z.coerce
         .number()
         .int()
