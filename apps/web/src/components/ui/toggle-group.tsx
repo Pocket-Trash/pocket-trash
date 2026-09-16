@@ -5,7 +5,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const toggleGroupItemVariants = cva(
-  "inline-flex h-8 flex-1 items-center justify-center rounded-md px-3 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-[pressed]:bg-primary data-[pressed]:text-primary-foreground",
+  "inline-flex h-8 flex-1 items-center justify-center rounded-md px-3 text-xs font-medium text-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-[pressed]:bg-primary data-[pressed]:text-primary-foreground",
 );
 
 type ToggleGroupBaseProps = Omit<
@@ -32,7 +32,7 @@ type ToggleGroupProps = ToggleGroupSingleProps | ToggleGroupMultipleProps;
 function ToggleGroup(props: ToggleGroupProps) {
   const { className } = props;
   const classes = cn(
-    "inline-flex w-full items-center gap-1 rounded-lg border border-input bg-secondary p-1",
+    "inline-flex w-full items-center gap-1 rounded-lg border border-input bg-background p-1",
     className,
   );
 

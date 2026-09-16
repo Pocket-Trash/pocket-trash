@@ -18,6 +18,7 @@
     "scraper:scrape:grimsmo-rask": "node scripts/scraper-command.mjs scrape:grimsmo-rask",
     "scraper:scrape:grimsmo-saga": "node scripts/scraper-command.mjs scrape:grimsmo-saga",
     "dev:web": "turbo run dev:web --filter=@app/web --filter=@package/logger",
+    "storybook": "pnpm --filter @app/web storybook --no-open",
     "build": "turbo run build",
     "build:ci": "turbo run build:ci",
     "start": "pnpm --filter @app/scraper run cron:run",

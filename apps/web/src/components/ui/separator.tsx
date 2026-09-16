@@ -10,6 +10,23 @@ function Separator({
 }: React.ComponentProps<typeof SeparatorPrimitive> & {
   decorative?: boolean;
 }) {
+  if (decorative) {
+    const divProps = props as React.ComponentProps<"div">;
+
+    return (
+      <div
+        className={cn(
+          "shrink-0 bg-border data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px",
+          className,
+        )}
+        data-orientation={orientation}
+        data-slot="separator"
+        role="none"
+        {...divProps}
+      />
+    );
+  }
+
   return (
     <SeparatorPrimitive
       className={cn(
@@ -18,7 +35,7 @@ function Separator({
       )}
       data-slot="separator"
       orientation={orientation}
-      role={decorative ? "none" : "separator"}
+      role="separator"
       {...props}
     />
   );

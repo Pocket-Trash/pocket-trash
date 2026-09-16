@@ -10,6 +10,7 @@ build/
 .tanstack/
 .turbo/
 coverage/
+storybook-static/
 
 # Logs
 *.log

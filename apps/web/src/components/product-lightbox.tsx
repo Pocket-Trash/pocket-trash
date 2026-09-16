@@ -229,7 +229,7 @@ export function ProductLightbox({
       <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 rounded-lg border border-border bg-secondary p-4">
         {specs.map(({ icon: Icon, label, value }) => (
           <div className="flex flex-col gap-1" key={label}>
-            <span className="text-[10px] tracking-[0.8px] text-muted-foreground uppercase">
+            <span className="text-[10px] tracking-[0.8px] text-foreground uppercase">
               {label}
             </span>
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
@@ -257,6 +257,7 @@ export function ProductLightbox({
               kind === "refill" && "bg-chart-3/15 text-chart-3",
               kind === "nose" && "bg-chart-4/15 text-chart-4",
               kind === "default" && "bg-secondary text-secondary-foreground",
+              kind !== "default" && "text-foreground",
             )}
             key={`${kind}-${tag}`}
           >
@@ -308,6 +309,7 @@ export function ProductLightbox({
 
   return (
     <div
+      aria-label={shown.title}
       aria-modal="true"
       className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/85 p-3 backdrop-blur-md md:items-stretch md:p-10"
       role="dialog"
