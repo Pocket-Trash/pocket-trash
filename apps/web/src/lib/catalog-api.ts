@@ -184,6 +184,26 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     if (!parsed.success) return validationFailure(parsed.error);
 
     const { s } = await import("@/lib/services");
+    if (parsed.data.compatibleButtonId) {
+      const compatibleButton = (
+        await s.db.catalog.listProducts("spinner-button")
+      ).find(({ id }) => id === parsed.data.compatibleButtonId);
+      if (
+        !compatibleButton ||
+        (parsed.data.buttonDiameterMm !== null &&
+          Number(compatibleButton.diameterMm) !==
+            Number(parsed.data.buttonDiameterMm))
+      ) {
+        return {
+          fieldErrors: {
+            compatibleButtonId: ["web.catalog.error.form"],
+          },
+          formError: "web.catalog.error.form",
+          ok: false as const,
+          requiresConfirmation: false as const,
+        };
+      }
+    }
     const slugs = await s.db.catalog.listSlugs(
       parsed.data.productTypeSlug,
       parsed.data.productId ?? undefined,

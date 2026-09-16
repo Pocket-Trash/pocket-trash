@@ -275,9 +275,12 @@ function ProductEditor({
                   aria-label={t(labels[name])}
                   min="0"
                   onBlur={field.handleBlur}
-                  onChange={(event) =>
-                    field.handleChange(event.target.value || null)
-                  }
+                  onChange={(event) => {
+                    field.handleChange(event.target.value || null);
+                    if (name === "buttonDiameterMm") {
+                      form.setFieldValue("compatibleButtonId", null);
+                    }
+                  }}
                   step="any"
                   type="number"
                   value={field.state.value ?? ""}
@@ -321,6 +324,10 @@ function ProductEditor({
                       }
                       placeholder={t("web.catalog.defaultButton")}
                       value={selected}
+                    />
+                    <FieldError
+                      error={serverErrors.compatibleButtonId?.[0]}
+                      t={t}
                     />
                   </Field>
                 );
