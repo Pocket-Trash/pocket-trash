@@ -80,6 +80,7 @@ export const loggerMessages = {
     download: "resources.download",
     getDetail: "resources.getDetail",
     listCategories: "resources.listCategories",
+    listDirectory: "resources.listDirectory",
   },
   scraper: {
     autmog: {

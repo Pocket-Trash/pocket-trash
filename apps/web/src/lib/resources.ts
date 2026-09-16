@@ -43,6 +43,29 @@ export const listResourceCategories = createServerFn({ method: "GET" })
     return await s.resources.listCategories(data.search);
   });
 
+export const listResourceDirectory = createServerFn({ method: "GET" })
+  .validator(parseResourceDirectoryInput)
+  .handler(async ({ data }) => {
+    const { s } = await import("@/lib/services");
+    return await s.resources.listDirectory(data.categorySlugs);
+  });
+
+export function parseResourceDirectoryInput(input: unknown) {
+  if (input === undefined) return { categorySlugs: [] };
+  if (typeof input !== "object" || input === null) {
+    throw invalidResourceRequest();
+  }
+  const categorySlugs = (input as { categorySlugs?: unknown }).categorySlugs;
+  if (
+    !Array.isArray(categorySlugs) ||
+    categorySlugs.length > 10 ||
+    categorySlugs.some((slug) => typeof slug !== "string")
+  ) {
+    throw invalidResourceRequest();
+  }
+  return { categorySlugs: categorySlugs as string[] };
+}
+
 export const downloadResource = createServerFn({ method: "POST" })
   .validator(parseResourceDownload)
   .handler(async ({ data }) => {

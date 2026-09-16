@@ -173,6 +173,8 @@ export type {
 export type {
   CreateResourceInput,
   ResourceDetail,
+  ResourceDirectory,
+  ResourceDirectoryItem,
   ResourcesService,
 } from "./resources/index.js";
 export {

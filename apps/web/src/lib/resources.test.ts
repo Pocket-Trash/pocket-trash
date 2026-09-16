@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseResourceUpload, requireResourceUploader } from "./resources.js";
+import {
+  parseResourceDirectoryInput,
+  parseResourceUpload,
+  requireResourceUploader,
+} from "./resources.js";
 
 describe("resource server functions", () => {
   it("rejects unauthenticated uploaders", async () => {
@@ -35,5 +39,21 @@ describe("resource server functions", () => {
 
     form.delete("file");
     expect(() => parseResourceUpload(form)).toThrow();
+  });
+
+  it("accepts at most ten category filters", () => {
+    expect(
+      parseResourceDirectoryInput({
+        categorySlugs: ["3d-printing", "accessories"],
+      }),
+    ).toEqual({ categorySlugs: ["3d-printing", "accessories"] });
+    expect(() =>
+      parseResourceDirectoryInput({
+        categorySlugs: Array.from(
+          { length: 11 },
+          (_, index) => `filter-${index}`,
+        ),
+      }),
+    ).toThrow();
   });
 });

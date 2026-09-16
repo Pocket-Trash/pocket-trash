@@ -7,6 +7,7 @@ import {
   loggerMessages,
 } from "@package/logger";
 import type { ResourceStorage } from "@package/resources";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 import { hashLogIdentifier } from "../logging.js";
 import { createResourcesService } from "./index.js";
@@ -210,5 +211,48 @@ describe("resources service", () => {
       previewImageUrl: null,
       uploaderClerkId: "user_123",
     });
+  });
+
+  it("lists directory cards and rejects unknown category filters", async () => {
+    const categories = [{ id: 1002, name: "3D printing", slug: "3d-printing" }];
+    const resources = [
+      {
+        categories,
+        createdAt: new Date("2026-09-16T12:00:00Z"),
+        currentVersion: {
+          fileName: "clip.stl",
+          id: 1001,
+        },
+        downloadCount: 3,
+        id: 1000,
+        name: "Pocket clip",
+        previewImageUrl: null,
+      },
+    ];
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: categories })
+      .mockResolvedValueOnce({ rows: resources })
+      .mockResolvedValueOnce({ rows: categories });
+    const service = createResourcesService(
+      { execute } as unknown as Database,
+      {} as ResourceStorage,
+      createNoopLogger({ app: "web", environment: "test" }),
+    );
+
+    await expect(service.listDirectory(["3d-printing"])).resolves.toEqual({
+      categories,
+      invalidFilters: [],
+      resources,
+    });
+    await expect(service.listDirectory(["missing-category"])).resolves.toEqual({
+      categories,
+      invalidFilters: ["missing-category"],
+      resources: [],
+    });
+    expect(execute).toHaveBeenCalledTimes(3);
+    const query = new PgDialect().sqlToQuery(execute.mock.calls[1]?.[0]);
+    expect(query.sql).toContain("order by resources.created_at desc");
+    expect(query.params).toEqual(["3d-printing"]);
   });
 });

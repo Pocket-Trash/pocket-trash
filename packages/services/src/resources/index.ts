@@ -40,10 +40,30 @@ export type ResourceDetail = {
   uploaderClerkId: string;
 };
 
+export type ResourceDirectory = {
+  categories: { id: number; name: string; slug: string }[];
+  invalidFilters: string[];
+  resources: ResourceDirectoryItem[];
+};
+
+export type ResourceDirectoryItem = {
+  categories: { id: number; name: string; slug: string }[];
+  createdAt: Date;
+  currentVersion: {
+    fileName: string;
+    id: number;
+  };
+  downloadCount: number;
+  id: number;
+  name: string;
+  previewImageUrl: string | null;
+};
+
 export type ResourcesService = {
   create(input: CreateResourceInput): Promise<{ id: number }>;
   download(resourceId: number, versionId: number): Promise<string | null>;
   getDetail(resourceId: number): Promise<ResourceDetail | null>;
+  listDirectory(categorySlugs?: string[]): Promise<ResourceDirectory>;
   listCategories(
     search?: string,
   ): Promise<{ id: number; name: string; slug: string }[]>;
@@ -198,6 +218,95 @@ export function createResourcesService(
         { attributes: { resourceId } },
       );
     },
+    async listDirectory(categorySlugs = []) {
+      return await logger.operation(
+        loggerMessages.resources.listDirectory,
+        async () => {
+          const filters = normalizeCategorySlugs(categorySlugs);
+          const categoryResult = await db.execute<{
+            id: number;
+            name: string;
+            slug: string;
+          }>(sql`
+            select id, name, slug
+            from resource_categories
+            order by name
+          `);
+          const categories = categoryResult.rows;
+          const knownSlugs = new Set(categories.map(({ slug }) => slug));
+          const invalidFilters = filters.filter(
+            (slug) => !knownSlugs.has(slug),
+          );
+
+          if (invalidFilters.length > 0) {
+            return { categories, invalidFilters, resources: [] };
+          }
+
+          const filter =
+            filters.length === 0
+              ? sql`true`
+              : sql`exists (
+                  select 1
+                  from resources_to_categories selected_assignments
+                  inner join resource_categories selected_categories
+                    on selected_categories.id = selected_assignments.category_id
+                  where selected_assignments.resource_id = resources.id
+                    and selected_categories.slug in (${sql.join(
+                      filters.map((slug) => sql`${slug}`),
+                      sql`, `,
+                    )})
+                )`;
+          const resourceResult = await db.execute<ResourceDirectoryItem>(sql`
+            select
+              resources.id,
+              resources.name,
+              resources.created_at as "createdAt",
+              resources.preview_image_url as "previewImageUrl",
+              jsonb_build_object(
+                'id', current_version.id,
+                'fileName', current_version.file_name
+              ) as "currentVersion",
+              count(distinct resource_downloads.id)::int as "downloadCount",
+              coalesce(
+                jsonb_agg(
+                  distinct jsonb_build_object(
+                    'id', resource_categories.id,
+                    'name', resource_categories.name,
+                    'slug', resource_categories.slug
+                  )
+                ) filter (where resource_categories.id is not null),
+                '[]'::jsonb
+              ) as categories
+            from resources
+            inner join lateral (
+              select id, file_name
+              from resource_versions
+              where resource_versions.resource_id = resources.id
+              order by version desc
+              limit 1
+            ) current_version on true
+            left join resource_versions all_versions
+              on all_versions.resource_id = resources.id
+            left join resource_downloads
+              on resource_downloads.version_id = all_versions.id
+            left join resources_to_categories
+              on resources_to_categories.resource_id = resources.id
+            left join resource_categories
+              on resource_categories.id = resources_to_categories.category_id
+            where ${filter}
+            group by resources.id, current_version.id, current_version.file_name
+            order by resources.created_at desc
+          `);
+
+          return {
+            categories,
+            invalidFilters,
+            resources: resourceResult.rows,
+          };
+        },
+        { attributes: { categoryCount: categorySlugs.length } },
+      );
+    },
     async listCategories(search = "") {
       return await logger.operation(
         loggerMessages.resources.listCategories,
@@ -316,6 +425,17 @@ function normalizeCreateInput(input: CreateResourceInput) {
   }
 
   return { ...input, categories, description, name, uploaderClerkId };
+}
+
+function normalizeCategorySlugs(categorySlugs: string[]): string[] {
+  const filters = [...new Set(categorySlugs.map((slug) => slug.trim()))];
+  if (
+    filters.length > 10 ||
+    filters.some((slug) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(slug))
+  ) {
+    throw new Error("Resource category filters are invalid.");
+  }
+  return filters;
 }
 
 function slugify(value: string): string {
