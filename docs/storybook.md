@@ -76,6 +76,11 @@ Add only the story machinery the component actually needs:
 - Use `play` for behavior a user can trigger or observe.
 - Use `storybook/test` for `expect`, `fn`, `mocked`, `within`, and `waitFor`.
 
+Use `withThemePanels` from `apps/web/.storybook/theme-panels.tsx` for visual
+stories that should render light and dark modes side by side. Keep interaction
+stories and portaled UI stories single-theme unless the interaction itself is
+theme-specific.
+
 ## Interactive Tests
 
 Use `play` functions for interaction coverage that belongs with the story:

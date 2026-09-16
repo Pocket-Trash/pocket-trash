@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { Plus } from "lucide-react";
 import { expect, fn } from "storybook/test";
+import { withThemePanels } from "../../../.storybook/theme-panels";
 import { Button } from "./button";
 
 const meta = {
@@ -39,13 +40,34 @@ export const Default: Story = {
   },
 };
 
-export const Destructive: Story = { args: { variant: "destructive" } };
-export const Outline: Story = { args: { variant: "outline" } };
-export const Secondary: Story = { args: { variant: "secondary" } };
-export const Ghost: Story = { args: { variant: "ghost" } };
-export const Link: Story = { args: { variant: "link" } };
-export const Small: Story = { args: { size: "sm" } };
-export const Large: Story = { args: { size: "lg" } };
+export const Destructive: Story = {
+  args: { variant: "destructive" },
+  decorators: [withThemePanels],
+};
+export const Outline: Story = {
+  args: { variant: "outline" },
+  decorators: [withThemePanels],
+};
+export const Secondary: Story = {
+  args: { variant: "secondary" },
+  decorators: [withThemePanels],
+};
+export const Ghost: Story = {
+  args: { variant: "ghost" },
+  decorators: [withThemePanels],
+};
+export const Link: Story = {
+  args: { variant: "link" },
+  decorators: [withThemePanels],
+};
+export const Small: Story = {
+  args: { size: "sm" },
+  decorators: [withThemePanels],
+};
+export const Large: Story = {
+  args: { size: "lg" },
+  decorators: [withThemePanels],
+};
 export const Icon: Story = {
   args: { "aria-label": "Add item", children: <Plus />, size: "icon" },
   play: async ({ canvas }) => {
