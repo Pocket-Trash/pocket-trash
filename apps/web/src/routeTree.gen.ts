@@ -24,6 +24,7 @@ import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
 import { Route as ResourcesResourceIdEditRouteImport } from './routes/resources.$resourceId.edit'
 import { Route as AdminSettingsFeatureFlagsRouteImport } from './routes/admin.settings.feature-flags'
+import { Route as AdminResourcesNotificationsRouteImport } from './routes/admin.resources.notifications'
 import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId.versions.new'
 
 const UserRoute = UserRouteImport.update({
@@ -103,6 +104,12 @@ const AdminSettingsFeatureFlagsRoute =
     path: '/admin/settings/feature-flags',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AdminResourcesNotificationsRoute =
+  AdminResourcesNotificationsRouteImport.update({
+    id: '/admin/resources/notifications',
+    path: '/admin/resources/notifications',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ResourcesResourceIdVersionsNewRoute =
   ResourcesResourceIdVersionsNewRouteImport.update({
     id: '/versions/new',
@@ -123,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/user/collections': typeof UserCollectionsRoute
   '/user/resources': typeof UserResourcesRoute
   '/resources/': typeof ResourcesIndexRoute
+  '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
   '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
@@ -140,6 +148,7 @@ export interface FileRoutesByTo {
   '/user/collections': typeof UserCollectionsRoute
   '/user/resources': typeof UserResourcesRoute
   '/resources': typeof ResourcesIndexRoute
+  '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
   '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
@@ -159,6 +168,7 @@ export interface FileRoutesById {
   '/user/collections': typeof UserCollectionsRoute
   '/user/resources': typeof UserResourcesRoute
   '/resources/': typeof ResourcesIndexRoute
+  '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
   '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/user/collections'
     | '/user/resources'
     | '/resources/'
+    | '/admin/resources/notifications'
     | '/admin/settings/feature-flags'
     | '/resources/$resourceId/edit'
     | '/user/settings/beta-features'
@@ -196,6 +207,7 @@ export interface FileRouteTypes {
     | '/user/collections'
     | '/user/resources'
     | '/resources'
+    | '/admin/resources/notifications'
     | '/admin/settings/feature-flags'
     | '/resources/$resourceId/edit'
     | '/user/settings/beta-features'
@@ -214,6 +226,7 @@ export interface FileRouteTypes {
     | '/user/collections'
     | '/user/resources'
     | '/resources/'
+    | '/admin/resources/notifications'
     | '/admin/settings/feature-flags'
     | '/resources/$resourceId/edit'
     | '/user/settings/beta-features'
@@ -227,6 +240,7 @@ export interface RootRouteChildren {
   PensPenIdRoute: typeof PensPenIdRoute
   SignInSplatRoute: typeof SignInSplatRoute
   SignUpSplatRoute: typeof SignUpSplatRoute
+  AdminResourcesNotificationsRoute: typeof AdminResourcesNotificationsRoute
   AdminSettingsFeatureFlagsRoute: typeof AdminSettingsFeatureFlagsRoute
 }
 
@@ -337,6 +351,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsFeatureFlagsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/resources/notifications': {
+      id: '/admin/resources/notifications'
+      path: '/admin/resources/notifications'
+      fullPath: '/admin/resources/notifications'
+      preLoaderRoute: typeof AdminResourcesNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/resources/$resourceId/versions/new': {
       id: '/resources/$resourceId/versions/new'
       path: '/versions/new'
@@ -399,6 +420,7 @@ const rootRouteChildren: RootRouteChildren = {
   PensPenIdRoute: PensPenIdRoute,
   SignInSplatRoute: SignInSplatRoute,
   SignUpSplatRoute: SignUpSplatRoute,
+  AdminResourcesNotificationsRoute: AdminResourcesNotificationsRoute,
   AdminSettingsFeatureFlagsRoute: AdminSettingsFeatureFlagsRoute,
 }
 export const routeTree = rootRouteImport

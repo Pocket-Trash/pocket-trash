@@ -5,6 +5,15 @@ import { createServerFn } from "@tanstack/react-start";
 type ResourceIdInput = { resourceId: number };
 type ResourceDownloadInput = ResourceIdInput & { versionId: number };
 
+type SessionClaimsWithRole = {
+  role?: unknown;
+};
+
+export const isResourceAdmin = createServerFn().handler(async () => {
+  const { isAuthenticated, sessionClaims } = await auth();
+  return isAuthenticated && getRole(sessionClaims) === "admin";
+});
+
 export const createResource = createServerFn({ method: "POST" })
   .validator(parseResourceUpload)
   .handler(async ({ data }) => {
@@ -67,6 +76,22 @@ export const listOwnedResources = createServerFn({ method: "GET" }).handler(
   },
 );
 
+export const listResourceNotifications = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  await requireResourceAdmin();
+  const { s } = await import("@/lib/services");
+  return await s.resources.listNotifications();
+});
+
+export const markResourceNotificationRead = createServerFn({ method: "POST" })
+  .validator(parseNotificationId)
+  .handler(async ({ data }) => {
+    const actorClerkId = await requireResourceAdmin();
+    const { s } = await import("@/lib/services");
+    await s.resources.markNotificationRead(data.notificationId, actorClerkId);
+  });
+
 export const updateResource = createServerFn({ method: "POST" })
   .validator(parseResourceUpdate)
   .handler(async ({ data }) => {
@@ -119,6 +144,16 @@ export async function requireResourceUploader(
 ): Promise<string> {
   const { isAuthenticated, userId } = await getAuth();
   if (!isAuthenticated || !userId) throw invalidResourceRequest();
+  return userId;
+}
+
+export async function requireResourceAdmin(
+  getAuth: typeof auth = auth,
+): Promise<string> {
+  const { isAuthenticated, sessionClaims, userId } = await getAuth();
+  if (!isAuthenticated || !userId || getRole(sessionClaims) !== "admin") {
+    throw invalidResourceRequest();
+  }
   return userId;
 }
 
@@ -209,6 +244,24 @@ function parseResourceDownload(input: unknown): ResourceDownloadInput {
     throw invalidResourceRequest();
   }
   return { resourceId, versionId };
+}
+
+function parseNotificationId(input: unknown) {
+  if (typeof input !== "object" || input === null) {
+    throw invalidResourceRequest();
+  }
+  const notificationId = Number(
+    (input as { notificationId?: unknown }).notificationId,
+  );
+  if (!Number.isSafeInteger(notificationId) || notificationId <= 0) {
+    throw invalidResourceRequest();
+  }
+  return { notificationId };
+}
+
+function getRole(sessionClaims: unknown): string | undefined {
+  const claims = sessionClaims as SessionClaimsWithRole | null | undefined;
+  return typeof claims?.role === "string" ? claims.role : undefined;
 }
 
 async function toUploadInput(file: File) {

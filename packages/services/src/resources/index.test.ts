@@ -27,6 +27,45 @@ function captureLogger(events: LogEvent[]) {
 }
 
 describe("resources service", () => {
+  it("creates one resource notification and one per newly created category", async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [{ id: 1000 }] });
+    const storage: ResourceStorage = {
+      delete: vi.fn(),
+      upload: async (input) => ({
+        ...input,
+        objectPath: "dev/resource.stl",
+        size: input.bytes.byteLength,
+        url: "https://cdn.example.test/dev/resource.stl",
+      }),
+      uploadPreview: vi.fn(),
+    };
+    const service = createResourcesService(
+      { execute } as unknown as Database,
+      storage,
+      createNoopLogger({ app: "web", environment: "test" }),
+    );
+
+    await expect(
+      service.create({
+        categories: ["3D printing", "Refill tools"],
+        description: "A useful clip.",
+        file: {
+          bytes: new Uint8Array([1]),
+          contentType: "model/stl",
+          fileName: "clip.stl",
+        },
+        name: "Pocket clip",
+        uploaderClerkId: "user_123",
+      }),
+    ).resolves.toEqual({ id: 1000 });
+
+    const query = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
+    expect(query.sql).toContain("(xmax = 0) as created");
+    expect(query.sql).toContain("inserted_resource_notification");
+    expect(query.sql).toContain("inserted_category_notifications");
+    expect(query.sql).toContain("where upserted_categories.created");
+  });
+
   it("cleans uploaded objects and logs safely when persistence fails", async () => {
     const events: LogEvent[] = [];
     const logger = captureLogger(events);
@@ -255,6 +294,43 @@ describe("resources service", () => {
     const query = new PgDialect().sqlToQuery(execute.mock.calls[1]?.[0]);
     expect(query.sql).toContain("order by resources.created_at desc");
     expect(query.params).toEqual(["3d-printing"]);
+  });
+
+  it("lists notifications newest first and marks unread rows globally", async () => {
+    const notification = {
+      categories: ["3D printing"],
+      categoryName: null,
+      createdAt: new Date("2026-09-16T12:00:00Z"),
+      id: 1000,
+      readAt: null,
+      readByClerkId: null,
+      resourceId: 1001,
+      resourceName: "Pocket clip",
+      type: "resource_created" as const,
+      uploaderClerkId: "user_123",
+    };
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [notification] })
+      .mockResolvedValueOnce({ rows: [] });
+    const service = createResourcesService(
+      { execute } as unknown as Database,
+      {} as ResourceStorage,
+      createNoopLogger({ app: "web", environment: "test" }),
+    );
+
+    await expect(service.listNotifications()).resolves.toEqual([notification]);
+    await expect(
+      service.markNotificationRead(1000, "admin_123"),
+    ).resolves.toBeUndefined();
+
+    const listQuery = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
+    expect(listQuery.sql).toContain(
+      "order by resource_notifications.created_at desc",
+    );
+    const updateQuery = new PgDialect().sqlToQuery(execute.mock.calls[1]?.[0]);
+    expect(updateQuery.sql).toContain("where id = $2 and read_at is null");
+    expect(updateQuery.params).toEqual(["admin_123", 1000]);
   });
 
   it("rejects non-owner mutations before uploading files", async () => {

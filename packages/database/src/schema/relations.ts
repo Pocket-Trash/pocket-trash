@@ -3,6 +3,7 @@ import { featureFlags, featureFlagUserOverrides } from "./feature-flags.js";
 import {
   resourceCategories,
   resourceDownloads,
+  resourceNotifications,
   resources,
   resourcesToCategories,
   resourceVersions,
@@ -45,6 +46,7 @@ export const userSettingsRelations = relations(userSettings, ({ one }) => ({
 
 export const resourcesRelations = relations(resources, ({ many }) => ({
   categories: many(resourcesToCategories),
+  notifications: many(resourceNotifications),
   versions: many(resourceVersions),
 }));
 
@@ -62,7 +64,22 @@ export const resourceVersionsRelations = relations(
 export const resourceCategoriesRelations = relations(
   resourceCategories,
   ({ many }) => ({
+    notifications: many(resourceNotifications),
     resources: many(resourcesToCategories),
+  }),
+);
+
+export const resourceNotificationsRelations = relations(
+  resourceNotifications,
+  ({ one }) => ({
+    category: one(resourceCategories, {
+      fields: [resourceNotifications.categoryId],
+      references: [resourceCategories.id],
+    }),
+    resource: one(resources, {
+      fields: [resourceNotifications.resourceId],
+      references: [resources.id],
+    }),
   }),
 );
 

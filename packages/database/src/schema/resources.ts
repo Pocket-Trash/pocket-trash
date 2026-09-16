@@ -11,6 +11,11 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
+export const resourceNotificationTypes = [
+  "resource_created",
+  "category_created",
+] as const;
+
 export const resources = pgTable(
   "resources",
   {
@@ -121,6 +126,44 @@ export const resourceDownloads = pgTable(
   (table) => [index("resource_downloads_version_id_idx").on(table.versionId)],
 );
 
+export const resourceNotifications = pgTable(
+  "resource_notifications",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    type: text("type", { enum: resourceNotificationTypes }).notNull(),
+    resourceId: bigint("resource_id", { mode: "number" })
+      .notNull()
+      .references(() => resources.id, { onDelete: "cascade" }),
+    categoryId: bigint("category_id", { mode: "number" }).references(
+      () => resourceCategories.id,
+      { onDelete: "restrict" },
+    ),
+    uploaderClerkId: text("uploader_clerk_id").notNull(),
+    readAt: timestamp("read_at", { mode: "date", withTimezone: true }),
+    readByClerkId: text("read_by_clerk_id"),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("resource_notifications_created_at_idx").on(table.createdAt),
+    check(
+      "resource_notifications_type_valid",
+      sql`${table.type} in ('resource_created', 'category_created')`,
+    ),
+    check(
+      "resource_notifications_category_matches_type",
+      sql`(${table.type} = 'category_created') = (${table.categoryId} is not null)`,
+    ),
+    check(
+      "resource_notifications_read_metadata_consistent",
+      sql`num_nonnulls(${table.readAt}, ${table.readByClerkId}) in (0, 2)`,
+    ),
+  ],
+);
+
 export type Resource = typeof resources.$inferSelect;
 export type NewResource = typeof resources.$inferInsert;
 export type ResourceVersion = typeof resourceVersions.$inferSelect;
@@ -129,3 +172,5 @@ export type ResourceCategory = typeof resourceCategories.$inferSelect;
 export type NewResourceCategory = typeof resourceCategories.$inferInsert;
 export type ResourceDownload = typeof resourceDownloads.$inferSelect;
 export type NewResourceDownload = typeof resourceDownloads.$inferInsert;
+export type ResourceNotification = typeof resourceNotifications.$inferSelect;
+export type NewResourceNotification = typeof resourceNotifications.$inferInsert;

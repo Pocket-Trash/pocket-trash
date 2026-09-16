@@ -12,6 +12,7 @@ Generated schema documentation for committed Drizzle tables.
 - [`product_types`](./product-types.md)
 - [`resource_categories`](./resource-categories.md)
 - [`resource_downloads`](./resource-downloads.md)
+- [`resource_notifications`](./resource-notifications.md)
 - [`resource_versions`](./resource-versions.md)
 - [`resources`](./resources.md)
 - [`resources_to_categories`](./resources-to-categories.md)

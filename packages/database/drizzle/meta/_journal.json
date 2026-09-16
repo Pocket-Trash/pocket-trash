@@ -127,6 +127,13 @@
       "when": 1789547433706,
       "tag": "0017_acoustic_alex_power",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789602109528,
+      "tag": "0018_loving_rafael_vega",
+      "breakpoints": true
     }
   ]
 }

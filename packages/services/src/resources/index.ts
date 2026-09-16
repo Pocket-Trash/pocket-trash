@@ -77,6 +77,19 @@ export type ResourceDirectoryItem = {
   previewImageUrl: string | null;
 };
 
+export type ResourceNotificationItem = {
+  categories: string[];
+  categoryName: string | null;
+  createdAt: Date;
+  id: number;
+  readAt: Date | null;
+  readByClerkId: string | null;
+  resourceId: number;
+  resourceName: string;
+  type: (typeof schema.resourceNotificationTypes)[number];
+  uploaderClerkId: string;
+};
+
 export type ResourcesService = {
   addVersion(
     input: UploadResourceVersionInput,
@@ -85,12 +98,17 @@ export type ResourcesService = {
   download(resourceId: number, versionId: number): Promise<string | null>;
   getDetail(resourceId: number): Promise<ResourceDetail | null>;
   listDirectory(categorySlugs?: string[]): Promise<ResourceDirectory>;
+  listNotifications(): Promise<ResourceNotificationItem[]>;
   listOwned(
     uploaderClerkId: string,
   ): Promise<{ id: number; name: string; updatedAt: Date; version: number }[]>;
   listCategories(
     search?: string,
   ): Promise<{ id: number; name: string; slug: string }[]>;
+  markNotificationRead(
+    notificationId: number,
+    actorClerkId: string,
+  ): Promise<void>;
   update(input: UpdateResourceInput): Promise<{ id: number }>;
 };
 
@@ -434,6 +452,46 @@ export function createResourcesService(
         },
       );
     },
+    async listNotifications() {
+      return await logger.operation(
+        loggerMessages.resources.listNotifications,
+        async () => {
+          const result = await db.execute<ResourceNotificationItem>(sql`
+            select
+              resource_notifications.id,
+              resource_notifications.type,
+              resource_notifications.resource_id as "resourceId",
+              resources.name as "resourceName",
+              notification_category.name as "categoryName",
+              coalesce(
+                array_agg(
+                  distinct assigned_category.name
+                  order by assigned_category.name
+                ) filter (where assigned_category.id is not null),
+                array[]::text[]
+              ) as categories,
+              resource_notifications.uploader_clerk_id as "uploaderClerkId",
+              resource_notifications.created_at as "createdAt",
+              resource_notifications.read_at as "readAt",
+              resource_notifications.read_by_clerk_id as "readByClerkId"
+            from resource_notifications
+            inner join resources
+              on resources.id = resource_notifications.resource_id
+            left join resource_categories notification_category
+              on notification_category.id = resource_notifications.category_id
+            left join resources_to_categories
+              on resources_to_categories.resource_id = resources.id
+            left join resource_categories assigned_category
+              on assigned_category.id = resources_to_categories.category_id
+            group by resource_notifications.id, resources.id,
+              notification_category.id
+            order by resource_notifications.created_at desc,
+              resource_notifications.id desc
+          `);
+          return result.rows;
+        },
+      );
+    },
     async listCategories(search = "") {
       return await logger.operation(
         loggerMessages.resources.listCategories,
@@ -455,6 +513,27 @@ export function createResourcesService(
             : await query;
         },
         { attributes: { hasSearch: Boolean(search.trim()) } },
+      );
+    },
+    async markNotificationRead(notificationId, actorClerkId) {
+      await logger.operation(
+        loggerMessages.resources.markNotificationRead,
+        async () => {
+          assertPositiveInteger(notificationId, "notificationId");
+          const actor = actorClerkId.trim();
+          if (!actor) throw new Error("actorClerkId is required.");
+          await db.execute(sql`
+            update resource_notifications
+            set read_at = now(), read_by_clerk_id = ${actor}
+            where id = ${notificationId} and read_at is null
+          `);
+        },
+        {
+          attributes: {
+            actorClerkIdHash: hashLogIdentifier(actorClerkId),
+            notificationId,
+          },
+        },
       );
     },
     async update(input) {
@@ -545,7 +624,7 @@ async function persistResource(
       insert into resource_categories (name, slug, created_by_clerk_id)
       select name, slug, ${input.uploaderClerkId} from input_categories
       on conflict (slug) do update set name = resource_categories.name
-      returning id, slug
+      returning id, slug, (xmax = 0) as created
     ),
     inserted_version as (
       insert into resource_versions (
@@ -561,10 +640,31 @@ async function persistResource(
       select inserted_resource.id, upserted_categories.id
       from inserted_resource cross join upserted_categories
       returning resource_id
+    ),
+    inserted_resource_notification as (
+      insert into resource_notifications (
+        type, resource_id, uploader_clerk_id
+      )
+      select 'resource_created', inserted_resource.id, ${input.uploaderClerkId}
+      from inserted_resource
+      returning id
+    ),
+    inserted_category_notifications as (
+      insert into resource_notifications (
+        type, resource_id, category_id, uploader_clerk_id
+      )
+      select 'category_created', inserted_resource.id,
+        upserted_categories.id, ${input.uploaderClerkId}
+      from inserted_resource cross join upserted_categories
+      where upserted_categories.created
+      returning id
     )
     select inserted_resource.id
     from inserted_resource cross join inserted_version
     where (select count(*) from inserted_assignments) = ${input.categories.length}
+      and (select count(*) from inserted_resource_notification) = 1
+      and (select count(*) from inserted_category_notifications) =
+        (select count(*) from upserted_categories where created)
   `);
   const created = result.rows[0];
   if (!created) throw new Error("Failed to persist resource.");

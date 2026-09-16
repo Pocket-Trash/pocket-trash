@@ -82,7 +82,9 @@ export const loggerMessages = {
     getDetail: "resources.getDetail",
     listCategories: "resources.listCategories",
     listDirectory: "resources.listDirectory",
+    listNotifications: "resources.listNotifications",
     listOwned: "resources.listOwned",
+    markNotificationRead: "resources.markNotificationRead",
     update: "resources.update",
   },
   scraper: {

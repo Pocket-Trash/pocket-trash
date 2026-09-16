@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   resourceCategories,
   resourceDownloads,
+  resourceNotifications,
   resources,
   resourcesToCategories,
   resourceVersions,
@@ -39,5 +40,13 @@ describe("resource schema", () => {
     expect(
       assignmentConfig.primaryKeys[0]?.columns.map(({ name }) => name),
     ).toEqual(["resource_id", "category_id"]);
+  });
+
+  it("stores typed resource notifications with global read metadata", () => {
+    expect(getTableName(resourceNotifications)).toBe("resource_notifications");
+    expect(resourceNotifications.resourceId.notNull).toBe(true);
+    expect(resourceNotifications.uploaderClerkId.notNull).toBe(true);
+    expect(resourceNotifications.readAt.notNull).toBe(false);
+    expect(resourceNotifications.readByClerkId.notNull).toBe(false);
   });
 });

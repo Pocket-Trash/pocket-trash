@@ -16,6 +16,10 @@ export const schemaDescriptions = {
   resource_downloads: {
     description: "Append-only download events for resource versions.",
   },
+  resource_notifications: {
+    description:
+      "Admin review events created for new resources and categories.",
+  },
   resource_versions: {
     description: "Immutable uploaded file versions for resources.",
   },

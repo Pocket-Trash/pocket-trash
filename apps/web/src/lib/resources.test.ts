@@ -4,6 +4,7 @@ import {
   parseResourceUpdate,
   parseResourceUpload,
   parseResourceVersionUpload,
+  requireResourceAdmin,
   requireResourceUploader,
 } from "./resources.js";
 
@@ -18,6 +19,30 @@ describe("resource server functions", () => {
           }) as never,
       ),
     ).rejects.toThrow();
+  });
+
+  it("allows only admins to review resource notifications", async () => {
+    await expect(
+      requireResourceAdmin(
+        async () =>
+          ({
+            isAuthenticated: true,
+            sessionClaims: { role: "user" },
+            userId: "user_123",
+          }) as never,
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      requireResourceAdmin(
+        async () =>
+          ({
+            isAuthenticated: true,
+            sessionClaims: { role: "admin" },
+            userId: "admin_123",
+          }) as never,
+      ),
+    ).resolves.toBe("admin_123");
   });
 
   it("accepts upload metadata only when a file and category are present", () => {

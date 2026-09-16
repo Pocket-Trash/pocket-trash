@@ -175,6 +175,7 @@ export type {
   ResourceDetail,
   ResourceDirectory,
   ResourceDirectoryItem,
+  ResourceNotificationItem,
   ResourcesService,
   ResourceVersionDetail,
   UpdateResourceInput,
