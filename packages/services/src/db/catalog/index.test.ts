@@ -2,7 +2,11 @@ import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
 import { describe, expect, it, vi } from "vitest";
-import { createCatalogService, createCollectionsService } from "./index.js";
+import {
+  assertValidFinishOptions,
+  createCatalogService,
+  createCollectionsService,
+} from "./index.js";
 
 function setup(returningRows: unknown[][]) {
   const writes: Array<{ table: unknown; value: unknown }> = [];
@@ -125,5 +129,58 @@ describe("catalog lookup writes", () => {
 
     await expect(result).rejects.toThrow(/already exists/i);
     expect(insert).not.toHaveBeenCalled();
+  });
+});
+
+describe("catalog finish validation", () => {
+  const effects = [
+    { id: 1000, slug: "solid" },
+    { id: 1001, slug: "fade" },
+  ];
+
+  it("accepts ordered finish and fade components", () => {
+    expect(() =>
+      assertValidFinishOptions(
+        [
+          {
+            colorEffectId: 1001,
+            colorIds: [1000, 1001],
+            finishIds: [1000, 1001],
+          },
+        ],
+        effects,
+      ),
+    ).not.toThrow();
+  });
+
+  it.each([
+    {
+      colorEffectId: null,
+      colorIds: [],
+      finishIds: [],
+    },
+    {
+      colorEffectId: 1001,
+      colorIds: [1000],
+      finishIds: [1000],
+    },
+    {
+      colorEffectId: null,
+      colorIds: [],
+      finishIds: [1000, 1000],
+    },
+  ])("rejects an invalid option", (option) => {
+    expect(() => assertValidFinishOptions([option], effects)).toThrow();
+  });
+
+  it("rejects duplicate options", () => {
+    const option = {
+      colorEffectId: null,
+      colorIds: [] as number[],
+      finishIds: [1000],
+    };
+    expect(() => assertValidFinishOptions([option, option], effects)).toThrow(
+      /duplicate/i,
+    );
   });
 });

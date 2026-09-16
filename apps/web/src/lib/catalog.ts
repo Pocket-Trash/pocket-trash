@@ -59,3 +59,18 @@ export function filterButtonsByDiameter<
     )
     .sort((a, b) => a.name.localeCompare(b.name));
 }
+
+export function finishOptionLabel(option: {
+  colorEffect: { name: string; slug: string } | null;
+  colors: Array<{ name: string }>;
+  finishes: Array<{ name: string }>;
+}): string {
+  const colors = option.colors.map(({ name }) => name);
+  const colorLabel =
+    option.colorEffect?.slug === "fade"
+      ? `${colors.join(" → ")} ${option.colorEffect.name}`
+      : colors.join(" + ");
+  return [option.finishes.map(({ name }) => name).join(" + "), colorLabel]
+    .filter(Boolean)
+    .join(" · ");
+}

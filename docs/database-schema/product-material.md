@@ -2,11 +2,11 @@
 
 # product_material
 
-No table description has been added yet.
+Materials in which a catalog product is available.
 
 ## Columns
 
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `product_id` | `bigint` | yes | FK |  | `product.id` (on delete cascade) |  |  |
-| `material_id` | `bigint` | yes | FK |  | `material.id` (on delete restrict) |  |  |
+| `product_id` | `bigint` | yes | FK |  | `product.id` (on delete cascade) | Catalog product. | `1000` |
+| `material_id` | `bigint` | yes | FK |  | `material.id` (on delete restrict) | Available canonical material. | `1000` |

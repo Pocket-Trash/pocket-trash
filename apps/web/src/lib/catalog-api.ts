@@ -1,5 +1,6 @@
 import { auth } from "@clerk/tanstack-react-start/server";
 import type {
+  CatalogLookup,
   CatalogProduct,
   CatalogProductType,
   ProductWriteInput,
@@ -30,21 +31,89 @@ const slugNameSchema = z
   .min(1, requiredMessage)
   .refine((value) => slugify(value).length > 0, requiredMessage);
 
-export const productFormSchema = z.object({
-  buttonDiameterMm: numericSpecSchema,
-  compatibleButtonId: idSchema.nullable(),
-  diameterMm: numericSpecSchema,
-  lengthMm: numericSpecSchema,
-  makerId: idSchema,
-  materialIds: z.array(idSchema).min(1, requiredMessage),
-  name: slugNameSchema,
-  productId: idSchema.nullable(),
-  productTypeSlug: productTypeSchema,
-  thicknessMm: numericSpecSchema,
-  thicknessWithButtonMm: numericSpecSchema,
-  weightG: numericSpecSchema,
-  widthMm: numericSpecSchema,
-});
+const finishOptionSchema = z
+  .object({
+    colorEffectId: idSchema.nullable(),
+    colorEffectSlug: z.enum(["solid", "fade"]).nullable(),
+    colorIds: z.array(idSchema),
+    finishIds: z.array(idSchema).min(1, "web.catalog.error.finishRequired"),
+  })
+  .superRefine((option, context) => {
+    if (new Set(option.finishIds).size !== option.finishIds.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.duplicateFinishOption",
+        path: ["finishIds"],
+      });
+    }
+    if (new Set(option.colorIds).size !== option.colorIds.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.duplicateFinishOption",
+        path: ["colorIds"],
+      });
+    }
+    if (
+      option.colorIds.length === 0 &&
+      (option.colorEffectId !== null || option.colorEffectSlug !== null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.colorEffectWithoutColors",
+        path: ["colorEffectId"],
+      });
+    }
+    if (
+      option.colorIds.length > 0 &&
+      (option.colorEffectId === null || option.colorEffectSlug === null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.colorEffectRequired",
+        path: ["colorEffectId"],
+      });
+    }
+    if (option.colorEffectSlug === "fade" && option.colorIds.length < 2) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.fadeColors",
+        path: ["colorIds"],
+      });
+    }
+  });
+
+export const productFormSchema = z
+  .object({
+    buttonDiameterMm: numericSpecSchema,
+    compatibleButtonId: idSchema.nullable(),
+    diameterMm: numericSpecSchema,
+    finishOptions: z
+      .array(finishOptionSchema)
+      .min(1, "web.catalog.error.finishOptionRequired"),
+    lengthMm: numericSpecSchema,
+    makerId: idSchema,
+    materialIds: z.array(idSchema).min(1, requiredMessage),
+    name: slugNameSchema,
+    productId: idSchema.nullable(),
+    productTypeSlug: productTypeSchema,
+    thicknessMm: numericSpecSchema,
+    thicknessWithButtonMm: numericSpecSchema,
+    weightG: numericSpecSchema,
+    widthMm: numericSpecSchema,
+  })
+  .superRefine(({ finishOptions }, context) => {
+    const signatures = finishOptions.map(
+      ({ colorEffectId, colorIds, finishIds }) =>
+        `${finishIds.join(",")}|${colorEffectId ?? ""}|${colorIds.join(",")}`,
+    );
+    if (new Set(signatures).size !== signatures.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.duplicateFinishOption",
+        path: ["finishOptions"],
+      });
+    }
+  });
 
 const productLookupSchema = z.object({
   productSlug: z.string().regex(slugPattern),
@@ -67,6 +136,17 @@ const materialSchema = z.object({
   name: slugNameSchema,
 });
 
+const finishSchema = z.object({ name: slugNameSchema });
+const colorSchema = z.object({ name: slugNameSchema });
+
+type CatalogLookupMutationResult<K extends string> =
+  | ({ ok: true } & Record<K, CatalogLookup>)
+  | {
+      fieldErrors: Record<string, string[] | undefined>;
+      formError: string;
+      ok: false;
+    };
+
 const collectionAddSchema = z.object({
   buttonProductId: idSchema.nullable(),
   confirmed: z.boolean(),
@@ -82,6 +162,9 @@ const collectionEditSchema = z.object({
 export type ProductFormInput = z.input<typeof productFormSchema>;
 
 export type CatalogOptions = {
+  colorEffects: Awaited<ReturnType<typeof listColorEffects>>;
+  colors: Awaited<ReturnType<typeof listColors>>;
+  finishes: Awaited<ReturnType<typeof listFinishes>>;
   makers: Awaited<ReturnType<typeof listMakers>>;
   materials: Awaited<ReturnType<typeof listMaterials>>;
   productTypes: Awaited<ReturnType<typeof listProductTypes>>;
@@ -91,15 +174,32 @@ export type CatalogOptions = {
 export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
   async (): Promise<CatalogOptions> => {
     const { s } = await import("@/lib/services");
-    const [makers, materials, productTypes, spinnerButtons] = await Promise.all(
-      [
-        listMakers(),
-        listMaterials(),
-        listProductTypes(),
-        s.db.catalog.listProducts("spinner-button"),
-      ],
-    );
-    return { makers, materials, productTypes, spinnerButtons };
+    const [
+      colorEffects,
+      colors,
+      finishes,
+      makers,
+      materials,
+      productTypes,
+      spinnerButtons,
+    ] = await Promise.all([
+      listColorEffects(),
+      listColors(),
+      listFinishes(),
+      listMakers(),
+      listMaterials(),
+      listProductTypes(),
+      s.db.catalog.listProducts("spinner-button"),
+    ]);
+    return {
+      colorEffects,
+      colors,
+      finishes,
+      makers,
+      materials,
+      productTypes,
+      spinnerButtons,
+    };
   },
 );
 
@@ -176,6 +276,54 @@ export const createCatalogMaterial = createServerFn({ method: "POST" })
     }
   });
 
+export const createCatalogFinish = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }): Promise<CatalogLookupMutationResult<"finish">> => {
+    const actorClerkId = await requireActor();
+    const parsed = finishSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+
+    const { s } = await import("@/lib/services");
+    const finishes = await s.db.catalog.listFinishes();
+    try {
+      const finish = await s.db.catalog.createFinish({
+        actorClerkId,
+        name: parsed.data.name,
+        slug: nextAvailableSlug(
+          parsed.data.name,
+          finishes.map(({ slug }) => slug),
+        ),
+      });
+      return { finish, ok: true as const };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
+
+export const createCatalogColor = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }): Promise<CatalogLookupMutationResult<"color">> => {
+    const actorClerkId = await requireActor();
+    const parsed = colorSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+
+    const { s } = await import("@/lib/services");
+    const colors = await s.db.catalog.listColors();
+    try {
+      const color = await s.db.catalog.createColor({
+        actorClerkId,
+        name: parsed.data.name,
+        slug: nextAvailableSlug(
+          parsed.data.name,
+          colors.map(({ slug }) => slug),
+        ),
+      });
+      return { color, ok: true as const };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
+
 export const saveCatalogProduct = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
@@ -211,6 +359,13 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     const slug = nextAvailableSlug(parsed.data.name, slugs);
     const input: ProductWriteInput = {
       actorClerkId,
+      finishOptions: parsed.data.finishOptions.map(
+        ({ colorEffectId, colorIds, finishIds }) => ({
+          colorEffectId,
+          colorIds,
+          finishIds,
+        }),
+      ),
       makerId: parsed.data.makerId,
       materialIds: parsed.data.materialIds,
       name: parsed.data.name,
@@ -338,6 +493,21 @@ export const updateCollectionSpinner = createServerFn({ method: "POST" })
 async function listMakers() {
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listMakers();
+}
+
+async function listColorEffects(): Promise<CatalogLookup[]> {
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listColorEffects();
+}
+
+async function listColors(): Promise<CatalogLookup[]> {
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listColors();
+}
+
+async function listFinishes(): Promise<CatalogLookup[]> {
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listFinishes();
 }
 
 async function listMaterials() {

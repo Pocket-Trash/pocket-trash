@@ -2,17 +2,17 @@
 
 # product
 
-No table description has been added yet.
+Shared catalog product identity for supported product types.
 
 ## Columns
 
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `id` | `bigint` | yes | PK |  |  |  |  |
-| `product_type_id` | `bigint` | yes | FK |  | `product_type.id` (on delete restrict) |  |  |
-| `maker_id` | `bigint` | yes | FK |  | `maker.id` (on delete restrict) |  |  |
-| `name` | `text` | yes |  |  |  |  |  |
-| `slug` | `text` | yes |  |  |  |  |  |
+| `id` | `bigint` | yes | PK |  |  | Internal product identifier. | `1000` |
+| `product_type_id` | `bigint` | yes | FK |  | `product_type.id` (on delete restrict) | Product type classification. | `1000` |
+| `maker_id` | `bigint` | yes | FK |  | `maker.id` (on delete restrict) | Maker that produced the product. | `1000` |
+| `name` | `text` | yes |  |  |  | Human-readable product name. | `Standard Katla` |
+| `slug` | `text` | yes |  |  |  | Stable product slug within its type. | `standard-katla` |
 
 ## Indexes
 

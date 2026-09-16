@@ -1,8 +1,11 @@
+import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   bigint,
   boolean,
+  check,
   decimal,
+  integer,
   pgTable,
   primaryKey,
   text,
@@ -67,6 +70,112 @@ export const productMaterial = pgTable(
       .references(() => material.id, { onDelete: "restrict" }),
   },
   (table) => [primaryKey({ columns: [table.productId, table.materialId] })],
+);
+
+const lookupColumns = () => ({
+  id: bigint("id", { mode: "number" })
+    .primaryKey()
+    .generatedAlwaysAsIdentity({ startWith: 1000 }),
+  name: text("name").notNull(),
+  slug: text("slug").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const finish = pgTable("finish", lookupColumns(), (table) => [
+  uniqueIndex("finish_slug_unique").on(table.slug),
+]);
+
+export const color = pgTable("color", lookupColumns(), (table) => [
+  uniqueIndex("color_slug_unique").on(table.slug),
+]);
+
+export const colorEffect = pgTable("color_effect", lookupColumns(), (table) => [
+  uniqueIndex("color_effect_slug_unique").on(table.slug),
+]);
+
+export const finishOption = pgTable(
+  "finish_option",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    productId: bigint("product_id", { mode: "number" }).references(
+      () => product.id,
+      { onDelete: "cascade" },
+    ),
+    collectionItemId: bigint("collection_item_id", {
+      mode: "number",
+    }).references(() => collectionItem.id, { onDelete: "cascade" }),
+    sourceProductFinishOptionId: bigint("source_product_finish_option_id", {
+      mode: "number",
+    }).references((): AnyPgColumn => finishOption.id, { onDelete: "set null" }),
+    colorEffectId: bigint("color_effect_id", { mode: "number" }).references(
+      () => colorEffect.id,
+      { onDelete: "restrict" },
+    ),
+    position: integer("position").notNull(),
+  },
+  (table) => [
+    check(
+      "finish_option_owner_check",
+      sql`(${table.productId} is not null) <> (${table.collectionItemId} is not null)`,
+    ),
+    check("finish_option_position_check", sql`${table.position} >= 0`),
+    uniqueIndex("finish_option_collection_item_unique").on(
+      table.collectionItemId,
+    ),
+    uniqueIndex("finish_option_product_position_unique").on(
+      table.productId,
+      table.position,
+    ),
+  ],
+);
+
+export const finishOptionFinish = pgTable(
+  "finish_option_finish",
+  {
+    finishOptionId: bigint("finish_option_id", { mode: "number" })
+      .notNull()
+      .references(() => finishOption.id, { onDelete: "cascade" }),
+    finishId: bigint("finish_id", { mode: "number" })
+      .notNull()
+      .references(() => finish.id, { onDelete: "restrict" }),
+    position: integer("position").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.finishOptionId, table.finishId] }),
+    uniqueIndex("finish_option_finish_position_unique").on(
+      table.finishOptionId,
+      table.position,
+    ),
+    check("finish_option_finish_position_check", sql`${table.position} >= 0`),
+  ],
+);
+
+export const finishOptionColor = pgTable(
+  "finish_option_color",
+  {
+    finishOptionId: bigint("finish_option_id", { mode: "number" })
+      .notNull()
+      .references(() => finishOption.id, { onDelete: "cascade" }),
+    colorId: bigint("color_id", { mode: "number" })
+      .notNull()
+      .references(() => color.id, { onDelete: "restrict" }),
+    position: integer("position").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.finishOptionId, table.colorId] }),
+    uniqueIndex("finish_option_color_position_unique").on(
+      table.finishOptionId,
+      table.position,
+    ),
+    check("finish_option_color_position_check", sql`${table.position} >= 0`),
+  ],
 );
 
 export const productSpinner = pgTable("product_spinner", {
@@ -136,6 +245,18 @@ export type Product = typeof product.$inferSelect;
 export type NewProduct = typeof product.$inferInsert;
 export type ProductMaterial = typeof productMaterial.$inferSelect;
 export type NewProductMaterial = typeof productMaterial.$inferInsert;
+export type Finish = typeof finish.$inferSelect;
+export type NewFinish = typeof finish.$inferInsert;
+export type Color = typeof color.$inferSelect;
+export type NewColor = typeof color.$inferInsert;
+export type ColorEffect = typeof colorEffect.$inferSelect;
+export type NewColorEffect = typeof colorEffect.$inferInsert;
+export type FinishOption = typeof finishOption.$inferSelect;
+export type NewFinishOption = typeof finishOption.$inferInsert;
+export type FinishOptionFinish = typeof finishOptionFinish.$inferSelect;
+export type NewFinishOptionFinish = typeof finishOptionFinish.$inferInsert;
+export type FinishOptionColor = typeof finishOptionColor.$inferSelect;
+export type NewFinishOptionColor = typeof finishOptionColor.$inferInsert;
 export type ProductSpinner = typeof productSpinner.$inferSelect;
 export type NewProductSpinner = typeof productSpinner.$inferInsert;
 export type ProductSpinnerButton = typeof productSpinnerButton.$inferSelect;

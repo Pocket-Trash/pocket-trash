@@ -46,6 +46,8 @@ export const loggerMessages = {
   common: {},
   database: {
     catalog: {
+      createColor: "database.catalog.createColor",
+      createFinish: "database.catalog.createFinish",
       createMaker: "database.catalog.createMaker",
       createMaterial: "database.catalog.createMaterial",
       createProduct: "database.catalog.createProduct",

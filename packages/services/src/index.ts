@@ -5,6 +5,7 @@ import { createLogger, type Logger, type LoggerConfig } from "@package/logger";
 import { createDbServices, type DbServices } from "./db/index.js";
 
 export type {
+  CatalogLookup,
   CatalogProduct,
   CatalogProductType,
   CatalogService,

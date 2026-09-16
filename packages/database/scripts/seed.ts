@@ -3,7 +3,14 @@ import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { createDb } from "../src/client.js";
 import { createDatabaseEnv } from "../src/env.schema.js";
-import { maker, material, productType } from "../src/schema/index.js";
+import {
+  color,
+  colorEffect,
+  finish,
+  maker,
+  material,
+  productType,
+} from "../src/schema/index.js";
 
 export const seedProductTypes = [
   { name: "Pen", slug: "pen" },
@@ -35,6 +42,28 @@ export const seedMaterials = [
   { name: "Tungsten", slug: "tungsten" },
   { name: "Ultem", slug: "ultem" },
   { name: "Zirconium", slug: "zirconium" },
+] as const;
+
+export const seedFinishes = [
+  { name: "Anodized", slug: "anodized" },
+  { name: "Cerakoted", slug: "cerakoted" },
+  { name: "Polished", slug: "polished" },
+  { name: "Machine finished", slug: "machine-finished" },
+  { name: "Blackened", slug: "blackened" },
+  { name: "Satin", slug: "satin" },
+  { name: "Tumbled", slug: "tumbled" },
+  { name: "Blasted", slug: "blasted" },
+] as const;
+
+export const seedColors = [
+  { name: "Blue", slug: "blue" },
+  { name: "Green", slug: "green" },
+  { name: "Purple", slug: "purple" },
+] as const;
+
+export const seedColorEffects = [
+  { name: "Solid", slug: "solid" },
+  { name: "Fade", slug: "fade" },
 ] as const;
 
 export function normalizeSeedUrl(url: string | null): string | null {
@@ -77,6 +106,22 @@ export async function seedCatalog(db: ReturnType<typeof createDb>) {
         set: { name: value.name, updatedAt: new Date() },
         target: material.slug,
       });
+  }
+
+  for (const [table, values] of [
+    [finish, seedFinishes],
+    [color, seedColors],
+    [colorEffect, seedColorEffects],
+  ] as const) {
+    for (const value of values) {
+      await db
+        .insert(table)
+        .values(value)
+        .onConflictDoUpdate({
+          set: { name: value.name, updatedAt: new Date() },
+          target: table.slug,
+        });
+    }
   }
 }
 

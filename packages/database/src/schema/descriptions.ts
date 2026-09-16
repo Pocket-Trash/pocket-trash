@@ -158,31 +158,119 @@ export const schemaDescriptions = {
       },
     },
   },
+  product: {
+    description: "Shared catalog product identity for supported product types.",
+    columns: {
+      id: { description: "Internal product identifier.", example: 1000 },
+      product_type_id: {
+        description: "Product type classification.",
+        example: 1000,
+      },
+      maker_id: {
+        description: "Maker that produced the product.",
+        example: 1000,
+      },
+      name: {
+        description: "Human-readable product name.",
+        example: "Standard Katla",
+      },
+      slug: {
+        description: "Stable product slug within its type.",
+        example: "standard-katla",
+      },
+    },
+  },
+  product_material: {
+    description: "Materials in which a catalog product is available.",
+    columns: {
+      product_id: { description: "Catalog product.", example: 1000 },
+      material_id: {
+        description: "Available canonical material.",
+        example: 1000,
+      },
+    },
+  },
+  finish: {
+    description: "Canonical atomic product finish values.",
+    columns: {
+      id: { description: "Internal finish identifier.", example: 1000 },
+      name: { description: "Human-readable finish name.", example: "Polished" },
+      slug: { description: "Stable finish slug.", example: "polished" },
+      created_at: { description: "Timestamp when the finish was created." },
+      updated_at: {
+        description: "Timestamp when the finish was last updated.",
+      },
+    },
+  },
+  color: {
+    description: "Canonical atomic colour values used by finish options.",
+    columns: {
+      id: { description: "Internal colour identifier.", example: 1000 },
+      name: { description: "Human-readable colour name.", example: "Blue" },
+      slug: { description: "Stable colour slug.", example: "blue" },
+      created_at: { description: "Timestamp when the colour was created." },
+      updated_at: {
+        description: "Timestamp when the colour was last updated.",
+      },
+    },
+  },
+  color_effect: {
+    description: "Supported relationships between finish-option colours.",
+    columns: {
+      id: { description: "Internal colour-effect identifier.", example: 1000 },
+      name: { description: "Human-readable effect name.", example: "Fade" },
+      slug: { description: "Stable colour-effect slug.", example: "fade" },
+      created_at: { description: "Timestamp when the effect was created." },
+      updated_at: {
+        description: "Timestamp when the effect was last updated.",
+      },
+    },
+  },
+  finish_option: {
+    description:
+      "Ordered finish composition owned by one product or collection item.",
+    columns: {
+      id: { description: "Internal finish-option identifier.", example: 1000 },
+      product_id: {
+        description: "Product that offers this option.",
+        example: 1000,
+      },
+      collection_item_id: {
+        description: "Collection item that owns this snapshot.",
+        example: 1000,
+      },
+      source_product_finish_option_id: {
+        description: "Product option copied into a collection snapshot.",
+        example: 1001,
+      },
+      color_effect_id: {
+        description: "Optional relationship between selected colours.",
+        example: 1000,
+      },
+      position: { description: "Zero-based option display order.", example: 0 },
+    },
+  },
+  finish_option_finish: {
+    description: "Ordered atomic finishes in a finish option.",
+    columns: {
+      finish_option_id: { description: "Owning finish option.", example: 1000 },
+      finish_id: { description: "Selected atomic finish.", example: 1000 },
+      position: { description: "Zero-based finish display order.", example: 0 },
+    },
+  },
+  finish_option_color: {
+    description: "Ordered atomic colours in a finish option.",
+    columns: {
+      finish_option_id: { description: "Owning finish option.", example: 1000 },
+      color_id: { description: "Selected atomic colour.", example: 1000 },
+      position: { description: "Zero-based colour display order.", example: 0 },
+    },
+  },
   product_spinner: {
     description: "Catalog spinner product row.",
     columns: {
       id: {
         description: "Internal product spinner row identifier.",
-        example: 1000,
-      },
-      maker_id: {
-        description: "Maker that produced the spinner.",
-        example: 1000,
-      },
-      name: {
-        description: "Human-readable spinner product name.",
-        example: "Standard Katla",
-      },
-      slug: {
-        description: "Stable slug for spinner deduplication and lookups.",
-        example: "standard-katla",
-      },
-      product_type_id: {
-        description: "Product type classification for the spinner.",
-        example: 1000,
-      },
-      material_id: {
-        description: "Primary material for this spinner product row.",
         example: 1000,
       },
       weight_g: {
@@ -229,27 +317,6 @@ export const schemaDescriptions = {
     columns: {
       id: {
         description: "Internal product spinner button row identifier.",
-        example: 1000,
-      },
-      maker_id: {
-        description: "Maker that produced the spinner button.",
-        example: 1000,
-      },
-      name: {
-        description: "Human-readable spinner button product name.",
-        example: "Whirl Button",
-      },
-      slug: {
-        description:
-          "Stable slug for spinner button deduplication and lookups.",
-        example: "whirl-button-24-5mm",
-      },
-      product_type_id: {
-        description: "Product type classification for the spinner button.",
-        example: 1001,
-      },
-      material_id: {
-        description: "Primary material for this spinner button product row.",
         example: 1000,
       },
       weight_g: {

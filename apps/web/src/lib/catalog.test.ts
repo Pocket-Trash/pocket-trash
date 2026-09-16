@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterButtonsByDiameter,
+  finishOptionLabel,
   nextAvailableSlug,
   normalizeOptionalUrl,
   positiveDecimalSchema,
@@ -46,5 +47,22 @@ describe("catalog helpers", () => {
       1,
     ]);
     expect(filterButtonsByDiameter(buttons, null)).toHaveLength(3);
+  });
+
+  it("formats ordered solid and fade finish labels", () => {
+    expect(
+      finishOptionLabel({
+        colorEffect: null,
+        colors: [],
+        finishes: [{ name: "Polished" }, { name: "Blackened" }],
+      }),
+    ).toBe("Polished + Blackened");
+    expect(
+      finishOptionLabel({
+        colorEffect: { name: "Fade", slug: "fade" },
+        colors: [{ name: "Blue" }, { name: "Purple" }],
+        finishes: [{ name: "Anodized" }],
+      }),
+    ).toBe("Anodized · Blue → Purple Fade");
   });
 });

@@ -3,6 +3,12 @@ import {
   collectionItem,
   collectionSpinner,
   collectionSpinnerButton,
+  color,
+  colorEffect,
+  finish,
+  finishOption,
+  finishOptionColor,
+  finishOptionFinish,
   product,
   productMaterial,
   productSpinner,
@@ -88,6 +94,7 @@ export const productTypesRelations = relations(productType, ({ many }) => ({
 export const scraperRunsRelations = relations(scraperRuns, () => ({}));
 
 export const collectionItemRelations = relations(collectionItem, ({ one }) => ({
+  finishOption: one(finishOption),
   owner: one(user, {
     fields: [collectionItem.ownerId],
     references: [user.id],
@@ -111,6 +118,7 @@ export const collectionItemRelations = relations(collectionItem, ({ one }) => ({
 }));
 
 export const productRelations = relations(product, ({ many, one }) => ({
+  finishOptions: many(finishOption),
   maker: one(maker, {
     fields: [product.makerId],
     references: [maker.id],
@@ -140,6 +148,74 @@ export const productMaterialRelations = relations(
     product: one(product, {
       fields: [productMaterial.productId],
       references: [product.id],
+    }),
+  }),
+);
+
+export const finishesRelations = relations(finish, ({ many }) => ({
+  options: many(finishOptionFinish),
+}));
+
+export const colorsRelations = relations(color, ({ many }) => ({
+  options: many(finishOptionColor),
+}));
+
+export const colorEffectsRelations = relations(colorEffect, ({ many }) => ({
+  options: many(finishOption),
+}));
+
+export const finishOptionRelations = relations(
+  finishOption,
+  ({ many, one }) => ({
+    product: one(product, {
+      fields: [finishOption.productId],
+      references: [product.id],
+    }),
+    collectionItem: one(collectionItem, {
+      fields: [finishOption.collectionItemId],
+      references: [collectionItem.id],
+    }),
+    sourceProductFinishOption: one(finishOption, {
+      fields: [finishOption.sourceProductFinishOptionId],
+      references: [finishOption.id],
+      relationName: "finishOptionSource",
+    }),
+    derivedCollectionOptions: many(finishOption, {
+      relationName: "finishOptionSource",
+    }),
+    colorEffect: one(colorEffect, {
+      fields: [finishOption.colorEffectId],
+      references: [colorEffect.id],
+    }),
+    colors: many(finishOptionColor),
+    finishes: many(finishOptionFinish),
+  }),
+);
+
+export const finishOptionFinishRelations = relations(
+  finishOptionFinish,
+  ({ one }) => ({
+    finishOption: one(finishOption, {
+      fields: [finishOptionFinish.finishOptionId],
+      references: [finishOption.id],
+    }),
+    finish: one(finish, {
+      fields: [finishOptionFinish.finishId],
+      references: [finish.id],
+    }),
+  }),
+);
+
+export const finishOptionColorRelations = relations(
+  finishOptionColor,
+  ({ one }) => ({
+    finishOption: one(finishOption, {
+      fields: [finishOptionColor.finishOptionId],
+      references: [finishOption.id],
+    }),
+    color: one(color, {
+      fields: [finishOptionColor.colorId],
+      references: [color.id],
     }),
   }),
 );

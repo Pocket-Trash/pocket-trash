@@ -7,6 +7,7 @@ import { Link } from "@tanstack/react-router";
 import { UserRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { buttonVariants } from "@/components/ui/button";
+import { finishOptionLabel } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -139,6 +140,30 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
           <Detail label={t("web.catalog.field.materials")}>
             {product.materials.map(({ name }) => name).join(", ")}
           </Detail>
+          {product.finishOptions.length ? (
+            <Detail label={t("web.catalog.field.finishOptions")}>
+              <ul className="grid gap-1">
+                {product.finishOptions.map((option) => (
+                  <li key={option.id}>
+                    {finishOptionLabel({
+                      ...option,
+                      colorEffect: option.colorEffect
+                        ? {
+                            ...option.colorEffect,
+                            name:
+                              option.colorEffect.slug === "fade"
+                                ? t("web.catalog.colorEffect.fade")
+                                : option.colorEffect.slug === "solid"
+                                  ? t("web.catalog.colorEffect.solid")
+                                  : option.colorEffect.name,
+                          }
+                        : null,
+                    })}
+                  </li>
+                ))}
+              </ul>
+            </Detail>
+          ) : null}
           {product.productTypeSlug === "spinner" ? (
             <Detail label={t("web.catalog.field.button")}>
               {product.compatibleButtonName ?? t("web.catalog.defaultButton")}
@@ -258,15 +283,17 @@ export function ProductGrid({ products }: { products: CatalogProduct[] }) {
           <p className="mt-1 min-h-[2.9em] text-[12.5px] leading-[1.45] text-muted-foreground">
             {product.productTypeName} · {product.makerName}
           </p>
-          <div className="mt-3 flex min-h-6 flex-wrap content-start gap-1">
-            {product.materials.map(({ id, name }) => (
-              <span
-                className="rounded-sm bg-chart-1/15 px-1.5 py-0.5 text-[11px] tracking-[0.3px] whitespace-nowrap text-chart-1"
-                key={id}
-              >
-                {name}
-              </span>
-            ))}
+          <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
+            <span>
+              {t("web.catalog.materialCount", {
+                count: product.materials.length,
+              })}
+            </span>
+            <span>
+              {t("web.catalog.finishOptionCount", {
+                count: product.finishOptions.length,
+              })}
+            </span>
           </div>
         </Link>
       ))}

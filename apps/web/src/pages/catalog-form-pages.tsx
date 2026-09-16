@@ -1,4 +1,5 @@
 import type {
+  CatalogLookup,
   CatalogProduct,
   CatalogProductType,
   UserCollectionItem,
@@ -20,12 +21,15 @@ import {
   type ComboboxOption,
 } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import { filterButtonsByDiameter } from "@/lib/catalog";
+import { filterButtonsByDiameter, finishOptionLabel } from "@/lib/catalog";
 import {
   addCollectionProduct,
   type CatalogOptions,
+  createCatalogColor,
+  createCatalogFinish,
   createCatalogMaker,
   createCatalogMaterial,
+  type ProductFormInput,
   productFormSchema,
   productSlugPreview,
   productTypeIsSupported,
@@ -78,7 +82,7 @@ export function ProductFormPage({
       ]}
       title={initialProduct ? initialProduct.name : t("web.action.addProduct")}
     >
-      <main className="mx-auto grid max-w-3xl gap-6 p-6">
+      <main className="grid max-w-3xl gap-6 p-6">
         {!initialProduct ? (
           <Field label={t("web.catalog.field.productType")}>
             <CatalogCombobox
@@ -126,6 +130,26 @@ function ProductEditor({
       buttonDiameterMm: initialProduct?.buttonDiameterMm ?? null,
       compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
       diameterMm: initialProduct?.diameterMm ?? null,
+      finishOptions: initialProduct?.finishOptions.length
+        ? initialProduct.finishOptions.map((option) => ({
+            colorEffectId: option.colorEffect?.id ?? null,
+            colorEffectSlug:
+              option.colorEffect?.slug === "solid"
+                ? ("solid" as const)
+                : option.colorEffect?.slug === "fade"
+                  ? ("fade" as const)
+                  : null,
+            colorIds: option.colors.map(({ id }) => id),
+            finishIds: option.finishes.map(({ id }) => id),
+          }))
+        : [
+            {
+              colorEffectId: null,
+              colorEffectSlug: null,
+              colorIds: [],
+              finishIds: [],
+            },
+          ],
       lengthMm: initialProduct?.lengthMm ?? null,
       makerId: initialProduct?.makerId ?? 0,
       materialIds: initialProduct?.materials.map(({ id }) => id) ?? [],
@@ -221,6 +245,7 @@ function ProductEditor({
                   }));
                   field.handleChange(maker.id);
                 }}
+                t={t}
               />
               <FieldError error={serverErrors.makerId?.[0]} t={t} />
             </Field>
@@ -255,12 +280,26 @@ function ProductEditor({
                   }));
                   field.handleChange([...field.state.value, material.id]);
                 }}
+                t={t}
               />
               <FieldError error={serverErrors.materialIds?.[0]} t={t} />
             </Field>
           );
         }}
       </form.Field>
+
+      <form.Field mode="array" name="finishOptions">
+        {(field) => (
+          <FinishOptionsEditor
+            onChange={field.handleChange}
+            onOptionsChange={setOptions}
+            options={options}
+            t={t}
+            value={field.state.value}
+          />
+        )}
+      </form.Field>
+      <FieldError error={serverErrors.finishOptions?.[0]} t={t} />
 
       {(productTypeSlug === "spinner"
         ? ([
@@ -366,7 +405,217 @@ function ProductEditor({
   );
 }
 
-type LookupDialogProps =
+type FinishOptionFormValue = ProductFormInput["finishOptions"][number];
+
+export function FinishOptionsEditor({
+  onChange,
+  onOptionsChange,
+  options,
+  t,
+  value,
+}: {
+  onChange: (value: FinishOptionFormValue[]) => void;
+  onOptionsChange: React.Dispatch<React.SetStateAction<CatalogOptions>>;
+  options: CatalogOptions;
+  t: ReturnType<typeof useCatalogCopy>;
+  value: FinishOptionFormValue[];
+}) {
+  const update = (index: number, option: FinishOptionFormValue) =>
+    onChange(
+      value.map((current, position) => (position === index ? option : current)),
+    );
+  const move = (index: number, offset: number) => {
+    const next = [...value];
+    const target = index + offset;
+    const current = next[index];
+    const destination = next[target];
+    if (!current || !destination) return;
+    next[index] = destination;
+    next[target] = current;
+    onChange(next);
+  };
+
+  return (
+    <fieldset className="grid gap-4 rounded-lg border border-border p-4">
+      <legend className="px-1 text-sm font-medium">
+        {t("web.catalog.field.finishOptions")}
+      </legend>
+      {value.map((option, index) => {
+        const effectOptions = options.colorEffects.map((effect) => ({
+          ...effect,
+          name:
+            effect.slug === "fade"
+              ? t("web.catalog.colorEffect.fade")
+              : effect.slug === "solid"
+                ? t("web.catalog.colorEffect.solid")
+                : effect.name,
+        }));
+        const selectedFinishes = option.finishIds.flatMap(
+          (id) => options.finishes.find((finish) => finish.id === id) ?? [],
+        );
+        const selectedColors = option.colorIds.flatMap(
+          (id) => options.colors.find((color) => color.id === id) ?? [],
+        );
+        const selectedEffect =
+          effectOptions.find(({ id }) => id === option.colorEffectId) ?? null;
+        const preview = finishOptionLabel({
+          colorEffect: selectedEffect,
+          colors: selectedColors,
+          finishes: selectedFinishes,
+        });
+
+        return (
+          <section
+            className="grid gap-4 rounded-lg border border-border bg-background p-4"
+            key={index}
+          >
+            <Field label={t("web.catalog.field.finishes")}>
+              <CatalogMultiCombobox
+                ariaLabel={t("web.catalog.field.finishes")}
+                items={options.finishes}
+                onValueChange={(finishes) =>
+                  update(index, {
+                    ...option,
+                    finishIds: finishes.map(({ id }) => Number(id)),
+                  })
+                }
+                placeholder={t("web.catalog.selectFinishes")}
+                removeLabel={t("web.action.close")}
+                value={selectedFinishes}
+              />
+              <LookupDialog
+                kind="finish"
+                onCreated={(finish) => {
+                  onOptionsChange((current) => ({
+                    ...current,
+                    finishes: [...current.finishes, finish].sort((a, b) =>
+                      a.name.localeCompare(b.name),
+                    ),
+                  }));
+                  update(index, {
+                    ...option,
+                    finishIds: [...option.finishIds, finish.id],
+                  });
+                }}
+                t={t}
+              />
+            </Field>
+            <Field label={t("web.catalog.field.colors")}>
+              <CatalogMultiCombobox
+                ariaLabel={t("web.catalog.field.colors")}
+                items={options.colors}
+                onValueChange={(colors) =>
+                  update(index, {
+                    ...option,
+                    colorEffectId: colors.length ? option.colorEffectId : null,
+                    colorEffectSlug: colors.length
+                      ? option.colorEffectSlug
+                      : null,
+                    colorIds: colors.map(({ id }) => Number(id)),
+                  })
+                }
+                placeholder={t("web.catalog.selectColors")}
+                removeLabel={t("web.action.close")}
+                value={selectedColors}
+              />
+              <LookupDialog
+                kind="color"
+                onCreated={(color) => {
+                  onOptionsChange((current) => ({
+                    ...current,
+                    colors: [...current.colors, color].sort((a, b) =>
+                      a.name.localeCompare(b.name),
+                    ),
+                  }));
+                  update(index, {
+                    ...option,
+                    colorIds: [...option.colorIds, color.id],
+                  });
+                }}
+                t={t}
+              />
+            </Field>
+            {option.colorIds.length ? (
+              <Field label={t("web.catalog.field.colorEffect")}>
+                <CatalogCombobox
+                  ariaLabel={t("web.catalog.field.colorEffect")}
+                  items={effectOptions}
+                  onValueChange={(effect) =>
+                    update(index, {
+                      ...option,
+                      colorEffectId: effect ? Number(effect.id) : null,
+                      colorEffectSlug:
+                        effect?.id ===
+                        effectOptions.find(({ slug }) => slug === "fade")?.id
+                          ? "fade"
+                          : effect
+                            ? "solid"
+                            : null,
+                    })
+                  }
+                  placeholder={t("web.catalog.selectColorEffect")}
+                  value={selectedEffect}
+                />
+              </Field>
+            ) : null}
+            {preview ? (
+              <p className="text-sm text-muted-foreground">
+                {t("web.catalog.finishPreview", { finish: preview })}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                disabled={index === 0}
+                onClick={() => move(index, -1)}
+                type="button"
+                variant="outline"
+              >
+                {t("web.action.moveFinishOptionUp")}
+              </Button>
+              <Button
+                disabled={index === value.length - 1}
+                onClick={() => move(index, 1)}
+                type="button"
+                variant="outline"
+              >
+                {t("web.action.moveFinishOptionDown")}
+              </Button>
+              <Button
+                onClick={() =>
+                  onChange(value.filter((_, position) => position !== index))
+                }
+                type="button"
+                variant="outline"
+              >
+                {t("web.action.removeFinishOption")}
+              </Button>
+            </div>
+          </section>
+        );
+      })}
+      <Button
+        className="w-fit"
+        onClick={() =>
+          onChange([
+            ...value,
+            {
+              colorEffectId: null,
+              colorEffectSlug: null,
+              colorIds: [],
+              finishIds: [],
+            },
+          ])
+        }
+        type="button"
+        variant="outline"
+      >
+        {t("web.action.addFinishOption")}
+      </Button>
+    </fieldset>
+  );
+}
+
+type LookupDialogProps = (
   | {
       kind: "maker";
       onCreated: (value: {
@@ -376,13 +625,13 @@ type LookupDialogProps =
       }) => void;
     }
   | {
-      kind: "material";
-      onCreated: (value: { id: number; name: string; slug: string }) => void;
-    };
+      kind: "color" | "finish" | "material";
+      onCreated: (value: CatalogLookup) => void;
+    }
+) & { t: ReturnType<typeof useCatalogCopy> };
 
 function LookupDialog(props: LookupDialogProps) {
-  const { kind } = props;
-  const t = useCatalogCopy();
+  const { kind, t } = props;
   const ref = React.useRef<HTMLDialogElement>(null);
   const dialogId = React.useId();
   const titleId = React.useId();
@@ -392,8 +641,12 @@ function LookupDialog(props: LookupDialogProps) {
     Record<string, string[] | undefined>
   >({});
   const [error, setError] = React.useState<string | null>(null);
-  const action =
-    kind === "maker" ? "web.action.addMaker" : "web.action.addMaterial";
+  const action = {
+    color: "web.action.addColor",
+    finish: "web.action.addFinish",
+    maker: "web.action.addMaker",
+    material: "web.action.addMaterial",
+  }[kind] as TranslationKey;
 
   const create = async () => {
     if (props.kind === "maker") {
@@ -404,7 +657,7 @@ function LookupDialog(props: LookupDialogProps) {
         return;
       }
       props.onCreated(result.maker);
-    } else {
+    } else if (props.kind === "material") {
       const result = await createCatalogMaterial({ data: { name } });
       if (!result.ok) {
         setFieldErrors(result.fieldErrors);
@@ -412,6 +665,22 @@ function LookupDialog(props: LookupDialogProps) {
         return;
       }
       props.onCreated(result.material);
+    } else if (props.kind === "finish") {
+      const result = await createCatalogFinish({ data: { name } });
+      if (!result.ok) {
+        setFieldErrors(result.fieldErrors);
+        setError(result.formError);
+        return;
+      }
+      props.onCreated(result.finish);
+    } else {
+      const result = await createCatalogColor({ data: { name } });
+      if (!result.ok) {
+        setFieldErrors(result.fieldErrors);
+        setError(result.formError);
+        return;
+      }
+      props.onCreated(result.color);
     }
     setName("");
     setRootUrl("");

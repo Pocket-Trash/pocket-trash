@@ -1,12 +1,27 @@
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
-import { and, asc, count, eq, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { hashLogIdentifier } from "../../logging.js";
 import type { UsersService } from "../users/index.js";
 
 export type CatalogProductType = "spinner" | "spinner-button";
+
+export type CatalogLookup = { id: number; name: string; slug: string };
+
+export type CatalogFinishOption = {
+  colorEffect: CatalogLookup | null;
+  colors: CatalogLookup[];
+  finishes: CatalogLookup[];
+  id: number;
+};
+
+export type ProductWriteFinishOption = {
+  colorEffectId: number | null;
+  colorIds: number[];
+  finishIds: number[];
+};
 
 export type CatalogProduct = {
   buttonDiameterMm: string | null;
@@ -14,6 +29,7 @@ export type CatalogProduct = {
   compatibleButtonName: string | null;
   createdAt: Date;
   diameterMm: string | null;
+  finishOptions: CatalogFinishOption[];
   id: number;
   lengthMm: string | null;
   makerId: number;
@@ -34,6 +50,7 @@ export type CatalogProduct = {
 export type ProductWriteInput = {
   actorClerkId: string;
   makerId: number;
+  finishOptions: ProductWriteFinishOption[];
   materialIds: number[];
   name: string;
   productTypeSlug: CatalogProductType;
@@ -51,6 +68,16 @@ export type ProductWriteInput = {
 };
 
 export type CatalogService = {
+  createColor(input: {
+    actorClerkId: string;
+    name: string;
+    slug: string;
+  }): Promise<CatalogLookup>;
+  createFinish(input: {
+    actorClerkId: string;
+    name: string;
+    slug: string;
+  }): Promise<CatalogLookup>;
   createMaker(input: {
     actorClerkId: string;
     name: string;
@@ -66,6 +93,9 @@ export type CatalogService = {
     productTypeSlug: string,
     productSlug: string,
   ): Promise<CatalogProduct | null>;
+  listColorEffects(): Promise<CatalogLookup[]>;
+  listColors(): Promise<CatalogLookup[]>;
+  listFinishes(): Promise<CatalogLookup[]>;
   listMakers(): Promise<
     Array<{ id: number; name: string; rootUrl: string | null }>
   >;
@@ -125,6 +155,60 @@ export function createCatalogService(
   logger: Logger,
 ): CatalogService {
   return {
+    async createColor(input) {
+      return await logger.operation(
+        loggerMessages.database.catalog.createColor,
+        async () => {
+          const [duplicate] = await db
+            .select({ id: schema.color.id })
+            .from(schema.color)
+            .where(
+              eq(sql`lower(${schema.color.name})`, input.name.toLowerCase()),
+            )
+            .limit(1);
+          if (duplicate) throw new Error("Color name already exists.");
+
+          const [row] = await db
+            .insert(schema.color)
+            .values({ name: input.name, slug: input.slug })
+            .returning({
+              id: schema.color.id,
+              name: schema.color.name,
+              slug: schema.color.slug,
+            });
+          if (!row) throw new Error("Failed to create color.");
+          return row;
+        },
+        actorAttributes(input.actorClerkId, { slug: input.slug }),
+      );
+    },
+    async createFinish(input) {
+      return await logger.operation(
+        loggerMessages.database.catalog.createFinish,
+        async () => {
+          const [duplicate] = await db
+            .select({ id: schema.finish.id })
+            .from(schema.finish)
+            .where(
+              eq(sql`lower(${schema.finish.name})`, input.name.toLowerCase()),
+            )
+            .limit(1);
+          if (duplicate) throw new Error("Finish name already exists.");
+
+          const [row] = await db
+            .insert(schema.finish)
+            .values({ name: input.name, slug: input.slug })
+            .returning({
+              id: schema.finish.id,
+              name: schema.finish.name,
+              slug: schema.finish.slug,
+            });
+          if (!row) throw new Error("Failed to create finish.");
+          return row;
+        },
+        actorAttributes(input.actorClerkId, { slug: input.slug }),
+      );
+    },
     async createMaker(input) {
       return await logger.operation(
         loggerMessages.database.catalog.createMaker,
@@ -189,6 +273,7 @@ export function createCatalogService(
             .where(eq(schema.productType.slug, input.productTypeSlug))
             .limit(1);
           if (!type) throw new Error("Product type does not exist.");
+          await validateFinishOptions(db, input.finishOptions);
 
           const productId = await db.transaction(async (tx) => {
             const [row] = await tx
@@ -210,6 +295,8 @@ export function createCatalogService(
                 })),
               );
             }
+
+            await replaceProductFinishOptions(tx, row.id, input.finishOptions);
 
             if (input.productTypeSlug === "spinner") {
               await tx.insert(schema.productSpinner).values({
@@ -250,6 +337,36 @@ export function createCatalogService(
         })
         .from(schema.maker)
         .orderBy(asc(schema.maker.name));
+    },
+    async listColorEffects() {
+      return await db
+        .select({
+          id: schema.colorEffect.id,
+          name: schema.colorEffect.name,
+          slug: schema.colorEffect.slug,
+        })
+        .from(schema.colorEffect)
+        .orderBy(asc(schema.colorEffect.name));
+    },
+    async listColors() {
+      return await db
+        .select({
+          id: schema.color.id,
+          name: schema.color.name,
+          slug: schema.color.slug,
+        })
+        .from(schema.color)
+        .orderBy(asc(schema.color.name));
+    },
+    async listFinishes() {
+      return await db
+        .select({
+          id: schema.finish.id,
+          name: schema.finish.name,
+          slug: schema.finish.slug,
+        })
+        .from(schema.finish)
+        .orderBy(asc(schema.finish.name));
     },
     async listMaterials() {
       return await db
@@ -293,6 +410,7 @@ export function createCatalogService(
       return await logger.operation(
         loggerMessages.database.catalog.updateProduct,
         async () => {
+          await validateFinishOptions(db, input.finishOptions);
           await db.transaction(async (tx) => {
             const [existing] = await tx
               .select({ id: schema.product.id })
@@ -326,6 +444,11 @@ export function createCatalogService(
                 materialId,
                 productId: input.productId,
               })),
+            );
+            await replaceProductFinishOptions(
+              tx,
+              input.productId,
+              input.finishOptions,
             );
 
             if (input.productTypeSlug === "spinner") {
@@ -647,6 +770,7 @@ async function queryProducts(
       compatibleButtonName: row.compatibleButtonName,
       createdAt: row.createdAt,
       diameterMm: row.diameterMm,
+      finishOptions: [],
       id: row.id,
       lengthMm: row.lengthMm,
       makerId: row.makerId,
@@ -673,7 +797,94 @@ async function queryProducts(
       widthMm: row.widthMm,
     });
   }
-  return [...products.values()];
+  const result = [...products.values()];
+  await loadFinishOptions(db, result);
+  return result;
+}
+
+async function loadFinishOptions(db: Database, products: CatalogProduct[]) {
+  if (!products.length) return;
+
+  const options = await db
+    .select({
+      colorEffectId: schema.colorEffect.id,
+      colorEffectName: schema.colorEffect.name,
+      colorEffectSlug: schema.colorEffect.slug,
+      id: schema.finishOption.id,
+      productId: schema.finishOption.productId,
+    })
+    .from(schema.finishOption)
+    .leftJoin(
+      schema.colorEffect,
+      eq(schema.finishOption.colorEffectId, schema.colorEffect.id),
+    )
+    .where(
+      inArray(
+        schema.finishOption.productId,
+        products.map(({ id }) => id),
+      ),
+    )
+    .orderBy(asc(schema.finishOption.position));
+
+  if (!options.length) return;
+  const optionIds = options.map(({ id }) => id);
+  const [finishes, colors] = await Promise.all([
+    db
+      .select({
+        finishOptionId: schema.finishOptionFinish.finishOptionId,
+        id: schema.finish.id,
+        name: schema.finish.name,
+        slug: schema.finish.slug,
+      })
+      .from(schema.finishOptionFinish)
+      .innerJoin(
+        schema.finish,
+        eq(schema.finishOptionFinish.finishId, schema.finish.id),
+      )
+      .where(inArray(schema.finishOptionFinish.finishOptionId, optionIds))
+      .orderBy(asc(schema.finishOptionFinish.position)),
+    db
+      .select({
+        finishOptionId: schema.finishOptionColor.finishOptionId,
+        id: schema.color.id,
+        name: schema.color.name,
+        slug: schema.color.slug,
+      })
+      .from(schema.finishOptionColor)
+      .innerJoin(
+        schema.color,
+        eq(schema.finishOptionColor.colorId, schema.color.id),
+      )
+      .where(inArray(schema.finishOptionColor.finishOptionId, optionIds))
+      .orderBy(asc(schema.finishOptionColor.position)),
+  ]);
+  const productsById = new Map(
+    products.map((product) => [product.id, product]),
+  );
+
+  for (const option of options) {
+    const product = option.productId
+      ? productsById.get(option.productId)
+      : undefined;
+    if (!product) continue;
+    product.finishOptions.push({
+      colorEffect:
+        option.colorEffectId && option.colorEffectName && option.colorEffectSlug
+          ? {
+              id: option.colorEffectId,
+              name: option.colorEffectName,
+              slug: option.colorEffectSlug,
+            }
+          : null,
+      colors: colors
+        .filter(({ finishOptionId }) => finishOptionId === option.id)
+        .map(({ id, name, slug }) => ({ id, name, slug })),
+      finishes: finishes
+        .filter(({ finishOptionId }) => finishOptionId === option.id)
+        .map(({ id, name, slug }) => ({ id, name, slug })),
+      id: option.id,
+    });
+  }
 }
 
 async function queryOwnedItems(
@@ -725,6 +936,113 @@ async function queryOwnedItems(
   }));
 }
 
+type CatalogTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+async function replaceProductFinishOptions(
+  tx: CatalogTransaction,
+  productId: number,
+  options: ProductWriteFinishOption[],
+) {
+  await tx
+    .delete(schema.finishOption)
+    .where(eq(schema.finishOption.productId, productId));
+
+  for (const [position, option] of options.entries()) {
+    const [row] = await tx
+      .insert(schema.finishOption)
+      .values({
+        colorEffectId: option.colorEffectId,
+        position,
+        productId,
+      })
+      .returning({ id: schema.finishOption.id });
+    if (!row) throw new Error("Failed to create finish option.");
+
+    await tx.insert(schema.finishOptionFinish).values(
+      option.finishIds.map((finishId, componentPosition) => ({
+        finishId,
+        finishOptionId: row.id,
+        position: componentPosition,
+      })),
+    );
+    if (option.colorIds.length) {
+      await tx.insert(schema.finishOptionColor).values(
+        option.colorIds.map((colorId, componentPosition) => ({
+          colorId,
+          finishOptionId: row.id,
+          position: componentPosition,
+        })),
+      );
+    }
+  }
+}
+
+async function validateFinishOptions(
+  db: Database,
+  options: ProductWriteFinishOption[],
+) {
+  if (!options.length)
+    throw new Error("At least one finish option is required.");
+
+  const effectIds = [
+    ...new Set(
+      options.flatMap(({ colorEffectId }) =>
+        colorEffectId === null ? [] : [colorEffectId],
+      ),
+    ),
+  ];
+  const effects = effectIds.length
+    ? await db
+        .select({ id: schema.colorEffect.id, slug: schema.colorEffect.slug })
+        .from(schema.colorEffect)
+        .where(inArray(schema.colorEffect.id, effectIds))
+    : [];
+  assertValidFinishOptions(options, effects);
+}
+
+export function assertValidFinishOptions(
+  options: ProductWriteFinishOption[],
+  effects: Array<Pick<CatalogLookup, "id" | "slug">>,
+) {
+  if (!options.length)
+    throw new Error("At least one finish option is required.");
+
+  const effectsById = new Map(effects.map((effect) => [effect.id, effect]));
+  const signatures = new Set<string>();
+
+  for (const option of options) {
+    if (!option.finishIds.length) throw new Error("A finish is required.");
+    if (new Set(option.finishIds).size !== option.finishIds.length) {
+      throw new Error("Duplicate finishes are not allowed.");
+    }
+    if (new Set(option.colorIds).size !== option.colorIds.length) {
+      throw new Error("Duplicate colors are not allowed.");
+    }
+    if (!option.colorIds.length && option.colorEffectId !== null) {
+      throw new Error("A color effect requires colors.");
+    }
+    if (option.colorIds.length && option.colorEffectId === null) {
+      throw new Error("Colors require a color effect.");
+    }
+    const effect =
+      option.colorEffectId === null
+        ? null
+        : effectsById.get(option.colorEffectId);
+    if (option.colorEffectId !== null && !effect) {
+      throw new Error("Color effect does not exist.");
+    }
+    if (effect?.slug === "fade" && option.colorIds.length < 2) {
+      throw new Error("A fade requires at least two colors.");
+    }
+
+    const signature = `${option.finishIds.join(",")}|${option.colorEffectId ?? ""}|${option.colorIds.join(",")}`;
+    if (signatures.has(signature)) {
+      throw new Error("Duplicate finish options are not allowed.");
+    }
+    signatures.add(signature);
+  }
+}
+
 function spinnerSpecs(specs: ProductWriteInput["specs"]) {
   return {
     buttonDiameterMm: specs.buttonDiameterMm ?? null,
@@ -759,6 +1077,7 @@ function actorAttributes(
 
 function productAttributes(input: ProductWriteInput) {
   return actorAttributes(input.actorClerkId, {
+    finishOptionCount: input.finishOptions.length,
     materialIds: input.materialIds,
     productTypeSlug: input.productTypeSlug,
     slug: input.slug,
