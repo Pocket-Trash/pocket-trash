@@ -21,8 +21,6 @@ export type CatalogProduct = {
   materials: Array<{ id: number; name: string; slug: string }>;
   name: string;
   productTypeId: number;
-  productTypeImageAlt: string | null;
-  productTypeImageUrl: string | null;
   productTypeName: string;
   productTypeSlug: string;
   slug: string;
@@ -588,8 +586,6 @@ async function queryProducts(
       materialSlug: schema.material.slug,
       name: schema.product.name,
       productTypeId: schema.productType.id,
-      productTypeImageAlt: schema.productType.imageAlt,
-      productTypeImageUrl: schema.productType.imageUrl,
       productTypeName: schema.productType.name,
       productTypeSlug: schema.productType.slug,
       slug: schema.product.slug,
@@ -667,8 +663,6 @@ async function queryProducts(
           : [],
       name: row.name,
       productTypeId: row.productTypeId,
-      productTypeImageAlt: row.productTypeImageAlt,
-      productTypeImageUrl: row.productTypeImageUrl,
       productTypeName: row.productTypeName,
       productTypeSlug: row.productTypeSlug,
       slug: row.slug,

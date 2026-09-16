@@ -560,7 +560,10 @@ export function CollectionAddPage({
                 { id: "default", name: t("web.catalog.defaultButton") },
                 ...options.spinnerButtons,
               ]}
-              onValueChange={setButton}
+              onValueChange={(value) => {
+                setButton(value);
+                setDuplicateCounts({});
+              }}
               placeholder={t("web.catalog.defaultButton")}
               value={button}
             />

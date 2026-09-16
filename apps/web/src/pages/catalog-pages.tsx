@@ -238,7 +238,7 @@ export function ProductGrid({ products }: { products: CatalogProduct[] }) {
     <section className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
       {products.map((product) => (
         <Link
-          className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground transition-transform hover:-translate-y-0.5 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded-xl border border-border bg-card p-5 text-card-foreground transition-transform hover:-translate-y-0.5 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           key={product.id}
           params={{
             productSlug: product.slug,
@@ -246,32 +246,21 @@ export function ProductGrid({ products }: { products: CatalogProduct[] }) {
           }}
           to="/products/$productTypeSlug/$productSlug"
         >
-          {product.productTypeImageUrl ? (
-            <img
-              alt={product.productTypeImageAlt ?? product.productTypeName}
-              className="aspect-4/3 w-full object-cover"
-              src={product.productTypeImageUrl}
-            />
-          ) : (
-            <div aria-hidden="true" className="aspect-4/3 bg-muted" />
-          )}
-          <div className="p-5">
-            <h2 className="line-clamp-2 min-h-[2.6em] text-[15px] leading-[1.3] font-semibold">
-              {product.name}
-            </h2>
-            <p className="mt-1 min-h-[2.9em] text-[12.5px] leading-[1.45] text-muted-foreground">
-              {product.productTypeName} · {product.makerName}
-            </p>
-            <div className="mt-3 flex min-h-6 flex-wrap content-start gap-1">
-              {product.materials.map(({ id, name }) => (
-                <span
-                  className="rounded-sm bg-chart-1/15 px-1.5 py-0.5 text-[11px] tracking-[0.3px] whitespace-nowrap text-chart-1"
-                  key={id}
-                >
-                  {name}
-                </span>
-              ))}
-            </div>
+          <h2 className="line-clamp-2 min-h-[2.6em] text-[15px] leading-[1.3] font-semibold">
+            {product.name}
+          </h2>
+          <p className="mt-1 min-h-[2.9em] text-[12.5px] leading-[1.45] text-muted-foreground">
+            {product.productTypeName} · {product.makerName}
+          </p>
+          <div className="mt-3 flex min-h-6 flex-wrap content-start gap-1">
+            {product.materials.map(({ id, name }) => (
+              <span
+                className="rounded-sm bg-chart-1/15 px-1.5 py-0.5 text-[11px] tracking-[0.3px] whitespace-nowrap text-chart-1"
+                key={id}
+              >
+                {name}
+              </span>
+            ))}
           </div>
         </Link>
       ))}
