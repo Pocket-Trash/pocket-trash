@@ -85,6 +85,32 @@ jobs:
       - name: Run tests
         run: pnpm test:ci
 
+  storybook-test:
+    name: Storybook Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @app/web exec playwright install --with-deps chromium
+
+      - name: Run Storybook tests
+        run: pnpm --filter @app/web test-storybook
+
   drizzle-check:
     name: Drizzle Migration Check
     runs-on: ubuntu-latest
