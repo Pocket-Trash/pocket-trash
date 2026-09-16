@@ -12,6 +12,8 @@ Generated schema documentation for committed Drizzle tables.
 - [`maker`](./maker.md)
 - [`material`](./material.md)
 - [`mechanism`](./mechanism.md)
+- [`product`](./product.md)
+- [`product_material`](./product-material.md)
 - [`product_spinner`](./product-spinner.md)
 - [`product_spinner_button`](./product-spinner-button.md)
 - [`product_type`](./product-type.md)

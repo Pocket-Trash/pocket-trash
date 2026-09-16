@@ -24,6 +24,7 @@
     "bunny:audit": "tsx packages/infisical-runner/src/cli.ts bunny audit -- node scripts/audit-bunny-services.mjs",
     "db:generate": "pnpm --filter @package/database db:generate",
     "db:migrate": "pnpm --filter @package/database db:migrate",
+    "db:seed": "pnpm --filter @package/database db:seed",
     "db:resolve-conflicts": "pnpm --filter @package/database db:resolve-conflicts",
     "db:view": "pnpm --filter @package/database db:view",
     "diagram:infra": "node scripts/generate-infrastructure-diagram.mjs --once --refresh-metadata",

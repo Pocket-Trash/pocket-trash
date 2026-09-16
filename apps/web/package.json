@@ -29,6 +29,7 @@
     "@pocket-trash/localizations": "^0.2.0",
     "@t3-oss/env-core": "^0.13.11",
     "@tailwindcss/vite": "^4.3.2",
+    "@tanstack/react-form": "^1.33.5",
     "@tanstack/react-router": "latest",
     "@tanstack/react-start": "latest",
     "class-variance-authority": "^0.7.1",

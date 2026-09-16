@@ -127,6 +127,13 @@
       "when": 1789510664540,
       "tag": "0017_add_collections",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789541900319,
+      "tag": "0018_stormy_red_hulk",
+      "breakpoints": true
     }
   ]
 }

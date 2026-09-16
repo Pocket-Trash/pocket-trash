@@ -8,20 +8,9 @@ Catalog spinner button product row.
 
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `id` | `bigint` | yes | PK |  |  | Internal product spinner button row identifier. | `1000` |
-| `maker_id` | `bigint` | yes | FK |  | `maker.id` (on delete restrict) | Maker that produced the spinner button. | `1000` |
-| `name` | `text` | yes |  |  |  | Human-readable spinner button product name. | `Whirl Button` |
-| `slug` | `text` | yes | unique |  |  | Stable slug for spinner button deduplication and lookups. | `whirl-button-24-5mm` |
-| `product_type_id` | `bigint` | yes | FK |  | `product_type.id` (on delete restrict) | Product type classification for the spinner button. | `1001` |
-| `material_id` | `bigint` | no | FK |  | `material.id` (on delete restrict) | Primary material for this spinner button product row. | `1000` |
+| `id` | `bigint` | yes | PK, FK |  | `product.id` (on delete cascade) | Internal product spinner button row identifier. | `1000` |
 | `weight_g` | `numeric` | no |  |  |  | Spinner button weight in grams. | `8.4` |
 | `diameter_mm` | `numeric` | no |  |  |  | Spinner button diameter in millimeters. | `24.5` |
 | `thickness_mm` | `numeric` | no |  |  |  | Spinner button thickness in millimeters. | `7.0` |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the spinner button row was created. | `2026-07-17T20:45:00.000Z` |
 | `updated_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the spinner button row was last updated. | `2026-07-17T20:45:00.000Z` |
-
-## Indexes
-
-| Name | Unique | Method | Columns |
-| --- | --- | --- | --- |
-| `product_spinner_button_slug_unique` | yes | `btree` | `slug` |

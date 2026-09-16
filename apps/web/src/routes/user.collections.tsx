@@ -1,6 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { UserCollectionsPage } from "@/pages/user-collections-page";
+import { getUserCollection } from "@/lib/catalog-api";
+import { UserCollectionPage } from "@/pages/catalog-pages";
 
 export const Route = createFileRoute("/user/collections")({
-  component: UserCollectionsPage,
+  loader: () => getUserCollection(),
+  component: UserCollectionsRoute,
 });
+
+function UserCollectionsRoute() {
+  return <UserCollectionPage items={Route.useLoaderData()} />;
+}

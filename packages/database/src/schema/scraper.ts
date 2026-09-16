@@ -142,7 +142,7 @@ export const maker = pgTable(
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
     name: text("name").notNull(),
-    rootUrl: text("root_url").notNull(),
+    rootUrl: text("root_url"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -236,6 +236,8 @@ export const productType = pgTable(
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    imageUrl: text("image_url"),
+    imageAlt: text("image_alt"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),

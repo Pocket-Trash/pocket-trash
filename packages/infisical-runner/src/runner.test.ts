@@ -251,6 +251,35 @@ describe("buildInfisicalRunArgs", () => {
     });
   });
 
+  it("builds database seed args with the database URL user override", () => {
+    const args = buildInfisicalRunArgs({
+      app: "database",
+      command: "db:seed",
+      commandArgs: ["tsx", "scripts/seed.ts"],
+      repoRoot: "/repo",
+    });
+
+    expect(args).toEqual([
+      "run",
+      "--project-config-dir=/repo",
+      "--env=dev",
+      "--path=/apps/web",
+      "--",
+      "tsx",
+      "/repo/packages/infisical-runner/src/env-alias-runner.ts",
+      expect.stringContaining("databaseUrlUserOverride"),
+      "--",
+      "tsx",
+      "scripts/seed.ts",
+    ]);
+    expect(getEnvAliasRunnerOptions(args)).toMatchObject({
+      databaseUrlUserOverride: true,
+      databaseUrlUserOverridePath: "/local/database",
+      environmentSlug: "dev",
+      secretPaths: ["/apps/web"],
+    });
+  });
+
   it("builds database studio args with the database URL user override", () => {
     const args = buildInfisicalRunArgs({
       app: "database",

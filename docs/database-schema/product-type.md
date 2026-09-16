@@ -11,6 +11,8 @@ Canonical product type values used to classify product aggregate rows.
 | `id` | `bigint` | yes | PK |  |  | Internal product type row identifier. | `1000` |
 | `name` | `text` | yes |  |  |  | Canonical display name for the product type. | `pen` |
 | `slug` | `text` | yes | unique |  |  | Stable slug for product type deduplication and lookups. | `pen` |
+| `image_url` | `text` | no |  |  |  |  |  |
+| `image_alt` | `text` | no |  |  |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the product type row was created. | `2026-07-17T20:45:00.000Z` |
 | `updated_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the product type row was last updated. | `2026-07-17T20:45:00.000Z` |
 

@@ -8,12 +8,7 @@ Catalog spinner product row.
 
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `id` | `bigint` | yes | PK |  |  | Internal product spinner row identifier. | `1000` |
-| `maker_id` | `bigint` | yes | FK |  | `maker.id` (on delete restrict) | Maker that produced the spinner. | `1000` |
-| `name` | `text` | yes |  |  |  | Human-readable spinner product name. | `Standard Katla` |
-| `slug` | `text` | yes | unique |  |  | Stable slug for spinner deduplication and lookups. | `standard-katla` |
-| `product_type_id` | `bigint` | yes | FK |  | `product_type.id` (on delete restrict) | Product type classification for the spinner. | `1000` |
-| `material_id` | `bigint` | no | FK |  | `material.id` (on delete restrict) | Primary material for this spinner product row. | `1000` |
+| `id` | `bigint` | yes | PK, FK |  | `product.id` (on delete cascade) | Internal product spinner row identifier. | `1000` |
 | `weight_g` | `numeric` | no |  |  |  | Spinner weight in grams. | `72.5` |
 | `length_mm` | `numeric` | no |  |  |  | Spinner length in millimeters. | `50.0` |
 | `width_mm` | `numeric` | no |  |  |  | Spinner width in millimeters. | `24.5` |
@@ -22,9 +17,3 @@ Catalog spinner product row.
 | `button_diameter_mm` | `numeric` | no |  |  |  | Compatible button diameter in millimeters. | `24.5` |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the spinner row was created. | `2026-07-17T20:45:00.000Z` |
 | `updated_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the spinner row was last updated. | `2026-07-17T20:45:00.000Z` |
-
-## Indexes
-
-| Name | Unique | Method | Columns |
-| --- | --- | --- | --- |
-| `product_spinner_slug_unique` | yes | `btree` | `slug` |

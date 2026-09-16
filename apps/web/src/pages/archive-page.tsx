@@ -69,7 +69,7 @@ export function ArchivePage() {
     key: TranslationKey,
     values: Readonly<Record<string, unknown>> = {},
   ) => formatTranslation(key, values, locale);
-  // `/` and `/pens/$penId` both render this page, so the open pen is read from
+  // `/autmog` and `/autmog/$penId` both render this page, so the open pen is read from
   // the URL rather than local state — that is what makes each pen shareable.
   const { penId } = useParams({ strict: false });
   const { img } = useSearch({ strict: false }) as { img?: number };
@@ -270,7 +270,7 @@ export function ArchivePage() {
                 key={product.id}
                 onOpen={(nextProduct) =>
                   navigate({
-                    to: "/pens/$penId",
+                    to: "/autmog/$penId",
                     params: { penId: penParam(nextProduct) },
                   })
                 }
@@ -291,11 +291,11 @@ export function ArchivePage() {
       <ProductLightbox
         currency={currency}
         imageIndex={imageIndex}
-        onClose={() => navigate({ to: "/" })}
+        onClose={() => navigate({ to: "/autmog" })}
         onImageChange={(nextIndex) => {
           if (!selectedProduct) return;
           navigate({
-            to: "/pens/$penId",
+            to: "/autmog/$penId",
             params: { penId: penParam(selectedProduct) },
             search: nextIndex > 0 ? { img: nextIndex + 1 } : {},
             replace: true,

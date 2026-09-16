@@ -5,7 +5,13 @@ import { createLogger, type Logger, type LoggerConfig } from "@package/logger";
 import { createDbServices, type DbServices } from "./db/index.js";
 
 export type {
+  CatalogProduct,
+  CatalogProductType,
+  CatalogService,
+  CollectionsService,
+  ProductWriteInput,
   UpsertUserSettingsInput,
+  UserCollectionItem,
   UserSettingsService,
 } from "./db/index.js";
 export { defaultUserSettings } from "./db/index.js";

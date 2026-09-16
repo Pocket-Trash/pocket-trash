@@ -45,6 +45,17 @@ export const loggerMessages = {
   },
   common: {},
   database: {
+    catalog: {
+      createMaker: "database.catalog.createMaker",
+      createMaterial: "database.catalog.createMaterial",
+      createProduct: "database.catalog.createProduct",
+      updateProduct: "database.catalog.updateProduct",
+    },
+    collections: {
+      addSpinner: "database.collections.addSpinner",
+      addSpinnerButton: "database.collections.addSpinnerButton",
+      updateSpinner: "database.collections.updateSpinner",
+    },
     featureFlags: {
       archive: "database.featureFlags.archive",
       create: "database.featureFlags.create",

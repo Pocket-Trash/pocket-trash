@@ -3,6 +3,7 @@ import {
   boolean,
   decimal,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -31,76 +32,74 @@ export const collectionItem = pgTable("collection_item", {
   owned: boolean("owned").notNull().default(true),
 });
 
-export const productSpinner = pgTable(
-  "product_spinner",
+export const product = pgTable(
+  "product",
   {
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    productTypeId: bigint("product_type_id", { mode: "number" })
+      .notNull()
+      .references(() => productType.id, { onDelete: "restrict" }),
     makerId: bigint("maker_id", { mode: "number" })
       .notNull()
       .references(() => maker.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
-    productTypeId: bigint("product_type_id", { mode: "number" })
-      .notNull()
-      .references(() => productType.id, { onDelete: "restrict" }),
-    materialId: bigint("material_id", { mode: "number" }).references(
-      () => material.id,
-      { onDelete: "restrict" },
-    ),
-    weightG: decimal("weight_g"),
-    lengthMm: decimal("length_mm"),
-    widthMm: decimal("width_mm"),
-    thicknessMm: decimal("thickness_mm"),
-    thicknessWithButtonMm: decimal("thickness_with_button_mm"),
-    buttonDiameterMm: decimal("button_diameter_mm"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
   },
   (table) => ({
-    slugUnique: uniqueIndex("product_spinner_slug_unique").on(table.slug),
-  }),
-);
-
-export const productSpinnerButton = pgTable(
-  "product_spinner_button",
-  {
-    id: bigint("id", { mode: "number" })
-      .primaryKey()
-      .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    makerId: bigint("maker_id", { mode: "number" })
-      .notNull()
-      .references(() => maker.id, { onDelete: "restrict" }),
-    name: text("name").notNull(),
-    slug: text("slug").notNull(),
-    productTypeId: bigint("product_type_id", { mode: "number" })
-      .notNull()
-      .references(() => productType.id, { onDelete: "restrict" }),
-    materialId: bigint("material_id", { mode: "number" }).references(
-      () => material.id,
-      { onDelete: "restrict" },
-    ),
-    weightG: decimal("weight_g"),
-    diameterMm: decimal("diameter_mm"),
-    thicknessMm: decimal("thickness_mm"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => ({
-    slugUnique: uniqueIndex("product_spinner_button_slug_unique").on(
+    typeSlugUnique: uniqueIndex("product_type_slug_unique").on(
+      table.productTypeId,
       table.slug,
     ),
   }),
 );
+
+export const productMaterial = pgTable(
+  "product_material",
+  {
+    productId: bigint("product_id", { mode: "number" })
+      .notNull()
+      .references(() => product.id, { onDelete: "cascade" }),
+    materialId: bigint("material_id", { mode: "number" })
+      .notNull()
+      .references(() => material.id, { onDelete: "restrict" }),
+  },
+  (table) => [primaryKey({ columns: [table.productId, table.materialId] })],
+);
+
+export const productSpinner = pgTable("product_spinner", {
+  id: bigint("id", { mode: "number" })
+    .primaryKey()
+    .references(() => product.id, { onDelete: "cascade" }),
+  weightG: decimal("weight_g"),
+  lengthMm: decimal("length_mm"),
+  widthMm: decimal("width_mm"),
+  thicknessMm: decimal("thickness_mm"),
+  thicknessWithButtonMm: decimal("thickness_with_button_mm"),
+  buttonDiameterMm: decimal("button_diameter_mm"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const productSpinnerButton = pgTable("product_spinner_button", {
+  id: bigint("id", { mode: "number" })
+    .primaryKey()
+    .references(() => product.id, { onDelete: "cascade" }),
+  weightG: decimal("weight_g"),
+  diameterMm: decimal("diameter_mm"),
+  thicknessMm: decimal("thickness_mm"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
 
 export const collectionSpinnerButton = pgTable("collection_spinner_button", {
   id: bigint("id", { mode: "number" })
@@ -127,6 +126,10 @@ export const collectionSpinner = pgTable("collection_spinner", {
 
 export type CollectionItem = typeof collectionItem.$inferSelect;
 export type NewCollectionItem = typeof collectionItem.$inferInsert;
+export type Product = typeof product.$inferSelect;
+export type NewProduct = typeof product.$inferInsert;
+export type ProductMaterial = typeof productMaterial.$inferSelect;
+export type NewProductMaterial = typeof productMaterial.$inferInsert;
 export type ProductSpinner = typeof productSpinner.$inferSelect;
 export type NewProductSpinner = typeof productSpinner.$inferInsert;
 export type ProductSpinnerButton = typeof productSpinnerButton.$inferSelect;

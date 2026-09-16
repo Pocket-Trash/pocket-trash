@@ -3,6 +3,8 @@ import {
   collectionItem,
   collectionSpinner,
   collectionSpinnerButton,
+  product,
+  productMaterial,
   productSpinner,
   productSpinnerButton,
 } from "./collection.js";
@@ -32,7 +34,8 @@ import {
 import { userSettings } from "./user-settings.js";
 import { user } from "./users.js";
 
-export const usersRelations = relations(user, ({ one }) => ({
+export const usersRelations = relations(user, ({ many, one }) => ({
+  collectionItems: many(collectionItem),
   settings: one(userSettings),
 }));
 
@@ -65,14 +68,12 @@ export const makersRelations = relations(maker, ({ many }) => ({
   autmogPens: many(tmpAutmogPens),
   grimsmoKnives: many(tmpGrimsmoKnives),
   grimsmoPens: many(tmpGrimsmoPens),
-  spinnerButtons: many(productSpinnerButton),
-  spinners: many(productSpinner),
+  products: many(product),
 }));
 
 export const materialsRelations = relations(material, ({ many }) => ({
   autmogPens: many(tmpAutmogPenMaterials),
-  spinnerButtons: many(productSpinnerButton),
-  spinners: many(productSpinner),
+  products: many(productMaterial),
 }));
 
 export const mechanismsRelations = relations(mechanism, ({ many }) => ({
@@ -80,9 +81,8 @@ export const mechanismsRelations = relations(mechanism, ({ many }) => ({
 }));
 
 export const productTypesRelations = relations(productType, ({ many }) => ({
+  catalogProducts: many(product),
   products: many(tmpProductProductTypes),
-  spinnerButtons: many(productSpinnerButton),
-  spinners: many(productSpinner),
 }));
 
 export const scraperRunsRelations = relations(scraperRuns, () => ({}));
@@ -110,35 +110,53 @@ export const collectionItemRelations = relations(collectionItem, ({ one }) => ({
   }),
 }));
 
-export const productSpinnerRelations = relations(productSpinner, ({ one }) => ({
+export const productRelations = relations(product, ({ many, one }) => ({
   maker: one(maker, {
-    fields: [productSpinner.makerId],
+    fields: [product.makerId],
     references: [maker.id],
   }),
-  material: one(material, {
-    fields: [productSpinner.materialId],
-    references: [material.id],
-  }),
+  materials: many(productMaterial),
   productType: one(productType, {
-    fields: [productSpinner.productTypeId],
+    fields: [product.productTypeId],
     references: [productType.id],
+  }),
+  spinner: one(productSpinner, {
+    fields: [product.id],
+    references: [productSpinner.id],
+  }),
+  spinnerButton: one(productSpinnerButton, {
+    fields: [product.id],
+    references: [productSpinnerButton.id],
+  }),
+}));
+
+export const productMaterialRelations = relations(
+  productMaterial,
+  ({ one }) => ({
+    material: one(material, {
+      fields: [productMaterial.materialId],
+      references: [material.id],
+    }),
+    product: one(product, {
+      fields: [productMaterial.productId],
+      references: [product.id],
+    }),
+  }),
+);
+
+export const productSpinnerRelations = relations(productSpinner, ({ one }) => ({
+  product: one(product, {
+    fields: [productSpinner.id],
+    references: [product.id],
   }),
 }));
 
 export const productSpinnerButtonRelations = relations(
   productSpinnerButton,
   ({ one }) => ({
-    maker: one(maker, {
-      fields: [productSpinnerButton.makerId],
-      references: [maker.id],
-    }),
-    material: one(material, {
-      fields: [productSpinnerButton.materialId],
-      references: [material.id],
-    }),
-    productType: one(productType, {
-      fields: [productSpinnerButton.productTypeId],
-      references: [productType.id],
+    product: one(product, {
+      fields: [productSpinnerButton.id],
+      references: [product.id],
     }),
   }),
 );
