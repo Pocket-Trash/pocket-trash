@@ -75,6 +75,12 @@ export const loggerMessages = {
     update: "images.update",
     upload: "images.upload",
   },
+  resources: {
+    create: "resources.create",
+    download: "resources.download",
+    getDetail: "resources.getDetail",
+    listCategories: "resources.listCategories",
+  },
   scraper: {
     autmog: {
       fetchCompleted: "scraper.autmog.fetch.completed",

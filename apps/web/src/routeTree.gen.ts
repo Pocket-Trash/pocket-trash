@@ -10,11 +10,15 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UserRouteImport } from './routes/user'
+import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
 import { Route as UserCollectionsRouteImport } from './routes/user.collections'
 import { Route as UserAccountRouteImport } from './routes/user.account'
 import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
+import { Route as ResourcesUploadRouteImport } from './routes/resources.upload'
+import { Route as ResourcesResourceIdRouteImport } from './routes/resources.$resourceId'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
 import { Route as AdminSettingsFeatureFlagsRouteImport } from './routes/admin.settings.feature-flags'
@@ -24,10 +28,20 @@ const UserRoute = UserRouteImport.update({
   path: '/user',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResourcesRoute = ResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ResourcesIndexRoute = ResourcesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ResourcesRoute,
 } as any)
 const UserCollectionsRoute = UserCollectionsRouteImport.update({
   id: '/collections',
@@ -49,6 +63,16 @@ const SignInSplatRoute = SignInSplatRouteImport.update({
   path: '/sign-in/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResourcesUploadRoute = ResourcesUploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => ResourcesRoute,
+} as any)
+const ResourcesResourceIdRoute = ResourcesResourceIdRouteImport.update({
+  id: '/$resourceId',
+  path: '/$resourceId',
+  getParentRoute: () => ResourcesRoute,
+} as any)
 const PensPenIdRoute = PensPenIdRouteImport.update({
   id: '/pens/$penId',
   path: '/pens/$penId',
@@ -69,12 +93,16 @@ const AdminSettingsFeatureFlagsRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/resources': typeof ResourcesRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
+  '/resources/$resourceId': typeof ResourcesResourceIdRoute
+  '/resources/upload': typeof ResourcesUploadRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/resources/': typeof ResourcesIndexRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
 }
@@ -82,22 +110,29 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
+  '/resources/$resourceId': typeof ResourcesResourceIdRoute
+  '/resources/upload': typeof ResourcesUploadRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/resources': typeof ResourcesIndexRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/resources': typeof ResourcesRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
+  '/resources/$resourceId': typeof ResourcesResourceIdRoute
+  '/resources/upload': typeof ResourcesUploadRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/resources/': typeof ResourcesIndexRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
 }
@@ -105,12 +140,16 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/resources'
     | '/user'
     | '/pens/$penId'
+    | '/resources/$resourceId'
+    | '/resources/upload'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/resources/'
     | '/admin/settings/feature-flags'
     | '/user/settings/beta-features'
   fileRoutesByTo: FileRoutesByTo
@@ -118,27 +157,35 @@ export interface FileRouteTypes {
     | '/'
     | '/user'
     | '/pens/$penId'
+    | '/resources/$resourceId'
+    | '/resources/upload'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/resources'
     | '/admin/settings/feature-flags'
     | '/user/settings/beta-features'
   id:
     | '__root__'
     | '/'
+    | '/resources'
     | '/user'
     | '/pens/$penId'
+    | '/resources/$resourceId'
+    | '/resources/upload'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/resources/'
     | '/admin/settings/feature-flags'
     | '/user/settings/beta-features'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ResourcesRoute: typeof ResourcesRouteWithChildren
   UserRoute: typeof UserRouteWithChildren
   PensPenIdRoute: typeof PensPenIdRoute
   SignInSplatRoute: typeof SignInSplatRoute
@@ -155,12 +202,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/resources': {
+      id: '/resources'
+      path: '/resources'
+      fullPath: '/resources'
+      preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/resources/': {
+      id: '/resources/'
+      path: '/'
+      fullPath: '/resources/'
+      preLoaderRoute: typeof ResourcesIndexRouteImport
+      parentRoute: typeof ResourcesRoute
     }
     '/user/collections': {
       id: '/user/collections'
@@ -190,6 +251,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignInSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/resources/upload': {
+      id: '/resources/upload'
+      path: '/upload'
+      fullPath: '/resources/upload'
+      preLoaderRoute: typeof ResourcesUploadRouteImport
+      parentRoute: typeof ResourcesRoute
+    }
+    '/resources/$resourceId': {
+      id: '/resources/$resourceId'
+      path: '/$resourceId'
+      fullPath: '/resources/$resourceId'
+      preLoaderRoute: typeof ResourcesResourceIdRouteImport
+      parentRoute: typeof ResourcesRoute
+    }
     '/pens/$penId': {
       id: '/pens/$penId'
       path: '/pens/$penId'
@@ -214,6 +289,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ResourcesRouteChildren {
+  ResourcesResourceIdRoute: typeof ResourcesResourceIdRoute
+  ResourcesUploadRoute: typeof ResourcesUploadRoute
+  ResourcesIndexRoute: typeof ResourcesIndexRoute
+}
+
+const ResourcesRouteChildren: ResourcesRouteChildren = {
+  ResourcesResourceIdRoute: ResourcesResourceIdRoute,
+  ResourcesUploadRoute: ResourcesUploadRoute,
+  ResourcesIndexRoute: ResourcesIndexRoute,
+}
+
+const ResourcesRouteWithChildren = ResourcesRoute._addFileChildren(
+  ResourcesRouteChildren,
+)
+
 interface UserRouteChildren {
   UserAccountRoute: typeof UserAccountRoute
   UserCollectionsRoute: typeof UserCollectionsRoute
@@ -230,6 +321,7 @@ const UserRouteWithChildren = UserRoute._addFileChildren(UserRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ResourcesRoute: ResourcesRouteWithChildren,
   UserRoute: UserRouteWithChildren,
   PensPenIdRoute: PensPenIdRoute,
   SignInSplatRoute: SignInSplatRoute,

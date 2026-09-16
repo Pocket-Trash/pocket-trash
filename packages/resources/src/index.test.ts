@@ -66,6 +66,36 @@ describe("resource storage", () => {
     });
   });
 
+  it("uploads an optional preview image through a separate allowlist", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      expect(toUrl(input).pathname).toBe(
+        "/pocket-trash-resources/dev/00000000-0000-4000-8000-000000000001.webp",
+      );
+      expect(init?.headers).toMatchObject({ "content-type": "image/webp" });
+      return new Response(null, { status: 201 });
+    });
+    const storage = createResourceStorage({ ...config, fetch: fetchMock });
+
+    await expect(
+      storage.uploadPreview({
+        bytes: new Uint8Array([1, 2, 3]),
+        contentType: "image/webp",
+        fileName: "clip.webp",
+      }),
+    ).resolves.toMatchObject({
+      contentType: "image/webp",
+      objectPath: "dev/00000000-0000-4000-8000-000000000001.webp",
+    });
+
+    await expect(
+      storage.upload({
+        bytes: new Uint8Array([1]),
+        contentType: "image/webp",
+        fileName: "clip.webp",
+      }),
+    ).rejects.toThrow("Resource file extension and MIME type do not match.");
+  });
+
   it("rejects oversized, mismatched, and unsafe uploads before Bunny", async () => {
     const fetchMock = vi.fn<typeof fetch>();
     const storage = createResourceStorage({ ...config, fetch: fetchMock });

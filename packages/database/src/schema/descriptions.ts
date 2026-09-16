@@ -10,6 +10,21 @@ export type SchemaDescription = {
 };
 
 export const schemaDescriptions = {
+  resource_categories: {
+    description: "Reusable categories assigned to resources.",
+  },
+  resource_downloads: {
+    description: "Append-only download events for resource versions.",
+  },
+  resource_versions: {
+    description: "Immutable uploaded file versions for resources.",
+  },
+  resources: {
+    description: "User-uploaded resources and their optional preview images.",
+  },
+  resources_to_categories: {
+    description: "Unique resource-to-category assignments.",
+  },
   makers: {
     description:
       "Canonical source makers that scraped or user-created products can belong to.",

@@ -1,6 +1,13 @@
 import { relations } from "drizzle-orm";
 import { featureFlags, featureFlagUserOverrides } from "./feature-flags.js";
 import {
+  resourceCategories,
+  resourceDownloads,
+  resources,
+  resourcesToCategories,
+  resourceVersions,
+} from "./resources.js";
+import {
   makers,
   materials,
   mechanisms,
@@ -35,6 +42,53 @@ export const userSettingsRelations = relations(userSettings, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+export const resourcesRelations = relations(resources, ({ many }) => ({
+  categories: many(resourcesToCategories),
+  versions: many(resourceVersions),
+}));
+
+export const resourceVersionsRelations = relations(
+  resourceVersions,
+  ({ many, one }) => ({
+    downloads: many(resourceDownloads),
+    resource: one(resources, {
+      fields: [resourceVersions.resourceId],
+      references: [resources.id],
+    }),
+  }),
+);
+
+export const resourceCategoriesRelations = relations(
+  resourceCategories,
+  ({ many }) => ({
+    resources: many(resourcesToCategories),
+  }),
+);
+
+export const resourcesToCategoriesRelations = relations(
+  resourcesToCategories,
+  ({ one }) => ({
+    category: one(resourceCategories, {
+      fields: [resourcesToCategories.categoryId],
+      references: [resourceCategories.id],
+    }),
+    resource: one(resources, {
+      fields: [resourcesToCategories.resourceId],
+      references: [resources.id],
+    }),
+  }),
+);
+
+export const resourceDownloadsRelations = relations(
+  resourceDownloads,
+  ({ one }) => ({
+    version: one(resourceVersions, {
+      fields: [resourceDownloads.versionId],
+      references: [resourceVersions.id],
+    }),
+  }),
+);
 
 export const featureFlagsRelations = relations(featureFlags, ({ many }) => ({
   userOverrides: many(featureFlagUserOverrides),

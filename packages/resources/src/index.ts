@@ -36,6 +36,7 @@ export type ResourceDeleteResult = "deleted" | "missing";
 export type ResourceStorage = {
   delete(objectPath: string): Promise<ResourceDeleteResult>;
   upload(input: ResourceUploadInput): Promise<ResourceUploadResult>;
+  uploadPreview(input: ResourceUploadInput): Promise<ResourceUploadResult>;
 };
 
 type BunnyConfig = {
@@ -62,6 +63,12 @@ const allowedMimeTypes = {
   ".stp": ["application/step", "model/step"],
   ".txt": ["text/plain"],
   ".zip": ["application/x-zip-compressed", "application/zip"],
+} as const;
+const allowedPreviewMimeTypes = {
+  ".jpeg": ["image/jpeg"],
+  ".jpg": ["image/jpeg"],
+  ".png": ["image/png"],
+  ".webp": ["image/webp"],
 } as const;
 
 export function buildResourceFolderPrefix(input: {
@@ -105,23 +112,11 @@ export function createResourceStorage(
 
       return response.status === 404 ? "missing" : "deleted";
     },
-    async upload(upload) {
-      const extension = validateUpload(upload);
-      const objectPath = `${config.folderPrefix}/${config.randomUUID()}${extension}`;
-      await bunnyRequest(config, objectPath, {
-        body: Uint8Array.from(upload.bytes),
-        expectedStatuses: [200, 201],
-        headers: { "content-type": upload.contentType },
-        method: "PUT",
-      });
-
-      return {
-        contentType: upload.contentType,
-        fileName: upload.fileName,
-        objectPath,
-        size: upload.bytes.byteLength,
-        url: buildUrl(config.cdnBaseUrl, objectPath),
-      };
+    async upload(input) {
+      return upload(config, input, allowedMimeTypes);
+    },
+    async uploadPreview(input) {
+      return upload(config, input, allowedPreviewMimeTypes);
     },
   };
 }
@@ -139,7 +134,37 @@ export async function deletePreviewResourceFolder(
   return { folderPath, status: found ? "deleted" : "missing" };
 }
 
-function validateUpload(input: ResourceUploadInput): string {
+async function upload(
+  config: BunnyConfig,
+  input: ResourceUploadInput,
+  allowedTypes: Readonly<Record<string, readonly string[]>>,
+): Promise<ResourceUploadResult> {
+  const extension = validateUpload(input, allowedTypes);
+  const objectPath = `${config.folderPrefix}/${config.randomUUID()}${extension}`;
+  await bunnyRequest(config, objectPath, {
+    body: Uint8Array.from(input.bytes),
+    expectedStatuses: [200, 201],
+    headers: { "content-type": input.contentType },
+    method: "PUT",
+  });
+
+  return {
+    contentType: input.contentType,
+    fileName: input.fileName,
+    objectPath,
+    size: input.bytes.byteLength,
+    url: buildUrl(config.cdnBaseUrl, objectPath),
+  };
+}
+
+function validateUpload(
+  input: ResourceUploadInput,
+  allowedTypes: Readonly<Record<string, readonly string[]>>,
+): string {
+  if (input.bytes.byteLength === 0) {
+    throw new Error("Resource files cannot be empty.");
+  }
+
   if (input.bytes.byteLength > maxResourceBytes) {
     throw new Error("Resource files cannot exceed 4 MiB.");
   }
@@ -161,8 +186,8 @@ function validateUpload(input: ResourceUploadInput): string {
 
   const extension = input.fileName
     .slice(input.fileName.lastIndexOf("."))
-    .toLowerCase() as keyof typeof allowedMimeTypes;
-  const allowed = allowedMimeTypes[extension];
+    .toLowerCase();
+  const allowed = allowedTypes[extension];
 
   if (!allowed?.some((contentType) => contentType === input.contentType)) {
     throw new Error("Resource file extension and MIME type do not match.");
