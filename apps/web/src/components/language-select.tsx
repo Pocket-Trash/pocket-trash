@@ -11,13 +11,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { localeLabel, supportedLocales } from "@/lib/locale";
+import { cn } from "@/lib/utils";
 
 type LanguageSelectProps = {
+  className?: string;
   locale: SupportedLocale;
   onLocaleChange: (locale: SupportedLocale) => void;
 };
 
 export function LanguageSelect({
+  className,
   locale,
   onLocaleChange,
 }: LanguageSelectProps) {
@@ -32,7 +35,10 @@ export function LanguageSelect({
       onValueChange={(value) => onLocaleChange(value as SupportedLocale)}
       value={locale}
     >
-      <SelectTrigger aria-label={t("web.settings.language")} className="w-full">
+      <SelectTrigger
+        aria-label={t("web.navigation.selectLanguage")}
+        className={cn("w-full", className)}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

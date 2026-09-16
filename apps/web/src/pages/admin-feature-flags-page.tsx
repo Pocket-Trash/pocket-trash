@@ -110,10 +110,7 @@ export function AdminFeatureFlagsPage() {
   }
 
   return (
-    <AppShell
-      sidebarContent={null}
-      title={t("web.admin.featureFlags.featureFlags")}
-    >
+    <AppShell title={t("web.admin.featureFlags.featureFlags")}>
       <main className="mx-auto grid w-full max-w-6xl gap-5 px-4 py-6 md:grid-cols-[minmax(0,1fr)_360px] md:px-6">
         <section className="min-w-0">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

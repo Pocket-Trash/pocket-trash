@@ -21,11 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  useCurrencyRates,
-  useFiltersOpen,
-  usePenSettings,
-} from "@/hooks/use-pen-settings";
+import { useCurrencyRates, usePenSettings } from "@/hooks/use-pen-settings";
 import { type PenProduct, products } from "@/lib/pen-data";
 import {
   createDefaultMatchModes,
@@ -77,7 +73,6 @@ export function ArchivePage() {
   const { currency, saving, setCurrency, setUnits, setWeight, units, weight } =
     usePenSettings();
   const { rates, refreshRates } = useCurrencyRates();
-  const [filtersOpen, setFiltersOpen] = useFiltersOpen();
   const [refreshing, setRefreshing] = React.useState(false);
   const [query, setQuery] = React.useState(browseState.query);
   const [debouncedQuery, setDebouncedQuery] = React.useState(browseState.query);
@@ -168,31 +163,32 @@ export function ArchivePage() {
     ]).finally(() => setRefreshing(false));
   }, [refreshRates]);
 
+  const mobileToolbar = (
+    <MobileToolbar
+      active={active}
+      currency={currency}
+      settingsDisabled={saving}
+      filterCount={filterCount}
+      matchModes={matchModes}
+      onClearFilters={clearFilters}
+      onCurrencyChange={setCurrency}
+      onMatchModeChange={setMatchMode}
+      onQueryChange={setQuery}
+      onSortChange={setSort}
+      onToggleFilter={toggleFilter}
+      onUnitsChange={setUnits}
+      onWeightChange={setWeight}
+      products={products}
+      query={query}
+      sort={sort}
+      sortOptions={localizedSortOptions}
+      units={units}
+      weight={weight}
+    />
+  );
+
   return (
     <AppShell
-      bottomBar={
-        <MobileToolbar
-          active={active}
-          currency={currency}
-          settingsDisabled={saving}
-          filterCount={filterCount}
-          matchModes={matchModes}
-          onClearFilters={clearFilters}
-          onCurrencyChange={setCurrency}
-          onMatchModeChange={setMatchMode}
-          onQueryChange={setQuery}
-          onSortChange={setSort}
-          onToggleFilter={toggleFilter}
-          onUnitsChange={setUnits}
-          onWeightChange={setWeight}
-          products={products}
-          query={query}
-          sort={sort}
-          sortOptions={localizedSortOptions}
-          units={units}
-          weight={weight}
-        />
-      }
       headerActions={
         <>
           <label
@@ -245,48 +241,50 @@ export function ArchivePage() {
         total: products.length,
         visible: visibleProducts.length,
       })}
-      onSidebarOpenChange={setFiltersOpen}
-      sidebarContent={
-        <FilterSidebar
-          active={active}
-          matchModes={matchModes}
-          onClear={clearFilters}
-          onMatchModeChange={setMatchMode}
-          onToggleFilter={toggleFilter}
-          products={products}
-        />
-      }
-      sidebarOpen={filtersOpen}
       title={t("web.site.name")}
     >
-      <PullToRefresh onRefresh={handleRefresh} refreshing={refreshing}>
-        <section className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
-          {refreshing ? (
-            <ProductGridSkeleton count={12} />
-          ) : visibleProducts.length > 0 ? (
-            visibleProducts.map((product) => (
-              <ProductCard
-                currency={currency}
-                key={product.id}
-                onOpen={(nextProduct) =>
-                  navigate({
-                    to: "/autmog/$penId",
-                    params: { penId: penParam(nextProduct) },
-                  })
-                }
-                product={product}
-                rates={rates}
-                units={units}
-                weight={weight}
-              />
-            ))
-          ) : (
-            <div className="col-span-full rounded-lg border border-dashed border-border p-16 text-center text-muted-foreground">
-              {t("web.archive.noItems")}
-            </div>
-          )}
-        </section>
-      </PullToRefresh>
+      <div className="grid md:grid-cols-[290px_minmax(0,1fr)] md:gap-5 md:p-[18px_22px_22px]">
+        <aside className="scrollbar-none sticky top-28 hidden max-h-[calc(100svh-8rem)] self-start overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar p-2 md:block">
+          <FilterSidebar
+            active={active}
+            matchModes={matchModes}
+            onClear={clearFilters}
+            onMatchModeChange={setMatchMode}
+            onToggleFilter={toggleFilter}
+            products={products}
+          />
+        </aside>
+        <div className="min-w-0">
+          <PullToRefresh onRefresh={handleRefresh} refreshing={refreshing}>
+            <section className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-0">
+              {refreshing ? (
+                <ProductGridSkeleton count={12} />
+              ) : visibleProducts.length > 0 ? (
+                visibleProducts.map((product) => (
+                  <ProductCard
+                    currency={currency}
+                    key={product.id}
+                    onOpen={(nextProduct) =>
+                      navigate({
+                        to: "/autmog/$penId",
+                        params: { penId: penParam(nextProduct) },
+                      })
+                    }
+                    product={product}
+                    rates={rates}
+                    units={units}
+                    weight={weight}
+                  />
+                ))
+              ) : (
+                <div className="col-span-full rounded-lg border border-dashed border-border p-16 text-center text-muted-foreground">
+                  {t("web.archive.noItems")}
+                </div>
+              )}
+            </section>
+          </PullToRefresh>
+        </div>
+      </div>
 
       <ProductLightbox
         currency={currency}
@@ -306,6 +304,11 @@ export function ArchivePage() {
         units={units}
         weight={weight}
       />
+      <div
+        aria-hidden="true"
+        className="h-[calc(3.5rem+env(safe-area-inset-bottom))] md:hidden"
+      />
+      {mobileToolbar}
     </AppShell>
   );
 }

@@ -27,7 +27,7 @@ export function HomePage() {
   ];
 
   return (
-    <AppShell sidebarContent={null} title={t("web.site.name")}>
+    <AppShell title={t("web.site.name")}>
       <main className="grid gap-[18px] p-4 md:grid-cols-3 md:p-[18px_22px_22px]">
         {cards.map(({ key, to }) => (
           <Link
@@ -46,7 +46,7 @@ export function HomePage() {
 export function ResourcesPage() {
   const t = useCatalogCopy();
   return (
-    <AppShell sidebarContent={null} title={t("web.navigation.resources")}>
+    <AppShell title={t("web.navigation.resources")}>
       <main className="mx-auto max-w-3xl p-6 text-muted-foreground">
         {t("web.page.resources.stub")}
       </main>
@@ -63,7 +63,6 @@ export function ProductsPage({ products }: { products: CatalogProduct[] }) {
           {t("web.action.addProduct")}
         </Link>
       }
-      sidebarContent={null}
       title={t("web.navigation.products")}
     >
       <ProductGrid products={products} />
@@ -82,7 +81,6 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
         breadcrumbItems={[
           { label: t("web.navigation.products"), to: "/products" },
         ]}
-        sidebarContent={null}
         title={product.name}
       >
         <main className="mx-auto max-w-3xl p-6">
@@ -128,7 +126,6 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
           {t("web.action.edit")}
         </Link>
       }
-      sidebarContent={null}
       title={product.name}
     >
       <main className="mx-auto grid max-w-3xl gap-6 p-6">
@@ -173,7 +170,6 @@ export function PublicCollectionsPage({
           {t("web.action.addToCollection")}
         </Link>
       }
-      sidebarContent={null}
       title={t("web.navigation.collections")}
     >
       <main className="grid gap-[18px] p-4 sm:grid-cols-2 lg:grid-cols-3 md:p-[18px_22px_22px]">
@@ -217,7 +213,6 @@ export function UserCollectionPage({ items }: { items: UserCollectionItem[] }) {
           {t("web.action.addToCollection")}
         </Link>
       }
-      sidebarContent={null}
       title={t("web.navigation.collections")}
     >
       <main className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">

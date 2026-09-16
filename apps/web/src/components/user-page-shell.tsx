@@ -21,7 +21,6 @@ export function UserPageShell({
       breadcrumbItems={[
         { label: t("web.navigation.user"), to: "/user/account" },
       ]}
-      sidebarContent={null}
       title={title}
     >
       <section className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6">

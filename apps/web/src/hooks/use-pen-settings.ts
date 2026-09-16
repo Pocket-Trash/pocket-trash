@@ -3,7 +3,6 @@ import { loggerMessages } from "@package/logger";
 import { formatTranslation } from "@pocket-trash/localizations";
 import * as React from "react";
 import { toast } from "sonner";
-import { compactMediaQuery } from "@/lib/breakpoints";
 import { logger } from "@/lib/logger";
 import {
   baseCurrency,
@@ -23,7 +22,6 @@ import {
 } from "@/lib/user-settings";
 import { useLocale } from "@/providers/locale-provider";
 
-const filtersClosedStorageKey = "pocket-trash.filtersClosed";
 const rateStorageKey = `pocket-trash.fxRates.${baseCurrency}`;
 type PenSettings = Pick<
   typeof defaultUserSettings,
@@ -308,36 +306,4 @@ export function useCurrencyRates() {
   const refreshRates = React.useCallback(() => loadRates(true), [loadRates]);
 
   return { rates, refreshRates };
-}
-
-export function useFiltersOpen() {
-  const [filtersOpen, setFiltersOpenState] = React.useState(true);
-
-  React.useEffect(() => {
-    const media = window.matchMedia(compactMediaQuery);
-    const sync = () => {
-      if (media.matches) {
-        setFiltersOpenState(false);
-        return;
-      }
-
-      setFiltersOpenState(
-        window.localStorage.getItem(filtersClosedStorageKey) !== "1",
-      );
-    };
-
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
-
-  const setFiltersOpen = React.useCallback((open: boolean) => {
-    setFiltersOpenState(open);
-
-    if (!window.matchMedia(compactMediaQuery).matches) {
-      window.localStorage.setItem(filtersClosedStorageKey, open ? "0" : "1");
-    }
-  }, []);
-
-  return [filtersOpen, setFiltersOpen] as const;
 }

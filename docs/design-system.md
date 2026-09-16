@@ -4,7 +4,7 @@
 - **Visual Identity:** Theme-aware archival product browser for machined pens; compact, technical, image-led, and filter-heavy.
 - **Aesthetic Inspiration:** Precision-tool catalog and enthusiast archive rather than marketing site. The UI emphasizes scannability, specs, materials, and product photography.
 - **Tone:** Utilitarian, quiet, data-rich, and maker-focused. Copy is direct and factual; interface labels are short.
-- **Primary Experience:** A searchable/filterable grid of product cards with a persistent filter sidebar, settings drawer, and image/spec lightbox.
+- **Primary Experience:** Shared site chrome around route-owned content. Autmog provides its own searchable/filterable product grid, desktop filter panel, settings controls, and image/spec lightbox.
 
 ## 2. Primitive & Semantic Design Tokens
 ### Typography
@@ -158,10 +158,9 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 - **Archived:** `bg-accent text-accent-foreground` or `border-border text-muted-foreground` when lower emphasis is needed.
 
 ## 3. Structural Layout Rules
-- **Page Shell:** Sticky top header, two-column main area, footer centered below grid.
-- **Desktop Main Grid:** `grid-template-columns: 290px 1fr`, `gap: 20px`, `padding: 18px 22px 22px`.
+- **Page Shell:** Sticky top header, route content, and a centered footer. The shell never owns route-specific sidebars or bottom toolbars.
+- **Autmog Desktop Grid:** `grid-template-columns: 290px 1fr`, `gap: 20px`, `padding: 18px 22px 22px`.
 - **Filter Sidebar:** Sticky at `top: 70px`, max height `calc(100vh - 90px)`, `10px` radius, hidden scrollbar, scrollable content.
-- **Collapsed Filters:** Body class `filters-closed` changes main to `0 1fr`, sets `gap: 0`, and reveals a fixed vertical edge tab.
 - **Product Grid:** CSS grid with max 5 columns: `repeat(auto-fill, minmax(max(240px, calc((100% - 4 * 18px) / 5)), 1fr))`; `gap: 18px`.
 - **Responsive Breakpoints:** At `max-width: 880px`, filters become a fixed slide-in drawer with scrim and grid becomes full width; at `max-width: 480px`, product grid becomes single column.
 - **Mobile Grid:** `repeat(auto-fill, minmax(160px, 1fr))` between 480px and 880px.
@@ -169,9 +168,12 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 - **Card Constraints:** Product images use `aspect-ratio: 4 / 3`; cards reserve heights for headline, subtitle, metadata, dimensions, and tags to prevent uneven layout jumps.
 
 ## 4. Component Patterns
-### Header
+### Shared Header
 - Sticky, translucent, blurred background using `bg-background/90`, `backdrop-blur`, and `border-border`.
-- Contains title, item count, search, sort select, and icon-only settings button.
+- Keeps the Pocket Trash site name at the upper left with route breadcrumbs directly below it.
+- Places the language selector, theme toggle, and account control at the upper right in that order.
+- Signed-in users receive an avatar menu; signed-out users receive an explicit Sign In button.
+- Route-specific actions and metadata wrap onto a separate header row when present.
 - Inputs use Tailwind theme tokens: `bg-background`, `border-input`, `text-foreground`, `ring-ring`, and inherited font.
 
 ### Filter Chips
@@ -215,7 +217,7 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 - **Hover States:** Accent border/color is the standard hover affordance for cards, chips, buttons, links, and controls.
 - **Search:** Debounced at `150ms`; multi-token AND search across title, tags, price, and body text.
 - **Sorting:** Supports date, price, weight, diameter, and title.
-- **Persistence:** Theme mode (`light`, `dark`, `system`) persists as `pocket-trash.theme`; units, weight, currency, and desktop filter collapsed state persist locally.
+- **Persistence:** Theme mode (`light`, `dark`, `system`) persists as `pocket-trash.theme`; language persists in local storage; units, weight, and currency persist through user settings where available.
 
 ## 6. Content & Data Rules
 - **Catalog Model:** Products are pens or accessories with titles, dates, price range, archived state, specs, local images, body text, and tag arrays.
@@ -229,5 +231,5 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 - System theme mode must respect `prefers-color-scheme` and update without requiring a page refresh.
 - Search, sort, settings, filters, and dialogs include ARIA labels or dialog roles.
 - Links are underlined in the footer so they are distinguishable without color alone.
-- Mobile filters use a scrim and larger edge-tab tap target.
+- Mobile Autmog filters use a scrim and bottom-sheet controls.
 - Layout reserves space for dynamic controls and text blocks to reduce layout shift.

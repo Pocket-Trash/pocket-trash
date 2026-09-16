@@ -76,7 +76,6 @@ export function ProductFormPage({
       breadcrumbItems={[
         { label: t("web.navigation.products"), to: "/products" },
       ]}
-      sidebarContent={null}
       title={initialProduct ? initialProduct.name : t("web.action.addProduct")}
     >
       <main className="mx-auto grid max-w-3xl gap-6 p-6">
@@ -543,7 +542,6 @@ export function CollectionAddPage({
       breadcrumbItems={[
         { label: t("web.navigation.collections"), to: "/collections" },
       ]}
-      sidebarContent={null}
       title={t("web.action.addToCollection")}
     >
       <main className="mx-auto grid max-w-5xl gap-6 p-6">
@@ -665,7 +663,6 @@ export function CollectionEditPage({
         breadcrumbItems={[
           { label: t("web.navigation.collections"), to: "/collections" },
         ]}
-        sidebarContent={null}
         title={item.name}
       >
         <main className="mx-auto max-w-xl p-6">
@@ -680,7 +677,6 @@ export function CollectionEditPage({
       breadcrumbItems={[
         { label: t("web.navigation.collections"), to: "/collections" },
       ]}
-      sidebarContent={null}
       title={item.name}
     >
       <main className="mx-auto grid max-w-xl gap-5 p-6">
