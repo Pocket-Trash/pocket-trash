@@ -118,7 +118,7 @@ jobs:
         uses: actions/create-github-app-token@v3
         with:
           client-id: ${{ env.GITHUB_CF_APP_CLIENT_ID }}
-          private-key: ${{ env.GITHUB_CF_APP_TOKEN }}
+          private-key: ${{ env.GITHUB_CF_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
           permission-issues: write
