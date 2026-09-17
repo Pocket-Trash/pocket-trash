@@ -23,7 +23,7 @@ permissions:
   contents: read
 
 env:
-  API_PREVIEW_COMMENT_MARKER: "<!-- pocket-trash-api-preview -->"
+  API_PREVIEW_COMMENT_MARKER: "<!-- pocket-trash-api-preview-app -->"
   DB_PREVIEW_COMMENT_MARKER: "<!-- pocket-trash-db-preview -->"
   RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME: "pocket-trash (preview)"
   RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME: "pocket-trash"
@@ -243,11 +243,35 @@ jobs:
 
           echo "url=$preview_url" >> "$GITHUB_OUTPUT"
 
+      - name: Validate API preview comment app configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for name in POCKET_TRASH_API_PREVIEW_APP_CLIENT_ID POCKET_TRASH_API_PREVIEW_APP_PRIVATE_KEY; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "$name is required." >&2
+              exit 1
+            fi
+          done
+
+      - name: Create API preview comment app token
+        id: api-preview-comment-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ env.POCKET_TRASH_API_PREVIEW_APP_CLIENT_ID }}
+          private-key: ${{ env.POCKET_TRASH_API_PREVIEW_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-issues: write
+          permission-pull-requests: write
+
       - name: Comment on API preview
         uses: actions/github-script@v8
         env:
           API_PREVIEW_URL: ${{ steps.api_preview.outputs.url }}
         with:
+          github-token: ${{ steps.api-preview-comment-token.outputs.token }}
           script: |
             const marker = process.env.API_PREVIEW_COMMENT_MARKER;
             const previewUrl = process.env.API_PREVIEW_URL;
