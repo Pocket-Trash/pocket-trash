@@ -169,6 +169,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build API workspace dependencies
+        run: pnpm turbo run build --filter=@app/api
+
       - name: Validate API preview configuration
         shell: bash
         run: |
@@ -809,6 +812,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build API workspace dependencies
+        run: pnpm turbo run build --filter=@app/api
 
       - name: Validate API production configuration
         shell: bash
