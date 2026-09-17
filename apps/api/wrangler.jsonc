@@ -24,6 +24,9 @@
       "custom_domain": true
     }
   ],
+  "triggers": {
+    "crons": ["15 * * * *"]
+  },
   "vars": {
     "APP_ENV": "production"
   },
@@ -32,6 +35,9 @@
       "name": "pocket-trash-api-preview",
       "preview_urls": true,
       "routes": [],
+      "triggers": {
+        "crons": []
+      },
       "workers_dev": false,
       "vars": {
         "APP_ENV": "preview"

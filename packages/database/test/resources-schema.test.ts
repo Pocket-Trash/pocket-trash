@@ -8,6 +8,8 @@ import {
   resourceNotifications,
   resources,
   resourcesToCategories,
+  resourceUploadFiles,
+  resourceUploadSessions,
   resourceVersions,
 } from "../src/schema/resources.js";
 
@@ -53,5 +55,18 @@ describe("resource schema", () => {
     expect(resourceNotifications.uploaderClerkId.notNull).toBe(true);
     expect(resourceNotifications.readAt.notNull).toBe(false);
     expect(resourceNotifications.readByClerkId.notNull).toBe(false);
+  });
+
+  it("tracks expiring upload sessions and their declared files", () => {
+    expect(getTableName(resourceUploadSessions)).toBe(
+      "resource_upload_sessions",
+    );
+    expect(resourceUploadSessions.uploaderClerkId.notNull).toBe(true);
+    expect(resourceUploadSessions.expiresAt.notNull).toBe(true);
+    expect(resourceUploadSessions.completedAt.notNull).toBe(false);
+
+    expect(getTableName(resourceUploadFiles)).toBe("resource_upload_files");
+    expect(resourceUploadFiles.sessionId.notNull).toBe(true);
+    expect(resourceUploadFiles.uploadedAt.notNull).toBe(false);
   });
 });

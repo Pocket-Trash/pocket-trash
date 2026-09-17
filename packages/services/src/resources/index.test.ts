@@ -60,6 +60,7 @@ describe("resources service", () => {
   it("creates one resource notification and one per newly created category", async () => {
     const execute = vi.fn().mockResolvedValue({ rows: [{ id: 1000 }] });
     const storage: ResourceStorage = {
+      createUploadTarget: vi.fn(),
       delete: vi.fn(),
       upload: async (input) => ({
         ...input,
@@ -68,6 +69,7 @@ describe("resources service", () => {
         url: "https://cdn.example.test/dev/resource.stl",
       }),
       uploadPreview: vi.fn(),
+      uploadStream: vi.fn(),
     };
     const service = createResourcesService(
       { execute } as unknown as Database,
@@ -106,6 +108,7 @@ describe("resources service", () => {
       .mockRejectedValue(new Error("database unavailable"));
     const deleted: string[] = [];
     const storage: ResourceStorage = {
+      createUploadTarget: vi.fn(),
       async delete(objectPath) {
         deleted.push(objectPath);
         return "deleted";
@@ -126,6 +129,7 @@ describe("resources service", () => {
           url: "https://cdn.example.test/dev/preview.webp",
         };
       },
+      uploadStream: vi.fn(),
     };
     const service = createResourcesService(
       { execute } as unknown as Database,
@@ -568,6 +572,7 @@ describe("resources service", () => {
       rows: [{ id: 1002, version: 2 }],
     });
     const storage: ResourceStorage = {
+      createUploadTarget: vi.fn(),
       delete: vi.fn(),
       upload: async (input) => ({
         ...input,
@@ -576,6 +581,7 @@ describe("resources service", () => {
         url: "https://cdn.example.test/dev/version-2.stl",
       }),
       uploadPreview: vi.fn(),
+      uploadStream: vi.fn(),
     };
     const db = {
       execute,
@@ -615,6 +621,7 @@ describe("resources service", () => {
     const deleted: string[] = [];
     const execute = vi.fn().mockResolvedValue({ rows: [{ id: 1000 }] });
     const storage: ResourceStorage = {
+      createUploadTarget: vi.fn(),
       async delete(objectPath) {
         deleted.push(objectPath);
         return "deleted";
@@ -628,6 +635,7 @@ describe("resources service", () => {
           url: "https://cdn.example.test/dev/new-preview.webp",
         };
       },
+      uploadStream: vi.fn(),
     };
     const db = {
       execute,

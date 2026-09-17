@@ -21,6 +21,7 @@ export function applyWebClientEnvAliases(env: MutableEnv = process.env) {
   const logDeploymentId = envValue(env, "LOG_DEPLOYMENT_ID");
   const logDeploymentTarget = envValue(env, "LOG_DEPLOYMENT_TARGET");
   const logProxyClientKey = envValue(env, "LOG_PROXY_CLIENT_KEY");
+  const resourceApiBaseUrl = envValue(env, "RESOURCE_API_BASE_URL");
 
   if (
     envValue(env, "VITE_ASSET_FOLDER_PREFIX") === undefined &&
@@ -56,6 +57,13 @@ export function applyWebClientEnvAliases(env: MutableEnv = process.env) {
   ) {
     env.VITE_LOG_PROXY_CLIENT_KEY = logProxyClientKey;
   }
+
+  if (
+    envValue(env, "VITE_RESOURCE_API_BASE_URL") === undefined &&
+    resourceApiBaseUrl !== undefined
+  ) {
+    env.VITE_RESOURCE_API_BASE_URL = resourceApiBaseUrl;
+  }
 }
 
 export default defineConfig(async ({ mode }) => {
@@ -73,6 +81,7 @@ export default defineConfig(async ({ mode }) => {
       VITE_LOG_DEPLOYMENT_ID: process.env.VITE_LOG_DEPLOYMENT_ID,
       VITE_LOG_DEPLOYMENT_TARGET: process.env.VITE_LOG_DEPLOYMENT_TARGET,
       VITE_LOG_PROXY_CLIENT_KEY: process.env.VITE_LOG_PROXY_CLIENT_KEY,
+      VITE_RESOURCE_API_BASE_URL: process.env.VITE_RESOURCE_API_BASE_URL,
     });
     createWebServerEnv({
       ASSET_FOLDER_PREFIX: process.env.ASSET_FOLDER_PREFIX,

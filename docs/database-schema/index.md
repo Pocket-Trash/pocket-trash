@@ -14,6 +14,8 @@ Generated schema documentation for committed Drizzle tables.
 - [`resource_downloads`](./resource-downloads.md)
 - [`resource_files`](./resource-files.md)
 - [`resource_notifications`](./resource-notifications.md)
+- [`resource_upload_files`](./resource-upload-files.md)
+- [`resource_upload_sessions`](./resource-upload-sessions.md)
 - [`resource_versions`](./resource-versions.md)
 - [`resources`](./resources.md)
 - [`resources_to_categories`](./resources-to-categories.md)

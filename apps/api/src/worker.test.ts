@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker, {
   ApiEnvValidationError,
+  handleWorkerScheduled,
+  isAllowedWebOrigin,
   validateApiBindings,
+  validateResourceUploadBindings,
 } from "./worker.js";
 
 describe("api worker", () => {
@@ -33,6 +36,49 @@ describe("api worker", () => {
     ).toThrow(
       new ApiEnvValidationError(["LOG_LEVEL", "LOGGER", "AXIOM_DATASET"]),
     );
+  });
+
+  it("validates upload bindings and environment-specific web origins", () => {
+    expect(() =>
+      validateResourceUploadBindings({ APP_ENV: "production" }),
+    ).toThrow(
+      new ApiEnvValidationError([
+        "CLERK_SECRET_KEY",
+        "DATABASE_URL",
+        "RESOURCE_CDN_BASE_URL",
+        "RESOURCE_FOLDER_PREFIX",
+        "RESOURCE_STORAGE_ACCESS_KEY",
+        "RESOURCE_STORAGE_ENDPOINT",
+        "RESOURCE_STORAGE_ZONE_NAME",
+      ]),
+    );
+    expect(isAllowedWebOrigin("http://localhost:4005", "development")).toBe(
+      true,
+    );
+    expect(
+      isAllowedWebOrigin(
+        "https://pocket-trash-git-pr-12.vercel.app",
+        "preview",
+      ),
+    ).toBe(true);
+    expect(isAllowedWebOrigin("https://pocket-trash.app", "production")).toBe(
+      true,
+    );
+    expect(isAllowedWebOrigin("https://attacker.example", "production")).toBe(
+      false,
+    );
+  });
+
+  it("does not schedule expired-session cleanup outside production", async () => {
+    const waitUntil = vi.fn();
+
+    await handleWorkerScheduled(
+      { cron: "15 * * * *", scheduledTime: 0 } as ScheduledController,
+      { APP_ENV: "preview" },
+      { waitUntil } as unknown as ExecutionContext,
+    );
+
+    expect(waitUntil).not.toHaveBeenCalled();
   });
 
   it("returns 500 and logs Worker errors", async () => {

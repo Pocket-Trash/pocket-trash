@@ -2,7 +2,8 @@
   "extends": "@package/tsconfig/node.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "types": ["node", "@cloudflare/workers-types"]
   },
   "include": ["src"]
 }

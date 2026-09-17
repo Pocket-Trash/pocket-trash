@@ -148,6 +148,13 @@
       "when": 1789606707814,
       "tag": "0020_same_iron_fist",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1789608324429,
+      "tag": "0021_nice_leopardon",
+      "breakpoints": true
     }
   ]
 }

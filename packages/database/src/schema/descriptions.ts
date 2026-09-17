@@ -20,6 +20,13 @@ export const schemaDescriptions = {
     description:
       "Admin review events created for new resources and categories.",
   },
+  resource_upload_files: {
+    description:
+      "Declared files and upload state for resumable resource upload sessions.",
+  },
+  resource_upload_sessions: {
+    description: "Authenticated resource creation and version upload sessions.",
+  },
   resource_versions: {
     description: "Immutable uploaded file versions for resources.",
   },

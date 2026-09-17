@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import {
   formatTranslation,
   type TranslationKey,
@@ -10,12 +11,18 @@ import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createResource, listResourceCategories } from "@/lib/resources";
+import {
+  getResourceUploadErrorTranslation,
+  uploadResourceSession,
+  validateResourceUpload,
+} from "@/lib/resource-upload-sessions";
+import { listResourceCategories } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
 type Category = Awaited<ReturnType<typeof listResourceCategories>>[number];
 
 export function ResourceUploadPage() {
+  const { getToken } = useAuth();
   const { locale } = useLocale();
   const navigate = useNavigate();
   const categoryListId = useId();
@@ -27,6 +34,7 @@ export function ResourceUploadPage() {
   const [categoryQuery, setCategoryQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState("");
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -73,20 +81,53 @@ export function ResourceUploadPage() {
               return;
             }
 
+            const formData = new FormData(event.currentTarget);
+            const files = formData
+              .getAll("files")
+              .filter((file): file is File => file instanceof File);
+            const previewValue = formData.get("preview");
+            const preview =
+              previewValue instanceof File && previewValue.size > 0
+                ? previewValue
+                : undefined;
+            const validation = validateResourceUpload(files, preview);
+            if (validation) {
+              toast.error(t(validation.key, validation.params));
+              return;
+            }
+
             setSubmitting(true);
+            setUploadStatus("");
             try {
-              const result = await createResource({
-                data: new FormData(event.currentTarget),
+              const result = await uploadResourceSession({
+                categories: selectedCategories,
+                description: String(formData.get("description") ?? ""),
+                files,
+                getToken,
+                name: String(formData.get("name") ?? ""),
+                onProgress: (filename, percent) =>
+                  setUploadStatus(
+                    t("web.resources.upload.progress", { filename, percent }),
+                  ),
+                onStage: (stage) => {
+                  if (stage === "complete") {
+                    setUploadStatus(t("web.resources.upload.finalizing"));
+                  }
+                },
+                operation: "create",
+                preview,
               });
               toast.success(t("web.resources.upload.success"));
               await navigate({
-                params: { resourceId: String(result.id) },
+                params: { resourceId: String(result.resourceId) },
                 to: "/resources/$resourceId",
               });
-            } catch {
-              toast.error(t("web.resources.error.saveFailed"));
+            } catch (error) {
+              const message = getResourceUploadErrorTranslation(error);
+              toast.error(t(message.key, message.params));
             } finally {
               setSubmitting(false);
+              setUploadStatus("");
             }
           }}
         >
@@ -123,9 +164,9 @@ export function ResourceUploadPage() {
 
           <Field
             description={t("web.resources.upload.fileHelp", {
-              maxFileSize: "4 MiB",
+              maxFileSize: "20 MiB",
               maxFiles: 10,
-              maxSessionSize: "40 MiB",
+              maxSessionSize: "50 MiB",
             })}
             htmlFor="resource-file"
             label={t("web.resources.upload.filesLabel")}
@@ -236,6 +277,9 @@ export function ResourceUploadPage() {
           <Button disabled={submitting} type="submit">
             {t("web.resources.action.upload")}
           </Button>
+          <p aria-live="polite" className="m-0 text-sm text-muted-foreground">
+            {uploadStatus}
+          </p>
         </form>
       </main>
     </AppShell>

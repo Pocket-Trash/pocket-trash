@@ -30,6 +30,7 @@
         "PORT",
         "RESOURCE_CDN_BASE_URL",
         "RESOURCE_FOLDER_PREFIX",
+        "RESOURCE_API_BASE_URL",
         "RESOURCE_STORAGE_ACCESS_KEY",
         "RESOURCE_STORAGE_ENDPOINT",
         "RESOURCE_STORAGE_ZONE_NAME",
@@ -42,7 +43,8 @@
         "VITE_CLERK_SIGN_IN_URL",
         "VITE_CLERK_SIGN_UP_URL",
         "VITE_LOG_PROXY_CLIENT_KEY",
-        "VITE_LOG_PROXY_URL"
+        "VITE_LOG_PROXY_URL",
+        "VITE_RESOURCE_API_BASE_URL"
       ],
       "outputs": ["dist/**", "build/**", ".output/**", ".vercel/output/**"]
     },
@@ -64,6 +66,7 @@
         "PORT",
         "RESOURCE_CDN_BASE_URL",
         "RESOURCE_FOLDER_PREFIX",
+        "RESOURCE_API_BASE_URL",
         "RESOURCE_STORAGE_ACCESS_KEY",
         "RESOURCE_STORAGE_ENDPOINT",
         "RESOURCE_STORAGE_ZONE_NAME",
@@ -76,7 +79,8 @@
         "VITE_CLERK_SIGN_IN_URL",
         "VITE_CLERK_SIGN_UP_URL",
         "VITE_LOG_PROXY_CLIENT_KEY",
-        "VITE_LOG_PROXY_URL"
+        "VITE_LOG_PROXY_URL",
+        "VITE_RESOURCE_API_BASE_URL"
       ],
       "outputs": ["dist/**", "build/**", ".output/**", ".vercel/output/**"]
     },

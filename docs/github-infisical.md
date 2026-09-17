@@ -31,6 +31,7 @@ logger, and Discord jobs. Use `prod` for release and manual main deploy jobs.
 | `BUNNY_STORAGE_ACCESS_KEY` | Required | Required |
 | `BUNNY_STORAGE_ENDPOINT` | Required | Required |
 | `BUNNY_STORAGE_ZONE_NAME` | Required | Required |
+| `CLERK_SECRET_KEY` | Required | Required |
 | `RESOURCE_CDN_BASE_URL` | Required | Required |
 | `RESOURCE_STORAGE_ACCESS_KEY` | Required | Required |
 | `RESOURCE_STORAGE_ENDPOINT` | Required | Required |
@@ -49,6 +50,11 @@ logger, and Discord jobs. Use `prod` for release and manual main deploy jobs.
 | `VERCEL_PROJECT_ID` | Required | Required |
 | `VERCEL_ORG_ID` | Required | Required |
 | `VERCEL_TOKEN` | Required | Required |
+
+The API deployment resolves `DATABASE_URL` from the matching Neon branch rather
+than storing it in `tools/github/secrets`. Preview deployments pass their Worker
+URL to the matching Vercel branch as `RESOURCE_API_BASE_URL`; production uses
+`https://api.pocket-trash.app` in the Vercel production environment.
 
 ## Machine Identity
 

@@ -4,14 +4,19 @@ import {
   type LogEvent,
   loggerValues,
 } from "@package/logger";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   apiDocsPath,
   createApp,
   healthPath,
   logsPath,
   openApiJsonPath,
+  resourceUploadSessionsPath,
 } from "./app.js";
+import {
+  ResourceUploadSessionError,
+  type ResourceUploadSessionsService,
+} from "./resource-upload-sessions.js";
 
 describe("api", () => {
   it("serves only the restored API shell", async () => {
@@ -32,6 +37,7 @@ describe("api", () => {
     };
     expect(document.paths).toHaveProperty(healthPath);
     expect(document.paths).toHaveProperty(logsPath);
+    expect(document.paths).toHaveProperty(resourceUploadSessionsPath);
 
     for (const path of [
       "/",
@@ -113,4 +119,129 @@ describe("api", () => {
       }),
     ).resolves.toMatchObject({ status: 400 });
   });
+
+  it("authenticates session creation and streams each declared file", async () => {
+    const service = createResourceUploadServiceMock();
+    const app = createApp({
+      resourceUploadRuntime: {
+        authenticate: async () => "user_123",
+        isAllowedOrigin: (origin) => origin === "https://preview.vercel.app",
+        service,
+      },
+    });
+    const sessionResponse = await app.request(resourceUploadSessionsPath, {
+      body: JSON.stringify({
+        categories: ["Tools"],
+        description: "Description",
+        files: [
+          {
+            contentType: "application/octet-stream",
+            fileName: "tool.stl",
+            size: 3,
+          },
+        ],
+        name: "Tool",
+        operation: "create",
+      }),
+      headers: {
+        "content-type": "application/json",
+        origin: "https://preview.vercel.app",
+      },
+      method: "POST",
+    });
+
+    expect(sessionResponse.status).toBe(201);
+    expect(sessionResponse.headers.get("access-control-allow-origin")).toBe(
+      "https://preview.vercel.app",
+    );
+    expect(service.create).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Tool", operation: "create" }),
+      "user_123",
+    );
+
+    const uploadRequest = new Request(
+      `https://api.example.test${resourceUploadSessionsPath}/00000000-0000-4000-8000-000000000001/files/00000000-0000-4000-8000-000000000002`,
+      {
+        body: new Uint8Array([1, 2, 3]),
+        headers: {
+          "content-length": "3",
+          "content-type": "application/octet-stream",
+        },
+        method: "PUT",
+      },
+    );
+    const uploadResponse = await app.request(uploadRequest);
+
+    expect(uploadResponse.status).toBe(204);
+    expect(service.upload).toHaveBeenCalledWith(
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000002",
+      "user_123",
+      uploadRequest,
+    );
+  });
+
+  it("rejects unauthenticated resource upload sessions", async () => {
+    const app = createApp({
+      resourceUploadRuntime: {
+        authenticate: async () => null,
+        isAllowedOrigin: () => true,
+        service: createResourceUploadServiceMock(),
+      },
+    });
+
+    const response = await app.request(resourceUploadSessionsPath, {
+      body: "{}",
+      method: "POST",
+    });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "unauthorized" });
+  });
+
+  it("uses the authenticated owner and returns stable completion errors", async () => {
+    const service = createResourceUploadServiceMock();
+    service.complete.mockRejectedValue(
+      new ResourceUploadSessionError("uploads_incomplete", 409),
+    );
+    const app = createApp({
+      resourceUploadRuntime: {
+        authenticate: async () => "user_123",
+        isAllowedOrigin: () => true,
+        service,
+      },
+    });
+
+    const response = await app.request(
+      `${resourceUploadSessionsPath}/session-id/complete`,
+      { method: "POST" },
+    );
+
+    expect(service.complete).toHaveBeenCalledWith("session-id", "user_123");
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "uploads_incomplete",
+    });
+  });
 });
+
+function createResourceUploadServiceMock() {
+  return {
+    cleanupExpired: vi.fn(async () => 0),
+    complete: vi.fn(async () => ({ resourceId: 1000, version: 1 })),
+    create: vi.fn(async () => ({
+      expiresAt: "2026-09-17T01:00:00.000Z",
+      id: "00000000-0000-4000-8000-000000000001",
+      uploads: [
+        {
+          contentType: "application/octet-stream",
+          fileName: "tool.stl",
+          id: "00000000-0000-4000-8000-000000000002",
+          kind: "resource" as const,
+          size: 3,
+        },
+      ],
+    })),
+    upload: vi.fn(async () => {}),
+  } satisfies ResourceUploadSessionsService;
+}

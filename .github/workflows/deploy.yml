@@ -174,7 +174,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for name in AXIOM_DATASET AXIOM_TOKEN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN LOG_PROXY_CLIENT_KEY; do
+          for name in AXIOM_DATASET AXIOM_TOKEN CLERK_SECRET_KEY CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN LOG_PROXY_CLIENT_KEY RESOURCE_CDN_BASE_URL RESOURCE_STORAGE_ACCESS_KEY RESOURCE_STORAGE_ENDPOINT RESOURCE_STORAGE_ZONE_NAME; do
             if [[ -z "${!name:-}" ]]; then
               echo "$name is required." >&2
               exit 1
@@ -186,23 +186,37 @@ jobs:
         working-directory: apps/api
         shell: bash
         env:
+          DB_CHANGING: ${{ steps.db_changes.outputs.database }}
           LOG_DEPLOYMENT_ID: pr-${{ github.event.pull_request.number }}
           PREVIEW_ALIAS: pr-${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
+
+          if [[ "$DB_CHANGING" == "true" ]]; then
+            resource_folder_prefix="resources/preview/pr-${PR_NUMBER}"
+          else
+            resource_folder_prefix="resources/preview"
+          fi
 
           api_vars=(
             --var "APP_ENV:preview"
             --var "AXIOM_DATASET:${AXIOM_DATASET}"
             --var "LOG_DEPLOYMENT_ID:${LOG_DEPLOYMENT_ID}"
             --var "LOG_DEPLOYMENT_TARGET:cloudflare-worker"
+            --var "RESOURCE_CDN_BASE_URL:${RESOURCE_CDN_BASE_URL}"
+            --var "RESOURCE_FOLDER_PREFIX:${resource_folder_prefix}"
+            --var "RESOURCE_STORAGE_ENDPOINT:${RESOURCE_STORAGE_ENDPOINT}"
+            --var "RESOURCE_STORAGE_ZONE_NAME:${RESOURCE_STORAGE_ZONE_NAME}"
           )
 
           pnpm exec wrangler deploy --env preview --keep-vars "${api_vars[@]}"
           jq -cn \
             --arg axiom_token "$AXIOM_TOKEN" \
+            --arg clerk_secret_key "$CLERK_SECRET_KEY" \
             --arg log_proxy_client_key "$LOG_PROXY_CLIENT_KEY" \
-            '{AXIOM_TOKEN: $axiom_token, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key}' | \
+            --arg resource_storage_access_key "$RESOURCE_STORAGE_ACCESS_KEY" \
+            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, RESOURCE_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
             pnpm exec wrangler secret bulk --env preview
           pnpm exec wrangler versions upload \
             --env preview \
@@ -267,6 +281,13 @@ jobs:
                 body,
               });
             }
+
+      - name: Configure Vercel branch resource API URL
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+          RESOURCE_API_BASE_URL: ${{ steps.api_preview.outputs.url }}
+        run: bash .github/scripts/vercel-branch-database-url.sh set-resource-api-base-url
 
       - name: Validate preview database configuration
         shell: bash
@@ -383,6 +404,46 @@ jobs:
         env:
           BRANCH_NAME: ${{ steps.db.outputs.branch_name }}
         run: bash .github/scripts/neon-database-branch.sh branch-url
+
+      - name: Configure API preview upload runtime
+        if: steps.db.outputs.can_deploy == 'true'
+        working-directory: apps/api
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.database_url }}
+          DB_CHANGING: ${{ steps.db_changes.outputs.database }}
+          LOG_DEPLOYMENT_ID: pr-${{ github.event.pull_request.number }}
+          PREVIEW_ALIAS: pr-${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$DB_CHANGING" == "true" ]]; then
+            resource_folder_prefix="resources/preview/pr-${PR_NUMBER}"
+          else
+            resource_folder_prefix="resources/preview"
+          fi
+
+          jq -cn \
+            --arg axiom_token "$AXIOM_TOKEN" \
+            --arg clerk_secret_key "$CLERK_SECRET_KEY" \
+            --arg database_url "$DATABASE_URL" \
+            --arg log_proxy_client_key "$LOG_PROXY_CLIENT_KEY" \
+            --arg resource_storage_access_key "$RESOURCE_STORAGE_ACCESS_KEY" \
+            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, DATABASE_URL: $database_url, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, RESOURCE_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
+            pnpm exec wrangler secret bulk --env preview
+
+          pnpm exec wrangler versions upload \
+            --env preview \
+            --preview-alias "$PREVIEW_ALIAS" \
+            --var "APP_ENV:preview" \
+            --var "AXIOM_DATASET:${AXIOM_DATASET}" \
+            --var "LOG_DEPLOYMENT_ID:${LOG_DEPLOYMENT_ID}" \
+            --var "LOG_DEPLOYMENT_TARGET:cloudflare-worker" \
+            --var "RESOURCE_CDN_BASE_URL:${RESOURCE_CDN_BASE_URL}" \
+            --var "RESOURCE_FOLDER_PREFIX:${resource_folder_prefix}" \
+            --var "RESOURCE_STORAGE_ENDPOINT:${RESOURCE_STORAGE_ENDPOINT}" \
+            --var "RESOURCE_STORAGE_ZONE_NAME:${RESOURCE_STORAGE_ZONE_NAME}"
 
       - name: Configure Railway scraper preview database and cron
         if: steps.db.outputs.can_deploy == 'true'
@@ -703,8 +764,11 @@ jobs:
           bash .github/scripts/vercel-branch-database-url.sh remove-resource-folder-prefix
           vercel_resource_status=$?
 
-          if [[ "$neon_status" -ne 0 || "$vercel_status" -ne 0 || "$vercel_image_status" -ne 0 || "$vercel_resource_status" -ne 0 ]]; then
-            echo "Preview cleanup encountered errors: neon=${neon_status}, vercel=${vercel_status}, vercel_image=${vercel_image_status}, vercel_resource=${vercel_resource_status}." >&2
+          bash .github/scripts/vercel-branch-database-url.sh remove-resource-api-base-url
+          vercel_resource_api_status=$?
+
+          if [[ "$neon_status" -ne 0 || "$vercel_status" -ne 0 || "$vercel_image_status" -ne 0 || "$vercel_resource_status" -ne 0 || "$vercel_resource_api_status" -ne 0 ]]; then
+            echo "Preview cleanup encountered errors: neon=${neon_status}, vercel=${vercel_status}, vercel_image=${vercel_image_status}, vercel_resource=${vercel_resource_status}, vercel_resource_api=${vercel_resource_api_status}." >&2
           fi
 
           exit 0
@@ -751,38 +815,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          for name in AXIOM_DATASET AXIOM_TOKEN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN LOG_PROXY_CLIENT_KEY; do
+          for name in AXIOM_DATASET AXIOM_TOKEN CLERK_SECRET_KEY CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN LOG_PROXY_CLIENT_KEY RESOURCE_CDN_BASE_URL RESOURCE_STORAGE_ACCESS_KEY RESOURCE_STORAGE_ENDPOINT RESOURCE_STORAGE_ZONE_NAME; do
             if [[ -z "${!name:-}" ]]; then
               echo "$name is required." >&2
               exit 1
             fi
           done
-
-      - name: Deploy production API
-        working-directory: apps/api
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          pnpm exec wrangler deploy --env="" --keep-vars \
-            --var "APP_ENV:production" \
-            --var "AXIOM_DATASET:${AXIOM_DATASET}" \
-            --var "LOG_DEPLOYMENT_ID:production" \
-            --var "LOG_DEPLOYMENT_TARGET:cloudflare-worker"
-          jq -cn \
-            --arg axiom_token "$AXIOM_TOKEN" \
-            --arg log_proxy_client_key "$LOG_PROXY_CLIENT_KEY" \
-            '{AXIOM_TOKEN: $axiom_token, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key}' | \
-            pnpm exec wrangler secret bulk --env=""
-
-          curl --fail --retry 5 --retry-all-errors --retry-delay 2 \
-            --silent --show-error "https://api.pocket-trash.app/api/v0/health" | \
-            jq -e '.ok == true and .service == "api"' >/dev/null
-          curl --fail --retry 5 --retry-all-errors --retry-delay 2 \
-            --silent --show-error "https://api.pocket-trash.app/api/v0/openapi.json" | \
-            jq -e '.openapi == "3.1.0"' >/dev/null
-          curl --fail --retry 5 --retry-all-errors --retry-delay 2 \
-            --silent --show-error "https://api.pocket-trash.app/api/v0/docs" >/dev/null
 
       - name: Resolve production database URL
         id: production_db
@@ -824,6 +862,41 @@ jobs:
               branchName: $branch_name,
               branchId: $branch_id
             }')"
+
+      - name: Deploy production API
+        working-directory: apps/api
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.production_db.outputs.database_url }}
+        run: |
+          set -euo pipefail
+
+          pnpm exec wrangler deploy --env="" --keep-vars \
+            --var "APP_ENV:production" \
+            --var "AXIOM_DATASET:${AXIOM_DATASET}" \
+            --var "LOG_DEPLOYMENT_ID:production" \
+            --var "LOG_DEPLOYMENT_TARGET:cloudflare-worker" \
+            --var "RESOURCE_CDN_BASE_URL:${RESOURCE_CDN_BASE_URL}" \
+            --var "RESOURCE_FOLDER_PREFIX:resources/files" \
+            --var "RESOURCE_STORAGE_ENDPOINT:${RESOURCE_STORAGE_ENDPOINT}" \
+            --var "RESOURCE_STORAGE_ZONE_NAME:${RESOURCE_STORAGE_ZONE_NAME}"
+          jq -cn \
+            --arg axiom_token "$AXIOM_TOKEN" \
+            --arg clerk_secret_key "$CLERK_SECRET_KEY" \
+            --arg database_url "$DATABASE_URL" \
+            --arg log_proxy_client_key "$LOG_PROXY_CLIENT_KEY" \
+            --arg resource_storage_access_key "$RESOURCE_STORAGE_ACCESS_KEY" \
+            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, DATABASE_URL: $database_url, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, RESOURCE_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
+            pnpm exec wrangler secret bulk --env=""
+
+          curl --fail --retry 5 --retry-all-errors --retry-delay 2 \
+            --silent --show-error "https://api.pocket-trash.app/api/v0/health" | \
+            jq -e '.ok == true and .service == "api"' >/dev/null
+          curl --fail --retry 5 --retry-all-errors --retry-delay 2 \
+            --silent --show-error "https://api.pocket-trash.app/api/v0/openapi.json" | \
+            jq -e '.openapi == "3.1.0"' >/dev/null
+          curl --fail --retry 5 --retry-all-errors --retry-delay 2 \
+            --silent --show-error "https://api.pocket-trash.app/api/v0/docs" >/dev/null
 
   railway-production:
     name: Railway Production

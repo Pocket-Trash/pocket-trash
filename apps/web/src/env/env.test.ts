@@ -21,6 +21,7 @@ describe("web client env", () => {
       VITE_LOG_DEPLOYMENT_ID: "pr-27",
       VITE_LOG_DEPLOYMENT_TARGET: "web-client",
       VITE_LOG_PROXY_CLIENT_KEY: "client-key",
+      VITE_RESOURCE_API_BASE_URL: "http://localhost:4006",
     });
 
     expect(env.VITE_CLERK_PUBLISHABLE_KEY).toBe("pk_test_example");
@@ -31,6 +32,7 @@ describe("web client env", () => {
     expect(env.VITE_LOG_DEPLOYMENT_ID).toBe("pr-27");
     expect(env.VITE_LOG_DEPLOYMENT_TARGET).toBe("web-client");
     expect(env.VITE_LOG_PROXY_CLIENT_KEY).toBe("client-key");
+    expect(env.VITE_RESOURCE_API_BASE_URL).toBe("http://localhost:4006");
   });
 
   it("rejects empty client values", () => {
@@ -39,6 +41,7 @@ describe("web client env", () => {
         VITE_CLERK_PUBLISHABLE_KEY: "",
         VITE_CLERK_SIGN_IN_URL: "/sign-in",
         VITE_CLERK_SIGN_UP_URL: "/sign-up",
+        VITE_RESOURCE_API_BASE_URL: "http://localhost:4006",
       }),
     ).toThrow("Invalid environment variables");
   });
@@ -52,6 +55,7 @@ describe("web client env aliases", () => {
       LOG_DEPLOYMENT_ID: "development",
       LOG_DEPLOYMENT_TARGET: "web-client",
       LOG_PROXY_CLIENT_KEY: "client-key",
+      RESOURCE_API_BASE_URL: "http://localhost:4006",
     };
 
     applyWebClientEnvAliases(runtimeEnv);
@@ -65,6 +69,7 @@ describe("web client env aliases", () => {
       VITE_LOG_DEPLOYMENT_ID: runtimeEnv.VITE_LOG_DEPLOYMENT_ID,
       VITE_LOG_DEPLOYMENT_TARGET: runtimeEnv.VITE_LOG_DEPLOYMENT_TARGET,
       VITE_LOG_PROXY_CLIENT_KEY: runtimeEnv.VITE_LOG_PROXY_CLIENT_KEY,
+      VITE_RESOURCE_API_BASE_URL: runtimeEnv.VITE_RESOURCE_API_BASE_URL,
     });
 
     expect(env.VITE_LOG_DEPLOYMENT_ID).toBe("development");
@@ -72,6 +77,7 @@ describe("web client env aliases", () => {
     expect(env.VITE_CDN_BASE_URL).toBe("https://cdn.pocket-trash.app");
     expect(env.VITE_LOG_DEPLOYMENT_TARGET).toBe("web-client");
     expect(env.VITE_LOG_PROXY_CLIENT_KEY).toBe("client-key");
+    expect(env.VITE_RESOURCE_API_BASE_URL).toBe("http://localhost:4006");
   });
 
   it("keeps explicit Vite logging variables over unprefixed aliases", () => {

@@ -1,14 +1,13 @@
 # Environment Variables
 
-Pocket Trash now has one user-facing runtime: `apps/web` on Vercel. The scraper
-runs separately on Railway. Browser logs are forwarded to Axiom through the web
-server at same-origin `POST /api/v0/logs`.
+Pocket Trash runs `apps/web` on Vercel, `apps/api` on Cloudflare Workers, and
+the scraper on Railway. Browser logs are forwarded to Axiom through the API.
 
 ## Local Secret Paths
 
 | Path | Used by |
 | --- | --- |
-| `/apps/web` | Web dev, build, test, and database-backed server code. |
+| `/apps/web` | Web dev/build/test, database-backed server code, and local API Worker development. |
 | `/apps/scraper` | Scraper cron and queue commands. |
 | `/local/database` | Optional developer-specific `DATABASE_URL_<INITIALS>` overrides. |
 | `/local/bunny` | Bunny account audits. |
@@ -42,7 +41,22 @@ server at same-origin `POST /api/v0/logs`.
 | `RESOURCE_STORAGE_ACCESS_KEY` | Server | Resource Storage Zone password. |
 | `RESOURCE_STORAGE_ENDPOINT` | Server | Regional Bunny Storage API origin. |
 | `RESOURCE_STORAGE_ZONE_NAME` | Server | Shared `pocket-trash-storage` Storage Zone name. |
+| `RESOURCE_API_BASE_URL` | Build/client | Aliased to `VITE_RESOURCE_API_BASE_URL` for Vite. |
+| `VITE_RESOURCE_API_BASE_URL` | Client | API origin used for resource upload sessions. |
 | `SITE_URL` | Server | Public site origin when needed. |
+
+## API
+
+| Variable | Scope | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | Secret | Neon Postgres connection string. GitHub Actions resolves the deployment-specific branch URL. |
+| `CLERK_SECRET_KEY` | Secret | Verifies Clerk bearer tokens. |
+| `RESOURCE_CDN_BASE_URL` | Worker | Public Bunny delivery origin. |
+| `RESOURCE_FOLDER_PREFIX` | Worker | Resource namespace selected for the deployment. |
+| `RESOURCE_STORAGE_ACCESS_KEY` | Secret | Bunny Storage Zone password. |
+| `RESOURCE_STORAGE_ENDPOINT` | Worker | Regional Bunny Storage API origin. |
+| `RESOURCE_STORAGE_ZONE_NAME` | Worker | Shared `pocket-trash-storage` Storage Zone name. |
+| `AXIOM_TOKEN`, `AXIOM_DATASET`, `AXIOM_EDGE_DOMAIN`, `LOG_LEVEL`, `LOGGER` | Worker | Shared logger configuration. |
 
 ## Scraper
 

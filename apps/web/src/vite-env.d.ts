@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_LOG_DEPLOYMENT_ID?: string;
   readonly VITE_LOG_DEPLOYMENT_TARGET?: string;
   readonly VITE_LOG_PROXY_CLIENT_KEY?: string;
+  readonly VITE_RESOURCE_API_BASE_URL?: string;
 }
 
 interface ImportMeta {

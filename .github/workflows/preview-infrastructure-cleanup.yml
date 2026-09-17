@@ -77,6 +77,12 @@ jobs:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
         run: bash .github/scripts/vercel-branch-database-url.sh remove-resource-folder-prefix
 
+      - name: Remove Vercel branch resource API URL
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: bash .github/scripts/vercel-branch-database-url.sh remove-resource-api-base-url
+
       - name: Delete image PR preview folder
         id: image_cleanup
         env:

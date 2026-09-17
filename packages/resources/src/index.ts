@@ -31,10 +31,31 @@ export type ResourceUploadResult = {
   url: string;
 };
 
+export type ResourceUploadMetadata = {
+  contentType: string;
+  fileName: string;
+  size: number;
+};
+
+export type ResourceUploadTarget = ResourceUploadMetadata & {
+  objectPath: string;
+  url: string;
+};
+
 export type ResourceDeleteResult = "deleted" | "missing";
 
 export type ResourceStorage = {
+  createUploadTarget(
+    input: ResourceUploadMetadata,
+    kind?: "preview" | "resource",
+  ): ResourceUploadTarget;
   delete(objectPath: string): Promise<ResourceDeleteResult>;
+  uploadStream(input: {
+    body: ReadableStream;
+    contentLength: number;
+    contentType: string;
+    objectPath: string;
+  }): Promise<void>;
   upload(input: ResourceUploadInput): Promise<ResourceUploadResult>;
   uploadPreview(input: ResourceUploadInput): Promise<ResourceUploadResult>;
 };
@@ -54,7 +75,9 @@ type BunnyObject = {
   ObjectName?: string;
 };
 
-const maxResourceBytes = 4 * 1024 * 1024;
+export const maxBufferedResourceBytes = 4 * 1024 * 1024;
+export const maxSessionFileBytes = 20 * 1024 * 1024;
+export const maxSessionBytes = 50 * 1024 * 1024;
 const allowedMimeTypes = {
   ".3mf": ["application/vnd.ms-package.3dmanufacturing-3dmodel+xml"],
   ".pdf": ["application/pdf"],
@@ -96,6 +119,20 @@ export function createResourceStorage(
   const config = readConfig(input);
 
   return {
+    createUploadTarget(metadata, kind = "resource") {
+      const extension = validateUploadMetadata(
+        metadata,
+        kind === "preview" ? allowedPreviewMimeTypes : allowedMimeTypes,
+        maxSessionFileBytes,
+      );
+      const objectPath = `${config.folderPrefix}/${config.randomUUID()}${extension}`;
+
+      return {
+        ...metadata,
+        objectPath,
+        url: buildUrl(config.cdnBaseUrl, objectPath),
+      };
+    },
     async delete(objectPath) {
       const normalizedPath = normalizeObjectPath(objectPath);
 
@@ -111,6 +148,24 @@ export function createResourceStorage(
       });
 
       return response.status === 404 ? "missing" : "deleted";
+    },
+    async uploadStream({ body, contentLength, contentType, objectPath }) {
+      const normalizedPath = normalizeObjectPath(objectPath);
+      if (!normalizedPath.startsWith(`${config.folderPrefix}/`)) {
+        throw new Error(
+          "Resource object path is outside the configured namespace.",
+        );
+      }
+
+      await bunnyRequest(config, normalizedPath, {
+        body,
+        expectedStatuses: [200, 201],
+        headers: {
+          "content-length": String(contentLength),
+          "content-type": contentType,
+        },
+        method: "PUT",
+      });
     },
     async upload(input) {
       return upload(config, input, allowedMimeTypes);
@@ -139,7 +194,11 @@ async function upload(
   input: ResourceUploadInput,
   allowedTypes: Readonly<Record<string, readonly string[]>>,
 ): Promise<ResourceUploadResult> {
-  const extension = validateUpload(input, allowedTypes);
+  const extension = validateUploadMetadata(
+    { ...input, size: input.bytes.byteLength },
+    allowedTypes,
+    maxBufferedResourceBytes,
+  );
   const objectPath = `${config.folderPrefix}/${config.randomUUID()}${extension}`;
   await bunnyRequest(config, objectPath, {
     body: Uint8Array.from(input.bytes),
@@ -157,16 +216,17 @@ async function upload(
   };
 }
 
-function validateUpload(
-  input: ResourceUploadInput,
+export function validateUploadMetadata(
+  input: ResourceUploadMetadata,
   allowedTypes: Readonly<Record<string, readonly string[]>>,
+  maxBytes: number,
 ): string {
-  if (input.bytes.byteLength === 0) {
+  if (!Number.isSafeInteger(input.size) || input.size <= 0) {
     throw new Error("Resource files cannot be empty.");
   }
 
-  if (input.bytes.byteLength > maxResourceBytes) {
-    throw new Error("Resource files cannot exceed 4 MiB.");
+  if (input.size > maxBytes) {
+    throw new Error("Resource file exceeds the configured size limit.");
   }
 
   if (

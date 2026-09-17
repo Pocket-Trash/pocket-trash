@@ -43,6 +43,21 @@ describe("parseCliArguments", () => {
 });
 
 describe("buildInfisicalRunArgs", () => {
+  it("builds API dev args with web secrets and the database override", () => {
+    const args = buildInfisicalRunArgs({
+      app: "api",
+      command: "dev",
+      commandArgs: ["wrangler", "dev", "--port", "4006"],
+      repoRoot: "/repo",
+    });
+
+    expect(getEnvAliasRunnerOptions(args)).toMatchObject({
+      databaseUrlUserOverride: true,
+      databaseUrlUserOverridePath: "/local/database",
+      secretPaths: ["/apps/web"],
+    });
+  });
+
   it.each([
     ["cron:run"],
     ["process:dead-letter"],

@@ -10,6 +10,7 @@ export type WebClientRuntimeEnv = {
   VITE_LOG_DEPLOYMENT_ID?: string;
   VITE_LOG_DEPLOYMENT_TARGET?: string;
   VITE_LOG_PROXY_CLIENT_KEY?: string;
+  VITE_RESOURCE_API_BASE_URL?: string;
 };
 
 export function createWebClientEnv(runtimeEnv: WebClientRuntimeEnv) {
@@ -23,6 +24,7 @@ export function createWebClientEnv(runtimeEnv: WebClientRuntimeEnv) {
       VITE_LOG_DEPLOYMENT_ID: z.string().min(1).optional(),
       VITE_LOG_DEPLOYMENT_TARGET: z.string().min(1).optional(),
       VITE_LOG_PROXY_CLIENT_KEY: z.string().min(1).optional(),
+      VITE_RESOURCE_API_BASE_URL: z.string().url(),
     },
     clientPrefix: "VITE_",
     emptyStringAsUndefined: true,
@@ -35,6 +37,7 @@ export function createWebClientEnv(runtimeEnv: WebClientRuntimeEnv) {
       VITE_LOG_DEPLOYMENT_ID: runtimeEnv.VITE_LOG_DEPLOYMENT_ID,
       VITE_LOG_DEPLOYMENT_TARGET: runtimeEnv.VITE_LOG_DEPLOYMENT_TARGET,
       VITE_LOG_PROXY_CLIENT_KEY: runtimeEnv.VITE_LOG_PROXY_CLIENT_KEY,
+      VITE_RESOURCE_API_BASE_URL: runtimeEnv.VITE_RESOURCE_API_BASE_URL,
     },
   });
 }

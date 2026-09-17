@@ -66,6 +66,48 @@ describe("resource storage", () => {
     });
   });
 
+  it("creates a server-owned target and streams a fixed-length body", async () => {
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3]));
+        controller.close();
+      },
+    });
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      expect(toUrl(input).pathname).toBe(
+        "/pocket-trash-storage/resources/dev/00000000-0000-4000-8000-000000000001.stl",
+      );
+      expect(init).toMatchObject({
+        body,
+        headers: {
+          AccessKey: "storage-key",
+          "content-length": "3",
+          "content-type": "application/octet-stream",
+        },
+        method: "PUT",
+      });
+      return new Response(null, { status: 201 });
+    });
+    const storage = createResourceStorage({ ...config, fetch: fetchMock });
+    const target = storage.createUploadTarget({
+      contentType: "application/octet-stream",
+      fileName: "clip.stl",
+      size: 3,
+    });
+
+    expect(target.objectPath).toBe(
+      "resources/dev/00000000-0000-4000-8000-000000000001.stl",
+    );
+    await expect(
+      storage.uploadStream({
+        body,
+        contentLength: 3,
+        contentType: target.contentType,
+        objectPath: target.objectPath,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it("uploads an optional preview image through a separate allowlist", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       expect(toUrl(input).pathname).toBe(
@@ -106,7 +148,7 @@ describe("resource storage", () => {
         contentType: "model/stl",
         fileName: "clip.stl",
       }),
-    ).rejects.toThrow("Resource files cannot exceed 4 MiB.");
+    ).rejects.toThrow("Resource file exceeds the configured size limit.");
     await expect(
       storage.upload({
         bytes: new Uint8Array([1]),

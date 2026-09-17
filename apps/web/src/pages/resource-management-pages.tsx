@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import {
   formatTranslation,
   type TranslationKey,
@@ -10,12 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserPageShell } from "@/components/user-page-shell";
-import type { getResourceDetail, listOwnedResources } from "@/lib/resources";
 import {
-  listResourceCategories,
-  updateResource,
-  uploadResourceVersion,
-} from "@/lib/resources";
+  getResourceUploadErrorTranslation,
+  uploadResourceSession,
+  validateResourceUpload,
+} from "@/lib/resource-upload-sessions";
+import type { getResourceDetail, listOwnedResources } from "@/lib/resources";
+import { listResourceCategories, updateResource } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
 type OwnedResource = Awaited<ReturnType<typeof listOwnedResources>>[number];
@@ -332,9 +334,11 @@ export function ResourceVersionUploadPage({
 }: {
   detail: ResourceDetail;
 }) {
+  const { getToken } = useAuth();
   const { locale } = useLocale();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState("");
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -348,10 +352,33 @@ export function ResourceVersionUploadPage({
         className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
         onSubmit={async (event) => {
           event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          const files = formData
+            .getAll("files")
+            .filter((file): file is File => file instanceof File);
+          const validation = validateResourceUpload(files);
+          if (validation) {
+            toast.error(t(validation.key, validation.params));
+            return;
+          }
+
           setSubmitting(true);
+          setUploadStatus("");
           try {
-            const result = await uploadResourceVersion({
-              data: new FormData(event.currentTarget),
+            const result = await uploadResourceSession({
+              files,
+              getToken,
+              onProgress: (filename, percent) =>
+                setUploadStatus(
+                  t("web.resources.upload.progress", { filename, percent }),
+                ),
+              onStage: (stage) => {
+                if (stage === "complete") {
+                  setUploadStatus(t("web.resources.upload.finalizing"));
+                }
+              },
+              operation: "version",
+              resourceId: detail.id,
             });
             toast.success(
               t("web.resources.upload.versionSuccess", {
@@ -362,9 +389,11 @@ export function ResourceVersionUploadPage({
               params: { resourceId: String(detail.id) },
               to: "/resources/$resourceId",
             });
-          } catch {
-            toast.error(t("web.resources.error.saveFailed"));
+          } catch (error) {
+            const message = getResourceUploadErrorTranslation(error);
+            toast.error(t(message.key, message.params));
             setSubmitting(false);
+            setUploadStatus("");
           }
         }}
       >
@@ -377,8 +406,8 @@ export function ResourceVersionUploadPage({
           <span className="text-xs font-normal text-muted-foreground">
             {t("web.resources.upload.fileHelp", {
               maxFiles: 10,
-              maxFileSize: "4 MiB",
-              maxSessionSize: "40 MiB",
+              maxFileSize: "20 MiB",
+              maxSessionSize: "50 MiB",
             })}
           </span>
           <Input
@@ -395,6 +424,9 @@ export function ResourceVersionUploadPage({
           <FileUp />
           {t("web.resources.action.uploadNewVersion")}
         </Button>
+        <p aria-live="polite" className="m-0 text-sm text-muted-foreground">
+          {uploadStatus}
+        </p>
       </form>
     </UserPageShell>
   );

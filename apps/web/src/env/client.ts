@@ -9,4 +9,5 @@ export const clientEnv = createWebClientEnv({
   VITE_LOG_DEPLOYMENT_ID: import.meta.env.VITE_LOG_DEPLOYMENT_ID,
   VITE_LOG_DEPLOYMENT_TARGET: import.meta.env.VITE_LOG_DEPLOYMENT_TARGET,
   VITE_LOG_PROXY_CLIENT_KEY: import.meta.env.VITE_LOG_PROXY_CLIENT_KEY,
+  VITE_RESOURCE_API_BASE_URL: import.meta.env.VITE_RESOURCE_API_BASE_URL,
 });

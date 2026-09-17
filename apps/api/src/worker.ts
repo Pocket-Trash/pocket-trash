@@ -1,3 +1,5 @@
+import { verifyToken } from "@clerk/backend";
+import { createDb } from "@package/database";
 import {
   createAxiomTransport,
   createConsoleTransport,
@@ -8,7 +10,9 @@ import {
   normalizeConsoleTransportMode,
   normalizeLogLevel,
 } from "@package/logger";
+import { createResourceStorage } from "@package/resources";
 import { type ApiBindings, createApp } from "./app.js";
+import { createResourceUploadSessionsService } from "./resource-upload-sessions.js";
 
 const app = createApp({
   getRuntimeConfig(bindings) {
@@ -17,6 +21,27 @@ const app = createApp({
     return {
       clientLogKey: bindings.LOG_PROXY_CLIENT_KEY,
       logger: createApiLogger(bindings),
+    };
+  },
+  getResourceUploadRuntime(bindings) {
+    validateResourceUploadBindings(bindings);
+    const service = createResourceUploadSessionsService({
+      db: createDb({ databaseUrl: bindings.DATABASE_URL as string }),
+      storage: createResourceStorage({
+        accessKey: bindings.RESOURCE_STORAGE_ACCESS_KEY,
+        cdnBaseUrl: bindings.RESOURCE_CDN_BASE_URL,
+        endpoint: bindings.RESOURCE_STORAGE_ENDPOINT,
+        folderPrefix: bindings.RESOURCE_FOLDER_PREFIX,
+        zoneName: bindings.RESOURCE_STORAGE_ZONE_NAME,
+      }),
+    });
+
+    return {
+      authenticate: (request: Request) =>
+        authenticateClerkRequest(request, bindings),
+      isAllowedOrigin: (origin: string) =>
+        isAllowedWebOrigin(origin, bindings.APP_ENV),
+      service,
     };
   },
 });
@@ -50,6 +75,23 @@ export function validateApiBindings(env: ApiBindings) {
   }
 }
 
+export function validateResourceUploadBindings(env: ApiBindings) {
+  const required = [
+    "CLERK_SECRET_KEY",
+    "DATABASE_URL",
+    "RESOURCE_CDN_BASE_URL",
+    "RESOURCE_FOLDER_PREFIX",
+    "RESOURCE_STORAGE_ACCESS_KEY",
+    "RESOURCE_STORAGE_ENDPOINT",
+    "RESOURCE_STORAGE_ZONE_NAME",
+  ] as const;
+  const invalidVariables = required.filter((name) => !env[name]?.trim());
+
+  if (invalidVariables.length > 0) {
+    throw new ApiEnvValidationError(invalidVariables);
+  }
+}
+
 app.onError(async (error, context) => {
   await logWorkerException(error, context.env, context.req.raw);
   return context.json({ error: "Internal server error." }, 500);
@@ -65,6 +107,89 @@ export async function handleWorkerFetch(
   } catch (error) {
     await logWorkerException(error, env, request);
     return Response.json({ error: "Internal server error." }, { status: 500 });
+  }
+}
+
+export async function handleWorkerScheduled(
+  _controller: ScheduledController,
+  env: ApiBindings,
+  context: ExecutionContext,
+): Promise<void> {
+  if (env.APP_ENV !== "production") return;
+
+  context.waitUntil(
+    (async () => {
+      try {
+        validateResourceUploadBindings(env);
+        await createResourceUploadSessionsService({
+          db: createDb({ databaseUrl: env.DATABASE_URL as string }),
+          storage: createResourceStorage({
+            accessKey: env.RESOURCE_STORAGE_ACCESS_KEY,
+            cdnBaseUrl: env.RESOURCE_CDN_BASE_URL,
+            endpoint: env.RESOURCE_STORAGE_ENDPOINT,
+            folderPrefix: env.RESOURCE_FOLDER_PREFIX,
+            zoneName: env.RESOURCE_STORAGE_ZONE_NAME,
+          }),
+        }).cleanupExpired();
+      } catch (error) {
+        await logWorkerException(
+          error,
+          env,
+          new Request("https://api.pocket-trash.app/__scheduled"),
+          "scheduled",
+        );
+      }
+    })(),
+  );
+}
+
+export function isAllowedWebOrigin(
+  origin: string,
+  environment = "unknown",
+): boolean {
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+
+  if (
+    environment === "development" &&
+    url.protocol === "http:" &&
+    url.hostname === "localhost"
+  ) {
+    return true;
+  }
+  if (url.protocol !== "https:") return false;
+  if (environment === "preview") return url.hostname.endsWith(".vercel.app");
+  return ["pocket-trash.app", "www.pocket-trash.app"].includes(url.hostname);
+}
+
+async function authenticateClerkRequest(
+  request: Request,
+  env: ApiBindings,
+): Promise<string | null> {
+  const authorization = request.headers.get("authorization");
+  const origin = request.headers.get("origin");
+  const token = authorization?.match(/^Bearer (.+)$/u)?.[1];
+  if (
+    !token ||
+    !origin ||
+    !env.CLERK_SECRET_KEY ||
+    !isAllowedWebOrigin(origin, env.APP_ENV)
+  ) {
+    return null;
+  }
+
+  try {
+    const payload = await verifyToken(token, {
+      authorizedParties: [origin],
+      secretKey: env.CLERK_SECRET_KEY,
+    });
+    return payload.sub;
+  } catch {
+    return null;
   }
 }
 
@@ -104,6 +229,7 @@ async function logWorkerException(
   error: unknown,
   env: ApiBindings,
   request: Request,
+  trigger = "fetch",
 ) {
   const logger = createApiLogger(env);
   logger.error(loggerMessages.api.workerUnhandledException, {
@@ -111,7 +237,7 @@ async function logWorkerException(
       method: request.method,
       path: new URL(request.url).pathname,
       source: "cloudflare-worker",
-      trigger: "fetch",
+      trigger,
     },
     error,
   });
@@ -120,4 +246,5 @@ async function logWorkerException(
 
 export default {
   fetch: handleWorkerFetch,
-};
+  scheduled: handleWorkerScheduled,
+} satisfies ExportedHandler<ApiBindings>;

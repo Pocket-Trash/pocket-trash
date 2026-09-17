@@ -7,6 +7,8 @@ import {
   resourceNotifications,
   resources,
   resourcesToCategories,
+  resourceUploadFiles,
+  resourceUploadSessions,
   resourceVersions,
 } from "./resources.js";
 import {
@@ -49,6 +51,12 @@ export const resourcesRelations = relations(resources, ({ many }) => ({
   categories: many(resourcesToCategories),
   notifications: many(resourceNotifications),
   versions: many(resourceVersions),
+  completedUploadSessions: many(resourceUploadSessions, {
+    relationName: "resourceUploadSessionCompletedResource",
+  }),
+  uploadSessions: many(resourceUploadSessions, {
+    relationName: "resourceUploadSessionTarget",
+  }),
 }));
 
 export const resourceVersionsRelations = relations(
@@ -70,6 +78,33 @@ export const resourceFilesRelations = relations(
     version: one(resourceVersions, {
       fields: [resourceFiles.versionId],
       references: [resourceVersions.id],
+    }),
+  }),
+);
+
+export const resourceUploadSessionsRelations = relations(
+  resourceUploadSessions,
+  ({ many, one }) => ({
+    files: many(resourceUploadFiles),
+    resource: one(resources, {
+      fields: [resourceUploadSessions.resourceId],
+      references: [resources.id],
+      relationName: "resourceUploadSessionTarget",
+    }),
+    completedResource: one(resources, {
+      fields: [resourceUploadSessions.completedResourceId],
+      references: [resources.id],
+      relationName: "resourceUploadSessionCompletedResource",
+    }),
+  }),
+);
+
+export const resourceUploadFilesRelations = relations(
+  resourceUploadFiles,
+  ({ one }) => ({
+    session: one(resourceUploadSessions, {
+      fields: [resourceUploadFiles.sessionId],
+      references: [resourceUploadSessions.id],
     }),
   }),
 );
