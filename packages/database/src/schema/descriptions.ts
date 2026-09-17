@@ -10,6 +10,32 @@ export type SchemaDescription = {
 };
 
 export const schemaDescriptions = {
+  resource_categories: {
+    description: "Reusable categories assigned to resources.",
+  },
+  resource_downloads: {
+    description: "Append-only download events for resource versions.",
+  },
+  resource_notifications: {
+    description:
+      "Admin review events created for new resources and categories.",
+  },
+  resource_upload_files: {
+    description:
+      "Declared files and upload state for resumable resource upload sessions.",
+  },
+  resource_upload_sessions: {
+    description: "Authenticated resource creation and version upload sessions.",
+  },
+  resource_versions: {
+    description: "Immutable uploaded file versions for resources.",
+  },
+  resources: {
+    description: "User-uploaded resources and their optional preview images.",
+  },
+  resources_to_categories: {
+    description: "Unique resource-to-category assignments.",
+  },
   makers: {
     description:
       "Canonical source makers that scraped or user-created products can belong to.",
@@ -215,16 +241,16 @@ export const schemaDescriptions = {
       image_file_id: {
         description:
           "Image storage file identifier used for updates and deletes.",
-        example: "/preview/pr-52/products/1000-1001/image.webp",
+        example: "/images/preview/pr-52/products/1000-1001/image.webp",
       },
       image_path: {
         description: "Image storage object path.",
-        example: "/preview/pr-52/products/1000-1001/image.webp",
+        example: "/images/preview/pr-52/products/1000-1001/image.webp",
       },
       image_url: {
         description: "Optimized uploaded image URL.",
         example:
-          "https://cdn.pocket-trash.app/preview/pr-52/products/1000-1001/image.webp",
+          "https://cdn.pocket-trash.app/images/preview/pr-52/products/1000-1001/image.webp",
       },
       status: {
         description: "Image upload/delete lifecycle status.",

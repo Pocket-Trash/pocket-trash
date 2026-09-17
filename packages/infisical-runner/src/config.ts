@@ -26,7 +26,16 @@ const scraperCommandSecretConfig = {
   paths: [scraperSecretPath],
 } as const satisfies CommandSecretConfig;
 
+const apiCommandSecretConfig = {
+  allowServerSecrets: true,
+  databaseUrlUserOverride: true,
+  paths: [webSecretPath],
+} as const satisfies CommandSecretConfig;
+
 export const commandSecrets = {
+  api: {
+    dev: apiCommandSecretConfig,
+  },
   bunny: {
     audit: {
       allowServerSecrets: true,

@@ -8,6 +8,7 @@ permissions:
   contents: read
 
 env:
+  API_PREVIEW_COMMENT_MARKER: "<!-- pocket-trash-api-preview-app -->"
   DB_PREVIEW_COMMENT_MARKER: "<!-- pocket-trash-db-preview -->"
 
 jobs:
@@ -71,11 +72,29 @@ jobs:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
         run: bash .github/scripts/vercel-branch-database-url.sh remove-image-folder-prefix
 
+      - name: Remove Vercel branch resource folder prefix
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: bash .github/scripts/vercel-branch-database-url.sh remove-resource-folder-prefix
+
+      - name: Remove Vercel branch resource API URL
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: bash .github/scripts/vercel-branch-database-url.sh remove-resource-api-base-url
+
       - name: Delete image PR preview folder
         id: image_cleanup
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: pnpm --filter @package/images run cleanup:preview-folder
+
+      - name: Delete resource PR preview folder
+        id: resource_cleanup
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: pnpm --filter @package/resources run cleanup:preview-folder
 
       - name: Remove db-change label
         uses: actions/github-script@v8
@@ -92,6 +111,52 @@ jobs:
               if (error.status !== 404) {
                 throw error;
               }
+            }
+
+      - name: Create API preview comment app token
+        id: api-preview-comment-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ env.GITHUB_CF_APP_CLIENT_ID }}
+          private-key: ${{ env.GITHUB_CF_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Mark API preview comment closed
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ steps.api-preview-comment-token.outputs.token }}
+          script: |
+            const marker = process.env.API_PREVIEW_COMMENT_MARKER;
+            const alias = `pr-${context.issue.number}`;
+            const body = [
+              marker,
+              "Cloudflare API preview",
+              "",
+              "| Worker | Alias | Status | Endpoints |",
+              "| --- | --- | --- | --- |",
+              `| \`pocket-trash-api-preview\` | \`${alias}\` | ⚪ Inactive | — |`,
+            ].join("\n");
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
             }
 
       - name: Create DB preview comment app token
@@ -111,6 +176,8 @@ jobs:
           CLEANUP_PERFORMED: ${{ steps.neon_cleanup.outputs.cleanup_performed }}
           IMAGE_CLEANUP_STATUS: ${{ steps.image_cleanup.outputs.status }}
           IMAGE_FOLDER_PATH: ${{ steps.image_cleanup.outputs.folder_path }}
+          RESOURCE_CLEANUP_STATUS: ${{ steps.resource_cleanup.outputs.status }}
+          RESOURCE_FOLDER_PATH: ${{ steps.resource_cleanup.outputs.folder_path }}
           TARGET_BRANCH: ${{ steps.neon_cleanup.outputs.target_branch }}
         with:
           github-token: ${{ steps.db-preview-comment-token.outputs.token }}
@@ -125,7 +192,8 @@ jobs:
               "",
               `Neon cleanup: ${cleanup} for \`${process.env.TARGET_BRANCH}\``,
               `Image cleanup: ${process.env.IMAGE_CLEANUP_STATUS} for \`${process.env.IMAGE_FOLDER_PATH}\``,
-              "Vercel branch-specific `DATABASE_URL` and `IMAGE_FOLDER_PREFIX` cleanup was attempted.",
+              `Resource cleanup: ${process.env.RESOURCE_CLEANUP_STATUS} for \`${process.env.RESOURCE_FOLDER_PATH}\``,
+              "Vercel branch-specific `DATABASE_URL`, `IMAGE_FOLDER_PREFIX`, and `RESOURCE_FOLDER_PREFIX` cleanup was attempted.",
             ].join("\n");
 
             const { owner, repo } = context.repo;

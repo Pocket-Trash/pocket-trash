@@ -2,6 +2,7 @@ import process from "node:process";
 import { createWebServerEnv } from "./server.schema";
 
 export const serverEnv = createWebServerEnv({
+  ASSET_FOLDER_PREFIX: process.env.ASSET_FOLDER_PREFIX,
   AXIOM_DATASET: process.env.AXIOM_DATASET,
   AXIOM_EDGE_DOMAIN: process.env.AXIOM_EDGE_DOMAIN,
   AXIOM_TOKEN: process.env.AXIOM_TOKEN,
@@ -13,4 +14,9 @@ export const serverEnv = createWebServerEnv({
   LOG_DEPLOYMENT_TARGET: process.env.LOG_DEPLOYMENT_TARGET,
   LOG_LEVEL: process.env.LOG_LEVEL,
   LOG_PROXY_CLIENT_KEY: process.env.LOG_PROXY_CLIENT_KEY,
+  RESOURCE_CDN_BASE_URL: process.env.RESOURCE_CDN_BASE_URL,
+  RESOURCE_FOLDER_PREFIX: process.env.RESOURCE_FOLDER_PREFIX,
+  RESOURCE_STORAGE_ACCESS_KEY: process.env.RESOURCE_STORAGE_ACCESS_KEY,
+  RESOURCE_STORAGE_ENDPOINT: process.env.RESOURCE_STORAGE_ENDPOINT,
+  RESOURCE_STORAGE_ZONE_NAME: process.env.RESOURCE_STORAGE_ZONE_NAME,
 });

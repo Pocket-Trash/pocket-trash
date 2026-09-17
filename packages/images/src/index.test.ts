@@ -9,8 +9,8 @@ import {
 const bunnyConfig = {
   bunnyStorageAccessKey: "storage-key",
   bunnyStorageEndpoint: "https://ny.storage.bunnycdn.com",
-  bunnyStorageZoneName: "pocket-trash-images",
-  cdnBaseUrl: "https://cdn.pocket-trash.app/pocket-trash-images",
+  bunnyStorageZoneName: "pocket-trash-storage",
+  cdnBaseUrl: "https://cdn.pocket-trash.app",
 };
 
 describe("createImageStorage", () => {
@@ -29,7 +29,7 @@ describe("createImageStorage", () => {
     await expect(storage.deleteFile("/products/1000/test.webp")).resolves.toBe(
       "skipped",
     );
-    await expect(storage.deleteFolder("/preview/pr-52")).resolves.toBe(
+    await expect(storage.deleteFolder("/images/preview/pr-52")).resolves.toBe(
       "skipped",
     );
   });
@@ -72,7 +72,7 @@ describe("createImageStorage", () => {
 
       if (
         url.pathname ===
-        "/pocket-trash-images/products/pens/123/source-image.webp"
+        "/pocket-trash-storage/images/products/pens/123/source-image.webp"
       ) {
         if (init?.body) {
           uploadedBodies.push(init.body);
@@ -91,17 +91,17 @@ describe("createImageStorage", () => {
     await expect(
       storage.uploadRemoteImage({
         fileName: "source-image.webp",
-        folder: "/products/pens/123",
+        folder: "/images/products/pens/123",
         sourceUrl: "https://cdn.example.test/source-image.jpg",
       }),
     ).resolves.toEqual({
-      fileId: "/products/pens/123/source-image.webp",
-      filePath: "/products/pens/123/source-image.webp",
+      fileId: "/images/products/pens/123/source-image.webp",
+      filePath: "/images/products/pens/123/source-image.webp",
       height: 300,
       provider: "bunny",
       thumbnailUrl:
-        "https://cdn.pocket-trash.app/pocket-trash-images/products/pens/123/source-image.webp?format=webp&quality=85&width=500",
-      url: "https://cdn.pocket-trash.app/pocket-trash-images/products/pens/123/source-image.webp",
+        "https://cdn.pocket-trash.app/images/products/pens/123/source-image.webp?format=webp&quality=85&width=500",
+      url: "https://cdn.pocket-trash.app/images/products/pens/123/source-image.webp",
       width: 400,
     });
     expect(uploadedBodies).toHaveLength(1);
@@ -129,13 +129,13 @@ describe("createImageStorage", () => {
         });
       }
 
-      if (url.pathname === "/pocket-trash-images/products/pens/123/") {
+      if (url.pathname === "/pocket-trash-storage/images/products/pens/123/") {
         return jsonResponse([]);
       }
 
       if (
         url.pathname ===
-        "/pocket-trash-images/products/pens/123/source-image.webp"
+        "/pocket-trash-storage/images/products/pens/123/source-image.webp"
       ) {
         expect(init?.method).toBe("PUT");
         expect(init?.headers).toMatchObject({
@@ -159,17 +159,17 @@ describe("createImageStorage", () => {
     await expect(
       storage.uploadRemoteImage({
         fileName: "source-image.webp",
-        folder: "/products/pens/123",
+        folder: "/images/products/pens/123",
         sourceUrl: "https://cdn.example.test/source-image.jpg",
       }),
     ).resolves.toEqual({
-      fileId: "/products/pens/123/source-image.webp",
-      filePath: "/products/pens/123/source-image.webp",
+      fileId: "/images/products/pens/123/source-image.webp",
+      filePath: "/images/products/pens/123/source-image.webp",
       height: 1500,
       provider: "bunny",
       thumbnailUrl:
-        "https://cdn.pocket-trash.app/pocket-trash-images/products/pens/123/source-image.webp?format=webp&quality=85&width=500",
-      url: "https://cdn.pocket-trash.app/pocket-trash-images/products/pens/123/source-image.webp",
+        "https://cdn.pocket-trash.app/images/products/pens/123/source-image.webp?format=webp&quality=85&width=500",
+      url: "https://cdn.pocket-trash.app/images/products/pens/123/source-image.webp",
       width: 2000,
     });
     expect(uploadedBodies).toHaveLength(1);
@@ -178,7 +178,7 @@ describe("createImageStorage", () => {
   it("preserves the Bunny zone when the CDN base URL includes it", async () => {
     const storage = createImageStorage({
       ...bunnyConfig,
-      cdnBaseUrl: "https://cdn.pocket-trash.app/pocket-trash-images/",
+      cdnBaseUrl: "https://cdn.pocket-trash.app/",
       fetch: vi.fn<typeof fetch>(),
     });
 
@@ -186,8 +186,8 @@ describe("createImageStorage", () => {
       storage.updateFile("/dev/products/1000/42143344591035.webp", {}),
     ).resolves.toMatchObject({
       thumbnailUrl:
-        "https://cdn.pocket-trash.app/pocket-trash-images/dev/products/1000/42143344591035.webp?format=webp&quality=85&width=500",
-      url: "https://cdn.pocket-trash.app/pocket-trash-images/dev/products/1000/42143344591035.webp",
+        "https://cdn.pocket-trash.app/dev/products/1000/42143344591035.webp?format=webp&quality=85&width=500",
+      url: "https://cdn.pocket-trash.app/dev/products/1000/42143344591035.webp",
     });
   });
 
@@ -196,7 +196,7 @@ describe("createImageStorage", () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const url = toUrl(input);
 
-      if (url.pathname === "/pocket-trash-images/preview/pr-52/") {
+      if (url.pathname === "/pocket-trash-storage/images/preview/pr-52/") {
         return jsonResponse([
           {
             IsDirectory: true,
@@ -205,7 +205,9 @@ describe("createImageStorage", () => {
         ]);
       }
 
-      if (url.pathname === "/pocket-trash-images/preview/pr-52/products/") {
+      if (
+        url.pathname === "/pocket-trash-storage/images/preview/pr-52/products/"
+      ) {
         return jsonResponse([
           {
             IsDirectory: false,
@@ -216,7 +218,7 @@ describe("createImageStorage", () => {
 
       if (
         url.pathname ===
-        "/pocket-trash-images/preview/pr-52/products/image.webp"
+        "/pocket-trash-storage/images/preview/pr-52/products/image.webp"
       ) {
         expect(init?.method).toBe("DELETE");
         deletedPaths.push(url.pathname);
@@ -234,11 +236,11 @@ describe("createImageStorage", () => {
         prNumber: 52,
       }),
     ).resolves.toEqual({
-      folderPath: "/preview/pr-52",
+      folderPath: "/images/preview/pr-52",
       status: "deleted",
     });
     expect(deletedPaths).toEqual([
-      "/pocket-trash-images/preview/pr-52/products/image.webp",
+      "/pocket-trash-storage/images/preview/pr-52/products/image.webp",
     ]);
   });
 
@@ -246,7 +248,7 @@ describe("createImageStorage", () => {
     const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = toUrl(input);
 
-      if (url.pathname === "/pocket-trash-images/preview/pr-52/") {
+      if (url.pathname === "/pocket-trash-storage/images/preview/pr-52/") {
         return jsonResponse({ message: "Not Found" }, 404);
       }
 
@@ -260,7 +262,7 @@ describe("createImageStorage", () => {
         prNumber: 52,
       }),
     ).resolves.toEqual({
-      folderPath: "/preview/pr-52",
+      folderPath: "/images/preview/pr-52",
       status: "missing",
     });
   });
@@ -269,7 +271,7 @@ describe("createImageStorage", () => {
     const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = toUrl(input);
 
-      if (url.pathname === "/pocket-trash-images/preview/pr-52/") {
+      if (url.pathname === "/pocket-trash-storage/images/preview/pr-52/") {
         return jsonResponse([]);
       }
 
@@ -283,7 +285,7 @@ describe("createImageStorage", () => {
         prNumber: 52,
       }),
     ).resolves.toEqual({
-      folderPath: "/preview/pr-52",
+      folderPath: "/images/preview/pr-52",
       status: "deleted",
     });
   });
@@ -293,7 +295,8 @@ describe("createImageStorage", () => {
       const url = toUrl(input);
 
       if (
-        url.pathname === "/pocket-trash-images/products/pens/123/image.webp"
+        url.pathname ===
+        "/pocket-trash-storage/images/products/pens/123/image.webp"
       ) {
         expect(init?.method).toBe("DELETE");
 
@@ -308,7 +311,7 @@ describe("createImageStorage", () => {
     });
 
     await expect(
-      storage.deleteFile("/products/pens/123/image.webp"),
+      storage.deleteFile("/images/products/pens/123/image.webp"),
     ).resolves.toBe("missing");
   });
 
@@ -339,7 +342,7 @@ describe("createImageStorage", () => {
     await expect(
       storage.uploadRemoteImage({
         fileName: "source-image.webp",
-        folder: "/products/pens/123",
+        folder: "/images/products/pens/123",
         sourceUrl: "https://cdn.example.test/source-image.jpg",
       }),
     ).rejects.toThrow(
@@ -367,7 +370,7 @@ describe("createImageStorage", () => {
     await expect(
       storage.uploadRemoteImage({
         fileName: "source-image.webp",
-        folder: "/products/pens/123",
+        folder: "/images/products/pens/123",
         sourceUrl: "https://cdn.example.test/source-image.jpg",
       }),
     ).rejects.toThrow("The operation was aborted.");
@@ -398,14 +401,14 @@ describe("createImageStorage", () => {
     await expect(
       storage.uploadRemoteImage({
         fileName: "source-image.webp",
-        folder: "/products/pens/123",
+        folder: "/images/products/pens/123",
         sourceUrl: "https://cdn.example.test/source-image.jpg",
       }),
     ).rejects.toThrow("The operation was aborted.");
   });
 
   it("only builds positive PR preview folder paths", () => {
-    expect(buildPreviewImageFolderPath(52)).toBe("/preview/pr-52");
+    expect(buildPreviewImageFolderPath(52)).toBe("/images/preview/pr-52");
     expect(() => buildPreviewImageFolderPath(0)).toThrow(
       "Image preview cleanup requires a positive PR number.",
     );
@@ -417,8 +420,8 @@ describe("createImageStorage", () => {
       fetch: vi.fn<typeof fetch>(),
     });
 
-    await expect(storage.deleteFolder("/preview")).rejects.toThrow(
-      "Image preview cleanup can only delete /preview/pr-<number> folders.",
+    await expect(storage.deleteFolder("/images/preview")).rejects.toThrow(
+      "Image preview cleanup can only delete /images/preview/pr-<number> folders.",
     );
   });
 });

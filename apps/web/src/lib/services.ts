@@ -44,6 +44,19 @@ services.configure({
     databaseUrl: serverEnv.DATABASE_URL,
   },
   logger,
+  resources:
+    serverEnv.RESOURCE_STORAGE_ACCESS_KEY &&
+    serverEnv.RESOURCE_CDN_BASE_URL &&
+    serverEnv.RESOURCE_STORAGE_ENDPOINT &&
+    serverEnv.RESOURCE_STORAGE_ZONE_NAME
+      ? {
+          accessKey: serverEnv.RESOURCE_STORAGE_ACCESS_KEY,
+          cdnBaseUrl: serverEnv.RESOURCE_CDN_BASE_URL,
+          endpoint: serverEnv.RESOURCE_STORAGE_ENDPOINT,
+          folderPrefix: serverEnv.RESOURCE_FOLDER_PREFIX,
+          zoneName: serverEnv.RESOURCE_STORAGE_ZONE_NAME,
+        }
+      : undefined,
 });
 
 export { services as s };
