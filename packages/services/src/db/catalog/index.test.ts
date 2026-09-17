@@ -92,10 +92,12 @@ describe("collection catalog writes", () => {
     await expect(
       service.addSpinner({
         actorClerkId: "user-secret",
+        buttonCustomFinish: null,
         buttonFinishOptionId: 1202,
         buttonMaterialId: 1201,
         buttonProductId: 1200,
         spinnerFinishOptionId: 1102,
+        spinnerCustomFinish: null,
         spinnerMaterialId: 1101,
         spinnerProductId: 1100,
       }),
@@ -151,10 +153,12 @@ describe("collection catalog writes", () => {
     await expect(
       service.addSpinner({
         actorClerkId: "user-secret",
+        buttonCustomFinish: null,
         buttonFinishOptionId: null,
         buttonMaterialId: null,
         buttonProductId: null,
         spinnerFinishOptionId: 1102,
+        spinnerCustomFinish: null,
         spinnerMaterialId: 1101,
         spinnerProductId: 1100,
       }),
@@ -189,6 +193,59 @@ describe("collection catalog writes", () => {
     ]);
   });
 
+  it("stores a private custom finish with ordered fade colors", async () => {
+    const { service, writes } = setup(
+      [[{ id: 2000 }], [{ id: 3000 }]],
+      [[{ materialId: 1201 }], [{ id: 10, slug: "fade" }]],
+    );
+
+    await expect(
+      service.addSpinnerButton({
+        actorClerkId: "user-secret",
+        customFinish: {
+          colorEffectId: 10,
+          colorIds: [22, 21],
+          finishIds: [31, 32],
+        },
+        finishOptionId: null,
+        materialId: 1201,
+        productId: 1200,
+      }),
+    ).resolves.toBe(2000);
+
+    expect(writes).toEqual(
+      expect.arrayContaining([
+        {
+          table: schema.finishOption,
+          value: {
+            collectionItemId: 2000,
+            colorEffectId: 10,
+            position: 0,
+          },
+        },
+        {
+          table: schema.finishOptionFinish,
+          value: [
+            { finishId: 31, finishOptionId: 3000, position: 0 },
+            { finishId: 32, finishOptionId: 3000, position: 1 },
+          ],
+        },
+        {
+          table: schema.finishOptionColor,
+          value: [
+            { colorId: 22, finishOptionId: 3000, position: 0 },
+            { colorId: 21, finishOptionId: 3000, position: 1 },
+          ],
+        },
+      ]),
+    );
+    const optionWrite = writes.find(
+      ({ table }) => table === schema.finishOption,
+    )?.value;
+    expect(optionWrite).not.toHaveProperty("productId");
+    expect(optionWrite).not.toHaveProperty("sourceProductFinishOptionId");
+  });
+
   it("rejects collection edits when the authenticated owner is missing", async () => {
     const { db, service, users } = setup([], []);
     users.getByClerkId.mockResolvedValueOnce(null as never);
@@ -197,6 +254,7 @@ describe("collection catalog writes", () => {
       service.updateItem({
         actorClerkId: "other-user",
         collectionItemId: 2001,
+        customFinish: null,
         finishOptionId: 1102,
         materialId: 1101,
       }),
@@ -221,9 +279,11 @@ describe("collection catalog writes", () => {
       service.updateItem({
         actorClerkId: "user-secret",
         collectionItemId: 2001,
+        customFinish: null,
         finishOptionId: null,
         installedButton: {
           collectionItemId: 2000,
+          customFinish: null,
           finishOptionId: null,
           materialId: 1201,
         },
@@ -250,10 +310,12 @@ describe("collection catalog writes", () => {
     await expect(
       service.addSpinner({
         actorClerkId: "user-secret",
+        buttonCustomFinish: null,
         buttonFinishOptionId: null,
         buttonMaterialId: null,
         buttonProductId: null,
         spinnerFinishOptionId: 1102,
+        spinnerCustomFinish: null,
         spinnerMaterialId: 9999,
         spinnerProductId: 1100,
       }),
@@ -267,10 +329,12 @@ describe("collection catalog writes", () => {
     await expect(
       service.addSpinner({
         actorClerkId: "user-secret",
+        buttonCustomFinish: null,
         buttonFinishOptionId: null,
         buttonMaterialId: null,
         buttonProductId: null,
         spinnerFinishOptionId: 9999,
+        spinnerCustomFinish: null,
         spinnerMaterialId: 1101,
         spinnerProductId: 1100,
       }),
@@ -280,6 +344,8 @@ describe("collection catalog writes", () => {
 
 describe("catalog lookup writes", () => {
   it.each([
+    "color",
+    "finish",
     "maker",
     "material",
   ] as const)("rejects a case-insensitive duplicate %s name", async (kind) => {
@@ -299,18 +365,34 @@ describe("catalog lookup writes", () => {
       createLogger({ app: "api", environment: "test" }),
     );
 
-    const result =
-      kind === "maker"
-        ? service.createMaker({
-            actorClerkId: "user-secret",
-            name: "bronze",
-            rootUrl: null,
-          })
-        : service.createMaterial({
+    const result = (() => {
+      switch (kind) {
+        case "color":
+          return service.createColor({
             actorClerkId: "user-secret",
             name: "bronze",
             slug: "bronze-2",
           });
+        case "finish":
+          return service.createFinish({
+            actorClerkId: "user-secret",
+            name: "bronze",
+            slug: "bronze-2",
+          });
+        case "maker":
+          return service.createMaker({
+            actorClerkId: "user-secret",
+            name: "bronze",
+            rootUrl: null,
+          });
+        case "material":
+          return service.createMaterial({
+            actorClerkId: "user-secret",
+            name: "bronze",
+            slug: "bronze-2",
+          });
+      }
+    })();
 
     await expect(result).rejects.toThrow(/already exists/i);
     expect(insert).not.toHaveBeenCalled();

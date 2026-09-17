@@ -30,6 +30,7 @@ import {
   createCatalogFinish,
   createCatalogMaker,
   createCatalogMaterial,
+  finishOptionSchema,
   type ProductFormInput,
   productFormSchema,
   productSlugPreview,
@@ -408,16 +409,25 @@ function ProductEditor({
 
 type FinishOptionFormValue = ProductFormInput["finishOptions"][number];
 
+const emptyFinishOption = (): FinishOptionFormValue => ({
+  colorEffectId: null,
+  colorEffectSlug: null,
+  colorIds: [],
+  finishIds: [],
+});
+
 export function FinishOptionsEditor({
   onChange,
   onOptionsChange,
   options,
+  singleOption = false,
   t,
   value,
 }: {
   onChange: (value: FinishOptionFormValue[]) => void;
   onOptionsChange: React.Dispatch<React.SetStateAction<CatalogOptions>>;
   options: CatalogOptions;
+  singleOption?: boolean;
   t: ReturnType<typeof useCatalogCopy>;
   value: FinishOptionFormValue[];
 }) {
@@ -564,54 +574,48 @@ export function FinishOptionsEditor({
                 {t("web.catalog.finishPreview", { finish: preview })}
               </p>
             ) : null}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                disabled={index === 0}
-                onClick={() => move(index, -1)}
-                type="button"
-                variant="outline"
-              >
-                {t("web.action.moveFinishOptionUp")}
-              </Button>
-              <Button
-                disabled={index === value.length - 1}
-                onClick={() => move(index, 1)}
-                type="button"
-                variant="outline"
-              >
-                {t("web.action.moveFinishOptionDown")}
-              </Button>
-              <Button
-                onClick={() =>
-                  onChange(value.filter((_, position) => position !== index))
-                }
-                type="button"
-                variant="outline"
-              >
-                {t("web.action.removeFinishOption")}
-              </Button>
-            </div>
+            {!singleOption ? (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  disabled={index === 0}
+                  onClick={() => move(index, -1)}
+                  type="button"
+                  variant="outline"
+                >
+                  {t("web.action.moveFinishOptionUp")}
+                </Button>
+                <Button
+                  disabled={index === value.length - 1}
+                  onClick={() => move(index, 1)}
+                  type="button"
+                  variant="outline"
+                >
+                  {t("web.action.moveFinishOptionDown")}
+                </Button>
+                <Button
+                  onClick={() =>
+                    onChange(value.filter((_, position) => position !== index))
+                  }
+                  type="button"
+                  variant="outline"
+                >
+                  {t("web.action.removeFinishOption")}
+                </Button>
+              </div>
+            ) : null}
           </section>
         );
       })}
-      <Button
-        className="w-fit"
-        onClick={() =>
-          onChange([
-            ...value,
-            {
-              colorEffectId: null,
-              colorEffectSlug: null,
-              colorIds: [],
-              finishIds: [],
-            },
-          ])
-        }
-        type="button"
-        variant="outline"
-      >
-        {t("web.action.addFinishOption")}
-      </Button>
+      {!singleOption ? (
+        <Button
+          className="w-fit"
+          onClick={() => onChange([...value, emptyFinishOption()])}
+          type="button"
+          variant="outline"
+        >
+          {t("web.action.addFinishOption")}
+        </Button>
+      ) : null}
     </fieldset>
   );
 }
@@ -763,7 +767,7 @@ function LookupDialog(props: LookupDialogProps) {
 }
 
 export function CollectionAddPage({
-  options,
+  options: initialOptions,
   products,
 }: {
   options: CatalogOptions;
@@ -771,10 +775,12 @@ export function CollectionAddPage({
 }) {
   const t = useCatalogCopy();
   const navigate = useNavigate();
+  const [options, setOptions] = React.useState(initialOptions);
   const [type, setType] = React.useState<ComboboxOption | null>(null);
   const [product, setProduct] = React.useState<CatalogProduct | null>(null);
   const [material, setMaterial] = React.useState<CatalogLookup | null>(null);
   const [finish, setFinish] = React.useState<ComboboxOption | null>(null);
+  const [customFinish, setCustomFinish] = React.useState(emptyFinishOption);
   const [button, setButton] = React.useState<
     CatalogProduct | ComboboxOption | null
   >(null);
@@ -783,6 +789,8 @@ export function CollectionAddPage({
   const [buttonFinish, setButtonFinish] = React.useState<ComboboxOption | null>(
     null,
   );
+  const [buttonCustomFinish, setButtonCustomFinish] =
+    React.useState(emptyFinishOption);
   const [duplicateCounts, setDuplicateCounts] = React.useState<
     Record<number, number>
   >({});
@@ -795,24 +803,40 @@ export function CollectionAddPage({
     typeof button?.id === "number"
       ? (options.spinnerButtons.find(({ id }) => id === button.id) ?? null)
       : null;
+  const customFinishIsValid =
+    finishOptionSchema.safeParse(customFinish).success;
+  const buttonCustomFinishIsValid =
+    finishOptionSchema.safeParse(buttonCustomFinish).success;
 
   const submit = async (confirmed: boolean) => {
     if (
       !product ||
       !material ||
       !finish ||
+      (finish.id === "custom" && !customFinishIsValid) ||
       !productTypeIsSupported(product.productTypeSlug) ||
-      (selectedButton && (!buttonMaterial || !buttonFinish))
+      (selectedButton &&
+        (!buttonMaterial ||
+          !buttonFinish ||
+          (buttonFinish.id === "custom" && !buttonCustomFinishIsValid)))
     ) {
       return;
     }
     const result = await addCollectionProduct({
       data: {
-        buttonFinishOptionId: selectedButton ? Number(buttonFinish?.id) : null,
+        buttonCustomFinish:
+          selectedButton && buttonFinish?.id === "custom"
+            ? buttonCustomFinish
+            : null,
+        buttonFinishOptionId:
+          selectedButton && buttonFinish?.id !== "custom"
+            ? Number(buttonFinish?.id)
+            : null,
         buttonMaterialId: selectedButton ? (buttonMaterial?.id ?? null) : null,
         buttonProductId: selectedButton?.id ?? null,
         confirmed,
-        finishOptionId: Number(finish.id),
+        customFinish: finish.id === "custom" ? customFinish : null,
+        finishOptionId: finish.id === "custom" ? null : Number(finish.id),
         materialId: material.id,
         productId: product.id,
         productTypeSlug: product.productTypeSlug,
@@ -846,9 +870,11 @@ export function CollectionAddPage({
               setProduct(null);
               setMaterial(null);
               setFinish(null);
+              setCustomFinish(emptyFinishOption());
               setButton(null);
               setButtonMaterial(null);
               setButtonFinish(null);
+              setButtonCustomFinish(emptyFinishOption());
               setDuplicateCounts({});
               setFormError(null);
             }}
@@ -868,9 +894,11 @@ export function CollectionAddPage({
                 setProduct(candidate);
                 setMaterial(null);
                 setFinish(null);
+                setCustomFinish(emptyFinishOption());
                 setButton(null);
                 setButtonMaterial(null);
                 setButtonFinish(null);
+                setButtonCustomFinish(emptyFinishOption());
                 setDuplicateCounts({});
                 setFormError(null);
               }}
@@ -883,10 +911,14 @@ export function CollectionAddPage({
         </div>
         {product ? (
           <CollectionProductFields
+            customFinish={customFinish}
             finish={finish}
             material={material}
+            onCustomFinishChange={setCustomFinish}
             onFinishChange={setFinish}
             onMaterialChange={setMaterial}
+            onOptionsChange={setOptions}
+            options={options}
             product={product}
             t={t}
           />
@@ -909,6 +941,7 @@ export function CollectionAddPage({
                 );
                 setButtonMaterial(null);
                 setButtonFinish(null);
+                setButtonCustomFinish(emptyFinishOption());
                 setDuplicateCounts({});
               }}
               placeholder={t("web.catalog.defaultButton")}
@@ -920,10 +953,14 @@ export function CollectionAddPage({
         ) : null}
         {selectedButton ? (
           <CollectionProductFields
+            customFinish={buttonCustomFinish}
             finish={buttonFinish}
             material={buttonMaterial}
+            onCustomFinishChange={setButtonCustomFinish}
             onFinishChange={setButtonFinish}
             onMaterialChange={setButtonMaterial}
+            onOptionsChange={setOptions}
+            options={options}
             product={selectedButton}
             t={t}
           />
@@ -954,7 +991,12 @@ export function CollectionAddPage({
         {product && material && finish ? (
           <Button
             disabled={Boolean(
-              selectedButton && (!buttonMaterial || !buttonFinish),
+              (finish.id === "custom" && !customFinishIsValid) ||
+                (selectedButton &&
+                  (!buttonMaterial ||
+                    !buttonFinish ||
+                    (buttonFinish.id === "custom" &&
+                      !buttonCustomFinishIsValid))),
             )}
             onClick={() => void submit(Object.keys(duplicateCounts).length > 0)}
             type="button"
@@ -971,18 +1013,26 @@ export function CollectionAddPage({
 
 export function CollectionProductFields({
   currentFinish,
+  customFinish,
   finish,
   material,
+  onCustomFinishChange,
   onFinishChange,
   onMaterialChange,
+  onOptionsChange,
+  options,
   product,
   t,
 }: {
   currentFinish?: CatalogFinishOption | null;
+  customFinish: FinishOptionFormValue;
   finish: ComboboxOption | null;
   material: CatalogLookup | null;
+  onCustomFinishChange: (value: FinishOptionFormValue) => void;
   onFinishChange: (value: ComboboxOption | null) => void;
   onMaterialChange: (value: CatalogLookup | null) => void;
+  onOptionsChange: React.Dispatch<React.SetStateAction<CatalogOptions>>;
+  options: CatalogOptions;
   product: CatalogProduct;
   t: ReturnType<typeof useCatalogCopy>;
 }) {
@@ -994,6 +1044,7 @@ export function CollectionProductFields({
       id: option.id,
       name: localizedFinishLabel(option, t),
     })),
+    { id: "custom", name: t("web.collections.finishChoice.custom") },
   ];
 
   return (
@@ -1025,6 +1076,19 @@ export function CollectionProductFields({
           value={finish}
         />
       </Field>
+      {finish?.id === "custom" ? (
+        <FinishOptionsEditor
+          onChange={(value) => {
+            const next = value[0];
+            if (next) onCustomFinishChange(next);
+          }}
+          onOptionsChange={onOptionsChange}
+          options={options}
+          singleOption
+          t={t}
+          value={[customFinish]}
+        />
+      ) : null}
     </fieldset>
   );
 }
@@ -1052,16 +1116,19 @@ function localizedFinishLabel(
 export function CollectionEditPage({
   buttonProducts,
   item,
+  options: initialOptions,
   ownedButtons,
   product,
 }: {
   buttonProducts: CatalogProduct[];
   item: UserCollectionItem;
+  options: CatalogOptions;
   ownedButtons: UserCollectionItem[];
   product: CatalogProduct;
 }) {
   const t = useCatalogCopy();
   const navigate = useNavigate();
+  const [options, setOptions] = React.useState(initialOptions);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [material, setMaterial] = React.useState<CatalogLookup | null>(
     item.material,
@@ -1071,6 +1138,7 @@ export function CollectionEditPage({
       ? { id: "current", name: localizedFinishLabel(item.finishOption, t) }
       : null,
   );
+  const [customFinish, setCustomFinish] = React.useState(emptyFinishOption);
   const initialButton = ownedButtons.find(
     ({ collectionItemId }) => collectionItemId === item.installedButtonId,
   );
@@ -1090,6 +1158,8 @@ export function CollectionEditPage({
           }
         : null,
   );
+  const [buttonCustomFinish, setButtonCustomFinish] =
+    React.useState(emptyFinishOption);
   const selectedButton = ownedButtons.find(
     ({ collectionItemId }) => collectionItemId === button?.id,
   );
@@ -1102,6 +1172,14 @@ export function CollectionEditPage({
     Boolean(
       selectedButton && selectedButtonProduct && buttonMaterial && buttonFinish,
     );
+  const finishSelectionIsValid =
+    Boolean(finish) &&
+    (finish?.id !== "custom" ||
+      finishOptionSchema.safeParse(customFinish).success);
+  const buttonFinishSelectionIsValid =
+    Boolean(buttonFinish) &&
+    (buttonFinish?.id !== "custom" ||
+      finishOptionSchema.safeParse(buttonCustomFinish).success);
 
   return (
     <AppShell
@@ -1113,10 +1191,14 @@ export function CollectionEditPage({
       <main className="grid max-w-xl gap-5 p-6">
         <CollectionProductFields
           currentFinish={item.finishOption}
+          customFinish={customFinish}
           finish={finish}
           material={material}
+          onCustomFinishChange={setCustomFinish}
           onFinishChange={setFinish}
           onMaterialChange={setMaterial}
+          onOptionsChange={setOptions}
+          options={options}
           product={product}
           t={t}
         />
@@ -1145,6 +1227,7 @@ export function CollectionEditPage({
                       }
                     : null,
                 );
+                setButtonCustomFinish(emptyFinishOption());
               }}
               placeholder={t("web.catalog.defaultButton")}
               removeLabel={t("web.action.close")}
@@ -1156,21 +1239,38 @@ export function CollectionEditPage({
         {selectedButton && selectedButtonProduct ? (
           <CollectionProductFields
             currentFinish={selectedButton.finishOption}
+            customFinish={buttonCustomFinish}
             finish={buttonFinish}
             material={buttonMaterial}
+            onCustomFinishChange={setButtonCustomFinish}
             onFinishChange={setButtonFinish}
             onMaterialChange={setButtonMaterial}
+            onOptionsChange={setOptions}
+            options={options}
             product={selectedButtonProduct}
             t={t}
           />
         ) : null}
         <Button
-          disabled={!material || !finish || !buttonSelectionIsValid}
+          disabled={
+            !material ||
+            !finishSelectionIsValid ||
+            !buttonSelectionIsValid ||
+            (selectedButton ? !buttonFinishSelectionIsValid : false)
+          }
           onClick={async () => {
-            if (!material || !finish || !buttonSelectionIsValid) return;
+            if (
+              !material ||
+              !finish ||
+              !finishSelectionIsValid ||
+              !buttonSelectionIsValid
+            ) {
+              return;
+            }
             let installedButton:
               | {
                   collectionItemId: number;
+                  customFinish: FinishOptionFormValue | null;
                   finishOptionId: number | null;
                   materialId: number;
                 }
@@ -1180,11 +1280,21 @@ export function CollectionEditPage({
               if (button?.id === "default") {
                 installedButton = null;
               } else {
-                if (!selectedButton || !buttonMaterial || !buttonFinish) return;
+                if (
+                  !selectedButton ||
+                  !buttonMaterial ||
+                  !buttonFinish ||
+                  !buttonFinishSelectionIsValid
+                ) {
+                  return;
+                }
                 installedButton = {
                   collectionItemId: selectedButton.collectionItemId,
+                  customFinish:
+                    buttonFinish.id === "custom" ? buttonCustomFinish : null,
                   finishOptionId:
-                    buttonFinish.id === "current"
+                    buttonFinish.id === "current" ||
+                    buttonFinish.id === "custom"
                       ? null
                       : Number(buttonFinish.id),
                   materialId: buttonMaterial.id,
@@ -1194,8 +1304,11 @@ export function CollectionEditPage({
             const result = await updateCollectionItem({
               data: {
                 collectionItemId: item.collectionItemId,
+                customFinish: finish.id === "custom" ? customFinish : null,
                 finishOptionId:
-                  finish.id === "current" ? null : Number(finish.id),
+                  finish.id === "current" || finish.id === "custom"
+                    ? null
+                    : Number(finish.id),
                 ...(item.productTypeSlug === "spinner"
                   ? { installedButton }
                   : {}),

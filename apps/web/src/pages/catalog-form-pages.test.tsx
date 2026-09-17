@@ -24,6 +24,21 @@ vi.mock("@/providers/locale-provider", () => ({
 
 const t = (key: string, values: Readonly<Record<string, unknown>> = {}) =>
   key === "web.catalog.finishPreview" ? String(values.finish) : key;
+const emptyCustomFinish = {
+  colorEffectId: null,
+  colorEffectSlug: null,
+  colorIds: [],
+  finishIds: [],
+};
+const emptyCatalogOptions = {
+  colorEffects: [],
+  colors: [],
+  finishes: [],
+  makers: [],
+  materials: [],
+  productTypes: [],
+  spinnerButtons: [],
+};
 
 describe("finish option editor", () => {
   it("renders removable components and accessible ordering controls", () => {
@@ -102,10 +117,14 @@ describe("finish option editor", () => {
     };
     const html = renderToStaticMarkup(
       createElement(CollectionProductFields, {
+        customFinish: emptyCustomFinish,
         finish: { id: 1002, name: "Polished" },
         material: product.materials[0] ?? null,
+        onCustomFinishChange: vi.fn(),
         onFinishChange: vi.fn(),
         onMaterialChange: vi.fn(),
+        onOptionsChange: vi.fn(),
+        options: emptyCatalogOptions,
         product,
         t,
       }),
@@ -114,6 +133,47 @@ describe("finish option editor", () => {
     expect(html).toContain('aria-label="web.catalog.field.materials"');
     expect(html).toContain('aria-label="web.action.close: Bronze"');
     expect(html).toContain('aria-label="web.action.close: Polished"');
+  });
+
+  it("renders a single private custom finish editor with ordered colors", () => {
+    const product = productFixture(1000, "Spinner", "spinner");
+    const html = renderToStaticMarkup(
+      createElement(CollectionProductFields, {
+        customFinish: {
+          colorEffectId: 10,
+          colorEffectSlug: "fade",
+          colorIds: [22, 21],
+          finishIds: [31],
+        },
+        finish: {
+          id: "custom",
+          name: "web.collections.finishChoice.custom",
+        },
+        material: product.materials[0] ?? null,
+        onCustomFinishChange: vi.fn(),
+        onFinishChange: vi.fn(),
+        onMaterialChange: vi.fn(),
+        onOptionsChange: vi.fn(),
+        options: {
+          ...emptyCatalogOptions,
+          colorEffects: [{ id: 10, name: "Fade", slug: "fade" }],
+          colors: [
+            { id: 21, name: "Blue", slug: "blue" },
+            { id: 22, name: "Purple", slug: "purple" },
+          ],
+          finishes: [{ id: 31, name: "Polished", slug: "polished" }],
+        },
+        product,
+        t,
+      }),
+    );
+
+    expect(html).toContain(
+      "Polished · Purple → Blue web.catalog.colorEffect.fade",
+    );
+    expect(html).toContain("web.action.addFinish");
+    expect(html).toContain("web.action.addColor");
+    expect(html).not.toContain("web.action.addFinishOption");
   });
 
   it("restores independent spinner and installed button fields", () => {
@@ -129,6 +189,7 @@ describe("finish option editor", () => {
       createElement(CollectionEditPage, {
         buttonProducts: [button],
         item: spinnerItem,
+        options: emptyCatalogOptions,
         ownedButtons: [buttonItem],
         product: spinner,
       }),

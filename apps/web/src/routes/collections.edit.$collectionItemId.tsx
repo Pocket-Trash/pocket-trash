@@ -1,6 +1,6 @@
 import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { getAuthState } from "@/lib/auth";
-import { getCollectionEditData } from "@/lib/catalog-api";
+import { getCatalogOptions, getCollectionEditData } from "@/lib/catalog-api";
 import { CollectionEditPage } from "@/pages/catalog-form-pages";
 
 export const Route = createFileRoute("/collections/edit/$collectionItemId")({
@@ -19,12 +19,16 @@ export const Route = createFileRoute("/collections/edit/$collectionItemId")({
   },
   loader: async ({ params }) => {
     if (!Number.isInteger(params.collectionItemId)) throw notFound();
-    const data = await getCollectionEditData({ data: params });
+    const [data, options] = await Promise.all([
+      getCollectionEditData({ data: params }),
+      getCatalogOptions(),
+    ]);
     if (!data.item || !data.product) throw notFound();
     return {
       buttonProducts: data.buttonProducts,
       item: data.item,
       ownedButtons: data.ownedButtons,
+      options,
       product: data.product,
     };
   },

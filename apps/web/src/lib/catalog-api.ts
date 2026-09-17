@@ -31,7 +31,7 @@ const slugNameSchema = z
   .min(1, requiredMessage)
   .refine((value) => slugify(value).length > 0, requiredMessage);
 
-const finishOptionSchema = z
+export const finishOptionSchema = z
   .object({
     colorEffectId: idSchema.nullable(),
     colorEffectSlug: z.enum(["solid", "fade"]).nullable(),
@@ -149,24 +149,42 @@ type CatalogLookupMutationResult<K extends string> =
 
 const collectionAddSchema = z
   .object({
+    buttonCustomFinish: finishOptionSchema.nullable(),
     buttonFinishOptionId: idSchema.nullable(),
     buttonMaterialId: idSchema.nullable(),
     buttonProductId: idSchema.nullable(),
     confirmed: z.boolean(),
-    finishOptionId: idSchema,
+    customFinish: finishOptionSchema.nullable(),
+    finishOptionId: idSchema.nullable(),
     materialId: idSchema,
     productId: idSchema,
     productTypeSlug: productTypeSchema,
   })
   .superRefine((input, context) => {
+    const finishCount = [input.finishOptionId, input.customFinish].filter(
+      (value) => value !== null,
+    ).length;
+    if (finishCount !== 1) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.productFinishRequired",
+        path: ["finishOptionId"],
+      });
+    }
+    const buttonFinishCount = [
+      input.buttonFinishOptionId,
+      input.buttonCustomFinish,
+    ].filter((value) => value !== null).length;
     const selectedButtonValues = [
       input.buttonProductId,
       input.buttonMaterialId,
-      input.buttonFinishOptionId,
+      buttonFinishCount === 1 ? true : null,
     ].filter((value) => value !== null).length;
     if (
       (selectedButtonValues !== 0 && selectedButtonValues !== 3) ||
-      (input.productTypeSlug !== "spinner" && selectedButtonValues > 0)
+      buttonFinishCount > 1 ||
+      (input.productTypeSlug !== "spinner" && selectedButtonValues > 0) ||
+      (input.buttonProductId === null && buttonFinishCount > 0)
     ) {
       context.addIssue({
         code: "custom",
@@ -176,19 +194,42 @@ const collectionAddSchema = z
     }
   });
 
-const collectionEditSchema = z.object({
-  collectionItemId: idSchema,
-  finishOptionId: idSchema.nullable(),
-  installedButton: z
-    .object({
-      collectionItemId: idSchema,
-      finishOptionId: idSchema.nullable(),
-      materialId: idSchema,
-    })
-    .nullable()
-    .optional(),
-  materialId: idSchema,
-});
+const collectionEditSchema = z
+  .object({
+    collectionItemId: idSchema,
+    customFinish: finishOptionSchema.nullable(),
+    finishOptionId: idSchema.nullable(),
+    installedButton: z
+      .object({
+        collectionItemId: idSchema,
+        customFinish: finishOptionSchema.nullable(),
+        finishOptionId: idSchema.nullable(),
+        materialId: idSchema,
+      })
+      .nullable()
+      .optional(),
+    materialId: idSchema,
+  })
+  .superRefine((input, context) => {
+    if (input.finishOptionId !== null && input.customFinish !== null) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.productFinishRequired",
+        path: ["finishOptionId"],
+      });
+    }
+    if (
+      input.installedButton?.finishOptionId !== null &&
+      input.installedButton?.finishOptionId !== undefined &&
+      input.installedButton.customFinish !== null
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.productFinishRequired",
+        path: ["installedButton", "finishOptionId"],
+      });
+    }
+  });
 
 export type ProductFormInput = z.input<typeof productFormSchema>;
 
@@ -457,16 +498,25 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
           ? (
               await s.db.collections.addSpinner({
                 actorClerkId,
+                buttonCustomFinish: parsed.data.buttonCustomFinish
+                  ? toFinishWriteOption(parsed.data.buttonCustomFinish)
+                  : null,
                 buttonFinishOptionId: parsed.data.buttonFinishOptionId,
                 buttonMaterialId: parsed.data.buttonMaterialId,
                 buttonProductId: parsed.data.buttonProductId,
                 spinnerFinishOptionId: parsed.data.finishOptionId,
+                spinnerCustomFinish: parsed.data.customFinish
+                  ? toFinishWriteOption(parsed.data.customFinish)
+                  : null,
                 spinnerMaterialId: parsed.data.materialId,
                 spinnerProductId: parsed.data.productId,
               })
             ).spinnerItemId
           : await s.db.collections.addSpinnerButton({
               actorClerkId,
+              customFinish: parsed.data.customFinish
+                ? toFinishWriteOption(parsed.data.customFinish)
+                : null,
               finishOptionId: parsed.data.finishOptionId,
               materialId: parsed.data.materialId,
               productId: parsed.data.productId,
@@ -537,12 +587,36 @@ export const updateCollectionItem = createServerFn({ method: "POST" })
 
     const { s } = await import("@/lib/services");
     try {
-      await s.db.collections.updateItem({ actorClerkId, ...parsed.data });
+      await s.db.collections.updateItem({
+        actorClerkId,
+        ...parsed.data,
+        customFinish: parsed.data.customFinish
+          ? toFinishWriteOption(parsed.data.customFinish)
+          : null,
+        installedButton: parsed.data.installedButton
+          ? {
+              ...parsed.data.installedButton,
+              customFinish: parsed.data.installedButton.customFinish
+                ? toFinishWriteOption(parsed.data.installedButton.customFinish)
+                : null,
+            }
+          : parsed.data.installedButton,
+      });
       return { ok: true as const };
     } catch (error) {
       return mutationFailure(error);
     }
   });
+
+function toFinishWriteOption(
+  option: z.infer<typeof finishOptionSchema>,
+): ProductWriteInput["finishOptions"][number] {
+  return {
+    colorEffectId: option.colorEffectId,
+    colorIds: option.colorIds,
+    finishIds: option.finishIds,
+  };
+}
 
 async function listMakers() {
   const { s } = await import("@/lib/services");

@@ -127,16 +127,19 @@ export type UserCollectionItem = {
 export type CollectionsService = {
   addSpinner(input: {
     actorClerkId: string;
+    buttonCustomFinish: ProductWriteFinishOption | null;
     buttonFinishOptionId: number | null;
     buttonMaterialId: number | null;
     buttonProductId: number | null;
-    spinnerFinishOptionId: number;
+    spinnerFinishOptionId: number | null;
+    spinnerCustomFinish: ProductWriteFinishOption | null;
     spinnerMaterialId: number;
     spinnerProductId: number;
   }): Promise<{ buttonItemId: number | null; spinnerItemId: number }>;
   addSpinnerButton(input: {
     actorClerkId: string;
-    finishOptionId: number;
+    customFinish: ProductWriteFinishOption | null;
+    finishOptionId: number | null;
     materialId: number;
     productId: number;
   }): Promise<number>;
@@ -155,9 +158,11 @@ export type CollectionsService = {
   updateItem(input: {
     actorClerkId: string;
     collectionItemId: number;
+    customFinish: ProductWriteFinishOption | null;
     finishOptionId: number | null;
     installedButton?: {
       collectionItemId: number;
+      customFinish: ProductWriteFinishOption | null;
       finishOptionId: number | null;
       materialId: number;
     } | null;
@@ -508,14 +513,16 @@ export function createCollectionsService(
             if (
               input.buttonProductId === null &&
               (input.buttonMaterialId !== null ||
-                input.buttonFinishOptionId !== null)
+                input.buttonFinishOptionId !== null ||
+                input.buttonCustomFinish !== null)
             ) {
               throw new Error("Button product is required.");
             }
             if (input.buttonProductId !== null) {
               if (
                 input.buttonMaterialId === null ||
-                input.buttonFinishOptionId === null
+                (input.buttonFinishOptionId === null) ===
+                  (input.buttonCustomFinish === null)
               ) {
                 throw new Error("Button material and finish are required.");
               }
@@ -536,12 +543,12 @@ export function createCollectionsService(
                 id: buttonItem.id,
                 productSpinnerButtonId: input.buttonProductId,
               });
-              await copyProductFinishOption(
-                tx,
-                input.buttonProductId,
-                input.buttonFinishOptionId,
-                buttonItem.id,
-              );
+              await createCollectionFinishOption(tx, {
+                collectionItemId: buttonItem.id,
+                customFinish: input.buttonCustomFinish,
+                productFinishOptionId: input.buttonFinishOptionId,
+                productId: input.buttonProductId,
+              });
               buttonItemId = buttonItem.id;
             }
 
@@ -563,12 +570,12 @@ export function createCollectionsService(
               installedButtonId: buttonItemId,
               productSpinnerId: input.spinnerProductId,
             });
-            await copyProductFinishOption(
-              tx,
-              input.spinnerProductId,
-              input.spinnerFinishOptionId,
-              spinnerItem.id,
-            );
+            await createCollectionFinishOption(tx, {
+              collectionItemId: spinnerItem.id,
+              customFinish: input.spinnerCustomFinish,
+              productFinishOptionId: input.spinnerFinishOptionId,
+              productId: input.spinnerProductId,
+            });
             return { buttonItemId, spinnerItemId: spinnerItem.id };
           });
         },
@@ -594,12 +601,12 @@ export function createCollectionsService(
               id: item.id,
               productSpinnerButtonId: input.productId,
             });
-            await copyProductFinishOption(
-              tx,
-              input.productId,
-              input.finishOptionId,
-              item.id,
-            );
+            await createCollectionFinishOption(tx, {
+              collectionItemId: item.id,
+              customFinish: input.customFinish,
+              productFinishOptionId: input.finishOptionId,
+              productId: input.productId,
+            });
             return item.id;
           });
         },
@@ -722,6 +729,7 @@ export function createCollectionsService(
 
             await updateCollectionItemSnapshot(tx, {
               collectionItemId: input.collectionItemId,
+              customFinish: input.customFinish,
               finishOptionId: input.finishOptionId,
               materialId: input.materialId,
               productId,
@@ -789,6 +797,7 @@ async function updateCollectionItemSnapshot(
   tx: CatalogTransaction,
   input: {
     collectionItemId: number;
+    customFinish: ProductWriteFinishOption | null;
     finishOptionId: number | null;
     materialId: number;
     productId: number;
@@ -800,16 +809,16 @@ async function updateCollectionItemSnapshot(
     .set({ materialId: input.materialId })
     .where(eq(schema.collectionItem.id, input.collectionItemId));
 
-  if (input.finishOptionId !== null) {
+  if (input.customFinish !== null || input.finishOptionId !== null) {
     await tx
       .delete(schema.finishOption)
       .where(eq(schema.finishOption.collectionItemId, input.collectionItemId));
-    await copyProductFinishOption(
-      tx,
-      input.productId,
-      input.finishOptionId,
-      input.collectionItemId,
-    );
+    await createCollectionFinishOption(tx, {
+      collectionItemId: input.collectionItemId,
+      customFinish: input.customFinish,
+      productFinishOptionId: input.finishOptionId,
+      productId: input.productId,
+    });
     return;
   }
 
@@ -1232,6 +1241,62 @@ async function copyProductFinishOption(
   }
 }
 
+async function createCollectionFinishOption(
+  tx: CatalogTransaction,
+  input: {
+    collectionItemId: number;
+    customFinish: ProductWriteFinishOption | null;
+    productFinishOptionId: number | null;
+    productId: number;
+  },
+) {
+  if (
+    (input.productFinishOptionId === null) ===
+    (input.customFinish === null)
+  ) {
+    throw new Error("Select one finish option.");
+  }
+  if (input.productFinishOptionId !== null) {
+    await copyProductFinishOption(
+      tx,
+      input.productId,
+      input.productFinishOptionId,
+      input.collectionItemId,
+    );
+    return;
+  }
+
+  const customFinish = input.customFinish;
+  if (!customFinish) throw new Error("A finish is required.");
+  await validateFinishOptions(tx, [customFinish]);
+  const [option] = await tx
+    .insert(schema.finishOption)
+    .values({
+      collectionItemId: input.collectionItemId,
+      colorEffectId: customFinish.colorEffectId,
+      position: 0,
+    })
+    .returning({ id: schema.finishOption.id });
+  if (!option) throw new Error("Failed to create finish snapshot.");
+
+  await tx.insert(schema.finishOptionFinish).values(
+    customFinish.finishIds.map((finishId, position) => ({
+      finishId,
+      finishOptionId: option.id,
+      position,
+    })),
+  );
+  if (customFinish.colorIds.length) {
+    await tx.insert(schema.finishOptionColor).values(
+      customFinish.colorIds.map((colorId, position) => ({
+        colorId,
+        finishOptionId: option.id,
+        position,
+      })),
+    );
+  }
+}
+
 async function replaceProductFinishOptions(
   tx: CatalogTransaction,
   productId: number,
@@ -1272,7 +1337,7 @@ async function replaceProductFinishOptions(
 }
 
 async function validateFinishOptions(
-  db: Database,
+  db: Pick<Database, "select">,
   options: ProductWriteFinishOption[],
 ) {
   if (!options.length)
