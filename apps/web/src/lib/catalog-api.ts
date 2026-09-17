@@ -179,7 +179,14 @@ const collectionAddSchema = z
 const collectionEditSchema = z.object({
   collectionItemId: idSchema,
   finishOptionId: idSchema.nullable(),
-  installedButtonId: idSchema.nullable().optional(),
+  installedButton: z
+    .object({
+      collectionItemId: idSchema,
+      finishOptionId: idSchema.nullable(),
+      materialId: idSchema,
+    })
+    .nullable()
+    .optional(),
   materialId: idSchema,
 });
 
@@ -496,12 +503,23 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
       actorClerkId,
       data.collectionItemId,
     );
-    if (!item) return { item: null, ownedButtons: [], product: null };
-    const [items, products] = await Promise.all([
+    if (!item) {
+      return {
+        buttonProducts: [],
+        item: null,
+        ownedButtons: [],
+        product: null,
+      };
+    }
+    const [items, products, buttonProducts] = await Promise.all([
       s.db.collections.listOwned(actorClerkId),
       s.db.catalog.listProducts(item.productTypeSlug),
+      item.productTypeSlug === "spinner"
+        ? s.db.catalog.listProducts("spinner-button")
+        : Promise.resolve([]),
     ]);
     return {
+      buttonProducts,
       item,
       ownedButtons: items.filter(
         (candidate) => candidate.productTypeSlug === "spinner-button",

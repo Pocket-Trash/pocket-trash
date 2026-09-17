@@ -22,6 +22,7 @@ export const Route = createFileRoute("/collections/edit/$collectionItemId")({
     const data = await getCollectionEditData({ data: params });
     if (!data.item || !data.product) throw notFound();
     return {
+      buttonProducts: data.buttonProducts,
       item: data.item,
       ownedButtons: data.ownedButtons,
       product: data.product,

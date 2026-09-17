@@ -9,6 +9,7 @@ import {
 } from "./index.js";
 
 function setup(returningRows: unknown[][], selectRows: unknown[][]) {
+  const updates: Array<{ table: unknown; value: unknown }> = [];
   const writes: Array<{ table: unknown; value: unknown }> = [];
   const query = () => {
     const take = async () => selectRows.shift() ?? [];
@@ -40,7 +41,14 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
         };
       }),
     })),
+    delete: vi.fn(() => ({ where: vi.fn(async () => []) })),
     select: vi.fn(query),
+    update: vi.fn((table: unknown) => ({
+      set: vi.fn((value: unknown) => {
+        updates.push({ table, value });
+        return { where: vi.fn(async () => []) };
+      }),
+    })),
   };
   const db = {
     transaction: vi.fn(async (callback: (value: typeof tx) => unknown) =>
@@ -59,6 +67,7 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
   return {
     db,
     service: createCollectionsService(db, users as never, logger),
+    updates,
     users,
     writes,
   };
@@ -193,6 +202,46 @@ describe("collection catalog writes", () => {
       }),
     ).rejects.toThrow(/does not exist/i);
     expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it("updates spinner and installed button snapshots in one transaction", async () => {
+    const { db, service, updates } = setup(
+      [],
+      [
+        [{ buttonProductId: null, spinnerProductId: 1100 }],
+        [{ materialId: 1101 }],
+        [{ id: 3100 }],
+        [{ id: 2000, productId: 1200 }],
+        [{ materialId: 1201 }],
+        [{ id: 3200 }],
+      ],
+    );
+
+    await expect(
+      service.updateItem({
+        actorClerkId: "user-secret",
+        collectionItemId: 2001,
+        finishOptionId: null,
+        installedButton: {
+          collectionItemId: 2000,
+          finishOptionId: null,
+          materialId: 1201,
+        },
+        materialId: 1101,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(db.transaction).toHaveBeenCalledOnce();
+    expect(updates).toEqual(
+      expect.arrayContaining([
+        { table: schema.collectionItem, value: { materialId: 1101 } },
+        { table: schema.collectionItem, value: { materialId: 1201 } },
+        {
+          table: schema.collectionSpinner,
+          value: { installedButtonId: 2000 },
+        },
+      ]),
+    );
   });
 
   it("rejects a material not offered by the selected product", async () => {

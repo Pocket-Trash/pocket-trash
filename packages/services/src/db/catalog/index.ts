@@ -156,7 +156,11 @@ export type CollectionsService = {
     actorClerkId: string;
     collectionItemId: number;
     finishOptionId: number | null;
-    installedButtonId?: number | null;
+    installedButton?: {
+      collectionItemId: number;
+      finishOptionId: number | null;
+      materialId: number;
+    } | null;
     materialId: number;
   }): Promise<void>;
 };
@@ -716,48 +720,24 @@ export function createCollectionsService(
               throw new Error("Collection item does not exist.");
             }
 
-            await assertProductMaterial(tx, productId, input.materialId);
-            await tx
-              .update(schema.collectionItem)
-              .set({ materialId: input.materialId })
-              .where(eq(schema.collectionItem.id, input.collectionItemId));
+            await updateCollectionItemSnapshot(tx, {
+              collectionItemId: input.collectionItemId,
+              finishOptionId: input.finishOptionId,
+              materialId: input.materialId,
+              productId,
+            });
 
-            if (input.finishOptionId !== null) {
-              await tx
-                .delete(schema.finishOption)
-                .where(
-                  eq(
-                    schema.finishOption.collectionItemId,
-                    input.collectionItemId,
-                  ),
-                );
-              await copyProductFinishOption(
-                tx,
-                productId,
-                input.finishOptionId,
-                input.collectionItemId,
-              );
-            } else {
-              const [finish] = await tx
-                .select({ id: schema.finishOption.id })
-                .from(schema.finishOption)
-                .where(
-                  eq(
-                    schema.finishOption.collectionItemId,
-                    input.collectionItemId,
-                  ),
-                )
-                .limit(1);
-              if (!finish) throw new Error("A finish is required.");
-            }
-
-            if (input.installedButtonId !== undefined) {
+            if (input.installedButton !== undefined) {
               if (item.spinnerProductId === null) {
                 throw new Error("Collection item is not a spinner.");
               }
-              if (input.installedButtonId !== null) {
+              if (input.installedButton !== null) {
                 const [button] = await tx
-                  .select({ id: schema.collectionSpinnerButton.id })
+                  .select({
+                    id: schema.collectionSpinnerButton.id,
+                    productId:
+                      schema.collectionSpinnerButton.productSpinnerButtonId,
+                  })
                   .from(schema.collectionSpinnerButton)
                   .innerJoin(
                     schema.collectionItem,
@@ -770,7 +750,7 @@ export function createCollectionsService(
                     and(
                       eq(
                         schema.collectionSpinnerButton.id,
-                        input.installedButtonId,
+                        input.installedButton.collectionItemId,
                       ),
                       eq(schema.collectionItem.ownerId, owner.id),
                       eq(schema.collectionItem.owned, true),
@@ -780,22 +760,65 @@ export function createCollectionsService(
                 if (!button) {
                   throw new Error("Installed button does not exist.");
                 }
+                await updateCollectionItemSnapshot(tx, {
+                  ...input.installedButton,
+                  productId: button.productId,
+                });
               }
               await tx
                 .update(schema.collectionSpinner)
-                .set({ installedButtonId: input.installedButtonId })
+                .set({
+                  installedButtonId:
+                    input.installedButton?.collectionItemId ?? null,
+                })
                 .where(eq(schema.collectionSpinner.id, input.collectionItemId));
             }
           });
         },
         actorAttributes(input.actorClerkId, {
           collectionItemId: input.collectionItemId,
-          installedButtonId: input.installedButtonId,
+          installedButtonId: input.installedButton?.collectionItemId,
           materialId: input.materialId,
         }),
       );
     },
   };
+}
+
+async function updateCollectionItemSnapshot(
+  tx: CatalogTransaction,
+  input: {
+    collectionItemId: number;
+    finishOptionId: number | null;
+    materialId: number;
+    productId: number;
+  },
+) {
+  await assertProductMaterial(tx, input.productId, input.materialId);
+  await tx
+    .update(schema.collectionItem)
+    .set({ materialId: input.materialId })
+    .where(eq(schema.collectionItem.id, input.collectionItemId));
+
+  if (input.finishOptionId !== null) {
+    await tx
+      .delete(schema.finishOption)
+      .where(eq(schema.finishOption.collectionItemId, input.collectionItemId));
+    await copyProductFinishOption(
+      tx,
+      input.productId,
+      input.finishOptionId,
+      input.collectionItemId,
+    );
+    return;
+  }
+
+  const [finish] = await tx
+    .select({ id: schema.finishOption.id })
+    .from(schema.finishOption)
+    .where(eq(schema.finishOption.collectionItemId, input.collectionItemId))
+    .limit(1);
+  if (!finish) throw new Error("A finish is required.");
 }
 
 async function queryProducts(

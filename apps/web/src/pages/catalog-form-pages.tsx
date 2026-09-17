@@ -1050,10 +1050,12 @@ function localizedFinishLabel(
 }
 
 export function CollectionEditPage({
+  buttonProducts,
   item,
   ownedButtons,
   product,
 }: {
+  buttonProducts: CatalogProduct[];
   item: UserCollectionItem;
   ownedButtons: UserCollectionItem[];
   product: CatalogProduct;
@@ -1069,14 +1071,37 @@ export function CollectionEditPage({
       ? { id: "current", name: localizedFinishLabel(item.finishOption, t) }
       : null,
   );
+  const initialButton = ownedButtons.find(
+    ({ collectionItemId }) => collectionItemId === item.installedButtonId,
+  );
   const [button, setButton] = React.useState<ComboboxOption | null>(() => {
-    const selected = ownedButtons.find(
-      ({ collectionItemId }) => collectionItemId === item.installedButtonId,
-    );
-    return selected
-      ? { id: selected.collectionItemId, name: selected.name }
+    return initialButton
+      ? { id: initialButton.collectionItemId, name: initialButton.name }
       : { id: "default", name: t("web.catalog.defaultButton") };
   });
+  const [buttonMaterial, setButtonMaterial] =
+    React.useState<CatalogLookup | null>(initialButton?.material ?? null);
+  const [buttonFinish, setButtonFinish] = React.useState<ComboboxOption | null>(
+    () =>
+      initialButton?.finishOption
+        ? {
+            id: "current",
+            name: localizedFinishLabel(initialButton.finishOption, t),
+          }
+        : null,
+  );
+  const selectedButton = ownedButtons.find(
+    ({ collectionItemId }) => collectionItemId === button?.id,
+  );
+  const selectedButtonProduct = buttonProducts.find(
+    ({ id }) => id === selectedButton?.productId,
+  );
+  const buttonSelectionIsValid =
+    item.productTypeSlug !== "spinner" ||
+    button?.id === "default" ||
+    Boolean(
+      selectedButton && selectedButtonProduct && buttonMaterial && buttonFinish,
+    );
 
   return (
     <AppShell
@@ -1106,7 +1131,21 @@ export function CollectionEditPage({
                   name,
                 })),
               ]}
-              onValueChange={setButton}
+              onValueChange={(value) => {
+                setButton(value);
+                const selected = ownedButtons.find(
+                  ({ collectionItemId }) => collectionItemId === value?.id,
+                );
+                setButtonMaterial(selected?.material ?? null);
+                setButtonFinish(
+                  selected?.finishOption
+                    ? {
+                        id: "current",
+                        name: localizedFinishLabel(selected.finishOption, t),
+                      }
+                    : null,
+                );
+              }}
               placeholder={t("web.catalog.defaultButton")}
               removeLabel={t("web.action.close")}
               showSelectedPill
@@ -1114,20 +1153,51 @@ export function CollectionEditPage({
             />
           </Field>
         ) : null}
+        {selectedButton && selectedButtonProduct ? (
+          <CollectionProductFields
+            currentFinish={selectedButton.finishOption}
+            finish={buttonFinish}
+            material={buttonMaterial}
+            onFinishChange={setButtonFinish}
+            onMaterialChange={setButtonMaterial}
+            product={selectedButtonProduct}
+            t={t}
+          />
+        ) : null}
         <Button
-          disabled={!material || !finish}
+          disabled={!material || !finish || !buttonSelectionIsValid}
           onClick={async () => {
-            if (!material || !finish) return;
+            if (!material || !finish || !buttonSelectionIsValid) return;
+            let installedButton:
+              | {
+                  collectionItemId: number;
+                  finishOptionId: number | null;
+                  materialId: number;
+                }
+              | null
+              | undefined;
+            if (item.productTypeSlug === "spinner") {
+              if (button?.id === "default") {
+                installedButton = null;
+              } else {
+                if (!selectedButton || !buttonMaterial || !buttonFinish) return;
+                installedButton = {
+                  collectionItemId: selectedButton.collectionItemId,
+                  finishOptionId:
+                    buttonFinish.id === "current"
+                      ? null
+                      : Number(buttonFinish.id),
+                  materialId: buttonMaterial.id,
+                };
+              }
+            }
             const result = await updateCollectionItem({
               data: {
                 collectionItemId: item.collectionItemId,
                 finishOptionId:
                   finish.id === "current" ? null : Number(finish.id),
                 ...(item.productTypeSlug === "spinner"
-                  ? {
-                      installedButtonId:
-                        button?.id === "default" ? null : Number(button?.id),
-                    }
+                  ? { installedButton }
                   : {}),
                 materialId: material.id,
               },
