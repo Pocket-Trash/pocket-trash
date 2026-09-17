@@ -117,8 +117,8 @@ jobs:
         id: api-preview-comment-token
         uses: actions/create-github-app-token@v3
         with:
-          client-id: ${{ env.POCKET_TRASH_API_PREVIEW_APP_CLIENT_ID }}
-          private-key: ${{ env.POCKET_TRASH_API_PREVIEW_APP_PRIVATE_KEY }}
+          client-id: ${{ env.GITHUB_CF_APP_CLIENT_ID }}
+          private-key: ${{ env.GITHUB_CF_APP_TOKEN }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
           permission-issues: write
