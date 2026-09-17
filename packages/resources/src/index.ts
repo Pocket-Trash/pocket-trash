@@ -14,6 +14,7 @@ export type ResourceStorageConfig = {
   fetch?: FetchLike;
   folderPrefix?: string;
   randomUUID?: () => string;
+  tokenKey?: string;
   zoneName?: string;
 };
 
@@ -78,6 +79,7 @@ type BunnyObject = {
 export const maxBufferedResourceBytes = 4 * 1024 * 1024;
 export const maxSessionFileBytes = 20 * 1024 * 1024;
 export const maxSessionBytes = 50 * 1024 * 1024;
+export const resourceUrlLifetimeSeconds = 120;
 const allowedMimeTypes = {
   ".3mf": [
     "application/octet-stream",
@@ -181,6 +183,49 @@ export function createResourceStorage(
       return upload(config, input, allowedPreviewMimeTypes);
     },
   };
+}
+
+export async function signResourceUrl(input: {
+  cdnBaseUrl?: string;
+  expiresAt?: number;
+  objectPath: string;
+  tokenKey?: string;
+}): Promise<string> {
+  const cdnBaseUrl = input.cdnBaseUrl?.trim();
+  const tokenKey = input.tokenKey?.trim();
+  if (!cdnBaseUrl) throw new Error("RESOURCE_CDN_BASE_URL is required.");
+  if (!tokenKey) throw new Error("RESOURCE_CDN_TOKEN_KEY is required.");
+
+  const expiresAt =
+    input.expiresAt ??
+    Math.floor(Date.now() / 1000) + resourceUrlLifetimeSeconds;
+  if (!Number.isSafeInteger(expiresAt) || expiresAt <= 0) {
+    throw new Error("Resource URL expiry is invalid.");
+  }
+
+  const url = new URL(
+    buildUrl(cdnBaseUrl, normalizeObjectPath(input.objectPath)),
+  );
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(tokenKey),
+    { hash: "SHA-256", name: "HMAC" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`${decodeURIComponent(url.pathname)}${expiresAt}`),
+  );
+  const token = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+
+  url.searchParams.set("token", `HS256-${token}`);
+  url.searchParams.set("expires", String(expiresAt));
+  return url.toString();
 }
 
 export async function deletePreviewResourceFolder(

@@ -231,7 +231,7 @@ describe("resources service", () => {
                             return [
                               {
                                 id: 1001,
-                                url: "https://cdn.example.test/file.stl",
+                                objectPath: "resources/dev/file.stl",
                               },
                             ];
                           },
@@ -250,12 +250,17 @@ describe("resources service", () => {
       db,
       {} as ResourceStorage,
       createNoopLogger({ app: "web", environment: "test" }),
+      async (objectPath) => {
+        calls.push("signed");
+        expect(objectPath).toBe("resources/dev/file.stl");
+        return "https://cdn.example.test/resources/dev/file.stl?token=signed";
+      },
     );
 
     await expect(service.download(1000, 1001)).resolves.toBe(
-      "https://cdn.example.test/file.stl",
+      "https://cdn.example.test/resources/dev/file.stl?token=signed",
     );
-    expect(calls).toEqual(["selected", "recorded"]);
+    expect(calls).toEqual(["selected", "recorded", "signed"]);
   });
 
   it("returns resource detail with event-derived download counts", async () => {
@@ -301,7 +306,9 @@ describe("resources service", () => {
                 name: "Pocket clip",
                 privateReason: null,
                 privatedAt: null,
-                previewImageUrl: null,
+                previewImageObjectPath: "resources/dev/preview.webp",
+                previewImageUrl:
+                  "https://cdn.example.test/resources/dev/preview.webp",
                 uploaderClerkId: "user_123",
               },
             ],
@@ -346,6 +353,8 @@ describe("resources service", () => {
       { select } as unknown as Database,
       {} as ResourceStorage,
       createNoopLogger({ app: "web", environment: "test" }),
+      async (objectPath) =>
+        `https://cdn.example.test/${objectPath}?token=signed`,
     );
 
     await expect(service.getDetail(1000)).resolves.toEqual({
@@ -359,7 +368,8 @@ describe("resources service", () => {
       name: "Pocket clip",
       privateReason: null,
       privatedAt: null,
-      previewImageUrl: null,
+      previewImageUrl:
+        "https://cdn.example.test/resources/dev/preview.webp?token=signed",
       uploaderClerkId: "user_123",
       versions: [currentVersion],
     });
@@ -393,35 +403,53 @@ describe("resources service", () => {
 
   it("lists directory cards and rejects unknown category filters", async () => {
     const categories = [{ id: 1002, name: "3D printing", slug: "3d-printing" }];
-    const resources = [
+    const resourceRows = [
       {
         categories,
         createdAt: new Date("2026-09-16T12:00:00Z"),
         currentVersion: {
+          fileId: 1003,
           fileName: "clip.stl",
           id: 1001,
         },
         downloadCount: 3,
         id: 1000,
         name: "Pocket clip",
-        previewImageUrl: null,
+        previewImageObjectPath: "resources/dev/preview.webp",
       },
     ];
     const execute = vi
       .fn()
       .mockResolvedValueOnce({ rows: categories })
-      .mockResolvedValueOnce({ rows: resources })
+      .mockResolvedValueOnce({ rows: resourceRows })
       .mockResolvedValueOnce({ rows: categories });
     const service = createResourcesService(
       { execute } as unknown as Database,
       {} as ResourceStorage,
       createNoopLogger({ app: "web", environment: "test" }),
+      async (objectPath) =>
+        `https://cdn.example.test/${objectPath}?token=signed`,
     );
 
     await expect(service.listDirectory(["3d-printing"])).resolves.toEqual({
       categories,
       invalidFilters: [],
-      resources,
+      resources: [
+        {
+          categories,
+          createdAt: new Date("2026-09-16T12:00:00Z"),
+          currentVersion: {
+            fileId: 1003,
+            fileName: "clip.stl",
+            id: 1001,
+          },
+          downloadCount: 3,
+          id: 1000,
+          name: "Pocket clip",
+          previewImageUrl:
+            "https://cdn.example.test/resources/dev/preview.webp?token=signed",
+        },
+      ],
     });
     await expect(service.listDirectory(["missing-category"])).resolves.toEqual({
       categories,

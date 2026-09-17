@@ -47,6 +47,7 @@ services.configure({
   resources:
     serverEnv.RESOURCE_STORAGE_ACCESS_KEY &&
     serverEnv.RESOURCE_CDN_BASE_URL &&
+    serverEnv.RESOURCE_CDN_TOKEN_KEY &&
     serverEnv.RESOURCE_STORAGE_ENDPOINT &&
     serverEnv.RESOURCE_STORAGE_ZONE_NAME
       ? {
@@ -54,6 +55,7 @@ services.configure({
           cdnBaseUrl: serverEnv.RESOURCE_CDN_BASE_URL,
           endpoint: serverEnv.RESOURCE_STORAGE_ENDPOINT,
           folderPrefix: serverEnv.RESOURCE_FOLDER_PREFIX,
+          tokenKey: serverEnv.RESOURCE_CDN_TOKEN_KEY,
           zoneName: serverEnv.RESOURCE_STORAGE_ZONE_NAME,
         }
       : undefined,

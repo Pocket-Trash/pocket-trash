@@ -164,8 +164,8 @@ export function ResourcesPage({
                         try {
                           const url = await downloadResource({
                             data: {
+                              fileId: resource.currentVersion.fileId,
                               resourceId: resource.id,
-                              versionId: resource.currentVersion.id,
                             },
                           });
                           if (!url) throw new Error("missing download");

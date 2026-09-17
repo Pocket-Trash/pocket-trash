@@ -7,6 +7,7 @@ import {
   type ResourceStorageConfig,
   type ResourceUploadInput,
   type ResourceUploadResult,
+  signResourceUrl,
 } from "@package/resources";
 import { count, desc, eq, ilike, sql } from "drizzle-orm";
 import { hashLogIdentifier } from "../logging.js";
@@ -83,6 +84,7 @@ export type ResourceDirectoryItem = {
   categories: { id: number; name: string; slug: string }[];
   createdAt: Date;
   currentVersion: {
+    fileId: number;
     fileName: string;
     id: number;
   };
@@ -157,6 +159,9 @@ export function createResourcesService(
   db: Database,
   storage: ResourceStorage,
   logger: Logger,
+  signUrl: (objectPath: string) => Promise<string> = async () => {
+    throw new Error("Resource URL signing is not configured.");
+  },
 ): ResourcesService {
   return {
     async addVersion(input) {
@@ -278,7 +283,7 @@ export function createResourcesService(
           const [file] = await db
             .select({
               id: schema.resourceFiles.id,
-              url: schema.resourceFiles.url,
+              objectPath: schema.resourceFiles.objectPath,
             })
             .from(schema.resourceFiles)
             .innerJoin(
@@ -301,7 +306,7 @@ export function createResourcesService(
           if (!file) return null;
 
           await db.insert(schema.resourceDownloads).values({ fileId: file.id });
-          return file.url;
+          return await signUrl(file.objectPath);
         },
         { attributes: { fileId, resourceId } },
       );
@@ -414,7 +419,9 @@ export function createResourcesService(
             name: resource.name,
             privateReason: resource.privateReason,
             privatedAt: resource.privatedAt,
-            previewImageUrl: resource.previewImageUrl,
+            previewImageUrl: resource.previewImageObjectPath
+              ? await signUrl(resource.previewImageObjectPath)
+              : null,
             uploaderClerkId: resource.uploaderClerkId,
             versions: versionDetails,
           };
@@ -460,7 +467,11 @@ export function createResourcesService(
                       sql`, `,
                     )})
                 )`;
-          const resourceResult = await db.execute<ResourceDirectoryItem>(sql`
+          const resourceResult = await db.execute<
+            Omit<ResourceDirectoryItem, "previewImageUrl"> & {
+              previewImageObjectPath: string | null;
+            }
+          >(sql`
             select
               resources.id,
               resources.name,
@@ -468,9 +479,10 @@ export function createResourcesService(
               resources.is_private as "isPrivate",
               resources.private_reason as "privateReason",
               resources.created_at as "createdAt",
-              resources.preview_image_url as "previewImageUrl",
+              resources.preview_image_object_path as "previewImageObjectPath",
               jsonb_build_object(
                 'id', current_version.id,
+                'fileId', current_version.file_id,
                 'fileName', current_version.file_name
               ) as "currentVersion",
               count(distinct resource_downloads.id)::int as "downloadCount",
@@ -486,10 +498,11 @@ export function createResourcesService(
               ) as categories
             from resources
             inner join lateral (
-              select resource_versions.id, first_file.file_name
+              select resource_versions.id, first_file.id as file_id,
+                first_file.file_name
               from resource_versions
               inner join lateral (
-                select file_name
+                select id, file_name
                 from resource_files
                 where resource_files.version_id = resource_versions.id
                 order by resource_files.id
@@ -513,14 +526,24 @@ export function createResourcesService(
                 or ${Boolean(viewer.isAdmin)}
                 or ${schema.resources.uploaderClerkId} = ${viewer.clerkId ?? ""})
               and ${filter}
-            group by resources.id, current_version.id, current_version.file_name
+            group by resources.id, current_version.id, current_version.file_id,
+              current_version.file_name
             order by resources.created_at desc
           `);
 
           return {
             categories,
             invalidFilters,
-            resources: resourceResult.rows,
+            resources: await Promise.all(
+              resourceResult.rows.map(
+                async ({ previewImageObjectPath, ...resource }) => ({
+                  ...resource,
+                  previewImageUrl: previewImageObjectPath
+                    ? await signUrl(previewImageObjectPath)
+                    : null,
+                }),
+              ),
+            ),
           };
         },
         { attributes: { categoryCount: categorySlugs.length } },
@@ -734,7 +757,12 @@ export function createConfiguredResourcesService(
   config: ResourceStorageConfig,
   logger: Logger,
 ): ResourcesService {
-  return createResourcesService(db, createResourceStorage(config), logger);
+  return createResourcesService(
+    db,
+    createResourceStorage(config),
+    logger,
+    async (objectPath) => await signResourceUrl({ ...config, objectPath }),
+  );
 }
 
 async function persistResource(

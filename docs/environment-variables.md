@@ -37,6 +37,7 @@ the scraper on Railway. Browser logs are forwarded to Axiom through the API.
 | `IMAGE_FOLDER_PREFIX` | Server | Image folder prefix for preview isolation. |
 | `ASSET_FOLDER_PREFIX` | Server/build | Static asset namespace; always `assets`. |
 | `RESOURCE_CDN_BASE_URL` | Server | Public Bunny resource delivery origin. |
+| `RESOURCE_CDN_TOKEN_KEY` | Secret | Signs short-lived Bunny resource URLs. |
 | `RESOURCE_FOLDER_PREFIX` | Server | Resource namespace: `resources/files`, `resources/dev`, `resources/preview`, or `resources/preview/pr-<number>`. |
 | `RESOURCE_STORAGE_ACCESS_KEY` | Server | Resource Storage Zone password. |
 | `RESOURCE_STORAGE_ENDPOINT` | Server | Regional Bunny Storage API origin. |

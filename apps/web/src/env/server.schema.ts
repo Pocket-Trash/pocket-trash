@@ -15,6 +15,7 @@ export type WebServerRuntimeEnv = {
   LOG_LEVEL?: string;
   LOG_PROXY_CLIENT_KEY?: string;
   RESOURCE_CDN_BASE_URL?: string;
+  RESOURCE_CDN_TOKEN_KEY?: string;
   RESOURCE_FOLDER_PREFIX?: string;
   RESOURCE_STORAGE_ACCESS_KEY?: string;
   RESOURCE_STORAGE_ENDPOINT?: string;
@@ -39,6 +40,7 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
       LOG_LEVEL: runtimeEnv.LOG_LEVEL,
       LOG_PROXY_CLIENT_KEY: runtimeEnv.LOG_PROXY_CLIENT_KEY,
       RESOURCE_CDN_BASE_URL: runtimeEnv.RESOURCE_CDN_BASE_URL,
+      RESOURCE_CDN_TOKEN_KEY: runtimeEnv.RESOURCE_CDN_TOKEN_KEY,
       RESOURCE_FOLDER_PREFIX: runtimeEnv.RESOURCE_FOLDER_PREFIX,
       RESOURCE_STORAGE_ACCESS_KEY: runtimeEnv.RESOURCE_STORAGE_ACCESS_KEY,
       RESOURCE_STORAGE_ENDPOINT: runtimeEnv.RESOURCE_STORAGE_ENDPOINT,
@@ -63,6 +65,7 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
         .optional(),
       LOG_PROXY_CLIENT_KEY: z.string().min(1).optional(),
       RESOURCE_CDN_BASE_URL: z.string().url().optional(),
+      RESOURCE_CDN_TOKEN_KEY: z.string().min(1).optional(),
       RESOURCE_FOLDER_PREFIX: z
         .string()
         .regex(/^resources\/(?:dev|files|preview(?:\/pr-[1-9]\d*)?)$/u)
