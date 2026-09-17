@@ -12,7 +12,7 @@ import {
   FileDown,
   FileText,
   Pencil,
-  Upload,
+  Plus,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -51,9 +51,9 @@ export function ResourcesPage({
     <AppShell
       headerActions={
         isSignedIn ? (
-          <Button nativeButton={false} render={<Link to="/resources/upload" />}>
-            <Upload />
-            {t("web.resources.action.upload")}
+          <Button nativeButton={false} render={<Link to="/resources/add" />}>
+            <Plus />
+            {t("web.resources.action.add" as TranslationKey)}
           </Button>
         ) : null
       }

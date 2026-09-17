@@ -1,11 +1,14 @@
 import { Upload, X } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { appendResourceUploadFiles } from "@/lib/resource-upload-sessions";
+import { cn } from "@/lib/utils";
 
 const acceptedResourceFiles = ".stl,.3mf,.step,.stp,.pdf,.txt,.zip";
 
 export function ResourceFileInput({
+  browseLabel,
   description,
   disabled,
   fileTypes,
@@ -15,6 +18,7 @@ export function ResourceFileInput({
   onFilesChange,
   removeFileLabel,
 }: {
+  browseLabel: string;
   description: string;
   disabled?: boolean;
   fileTypes: string;
@@ -24,11 +28,61 @@ export function ResourceFileInput({
   onFilesChange(files: File[]): void;
   removeFileLabel: string;
 }) {
+  return (
+    <FileDropInput
+      accept={acceptedResourceFiles}
+      browseLabel={browseLabel}
+      description={description}
+      disabled={disabled}
+      files={files}
+      fileTypes={fileTypes}
+      id={id}
+      label={label}
+      multiple
+      onFilesChange={(additions) =>
+        onFilesChange(appendResourceUploadFiles(files, additions))
+      }
+      onRemove={(index) =>
+        onFilesChange(files.filter((_, fileIndex) => fileIndex !== index))
+      }
+      removeFileLabel={removeFileLabel}
+    />
+  );
+}
+
+export function FileDropInput({
+  accept,
+  browseLabel,
+  description,
+  disabled,
+  fileTypes,
+  files,
+  id,
+  label,
+  multiple = false,
+  onFilesChange,
+  onRemove,
+  removeFileLabel,
+}: {
+  accept: string;
+  browseLabel: string;
+  description: string;
+  disabled?: boolean;
+  fileTypes: string;
+  files: File[];
+  id: string;
+  label: string;
+  multiple?: boolean;
+  onFilesChange(files: File[]): void;
+  onRemove(index: number): void;
+  removeFileLabel: string;
+}) {
   const descriptionId = `${id}-description`;
+  const [dragActive, setDragActive] = useState(false);
 
   function addFiles(additions: Iterable<File>) {
     if (!disabled) {
-      onFilesChange(appendResourceUploadFiles(files, additions));
+      onFilesChange(multiple ? [...additions] : [...additions].slice(0, 1));
     }
   }
 
@@ -36,12 +90,12 @@ export function ResourceFileInput({
     <div className="grid gap-2 text-sm font-medium">
       <div>
         <Input
-          accept={acceptedResourceFiles}
+          accept={accept}
           aria-describedby={descriptionId}
           className="peer sr-only"
           disabled={disabled}
           id={id}
-          multiple
+          multiple={multiple}
           onChange={(event) => {
             addFiles(event.currentTarget.files ?? []);
             event.currentTarget.value = "";
@@ -49,14 +103,24 @@ export function ResourceFileInput({
           type="file"
         />
         <label
-          className="flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-background px-4 py-6 text-center transition-colors hover:border-ring peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50 peer-disabled:pointer-events-none peer-disabled:opacity-50"
+          className={cn(
+            "flex min-h-44 cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-input bg-background px-6 py-10 text-center transition-colors hover:border-ring hover:bg-accent/40 peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50 peer-disabled:pointer-events-none peer-disabled:opacity-50",
+            dragActive && "border-ring bg-accent/60",
+          )}
           htmlFor={id}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            if (!disabled) setDragActive(true);
+          }}
+          onDragLeave={() => setDragActive(false)}
           onDragOver={(event) => {
             event.preventDefault();
             event.dataTransfer.dropEffect = disabled ? "none" : "copy";
+            if (!disabled) setDragActive(true);
           }}
           onDrop={(event) => {
             event.preventDefault();
+            setDragActive(false);
             addFiles(event.dataTransfer.files);
           }}
         >
@@ -70,6 +134,9 @@ export function ResourceFileInput({
           </span>
           <span className="text-xs font-normal text-muted-foreground">
             {fileTypes}
+          </span>
+          <span className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent">
+            {browseLabel}
           </span>
         </label>
       </div>
@@ -87,11 +154,7 @@ export function ResourceFileInput({
               <Button
                 aria-label={`${removeFileLabel} ${file.name}`}
                 className="size-11"
-                onClick={() =>
-                  onFilesChange(
-                    files.filter((_, fileIndex) => fileIndex !== index),
-                  )
-                }
+                onClick={() => onRemove(index)}
                 size="icon"
                 type="button"
                 variant="ghost"

@@ -18,7 +18,7 @@ import { Route as UserCollectionsRouteImport } from './routes/user.collections'
 import { Route as UserAccountRouteImport } from './routes/user.account'
 import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
-import { Route as ResourcesUploadRouteImport } from './routes/resources.upload'
+import { Route as ResourcesAddRouteImport } from './routes/resources.add'
 import { Route as ResourcesResourceIdRouteImport } from './routes/resources.$resourceId'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
@@ -72,9 +72,9 @@ const SignInSplatRoute = SignInSplatRouteImport.update({
   path: '/sign-in/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ResourcesUploadRoute = ResourcesUploadRouteImport.update({
-  id: '/upload',
-  path: '/upload',
+const ResourcesAddRoute = ResourcesAddRouteImport.update({
+  id: '/add',
+  path: '/add',
   getParentRoute: () => ResourcesRoute,
 } as any)
 const ResourcesResourceIdRoute = ResourcesResourceIdRouteImport.update({
@@ -123,7 +123,7 @@ export interface FileRoutesByFullPath {
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
   '/resources/$resourceId': typeof ResourcesResourceIdRoute
-  '/resources/upload': typeof ResourcesUploadRoute
+  '/resources/add': typeof ResourcesAddRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
@@ -141,7 +141,7 @@ export interface FileRoutesByTo {
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
   '/resources/$resourceId': typeof ResourcesResourceIdRoute
-  '/resources/upload': typeof ResourcesUploadRoute
+  '/resources/add': typeof ResourcesAddRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
@@ -161,7 +161,7 @@ export interface FileRoutesById {
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
   '/resources/$resourceId': typeof ResourcesResourceIdRoute
-  '/resources/upload': typeof ResourcesUploadRoute
+  '/resources/add': typeof ResourcesAddRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
@@ -182,7 +182,7 @@ export interface FileRouteTypes {
     | '/user'
     | '/pens/$penId'
     | '/resources/$resourceId'
-    | '/resources/upload'
+    | '/resources/add'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/user/account'
@@ -200,7 +200,7 @@ export interface FileRouteTypes {
     | '/user'
     | '/pens/$penId'
     | '/resources/$resourceId'
-    | '/resources/upload'
+    | '/resources/add'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/user/account'
@@ -219,7 +219,7 @@ export interface FileRouteTypes {
     | '/user'
     | '/pens/$penId'
     | '/resources/$resourceId'
-    | '/resources/upload'
+    | '/resources/add'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/user/account'
@@ -309,11 +309,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignInSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/resources/upload': {
-      id: '/resources/upload'
-      path: '/upload'
-      fullPath: '/resources/upload'
-      preLoaderRoute: typeof ResourcesUploadRouteImport
+    '/resources/add': {
+      id: '/resources/add'
+      path: '/add'
+      fullPath: '/resources/add'
+      preLoaderRoute: typeof ResourcesAddRouteImport
       parentRoute: typeof ResourcesRoute
     }
     '/resources/$resourceId': {
@@ -370,7 +370,7 @@ declare module '@tanstack/react-router' {
 
 interface ResourcesRouteChildren {
   ResourcesResourceIdRoute: typeof ResourcesResourceIdRoute
-  ResourcesUploadRoute: typeof ResourcesUploadRoute
+  ResourcesAddRoute: typeof ResourcesAddRoute
   ResourcesIndexRoute: typeof ResourcesIndexRoute
   ResourcesResourceIdEditRoute: typeof ResourcesResourceIdEditRoute
   ResourcesResourceIdVersionsNewRoute: typeof ResourcesResourceIdVersionsNewRoute
@@ -378,7 +378,7 @@ interface ResourcesRouteChildren {
 
 const ResourcesRouteChildren: ResourcesRouteChildren = {
   ResourcesResourceIdRoute: ResourcesResourceIdRoute,
-  ResourcesUploadRoute: ResourcesUploadRoute,
+  ResourcesAddRoute: ResourcesAddRoute,
   ResourcesIndexRoute: ResourcesIndexRoute,
   ResourcesResourceIdEditRoute: ResourcesResourceIdEditRoute,
   ResourcesResourceIdVersionsNewRoute: ResourcesResourceIdVersionsNewRoute,
