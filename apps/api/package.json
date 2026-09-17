@@ -1,0 +1,30 @@
+{
+  "name": "@app/api",
+  "version": "0.2.8",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx ../../packages/infisical-runner/src/cli.ts api dev -- wrangler dev --port 4006",
+    "dev:web": "pnpm run dev",
+    "build": "tsc -p tsconfig.json",
+    "build:ci": "tsc -p tsconfig.json",
+    "check": "biome check .",
+    "cf-typegen": "wrangler types src/worker-configuration.d.ts --include-runtime false",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:ci": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hono/zod-openapi": "^1.6.3",
+    "@package/logger": "workspace:*",
+    "@scalar/hono-api-reference": "^0.12.2",
+    "hono": "^4.13.8"
+  },
+  "devDependencies": {
+    "@package/eslint": "workspace:*",
+    "@package/tsconfig": "workspace:*",
+    "wrangler": "4.133.0"
+  }
+}
