@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   resourceCategories,
   resourceDownloads,
+  resourceFiles,
   resourceNotifications,
   resources,
   resourcesToCategories,
@@ -25,10 +26,12 @@ describe("resource schema", () => {
       "resource_versions_resource_version_unique",
     );
     expect(resourceVersions.resourceId.notNull).toBe(true);
-    expect(resourceVersions.objectPath.notNull).toBe(true);
+    expect(getTableName(resourceFiles)).toBe("resource_files");
+    expect(resourceFiles.versionId.notNull).toBe(true);
+    expect(resourceFiles.objectPath.notNull).toBe(true);
 
     expect(getTableName(resourceDownloads)).toBe("resource_downloads");
-    expect(resourceDownloads.versionId.notNull).toBe(true);
+    expect(resourceDownloads.fileId.notNull).toBe(false);
     expect("resourceId" in resourceDownloads).toBe(false);
   });
 

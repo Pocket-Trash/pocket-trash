@@ -3,7 +3,7 @@ import { formatTranslation } from "@pocket-trash/localizations";
 import { createServerFn } from "@tanstack/react-start";
 
 type ResourceIdInput = { resourceId: number };
-type ResourceDownloadInput = ResourceIdInput & { versionId: number };
+type ResourceDownloadInput = ResourceIdInput & { fileId: number };
 
 type SessionClaimsWithRole = {
   role?: unknown;
@@ -21,7 +21,7 @@ export const createResource = createServerFn({ method: "POST" })
 
     return await s.resources.create({
       ...data,
-      file: await toUploadInput(data.file),
+      files: await Promise.all(data.files.map(toUploadInput)),
       preview: data.preview ? await toUploadInput(data.preview) : undefined,
       uploaderClerkId: userId,
     });
@@ -152,7 +152,7 @@ export const uploadResourceVersion = createServerFn({ method: "POST" })
     const userId = await requireResourceUploader();
     const { s } = await import("@/lib/services");
     return await s.resources.addVersion({
-      file: await toUploadInput(data.file),
+      files: await Promise.all(data.files.map(toUploadInput)),
       resourceId: data.resourceId,
       uploaderClerkId: userId,
     });
@@ -180,7 +180,7 @@ export const downloadResource = createServerFn({ method: "POST" })
     const { s } = await import("@/lib/services");
     return await s.resources.download(
       data.resourceId,
-      data.versionId,
+      data.fileId,
       await getResourceViewer(),
     );
   });
@@ -215,7 +215,7 @@ export function parseResourceUpload(input: unknown) {
   if (!(input instanceof FormData)) throw invalidResourceRequest();
   const name = input.get("name");
   const description = input.get("description");
-  const file = input.get("file");
+  const files = input.getAll("files");
   const previewValue = input.get("preview");
   const preview = isEmptyFile(previewValue) ? undefined : previewValue;
   const categories = input.getAll("categories");
@@ -223,7 +223,9 @@ export function parseResourceUpload(input: unknown) {
   if (
     typeof name !== "string" ||
     typeof description !== "string" ||
-    !isFile(file) ||
+    files.length === 0 ||
+    files.length > 10 ||
+    files.some((file) => !isFile(file)) ||
     (preview !== null && preview !== undefined && !isFile(preview)) ||
     categories.length === 0 ||
     categories.some((category) => typeof category !== "string")
@@ -234,7 +236,7 @@ export function parseResourceUpload(input: unknown) {
   return {
     categories: categories as string[],
     description,
-    file,
+    files: files as File[],
     name,
     preview: preview ?? undefined,
   };
@@ -273,11 +275,17 @@ export function parseResourceUpdate(input: unknown) {
 export function parseResourceVersionUpload(input: unknown) {
   if (!(input instanceof FormData)) throw invalidResourceRequest();
   const resourceId = Number(input.get("resourceId"));
-  const file = input.get("file");
-  if (!Number.isSafeInteger(resourceId) || resourceId <= 0 || !isFile(file)) {
+  const files = input.getAll("files");
+  if (
+    !Number.isSafeInteger(resourceId) ||
+    resourceId <= 0 ||
+    files.length === 0 ||
+    files.length > 10 ||
+    files.some((file) => !isFile(file))
+  ) {
     throw invalidResourceRequest();
   }
-  return { file, resourceId };
+  return { files: files as File[], resourceId };
 }
 
 function parseResourceId(input: unknown): ResourceIdInput {
@@ -293,11 +301,11 @@ function parseResourceId(input: unknown): ResourceIdInput {
 
 function parseResourceDownload(input: unknown): ResourceDownloadInput {
   const { resourceId } = parseResourceId(input);
-  const versionId = Number((input as { versionId?: unknown }).versionId);
-  if (!Number.isSafeInteger(versionId) || versionId <= 0) {
+  const fileId = Number((input as { fileId?: unknown }).fileId);
+  if (!Number.isSafeInteger(fileId) || fileId <= 0) {
     throw invalidResourceRequest();
   }
-  return { resourceId, versionId };
+  return { fileId, resourceId };
 }
 
 function parseNotificationId(input: unknown) {

@@ -79,11 +79,13 @@ describe("resources service", () => {
       service.create({
         categories: ["3D printing", "Refill tools"],
         description: "A useful clip.",
-        file: {
-          bytes: new Uint8Array([1]),
-          contentType: "model/stl",
-          fileName: "clip.stl",
-        },
+        files: [
+          {
+            bytes: new Uint8Array([1]),
+            contentType: "model/stl",
+            fileName: "clip.stl",
+          },
+        ],
         name: "Pocket clip",
         uploaderClerkId: "user_123",
       }),
@@ -135,11 +137,13 @@ describe("resources service", () => {
       service.create({
         categories: ["3D printing"],
         description: "A useful clip.",
-        file: {
-          bytes: new Uint8Array([1]),
-          contentType: "model/stl",
-          fileName: "private-file.stl",
-        },
+        files: [
+          {
+            bytes: new Uint8Array([1]),
+            contentType: "model/stl",
+            fileName: "private-file.stl",
+          },
+        ],
         name: "Pocket clip",
         preview: {
           bytes: new Uint8Array([2]),
@@ -158,13 +162,44 @@ describe("resources service", () => {
     );
     expect(events[0]?.attributes).toMatchObject({
       categoryCount: 1,
-      fileNameHash: hashLogIdentifier("private-file.stl"),
+      fileCount: 1,
       operation: loggerMessages.resources.create,
       outcome: "failure",
       uploaderClerkIdHash: hashLogIdentifier("user_private"),
     });
     expect(JSON.stringify(events)).not.toContain("private-file.stl");
     expect(JSON.stringify(events)).not.toContain("user_private");
+  });
+
+  it("rejects duplicate filenames case-insensitively before upload", async () => {
+    const upload = vi.fn();
+    const service = createResourcesService(
+      {} as Database,
+      { upload } as unknown as ResourceStorage,
+      createNoopLogger({ app: "web", environment: "test" }),
+    );
+
+    await expect(
+      service.create({
+        categories: ["3D printing"],
+        description: "A useful clip.",
+        files: [
+          {
+            bytes: new Uint8Array([1]),
+            contentType: "model/stl",
+            fileName: "clip.stl",
+          },
+          {
+            bytes: new Uint8Array([2]),
+            contentType: "model/stl",
+            fileName: "CLIP.STL",
+          },
+        ],
+        name: "Pocket clip",
+        uploaderClerkId: "user_123",
+      }),
+    ).rejects.toThrow("Resource filenames must be unique within a version.");
+    expect(upload).not.toHaveBeenCalled();
   });
 
   it("records a download before returning the file URL", async () => {
@@ -183,16 +218,20 @@ describe("resources service", () => {
             return {
               innerJoin() {
                 return {
-                  where() {
+                  innerJoin() {
                     return {
-                      async limit() {
-                        calls.push("selected");
-                        return [
-                          {
-                            id: 1001,
-                            url: "https://cdn.example.test/file.stl",
+                      where() {
+                        return {
+                          async limit() {
+                            calls.push("selected");
+                            return [
+                              {
+                                id: 1001,
+                                url: "https://cdn.example.test/file.stl",
+                              },
+                            ];
                           },
-                        ];
+                        };
                       },
                     };
                   },
@@ -218,14 +257,31 @@ describe("resources service", () => {
   it("returns resource detail with event-derived download counts", async () => {
     const createdAt = new Date("2026-09-16T12:00:00Z");
     const categories = [{ id: 1002, name: "3D printing", slug: "3d-printing" }];
-    const currentVersion = {
-      contentType: "model/stl",
+    const version = {
       createdAt,
+      id: 1001,
+      version: 1,
+    };
+    const file = {
+      contentType: "model/stl",
       downloadCount: 2,
       fileName: "clip.stl",
-      id: 1001,
+      id: 1003,
       size: 42,
-      version: 1,
+      versionId: 1001,
+    };
+    const currentVersion = {
+      ...version,
+      downloadCount: 2,
+      files: [
+        {
+          contentType: file.contentType,
+          downloadCount: file.downloadCount,
+          fileName: file.fileName,
+          id: file.id,
+          size: file.size,
+        },
+      ],
     };
     const select = vi
       .fn()
@@ -250,10 +306,17 @@ describe("resources service", () => {
       })
       .mockReturnValueOnce({
         from: () => ({
+          where: () => ({
+            orderBy: async () => [version],
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: () => ({
           leftJoin: () => ({
-            where: () => ({
-              groupBy: () => ({
-                orderBy: async () => [currentVersion],
+            innerJoin: () => ({
+              where: () => ({
+                groupBy: () => ({ orderBy: async () => [file] }),
               }),
             }),
           }),
@@ -268,8 +331,10 @@ describe("resources service", () => {
       })
       .mockReturnValueOnce({
         from: () => ({
-          leftJoin: () => ({
-            where: async () => [{ downloadCount: 3 }],
+          innerJoin: () => ({
+            leftJoin: () => ({
+              where: async () => [{ downloadCount: 3 }],
+            }),
           }),
         }),
       });
@@ -440,11 +505,13 @@ describe("resources service", () => {
 
     await expect(
       service.addVersion({
-        file: {
-          bytes: new Uint8Array([1]),
-          contentType: "model/stl",
-          fileName: "clip.stl",
-        },
+        files: [
+          {
+            bytes: new Uint8Array([1]),
+            contentType: "model/stl",
+            fileName: "clip.stl",
+          },
+        ],
         resourceId: 1000,
         uploaderClerkId: "user_other",
       }),
@@ -526,11 +593,13 @@ describe("resources service", () => {
 
     await expect(
       service.addVersion({
-        file: {
-          bytes: new Uint8Array([1]),
-          contentType: "model/stl",
-          fileName: "clip.stl",
-        },
+        files: [
+          {
+            bytes: new Uint8Array([1]),
+            contentType: "model/stl",
+            fileName: "clip.stl",
+          },
+        ],
         resourceId: 1000,
         uploaderClerkId: "user_123",
       }),

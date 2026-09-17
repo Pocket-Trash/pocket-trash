@@ -1,17 +1,17 @@
 # Resource Storage
 
-Pocket Trash stores downloadable resources in a dedicated Bunny Storage Zone
-and serves public files through its linked Pull Zone.
+Pocket Trash stores downloadable resources in the shared Bunny Storage Zone and
+serves protected files through its linked Pull Zone.
 
 ## Bunny services
 
 | Service | Value |
 | --- | --- |
-| Storage Zone | `pocket-trash-resources` |
+| Storage Zone | `pocket-trash-storage` |
 | Storage tier | Standard |
 | Primary region | New York (`NY`) |
-| Pull Zone | `pocket-trash-resources` |
-| CDN hostname | `pocket-trash-resources.b-cdn.net` |
+| Pull Zone | `pocket-trash` |
+| CDN hostname | `cdn.pocket-trash.app` |
 
 Use the Storage Zone password, not the Bunny account API key, as
 `RESOURCE_STORAGE_ACCESS_KEY`. Keep every `RESOURCE_*` value server-only.
@@ -20,10 +20,10 @@ Use the Storage Zone password, not the Bunny account API key, as
 
 | Environment | `RESOURCE_FOLDER_PREFIX` | Object path root |
 | --- | --- | --- |
-| Production | `files` | `pocket-trash-resources/files` |
-| Local | `dev` | `pocket-trash-resources/dev` |
-| Shared preview | `preview` | `pocket-trash-resources/preview` |
-| Isolated preview | `preview/pr-<number>` | `pocket-trash-resources/preview/pr-<number>` |
+| Production | `resources/files` | `resources/files` |
+| Local | `resources/dev` | `resources/dev` |
+| Shared preview | `resources/preview` | `resources/preview` |
+| Isolated preview | `resources/preview/pr-<number>` | `resources/preview/pr-<number>` |
 
 The PR deploy workflow selects shared or isolated preview storage alongside the
 database namespace. The close workflow deletes only the matching isolated PR
@@ -31,9 +31,10 @@ prefix.
 
 ## Upload limits
 
-Version 1 accepts files up to 4 MiB. Allowed extension and MIME pairs are:
+Each version accepts 1–10 files up to 4 MiB each. Filenames must be unique
+within a version, case-insensitively. Allowed extension and MIME pairs are:
 
-- `.stl`: `model/stl`, `application/sla`
+- `.stl`: `model/stl`, `application/sla`, `application/octet-stream`
 - `.3mf`: `application/vnd.ms-package.3dmanufacturing-3dmodel+xml`
 - `.step` and `.stp`: `model/step`, `application/step`
 - `.pdf`: `application/pdf`

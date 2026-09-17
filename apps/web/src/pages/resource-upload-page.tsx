@@ -123,9 +123,9 @@ export function ResourceUploadPage() {
 
           <Field
             description={t("web.resources.upload.fileHelp", {
-              maxFiles: 1,
               maxFileSize: "4 MiB",
-              maxSessionSize: "8 MiB",
+              maxFiles: 10,
+              maxSessionSize: "40 MiB",
             })}
             htmlFor="resource-file"
             label={t("web.resources.upload.filesLabel")}
@@ -134,7 +134,8 @@ export function ResourceUploadPage() {
               accept=".stl,.3mf,.step,.stp,.pdf,.txt,.zip"
               className="h-auto py-2 file:mr-3 file:font-medium"
               id="resource-file"
-              name="file"
+              multiple
+              name="files"
               required
               type="file"
             />

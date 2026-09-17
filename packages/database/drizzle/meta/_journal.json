@@ -141,6 +141,13 @@
       "when": 1789602407795,
       "tag": "0019_keen_stardust",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789606707814,
+      "tag": "0020_same_iron_fist",
+      "breakpoints": true
     }
   ]
 }

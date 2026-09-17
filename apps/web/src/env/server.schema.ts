@@ -2,6 +2,7 @@ import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 
 export type WebServerRuntimeEnv = {
+  ASSET_FOLDER_PREFIX?: string;
   AXIOM_DATASET?: string;
   AXIOM_EDGE_DOMAIN?: string;
   AXIOM_TOKEN?: string;
@@ -25,6 +26,7 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
     emptyStringAsUndefined: true,
     isServer: true,
     runtimeEnvStrict: {
+      ASSET_FOLDER_PREFIX: runtimeEnv.ASSET_FOLDER_PREFIX,
       AXIOM_DATASET: runtimeEnv.AXIOM_DATASET,
       AXIOM_EDGE_DOMAIN: runtimeEnv.AXIOM_EDGE_DOMAIN,
       AXIOM_TOKEN: runtimeEnv.AXIOM_TOKEN,
@@ -43,12 +45,16 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
       RESOURCE_STORAGE_ZONE_NAME: runtimeEnv.RESOURCE_STORAGE_ZONE_NAME,
     },
     server: {
+      ASSET_FOLDER_PREFIX: z.literal("assets").optional(),
       AXIOM_DATASET: z.string().min(1).optional(),
       AXIOM_EDGE_DOMAIN: z.string().min(1).optional(),
       AXIOM_TOKEN: z.string().min(1).optional(),
       CLERK_SECRET_KEY: z.string().min(1),
       DATABASE_URL: z.string().min(1).url(),
-      IMAGE_FOLDER_PREFIX: z.string().min(1).optional(),
+      IMAGE_FOLDER_PREFIX: z
+        .string()
+        .regex(/^images(?:\/(?:dev|preview(?:\/pr-[1-9]\d*)?))?$/u)
+        .optional(),
       LOGGER: z.enum(["compact", "verbose"]).optional(),
       LOG_DEPLOYMENT_ID: z.string().min(1).optional(),
       LOG_DEPLOYMENT_TARGET: z.string().min(1).optional(),
@@ -59,7 +65,7 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
       RESOURCE_CDN_BASE_URL: z.string().url().optional(),
       RESOURCE_FOLDER_PREFIX: z
         .string()
-        .regex(/^(?:dev|files|preview(?:\/pr-[1-9]\d*)?)$/u)
+        .regex(/^resources\/(?:dev|files|preview(?:\/pr-[1-9]\d*)?)$/u)
         .optional(),
       RESOURCE_STORAGE_ACCESS_KEY: z.string().min(1).optional(),
       RESOURCE_STORAGE_ENDPOINT: z.string().url().optional(),

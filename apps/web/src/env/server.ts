@@ -2,6 +2,7 @@ import process from "node:process";
 import { createWebServerEnv } from "./server.schema";
 
 export const serverEnv = createWebServerEnv({
+  ASSET_FOLDER_PREFIX: process.env.ASSET_FOLDER_PREFIX,
   AXIOM_DATASET: process.env.AXIOM_DATASET,
   AXIOM_EDGE_DOMAIN: process.env.AXIOM_EDGE_DOMAIN,
   AXIOM_TOKEN: process.env.AXIOM_TOKEN,

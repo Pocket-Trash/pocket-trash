@@ -1,6 +1,8 @@
 import { createWebClientEnv } from "./client.schema";
 
 export const clientEnv = createWebClientEnv({
+  VITE_ASSET_FOLDER_PREFIX: import.meta.env.VITE_ASSET_FOLDER_PREFIX,
+  VITE_CDN_BASE_URL: import.meta.env.VITE_CDN_BASE_URL,
   VITE_CLERK_PUBLISHABLE_KEY: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
   VITE_CLERK_SIGN_IN_URL: import.meta.env.VITE_CLERK_SIGN_IN_URL,
   VITE_CLERK_SIGN_UP_URL: import.meta.env.VITE_CLERK_SIGN_UP_URL,

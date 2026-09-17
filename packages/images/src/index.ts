@@ -145,7 +145,7 @@ export function buildPreviewImageFolderPath(prNumber: number): string {
     throw new Error("Image preview cleanup requires a positive PR number.");
   }
 
-  return `/preview/pr-${prNumber}`;
+  return `/images/preview/pr-${prNumber}`;
 }
 
 function createBunnyImageStorage(config: BunnyStorageConfig): ImageStorage {
@@ -552,9 +552,9 @@ function normalizeImageFilePath(filePath: string): string {
 function normalizePreviewFolderPath(folderPath: string): string {
   const normalizedFolder = normalizeImageFolder(folderPath).replace(/\/$/u, "");
 
-  if (!/^\/preview\/pr-[1-9]\d*$/u.test(normalizedFolder)) {
+  if (!/^\/images\/preview\/pr-[1-9]\d*$/u.test(normalizedFolder)) {
     throw new Error(
-      "Image preview cleanup can only delete /preview/pr-<number> folders.",
+      "Image preview cleanup can only delete /images/preview/pr-<number> folders.",
     );
   }
 

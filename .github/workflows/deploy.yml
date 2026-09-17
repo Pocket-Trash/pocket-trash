@@ -317,9 +317,9 @@ jobs:
           set -euo pipefail
 
           if [[ "$DB_CHANGING" == "true" ]]; then
-            export IMAGE_FOLDER_PREFIX="preview/pr-${PR_NUMBER}"
+            export IMAGE_FOLDER_PREFIX="images/preview/pr-${PR_NUMBER}"
           else
-            export IMAGE_FOLDER_PREFIX="preview"
+            export IMAGE_FOLDER_PREFIX="images/preview"
           fi
 
           bash .github/scripts/vercel-branch-database-url.sh set-image-folder-prefix
@@ -335,9 +335,9 @@ jobs:
           set -euo pipefail
 
           if [[ "$DB_CHANGING" == "true" ]]; then
-            export RESOURCE_FOLDER_PREFIX="preview/pr-${PR_NUMBER}"
+            export RESOURCE_FOLDER_PREFIX="resources/preview/pr-${PR_NUMBER}"
           else
-            export RESOURCE_FOLDER_PREFIX="preview"
+            export RESOURCE_FOLDER_PREFIX="resources/preview"
           fi
 
           bash .github/scripts/vercel-branch-database-url.sh set-resource-folder-prefix
@@ -398,10 +398,10 @@ jobs:
 
           railway_environment="pocket-trash-pr-${PR_NUMBER}"
           if [[ "$DB_CHANGING" == "true" ]]; then
-            image_folder_prefix="preview/pr-${PR_NUMBER}"
+            image_folder_prefix="images/preview/pr-${PR_NUMBER}"
             scraper_cron_enabled="true"
           else
-            image_folder_prefix="preview"
+            image_folder_prefix="images/preview"
             scraper_cron_enabled="false"
           fi
           redis_url_reference='$'"{{${RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME}.REDIS_PUBLIC_URL}}"

@@ -234,16 +234,16 @@ export const schemaDescriptions = {
       image_file_id: {
         description:
           "Image storage file identifier used for updates and deletes.",
-        example: "/preview/pr-52/products/1000-1001/image.webp",
+        example: "/images/preview/pr-52/products/1000-1001/image.webp",
       },
       image_path: {
         description: "Image storage object path.",
-        example: "/preview/pr-52/products/1000-1001/image.webp",
+        example: "/images/preview/pr-52/products/1000-1001/image.webp",
       },
       image_url: {
         description: "Optimized uploaded image URL.",
         example:
-          "https://cdn.pocket-trash.app/preview/pr-52/products/1000-1001/image.webp",
+          "https://cdn.pocket-trash.app/images/preview/pr-52/products/1000-1001/image.webp",
       },
       status: {
         description: "Image upload/delete lifecycle status.",

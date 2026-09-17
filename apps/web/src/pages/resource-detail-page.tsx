@@ -19,27 +19,29 @@ type ResourceDetail = NonNullable<
 
 export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
   const { locale } = useLocale();
-  const [downloadingVersionId, setDownloadingVersionId] = useState<number>();
+  const [downloadingFileId, setDownloadingFileId] = useState<number>();
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
 
-  async function startDownload(version: ResourceDetail["currentVersion"]) {
-    setDownloadingVersionId(version.id);
+  async function startDownload(
+    file: ResourceDetail["currentVersion"]["files"][number],
+  ) {
+    setDownloadingFileId(file.id);
     try {
       const url = await downloadResource({
-        data: { resourceId: detail.id, versionId: version.id },
+        data: { fileId: file.id, resourceId: detail.id },
       });
       if (!url) throw new Error("missing download");
       window.location.assign(url);
     } catch {
       toast.error(
         t("web.resources.error.downloadUnavailable", {
-          filename: version.fileName,
+          filename: file.fileName,
         }),
       );
-      setDownloadingVersionId(undefined);
+      setDownloadingFileId(undefined);
     }
   }
 
@@ -120,16 +122,6 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
           </h2>
           <dl className="mt-4 grid gap-2 text-sm text-muted-foreground">
             <DetailRow
-              label={t("web.resources.detail.filename", {
-                filename: detail.currentVersion.fileName,
-              })}
-            />
-            <DetailRow
-              label={t("web.resources.detail.fileSize", {
-                size: formatFileSize(detail.currentVersion.size, locale),
-              })}
-            />
-            <DetailRow
               label={t("web.resources.detail.downloadCount", {
                 count: detail.currentVersion.downloadCount,
               })}
@@ -141,15 +133,18 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
               })}
             />
           </dl>
-          <Button
-            className="mt-5 w-full"
-            disabled={downloadingVersionId === detail.currentVersion.id}
-            onClick={() => void startDownload(detail.currentVersion)}
-            type="button"
-          >
-            <FileDown />
-            {t("web.resources.action.download")}
-          </Button>
+          <div className="mt-5 grid gap-2">
+            {detail.currentVersion.files.map((file) => (
+              <ResourceFileDownload
+                downloading={downloadingFileId === file.id}
+                file={file}
+                key={file.id}
+                locale={locale}
+                onDownload={startDownload}
+                t={t}
+              />
+            ))}
+          </div>
           {detail.canEdit ? (
             <Button
               className="mt-2 w-full"
@@ -185,17 +180,6 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
                     })}
                   </h3>
                   <span>
-                    {t("web.resources.detail.filename", {
-                      filename: version.fileName,
-                    })}
-                  </span>
-                  <span>{version.contentType}</span>
-                  <span>
-                    {t("web.resources.detail.fileSize", {
-                      size: formatFileSize(version.size, locale),
-                    })}
-                  </span>
-                  <span>
                     {t("web.resources.detail.downloadCount", {
                       count: version.downloadCount,
                     })}
@@ -207,21 +191,66 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
                     })}
                   </span>
                 </div>
-                <Button
-                  disabled={downloadingVersionId === version.id}
-                  onClick={() => void startDownload(version)}
-                  type="button"
-                  variant="outline"
-                >
-                  <FileDown />
-                  {t("web.resources.action.download")}
-                </Button>
+                <div className="grid gap-2">
+                  {version.files.map((file) => (
+                    <ResourceFileDownload
+                      downloading={downloadingFileId === file.id}
+                      file={file}
+                      key={file.id}
+                      locale={locale}
+                      onDownload={startDownload}
+                      t={t}
+                    />
+                  ))}
+                </div>
               </article>
             ))}
           </div>
         </section>
       </main>
     </AppShell>
+  );
+}
+
+function ResourceFileDownload({
+  downloading,
+  file,
+  locale,
+  onDownload,
+  t,
+}: {
+  downloading: boolean;
+  file: ResourceDetail["currentVersion"]["files"][number];
+  locale: SupportedLocale;
+  onDownload: (file: ResourceDetail["currentVersion"]["files"][number]) => void;
+  t: (key: TranslationKey, params?: Record<string, number | string>) => string;
+}) {
+  return (
+    <div className="grid gap-2 rounded-md border border-border p-3 text-sm">
+      <span>
+        {t("web.resources.detail.filename", { filename: file.fileName })}
+      </span>
+      <span className="text-muted-foreground">{file.contentType}</span>
+      <span className="text-muted-foreground">
+        {t("web.resources.detail.fileSize", {
+          size: formatFileSize(file.size, locale),
+        })}
+      </span>
+      <span className="text-muted-foreground">
+        {t("web.resources.detail.downloadCount", {
+          count: file.downloadCount,
+        })}
+      </span>
+      <Button
+        disabled={downloading}
+        onClick={() => onDownload(file)}
+        type="button"
+        variant="outline"
+      >
+        <FileDown />
+        {t("web.resources.action.download")}
+      </Button>
+    </div>
   );
 }
 

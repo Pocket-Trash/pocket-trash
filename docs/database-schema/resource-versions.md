@@ -11,12 +11,12 @@ Immutable uploaded file versions for resources.
 | `id` | `bigint` | yes | PK |  |  |  |  |
 | `resource_id` | `bigint` | yes | FK |  | `resources.id` (on delete cascade) |  |  |
 | `version` | `integer` | yes |  |  |  |  |  |
-| `file_name` | `text` | yes |  |  |  |  |  |
-| `content_type` | `text` | yes |  |  |  |  |  |
-| `size` | `integer` | yes |  |  |  |  |  |
-| `storage_provider` | `text` | yes |  | `'bunny'` |  |  |  |
-| `object_path` | `text` | yes | unique |  |  |  |  |
-| `url` | `text` | yes |  |  |  |  |  |
+| `file_name` | `text` | no |  |  |  |  |  |
+| `content_type` | `text` | no |  |  |  |  |  |
+| `size` | `integer` | no |  |  |  |  |  |
+| `storage_provider` | `text` | no |  | `'bunny'` |  |  |  |
+| `object_path` | `text` | no | unique |  |  |  |  |
+| `url` | `text` | no |  |  |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 
 ## Indexes

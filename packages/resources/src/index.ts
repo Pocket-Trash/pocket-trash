@@ -59,7 +59,7 @@ const allowedMimeTypes = {
   ".3mf": ["application/vnd.ms-package.3dmanufacturing-3dmodel+xml"],
   ".pdf": ["application/pdf"],
   ".step": ["application/step", "model/step"],
-  ".stl": ["application/sla", "model/stl"],
+  ".stl": ["application/octet-stream", "application/sla", "model/stl"],
   ".stp": ["application/step", "model/step"],
   ".txt": ["text/plain"],
   ".zip": ["application/x-zip-compressed", "application/zip"],
@@ -76,15 +76,15 @@ export function buildResourceFolderPrefix(input: {
   isolatedPreviewPrNumber?: number;
 }): string {
   if (input.environment === "production") {
-    return "files";
+    return "resources/files";
   }
 
   if (input.environment === "development") {
-    return "dev";
+    return "resources/dev";
   }
 
   if (input.isolatedPreviewPrNumber === undefined) {
-    return "preview";
+    return "resources/preview";
   }
 
   return buildPreviewFolderPath(input.isolatedPreviewPrNumber);
@@ -299,7 +299,7 @@ function buildPreviewFolderPath(prNumber: number): string {
     throw new Error("Resource preview cleanup requires a positive PR number.");
   }
 
-  return `preview/pr-${prNumber}`;
+  return `resources/preview/pr-${prNumber}`;
 }
 
 function normalizeFolderPrefix(folderPrefix: string | undefined): string {
@@ -307,7 +307,7 @@ function normalizeFolderPrefix(folderPrefix: string | undefined): string {
 
   if (
     !normalized ||
-    !/^(?:dev|files|preview(?:\/pr-[1-9]\d*)?)$/u.test(normalized)
+    !/^resources\/(?:dev|files|preview(?:\/pr-[1-9]\d*)?)$/u.test(normalized)
   ) {
     throw new Error("RESOURCE_FOLDER_PREFIX is invalid.");
   }

@@ -7,42 +7,42 @@ import {
 
 const config = {
   accessKey: "storage-key",
-  cdnBaseUrl: "https://pocket-trash-resources.b-cdn.net",
+  cdnBaseUrl: "https://cdn.pocket-trash.app",
   endpoint: "https://ny.storage.bunnycdn.com",
-  folderPrefix: "dev",
+  folderPrefix: "resources/dev",
   randomUUID: () => "00000000-0000-4000-8000-000000000001",
-  zoneName: "pocket-trash-resources",
+  zoneName: "pocket-trash-storage",
 };
 
 describe("resource storage", () => {
   it("selects the object namespace for each deployment environment", () => {
     expect(buildResourceFolderPrefix({ environment: "production" })).toBe(
-      "files",
+      "resources/files",
     );
     expect(buildResourceFolderPrefix({ environment: "development" })).toBe(
-      "dev",
+      "resources/dev",
     );
     expect(buildResourceFolderPrefix({ environment: "preview" })).toBe(
-      "preview",
+      "resources/preview",
     );
     expect(
       buildResourceFolderPrefix({
         environment: "preview",
         isolatedPreviewPrNumber: 52,
       }),
-    ).toBe("preview/pr-52");
+    ).toBe("resources/preview/pr-52");
   });
 
   it("uploads an allowed file without accepting an object path", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       expect(toUrl(input).href).toBe(
-        "https://ny.storage.bunnycdn.com/pocket-trash-resources/dev/00000000-0000-4000-8000-000000000001.stl",
+        "https://ny.storage.bunnycdn.com/pocket-trash-storage/resources/dev/00000000-0000-4000-8000-000000000001.stl",
       );
       expect(init).toMatchObject({
         body: new Uint8Array([1, 2, 3]),
         headers: {
           AccessKey: "storage-key",
-          "content-type": "model/stl",
+          "content-type": "application/octet-stream",
         },
         method: "PUT",
       });
@@ -54,22 +54,22 @@ describe("resource storage", () => {
     await expect(
       storage.upload({
         bytes: new Uint8Array([1, 2, 3]),
-        contentType: "model/stl",
+        contentType: "application/octet-stream",
         fileName: "clip.stl",
       }),
     ).resolves.toEqual({
-      contentType: "model/stl",
+      contentType: "application/octet-stream",
       fileName: "clip.stl",
-      objectPath: "dev/00000000-0000-4000-8000-000000000001.stl",
+      objectPath: "resources/dev/00000000-0000-4000-8000-000000000001.stl",
       size: 3,
-      url: "https://pocket-trash-resources.b-cdn.net/dev/00000000-0000-4000-8000-000000000001.stl",
+      url: "https://cdn.pocket-trash.app/resources/dev/00000000-0000-4000-8000-000000000001.stl",
     });
   });
 
   it("uploads an optional preview image through a separate allowlist", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       expect(toUrl(input).pathname).toBe(
-        "/pocket-trash-resources/dev/00000000-0000-4000-8000-000000000001.webp",
+        "/pocket-trash-storage/resources/dev/00000000-0000-4000-8000-000000000001.webp",
       );
       expect(init?.headers).toMatchObject({ "content-type": "image/webp" });
       return new Response(null, { status: 201 });
@@ -84,7 +84,7 @@ describe("resource storage", () => {
       }),
     ).resolves.toMatchObject({
       contentType: "image/webp",
-      objectPath: "dev/00000000-0000-4000-8000-000000000001.webp",
+      objectPath: "resources/dev/00000000-0000-4000-8000-000000000001.webp",
     });
 
     await expect(
@@ -127,15 +127,19 @@ describe("resource storage", () => {
   it("deletes only objects in the configured namespace", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       expect(toUrl(input).pathname).toBe(
-        "/pocket-trash-resources/dev/resource.stl",
+        "/pocket-trash-storage/resources/dev/resource.stl",
       );
       expect(init?.method).toBe("DELETE");
       return new Response(null, { status: 200 });
     });
     const storage = createResourceStorage({ ...config, fetch: fetchMock });
 
-    await expect(storage.delete("dev/resource.stl")).resolves.toBe("deleted");
-    await expect(storage.delete("files/resource.stl")).rejects.toThrow(
+    await expect(storage.delete("resources/dev/resource.stl")).resolves.toBe(
+      "deleted",
+    );
+    await expect(
+      storage.delete("resources/files/resource.stl"),
+    ).rejects.toThrow(
       "Resource object path is outside the configured namespace.",
     );
   });
@@ -144,11 +148,11 @@ describe("resource storage", () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const path = toUrl(input).pathname;
 
-      if (path === "/pocket-trash-resources/preview/pr-52/") {
+      if (path === "/pocket-trash-storage/resources/preview/pr-52/") {
         return jsonResponse([{ IsDirectory: false, ObjectName: "clip.stl" }]);
       }
 
-      if (path === "/pocket-trash-resources/preview/pr-52/clip.stl") {
+      if (path === "/pocket-trash-storage/resources/preview/pr-52/clip.stl") {
         expect(init?.method).toBe("DELETE");
         return new Response(null, { status: 200 });
       }
@@ -163,7 +167,7 @@ describe("resource storage", () => {
         prNumber: 52,
       }),
     ).resolves.toEqual({
-      folderPath: "preview/pr-52",
+      folderPath: "resources/preview/pr-52",
       status: "deleted",
     });
     await expect(

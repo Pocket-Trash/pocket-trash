@@ -10,6 +10,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const resourceNotificationTypes = [
@@ -66,6 +67,37 @@ export const resourceVersions = pgTable(
       .notNull()
       .references(() => resources.id, { onDelete: "cascade" }),
     version: integer("version").notNull(),
+    legacyFileName: text("file_name"),
+    legacyContentType: text("content_type"),
+    legacySize: integer("size"),
+    legacyStorageProvider: text("storage_provider").default("bunny"),
+    legacyObjectPath: text("object_path"),
+    legacyUrl: text("url"),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("resource_versions_resource_id_idx").on(table.resourceId),
+    unique("resource_versions_resource_version_unique").on(
+      table.resourceId,
+      table.version,
+    ),
+    unique("resource_versions_object_path_unique").on(table.legacyObjectPath),
+    check("resource_versions_version_positive", sql`${table.version} > 0`),
+    check("resource_versions_size_positive", sql`${table.legacySize} > 0`),
+  ],
+);
+
+export const resourceFiles = pgTable(
+  "resource_files",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    versionId: bigint("version_id", { mode: "number" })
+      .notNull()
+      .references(() => resourceVersions.id, { onDelete: "cascade" }),
     fileName: text("file_name").notNull(),
     contentType: text("content_type").notNull(),
     size: integer("size").notNull(),
@@ -77,14 +109,13 @@ export const resourceVersions = pgTable(
       .notNull(),
   },
   (table) => [
-    index("resource_versions_resource_id_idx").on(table.resourceId),
-    unique("resource_versions_resource_version_unique").on(
-      table.resourceId,
-      table.version,
+    index("resource_files_version_id_idx").on(table.versionId),
+    unique("resource_files_object_path_unique").on(table.objectPath),
+    uniqueIndex("resource_files_version_file_name_unique").on(
+      table.versionId,
+      sql`lower(${table.fileName})`,
     ),
-    unique("resource_versions_object_path_unique").on(table.objectPath),
-    check("resource_versions_version_positive", sql`${table.version} > 0`),
-    check("resource_versions_size_positive", sql`${table.size} > 0`),
+    check("resource_files_size_positive", sql`${table.size} > 0`),
   ],
 );
 
@@ -125,14 +156,22 @@ export const resourceDownloads = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    versionId: bigint("version_id", { mode: "number" })
-      .notNull()
-      .references(() => resourceVersions.id, { onDelete: "restrict" }),
+    versionId: bigint("version_id", { mode: "number" }).references(
+      () => resourceVersions.id,
+      { onDelete: "restrict" },
+    ),
+    fileId: bigint("file_id", { mode: "number" }).references(
+      () => resourceFiles.id,
+      { onDelete: "restrict" },
+    ),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
   },
-  (table) => [index("resource_downloads_version_id_idx").on(table.versionId)],
+  (table) => [
+    index("resource_downloads_version_id_idx").on(table.versionId),
+    index("resource_downloads_file_id_idx").on(table.fileId),
+  ],
 );
 
 export const resourceNotifications = pgTable(
@@ -177,6 +216,8 @@ export type Resource = typeof resources.$inferSelect;
 export type NewResource = typeof resources.$inferInsert;
 export type ResourceVersion = typeof resourceVersions.$inferSelect;
 export type NewResourceVersion = typeof resourceVersions.$inferInsert;
+export type ResourceFile = typeof resourceFiles.$inferSelect;
+export type NewResourceFile = typeof resourceFiles.$inferInsert;
 export type ResourceCategory = typeof resourceCategories.$inferSelect;
 export type NewResourceCategory = typeof resourceCategories.$inferInsert;
 export type ResourceDownload = typeof resourceDownloads.$inferSelect;

@@ -376,16 +376,17 @@ export function ResourceVersionUploadPage({
           {t("web.resources.upload.filesLabel")}
           <span className="text-xs font-normal text-muted-foreground">
             {t("web.resources.upload.fileHelp", {
-              maxFiles: 1,
+              maxFiles: 10,
               maxFileSize: "4 MiB",
-              maxSessionSize: "4 MiB",
+              maxSessionSize: "40 MiB",
             })}
           </span>
           <Input
             accept=".stl,.3mf,.step,.stp,.pdf,.txt,.zip"
             className="h-auto py-2 file:mr-3 file:font-medium"
             id="resource-version-file"
-            name="file"
+            multiple
+            name="files"
             required
             type="file"
           />

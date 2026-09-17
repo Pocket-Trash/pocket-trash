@@ -26,12 +26,18 @@ describe("resource detail", () => {
   it("renders private state, reason, and owner/admin edit action", () => {
     const createdAt = new Date("2026-09-16T12:00:00Z");
     const version = {
-      contentType: "model/stl",
       createdAt,
       downloadCount: 0,
-      fileName: "clip.stl",
+      files: [
+        {
+          contentType: "model/stl",
+          downloadCount: 0,
+          fileName: "clip.stl",
+          id: 1002,
+          size: 42,
+        },
+      ],
       id: 1001,
-      size: 42,
       version: 1,
     };
     const html = renderToStaticMarkup(

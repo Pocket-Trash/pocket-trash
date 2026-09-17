@@ -36,11 +36,12 @@ server at same-origin `POST /api/v0/logs`.
 | `LOG_DEPLOYMENT_ID` | Server/build | Optional deployment id. Aliased to `VITE_LOG_DEPLOYMENT_ID`. |
 | `LOG_DEPLOYMENT_TARGET` | Server/build | Optional deployment target. Aliased to `VITE_LOG_DEPLOYMENT_TARGET`. |
 | `IMAGE_FOLDER_PREFIX` | Server | Image folder prefix for preview isolation. |
+| `ASSET_FOLDER_PREFIX` | Server/build | Static asset namespace; always `assets`. |
 | `RESOURCE_CDN_BASE_URL` | Server | Public Bunny resource delivery origin. |
-| `RESOURCE_FOLDER_PREFIX` | Server | Resource namespace: `files`, `dev`, `preview`, or `preview/pr-<number>`. |
+| `RESOURCE_FOLDER_PREFIX` | Server | Resource namespace: `resources/files`, `resources/dev`, `resources/preview`, or `resources/preview/pr-<number>`. |
 | `RESOURCE_STORAGE_ACCESS_KEY` | Server | Resource Storage Zone password. |
 | `RESOURCE_STORAGE_ENDPOINT` | Server | Regional Bunny Storage API origin. |
-| `RESOURCE_STORAGE_ZONE_NAME` | Server | Dedicated resource Storage Zone name. |
+| `RESOURCE_STORAGE_ZONE_NAME` | Server | Shared `pocket-trash-storage` Storage Zone name. |
 | `SITE_URL` | Server | Public site origin when needed. |
 
 ## Scraper
@@ -50,7 +51,7 @@ server at same-origin `POST /api/v0/logs`.
 | `DATABASE_URL` | Postgres connection string. |
 | `REDIS_URL` | Queue backend. |
 | `SCRAPER_CRON_ENABLED` | Enables scheduled scraping on Railway. |
-| `IMAGE_FOLDER_PREFIX` | Image folder namespace. |
+| `IMAGE_FOLDER_PREFIX` | Complete image namespace such as `images`, `images/dev`, or `images/preview`. |
 | `AXIOM_TOKEN`, `AXIOM_DATASET`, `AXIOM_EDGE_DOMAIN`, `LOG_LEVEL`, `LOGGER` | Shared logger configuration. |
 
 ## Hosting

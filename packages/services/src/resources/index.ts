@@ -14,7 +14,7 @@ import { hashLogIdentifier } from "../logging.js";
 export type CreateResourceInput = {
   categories: string[];
   description: string;
-  file: ResourceUploadInput;
+  files: ResourceUploadInput[];
   name: string;
   preview?: ResourceUploadInput;
   uploaderClerkId: string;
@@ -36,19 +36,25 @@ export type ResourceViewer = {
 };
 
 export type UploadResourceVersionInput = {
-  file: ResourceUploadInput;
+  files: ResourceUploadInput[];
   resourceId: number;
   uploaderClerkId: string;
 };
 
 export type ResourceVersionDetail = {
-  contentType: string;
   createdAt: Date;
+  downloadCount: number;
+  files: ResourceFileDetail[];
+  id: number;
+  version: number;
+};
+
+export type ResourceFileDetail = {
+  contentType: string;
   downloadCount: number;
   fileName: string;
   id: number;
   size: number;
-  version: number;
 };
 
 export type ResourceDetail = {
@@ -110,7 +116,7 @@ export type ResourcesService = {
   create(input: CreateResourceInput): Promise<{ id: number }>;
   download(
     resourceId: number,
-    versionId: number,
+    fileId: number,
     viewer?: ResourceViewer,
   ): Promise<string | null>;
   getDetail(
@@ -171,20 +177,17 @@ export function createResourcesService(
             .limit(1);
           if (!ownedResource) throw new Error("Resource owner is required.");
 
-          const uploaded = await storage.upload(input.file);
+          const uploaded = await uploadResourceFiles(storage, input.files);
           try {
+            const fileValues = resourceFileValues(uploaded);
             const result = await db.execute<{
               id: number;
               version: number;
             }>(sql`
               with inserted_version as (
-                insert into resource_versions (
-                  resource_id, version, file_name, content_type, size, object_path, url
-                )
+                insert into resource_versions (resource_id, version)
                 select resources.id,
-                  coalesce(max(resource_versions.version), 0) + 1,
-                  ${uploaded.fileName}, ${uploaded.contentType}, ${uploaded.size},
-                  ${uploaded.objectPath}, ${uploaded.url}
+                  coalesce(max(resource_versions.version), 0) + 1
                 from resources
                 left join resource_versions
                   on resource_versions.resource_id = resources.id
@@ -192,6 +195,17 @@ export function createResourcesService(
                   and resources.uploader_clerk_id = ${uploaderClerkId}
                 group by resources.id
                 returning id, resource_id, version
+              ),
+              input_files(file_name, content_type, size, object_path, url) as (
+                values ${fileValues}
+              ),
+              inserted_files as (
+                insert into resource_files (
+                  version_id, file_name, content_type, size, object_path, url
+                )
+                select inserted_version.id, input_files.*
+                from inserted_version cross join input_files
+                returning id
               ),
               updated_resource as (
                 update resources
@@ -202,18 +216,19 @@ export function createResourcesService(
               )
               select inserted_version.id, inserted_version.version
               from inserted_version cross join updated_resource
+              where (select count(*) from inserted_files) = ${uploaded.length}
             `);
             const version = result.rows[0];
             if (!version) throw new Error("Resource owner is required.");
             return version;
           } catch (error) {
-            await Promise.allSettled([storage.delete(uploaded.objectPath)]);
+            await deleteUploadedFiles(storage, uploaded);
             throw error;
           }
         },
         {
           attributes: {
-            fileNameHash: hashLogIdentifier(input.file.fileName),
+            fileCount: input.files.length,
             resourceId: input.resourceId,
             uploaderClerkIdHash: hashLogIdentifier(input.uploaderClerkId),
           },
@@ -228,14 +243,14 @@ export function createResourcesService(
           const uploaded: ResourceUploadResult[] = [];
 
           try {
-            const file = await storage.upload(normalized.file);
-            uploaded.push(file);
+            const files = await uploadResourceFiles(storage, normalized.files);
+            uploaded.push(...files);
             const preview = normalized.preview
               ? await storage.uploadPreview(normalized.preview)
               : undefined;
             if (preview) uploaded.push(preview);
 
-            return await persistResource(db, normalized, file, preview);
+            return await persistResource(db, normalized, files, preview);
           } catch (error) {
             await Promise.allSettled(
               uploaded.map(({ objectPath }) => storage.delete(objectPath)),
@@ -246,32 +261,36 @@ export function createResourcesService(
         {
           attributes: {
             categoryCount: input.categories.length,
-            fileNameHash: hashLogIdentifier(input.file.fileName),
+            fileCount: input.files.length,
             hasPreview: Boolean(input.preview),
             uploaderClerkIdHash: hashLogIdentifier(input.uploaderClerkId),
           },
         },
       );
     },
-    async download(resourceId, versionId, viewer = {}) {
+    async download(resourceId, fileId, viewer = {}) {
       return await logger.operation(
         loggerMessages.resources.download,
         async () => {
           assertPositiveInteger(resourceId, "resourceId");
-          assertPositiveInteger(versionId, "versionId");
+          assertPositiveInteger(fileId, "fileId");
 
-          const [version] = await db
+          const [file] = await db
             .select({
-              id: schema.resourceVersions.id,
-              url: schema.resourceVersions.url,
+              id: schema.resourceFiles.id,
+              url: schema.resourceFiles.url,
             })
-            .from(schema.resourceVersions)
+            .from(schema.resourceFiles)
+            .innerJoin(
+              schema.resourceVersions,
+              eq(schema.resourceVersions.id, schema.resourceFiles.versionId),
+            )
             .innerJoin(
               schema.resources,
               eq(schema.resources.id, schema.resourceVersions.resourceId),
             )
             .where(
-              sql`${schema.resourceVersions.id} = ${versionId}
+              sql`${schema.resourceFiles.id} = ${fileId}
                 and ${schema.resourceVersions.resourceId} = ${resourceId}
                 and (${schema.resources.isPrivate} = false
                   or ${Boolean(viewer.isAdmin)}
@@ -279,14 +298,12 @@ export function createResourcesService(
             )
             .limit(1);
 
-          if (!version) return null;
+          if (!file) return null;
 
-          await db
-            .insert(schema.resourceDownloads)
-            .values({ versionId: version.id });
-          return version.url;
+          await db.insert(schema.resourceDownloads).values({ fileId: file.id });
+          return file.url;
         },
-        { attributes: { resourceId, versionId } },
+        { attributes: { fileId, resourceId } },
       );
     },
     async getDetail(resourceId, viewer = {}) {
@@ -302,28 +319,37 @@ export function createResourcesService(
 
           if (!resource || !canViewResource(resource, viewer)) return null;
 
-          const [versions, categories, totals] = await Promise.all([
+          const [versions, files, categories, totals] = await Promise.all([
             db
               .select({
-                contentType: schema.resourceVersions.contentType,
                 createdAt: schema.resourceVersions.createdAt,
-                downloadCount: count(schema.resourceDownloads.id),
-                fileName: schema.resourceVersions.fileName,
                 id: schema.resourceVersions.id,
-                size: schema.resourceVersions.size,
                 version: schema.resourceVersions.version,
               })
               .from(schema.resourceVersions)
+              .where(eq(schema.resourceVersions.resourceId, resourceId))
+              .orderBy(desc(schema.resourceVersions.version)),
+            db
+              .select({
+                contentType: schema.resourceFiles.contentType,
+                downloadCount: count(schema.resourceDownloads.id),
+                fileName: schema.resourceFiles.fileName,
+                id: schema.resourceFiles.id,
+                size: schema.resourceFiles.size,
+                versionId: schema.resourceFiles.versionId,
+              })
+              .from(schema.resourceFiles)
               .leftJoin(
                 schema.resourceDownloads,
-                eq(
-                  schema.resourceDownloads.versionId,
-                  schema.resourceVersions.id,
-                ),
+                eq(schema.resourceDownloads.fileId, schema.resourceFiles.id),
+              )
+              .innerJoin(
+                schema.resourceVersions,
+                eq(schema.resourceVersions.id, schema.resourceFiles.versionId),
               )
               .where(eq(schema.resourceVersions.resourceId, resourceId))
-              .groupBy(schema.resourceVersions.id)
-              .orderBy(desc(schema.resourceVersions.version)),
+              .groupBy(schema.resourceFiles.id)
+              .orderBy(schema.resourceFiles.id),
             db
               .select({
                 id: schema.resourceCategories.id,
@@ -343,16 +369,38 @@ export function createResourcesService(
             db
               .select({ downloadCount: count(schema.resourceDownloads.id) })
               .from(schema.resourceVersions)
+              .innerJoin(
+                schema.resourceFiles,
+                eq(schema.resourceFiles.versionId, schema.resourceVersions.id),
+              )
               .leftJoin(
                 schema.resourceDownloads,
-                eq(
-                  schema.resourceDownloads.versionId,
-                  schema.resourceVersions.id,
-                ),
+                eq(schema.resourceDownloads.fileId, schema.resourceFiles.id),
               )
               .where(eq(schema.resourceVersions.resourceId, resourceId)),
           ]);
-          const currentVersion = versions[0];
+          const versionDetails = versions.map((version) => {
+            const versionFiles = files.filter(
+              (file) => file.versionId === version.id,
+            );
+            return {
+              ...version,
+              downloadCount: versionFiles.reduce(
+                (total, file) => total + file.downloadCount,
+                0,
+              ),
+              files: versionFiles.map(
+                ({ contentType, downloadCount, fileName, id, size }) => ({
+                  contentType,
+                  downloadCount,
+                  fileName,
+                  id,
+                  size,
+                }),
+              ),
+            };
+          });
+          const currentVersion = versionDetails[0];
           if (!currentVersion) return null;
 
           return {
@@ -368,7 +416,7 @@ export function createResourcesService(
             privatedAt: resource.privatedAt,
             previewImageUrl: resource.previewImageUrl,
             uploaderClerkId: resource.uploaderClerkId,
-            versions,
+            versions: versionDetails,
           };
         },
         { attributes: { resourceId } },
@@ -438,16 +486,25 @@ export function createResourcesService(
               ) as categories
             from resources
             inner join lateral (
-              select id, file_name
+              select resource_versions.id, first_file.file_name
               from resource_versions
+              inner join lateral (
+                select file_name
+                from resource_files
+                where resource_files.version_id = resource_versions.id
+                order by resource_files.id
+                limit 1
+              ) first_file on true
               where resource_versions.resource_id = resources.id
               order by version desc
               limit 1
             ) current_version on true
             left join resource_versions all_versions
               on all_versions.resource_id = resources.id
+            left join resource_files all_files
+              on all_files.version_id = all_versions.id
             left join resource_downloads
-              on resource_downloads.version_id = all_versions.id
+              on resource_downloads.file_id = all_files.id
             left join resources_to_categories
               on resources_to_categories.resource_id = resources.id
             left join resource_categories
@@ -683,13 +740,14 @@ export function createConfiguredResourcesService(
 async function persistResource(
   db: Database,
   input: ReturnType<typeof normalizeCreateInput>,
-  file: ResourceUploadResult,
+  files: ResourceUploadResult[],
   preview?: ResourceUploadResult,
 ): Promise<{ id: number }> {
   const categoryValues = sql.join(
     input.categories.map(({ name, slug }) => sql`(${name}, ${slug})`),
     sql`, `,
   );
+  const fileValues = resourceFileValues(files);
   const result = await db.execute<{ id: number }>(sql`
     with input_categories(name, slug) as (values ${categoryValues}),
     inserted_resource as (
@@ -711,12 +769,20 @@ async function persistResource(
       returning id, slug, (xmax = 0) as created
     ),
     inserted_version as (
-      insert into resource_versions (
-        resource_id, version, file_name, content_type, size, object_path, url
-      )
-      select id, 1, ${file.fileName}, ${file.contentType}, ${file.size},
-        ${file.objectPath}, ${file.url}
+      insert into resource_versions (resource_id, version)
+      select id, 1
       from inserted_resource
+      returning id
+    ),
+    input_files(file_name, content_type, size, object_path, url) as (
+      values ${fileValues}
+    ),
+    inserted_files as (
+      insert into resource_files (
+        version_id, file_name, content_type, size, object_path, url
+      )
+      select inserted_version.id, input_files.*
+      from inserted_version cross join input_files
       returning id
     ),
     inserted_assignments as (
@@ -745,7 +811,8 @@ async function persistResource(
     )
     select inserted_resource.id
     from inserted_resource cross join inserted_version
-    where (select count(*) from inserted_assignments) = ${input.categories.length}
+    where (select count(*) from inserted_files) = ${files.length}
+      and (select count(*) from inserted_assignments) = ${input.categories.length}
       and (select count(*) from inserted_resource_notification) = 1
       and (select count(*) from inserted_category_notifications) =
         (select count(*) from upserted_categories where created)
@@ -814,7 +881,11 @@ async function persistResourceUpdate(
 }
 
 function normalizeCreateInput(input: CreateResourceInput) {
-  return { ...input, ...normalizeMetadata(input) };
+  return {
+    ...input,
+    ...normalizeMetadata(input),
+    files: normalizeResourceFiles(input.files),
+  };
 }
 
 function normalizeUpdateInput(input: UpdateResourceInput) {
@@ -888,6 +959,57 @@ function assertPositiveInteger(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive integer.`);
   }
+}
+
+function normalizeResourceFiles(
+  files: ResourceUploadInput[],
+): ResourceUploadInput[] {
+  if (!Array.isArray(files) || files.length === 0 || files.length > 10) {
+    throw new Error("A resource version requires 1–10 files.");
+  }
+
+  const names = files.map(({ fileName }) => fileName.trim().toLowerCase());
+  if (new Set(names).size !== names.length) {
+    throw new Error("Resource filenames must be unique within a version.");
+  }
+
+  return files;
+}
+
+async function uploadResourceFiles(
+  storage: ResourceStorage,
+  files: ResourceUploadInput[],
+): Promise<ResourceUploadResult[]> {
+  const uploaded: ResourceUploadResult[] = [];
+
+  try {
+    for (const file of normalizeResourceFiles(files)) {
+      uploaded.push(await storage.upload(file));
+    }
+    return uploaded;
+  } catch (error) {
+    await deleteUploadedFiles(storage, uploaded);
+    throw error;
+  }
+}
+
+async function deleteUploadedFiles(
+  storage: ResourceStorage,
+  files: ResourceUploadResult[],
+): Promise<void> {
+  await Promise.allSettled(
+    files.map(({ objectPath }) => storage.delete(objectPath)),
+  );
+}
+
+function resourceFileValues(files: ResourceUploadResult[]) {
+  return sql.join(
+    files.map(
+      (file) =>
+        sql`(${file.fileName}, ${file.contentType}, ${file.size}, ${file.objectPath}, ${file.url})`,
+    ),
+    sql`, `,
+  );
 }
 
 export function canViewResource(
