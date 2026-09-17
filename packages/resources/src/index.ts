@@ -79,13 +79,20 @@ export const maxBufferedResourceBytes = 4 * 1024 * 1024;
 export const maxSessionFileBytes = 20 * 1024 * 1024;
 export const maxSessionBytes = 50 * 1024 * 1024;
 const allowedMimeTypes = {
-  ".3mf": ["application/vnd.ms-package.3dmanufacturing-3dmodel+xml"],
-  ".pdf": ["application/pdf"],
-  ".step": ["application/step", "model/step"],
+  ".3mf": [
+    "application/octet-stream",
+    "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+  ],
+  ".pdf": ["application/octet-stream", "application/pdf"],
+  ".step": ["application/octet-stream", "application/step", "model/step"],
   ".stl": ["application/octet-stream", "application/sla", "model/stl"],
-  ".stp": ["application/step", "model/step"],
-  ".txt": ["text/plain"],
-  ".zip": ["application/x-zip-compressed", "application/zip"],
+  ".stp": ["application/octet-stream", "application/step", "model/step"],
+  ".txt": ["application/octet-stream", "text/plain"],
+  ".zip": [
+    "application/octet-stream",
+    "application/x-zip-compressed",
+    "application/zip",
+  ],
 } as const;
 const allowedPreviewMimeTypes = {
   ".jpeg": ["image/jpeg"],
@@ -347,7 +354,7 @@ function readConfig(input: ResourceStorageConfig): BunnyConfig {
     accessKey,
     cdnBaseUrl: trimTrailingSlash(cdnBaseUrl),
     endpoint: trimTrailingSlash(endpoint),
-    fetch: input.fetch ?? fetch,
+    fetch: input.fetch ?? ((request, init) => fetch(request, init)),
     folderPrefix: normalizeFolderPrefix(input.folderPrefix),
     randomUUID: input.randomUUID ?? randomUUID,
     zoneName,

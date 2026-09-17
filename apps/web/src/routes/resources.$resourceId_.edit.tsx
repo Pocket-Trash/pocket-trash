@@ -4,14 +4,14 @@ import { getAuthState } from "@/lib/auth";
 import { getEditableResourceDetail } from "@/lib/resources";
 import { ResourceEditPage } from "@/pages/resource-management-pages";
 
-export const Route = createFileRoute("/resources/$resourceId/edit")({
+export const Route = createFileRoute("/resources/$resourceId_/edit")({
   beforeLoad: async () => {
     const { isAuthenticated } = await getAuthState();
     if (!isAuthenticated) {
       throw redirect({ params: { _splat: "" }, to: "/sign-in/$" });
     }
   },
-  component: ResourceEditRoute,
+  component: ResourceEditPageRoute,
   loader: async ({ params }) => {
     const detail = await getEditableResourceDetail({
       data: { resourceId: Number(params.resourceId) },
@@ -32,6 +32,6 @@ export const Route = createFileRoute("/resources/$resourceId/edit")({
   }),
 });
 
-function ResourceEditRoute() {
+function ResourceEditPageRoute() {
   return <ResourceEditPage detail={Route.useLoaderData()} />;
 }

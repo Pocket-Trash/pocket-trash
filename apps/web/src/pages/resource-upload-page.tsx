@@ -8,6 +8,7 @@ import { X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
+import { ResourceFileInput } from "@/components/resource-file-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ export function ResourceUploadPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryQuery, setCategoryQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
 
@@ -82,9 +84,6 @@ export function ResourceUploadPage() {
             }
 
             const formData = new FormData(event.currentTarget);
-            const files = formData
-              .getAll("files")
-              .filter((file): file is File => file instanceof File);
             const previewValue = formData.get("preview");
             const preview =
               previewValue instanceof File && previewValue.size > 0
@@ -162,28 +161,20 @@ export function ResourceUploadPage() {
             />
           </Field>
 
-          <Field
+          <ResourceFileInput
             description={t("web.resources.upload.fileHelp", {
               maxFileSize: "20 MiB",
               maxFiles: 10,
               maxSessionSize: "50 MiB",
             })}
-            htmlFor="resource-file"
+            disabled={submitting}
+            files={files}
+            fileTypes={t("web.resources.upload.fileTypes")}
+            id="resource-file"
             label={t("web.resources.upload.filesLabel")}
-          >
-            <Input
-              accept=".stl,.3mf,.step,.stp,.pdf,.txt,.zip"
-              className="h-auto py-2 file:mr-3 file:font-medium"
-              id="resource-file"
-              multiple
-              name="files"
-              required
-              type="file"
-            />
-            <p className="m-0 text-xs text-muted-foreground">
-              {t("web.resources.upload.fileTypes")}
-            </p>
-          </Field>
+            onFilesChange={setFiles}
+            removeFileLabel={t("web.resources.action.removeFile")}
+          />
 
           <Field
             description={t("web.resources.upload.previewHelp")}

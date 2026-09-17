@@ -213,7 +213,7 @@ export function createResourceUploadSessionsService(input: {
       const uploadValues = sql.join(
         uploads.map(
           (file) =>
-            sql`(${file.id}::uuid, ${file.kind}, ${file.fileName}, ${file.contentType}, ${file.size}, ${file.objectPath}, ${file.url})`,
+            sql`(${file.id}::uuid, ${file.kind}, ${file.fileName}, ${file.contentType}, ${file.size}::integer, ${file.objectPath}, ${file.url})`,
         ),
         sql`, `,
       );

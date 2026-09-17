@@ -22,10 +22,10 @@ import { Route as ResourcesUploadRouteImport } from './routes/resources.upload'
 import { Route as ResourcesResourceIdRouteImport } from './routes/resources.$resourceId'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
-import { Route as ResourcesResourceIdEditRouteImport } from './routes/resources.$resourceId.edit'
+import { Route as ResourcesResourceIdEditRouteImport } from './routes/resources.$resourceId_.edit'
 import { Route as AdminSettingsFeatureFlagsRouteImport } from './routes/admin.settings.feature-flags'
 import { Route as AdminResourcesNotificationsRouteImport } from './routes/admin.resources.notifications'
-import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId.versions.new'
+import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId_.versions.new'
 
 const UserRoute = UserRouteImport.update({
   id: '/user',
@@ -94,9 +94,9 @@ const UserSettingsBetaFeaturesRoute =
     getParentRoute: () => UserRoute,
   } as any)
 const ResourcesResourceIdEditRoute = ResourcesResourceIdEditRouteImport.update({
-  id: '/edit',
-  path: '/edit',
-  getParentRoute: () => ResourcesResourceIdRoute,
+  id: '/$resourceId_/edit',
+  path: '/$resourceId/edit',
+  getParentRoute: () => ResourcesRoute,
 } as any)
 const AdminSettingsFeatureFlagsRoute =
   AdminSettingsFeatureFlagsRouteImport.update({
@@ -112,9 +112,9 @@ const AdminResourcesNotificationsRoute =
   } as any)
 const ResourcesResourceIdVersionsNewRoute =
   ResourcesResourceIdVersionsNewRouteImport.update({
-    id: '/versions/new',
-    path: '/versions/new',
-    getParentRoute: () => ResourcesResourceIdRoute,
+    id: '/$resourceId_/versions/new',
+    path: '/$resourceId/versions/new',
+    getParentRoute: () => ResourcesRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -122,7 +122,7 @@ export interface FileRoutesByFullPath {
   '/resources': typeof ResourcesRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
-  '/resources/$resourceId': typeof ResourcesResourceIdRouteWithChildren
+  '/resources/$resourceId': typeof ResourcesResourceIdRoute
   '/resources/upload': typeof ResourcesUploadRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
@@ -140,7 +140,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
-  '/resources/$resourceId': typeof ResourcesResourceIdRouteWithChildren
+  '/resources/$resourceId': typeof ResourcesResourceIdRoute
   '/resources/upload': typeof ResourcesUploadRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
@@ -160,7 +160,7 @@ export interface FileRoutesById {
   '/resources': typeof ResourcesRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
-  '/resources/$resourceId': typeof ResourcesResourceIdRouteWithChildren
+  '/resources/$resourceId': typeof ResourcesResourceIdRoute
   '/resources/upload': typeof ResourcesUploadRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
@@ -170,9 +170,9 @@ export interface FileRoutesById {
   '/resources/': typeof ResourcesIndexRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
-  '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
+  '/resources/$resourceId_/edit': typeof ResourcesResourceIdEditRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
-  '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
+  '/resources/$resourceId_/versions/new': typeof ResourcesResourceIdVersionsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -228,9 +228,9 @@ export interface FileRouteTypes {
     | '/resources/'
     | '/admin/resources/notifications'
     | '/admin/settings/feature-flags'
-    | '/resources/$resourceId/edit'
+    | '/resources/$resourceId_/edit'
     | '/user/settings/beta-features'
-    | '/resources/$resourceId/versions/new'
+    | '/resources/$resourceId_/versions/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -337,12 +337,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserSettingsBetaFeaturesRouteImport
       parentRoute: typeof UserRoute
     }
-    '/resources/$resourceId/edit': {
-      id: '/resources/$resourceId/edit'
-      path: '/edit'
+    '/resources/$resourceId_/edit': {
+      id: '/resources/$resourceId_/edit'
+      path: '/$resourceId/edit'
       fullPath: '/resources/$resourceId/edit'
       preLoaderRoute: typeof ResourcesResourceIdEditRouteImport
-      parentRoute: typeof ResourcesResourceIdRoute
+      parentRoute: typeof ResourcesRoute
     }
     '/admin/settings/feature-flags': {
       id: '/admin/settings/feature-flags'
@@ -358,39 +358,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminResourcesNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/resources/$resourceId/versions/new': {
-      id: '/resources/$resourceId/versions/new'
-      path: '/versions/new'
+    '/resources/$resourceId_/versions/new': {
+      id: '/resources/$resourceId_/versions/new'
+      path: '/$resourceId/versions/new'
       fullPath: '/resources/$resourceId/versions/new'
       preLoaderRoute: typeof ResourcesResourceIdVersionsNewRouteImport
-      parentRoute: typeof ResourcesResourceIdRoute
+      parentRoute: typeof ResourcesRoute
     }
   }
 }
 
-interface ResourcesResourceIdRouteChildren {
+interface ResourcesRouteChildren {
+  ResourcesResourceIdRoute: typeof ResourcesResourceIdRoute
+  ResourcesUploadRoute: typeof ResourcesUploadRoute
+  ResourcesIndexRoute: typeof ResourcesIndexRoute
   ResourcesResourceIdEditRoute: typeof ResourcesResourceIdEditRoute
   ResourcesResourceIdVersionsNewRoute: typeof ResourcesResourceIdVersionsNewRoute
 }
 
-const ResourcesResourceIdRouteChildren: ResourcesResourceIdRouteChildren = {
-  ResourcesResourceIdEditRoute: ResourcesResourceIdEditRoute,
-  ResourcesResourceIdVersionsNewRoute: ResourcesResourceIdVersionsNewRoute,
-}
-
-const ResourcesResourceIdRouteWithChildren =
-  ResourcesResourceIdRoute._addFileChildren(ResourcesResourceIdRouteChildren)
-
-interface ResourcesRouteChildren {
-  ResourcesResourceIdRoute: typeof ResourcesResourceIdRouteWithChildren
-  ResourcesUploadRoute: typeof ResourcesUploadRoute
-  ResourcesIndexRoute: typeof ResourcesIndexRoute
-}
-
 const ResourcesRouteChildren: ResourcesRouteChildren = {
-  ResourcesResourceIdRoute: ResourcesResourceIdRouteWithChildren,
+  ResourcesResourceIdRoute: ResourcesResourceIdRoute,
   ResourcesUploadRoute: ResourcesUploadRoute,
   ResourcesIndexRoute: ResourcesIndexRoute,
+  ResourcesResourceIdEditRoute: ResourcesResourceIdEditRoute,
+  ResourcesResourceIdVersionsNewRoute: ResourcesResourceIdVersionsNewRoute,
 }
 
 const ResourcesRouteWithChildren = ResourcesRoute._addFileChildren(

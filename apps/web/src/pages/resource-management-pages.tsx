@@ -7,6 +7,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { FileUp, Pencil, Upload, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
+import { ResourceFileInput } from "@/components/resource-file-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -336,7 +337,7 @@ export function ResourceVersionUploadPage({
 }) {
   const { getToken } = useAuth();
   const { locale } = useLocale();
-  const navigate = useNavigate();
+  const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
   const t = (
@@ -352,10 +353,6 @@ export function ResourceVersionUploadPage({
         className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
         onSubmit={async (event) => {
           event.preventDefault();
-          const formData = new FormData(event.currentTarget);
-          const files = formData
-            .getAll("files")
-            .filter((file): file is File => file instanceof File);
           const validation = validateResourceUpload(files);
           if (validation) {
             toast.error(t(validation.key, validation.params));
@@ -385,10 +382,7 @@ export function ResourceVersionUploadPage({
                 version: result.version,
               }),
             );
-            await navigate({
-              params: { resourceId: String(detail.id) },
-              to: "/resources/$resourceId",
-            });
+            window.location.assign(`/resources/${result.resourceId}`);
           } catch (error) {
             const message = getResourceUploadErrorTranslation(error);
             toast.error(t(message.key, message.params));
@@ -398,28 +392,20 @@ export function ResourceVersionUploadPage({
         }}
       >
         <input name="resourceId" type="hidden" value={detail.id} />
-        <label
-          className="grid gap-2 text-sm font-medium"
-          htmlFor="resource-version-file"
-        >
-          {t("web.resources.upload.filesLabel")}
-          <span className="text-xs font-normal text-muted-foreground">
-            {t("web.resources.upload.fileHelp", {
-              maxFiles: 10,
-              maxFileSize: "20 MiB",
-              maxSessionSize: "50 MiB",
-            })}
-          </span>
-          <Input
-            accept=".stl,.3mf,.step,.stp,.pdf,.txt,.zip"
-            className="h-auto py-2 file:mr-3 file:font-medium"
-            id="resource-version-file"
-            multiple
-            name="files"
-            required
-            type="file"
-          />
-        </label>
+        <ResourceFileInput
+          description={t("web.resources.upload.fileHelp", {
+            maxFiles: 10,
+            maxFileSize: "20 MiB",
+            maxSessionSize: "50 MiB",
+          })}
+          disabled={submitting}
+          files={files}
+          fileTypes={t("web.resources.upload.fileTypes")}
+          id="resource-version-file"
+          label={t("web.resources.upload.filesLabel")}
+          onFilesChange={setFiles}
+          removeFileLabel={t("web.resources.action.removeFile")}
+        />
         <Button disabled={submitting} type="submit">
           <FileUp />
           {t("web.resources.action.uploadNewVersion")}

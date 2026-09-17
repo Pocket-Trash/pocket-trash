@@ -4,14 +4,14 @@ import { getAuthState } from "@/lib/auth";
 import { getOwnedResourceDetail } from "@/lib/resources";
 import { ResourceVersionUploadPage } from "@/pages/resource-management-pages";
 
-export const Route = createFileRoute("/resources/$resourceId/versions/new")({
+export const Route = createFileRoute("/resources/$resourceId_/versions/new")({
   beforeLoad: async () => {
     const { isAuthenticated } = await getAuthState();
     if (!isAuthenticated) {
       throw redirect({ params: { _splat: "" }, to: "/sign-in/$" });
     }
   },
-  component: ResourceVersionRoute,
+  component: ResourceVersionUploadRoute,
   loader: async ({ params }) => {
     const detail = await getOwnedResourceDetail({
       data: { resourceId: Number(params.resourceId) },
@@ -32,6 +32,6 @@ export const Route = createFileRoute("/resources/$resourceId/versions/new")({
   }),
 });
 
-function ResourceVersionRoute() {
+function ResourceVersionUploadRoute() {
   return <ResourceVersionUploadPage detail={Route.useLoaderData()} />;
 }

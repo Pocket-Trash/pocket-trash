@@ -108,6 +108,52 @@ describe("resource storage", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("calls the Workers runtime fetch without rebinding it", async () => {
+    const runtimeFetch = vi.fn(async function (this: unknown) {
+      if (this && typeof this === "object" && "accessKey" in this) {
+        throw new TypeError("Illegal invocation");
+      }
+      return new Response(null, { status: 201 });
+    });
+    vi.stubGlobal("fetch", runtimeFetch);
+
+    try {
+      const storage = createResourceStorage(config);
+      await expect(
+        storage.uploadStream({
+          body: new ReadableStream(),
+          contentLength: 3,
+          contentType: "application/octet-stream",
+          objectPath: "resources/dev/resource.stl",
+        }),
+      ).resolves.toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("accepts octet-stream for every supported resource extension", () => {
+    const storage = createResourceStorage(config);
+
+    for (const extension of [
+      "3mf",
+      "pdf",
+      "step",
+      "stl",
+      "stp",
+      "txt",
+      "zip",
+    ]) {
+      expect(() =>
+        storage.createUploadTarget({
+          contentType: "application/octet-stream",
+          fileName: `resource.${extension}`,
+          size: 1,
+        }),
+      ).not.toThrow();
+    }
+  });
+
   it("uploads an optional preview image through a separate allowlist", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       expect(toUrl(input).pathname).toBe(

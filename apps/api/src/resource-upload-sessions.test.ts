@@ -1,5 +1,7 @@
 import type { Database } from "@package/database";
 import type { ResourceStorage } from "@package/resources";
+import type { SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 import {
   createResourceUploadSessionsService,
@@ -7,6 +9,49 @@ import {
 } from "./resource-upload-sessions.js";
 
 describe("resource upload sessions", () => {
+  it("casts upload sizes in the values CTE", async () => {
+    const execute = vi.fn<(query: SQL) => Promise<void>>().mockResolvedValue();
+    const db = { execute } as unknown as Database;
+    const storage = storageMock();
+    storage.createUploadTarget.mockReturnValue({
+      contentType: "application/octet-stream",
+      fileName: "tool.stl",
+      objectPath: "resources/dev/tool.stl",
+      size: 3,
+      url: "https://cdn.example.test/resources/dev/tool.stl",
+    });
+    const service = createResourceUploadSessionsService({
+      db,
+      randomUUID: vi
+        .fn()
+        .mockReturnValueOnce("00000000-0000-4000-8000-000000000001")
+        .mockReturnValueOnce("00000000-0000-4000-8000-000000000002"),
+      storage,
+    });
+
+    await service.create(
+      {
+        categories: ["Tools"],
+        description: "Description",
+        files: [
+          {
+            contentType: "application/octet-stream",
+            fileName: "tool.stl",
+            size: 3,
+          },
+        ],
+        name: "Tool",
+        operation: "create",
+      },
+      "user-id",
+    );
+
+    const executedQuery = execute.mock.calls[0]?.[0];
+    if (!executedQuery) throw new Error("Expected an upload-session insert");
+    const query = new PgDialect().sqlToQuery(executedQuery);
+    expect(query.sql).toContain("$13::integer");
+  });
+
   it("returns an already completed session without writing twice", async () => {
     const execute = vi.fn();
     const db = {

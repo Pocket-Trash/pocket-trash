@@ -5,6 +5,7 @@ vi.mock("@/env/client", () => ({
 }));
 
 import {
+  appendResourceUploadFiles,
   getResourceUploadErrorTranslation,
   ResourceUploadRequestError,
   uploadResourceSession,
@@ -16,6 +17,62 @@ beforeEach(() => {
 });
 
 describe("resource upload sessions", () => {
+  it("appends files selected in separate picker or drop actions", () => {
+    const first = file("one.stl", 1);
+    const second = file("two.stl", 1);
+
+    expect(appendResourceUploadFiles([first], [second])).toEqual([
+      first,
+      second,
+    ]);
+  });
+
+  it("normalizes an STL with no browser MIME type to octet-stream", async () => {
+    const stl = file("GUIDE TRIM TOOL_No-Text.stl", 3, "");
+    const requests: Array<{ init?: RequestInit; url: string }> = [];
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = typeof input === "string" ? input : input.toString();
+      requests.push({ init, url });
+      if (url.endsWith("/resource-upload-sessions")) {
+        return jsonResponse({
+          expiresAt: "2026-09-17T01:00:00.000Z",
+          id: "session-id",
+          uploads: [
+            {
+              contentType: "application/octet-stream",
+              fileName: stl.name,
+              id: "file-1",
+              kind: "resource",
+              size: stl.size,
+            },
+          ],
+        });
+      }
+      if (url.endsWith("/complete")) {
+        return jsonResponse({ resourceId: 1000, version: 1 });
+      }
+      return new Response(null, { status: 204 });
+    });
+
+    expect(validateResourceUpload([stl])).toBeUndefined();
+    await uploadResourceSession({
+      categories: ["Tools"],
+      description: "Description",
+      fetch: fetchMock,
+      files: [stl],
+      getToken: async () => "token",
+      name: "Tool",
+      operation: "create",
+    });
+
+    expect(JSON.parse(String(requests[0]?.init?.body))).toMatchObject({
+      files: [{ contentType: "application/octet-stream" }],
+    });
+    expect(requests[1]?.init?.headers).toMatchObject({
+      "content-type": "application/octet-stream",
+    });
+  });
+
   it("rejects duplicate names and declared size limits before the API", () => {
     expect(
       validateResourceUpload([file("Tool.stl", 1), file("tool.STL", 1)]),
@@ -98,6 +155,47 @@ describe("resource upload sessions", () => {
     expect(requests[1]?.init?.body).toBe(files[0]);
     expect(requests[2]?.init?.body).toBe(files[1]);
     expect(requests[3]?.init?.body).toBe(preview);
+  });
+
+  it("retries idempotent completion after a server failure", async () => {
+    const stl = file("tool.stl", 3);
+    let completionAttempts = 0;
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/resource-upload-sessions")) {
+        return jsonResponse({
+          expiresAt: "2026-09-17T01:00:00.000Z",
+          id: "session-id",
+          uploads: [
+            {
+              contentType: stl.type,
+              fileName: stl.name,
+              id: "file-1",
+              kind: "resource",
+              size: stl.size,
+            },
+          ],
+        });
+      }
+      if (url.endsWith("/complete")) {
+        completionAttempts += 1;
+        return completionAttempts === 1
+          ? jsonResponse({ error: "internal_error" }, 502)
+          : jsonResponse({ resourceId: 1001, version: 2 });
+      }
+      return new Response(null, { status: 204 });
+    });
+
+    await expect(
+      uploadResourceSession({
+        fetch: fetchMock,
+        files: [stl],
+        getToken: async () => "token",
+        operation: "version",
+        resourceId: 1001,
+      }),
+    ).resolves.toEqual({ resourceId: 1001, version: 2 });
+    expect(completionAttempts).toBe(2);
   });
 
   it("maps stable API codes to localized upload messages", () => {

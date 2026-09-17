@@ -3,14 +3,22 @@ import { clientEnv } from "@/env/client";
 
 const maxFileBytes = 20 * 1024 * 1024;
 const maxSessionBytes = 50 * 1024 * 1024;
+const resourceContentType = "application/octet-stream";
 const fileMimeTypes: Readonly<Record<string, readonly string[]>> = {
-  ".3mf": ["application/vnd.ms-package.3dmanufacturing-3dmodel+xml"],
-  ".pdf": ["application/pdf"],
-  ".step": ["application/step", "model/step"],
+  ".3mf": [
+    resourceContentType,
+    "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+  ],
+  ".pdf": [resourceContentType, "application/pdf"],
+  ".step": [resourceContentType, "application/step", "model/step"],
   ".stl": ["application/octet-stream", "application/sla", "model/stl"],
-  ".stp": ["application/step", "model/step"],
-  ".txt": ["text/plain"],
-  ".zip": ["application/x-zip-compressed", "application/zip"],
+  ".stp": [resourceContentType, "application/step", "model/step"],
+  ".txt": [resourceContentType, "text/plain"],
+  ".zip": [
+    resourceContentType,
+    "application/x-zip-compressed",
+    "application/zip",
+  ],
 };
 const previewMimeTypes: Readonly<Record<string, readonly string[]>> = {
   ".jpeg": ["image/jpeg"],
@@ -52,6 +60,13 @@ export class ResourceUploadRequestError extends Error {
   }
 }
 
+export function appendResourceUploadFiles(
+  current: File[],
+  additions: Iterable<File>,
+): File[] {
+  return [...current, ...additions];
+}
+
 export function getResourceUploadErrorTranslation(
   error: unknown,
 ): ResourceUploadValidationError {
@@ -89,7 +104,7 @@ export function validateResourceUpload(
 
   const names = new Set<string>();
   for (const file of files) {
-    const unsafe = validateFile(file, fileMimeTypes);
+    const unsafe = validateFile(file, fileMimeTypes, resourceContentType);
     if (unsafe) return unsafe;
     const normalizedName = file.name.toLocaleLowerCase();
     if (names.has(normalizedName)) {
@@ -153,7 +168,7 @@ export async function uploadResourceSession(input: {
               name: input.name,
             }
           : { resourceId: input.resourceId }),
-        files: input.files.map(toMetadata),
+        files: input.files.map((file) => toMetadata(file, resourceContentType)),
         operation: input.operation,
         preview: input.preview ? toMetadata(input.preview) : undefined,
       }),
@@ -193,7 +208,7 @@ export async function uploadResourceSession(input: {
         body: file,
         headers: {
           authorization: `Bearer ${token}`,
-          "content-type": file.type,
+          "content-type": upload.contentType,
         },
         method: "PUT",
       },
@@ -209,13 +224,18 @@ export async function uploadResourceSession(input: {
   }
 
   input.onStage?.("complete");
-  const completeResponse = await fetcher(
-    `${trimTrailingSlash(clientEnv.VITE_RESOURCE_API_BASE_URL)}/api/v0/resource-upload-sessions/${encodeURIComponent(session.id)}/complete`,
-    {
-      headers: { authorization: `Bearer ${token}` },
-      method: "POST",
-    },
-  );
+  const complete = () =>
+    fetcher(
+      `${trimTrailingSlash(clientEnv.VITE_RESOURCE_API_BASE_URL)}/api/v0/resource-upload-sessions/${encodeURIComponent(session.id)}/complete`,
+      {
+        headers: { authorization: `Bearer ${token}` },
+        method: "POST",
+      },
+    );
+  let completeResponse = await complete();
+  if (completeResponse.status >= 500) {
+    completeResponse = await complete();
+  }
   if (!completeResponse.ok) {
     throw new ResourceUploadRequestError(
       "complete",
@@ -231,6 +251,7 @@ export async function uploadResourceSession(input: {
 function validateFile(
   file: File,
   allowedTypes: Readonly<Record<string, readonly string[]>>,
+  contentType = file.type,
 ): ResourceUploadValidationError | undefined {
   if (
     !file.name ||
@@ -256,7 +277,7 @@ function validateFile(
     };
   }
   const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
-  if (!allowedTypes[extension]?.includes(file.type)) {
+  if (!allowedTypes[extension]?.includes(contentType)) {
     return {
       key: "web.resources.validation.invalidFileType",
       params: { filename: file.name },
@@ -264,9 +285,9 @@ function validateFile(
   }
 }
 
-function toMetadata(file: File): UploadMetadata {
+function toMetadata(file: File, contentType = file.type): UploadMetadata {
   return {
-    contentType: file.type,
+    contentType,
     fileName: file.name,
     size: file.size,
   };

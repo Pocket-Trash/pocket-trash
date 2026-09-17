@@ -4,7 +4,7 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { File, FileDown, Pencil } from "lucide-react";
+import { File, FileDown, FileUp, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
@@ -146,20 +146,33 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
             ))}
           </div>
           {detail.canEdit ? (
-            <Button
-              className="mt-2 w-full"
-              nativeButton={false}
-              render={
-                <Link
-                  params={{ resourceId: String(detail.id) }}
-                  to="/resources/$resourceId/edit"
-                />
-              }
-              variant="outline"
-            >
-              <Pencil />
-              {t("web.resources.action.edit")}
-            </Button>
+            <div className="mt-2 grid gap-2">
+              <Button
+                nativeButton={false}
+                render={
+                  <Link
+                    params={{ resourceId: String(detail.id) }}
+                    to="/resources/$resourceId/versions/new"
+                  />
+                }
+              >
+                <FileUp />
+                {t("web.resources.action.uploadNewVersion")}
+              </Button>
+              <Button
+                nativeButton={false}
+                render={
+                  <Link
+                    params={{ resourceId: String(detail.id) }}
+                    to="/resources/$resourceId/edit"
+                  />
+                }
+                variant="outline"
+              >
+                <Pencil />
+                {t("web.resources.action.edit")}
+              </Button>
+            </div>
           ) : null}
         </aside>
 

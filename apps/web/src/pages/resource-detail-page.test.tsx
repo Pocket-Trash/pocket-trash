@@ -17,8 +17,8 @@ vi.mock("@/providers/locale-provider", () => ({
 }));
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children }: { children: ReactNode }) => (
-    <a href="/resources/1000/edit">{children}</a>
+  Link: ({ children, to }: { children: ReactNode; to: string }) => (
+    <a href={to.replace("$resourceId", "1000")}>{children}</a>
   ),
 }));
 
@@ -65,5 +65,7 @@ describe("resource detail", () => {
     expect(html).toContain("Reason: Inappropriate content");
     expect(html).toContain("Edit");
     expect(html).toContain('href="/resources/1000/edit"');
+    expect(html).toContain("Upload new version");
+    expect(html).toContain('href="/resources/1000/versions/new"');
   });
 });
