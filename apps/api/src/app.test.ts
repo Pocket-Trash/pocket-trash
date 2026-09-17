@@ -140,6 +140,7 @@ describe("api", () => {
             size: 3,
           },
         ],
+        isPrivate: true,
         name: "Tool",
         operation: "create",
       }),
@@ -155,7 +156,11 @@ describe("api", () => {
       "https://preview.vercel.app",
     );
     expect(service.create).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Tool", operation: "create" }),
+      expect.objectContaining({
+        isPrivate: true,
+        name: "Tool",
+        operation: "create",
+      }),
       "user_123",
     );
 

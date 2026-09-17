@@ -61,12 +61,14 @@ describe("resource upload sessions", () => {
       fetch: fetchMock,
       files: [stl],
       getToken: async () => "token",
+      isPrivate: true,
       name: "Tool",
       operation: "create",
     });
 
     expect(JSON.parse(String(requests[0]?.init?.body))).toMatchObject({
       files: [{ contentType: "application/octet-stream" }],
+      isPrivate: true,
     });
     expect(requests[1]?.init?.headers).toMatchObject({
       "content-type": "application/octet-stream",

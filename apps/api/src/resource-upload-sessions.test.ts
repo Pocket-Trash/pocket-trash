@@ -40,6 +40,7 @@ describe("resource upload sessions", () => {
             size: 3,
           },
         ],
+        isPrivate: true,
         name: "Tool",
         operation: "create",
       },
@@ -49,7 +50,9 @@ describe("resource upload sessions", () => {
     const executedQuery = execute.mock.calls[0]?.[0];
     if (!executedQuery) throw new Error("Expected an upload-session insert");
     const query = new PgDialect().sqlToQuery(executedQuery);
-    expect(query.sql).toContain("$13::integer");
+    expect(query.sql).toContain("is_private");
+    expect(query.sql).toContain("::integer");
+    expect(query.params).toContain(true);
   });
 
   it("returns an already completed session without writing twice", async () => {

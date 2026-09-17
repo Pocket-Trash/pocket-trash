@@ -15,6 +15,7 @@ Authenticated resource creation and version upload sessions.
 | `name` | `text` | no |  |  |  |  |  |
 | `description` | `text` | no |  |  |  |  |  |
 | `categories` | `jsonb` | yes |  | `'[]'::jsonb` |  |  |  |
+| `is_private` | `boolean` | yes |  |  |  |  |  |
 | `completed_resource_id` | `bigint` | no | FK |  | `resources.id` (on delete cascade) |  |  |
 | `completed_version` | `integer` | no |  |  |  |  |  |
 | `expires_at` | `timestamp with time zone` | yes |  |  |  |  |  |

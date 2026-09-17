@@ -364,6 +364,7 @@ describe("resources service", () => {
       description: "A useful clip.",
       downloadCount: 3,
       id: 1000,
+      isAdminPrivate: false,
       isPrivate: false,
       name: "Pocket clip",
       privateReason: null,
@@ -520,6 +521,49 @@ describe("resources service", () => {
     expect(query.sql).toContain("set is_private = true");
     expect(query.sql).toContain("privated_at = now()");
     expect(query.params).toEqual(["Inappropriate content", "admin_123", 1000]);
+  });
+
+  it("keeps admin-private resources locked from owner visibility changes", async () => {
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 1000 }] });
+    const service = createResourcesService(
+      { execute } as unknown as Database,
+      {} as ResourceStorage,
+      createNoopLogger({ app: "web", environment: "test" }),
+    );
+
+    await expect(
+      service.setVisibility({
+        actorClerkId: "user_123",
+        actorIsAdmin: false,
+        isPublic: true,
+        resourceId: 1000,
+      }),
+    ).rejects.toThrow("Resource visibility update is not allowed.");
+    await expect(
+      service.setVisibility({
+        actorClerkId: "user_123",
+        actorIsAdmin: false,
+        isPublic: false,
+        resourceId: 1000,
+      }),
+    ).rejects.toThrow("Resource visibility update is not allowed.");
+    await expect(
+      service.setVisibility({
+        actorClerkId: "admin_123",
+        actorIsAdmin: true,
+        isPublic: true,
+        resourceId: 1000,
+      }),
+    ).resolves.toBeUndefined();
+
+    const ownerQuery = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
+    expect(ownerQuery.sql).toContain("privated_by_clerk_id is null");
+    expect(ownerQuery.params).toContain(false);
+    expect(ownerQuery.params).toContain("user_123");
   });
 
   it("rejects non-owner mutations before uploading files", async () => {

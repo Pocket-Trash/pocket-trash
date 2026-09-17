@@ -65,6 +65,7 @@ export type ResourceDetail = {
   description: string;
   downloadCount: number;
   id: number;
+  isAdminPrivate: boolean;
   isPrivate: boolean;
   name: string;
   privateReason: string | null;
@@ -150,6 +151,12 @@ export type ResourcesService = {
   markPrivate(input: {
     actorClerkId: string;
     reason: string;
+    resourceId: number;
+  }): Promise<void>;
+  setVisibility(input: {
+    actorClerkId: string;
+    actorIsAdmin: boolean;
+    isPublic: boolean;
     resourceId: number;
   }): Promise<void>;
   update(input: UpdateResourceInput): Promise<{ id: number }>;
@@ -415,6 +422,7 @@ export function createResourcesService(
             description: resource.description,
             downloadCount: totals[0]?.downloadCount ?? 0,
             id: resource.id,
+            isAdminPrivate: Boolean(resource.privatedByClerkId),
             isPrivate: resource.isPrivate,
             name: resource.name,
             privateReason: resource.privateReason,
@@ -687,12 +695,44 @@ export function createResourcesService(
             set is_private = true, private_reason = ${reason},
               privated_at = now(), privated_by_clerk_id = ${actorClerkId},
               updated_at = now()
-            where id = ${input.resourceId} and is_private = false
+            where id = ${input.resourceId}
+              and privated_by_clerk_id is null
           `);
         },
         {
           attributes: {
             actorClerkIdHash: hashLogIdentifier(input.actorClerkId),
+            resourceId: input.resourceId,
+          },
+        },
+      );
+    },
+    async setVisibility(input) {
+      await logger.operation(
+        loggerMessages.resources.update,
+        async () => {
+          assertPositiveInteger(input.resourceId, "resourceId");
+          const actorClerkId = input.actorClerkId.trim();
+          if (!actorClerkId) throw new Error("actorClerkId is required.");
+          const result = await db.execute<{ id: number }>(sql`
+            update resources
+            set is_private = ${!input.isPublic}, private_reason = null,
+              privated_at = null, privated_by_clerk_id = null,
+              updated_at = now()
+            where id = ${input.resourceId}
+              and (uploader_clerk_id = ${actorClerkId} or ${input.actorIsAdmin})
+              and (${input.actorIsAdmin} or privated_by_clerk_id is null)
+              and (${input.isPublic} or uploader_clerk_id = ${actorClerkId})
+            returning id
+          `);
+          if (!result.rows[0]) {
+            throw new Error("Resource visibility update is not allowed.");
+          }
+        },
+        {
+          attributes: {
+            actorClerkIdHash: hashLogIdentifier(input.actorClerkId),
+            isPublic: input.isPublic,
             resourceId: input.resourceId,
           },
         },

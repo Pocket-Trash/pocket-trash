@@ -146,6 +146,7 @@ export async function uploadResourceSession(input: {
   fetch?: typeof fetch;
   files: File[];
   getToken(): Promise<string | null>;
+  isPrivate?: boolean;
   name?: string;
   onProgress?(fileName: string, percent: number): void;
   onStage?(stage: "complete" | "upload"): void;
@@ -165,6 +166,7 @@ export async function uploadResourceSession(input: {
           ? {
               categories: input.categories,
               description: input.description,
+              isPrivate: Boolean(input.isPrivate),
               name: input.name,
             }
           : { resourceId: input.resourceId }),

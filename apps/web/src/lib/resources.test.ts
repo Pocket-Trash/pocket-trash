@@ -6,6 +6,7 @@ import {
   parseResourceUpdate,
   parseResourceUpload,
   parseResourceVersionUpload,
+  parseResourceVisibility,
   requireResourceAdmin,
   requireResourceUploader,
 } from "./resources.js";
@@ -69,6 +70,15 @@ describe("resource server functions", () => {
     ).toEqual({ reason: "Inappropriate content", resourceId: 1000 });
     expect(() =>
       parseMarkPrivate({ reason: "   ", resourceId: 1000 }),
+    ).toThrow();
+  });
+
+  it("accepts only explicit resource visibility", () => {
+    expect(
+      parseResourceVisibility({ isPublic: false, resourceId: 1000 }),
+    ).toEqual({ isPublic: false, resourceId: 1000 });
+    expect(() =>
+      parseResourceVisibility({ isPublic: "false", resourceId: 1000 }),
     ).toThrow();
   });
 

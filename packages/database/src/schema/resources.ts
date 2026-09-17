@@ -56,7 +56,7 @@ export const resources = pgTable(
     ),
     check(
       "resources_private_metadata_consistent",
-      sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 3) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
+      sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
     ),
   ],
 );
@@ -141,6 +141,7 @@ export const resourceUploadSessions = pgTable(
       .$type<Array<{ name: string; slug: string }>>()
       .default(sql`'[]'::jsonb`)
       .notNull(),
+    isPrivate: boolean("is_private").default(false).notNull(),
     completedResourceId: bigint("completed_resource_id", {
       mode: "number",
     }).references(() => resources.id, { onDelete: "cascade" }),
@@ -168,7 +169,7 @@ export const resourceUploadSessions = pgTable(
     ),
     check(
       "resource_upload_sessions_metadata_consistent",
-      sql`(${table.operation} = 'create' and ${table.resourceId} is null and num_nonnulls(${table.name}, ${table.description}) = 2 and jsonb_array_length(${table.categories}) between 1 and 10) or (${table.operation} = 'version' and ${table.resourceId} is not null and num_nonnulls(${table.name}, ${table.description}) = 0 and ${table.categories} = '[]'::jsonb)`,
+      sql`(${table.operation} = 'create' and ${table.resourceId} is null and num_nonnulls(${table.name}, ${table.description}) = 2 and jsonb_array_length(${table.categories}) between 1 and 10) or (${table.operation} = 'version' and ${table.resourceId} is not null and num_nonnulls(${table.name}, ${table.description}) = 0 and ${table.categories} = '[]'::jsonb and not ${table.isPrivate})`,
     ),
     check(
       "resource_upload_sessions_completion_consistent",
