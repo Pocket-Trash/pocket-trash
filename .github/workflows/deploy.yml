@@ -282,7 +282,7 @@ jobs:
               "",
               "| Worker | Alias | Status | Endpoints |",
               "| --- | --- | --- | --- |",
-              `| \`pocket-trash-api-preview\` | \`${alias}\` | ✅ Ready | [Health](${previewUrl}/api/v0/health) · [OpenAPI](${previewUrl}/api/v0/openapi.json) · [API reference](${previewUrl}/api/v0/docs) |`,
+              `| \`pocket-trash-api-preview\` | \`${alias}\` | ✅ Ready | [Health](${previewUrl}/api/v0/health) · [OpenAPI](${previewUrl}/api/v0/openapi.json) |`,
             ].join("\n");
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
