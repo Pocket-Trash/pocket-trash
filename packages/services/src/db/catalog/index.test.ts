@@ -432,6 +432,11 @@ describe("catalog finish validation", () => {
       finishIds: [1000],
     },
     {
+      colorEffectId: 1000,
+      colorIds: [1000, 1001],
+      finishIds: [1000],
+    },
+    {
       colorEffectId: null,
       colorIds: [],
       finishIds: [1000, 1000],

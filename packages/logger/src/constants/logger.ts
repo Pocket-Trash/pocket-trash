@@ -51,6 +51,9 @@ export const loggerMessages = {
       createMaker: "database.catalog.createMaker",
       createMaterial: "database.catalog.createMaterial",
       createProduct: "database.catalog.createProduct",
+      listColorEffects: "database.catalog.listColorEffects",
+      listColors: "database.catalog.listColors",
+      listFinishes: "database.catalog.listFinishes",
       updateProduct: "database.catalog.updateProduct",
     },
     collections: {

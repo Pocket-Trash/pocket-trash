@@ -46,10 +46,10 @@ type MobileToolbarProps = {
 };
 
 /**
- * Compact-only (`< md`) bottom toolbar. It is a toolbar, not a nav bar: each
+ * Compact-only (`<= 880px`) bottom toolbar. It is a toolbar, not a nav bar: each
  * item opens a sheet or field rather than switching screens. Filters and Sort
  * are vaul bottom sheets (swipe-to-dismiss); Search expands a field docked
- * above the bar. Hidden at `md` and up, where the persistent sidebar and header
+ * above the bar. Hidden above 880px, where the persistent sidebar and header
  * controls take over.
  */
 export function MobileToolbar({
@@ -86,7 +86,7 @@ export function MobileToolbar({
   const keyboardInset = useKeyboardInset(searchOpen);
 
   return (
-    <div className="md:hidden">
+    <div className="min-[881px]:hidden">
       {searchOpen ? (
         <div
           className="fixed inset-x-0 z-40 flex items-center gap-2 border-t border-border bg-background/95 p-2 backdrop-blur"

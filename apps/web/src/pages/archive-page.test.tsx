@@ -54,7 +54,7 @@ describe("ArchivePage", () => {
   it("owns the desktop filter layout and mobile toolbar", () => {
     const html = renderToStaticMarkup(<ArchivePage />);
 
-    expect(html).toContain("md:grid-cols-[290px_minmax(0,1fr)]");
+    expect(html).toContain("min-[881px]:grid-cols-[290px_minmax(0,1fr)]");
     expect(html).toContain('data-autmog-filters="desktop"');
     expect(html).toContain('data-autmog-toolbar="mobile"');
     expect(html).not.toContain("Settings");

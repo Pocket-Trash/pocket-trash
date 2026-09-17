@@ -63,8 +63,10 @@ export function AuthenticatedLocaleSync({
   initialSettingsState: UserSettingsState | null;
 }) {
   const { isLoaded, isSignedIn } = useAuth();
-  const { setLocale } = useLocale();
+  const { locale, setLocale } = useLocale();
   const initialStateRef = React.useRef(initialSettingsState);
+  const localeRef = React.useRef(locale);
+  localeRef.current = locale;
 
   React.useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -97,7 +99,17 @@ export function AuthenticatedLocaleSync({
           }
         });
       }
-    })().catch(() => undefined);
+    })().catch(() => {
+      if (!canceled) {
+        toast.error(
+          formatTranslation(
+            "web.error.settingsSaveFailed",
+            {},
+            localeRef.current,
+          ),
+        );
+      }
+    });
 
     return () => {
       canceled = true;

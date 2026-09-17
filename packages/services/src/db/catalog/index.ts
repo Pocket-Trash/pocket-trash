@@ -359,34 +359,46 @@ export function createCatalogService(
         .orderBy(asc(schema.maker.name));
     },
     async listColorEffects() {
-      return await db
-        .select({
-          id: schema.colorEffect.id,
-          name: schema.colorEffect.name,
-          slug: schema.colorEffect.slug,
-        })
-        .from(schema.colorEffect)
-        .orderBy(asc(schema.colorEffect.name));
+      return await logger.operation(
+        loggerMessages.database.catalog.listColorEffects,
+        async () =>
+          await db
+            .select({
+              id: schema.colorEffect.id,
+              name: schema.colorEffect.name,
+              slug: schema.colorEffect.slug,
+            })
+            .from(schema.colorEffect)
+            .orderBy(asc(schema.colorEffect.name)),
+      );
     },
     async listColors() {
-      return await db
-        .select({
-          id: schema.color.id,
-          name: schema.color.name,
-          slug: schema.color.slug,
-        })
-        .from(schema.color)
-        .orderBy(asc(schema.color.name));
+      return await logger.operation(
+        loggerMessages.database.catalog.listColors,
+        async () =>
+          await db
+            .select({
+              id: schema.color.id,
+              name: schema.color.name,
+              slug: schema.color.slug,
+            })
+            .from(schema.color)
+            .orderBy(asc(schema.color.name)),
+      );
     },
     async listFinishes() {
-      return await db
-        .select({
-          id: schema.finish.id,
-          name: schema.finish.name,
-          slug: schema.finish.slug,
-        })
-        .from(schema.finish)
-        .orderBy(asc(schema.finish.name));
+      return await logger.operation(
+        loggerMessages.database.catalog.listFinishes,
+        async () =>
+          await db
+            .select({
+              id: schema.finish.id,
+              name: schema.finish.name,
+              slug: schema.finish.slug,
+            })
+            .from(schema.finish)
+            .orderBy(asc(schema.finish.name)),
+      );
     },
     async listMaterials() {
       return await db
@@ -1392,6 +1404,9 @@ export function assertValidFinishOptions(
     }
     if (effect?.slug === "fade" && option.colorIds.length < 2) {
       throw new Error("A fade requires at least two colors.");
+    }
+    if (effect?.slug === "solid" && option.colorIds.length !== 1) {
+      throw new Error("A solid finish requires exactly one color.");
     }
 
     const signature = `${option.finishIds.join(",")}|${option.colorEffectId ?? ""}|${option.colorIds.join(",")}`;

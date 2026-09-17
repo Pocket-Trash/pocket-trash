@@ -159,8 +159,10 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 
 ## 3. Structural Layout Rules
 - **Page Shell:** Sticky top header, route content, and a centered footer. The shell never owns route-specific sidebars or bottom toolbars.
+- **Form Alignment:** Product, collection, edit, and User Settings forms are left-aligned inside route content. Keep readable route-level maximum widths, existing field widths, and `p-6` page spacing; authentication screens remain centered.
+- **Autmog Route Shell:** Only `/autmog` owns the Autmog filter sidebar and mobile filter toolbar. Both render below the shared site header and never appear on other routes.
 - **Autmog Desktop Grid:** `grid-template-columns: 290px 1fr`, `gap: 20px`, `padding: 18px 22px 22px`.
-- **Filter Sidebar:** Sticky at `top: 70px`, max height `calc(100vh - 90px)`, `10px` radius, hidden scrollbar, scrollable content.
+- **Filter Sidebar:** Sticky below the two-row shared header at `top: 112px`, max height `calc(100svh - 128px)`, `10px` radius, hidden scrollbar, scrollable content.
 - **Product Grid:** CSS grid with max 5 columns: `repeat(auto-fill, minmax(max(240px, calc((100% - 4 * 18px) / 5)), 1fr))`; `gap: 18px`.
 - **Responsive Breakpoints:** At `max-width: 880px`, filters become a fixed slide-in drawer with scrim and grid becomes full width; at `max-width: 480px`, product grid becomes single column.
 - **Mobile Grid:** `repeat(auto-fill, minmax(160px, 1fr))` between 480px and 880px.
@@ -192,12 +194,11 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 - Dimensions use compact symbols for weight, diameter, and length.
 - Tags use semantic colors for size, material, refill, and nose.
 
-### Settings Drawer
-- Right-side fixed drawer, `360px` wide, `max-width: 92vw`.
-- Opens over a dark scrim with blur.
-- Uses segmented controls for theme (`Light`, `Dark`, `System`), dimensions, and weight; select menu for currency.
-- Gear button rotates when drawer is open.
-- Theme mode persists in `localStorage` under `pocket-trash.theme`; units and weight persist under `pocket-trash.settings`; currency persists separately.
+### User Settings
+- Signed-in display preferences live at `/user/settings` in a left-aligned, readable-width form.
+- Uses segmented controls for dimensions and weight and a select menu for currency.
+- Language is available globally in the shared header; signed-out choices persist locally, while authenticated choices sync to user settings.
+- Theme is available globally in the shared header and persists in `localStorage` under `pocket-trash.theme`.
 
 ### Lightbox
 - Full-screen dialog with dark blurred overlay.
@@ -213,7 +214,7 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 
 ## 5. Interaction & Motion
 - **Motion Curve:** Primary expand/collapse transitions use `cubic-bezier(0.22, 0.65, 0.27, 1)`.
-- **Durations:** Sidebar collapse around `280ms`; settings drawer `350ms`; lightbox enter `520ms`, exit `380ms`.
+- **Durations:** Autmog filter drawer transitions use the primary motion curve; lightbox enter is `520ms` and exit is `380ms`.
 - **Hover States:** Accent border/color is the standard hover affordance for cards, chips, buttons, links, and controls.
 - **Search:** Debounced at `150ms`; multi-token AND search across title, tags, price, and body text.
 - **Sorting:** Supports date, price, weight, diameter, and title.

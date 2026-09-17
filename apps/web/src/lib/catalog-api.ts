@@ -80,6 +80,13 @@ export const finishOptionSchema = z
         path: ["colorIds"],
       });
     }
+    if (option.colorEffectSlug === "solid" && option.colorIds.length !== 1) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["colorIds"],
+      });
+    }
   });
 
 export const productFormSchema = z

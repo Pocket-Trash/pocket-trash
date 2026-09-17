@@ -31,6 +31,7 @@ describe("MobileToolbar", () => {
     expect(html).toContain("Search");
     expect(html).toContain("Filters");
     expect(html).toContain("Sort");
+    expect(html).toContain("min-[881px]:hidden");
     expect(html).not.toContain("Settings");
   });
 });

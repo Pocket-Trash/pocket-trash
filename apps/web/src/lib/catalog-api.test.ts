@@ -64,6 +64,19 @@ describe("product finish options", () => {
         ],
       }).success,
     ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        finishOptions: [
+          {
+            colorEffectId: 1000,
+            colorEffectSlug: "solid",
+            colorIds: [1000, 1001],
+            finishIds: [1000],
+          },
+        ],
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects duplicate components and duplicate options", () => {

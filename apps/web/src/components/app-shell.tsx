@@ -50,7 +50,7 @@ export function AppShell({
     <div className="flex min-h-svh flex-col bg-background text-foreground">
       <header className="sticky top-0 z-30 flex flex-wrap items-start gap-x-4 gap-y-3 border-b border-border bg-background/90 px-3.5 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2.5 backdrop-blur md:px-5 md:pt-[max(0.875rem,env(safe-area-inset-top))] md:pb-3.5">
         <div className="min-w-0 flex-1">
-          <h1 className="m-0 text-[16px] font-bold tracking-[0.5px] md:text-lg">
+          <h1 className="m-0 text-[16px] font-bold tracking-[0.5px] max-[480px]:text-[15px] md:text-lg">
             <Link className="hover:text-primary" to="/">
               {siteName}
             </Link>

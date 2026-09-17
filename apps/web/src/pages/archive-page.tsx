@@ -183,7 +183,7 @@ export function ArchivePage() {
       headerActions={
         <>
           <label
-            className="relative order-99 w-full md:order-none md:w-[260px]"
+            className="relative order-99 w-full min-[881px]:order-none min-[881px]:w-[260px]"
             htmlFor={searchInputId}
           >
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -225,8 +225,8 @@ export function ArchivePage() {
       })}
       title={t("web.site.name")}
     >
-      <div className="grid md:grid-cols-[290px_minmax(0,1fr)] md:gap-5 md:p-[18px_22px_22px]">
-        <aside className="scrollbar-none sticky top-28 hidden max-h-[calc(100svh-8rem)] self-start overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar p-2 md:block">
+      <div className="grid min-[881px]:grid-cols-[290px_minmax(0,1fr)] min-[881px]:gap-5 min-[881px]:p-[18px_22px_22px]">
+        <aside className="scrollbar-none sticky top-28 hidden max-h-[calc(100svh-8rem)] self-start overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar p-2 min-[881px]:block">
           <FilterSidebar
             active={active}
             matchModes={matchModes}
@@ -238,7 +238,7 @@ export function ArchivePage() {
         </aside>
         <div className="min-w-0">
           <PullToRefresh onRefresh={handleRefresh} refreshing={refreshing}>
-            <section className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-0">
+            <section className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] min-[881px]:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] min-[881px]:p-0">
               {refreshing ? (
                 <ProductGridSkeleton count={12} />
               ) : visibleProducts.length > 0 ? (
@@ -288,7 +288,7 @@ export function ArchivePage() {
       />
       <div
         aria-hidden="true"
-        className="h-[calc(3.5rem+env(safe-area-inset-bottom))] md:hidden"
+        className="h-[calc(3.5rem+env(safe-area-inset-bottom))] min-[881px]:hidden"
       />
       {mobileToolbar}
     </AppShell>
