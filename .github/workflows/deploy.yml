@@ -434,11 +434,10 @@ jobs:
             --arg log_proxy_client_key "$LOG_PROXY_CLIENT_KEY" \
             --arg resource_storage_access_key "$RESOURCE_STORAGE_ACCESS_KEY" \
             '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, DATABASE_URL: $database_url, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, RESOURCE_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
-            pnpm exec wrangler secret bulk --env preview
-
-          pnpm exec wrangler versions upload \
+            pnpm exec wrangler versions upload \
             --env preview \
             --preview-alias "$PREVIEW_ALIAS" \
+            --secrets-file /dev/stdin \
             --var "APP_ENV:preview" \
             --var "AXIOM_DATASET:${AXIOM_DATASET}" \
             --var "LOG_DEPLOYMENT_ID:${LOG_DEPLOYMENT_ID}" \
