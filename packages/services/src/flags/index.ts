@@ -232,7 +232,7 @@ export function createFeatureFlagsService(
         async () => {
           const flag = await getActiveFlagBySlug(db, input.slug);
 
-          if (!flag || flag.audience !== "admin") {
+          if (flag?.audience !== "admin") {
             await logFailedClosed(logger, input.slug, "invalid-admin-flag");
             return;
           }
@@ -264,7 +264,7 @@ export function createFeatureFlagsService(
         async () => {
           const flag = await getActiveFlagBySlug(db, input.slug);
 
-          if (!flag || flag.audience !== "user") {
+          if (flag?.audience !== "user") {
             await logFailedClosed(logger, input.slug, "invalid-user-flag");
             return;
           }

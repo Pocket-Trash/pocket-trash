@@ -151,9 +151,15 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
 
   // Infisical accepts a single secret path per `run`, so nest runs to
   // accumulate each path's secrets before the wrapped command executes.
-  let args = [...runArgsForPath(paths[paths.length - 1]!), ...innerCommand];
-  for (let index = paths.length - 2; index >= 0; index -= 1) {
-    args = [...runArgsForPath(paths[index]!), "infisical", ...args];
+  const reversedPaths = [...paths].reverse();
+  const innermostPath = reversedPaths[0];
+  if (!innermostPath) {
+    throw new RunnerError("Expected at least one Infisical secret path.");
+  }
+
+  let args = [...runArgsForPath(innermostPath), ...innerCommand];
+  for (const secretPath of reversedPaths.slice(1)) {
+    args = [...runArgsForPath(secretPath), "infisical", ...args];
   }
 
   return args;
