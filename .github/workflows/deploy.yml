@@ -473,73 +473,16 @@ jobs:
             --var "RESOURCE_STORAGE_ENDPOINT:${RESOURCE_STORAGE_ENDPOINT}" \
             --var "RESOURCE_STORAGE_ZONE_NAME:${RESOURCE_STORAGE_ZONE_NAME}"
 
-      - name: Pull Vercel preview environment
-        if: steps.db.outputs.can_deploy == 'true'
-        env:
-          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
-          NO_COLOR: "1"
-        run: |
-          pnpm dlx vercel pull \
-            --yes \
-            --environment=preview \
-            --git-branch "$BRANCH_NAME" \
-            --scope "$VERCEL_ORG_ID"
-
-      - name: Build Vercel preview output
-        if: steps.db.outputs.can_deploy == 'true'
-        shell: bash
-        env:
-          NITRO_PRESET: vercel
-          NO_COLOR: "1"
-        run: |
-          set -euo pipefail
-
-          set -a
-          source .vercel/.env.preview.local
-          set +a
-
-          rm -rf .vercel/output apps/web/.vercel/output
-          pnpm build:ci --filter=@app/web
-
-          if [[ -f .vercel/output/config.json ]]; then
-            echo "Using .vercel/output"
-          elif [[ -f apps/web/.vercel/output/config.json ]]; then
-            mkdir -p .vercel
-            mv apps/web/.vercel/output .vercel/output
-            echo "Moved apps/web/.vercel/output to .vercel/output"
-          else
-            echo "No Vercel Build Output API config found." >&2
-            exit 1
-          fi
-
-      - name: Deploy Vercel preview
+      - name: Deploy Vercel preview from Git
         if: steps.db.outputs.can_deploy == 'true'
         id: vercel_preview
         shell: bash
         env:
-          DATABASE_URL: ${{ steps.db.outputs.database_url }}
-          DB_CHANGING: ${{ steps.db_changes.outputs.database }}
-          NO_COLOR: "1"
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-
-          printf '::add-mask::%s\n' "$DATABASE_URL"
-
-          if [[ "$DB_CHANGING" == "true" ]]; then
-            image_folder_prefix="images/preview/pr-${PR_NUMBER}"
-            resource_folder_prefix="resources/preview/pr-${PR_NUMBER}"
-          else
-            image_folder_prefix="images/preview"
-            resource_folder_prefix="resources/preview"
-          fi
-
-          deployment_url="$(pnpm dlx vercel deploy --prebuilt --archive=tgz --scope "$VERCEL_ORG_ID" \
-            --env "DATABASE_URL=$DATABASE_URL" \
-            --env "IMAGE_FOLDER_PREFIX=$image_folder_prefix" \
-            --env "RESOURCE_FOLDER_PREFIX=$resource_folder_prefix")"
-          echo "web_preview_url=$deployment_url" >> "$GITHUB_OUTPUT"
-          printf 'Vercel preview deployment: %s\n' "$deployment_url"
+          REPOSITORY_ID: ${{ github.event.repository.id }}
+        run: bash .github/scripts/vercel-branch-database-url.sh deploy-preview
 
       - name: Configure Railway scraper preview database and cron
         if: steps.db.outputs.can_deploy == 'true'
