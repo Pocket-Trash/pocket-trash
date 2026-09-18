@@ -4,13 +4,19 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { FileUp, Pencil, Upload, X } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { FileUp, LoaderCircle, Plus } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { ResourceFileInput } from "@/components/resource-file-input";
+import { ResourceCategoryInput } from "@/components/resource-category-input";
+import {
+  FileDropInput,
+  ResourceFileInput,
+} from "@/components/resource-file-input";
+import { ResourceVisibilityToggle } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPageShell } from "@/components/user-page-shell";
 import {
   getResourceUploadErrorTranslation,
@@ -18,14 +24,13 @@ import {
   validateResourceUpload,
 } from "@/lib/resource-upload-sessions";
 import type { getResourceDetail, listOwnedResources } from "@/lib/resources";
-import { listResourceCategories, updateResource } from "@/lib/resources";
+import { updateResource } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
 type OwnedResource = Awaited<ReturnType<typeof listOwnedResources>>[number];
 type ResourceDetail = NonNullable<
   Awaited<ReturnType<typeof getResourceDetail>>
 >;
-type Category = Awaited<ReturnType<typeof listResourceCategories>>[number];
 
 export function ResourceManagementPage({
   resources,
@@ -45,9 +50,9 @@ export function ResourceManagementPage({
           <p className="m-0 text-sm text-muted-foreground">
             {t("web.resources.management.description")}
           </p>
-          <Button nativeButton={false} render={<Link to="/resources/upload" />}>
-            <Upload />
-            {t("web.resources.action.upload")}
+          <Button nativeButton={false} render={<Link to="/resources/add" />}>
+            <Plus />
+            {t("web.resources.action.add" as TranslationKey)}
           </Button>
         </div>
 
@@ -58,80 +63,42 @@ export function ResourceManagementPage({
         ) : (
           <div className="grid gap-4">
             {resources.map((resource) => (
-              <article
-                className="grid gap-4 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
+              <Link
+                className="relative grid gap-2 rounded-lg border border-border bg-card p-5 pr-24 text-card-foreground shadow-sm transition-transform hover:-translate-y-0.5 hover:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 key={resource.id}
+                params={{ resourceId: String(resource.id) }}
+                to="/resources/$resourceId"
               >
-                <div className="min-w-0">
-                  <h2 className="m-0 truncate text-lg font-semibold">
-                    {resource.name}
-                  </h2>
-                  {resource.isPrivate ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <Badge variant="destructive">
-                        {t("web.resources.moderation.privateBadge")}
-                      </Badge>
-                      {resource.privateReason ? (
-                        <span className="text-sm text-muted-foreground">
-                          {t("web.resources.moderation.privateReason", {
-                            reason: resource.privateReason,
-                          })}
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  <p className="mt-1 mb-0 text-sm text-muted-foreground">
-                    {t("web.resources.detail.version", {
-                      version: resource.version,
+                <Badge
+                  className="absolute top-4 right-4"
+                  variant={resource.isPrivate ? "secondary" : "destructive"}
+                >
+                  {resource.isPrivate
+                    ? t("web.resources.visibility.private" as TranslationKey)
+                    : t("web.resources.visibility.public" as TranslationKey)}
+                </Badge>
+                <h2 className="m-0 truncate text-lg font-semibold">
+                  {resource.name}
+                </h2>
+                {resource.privateReason ? (
+                  <span className="text-sm text-muted-foreground">
+                    {t("web.resources.moderation.privateReason", {
+                      reason: resource.privateReason,
                     })}
-                    {" · "}
-                    {t("web.resources.detail.updatedOn", {
-                      date: new Intl.DateTimeFormat(locale, {
-                        dateStyle: "medium",
-                      }).format(new Date(resource.updatedAt)),
-                    })}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    nativeButton={false}
-                    render={
-                      <Link
-                        params={{ resourceId: String(resource.id) }}
-                        to="/resources/$resourceId"
-                      />
-                    }
-                    variant="outline"
-                  >
-                    {t("web.resources.action.details")}
-                  </Button>
-                  <Button
-                    nativeButton={false}
-                    render={
-                      <Link
-                        params={{ resourceId: String(resource.id) }}
-                        to="/resources/$resourceId/edit"
-                      />
-                    }
-                    variant="outline"
-                  >
-                    <Pencil />
-                    {t("web.resources.action.edit")}
-                  </Button>
-                  <Button
-                    nativeButton={false}
-                    render={
-                      <Link
-                        params={{ resourceId: String(resource.id) }}
-                        to="/resources/$resourceId/versions/new"
-                      />
-                    }
-                  >
-                    <FileUp />
-                    {t("web.resources.action.uploadNewVersion")}
-                  </Button>
-                </div>
-              </article>
+                  </span>
+                ) : null}
+                <p className="m-0 text-sm text-muted-foreground">
+                  {t("web.resources.detail.version", {
+                    version: resource.version,
+                  })}
+                  {" · "}
+                  {t("web.resources.detail.updatedOn", {
+                    date: new Intl.DateTimeFormat(locale, {
+                      dateStyle: "medium",
+                    }).format(new Date(resource.updatedAt)),
+                  })}
+                </p>
+              </Link>
             ))}
           </div>
         )}
@@ -142,6 +109,37 @@ export function ResourceManagementPage({
 
 export function ResourceEditPage({ detail }: { detail: ResourceDetail }) {
   const { locale } = useLocale();
+  const t = (
+    key: TranslationKey,
+    params: Record<string, number | string> = {},
+  ) => formatTranslation(key, params, locale);
+
+  return (
+    <UserPageShell
+      title={t("web.resources.management.editResources" as TranslationKey)}
+    >
+      <Tabs defaultValue="edit">
+        <TabsList>
+          <TabsTrigger value="edit">
+            {t("web.resources.action.edit")}
+          </TabsTrigger>
+          <TabsTrigger value="version">
+            {t("web.resources.action.uploadNewVersion")}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="edit">
+          <ResourceEditForm detail={detail} />
+        </TabsContent>
+        <TabsContent value="version">
+          <ResourceVersionUploadForm detail={detail} />
+        </TabsContent>
+      </Tabs>
+    </UserPageShell>
+  );
+}
+
+function ResourceEditForm({ detail }: { detail: ResourceDetail }) {
+  const { locale } = useLocale();
   const navigate = useNavigate();
   const t = (
     key: TranslationKey,
@@ -150,183 +148,112 @@ export function ResourceEditPage({ detail }: { detail: ResourceDetail }) {
   const [selectedCategories, setSelectedCategories] = useState(
     detail.categories.map(({ name }) => name),
   );
-  const [categoryQuery, setCategoryQuery] = useState("");
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [previewFiles, setPreviewFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const categoryListId = useId();
-  const normalizedQuery = categoryQuery.trim();
-  const matchingCategory = categories.find(
-    ({ name }) =>
-      name.toLocaleLowerCase() === normalizedQuery.toLocaleLowerCase(),
-  );
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      void listResourceCategories({ data: { search: categoryQuery } })
-        .then(setCategories)
-        .catch(() => setCategories([]));
-    }, 150);
-    return () => window.clearTimeout(timeout);
-  }, [categoryQuery]);
-
-  function addCategory() {
-    const category = matchingCategory?.name ?? normalizedQuery;
-    if (
-      !category ||
-      selectedCategories.length >= 10 ||
-      selectedCategories.some(
-        (selected) =>
-          selected.toLocaleLowerCase() === category.toLocaleLowerCase(),
-      )
-    ) {
-      return;
-    }
-    setSelectedCategories((current) => [...current, category]);
-    setCategoryQuery("");
-  }
 
   return (
-    <UserPageShell
-      title={t("web.resources.management.editTitle", { name: detail.name })}
+    <form
+      className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (selectedCategories.length === 0) {
+          toast.error(t("web.resources.validation.requiredCategory"));
+          return;
+        }
+        setSubmitting(true);
+        try {
+          const formData = new FormData(event.currentTarget);
+          if (previewFiles[0]) formData.set("preview", previewFiles[0]);
+          await updateResource({ data: formData });
+          await navigate({
+            params: { resourceId: String(detail.id) },
+            to: "/resources/$resourceId",
+          });
+        } catch {
+          toast.error(t("web.resources.error.editFailed"));
+          setSubmitting(false);
+        }
+      }}
     >
-      <form
-        className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          if (selectedCategories.length === 0) {
-            toast.error(t("web.resources.validation.requiredCategory"));
-            return;
-          }
-          setSubmitting(true);
-          try {
-            await updateResource({ data: new FormData(event.currentTarget) });
-            await navigate({
-              params: { resourceId: String(detail.id) },
-              to: "/resources/$resourceId",
-            });
-          } catch {
-            toast.error(t("web.resources.error.editFailed"));
-            setSubmitting(false);
-          }
-        }}
+      <p className="m-0 text-sm text-muted-foreground">
+        {t("web.resources.management.editDescription")}
+      </p>
+      <ResourceVisibilityToggle
+        canAdminister={detail.canAdminister}
+        isAdminPrivate={detail.isAdminPrivate}
+        isOwner={detail.isOwner}
+        isPrivate={detail.isPrivate}
+        name={detail.name}
+        resourceId={detail.id}
+      />
+      <input name="resourceId" type="hidden" value={detail.id} />
+
+      <label
+        className="grid gap-2 text-sm font-medium"
+        htmlFor="edit-resource-name"
       >
-        <p className="m-0 text-sm text-muted-foreground">
-          {t("web.resources.management.editDescription")}
-        </p>
-        <p className="m-0 rounded-md bg-muted p-3 text-xs text-muted-foreground">
-          {t("web.resources.management.metadataOnly")}
-        </p>
-        <input name="resourceId" type="hidden" value={detail.id} />
+        {t("web.resources.upload.nameLabel")}
+        <Input
+          defaultValue={detail.name}
+          id="edit-resource-name"
+          maxLength={120}
+          name="name"
+          required
+        />
+      </label>
 
-        <label
-          className="grid gap-2 text-sm font-medium"
-          htmlFor="edit-resource-name"
-        >
-          {t("web.resources.upload.nameLabel")}
-          <Input
-            defaultValue={detail.name}
-            id="edit-resource-name"
-            maxLength={120}
-            name="name"
-            required
-          />
-        </label>
-        <label
-          className="grid gap-2 text-sm font-medium"
-          htmlFor="edit-resource-description"
-        >
-          {t("web.resources.upload.descriptionLabel")}
-          <textarea
-            className="min-h-32 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            defaultValue={detail.description}
-            id="edit-resource-description"
-            maxLength={5000}
-            name="description"
-            required
-          />
-        </label>
-        <label
-          className="grid gap-2 text-sm font-medium"
-          htmlFor="edit-resource-preview"
-        >
-          {t("web.resources.upload.previewLabel")}
-          <span className="text-xs font-normal text-muted-foreground">
-            {t("web.resources.upload.previewHelp")}
-          </span>
-          <Input
-            accept="image/jpeg,image/png,image/webp"
-            className="h-auto py-2 file:mr-3 file:font-medium"
-            id="edit-resource-preview"
-            name="preview"
-            type="file"
-          />
-        </label>
+      {detail.previewImageUrl ? (
+        <img
+          alt={t("web.resources.detail.previewAlt", { name: detail.name })}
+          className="aspect-4/3 w-40 rounded-md border border-border object-cover"
+          src={detail.previewImageUrl}
+        />
+      ) : null}
+      <FileDropInput
+        accept="image/jpeg,image/png,image/webp"
+        browseLabel={t("web.resources.upload.browseFiles" as TranslationKey)}
+        description={t("web.resources.upload.previewHelp")}
+        disabled={submitting}
+        files={previewFiles}
+        fileTypes={t("web.resources.upload.previewTypes")}
+        id="edit-resource-preview"
+        label={t("web.resources.upload.previewLabel")}
+        onFilesChange={setPreviewFiles}
+        onRemove={() => setPreviewFiles([])}
+        removeFileLabel={t("web.resources.action.removeFile")}
+      />
 
-        <div className="grid gap-2 text-sm font-medium">
-          <label htmlFor="edit-resource-category">
-            {t("web.resources.category.label")}
-          </label>
-          <div className="flex gap-2">
-            <Input
-              id="edit-resource-category"
-              list={categoryListId}
-              onChange={(event) => setCategoryQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  addCategory();
-                }
-              }}
-              placeholder={t("web.resources.category.search")}
-              value={categoryQuery}
-            />
-            <Button
-              disabled={!normalizedQuery || selectedCategories.length >= 10}
-              onClick={addCategory}
-              type="button"
-              variant="secondary"
-            >
-              {!normalizedQuery
-                ? t("web.resources.category.select")
-                : matchingCategory
-                  ? t("web.resources.action.accept")
-                  : t("web.resources.category.create", {
-                      category: normalizedQuery,
-                    })}
-            </Button>
-            <datalist id={categoryListId}>
-              {categories.map((category) => (
-                <option key={category.id} value={category.name} />
-              ))}
-            </datalist>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {selectedCategories.map((category) => (
-              <Badge className="gap-1 pr-1" key={category} variant="secondary">
-                {category}
-                <button
-                  aria-label={t("web.resources.category.remove", { category })}
-                  className="rounded-full p-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() =>
-                    setSelectedCategories((current) =>
-                      current.filter((selected) => selected !== category),
-                    )
-                  }
-                  type="button"
-                >
-                  <X className="size-3" />
-                </button>
-                <input name="categories" type="hidden" value={category} />
-              </Badge>
-            ))}
-          </div>
-        </div>
+      <label
+        className="grid gap-2 text-sm font-medium"
+        htmlFor="edit-resource-description"
+      >
+        {t("web.resources.upload.descriptionLabel")}
+        <textarea
+          className="min-h-32 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          defaultValue={detail.description}
+          id="edit-resource-description"
+          maxLength={5000}
+          name="description"
+          required
+        />
+      </label>
 
-        <Button disabled={submitting} type="submit">
-          {t("web.resources.action.saveChanges")}
-        </Button>
-      </form>
-    </UserPageShell>
+      <ResourceCategoryInput
+        disabled={submitting}
+        label={t("web.resources.category.label")}
+        noResultsLabel={t("web.resources.category.noResults")}
+        onChange={setSelectedCategories}
+        placeholder={t("web.resources.category.search")}
+        removeLabel={(category) =>
+          t("web.resources.category.remove", { category })
+        }
+        selected={selectedCategories}
+      />
+
+      <Button disabled={submitting} type="submit">
+        {t("web.resources.action.saveChanges")}
+      </Button>
+    </form>
   );
 }
 
@@ -335,11 +262,7 @@ export function ResourceVersionUploadPage({
 }: {
   detail: ResourceDetail;
 }) {
-  const { getToken } = useAuth();
   const { locale } = useLocale();
-  const [files, setFiles] = useState<File[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState("");
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -349,71 +272,96 @@ export function ResourceVersionUploadPage({
     <UserPageShell
       title={t("web.resources.upload.newVersionTitle", { name: detail.name })}
     >
-      <form
-        className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          const validation = validateResourceUpload(files);
-          if (validation) {
-            toast.error(t(validation.key, validation.params));
-            return;
-          }
-
-          setSubmitting(true);
-          setUploadStatus("");
-          try {
-            const result = await uploadResourceSession({
-              files,
-              getToken,
-              onProgress: (filename, percent) =>
-                setUploadStatus(
-                  t("web.resources.upload.progress", { filename, percent }),
-                ),
-              onStage: (stage) => {
-                if (stage === "complete") {
-                  setUploadStatus(t("web.resources.upload.finalizing"));
-                }
-              },
-              operation: "version",
-              resourceId: detail.id,
-            });
-            toast.success(
-              t("web.resources.upload.versionSuccess", {
-                version: result.version,
-              }),
-            );
-            window.location.assign(`/resources/${result.resourceId}`);
-          } catch (error) {
-            const message = getResourceUploadErrorTranslation(error);
-            toast.error(t(message.key, message.params));
-            setSubmitting(false);
-            setUploadStatus("");
-          }
-        }}
-      >
-        <input name="resourceId" type="hidden" value={detail.id} />
-        <ResourceFileInput
-          description={t("web.resources.upload.fileHelp", {
-            maxFiles: 10,
-            maxFileSize: "20 MiB",
-            maxSessionSize: "50 MiB",
-          })}
-          disabled={submitting}
-          files={files}
-          fileTypes={t("web.resources.upload.fileTypes")}
-          id="resource-version-file"
-          label={t("web.resources.upload.filesLabel")}
-          onFilesChange={setFiles}
-          removeFileLabel={t("web.resources.action.removeFile")}
-        />
-        <Button disabled={submitting} type="submit">
-          <FileUp />
-          {t("web.resources.action.uploadNewVersion")}
-        </Button>
-        <p aria-live="polite" className="m-0 text-sm text-muted-foreground">
-          {uploadStatus}
-        </p>
-      </form>
+      <ResourceVersionUploadForm detail={detail} />
     </UserPageShell>
+  );
+}
+
+function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
+  const { getToken } = useAuth();
+  const { locale } = useLocale();
+  const navigate = useNavigate();
+  const [files, setFiles] = useState<File[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState("");
+  const t = (
+    key: TranslationKey,
+    params: Record<string, number | string> = {},
+  ) => formatTranslation(key, params, locale);
+
+  return (
+    <form
+      aria-busy={submitting}
+      className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        const validation = validateResourceUpload(files);
+        if (validation) {
+          toast.error(t(validation.key, validation.params));
+          return;
+        }
+
+        setSubmitting(true);
+        setUploadStatus("");
+        try {
+          const result = await uploadResourceSession({
+            files,
+            getToken,
+            onProgress: (filename, percent) =>
+              setUploadStatus(
+                t("web.resources.upload.progress", { filename, percent }),
+              ),
+            onStage: (stage) => {
+              if (stage === "complete") {
+                setUploadStatus(t("web.resources.upload.finalizing"));
+              }
+            },
+            operation: "version",
+            resourceId: detail.id,
+          });
+          toast.success(
+            t("web.resources.upload.versionSuccess", {
+              version: result.version,
+            }),
+          );
+          await navigate({
+            params: { resourceId: String(result.resourceId) },
+            to: "/resources/$resourceId",
+          });
+        } catch (error) {
+          const message = getResourceUploadErrorTranslation(error);
+          toast.error(t(message.key, message.params));
+          setSubmitting(false);
+          setUploadStatus("");
+        }
+      }}
+    >
+      <ResourceFileInput
+        browseLabel={t("web.resources.upload.browseFiles" as TranslationKey)}
+        description={t("web.resources.upload.fileHelp", {
+          maxFiles: 10,
+          maxFileSize: "20 MiB",
+          maxSessionSize: "50 MiB",
+        })}
+        disabled={submitting}
+        files={files}
+        fileTypes={t("web.resources.upload.fileTypes")}
+        id="resource-version-file"
+        label={t("web.resources.upload.filesLabel")}
+        onFilesChange={setFiles}
+        removeFileLabel={t("web.resources.action.removeFile")}
+      />
+      <Button disabled={submitting} type="submit">
+        {submitting ? (
+          <LoaderCircle aria-hidden="true" className="animate-spin" />
+        ) : (
+          <FileUp />
+        )}
+        {t("web.resources.action.uploadNewVersion")}
+      </Button>
+      <p aria-live="polite" className="m-0 text-sm text-muted-foreground">
+        {uploadStatus}
+      </p>
+    </form>
   );
 }

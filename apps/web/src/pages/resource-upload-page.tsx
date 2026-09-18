@@ -4,12 +4,16 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { useNavigate } from "@tanstack/react-router";
-import { X } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { LoaderCircle } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
-import { ResourceFileInput } from "@/components/resource-file-input";
-import { Badge } from "@/components/ui/badge";
+import { ResourceCategoryInput } from "@/components/resource-category-input";
+import {
+  FileDropInput,
+  ResourceFileInput,
+} from "@/components/resource-file-input";
+import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,63 +21,28 @@ import {
   uploadResourceSession,
   validateResourceUpload,
 } from "@/lib/resource-upload-sessions";
-import { listResourceCategories } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
-
-type Category = Awaited<ReturnType<typeof listResourceCategories>>[number];
 
 export function ResourceUploadPage() {
   const { getToken } = useAuth();
   const { locale } = useLocale();
   const navigate = useNavigate();
-  const categoryListId = useId();
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [categoryQuery, setCategoryQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
+  const [previewFiles, setPreviewFiles] = useState<File[]>([]);
+  const [isPublic, setIsPublic] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
 
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      void listResourceCategories({ data: { search: categoryQuery } })
-        .then(setCategories)
-        .catch(() => setCategories([]));
-    }, 150);
-    return () => window.clearTimeout(timeout);
-  }, [categoryQuery]);
-
-  const normalizedQuery = categoryQuery.trim();
-  const matchingCategory = categories.find(
-    ({ name }) =>
-      name.toLocaleLowerCase() === normalizedQuery.toLocaleLowerCase(),
-  );
-
-  function addCategory() {
-    const category = matchingCategory?.name ?? normalizedQuery;
-    if (
-      !category ||
-      selectedCategories.length >= 10 ||
-      selectedCategories.some(
-        (selected) =>
-          selected.toLocaleLowerCase() === category.toLocaleLowerCase(),
-      )
-    ) {
-      return;
-    }
-
-    setSelectedCategories((current) => [...current, category]);
-    setCategoryQuery("");
-  }
-
   return (
-    <AppShell title={t("web.resources.upload.title")}>
+    <AppShell title={t("web.resources.add.title" as TranslationKey)}>
       <main className="mx-auto w-full max-w-2xl px-4 py-8 md:px-6">
         <form
+          aria-busy={submitting}
           className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
           encType="multipart/form-data"
           onSubmit={async (event) => {
@@ -84,11 +53,7 @@ export function ResourceUploadPage() {
             }
 
             const formData = new FormData(event.currentTarget);
-            const previewValue = formData.get("preview");
-            const preview =
-              previewValue instanceof File && previewValue.size > 0
-                ? previewValue
-                : undefined;
+            const preview = previewFiles[0];
             const validation = validateResourceUpload(files, preview);
             if (validation) {
               toast.error(t(validation.key, validation.params));
@@ -103,6 +68,7 @@ export function ResourceUploadPage() {
                 description: String(formData.get("description") ?? ""),
                 files,
                 getToken,
+                isPrivate: !isPublic,
                 name: String(formData.get("name") ?? ""),
                 onProgress: (filename, percent) =>
                   setUploadStatus(
@@ -147,6 +113,22 @@ export function ResourceUploadPage() {
             />
           </Field>
 
+          <FileDropInput
+            accept="image/jpeg,image/png,image/webp"
+            browseLabel={t(
+              "web.resources.upload.browseFiles" as TranslationKey,
+            )}
+            description={t("web.resources.upload.previewHelp")}
+            disabled={submitting}
+            files={previewFiles}
+            fileTypes={t("web.resources.upload.previewTypes")}
+            id="resource-preview"
+            label={t("web.resources.upload.previewLabel")}
+            onFilesChange={setPreviewFiles}
+            onRemove={() => setPreviewFiles([])}
+            removeFileLabel={t("web.resources.action.removeFile")}
+          />
+
           <Field
             htmlFor="resource-description"
             label={t("web.resources.upload.descriptionLabel")}
@@ -162,6 +144,9 @@ export function ResourceUploadPage() {
           </Field>
 
           <ResourceFileInput
+            browseLabel={t(
+              "web.resources.upload.browseFiles" as TranslationKey,
+            )}
             description={t("web.resources.upload.fileHelp", {
               maxFileSize: "20 MiB",
               maxFiles: 10,
@@ -176,97 +161,29 @@ export function ResourceUploadPage() {
             removeFileLabel={t("web.resources.action.removeFile")}
           />
 
-          <Field
-            description={t("web.resources.upload.previewHelp")}
-            htmlFor="resource-preview"
-            label={t("web.resources.upload.previewLabel")}
-          >
-            <Input
-              accept="image/jpeg,image/png,image/webp"
-              className="h-auto py-2 file:mr-3 file:font-medium"
-              id="resource-preview"
-              name="preview"
-              type="file"
-            />
-            <p className="m-0 text-xs text-muted-foreground">
-              {t("web.resources.upload.previewTypes")}
-            </p>
-          </Field>
-
-          <Field
-            htmlFor="resource-category"
+          <ResourceCategoryInput
+            disabled={submitting}
             label={t("web.resources.category.label")}
-          >
-            <div className="flex gap-2">
-              <Input
-                aria-label={t("web.resources.category.search")}
-                id="resource-category"
-                list={categoryListId}
-                onChange={(event) => setCategoryQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    addCategory();
-                  }
-                }}
-                placeholder={t("web.resources.category.search")}
-                value={categoryQuery}
-              />
-              <Button
-                disabled={!normalizedQuery || selectedCategories.length >= 10}
-                onClick={addCategory}
-                type="button"
-                variant="secondary"
-              >
-                {!normalizedQuery
-                  ? t("web.resources.category.select")
-                  : matchingCategory
-                    ? t("web.resources.action.accept")
-                    : t("web.resources.category.create", {
-                        category: normalizedQuery,
-                      })}
-              </Button>
-              <datalist id={categoryListId}>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.name} />
-                ))}
-              </datalist>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {selectedCategories.map((category) => (
-                <Badge
-                  className="gap-1 pr-1"
-                  key={category}
-                  variant="secondary"
-                >
-                  {category}
-                  <button
-                    aria-label={t("web.resources.category.remove", {
-                      category,
-                    })}
-                    className="rounded-full p-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    onClick={() =>
-                      setSelectedCategories((current) =>
-                        current.filter((selected) => selected !== category),
-                      )
-                    }
-                    type="button"
-                  >
-                    <X className="size-3" />
-                  </button>
-                  <input name="categories" type="hidden" value={category} />
-                </Badge>
-              ))}
-            </div>
-            <p className="m-0 text-xs text-muted-foreground">
-              {t("web.resources.category.selectedCount", {
-                count: selectedCategories.length,
-              })}
-            </p>
-          </Field>
+            noResultsLabel={t("web.resources.category.noResults")}
+            onChange={setSelectedCategories}
+            placeholder={t("web.resources.category.search")}
+            removeLabel={(category) =>
+              t("web.resources.category.remove", { category })
+            }
+            selected={selectedCategories}
+          />
+
+          <PublicResourceSwitch
+            checked={isPublic}
+            disabled={submitting}
+            onCheckedChange={setIsPublic}
+          />
 
           <Button disabled={submitting} type="submit">
-            {t("web.resources.action.upload")}
+            {submitting ? (
+              <LoaderCircle aria-hidden="true" className="animate-spin" />
+            ) : null}
+            {t("web.resources.action.add" as TranslationKey)}
           </Button>
           <p aria-live="polite" className="m-0 text-sm text-muted-foreground">
             {uploadStatus}

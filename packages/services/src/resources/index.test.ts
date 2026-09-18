@@ -231,7 +231,7 @@ describe("resources service", () => {
                             return [
                               {
                                 id: 1001,
-                                url: "https://cdn.example.test/file.stl",
+                                objectPath: "resources/dev/file.stl",
                               },
                             ];
                           },
@@ -250,12 +250,17 @@ describe("resources service", () => {
       db,
       {} as ResourceStorage,
       createNoopLogger({ app: "web", environment: "test" }),
+      async (objectPath) => {
+        calls.push("signed");
+        expect(objectPath).toBe("resources/dev/file.stl");
+        return "https://cdn.example.test/resources/dev/file.stl?token=signed";
+      },
     );
 
     await expect(service.download(1000, 1001)).resolves.toBe(
-      "https://cdn.example.test/file.stl",
+      "https://cdn.example.test/resources/dev/file.stl?token=signed",
     );
-    expect(calls).toEqual(["selected", "recorded"]);
+    expect(calls).toEqual(["selected", "recorded", "signed"]);
   });
 
   it("returns resource detail with event-derived download counts", async () => {
@@ -301,7 +306,9 @@ describe("resources service", () => {
                 name: "Pocket clip",
                 privateReason: null,
                 privatedAt: null,
-                previewImageUrl: null,
+                previewImageObjectPath: "resources/dev/preview.webp",
+                previewImageUrl:
+                  "https://cdn.example.test/resources/dev/preview.webp",
                 uploaderClerkId: "user_123",
               },
             ],
@@ -346,6 +353,8 @@ describe("resources service", () => {
       { select } as unknown as Database,
       {} as ResourceStorage,
       createNoopLogger({ app: "web", environment: "test" }),
+      async (objectPath) =>
+        `https://cdn.example.test/${objectPath}?token=signed`,
     );
 
     await expect(service.getDetail(1000)).resolves.toEqual({
@@ -355,11 +364,13 @@ describe("resources service", () => {
       description: "A useful clip.",
       downloadCount: 3,
       id: 1000,
+      isAdminPrivate: false,
       isPrivate: false,
       name: "Pocket clip",
       privateReason: null,
       privatedAt: null,
-      previewImageUrl: null,
+      previewImageUrl:
+        "https://cdn.example.test/resources/dev/preview.webp?token=signed",
       uploaderClerkId: "user_123",
       versions: [currentVersion],
     });
@@ -393,35 +404,53 @@ describe("resources service", () => {
 
   it("lists directory cards and rejects unknown category filters", async () => {
     const categories = [{ id: 1002, name: "3D printing", slug: "3d-printing" }];
-    const resources = [
+    const resourceRows = [
       {
         categories,
         createdAt: new Date("2026-09-16T12:00:00Z"),
         currentVersion: {
+          fileId: 1003,
           fileName: "clip.stl",
           id: 1001,
         },
         downloadCount: 3,
         id: 1000,
         name: "Pocket clip",
-        previewImageUrl: null,
+        previewImageObjectPath: "resources/dev/preview.webp",
       },
     ];
     const execute = vi
       .fn()
       .mockResolvedValueOnce({ rows: categories })
-      .mockResolvedValueOnce({ rows: resources })
+      .mockResolvedValueOnce({ rows: resourceRows })
       .mockResolvedValueOnce({ rows: categories });
     const service = createResourcesService(
       { execute } as unknown as Database,
       {} as ResourceStorage,
       createNoopLogger({ app: "web", environment: "test" }),
+      async (objectPath) =>
+        `https://cdn.example.test/${objectPath}?token=signed`,
     );
 
     await expect(service.listDirectory(["3d-printing"])).resolves.toEqual({
       categories,
       invalidFilters: [],
-      resources,
+      resources: [
+        {
+          categories,
+          createdAt: new Date("2026-09-16T12:00:00Z"),
+          currentVersion: {
+            fileId: 1003,
+            fileName: "clip.stl",
+            id: 1001,
+          },
+          downloadCount: 3,
+          id: 1000,
+          name: "Pocket clip",
+          previewImageUrl:
+            "https://cdn.example.test/resources/dev/preview.webp?token=signed",
+        },
+      ],
     });
     await expect(service.listDirectory(["missing-category"])).resolves.toEqual({
       categories,
@@ -492,6 +521,49 @@ describe("resources service", () => {
     expect(query.sql).toContain("set is_private = true");
     expect(query.sql).toContain("privated_at = now()");
     expect(query.params).toEqual(["Inappropriate content", "admin_123", 1000]);
+  });
+
+  it("keeps admin-private resources locked from owner visibility changes", async () => {
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 1000 }] });
+    const service = createResourcesService(
+      { execute } as unknown as Database,
+      {} as ResourceStorage,
+      createNoopLogger({ app: "web", environment: "test" }),
+    );
+
+    await expect(
+      service.setVisibility({
+        actorClerkId: "user_123",
+        actorIsAdmin: false,
+        isPublic: true,
+        resourceId: 1000,
+      }),
+    ).rejects.toThrow("Resource visibility update is not allowed.");
+    await expect(
+      service.setVisibility({
+        actorClerkId: "user_123",
+        actorIsAdmin: false,
+        isPublic: false,
+        resourceId: 1000,
+      }),
+    ).rejects.toThrow("Resource visibility update is not allowed.");
+    await expect(
+      service.setVisibility({
+        actorClerkId: "admin_123",
+        actorIsAdmin: true,
+        isPublic: true,
+        resourceId: 1000,
+      }),
+    ).resolves.toBeUndefined();
+
+    const ownerQuery = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
+    expect(ownerQuery.sql).toContain("privated_by_clerk_id is null");
+    expect(ownerQuery.params).toContain(false);
+    expect(ownerQuery.params).toContain("user_123");
   });
 
   it("rejects non-owner mutations before uploading files", async () => {

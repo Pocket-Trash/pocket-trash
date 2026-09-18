@@ -33,6 +33,15 @@ type UploadMetadata = {
   size: number;
 };
 
+type FileUploadRequest = {
+  file: File;
+  headers: Record<string, string>;
+  onProgress(percent: number): void;
+  url: string;
+};
+
+type FileUploader = (request: FileUploadRequest) => Promise<Response>;
+
 type SessionResponse = {
   expiresAt: string;
   id: string;
@@ -146,14 +155,21 @@ export async function uploadResourceSession(input: {
   fetch?: typeof fetch;
   files: File[];
   getToken(): Promise<string | null>;
+  isPrivate?: boolean;
   name?: string;
   onProgress?(fileName: string, percent: number): void;
   onStage?(stage: "complete" | "upload"): void;
   operation: "create" | "version";
   preview?: File;
   resourceId?: number;
+  uploadFile?: FileUploader;
 }): Promise<{ resourceId: number; version: number }> {
   const fetcher = input.fetch ?? fetch;
+  const uploadFile =
+    input.uploadFile ??
+    (input.fetch
+      ? (request: FileUploadRequest) => uploadFileWithFetch(fetcher, request)
+      : uploadFileWithProgress);
   const token = await input.getToken();
   if (!token) throw new ResourceUploadRequestError("session", "unauthorized");
 
@@ -165,6 +181,7 @@ export async function uploadResourceSession(input: {
           ? {
               categories: input.categories,
               description: input.description,
+              isPrivate: Boolean(input.isPrivate),
               name: input.name,
             }
           : { resourceId: input.resourceId }),
@@ -201,18 +218,15 @@ export async function uploadResourceSession(input: {
       );
     }
 
-    input.onProgress?.(file.name, 0);
-    const uploadResponse = await fetcher(
-      `${trimTrailingSlash(clientEnv.VITE_RESOURCE_API_BASE_URL)}/api/v0/resource-upload-sessions/${encodeURIComponent(session.id)}/files/${encodeURIComponent(upload.id)}`,
-      {
-        body: file,
-        headers: {
-          authorization: `Bearer ${token}`,
-          "content-type": upload.contentType,
-        },
-        method: "PUT",
+    const uploadResponse = await uploadFile({
+      file,
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": upload.contentType,
       },
-    );
+      onProgress: (percent) => input.onProgress?.(file.name, percent),
+      url: `${trimTrailingSlash(clientEnv.VITE_RESOURCE_API_BASE_URL)}/api/v0/resource-upload-sessions/${encodeURIComponent(session.id)}/files/${encodeURIComponent(upload.id)}`,
+    });
     if (!uploadResponse.ok) {
       throw new ResourceUploadRequestError(
         "file",
@@ -220,7 +234,6 @@ export async function uploadResourceSession(input: {
         file.name,
       );
     }
-    input.onProgress?.(file.name, 100);
   }
 
   input.onStage?.("complete");
@@ -246,6 +259,66 @@ export async function uploadResourceSession(input: {
     resourceId: number;
     version: number;
   };
+}
+
+async function uploadFileWithFetch(
+  fetcher: typeof fetch,
+  input: FileUploadRequest,
+): Promise<Response> {
+  input.onProgress(0);
+  const response = await fetcher(input.url, {
+    body: input.file,
+    headers: input.headers,
+    method: "PUT",
+  });
+  input.onProgress(100);
+  return response;
+}
+
+function uploadFileWithProgress(input: FileUploadRequest): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    let lastPercent = -1;
+    const report = (percent: number) => {
+      const nextPercent = Math.max(0, Math.min(100, Math.round(percent)));
+      if (nextPercent === lastPercent) return;
+      lastPercent = nextPercent;
+      input.onProgress(nextPercent);
+    };
+
+    request.open("PUT", input.url);
+    for (const [name, value] of Object.entries(input.headers)) {
+      request.setRequestHeader(name, value);
+    }
+    request.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        report((event.loaded / event.total) * 100);
+      }
+    });
+    request.addEventListener("load", () => {
+      report(100);
+      resolve(
+        new Response(
+          request.status === 204 || request.status === 205
+            ? null
+            : request.responseText,
+          { status: request.status, statusText: request.statusText },
+        ),
+      );
+    });
+    const rejectUpload = () =>
+      reject(
+        new ResourceUploadRequestError(
+          "file",
+          "upload_failed",
+          input.file.name,
+        ),
+      );
+    request.addEventListener("abort", rejectUpload);
+    request.addEventListener("error", rejectUpload);
+    report(0);
+    request.send(input.file);
+  });
 }
 
 function validateFile(

@@ -114,6 +114,7 @@ describe("web server env", () => {
       LOG_LEVEL: "debug",
       LOG_PROXY_CLIENT_KEY: "client-key",
       RESOURCE_CDN_BASE_URL: "https://cdn.pocket-trash.app",
+      RESOURCE_CDN_TOKEN_KEY: "cdn-token-key",
       RESOURCE_FOLDER_PREFIX: "resources/preview/pr-52",
       RESOURCE_STORAGE_ACCESS_KEY: "resource-storage-key",
       RESOURCE_STORAGE_ENDPOINT: "https://ny.storage.bunnycdn.com",
@@ -135,6 +136,7 @@ describe("web server env", () => {
     expect(env.LOG_LEVEL).toBe("debug");
     expect(env.LOG_PROXY_CLIENT_KEY).toBe("client-key");
     expect(env.RESOURCE_CDN_BASE_URL).toBe("https://cdn.pocket-trash.app");
+    expect(env.RESOURCE_CDN_TOKEN_KEY).toBe("cdn-token-key");
     expect(env.RESOURCE_FOLDER_PREFIX).toBe("resources/preview/pr-52");
     expect(env.RESOURCE_STORAGE_ACCESS_KEY).toBe("resource-storage-key");
     expect(env.RESOURCE_STORAGE_ENDPOINT).toBe(

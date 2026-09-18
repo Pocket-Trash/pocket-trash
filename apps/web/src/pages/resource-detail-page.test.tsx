@@ -43,6 +43,7 @@ describe("resource detail", () => {
     const html = renderToStaticMarkup(
       <ResourceDetailPage
         detail={{
+          canAdminister: false,
           canEdit: true,
           categories: [{ id: 1002, name: "3D printing", slug: "3d-printing" }],
           createdAt,
@@ -50,7 +51,9 @@ describe("resource detail", () => {
           description: "A useful clip.",
           downloadCount: 0,
           id: 1000,
+          isAdminPrivate: true,
           isPrivate: true,
+          isOwner: true,
           name: "Pocket clip",
           privateReason: "Inappropriate content",
           privatedAt: createdAt,
@@ -65,7 +68,9 @@ describe("resource detail", () => {
     expect(html).toContain("Reason: Inappropriate content");
     expect(html).toContain("Edit");
     expect(html).toContain('href="/resources/1000/edit"');
-    expect(html).toContain("Upload new version");
-    expect(html).toContain('href="/resources/1000/versions/new"');
+    expect(html).not.toContain("Upload new version");
+    expect(html).not.toContain('href="/resources/1000/versions/new"');
+    expect(html).toContain("clip.stl");
+    expect(html).not.toContain("File: clip.stl");
   });
 });

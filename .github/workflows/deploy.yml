@@ -6,6 +6,7 @@ on:
     paths:
       - apps/api/**
       - apps/scraper/**
+      - apps/web/**
       - packages/**
       - .github/scripts/**
       - .github/workflows/deploy.yml
@@ -472,6 +473,17 @@ jobs:
             --var "RESOURCE_STORAGE_ENDPOINT:${RESOURCE_STORAGE_ENDPOINT}" \
             --var "RESOURCE_STORAGE_ZONE_NAME:${RESOURCE_STORAGE_ZONE_NAME}"
 
+      - name: Deploy Vercel preview from Git
+        if: steps.db.outputs.can_deploy == 'true'
+        id: vercel_preview
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY_ID: ${{ github.event.repository.id }}
+        run: bash .github/scripts/vercel-branch-database-url.sh deploy-preview
+
       - name: Configure Railway scraper preview database and cron
         if: steps.db.outputs.can_deploy == 'true'
         shell: bash
@@ -721,7 +733,7 @@ jobs:
           BRANCH_NAME: ${{ steps.db.outputs.branch_name }}
           BRANCH_URL: ${{ steps.db.outputs.branch_url }}
           PARENT_BRANCH: ${{ steps.db.outputs.parent_branch }}
-          WEB_PREVIEW_URL: ${{ steps.vercel.outputs.web_preview_url }}
+          WEB_PREVIEW_URL: ${{ steps.vercel_preview.outputs.web_preview_url }}
         with:
           github-token: ${{ steps.db-preview-comment-token.outputs.token }}
           script: |

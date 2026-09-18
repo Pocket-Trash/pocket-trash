@@ -62,6 +62,8 @@ describe("resource schema", () => {
       "resource_upload_sessions",
     );
     expect(resourceUploadSessions.uploaderClerkId.notNull).toBe(true);
+    expect(resourceUploadSessions.isPrivate.default).toBe(false);
+    expect(resourceUploadSessions.isPrivate.notNull).toBe(true);
     expect(resourceUploadSessions.expiresAt.notNull).toBe(true);
     expect(resourceUploadSessions.completedAt.notNull).toBe(false);
 

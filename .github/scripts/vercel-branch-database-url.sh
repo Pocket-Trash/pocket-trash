@@ -266,9 +266,99 @@ latest_preview_url() {
   fi
 }
 
+deploy_preview() {
+  require_env COMMIT_SHA
+  require_env REPOSITORY_ID
+  require_env PR_NUMBER
+
+  if [[ ! "$REPOSITORY_ID" =~ ^[0-9]+$ ]]; then
+    echo "REPOSITORY_ID must be numeric." >&2
+    exit 1
+  fi
+
+  local body
+  body="$(jq -n \
+    --arg project "$VERCEL_PROJECT_ID" \
+    --arg ref "$BRANCH_NAME" \
+    --arg sha "$COMMIT_SHA" \
+    --arg pr_number "$PR_NUMBER" \
+    --argjson repo_id "$REPOSITORY_ID" \
+    '{
+      name: "pocket-trash",
+      project: $project,
+      gitSource: {
+        type: "github",
+        ref: $ref,
+        repoId: $repo_id,
+        sha: $sha
+      },
+      meta: {
+        githubCommitRef: $ref,
+        githubCommitSha: $sha,
+        githubPrId: $pr_number
+      }
+    }')"
+
+  local response
+  response="$(api POST "/v13/deployments$(team_query_prefix)&forceNew=1&skipAutoDetectionConfirmation=1" "$body")"
+
+  local deployment_id
+  deployment_id="$(jq -er '.id' <<< "$response")"
+  emit_ci_log info "ci.vercel.preview.deployment.created" "$(jq -n \
+    --arg branch_name "$BRANCH_NAME" \
+    --arg deployment_id "$deployment_id" \
+    '{branchName: $branch_name, deploymentId: $deployment_id}')"
+
+  local attempt
+  for ((attempt = 1; attempt <= 180; attempt++)); do
+    response="$(api GET "/v13/deployments/${deployment_id}$(team_query_prefix)")"
+
+    local state
+    state="$(jq -er '.readyState' <<< "$response")"
+    case "$state" in
+      READY)
+        local url
+        url="https://$(jq -er '.url' <<< "$response")"
+        write_output deployment_id "$deployment_id"
+        write_output web_preview_url "$url"
+        emit_ci_log info "ci.vercel.preview.deployment.ready" "$(jq -n \
+          --arg branch_name "$BRANCH_NAME" \
+          --arg deployment_id "$deployment_id" \
+          --arg url "$url" \
+          '{branchName: $branch_name, deploymentId: $deployment_id, webPreviewUrl: $url}')"
+        return
+        ;;
+      ERROR | CANCELED | DELETED)
+        emit_ci_log error "ci.vercel.preview.deployment.failed" "$(jq -n \
+          --arg branch_name "$BRANCH_NAME" \
+          --arg deployment_id "$deployment_id" \
+          --arg state "$state" \
+          '{branchName: $branch_name, deploymentId: $deployment_id, state: $state}')"
+        return 1
+        ;;
+      QUEUED | INITIALIZING | BUILDING)
+        sleep "${VERCEL_DEPLOYMENT_POLL_INTERVAL_SECONDS:-5}"
+        ;;
+      *)
+        echo "Unexpected Vercel deployment state: ${state}." >&2
+        return 1
+        ;;
+    esac
+  done
+
+  emit_ci_log error "ci.vercel.preview.deployment.timeout" "$(jq -n \
+    --arg branch_name "$BRANCH_NAME" \
+    --arg deployment_id "$deployment_id" \
+    '{branchName: $branch_name, deploymentId: $deployment_id}')"
+  return 1
+}
+
 require_vercel_env
 
 case "${1:-}" in
+  deploy-preview)
+    deploy_preview
+    ;;
   set)
     set_database_url
     latest_preview_url
@@ -302,7 +392,7 @@ case "${1:-}" in
     latest_preview_url
     ;;
   *)
-    echo "Usage: $0 {set|remove|set-image-folder-prefix|remove-image-folder-prefix|set-resource-folder-prefix|remove-resource-folder-prefix|set-resource-api-base-url|remove-resource-api-base-url}" >&2
+    echo "Usage: $0 {deploy-preview|set|remove|set-image-folder-prefix|remove-image-folder-prefix|set-resource-folder-prefix|remove-resource-folder-prefix|set-resource-api-base-url|remove-resource-api-base-url}" >&2
     exit 1
     ;;
 esac

@@ -23,6 +23,7 @@ export type ResourceUploadSessionInput =
       categories: string[];
       description: string;
       files: ResourceUploadMetadata[];
+      isPrivate?: boolean;
       name: string;
       operation: "create";
       preview?: ResourceUploadMetadata;
@@ -222,13 +223,14 @@ export function createResourceUploadSessionsService(input: {
         with inserted_session as (
           insert into resource_upload_sessions (
             id, uploader_clerk_id, operation, resource_id, name, description,
-            categories, expires_at
+            categories, is_private, expires_at
           ) values (
             ${id}::uuid, ${uploaderClerkId}, ${sessionInput.operation},
             ${sessionInput.operation === "version" ? sessionInput.resourceId : null},
             ${sessionInput.operation === "create" ? metadata.name : null},
             ${sessionInput.operation === "create" ? metadata.description : null},
             ${JSON.stringify(sessionInput.operation === "create" ? metadata.categories : [])}::jsonb,
+            ${sessionInput.operation === "create" && Boolean(metadata.isPrivate)},
             ${expiresAt}
           )
           returning id
@@ -363,6 +365,7 @@ function normalizeSessionInput(input: ResourceUploadSessionInput): {
   categories: Array<{ name: string; slug: string }>;
   description?: string;
   files: ResourceUploadMetadata[];
+  isPrivate?: boolean;
   name?: string;
   preview?: ResourceUploadMetadata;
 } {
@@ -491,11 +494,11 @@ async function completeResource(
       insert into resources (
         uploader_clerk_id, name, description, preview_image_file_name,
         preview_image_content_type, preview_image_size,
-        preview_image_object_path, preview_image_url
+        preview_image_object_path, preview_image_url, is_private
       )
       select locked_session.uploader_clerk_id, locked_session.name,
         locked_session.description, preview.file_name, preview.content_type,
-        preview.size, preview.object_path, preview.url
+        preview.size, preview.object_path, preview.url, locked_session.is_private
       from locked_session left join preview on true
       returning id
     ), input_categories as (

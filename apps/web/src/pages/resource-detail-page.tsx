@@ -4,10 +4,11 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { File, FileDown, FileUp, Pencil } from "lucide-react";
+import { File, FileDown, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
+import { ResourceVisibilityToggle } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { downloadResource, type getResourceDetail } from "@/lib/resources";
@@ -47,30 +48,44 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
 
   return (
     <AppShell title={detail.name}>
-      <main className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-8 md:grid-cols-[minmax(0,1fr)_minmax(18rem,0.65fr)] md:px-6">
-        <section className="overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm">
+      <main className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-8 md:px-6">
+        <section className="grid overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm md:grid-cols-[minmax(14rem,0.6fr)_minmax(0,1fr)]">
           {detail.previewImageUrl ? (
             <img
               alt={t("web.resources.detail.previewAlt", { name: detail.name })}
-              className="aspect-4/3 w-full border-b border-border object-cover"
+              className="aspect-4/3 h-full w-full border-b border-border object-cover md:border-r md:border-b-0"
               src={detail.previewImageUrl}
             />
           ) : (
-            <div className="flex aspect-4/3 items-center justify-center border-b border-border bg-muted text-muted-foreground">
-              <File className="size-16" aria-hidden="true" />
+            <div className="flex aspect-4/3 items-center justify-center border-b border-border bg-muted text-muted-foreground md:border-r md:border-b-0">
+              <File aria-hidden="true" className="size-14" />
               <span className="sr-only">
                 {t("web.resources.detail.noPreview")}
               </span>
             </div>
           )}
-          <div className="grid gap-4 p-5">
+          <div className="grid content-start gap-4 p-5 md:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <h1 className="m-0 text-2xl font-semibold">{detail.name}</h1>
+              {detail.canEdit ? (
+                <Button
+                  nativeButton={false}
+                  render={
+                    <Link
+                      params={{ resourceId: String(detail.id) }}
+                      to="/resources/$resourceId/edit"
+                    />
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <Pencil />
+                  {t("web.resources.action.edit")}
+                </Button>
+              ) : null}
+            </div>
             <p className="m-0 text-sm leading-6">{detail.description}</p>
             <div className="flex flex-wrap gap-2">
-              {detail.isPrivate ? (
-                <Badge variant="destructive">
-                  {t("web.resources.moderation.privateBadge")}
-                </Badge>
-              ) : null}
               {detail.categories.map((category) => (
                 <Badge key={category.id} variant="secondary">
                   {category.name}
@@ -78,6 +93,17 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
               ))}
             </div>
             <dl className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+              <div>
+                <dt>{t("web.resources.detail.sharedBy" as TranslationKey)}</dt>
+                <dd className="m-0 text-foreground">
+                  {detail.uploaderClerkId}
+                </dd>
+              </div>
+              <DetailRow
+                label={t("web.resources.detail.totalDownloadCount", {
+                  count: detail.downloadCount,
+                })}
+              />
               {detail.isPrivate && detail.privateReason ? (
                 <DetailRow
                   label={t("web.resources.moderation.privateReason", {
@@ -92,131 +118,47 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
                   })}
                 />
               ) : null}
-              <DetailRow
-                label={t("web.resources.detail.uploadedBy", {
-                  uploader: detail.uploaderClerkId,
-                })}
-              />
-              <DetailRow
-                label={t("web.resources.detail.uploadedOn", {
-                  date: formatDate(detail.createdAt, locale),
-                })}
-              />
-              <DetailRow
-                label={t("web.resources.detail.totalDownloadCount", {
-                  count: detail.downloadCount,
-                })}
-              />
             </dl>
+            {detail.canEdit ? (
+              <ResourceVisibilityToggle
+                canAdminister={detail.canAdminister}
+                isAdminPrivate={detail.isAdminPrivate}
+                isOwner={detail.isOwner}
+                isPrivate={detail.isPrivate}
+                name={detail.name}
+                resourceId={detail.id}
+              />
+            ) : null}
           </div>
         </section>
 
-        <aside className="h-fit rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm">
-          <p className="m-0 text-[11px] font-semibold tracking-[1px] text-muted-foreground uppercase">
-            {t("web.resources.detail.currentVersion")}
-          </p>
-          <h2 className="mt-2 text-xl font-semibold">
-            {t("web.resources.detail.version", {
-              version: detail.currentVersion.version,
-            })}
-          </h2>
-          <dl className="mt-4 grid gap-2 text-sm text-muted-foreground">
-            <DetailRow
-              label={t("web.resources.detail.downloadCount", {
-                count: detail.currentVersion.downloadCount,
-              })}
-            />
-            <DetailRow
-              label={t("web.resources.detail.versionUploadedOn", {
-                date: formatDate(detail.currentVersion.createdAt, locale),
-                version: detail.currentVersion.version,
-              })}
-            />
-          </dl>
-          <div className="mt-5 grid gap-2">
-            {detail.currentVersion.files.map((file) => (
-              <ResourceFileDownload
-                downloading={downloadingFileId === file.id}
-                file={file}
-                key={file.id}
-                locale={locale}
-                onDownload={startDownload}
-                t={t}
-              />
-            ))}
-          </div>
-          {detail.canEdit ? (
-            <div className="mt-2 grid gap-2">
-              <Button
-                nativeButton={false}
-                render={
-                  <Link
-                    params={{ resourceId: String(detail.id) }}
-                    to="/resources/$resourceId/versions/new"
-                  />
-                }
-              >
-                <FileUp />
-                {t("web.resources.action.uploadNewVersion")}
-              </Button>
-              <Button
-                nativeButton={false}
-                render={
-                  <Link
-                    params={{ resourceId: String(detail.id) }}
-                    to="/resources/$resourceId/edit"
-                  />
-                }
-                variant="outline"
-              >
-                <Pencil />
-                {t("web.resources.action.edit")}
-              </Button>
-            </div>
-          ) : null}
-        </aside>
+        <VersionCard
+          canEdit={detail.canEdit}
+          downloadingFileId={downloadingFileId}
+          locale={locale}
+          onDownload={startDownload}
+          resourceId={detail.id}
+          t={t}
+          title={t("web.resources.detail.currentVersion")}
+          version={detail.currentVersion}
+        />
 
-        <section className="rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:col-span-2">
+        <section className="rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm">
           <h2 className="m-0 text-xl font-semibold">
             {t("web.resources.detail.versionHistory")}
           </h2>
           <div className="mt-4 grid gap-3">
             {detail.versions.map((version) => (
-              <article
-                className="grid gap-3 rounded-md border border-border p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+              <VersionCard
+                canEdit={detail.canEdit}
+                downloadingFileId={downloadingFileId}
                 key={version.id}
-              >
-                <div className="grid gap-1 text-sm text-muted-foreground">
-                  <h3 className="m-0 text-base font-semibold text-foreground">
-                    {t("web.resources.detail.version", {
-                      version: version.version,
-                    })}
-                  </h3>
-                  <span>
-                    {t("web.resources.detail.downloadCount", {
-                      count: version.downloadCount,
-                    })}
-                  </span>
-                  <span>
-                    {t("web.resources.detail.versionUploadedOn", {
-                      date: formatDate(version.createdAt, locale),
-                      version: version.version,
-                    })}
-                  </span>
-                </div>
-                <div className="grid gap-2">
-                  {version.files.map((file) => (
-                    <ResourceFileDownload
-                      downloading={downloadingFileId === file.id}
-                      file={file}
-                      key={file.id}
-                      locale={locale}
-                      onDownload={startDownload}
-                      t={t}
-                    />
-                  ))}
-                </div>
-              </article>
+                locale={locale}
+                onDownload={startDownload}
+                resourceId={detail.id}
+                t={t}
+                version={version}
+              />
             ))}
           </div>
         </section>
@@ -225,44 +167,118 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
   );
 }
 
+function VersionCard({
+  canEdit,
+  downloadingFileId,
+  locale,
+  onDownload,
+  resourceId,
+  t,
+  title,
+  version,
+}: {
+  canEdit: boolean;
+  downloadingFileId?: number;
+  locale: SupportedLocale;
+  onDownload: (file: ResourceDetail["currentVersion"]["files"][number]) => void;
+  resourceId: number;
+  t: (key: TranslationKey, params?: Record<string, number | string>) => string;
+  title?: string;
+  version: ResourceDetail["versions"][number];
+}) {
+  return (
+    <article className="rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm">
+      {title ? (
+        <p className="m-0 mb-2 text-[11px] font-semibold tracking-[1px] text-muted-foreground uppercase">
+          {title}
+        </p>
+      ) : null}
+      <h2 className="m-0 text-base font-semibold">
+        {t("web.resources.detail.version", { version: version.version })}
+        {", "}
+        {t("web.resources.detail.totalDownloadCount", {
+          count: version.downloadCount,
+        })}
+        {", "}
+        {t("web.resources.detail.uploadedOn", {
+          date: formatDate(version.createdAt, locale),
+        })}
+      </h2>
+      <div className="mt-4 grid gap-2">
+        {version.files.map((file) => (
+          <ResourceFileDownload
+            canEdit={canEdit}
+            downloading={downloadingFileId === file.id}
+            file={file}
+            key={file.id}
+            locale={locale}
+            onDownload={onDownload}
+            resourceId={resourceId}
+            t={t}
+          />
+        ))}
+      </div>
+    </article>
+  );
+}
+
 function ResourceFileDownload({
+  canEdit,
   downloading,
   file,
   locale,
   onDownload,
+  resourceId,
   t,
 }: {
+  canEdit: boolean;
   downloading: boolean;
   file: ResourceDetail["currentVersion"]["files"][number];
   locale: SupportedLocale;
   onDownload: (file: ResourceDetail["currentVersion"]["files"][number]) => void;
+  resourceId: number;
   t: (key: TranslationKey, params?: Record<string, number | string>) => string;
 }) {
   return (
-    <div className="grid gap-2 rounded-md border border-border p-3 text-sm">
-      <span>
-        {t("web.resources.detail.filename", { filename: file.fileName })}
-      </span>
-      <span className="text-muted-foreground">{file.contentType}</span>
-      <span className="text-muted-foreground">
-        {t("web.resources.detail.fileSize", {
-          size: formatFileSize(file.size, locale),
-        })}
-      </span>
-      <span className="text-muted-foreground">
-        {t("web.resources.detail.downloadCount", {
-          count: file.downloadCount,
-        })}
-      </span>
-      <Button
-        disabled={downloading}
-        onClick={() => onDownload(file)}
-        type="button"
-        variant="outline"
-      >
-        <FileDown />
-        {t("web.resources.action.download")}
-      </Button>
+    <div className="grid gap-3 rounded-md border border-border p-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+      <div className="min-w-0">
+        <p className="m-0 truncate font-medium">{file.fileName}</p>
+        <p className="m-0 text-muted-foreground">
+          {t("web.resources.detail.fileSize", {
+            size: formatFileSize(file.size, locale),
+          })}
+          {", "}
+          {t("web.resources.detail.downloadCount", {
+            count: file.downloadCount,
+          })}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        {canEdit ? (
+          <Button
+            nativeButton={false}
+            render={
+              <Link
+                params={{ resourceId: String(resourceId) }}
+                to="/resources/$resourceId/edit"
+              />
+            }
+            variant="outline"
+          >
+            <Pencil />
+            {t("web.resources.action.edit")}
+          </Button>
+        ) : null}
+        <Button
+          disabled={downloading}
+          onClick={() => onDownload(file)}
+          type="button"
+          variant="outline"
+        >
+          <FileDown />
+          {t("web.resources.action.download")}
+        </Button>
+      </div>
     </div>
   );
 }

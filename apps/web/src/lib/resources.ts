@@ -36,7 +36,9 @@ export const getResourceDetail = createServerFn({ method: "GET" })
     return detail
       ? {
           ...detail,
+          canAdminister: viewer.isAdmin,
           canEdit: viewer.isAdmin || detail.uploaderClerkId === viewer.clerkId,
+          isOwner: detail.uploaderClerkId === viewer.clerkId,
         }
       : null;
   });
@@ -50,7 +52,11 @@ export const getEditableResourceDetail = createServerFn({ method: "GET" })
     const detail = await s.resources.getDetail(data.resourceId, viewer);
     return detail &&
       (viewer.isAdmin || detail.uploaderClerkId === viewer.clerkId)
-      ? detail
+      ? {
+          ...detail,
+          canAdminister: viewer.isAdmin,
+          isOwner: detail.uploaderClerkId === viewer.clerkId,
+        }
       : null;
   });
 
@@ -130,6 +136,19 @@ export const markResourcePrivate = createServerFn({ method: "POST" })
     const actorClerkId = await requireResourceAdmin();
     const { s } = await import("@/lib/services");
     await s.resources.markPrivate({ ...data, actorClerkId });
+  });
+
+export const setResourceVisibility = createServerFn({ method: "POST" })
+  .validator(parseResourceVisibility)
+  .handler(async ({ data }) => {
+    const viewer = await getResourceViewer();
+    if (!viewer.clerkId) throw invalidResourceRequest();
+    const { s } = await import("@/lib/services");
+    await s.resources.setVisibility({
+      ...data,
+      actorClerkId: viewer.clerkId,
+      actorIsAdmin: viewer.isAdmin,
+    });
   });
 
 export const updateResource = createServerFn({ method: "POST" })
@@ -328,6 +347,13 @@ export function parseMarkPrivate(input: unknown) {
     throw invalidResourceRequest();
   }
   return { reason: reason.trim(), resourceId };
+}
+
+export function parseResourceVisibility(input: unknown) {
+  const { resourceId } = parseResourceId(input);
+  const isPublic = (input as { isPublic?: unknown }).isPublic;
+  if (typeof isPublic !== "boolean") throw invalidResourceRequest();
+  return { isPublic, resourceId };
 }
 
 function getRole(sessionClaims: unknown): string | undefined {

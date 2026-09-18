@@ -3,6 +3,7 @@ import {
   buildResourceFolderPrefix,
   createResourceStorage,
   deletePreviewResourceFolder,
+  signResourceUrl,
 } from "./index.js";
 
 const config = {
@@ -15,6 +16,23 @@ const config = {
 };
 
 describe("resource storage", () => {
+  it("signs one exact URL for 120 seconds, including decoded spaces", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-17T00:00:00Z"));
+
+    await expect(
+      signResourceUrl({
+        cdnBaseUrl: config.cdnBaseUrl,
+        objectPath: "resources/files/GUIDE TRIM TOOL_No-Text.stl",
+        tokenKey: "SecurityKey",
+      }),
+    ).resolves.toBe(
+      "https://cdn.pocket-trash.app/resources/files/GUIDE%20TRIM%20TOOL_No-Text.stl?token=HS256-0A4ptLSSga50TjJtK9zDMr-nesE6Ax0ArcdvIwj3bis&expires=1789603320",
+    );
+
+    vi.useRealTimers();
+  });
+
   it("selects the object namespace for each deployment environment", () => {
     expect(buildResourceFolderPrefix({ environment: "production" })).toBe(
       "resources/files",

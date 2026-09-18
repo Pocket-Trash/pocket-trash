@@ -61,12 +61,14 @@ describe("resource upload sessions", () => {
       fetch: fetchMock,
       files: [stl],
       getToken: async () => "token",
+      isPrivate: true,
       name: "Tool",
       operation: "create",
     });
 
     expect(JSON.parse(String(requests[0]?.init?.body))).toMatchObject({
       files: [{ contentType: "application/octet-stream" }],
+      isPrivate: true,
     });
     expect(requests[1]?.init?.headers).toMatchObject({
       "content-type": "application/octet-stream",
@@ -155,6 +157,45 @@ describe("resource upload sessions", () => {
     expect(requests[1]?.init?.body).toBe(files[0]);
     expect(requests[2]?.init?.body).toBe(files[1]);
     expect(requests[3]?.init?.body).toBe(preview);
+  });
+
+  it("forwards measured upload progress from the file transport", async () => {
+    const stl = file("tool.stl", 4);
+    const progress: number[] = [];
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = typeof input === "string" ? input : input.toString();
+      return url.endsWith("/resource-upload-sessions")
+        ? jsonResponse({
+            expiresAt: "2026-09-17T01:00:00.000Z",
+            id: "session-id",
+            uploads: [
+              {
+                contentType: stl.type,
+                fileName: stl.name,
+                id: "file-1",
+                kind: "resource",
+                size: stl.size,
+              },
+            ],
+          })
+        : jsonResponse({ resourceId: 1000, version: 1 });
+    });
+
+    await uploadResourceSession({
+      fetch: fetchMock,
+      files: [stl],
+      getToken: async () => "token",
+      onProgress: (_fileName, percent) => progress.push(percent),
+      operation: "version",
+      resourceId: 1000,
+      uploadFile: async ({ onProgress }) => {
+        onProgress(25);
+        onProgress(75);
+        return new Response(null, { status: 204 });
+      },
+    });
+
+    expect(progress).toEqual([25, 75]);
   });
 
   it("retries idempotent completion after a server failure", async () => {
