@@ -7,7 +7,7 @@ vi.mock("@/providers/locale-provider", () => ({
 }));
 
 describe("resource visibility toggle", () => {
-  it("does not nest a form when rendered inside an edit form", () => {
+  it("does not add conflicting form validation when rendered inside an edit form", () => {
     const html = renderToStaticMarkup(
       <form>
         <ResourceVisibilityToggle
@@ -22,5 +22,6 @@ describe("resource visibility toggle", () => {
     );
 
     expect(html).not.toMatch(/<form[\s\S]*<form/);
+    expect(html).not.toContain("required");
   });
 });

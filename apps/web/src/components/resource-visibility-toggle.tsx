@@ -159,7 +159,6 @@ export function ResourceVisibilityToggle({
               maxLength={1000}
               onChange={(event) => setReason(event.target.value)}
               placeholder={t("web.resources.moderation.reasonPlaceholder")}
-              required
               value={reason}
             />
           </label>
