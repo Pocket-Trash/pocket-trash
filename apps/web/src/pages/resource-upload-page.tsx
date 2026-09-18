@@ -4,6 +4,7 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { useNavigate } from "@tanstack/react-router";
+import { LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
@@ -41,6 +42,7 @@ export function ResourceUploadPage() {
     <AppShell title={t("web.resources.add.title" as TranslationKey)}>
       <main className="mx-auto w-full max-w-2xl px-4 py-8 md:px-6">
         <form
+          aria-busy={submitting}
           className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
           encType="multipart/form-data"
           onSubmit={async (event) => {
@@ -178,6 +180,9 @@ export function ResourceUploadPage() {
           />
 
           <Button disabled={submitting} type="submit">
+            {submitting ? (
+              <LoaderCircle aria-hidden="true" className="animate-spin" />
+            ) : null}
             {t("web.resources.action.add" as TranslationKey)}
           </Button>
           <p aria-live="polite" className="m-0 text-sm text-muted-foreground">

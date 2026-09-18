@@ -4,7 +4,7 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { FileUp, Plus } from "lucide-react";
+import { FileUp, LoaderCircle, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ResourceCategoryInput } from "@/components/resource-category-input";
@@ -291,6 +291,7 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
 
   return (
     <form
+      aria-busy={submitting}
       className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
       onSubmit={async (event) => {
         event.preventDefault();
@@ -351,7 +352,11 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
         removeFileLabel={t("web.resources.action.removeFile")}
       />
       <Button disabled={submitting} type="submit">
-        <FileUp />
+        {submitting ? (
+          <LoaderCircle aria-hidden="true" className="animate-spin" />
+        ) : (
+          <FileUp />
+        )}
         {t("web.resources.action.uploadNewVersion")}
       </Button>
       <p aria-live="polite" className="m-0 text-sm text-muted-foreground">
