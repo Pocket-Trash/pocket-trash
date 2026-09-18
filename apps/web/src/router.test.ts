@@ -7,6 +7,12 @@ vi.mock("@/env/client", () => ({
 import { getRouter } from "./router";
 
 describe("resource management routes", () => {
+  it("uses the router not-found page without remounting root providers", () => {
+    const rootRoute = getRouter().routesById.__root__;
+
+    expect(rootRoute.options.notFoundComponent).toBeUndefined();
+  });
+
   it.each([
     "/resources/$resourceId/edit",
     "/resources/$resourceId/versions/new",
