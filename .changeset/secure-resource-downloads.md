@@ -1,5 +1,5 @@
 ---
-"@pocket-trash/repo": patch
+"@pocket-trash/repo": minor
 ---
 
-Secure resource downloads and previews with short-lived Bunny URLs.
+Add secure multi-file resource uploads, management, and delivery.
