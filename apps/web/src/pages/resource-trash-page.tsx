@@ -3,15 +3,15 @@ import {
   type SupportedLocale,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { RotateCcw, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UserPageShell } from "@/components/user-page-shell";
 import type { listAdminResourceTrash } from "@/lib/resources";
-import { restoreResource } from "@/lib/resources";
+import { permanentlyDeleteResource, restoreResource } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
 type TrashItem = Awaited<ReturnType<typeof listAdminResourceTrash>>[number];
@@ -30,6 +30,7 @@ export function OwnerResourceTrashPage({
         emptyKey="web.resources.trash.ownerEmpty"
         initialResources={initialResources}
         locale={locale}
+        showPermanentDelete={false}
         showActor={false}
       />
     </UserPageShell>
@@ -52,6 +53,7 @@ export function AdminResourceTrashPage({
           emptyKey="web.resources.trash.adminEmpty"
           initialResources={initialResources}
           locale={locale}
+          showPermanentDelete
           showActor
         />
       </main>
@@ -63,11 +65,13 @@ function ResourceTrashList({
   emptyKey,
   initialResources,
   locale,
+  showPermanentDelete,
   showActor,
 }: {
   emptyKey: TranslationKey;
   initialResources: TrashItem[];
   locale: SupportedLocale;
+  showPermanentDelete: boolean;
   showActor: boolean;
 }) {
   const [resources, setResources] = useState(initialResources);
@@ -127,39 +131,138 @@ function ResourceTrashList({
               </div>
             ) : null}
           </div>
-          <Button
-            disabled={restoringId === resource.id}
-            onClick={async () => {
-              setRestoringId(resource.id);
-              try {
-                await restoreResource({ data: { resourceId: resource.id } });
-                setResources((current) =>
-                  current.filter(({ id }) => id !== resource.id),
-                );
-                toast.success(
-                  t("web.resources.trash.restoreSuccess", {
-                    name: resource.name,
-                  }),
-                );
-              } catch {
-                toast.error(
-                  t("web.resources.trash.restoreFailure", {
-                    name: resource.name,
-                  }),
-                );
-              } finally {
-                setRestoringId(undefined);
-              }
-            }}
-            type="button"
-            variant="outline"
-          >
-            <RotateCcw />
-            {t("web.resources.action.restore")}
-          </Button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              disabled={restoringId === resource.id}
+              onClick={async () => {
+                setRestoringId(resource.id);
+                try {
+                  await restoreResource({ data: { resourceId: resource.id } });
+                  setResources((current) =>
+                    current.filter(({ id }) => id !== resource.id),
+                  );
+                  toast.success(
+                    t("web.resources.trash.restoreSuccess", {
+                      name: resource.name,
+                    }),
+                  );
+                } catch {
+                  toast.error(
+                    t("web.resources.trash.restoreFailure", {
+                      name: resource.name,
+                    }),
+                  );
+                } finally {
+                  setRestoringId(undefined);
+                }
+              }}
+              type="button"
+              variant="outline"
+            >
+              <RotateCcw />
+              {t("web.resources.action.restore")}
+            </Button>
+            {showPermanentDelete ? (
+              <PermanentDeleteButton
+                onDeleted={() =>
+                  setResources((current) =>
+                    current.filter(({ id }) => id !== resource.id),
+                  )
+                }
+                resource={resource}
+                t={t}
+              />
+            ) : null}
+          </div>
         </article>
       ))}
     </div>
+  );
+}
+
+function PermanentDeleteButton({
+  onDeleted,
+  resource,
+  t,
+}: {
+  onDeleted(): void;
+  resource: TrashItem;
+  t: (key: TranslationKey, params?: Record<string, number | string>) => string;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = `permanently-delete-resource-${resource.id}`;
+
+  return (
+    <>
+      <Button
+        onClick={() => dialogRef.current?.showModal()}
+        type="button"
+        variant="destructive"
+      >
+        <Trash2 />
+        {t("web.resources.action.permanentlyDelete")}
+      </Button>
+      <dialog
+        aria-labelledby={titleId}
+        className="m-auto w-[min(32rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
+        ref={dialogRef}
+      >
+        <div className="grid gap-5 p-6">
+          <div className="grid gap-2">
+            <h2 className="m-0 text-xl font-semibold" id={titleId}>
+              {t("web.resources.trash.permanentConfirmationTitle")}
+            </h2>
+            <p className="m-0 text-sm text-muted-foreground">
+              {t("web.resources.trash.permanentConfirmationDescription", {
+                name: resource.name,
+              })}
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              disabled={deleting}
+              onClick={() => dialogRef.current?.close()}
+              type="button"
+              variant="outline"
+            >
+              {t("action.cancel")}
+            </Button>
+            <Button
+              disabled={deleting}
+              onClick={async () => {
+                setDeleting(true);
+                try {
+                  await permanentlyDeleteResource({
+                    data: { resourceId: resource.id },
+                  });
+                  dialogRef.current?.close();
+                  onDeleted();
+                  toast.success(
+                    t("web.resources.trash.permanentSuccess", {
+                      name: resource.name,
+                    }),
+                  );
+                } catch {
+                  toast.error(
+                    t("web.resources.trash.permanentFailure", {
+                      name: resource.name,
+                    }),
+                  );
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              type="button"
+              variant="destructive"
+            >
+              <Trash2 />
+              {t("web.resources.action.permanentlyDelete")}
+            </Button>
+          </div>
+        </div>
+      </dialog>
+    </>
   );
 }
 

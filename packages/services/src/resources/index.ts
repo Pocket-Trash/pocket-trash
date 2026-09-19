@@ -185,6 +185,11 @@ export type ResourcesService = {
     reason: string;
     resourceId: number;
   }): Promise<void>;
+  permanentlyDelete(input: {
+    actorClerkId: string;
+    actorIsAdmin: boolean;
+    resourceId: number;
+  }): Promise<void>;
   setVisibility(input: {
     actorClerkId: string;
     actorIsAdmin: boolean;
@@ -827,6 +832,69 @@ export function createResourcesService(
               and deleted_at is null
             returning id
           `);
+        },
+        {
+          attributes: {
+            actorClerkIdHash: hashLogIdentifier(input.actorClerkId),
+            resourceId: input.resourceId,
+          },
+        },
+      );
+    },
+    async permanentlyDelete(input) {
+      await logger.operation(
+        loggerMessages.resources.permanentlyDelete,
+        async () => {
+          assertPositiveInteger(input.resourceId, "resourceId");
+          const actorClerkId = input.actorClerkId.trim();
+          if (!actorClerkId || !input.actorIsAdmin) {
+            throw new Error("Resource permanent deletion requires an admin.");
+          }
+
+          const objects = await db.execute<{ objectPath: string | null }>(sql`
+            select stored_objects.object_path as "objectPath"
+            from resources
+            left join lateral (
+              select resource_images.object_path
+              from resource_images
+              where resource_images.resource_id = resources.id
+              union
+              select resource_files.object_path
+              from resource_files
+              inner join resource_versions
+                on resource_versions.id = resource_files.version_id
+              where resource_versions.resource_id = resources.id
+              union
+              select resource_versions.object_path
+              from resource_versions
+              where resource_versions.resource_id = resources.id
+                and resource_versions.object_path is not null
+            ) stored_objects on true
+            where resources.id = ${input.resourceId}
+              and resources.deleted_at is not null
+          `);
+          if (objects.rows.length === 0) {
+            throw new Error(
+              "Resource must be soft-deleted before permanent deletion.",
+            );
+          }
+
+          await Promise.all(
+            objects.rows.flatMap(({ objectPath }) =>
+              objectPath ? [storage.delete(objectPath)] : [],
+            ),
+          );
+
+          const deleted = await db.execute<{ id: number }>(sql`
+            delete from resources
+            where id = ${input.resourceId} and deleted_at is not null
+            returning id
+          `);
+          if (!deleted.rows[0]) {
+            throw new Error(
+              "Resource permanent deletion could not be completed.",
+            );
+          }
         },
         {
           attributes: {

@@ -186,6 +186,18 @@ export const softDeleteResource = createServerFn({ method: "POST" })
     });
   });
 
+export const permanentlyDeleteResource = createServerFn({ method: "POST" })
+  .validator(parseResourceId)
+  .handler(async ({ data }) => {
+    const actorClerkId = await requireResourceAdmin();
+    const { s } = await import("@/lib/services");
+    await s.resources.permanentlyDelete({
+      actorClerkId,
+      actorIsAdmin: true,
+      resourceId: data.resourceId,
+    });
+  });
+
 export const restoreResource = createServerFn({ method: "POST" })
   .validator(parseResourceId)
   .handler(async ({ data }) => {
