@@ -28,11 +28,11 @@ const app = createApp({
     const service = createResourceUploadSessionsService({
       db: createDb({ databaseUrl: bindings.DATABASE_URL as string }),
       storage: createResourceStorage({
-        accessKey: bindings.RESOURCE_STORAGE_ACCESS_KEY,
-        cdnBaseUrl: bindings.RESOURCE_CDN_BASE_URL,
-        endpoint: bindings.RESOURCE_STORAGE_ENDPOINT,
-        folderPrefix: bindings.RESOURCE_FOLDER_PREFIX,
-        zoneName: bindings.RESOURCE_STORAGE_ZONE_NAME,
+        accessKey: bindings.BUNNY_STORAGE_ACCESS_KEY,
+        cdnBaseUrl: bindings.BUNNY_CDN_BASE_URL,
+        endpoint: bindings.BUNNY_STORAGE_ENDPOINT,
+        folderPrefix: bindings.BUNNY_RESOURCE_FOLDER_PREFIX,
+        zoneName: bindings.BUNNY_STORAGE_ZONE_NAME,
       }),
     });
 
@@ -79,11 +79,11 @@ export function validateResourceUploadBindings(env: ApiBindings) {
   const required = [
     "CLERK_SECRET_KEY",
     "DATABASE_URL",
-    "RESOURCE_CDN_BASE_URL",
-    "RESOURCE_FOLDER_PREFIX",
-    "RESOURCE_STORAGE_ACCESS_KEY",
-    "RESOURCE_STORAGE_ENDPOINT",
-    "RESOURCE_STORAGE_ZONE_NAME",
+    "BUNNY_CDN_BASE_URL",
+    "BUNNY_RESOURCE_FOLDER_PREFIX",
+    "BUNNY_STORAGE_ACCESS_KEY",
+    "BUNNY_STORAGE_ENDPOINT",
+    "BUNNY_STORAGE_ZONE_NAME",
   ] as const;
   const invalidVariables = required.filter((name) => !env[name]?.trim());
 
@@ -124,11 +124,11 @@ export async function handleWorkerScheduled(
         await createResourceUploadSessionsService({
           db: createDb({ databaseUrl: env.DATABASE_URL as string }),
           storage: createResourceStorage({
-            accessKey: env.RESOURCE_STORAGE_ACCESS_KEY,
-            cdnBaseUrl: env.RESOURCE_CDN_BASE_URL,
-            endpoint: env.RESOURCE_STORAGE_ENDPOINT,
-            folderPrefix: env.RESOURCE_FOLDER_PREFIX,
-            zoneName: env.RESOURCE_STORAGE_ZONE_NAME,
+            accessKey: env.BUNNY_STORAGE_ACCESS_KEY,
+            cdnBaseUrl: env.BUNNY_CDN_BASE_URL,
+            endpoint: env.BUNNY_STORAGE_ENDPOINT,
+            folderPrefix: env.BUNNY_RESOURCE_FOLDER_PREFIX,
+            zoneName: env.BUNNY_STORAGE_ZONE_NAME,
           }),
         }).cleanupExpired();
       } catch (error) {

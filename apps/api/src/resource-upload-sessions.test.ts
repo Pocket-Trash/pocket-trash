@@ -9,8 +9,10 @@ import {
 } from "./resource-upload-sessions.js";
 
 describe("resource upload sessions", () => {
-  it("casts upload sizes in the values CTE", async () => {
-    const execute = vi.fn<(query: SQL) => Promise<void>>().mockResolvedValue();
+  it("casts upload positions and sizes in the values CTE", async () => {
+    const execute = vi
+      .fn<(query: SQL) => Promise<{ rows: { id: number }[] }>>()
+      .mockResolvedValue({ rows: [{ id: 1000 }] });
     const db = { execute } as unknown as Database;
     const storage = storageMock();
     storage.createUploadTarget.mockReturnValue({
@@ -25,7 +27,8 @@ describe("resource upload sessions", () => {
       randomUUID: vi
         .fn()
         .mockReturnValueOnce("00000000-0000-4000-8000-000000000001")
-        .mockReturnValueOnce("00000000-0000-4000-8000-000000000002"),
+        .mockReturnValueOnce("00000000-0000-4000-8000-000000000002")
+        .mockReturnValueOnce("00000000-0000-4000-8000-000000000003"),
       storage,
     });
 
@@ -40,6 +43,13 @@ describe("resource upload sessions", () => {
             size: 3,
           },
         ],
+        images: [
+          {
+            contentType: "image/webp",
+            fileName: "tool.webp",
+            size: 3,
+          },
+        ],
         isPrivate: true,
         name: "Tool",
         operation: "create",
@@ -47,12 +57,23 @@ describe("resource upload sessions", () => {
       "user-id",
     );
 
-    const executedQuery = execute.mock.calls[0]?.[0];
+    const executedQuery = execute.mock.calls[1]?.[0];
     if (!executedQuery) throw new Error("Expected an upload-session insert");
     const query = new PgDialect().sqlToQuery(executedQuery);
     expect(query.sql).toContain("is_private");
-    expect(query.sql).toContain("::integer");
+    expect(query.sql.match(/::integer/gu)).toHaveLength(4);
     expect(query.params).toContain(true);
+    expect(storage.createUploadTarget).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ fileName: "tool.stl" }),
+      1000,
+    );
+    expect(storage.createUploadTarget).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ fileName: "tool.webp" }),
+      1000,
+      "image",
+    );
   });
 
   it("returns an already completed session without writing twice", async () => {
@@ -80,6 +101,38 @@ describe("resource upload sessions", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("guards version completion against deleted resources", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      rows: [{ resourceId: 42, version: 2 }],
+    });
+    const select = vi
+      .fn()
+      .mockReturnValueOnce(
+        chain([
+          {
+            completedAt: null,
+            completedResourceId: null,
+            completedVersion: null,
+            expiresAt: new Date(Date.now() + 60_000),
+            operation: "version",
+          },
+        ]),
+      )
+      .mockReturnValueOnce(chain([{ missingUploads: 0 }]));
+    const service = createResourceUploadSessionsService({
+      db: { execute, select } as unknown as Database,
+      storage: storageMock(),
+    });
+
+    await expect(service.complete("session-id", "user-id")).resolves.toEqual({
+      resourceId: 42,
+      version: 2,
+    });
+
+    const query = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
+    expect(query.sql).toContain("resources.deleted_at is null");
+  });
+
   it("keeps an expired session when Bunny cleanup fails", async () => {
     const where = vi.fn(async () => undefined);
     const db = {
@@ -103,7 +156,10 @@ describe("resource upload sessions", () => {
   });
 
   it("returns stable validation and length errors before upload", async () => {
-    const db = { execute: vi.fn(), select: vi.fn() } as unknown as Database;
+    const db = {
+      execute: vi.fn().mockResolvedValue({ rows: [{ id: 1000 }] }),
+      select: vi.fn(),
+    } as unknown as Database;
     const storage = storageMock();
     storage.createUploadTarget.mockImplementation(() => {
       throw new Error("invalid MIME");
@@ -122,13 +178,20 @@ describe("resource upload sessions", () => {
               size: 3,
             },
           ],
+          images: [
+            {
+              contentType: "image/webp",
+              fileName: "tool.webp",
+              size: 3,
+            },
+          ],
           name: "Tool",
           operation: "create",
         },
         "user-id",
       ),
     ).rejects.toEqual(new ResourceUploadSessionError("invalid_request", 400));
-    expect(db.execute).not.toHaveBeenCalled();
+    expect(db.execute).toHaveBeenCalledTimes(1);
 
     const activeDb = {
       select: () =>
@@ -187,7 +250,7 @@ function storageMock() {
     createUploadTarget: vi.fn(),
     delete: vi.fn(async () => "deleted" as const),
     upload: vi.fn(),
-    uploadPreview: vi.fn(),
+    uploadImage: vi.fn(),
     uploadStream: vi.fn(),
   } satisfies ResourceStorage;
 }

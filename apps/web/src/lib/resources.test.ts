@@ -91,14 +91,17 @@ describe("resource server functions", () => {
       new File([new Uint8Array([1])], "clip.stl", { type: "model/stl" }),
     );
     form.append("categories", "3D printing");
-    form.set("preview", new File([], "", { type: "application/octet-stream" }));
+    form.set(
+      "images",
+      new File([new Uint8Array([2])], "clip.webp", { type: "image/webp" }),
+    );
 
     expect(parseResourceUpload(form)).toEqual({
       categories: ["3D printing"],
       description: "A useful clip.",
       files: [expect.any(File)],
+      images: [expect.any(File)],
       name: "Pocket clip",
-      preview: undefined,
     });
 
     form.delete("files");
@@ -127,16 +130,14 @@ describe("resource server functions", () => {
     update.set("name", "Updated clip");
     update.set("description", "Updated description.");
     update.append("categories", "3D printing");
-    update.set(
-      "preview",
-      new File([], "", { type: "application/octet-stream" }),
-    );
+    update.set("retainedImageIds", "1001");
 
     expect(parseResourceUpdate(update)).toEqual({
       categories: ["3D printing"],
       description: "Updated description.",
+      images: [],
       name: "Updated clip",
-      preview: undefined,
+      retainedImageIds: [1001],
       resourceId: 1000,
     });
 

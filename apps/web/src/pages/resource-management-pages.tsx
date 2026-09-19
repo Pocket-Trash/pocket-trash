@@ -4,23 +4,26 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { FileUp, LoaderCircle, Plus } from "lucide-react";
+import { FileUp, LoaderCircle, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AppShell } from "@/components/app-shell";
+import { ResourceCard } from "@/components/resource-card";
 import { ResourceCategoryInput } from "@/components/resource-category-input";
 import {
   FileDropInput,
   ResourceFileInput,
 } from "@/components/resource-file-input";
 import { ResourceVisibilityToggle } from "@/components/resource-visibility-toggle";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPageShell } from "@/components/user-page-shell";
 import {
+  appendResourceUploadFiles,
   getResourceUploadErrorTranslation,
   uploadResourceSession,
+  validateResourceImages,
   validateResourceUpload,
 } from "@/lib/resource-upload-sessions";
 import type { getResourceDetail, listOwnedResources } from "@/lib/resources";
@@ -44,16 +47,26 @@ export function ResourceManagementPage({
   ) => formatTranslation(key, params, locale);
 
   return (
-    <UserPageShell title={t("web.resources.management.title")}>
-      <div className="grid gap-6">
+    <AppShell sidebarContent={null} title={t("web.resources.management.title")}>
+      <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 md:px-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="m-0 text-sm text-muted-foreground">
             {t("web.resources.management.description")}
           </p>
-          <Button nativeButton={false} render={<Link to="/resources/add" />}>
-            <Plus />
-            {t("web.resources.action.add" as TranslationKey)}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              nativeButton={false}
+              render={<Link to="/user/resources/trash" />}
+              variant="outline"
+            >
+              <Trash2 />
+              {t("web.resources.trash.ownerTitle")}
+            </Button>
+            <Button nativeButton={false} render={<Link to="/resources/add" />}>
+              <Plus />
+              {t("web.resources.action.add")}
+            </Button>
+          </div>
         </div>
 
         {resources.length === 0 ? (
@@ -61,49 +74,18 @@ export function ResourceManagementPage({
             {t("web.resources.management.empty")}
           </p>
         ) : (
-          <div className="grid gap-4">
+          <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {resources.map((resource) => (
-              <Link
-                className="relative grid gap-2 rounded-lg border border-border bg-card p-5 pr-24 text-card-foreground shadow-sm transition-transform hover:-translate-y-0.5 hover:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              <ResourceCard
                 key={resource.id}
-                params={{ resourceId: String(resource.id) }}
-                to="/resources/$resourceId"
-              >
-                <Badge
-                  className="absolute top-4 right-4"
-                  variant={resource.isPrivate ? "secondary" : "destructive"}
-                >
-                  {resource.isPrivate
-                    ? t("web.resources.visibility.private" as TranslationKey)
-                    : t("web.resources.visibility.public" as TranslationKey)}
-                </Badge>
-                <h2 className="m-0 truncate text-lg font-semibold">
-                  {resource.name}
-                </h2>
-                {resource.privateReason ? (
-                  <span className="text-sm text-muted-foreground">
-                    {t("web.resources.moderation.privateReason", {
-                      reason: resource.privateReason,
-                    })}
-                  </span>
-                ) : null}
-                <p className="m-0 text-sm text-muted-foreground">
-                  {t("web.resources.detail.version", {
-                    version: resource.version,
-                  })}
-                  {" · "}
-                  {t("web.resources.detail.updatedOn", {
-                    date: new Intl.DateTimeFormat(locale, {
-                      dateStyle: "medium",
-                    }).format(new Date(resource.updatedAt)),
-                  })}
-                </p>
-              </Link>
+                mode="owned"
+                resource={resource}
+              />
             ))}
-          </div>
+          </section>
         )}
-      </div>
-    </UserPageShell>
+      </main>
+    </AppShell>
   );
 }
 
@@ -115,9 +97,7 @@ export function ResourceEditPage({ detail }: { detail: ResourceDetail }) {
   ) => formatTranslation(key, params, locale);
 
   return (
-    <UserPageShell
-      title={t("web.resources.management.editResources" as TranslationKey)}
-    >
+    <UserPageShell title={t("web.resources.management.editResources")}>
       <Tabs defaultValue="edit">
         <TabsList>
           <TabsTrigger value="edit">
@@ -148,7 +128,10 @@ function ResourceEditForm({ detail }: { detail: ResourceDetail }) {
   const [selectedCategories, setSelectedCategories] = useState(
     detail.categories.map(({ name }) => name),
   );
-  const [previewFiles, setPreviewFiles] = useState<File[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [retainedImageIds, setRetainedImageIds] = useState(
+    detail.images.map(({ id }) => id),
+  );
   const [submitting, setSubmitting] = useState(false);
 
   return (
@@ -160,10 +143,23 @@ function ResourceEditForm({ detail }: { detail: ResourceDetail }) {
           toast.error(t("web.resources.validation.requiredCategory"));
           return;
         }
+        const imageValidation = validateResourceImages(
+          imageFiles,
+          retainedImageIds.length + imageFiles.length,
+        );
+        if (imageValidation) {
+          toast.error(t(imageValidation.key, imageValidation.params));
+          return;
+        }
         setSubmitting(true);
         try {
           const formData = new FormData(event.currentTarget);
-          if (previewFiles[0]) formData.set("preview", previewFiles[0]);
+          retainedImageIds.forEach((id) => {
+            formData.append("retainedImageIds", String(id));
+          });
+          imageFiles.forEach((image) => {
+            formData.append("images", image);
+          });
           await updateResource({ data: formData });
           await navigate({
             params: { resourceId: String(detail.id) },
@@ -202,24 +198,57 @@ function ResourceEditForm({ detail }: { detail: ResourceDetail }) {
         />
       </label>
 
-      {detail.previewImageUrl ? (
-        <img
-          alt={t("web.resources.detail.previewAlt", { name: detail.name })}
-          className="aspect-4/3 w-40 rounded-md border border-border object-cover"
-          src={detail.previewImageUrl}
-        />
-      ) : null}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {detail.images
+          .filter(({ id }) => retainedImageIds.includes(id))
+          .map((image) => (
+            <div className="relative" key={image.id}>
+              <img
+                alt={t("web.resources.detail.imageAlt", {
+                  name: detail.name,
+                })}
+                className="aspect-4/3 w-full rounded-md border border-border object-cover"
+                src={image.url}
+              />
+              <Button
+                aria-label={`${t("web.resources.action.removeFile")} ${image.fileName}`}
+                className="absolute top-2 right-2"
+                onClick={() =>
+                  setRetainedImageIds(
+                    retainedImageIds.filter((id) => id !== image.id),
+                  )
+                }
+                size="icon"
+                type="button"
+                variant="secondary"
+              >
+                <X />
+              </Button>
+            </div>
+          ))}
+      </div>
       <FileDropInput
         accept="image/jpeg,image/png,image/webp"
-        browseLabel={t("web.resources.upload.browseFiles" as TranslationKey)}
-        description={t("web.resources.upload.previewHelp")}
+        browseLabel={t("web.resources.upload.browseFiles")}
+        description={t("web.resources.upload.imagesHelp", {
+          maxFileSize: "20 MiB",
+          maxImages: 10,
+          maxSessionSize: "100 MiB",
+        })}
         disabled={submitting}
-        files={previewFiles}
-        fileTypes={t("web.resources.upload.previewTypes")}
-        id="edit-resource-preview"
-        label={t("web.resources.upload.previewLabel")}
-        onFilesChange={setPreviewFiles}
-        onRemove={() => setPreviewFiles([])}
+        files={imageFiles}
+        fileTypes={t("web.resources.upload.imageTypes")}
+        id="edit-resource-images"
+        label={t("web.resources.upload.imagesLabel")}
+        multiple
+        onFilesChange={(additions) =>
+          setImageFiles(appendResourceUploadFiles(imageFiles, additions))
+        }
+        onRemove={(index) =>
+          setImageFiles(
+            imageFiles.filter((_, itemIndex) => itemIndex !== index),
+          )
+        }
         removeFileLabel={t("web.resources.action.removeFile")}
       />
 
@@ -337,11 +366,11 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
       }}
     >
       <ResourceFileInput
-        browseLabel={t("web.resources.upload.browseFiles" as TranslationKey)}
+        browseLabel={t("web.resources.upload.browseFiles")}
         description={t("web.resources.upload.fileHelp", {
           maxFiles: 10,
           maxFileSize: "20 MiB",
-          maxSessionSize: "50 MiB",
+          maxSessionSize: "100 MiB",
         })}
         disabled={submitting}
         files={files}

@@ -8,18 +8,18 @@ export type WebServerRuntimeEnv = {
   AXIOM_TOKEN?: string;
   CLERK_SECRET_KEY?: string;
   DATABASE_URL?: string;
-  IMAGE_FOLDER_PREFIX?: string;
+  BUNNY_IMAGE_FOLDER_PREFIX?: string;
   LOGGER?: string;
   LOG_DEPLOYMENT_ID?: string;
   LOG_DEPLOYMENT_TARGET?: string;
   LOG_LEVEL?: string;
   LOG_PROXY_CLIENT_KEY?: string;
-  RESOURCE_CDN_BASE_URL?: string;
-  RESOURCE_CDN_TOKEN_KEY?: string;
-  RESOURCE_FOLDER_PREFIX?: string;
-  RESOURCE_STORAGE_ACCESS_KEY?: string;
-  RESOURCE_STORAGE_ENDPOINT?: string;
-  RESOURCE_STORAGE_ZONE_NAME?: string;
+  BUNNY_CDN_BASE_URL?: string;
+  BUNNY_CDN_TOKEN_KEY?: string;
+  BUNNY_RESOURCE_FOLDER_PREFIX?: string;
+  BUNNY_STORAGE_ACCESS_KEY?: string;
+  BUNNY_STORAGE_ENDPOINT?: string;
+  BUNNY_STORAGE_ZONE_NAME?: string;
 };
 
 export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
@@ -33,18 +33,18 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
       AXIOM_TOKEN: runtimeEnv.AXIOM_TOKEN,
       CLERK_SECRET_KEY: runtimeEnv.CLERK_SECRET_KEY,
       DATABASE_URL: runtimeEnv.DATABASE_URL,
-      IMAGE_FOLDER_PREFIX: runtimeEnv.IMAGE_FOLDER_PREFIX,
+      BUNNY_IMAGE_FOLDER_PREFIX: runtimeEnv.BUNNY_IMAGE_FOLDER_PREFIX,
       LOGGER: runtimeEnv.LOGGER,
       LOG_DEPLOYMENT_ID: runtimeEnv.LOG_DEPLOYMENT_ID,
       LOG_DEPLOYMENT_TARGET: runtimeEnv.LOG_DEPLOYMENT_TARGET,
       LOG_LEVEL: runtimeEnv.LOG_LEVEL,
       LOG_PROXY_CLIENT_KEY: runtimeEnv.LOG_PROXY_CLIENT_KEY,
-      RESOURCE_CDN_BASE_URL: runtimeEnv.RESOURCE_CDN_BASE_URL,
-      RESOURCE_CDN_TOKEN_KEY: runtimeEnv.RESOURCE_CDN_TOKEN_KEY,
-      RESOURCE_FOLDER_PREFIX: runtimeEnv.RESOURCE_FOLDER_PREFIX,
-      RESOURCE_STORAGE_ACCESS_KEY: runtimeEnv.RESOURCE_STORAGE_ACCESS_KEY,
-      RESOURCE_STORAGE_ENDPOINT: runtimeEnv.RESOURCE_STORAGE_ENDPOINT,
-      RESOURCE_STORAGE_ZONE_NAME: runtimeEnv.RESOURCE_STORAGE_ZONE_NAME,
+      BUNNY_CDN_BASE_URL: runtimeEnv.BUNNY_CDN_BASE_URL,
+      BUNNY_CDN_TOKEN_KEY: runtimeEnv.BUNNY_CDN_TOKEN_KEY,
+      BUNNY_RESOURCE_FOLDER_PREFIX: runtimeEnv.BUNNY_RESOURCE_FOLDER_PREFIX,
+      BUNNY_STORAGE_ACCESS_KEY: runtimeEnv.BUNNY_STORAGE_ACCESS_KEY,
+      BUNNY_STORAGE_ENDPOINT: runtimeEnv.BUNNY_STORAGE_ENDPOINT,
+      BUNNY_STORAGE_ZONE_NAME: runtimeEnv.BUNNY_STORAGE_ZONE_NAME,
     },
     server: {
       ASSET_FOLDER_PREFIX: z.literal("assets").optional(),
@@ -53,7 +53,7 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
       AXIOM_TOKEN: z.string().min(1).optional(),
       CLERK_SECRET_KEY: z.string().min(1),
       DATABASE_URL: z.string().min(1).url(),
-      IMAGE_FOLDER_PREFIX: z
+      BUNNY_IMAGE_FOLDER_PREFIX: z
         .string()
         .regex(/^images(?:\/(?:dev|preview(?:\/pr-[1-9]\d*)?))?$/u)
         .optional(),
@@ -64,15 +64,15 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
         .enum(["trace", "debug", "verbose", "info", "warn", "error", "fatal"])
         .optional(),
       LOG_PROXY_CLIENT_KEY: z.string().min(1).optional(),
-      RESOURCE_CDN_BASE_URL: z.string().url().optional(),
-      RESOURCE_CDN_TOKEN_KEY: z.string().min(1).optional(),
-      RESOURCE_FOLDER_PREFIX: z
+      BUNNY_CDN_BASE_URL: z.string().url().optional(),
+      BUNNY_CDN_TOKEN_KEY: z.string().min(1).optional(),
+      BUNNY_RESOURCE_FOLDER_PREFIX: z
         .string()
         .regex(/^resources\/(?:dev|files|preview(?:\/pr-[1-9]\d*)?)$/u)
         .optional(),
-      RESOURCE_STORAGE_ACCESS_KEY: z.string().min(1).optional(),
-      RESOURCE_STORAGE_ENDPOINT: z.string().url().optional(),
-      RESOURCE_STORAGE_ZONE_NAME: z.string().min(1).optional(),
+      BUNNY_STORAGE_ACCESS_KEY: z.string().min(1).optional(),
+      BUNNY_STORAGE_ENDPOINT: z.string().url().optional(),
+      BUNNY_STORAGE_ZONE_NAME: z.string().min(1).optional(),
     },
   });
 }

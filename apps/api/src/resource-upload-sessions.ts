@@ -24,14 +24,13 @@ export type ResourceUploadSessionInput =
       description: string;
       files: ResourceUploadMetadata[];
       isPrivate?: boolean;
+      images: ResourceUploadMetadata[];
       name: string;
       operation: "create";
-      preview?: ResourceUploadMetadata;
     }
   | {
       files: ResourceUploadMetadata[];
       operation: "version";
-      preview?: ResourceUploadMetadata;
       resourceId: number;
     };
 
@@ -42,7 +41,7 @@ export type ResourceUploadSessionResult = {
     contentType: string;
     fileName: string;
     id: string;
-    kind: "preview" | "resource";
+    kind: "image" | "resource";
     size: number;
   }>;
 };
@@ -168,6 +167,10 @@ export function createResourceUploadSessionsService(input: {
       uploaderClerkId: string,
     ): Promise<ResourceUploadSessionResult> {
       const metadata = normalizeSessionInput(sessionInput);
+      const resourceId =
+        sessionInput.operation === "create"
+          ? await reserveResourceId(input.db)
+          : sessionInput.resourceId;
       if (sessionInput.operation === "version") {
         const [ownedResource] = await input.db
           .select({ id: schema.resources.id })
@@ -176,6 +179,7 @@ export function createResourceUploadSessionsService(input: {
             and(
               eq(schema.resources.id, sessionInput.resourceId),
               eq(schema.resources.uploaderClerkId, uploaderClerkId),
+              isNull(schema.resources.deletedAt),
             ),
           )
           .limit(1);
@@ -189,23 +193,18 @@ export function createResourceUploadSessionsService(input: {
       const uploads = (() => {
         try {
           return [
-            ...metadata.files.map((file) => ({
+            ...metadata.files.map((file, position) => ({
               id: randomUUID(),
               kind: "resource" as const,
-              ...input.storage.createUploadTarget(file),
+              position,
+              ...input.storage.createUploadTarget(file, resourceId),
             })),
-            ...(metadata.preview
-              ? [
-                  {
-                    id: randomUUID(),
-                    kind: "preview" as const,
-                    ...input.storage.createUploadTarget(
-                      metadata.preview,
-                      "preview",
-                    ),
-                  },
-                ]
-              : []),
+            ...metadata.images.map((image, position) => ({
+              id: randomUUID(),
+              kind: "image" as const,
+              position,
+              ...input.storage.createUploadTarget(image, resourceId, "image"),
+            })),
           ];
         } catch {
           throw new ResourceUploadSessionError("invalid_request", 400);
@@ -214,7 +213,7 @@ export function createResourceUploadSessionsService(input: {
       const uploadValues = sql.join(
         uploads.map(
           (file) =>
-            sql`(${file.id}::uuid, ${file.kind}, ${file.fileName}, ${file.contentType}, ${file.size}::integer, ${file.objectPath}, ${file.url})`,
+            sql`(${file.id}::uuid, ${file.kind}, ${file.position}::integer, ${file.fileName}, ${file.contentType}, ${file.size}::integer, ${file.objectPath}, ${file.url})`,
         ),
         sql`, `,
       );
@@ -222,11 +221,12 @@ export function createResourceUploadSessionsService(input: {
       await input.db.execute(sql`
         with inserted_session as (
           insert into resource_upload_sessions (
-            id, uploader_clerk_id, operation, resource_id, name, description,
+            id, uploader_clerk_id, operation, resource_id, reserved_resource_id, name, description,
             categories, is_private, expires_at
           ) values (
             ${id}::uuid, ${uploaderClerkId}, ${sessionInput.operation},
             ${sessionInput.operation === "version" ? sessionInput.resourceId : null},
+            ${sessionInput.operation === "create" ? resourceId : null},
             ${sessionInput.operation === "create" ? metadata.name : null},
             ${sessionInput.operation === "create" ? metadata.description : null},
             ${JSON.stringify(sessionInput.operation === "create" ? metadata.categories : [])}::jsonb,
@@ -234,13 +234,13 @@ export function createResourceUploadSessionsService(input: {
             ${expiresAt}
           )
           returning id
-        ), input_files(id, kind, file_name, content_type, size, object_path, url) as (
+        ), input_files(id, kind, position, file_name, content_type, size, object_path, url) as (
           values ${uploadValues}
         )
         insert into resource_upload_files (
-          id, session_id, kind, file_name, content_type, size, object_path, url
+          id, session_id, kind, position, file_name, content_type, size, object_path, url
         )
-        select input_files.id, inserted_session.id, input_files.kind,
+        select input_files.id, inserted_session.id, input_files.kind, input_files.position,
           input_files.file_name, input_files.content_type, input_files.size,
           input_files.object_path, input_files.url
         from input_files cross join inserted_session
@@ -365,9 +365,9 @@ function normalizeSessionInput(input: ResourceUploadSessionInput): {
   categories: Array<{ name: string; slug: string }>;
   description?: string;
   files: ResourceUploadMetadata[];
+  images: ResourceUploadMetadata[];
   isPrivate?: boolean;
   name?: string;
-  preview?: ResourceUploadMetadata;
 } {
   if (input.files.length === 0 || input.files.length > 10) {
     throw new ResourceUploadSessionError("invalid_request", 400);
@@ -378,14 +378,30 @@ function normalizeSessionInput(input: ResourceUploadSessionInput): {
   if (new Set(fileNames).size !== fileNames.length) {
     throw new ResourceUploadSessionError("invalid_request", 400);
   }
-  const totalSize =
-    input.files.reduce((total, { size }) => total + size, 0) +
-    (input.preview?.size ?? 0);
+  const images = input.operation === "create" ? input.images : [];
+  if (
+    input.operation === "create" &&
+    (images.length === 0 || images.length > 10)
+  ) {
+    throw new ResourceUploadSessionError("invalid_request", 400);
+  }
+  const imageNames = images.map(({ fileName }) =>
+    fileName.trim().toLocaleLowerCase(),
+  );
+  if (new Set(imageNames).size !== imageNames.length) {
+    throw new ResourceUploadSessionError("invalid_request", 400);
+  }
+  const totalSize = [...input.files, ...images].reduce(
+    (total, { size }) => total + size,
+    0,
+  );
   if (!Number.isSafeInteger(totalSize) || totalSize > maxSessionBytes) {
     throw new ResourceUploadSessionError("invalid_request", 400);
   }
 
-  if (input.operation === "version") return { ...input, categories: [] };
+  if (input.operation === "version") {
+    return { ...input, categories: [], images: [] };
+  }
 
   const name = input.name.trim();
   const description = input.description.trim();
@@ -412,7 +428,16 @@ function normalizeSessionInput(input: ResourceUploadSessionInput): {
     throw new ResourceUploadSessionError("invalid_request", 400);
   }
 
-  return { ...input, categories, description, name };
+  return { ...input, categories, description, images, name };
+}
+
+async function reserveResourceId(db: Database): Promise<number> {
+  const result = await db.execute<{ id: number }>(sql`
+    select nextval(pg_get_serial_sequence('resources', 'id'))::integer as id
+  `);
+  const id = result.rows[0]?.id;
+  if (!id) throw new ResourceUploadSessionError("invalid_request", 400);
+  return id;
 }
 
 function parseContentLength(value: string | null): number | null {
@@ -487,19 +512,15 @@ async function completeResource(
           where session_id = ${sessionId}::uuid and uploaded_at is null
         )
       for update
-    ), preview as (
-      select * from resource_upload_files
-      where session_id = ${sessionId}::uuid and kind = 'preview'
     ), inserted_resource as (
       insert into resources (
-        uploader_clerk_id, name, description, preview_image_file_name,
-        preview_image_content_type, preview_image_size,
-        preview_image_object_path, preview_image_url, is_private
+        id, uploader_clerk_id, name, description, is_private
       )
-      select locked_session.uploader_clerk_id, locked_session.name,
-        locked_session.description, preview.file_name, preview.content_type,
-        preview.size, preview.object_path, preview.url, locked_session.is_private
-      from locked_session left join preview on true
+      overriding system value
+      select locked_session.reserved_resource_id,
+        locked_session.uploader_clerk_id, locked_session.name,
+        locked_session.description, locked_session.is_private
+      from locked_session
       returning id
     ), input_categories as (
       select category.name, category.slug
@@ -526,6 +547,16 @@ async function completeResource(
       from inserted_version cross join resource_upload_files uploads
       where uploads.session_id = ${sessionId}::uuid
         and uploads.kind = 'resource'
+      returning id
+    ), inserted_images as (
+      insert into resource_images (
+        resource_id, position, file_name, content_type, size, object_path, url
+      )
+      select inserted_resource.id, uploads.position, uploads.file_name,
+        uploads.content_type, uploads.size, uploads.object_path, uploads.url
+      from inserted_resource cross join resource_upload_files uploads
+      where uploads.session_id = ${sessionId}::uuid
+        and uploads.kind = 'image'
       returning id
     ), inserted_assignments as (
       insert into resources_to_categories (resource_id, category_id)
@@ -561,6 +592,10 @@ async function completeResource(
         and (select count(*) from inserted_assignments) = (
           select jsonb_array_length(categories) from locked_session
         )
+        and (select count(*) from inserted_images) = (
+          select count(*) from resource_upload_files
+          where session_id = ${sessionId}::uuid and kind = 'image'
+        )
         and (select count(*) from inserted_resource_notification) = 1
       returning inserted_version.resource_id as "resourceId",
         inserted_version.version
@@ -584,6 +619,7 @@ async function completeVersion(
       where resource_upload_sessions.id = ${sessionId}::uuid
         and resource_upload_sessions.uploader_clerk_id = ${uploaderClerkId}
         and resources.uploader_clerk_id = ${uploaderClerkId}
+        and resources.deleted_at is null
         and resource_upload_sessions.operation = 'version'
         and resource_upload_sessions.completed_at is null
         and resource_upload_sessions.expires_at > now()
@@ -611,24 +647,10 @@ async function completeVersion(
       where uploads.session_id = ${sessionId}::uuid
         and uploads.kind = 'resource'
       returning id
-    ), preview as (
-      select * from resource_upload_files
-      where session_id = ${sessionId}::uuid and kind = 'preview'
     ), updated_resource as (
       update resources
-      set preview_image_file_name = coalesce(
-          preview.file_name, resources.preview_image_file_name
-        ),
-        preview_image_content_type = coalesce(
-          preview.content_type, resources.preview_image_content_type
-        ),
-        preview_image_size = coalesce(preview.size, resources.preview_image_size),
-        preview_image_object_path = coalesce(
-          preview.object_path, resources.preview_image_object_path
-        ),
-        preview_image_url = coalesce(preview.url, resources.preview_image_url),
-        updated_at = now()
-      from inserted_version left join preview on true
+      set updated_at = now()
+      from inserted_version
       where resources.id = inserted_version.resource_id
       returning resources.id
     ), completed as (

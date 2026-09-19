@@ -12,6 +12,7 @@ Authenticated resource creation and version upload sessions.
 | `uploader_clerk_id` | `text` | yes |  |  |  |  |  |
 | `operation` | `text` | yes |  |  |  |  |  |
 | `resource_id` | `bigint` | no | FK |  | `resources.id` (on delete cascade) |  |  |
+| `reserved_resource_id` | `bigint` | no |  |  |  |  |  |
 | `name` | `text` | no |  |  |  |  |  |
 | `description` | `text` | no |  |  |  |  |  |
 | `categories` | `jsonb` | yes |  | `'[]'::jsonb` |  |  |  |

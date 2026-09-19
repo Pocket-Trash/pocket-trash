@@ -1,11 +1,13 @@
 export const defaultEnvironmentSlug = "dev";
 
+const apiSecretPath = "/apps/api";
 const bunnyLocalSecretPath = "/local/bunny";
+const cloudflareToolsSecretPath = "/tools/cloudflare";
+const databaseLocalSecretPath = "/local/database";
 const scraperSecretPath = "/apps/scraper";
 const webSecretPath = "/apps/web";
 const githubSecretsPath = "tools/github/secrets";
 const loggerAxiomTestSecretPath = "/tools/logger-axiom-test";
-export const databaseUrlUserOverrideSecretPath = "/local/database";
 
 export type CommandSecretConfig = {
   allowServerSecrets: boolean;
@@ -23,18 +25,28 @@ export type EnvironmentAlias = {
 const scraperCommandSecretConfig = {
   allowServerSecrets: true,
   databaseUrlUserOverride: true,
-  paths: [scraperSecretPath],
+  paths: [scraperSecretPath, databaseLocalSecretPath],
 } as const satisfies CommandSecretConfig;
 
 const apiCommandSecretConfig = {
   allowServerSecrets: true,
   databaseUrlUserOverride: true,
-  paths: [webSecretPath],
+  paths: [apiSecretPath, databaseLocalSecretPath],
 } as const satisfies CommandSecretConfig;
 
 export const commandSecrets = {
   api: {
     dev: apiCommandSecretConfig,
+    deploy: {
+      allowServerSecrets: true,
+      environmentSlug: "prod",
+      paths: [cloudflareToolsSecretPath],
+    },
+    "deploy:preview": {
+      allowServerSecrets: true,
+      environmentSlug: "preview",
+      paths: [cloudflareToolsSecretPath],
+    },
   },
   bunny: {
     audit: {
@@ -46,12 +58,17 @@ export const commandSecrets = {
     "db:migrate": {
       allowServerSecrets: true,
       databaseUrlUserOverride: true,
-      paths: [webSecretPath],
+      paths: [webSecretPath, databaseLocalSecretPath],
     },
     "db:studio": {
       allowServerSecrets: true,
       databaseUrlUserOverride: true,
-      paths: [webSecretPath],
+      paths: [webSecretPath, databaseLocalSecretPath],
+    },
+    "resources:reconcile-storage": {
+      allowServerSecrets: true,
+      environmentSlug: "preview",
+      paths: [webSecretPath, githubSecretsPath],
     },
   },
   github: {
@@ -81,22 +98,22 @@ export const commandSecrets = {
     build: {
       allowServerSecrets: true,
       databaseUrlUserOverride: true,
-      paths: [webSecretPath],
+      paths: [webSecretPath, databaseLocalSecretPath],
     },
     dev: {
       allowServerSecrets: true,
       databaseUrlUserOverride: true,
-      paths: [webSecretPath],
+      paths: [webSecretPath, databaseLocalSecretPath],
     },
     test: {
       allowServerSecrets: true,
       databaseUrlUserOverride: true,
-      paths: [webSecretPath],
+      paths: [webSecretPath, databaseLocalSecretPath],
     },
     "test:watch": {
       allowServerSecrets: true,
       databaseUrlUserOverride: true,
-      paths: [webSecretPath],
+      paths: [webSecretPath, databaseLocalSecretPath],
     },
   },
 } as const satisfies Record<string, Record<string, CommandSecretConfig>>;

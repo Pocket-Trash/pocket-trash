@@ -193,7 +193,7 @@ jobs:
               `Neon cleanup: ${cleanup} for \`${process.env.TARGET_BRANCH}\``,
               `Image cleanup: ${process.env.IMAGE_CLEANUP_STATUS} for \`${process.env.IMAGE_FOLDER_PATH}\``,
               `Resource cleanup: ${process.env.RESOURCE_CLEANUP_STATUS} for \`${process.env.RESOURCE_FOLDER_PATH}\``,
-              "Vercel branch-specific `DATABASE_URL`, `IMAGE_FOLDER_PREFIX`, and `RESOURCE_FOLDER_PREFIX` cleanup was attempted.",
+              "Vercel branch-specific `DATABASE_URL`, `BUNNY_IMAGE_FOLDER_PREFIX`, and `BUNNY_RESOURCE_FOLDER_PREFIX` cleanup was attempted.",
             ].join("\n");
 
             const { owner, repo } = context.repo;

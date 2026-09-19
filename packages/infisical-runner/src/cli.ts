@@ -30,6 +30,7 @@ async function main(argv: readonly string[]): Promise<number> {
     ...parsedArguments,
     infisicalProjectId: process.env.INFISICAL_PROJECT_ID,
     repoRoot: getRepoRoot(),
+    verbose: process.env.INFISICAL_RUNNER_VERBOSE === "1",
   });
 }
 

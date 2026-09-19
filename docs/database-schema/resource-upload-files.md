@@ -9,8 +9,9 @@ Declared files and upload state for resumable resource upload sessions.
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | yes | PK |  |  |  |  |
-| `session_id` | `uuid` | yes | unique, FK |  | `resource_upload_sessions.id` (on delete cascade) |  |  |
+| `session_id` | `uuid` | yes | FK |  | `resource_upload_sessions.id` (on delete cascade) |  |  |
 | `kind` | `text` | yes |  |  |  |  |  |
+| `position` | `integer` | yes |  |  |  |  |  |
 | `file_name` | `text` | yes |  |  |  |  |  |
 | `content_type` | `text` | yes |  |  |  |  |  |
 | `size` | `integer` | yes |  |  |  |  |  |
@@ -25,4 +26,3 @@ Declared files and upload state for resumable resource upload sessions.
 | --- | --- | --- | --- |
 | `resource_upload_files_session_file_name_unique` | yes | `btree` | `session_id`, `lower("file_name")` |
 | `resource_upload_files_session_id_idx` | no | `btree` | `session_id` |
-| `resource_upload_files_session_preview_unique` | yes | `btree` | `session_id` |

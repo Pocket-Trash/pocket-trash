@@ -485,7 +485,7 @@ function readBunnyConfig(config: ImageStorageConfig): BunnyStorageConfig {
   }
 
   if (!cdnBaseUrl) {
-    throw new Error("IMAGE_CDN_BASE_URL is required unless dry-run is on.");
+    throw new Error("BUNNY_CDN_BASE_URL is required unless dry-run is on.");
   }
 
   return {

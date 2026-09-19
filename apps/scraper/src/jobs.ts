@@ -60,7 +60,7 @@ export async function createScraperJobContext(
       bunnyStorageAccessKey: env.BUNNY_STORAGE_ACCESS_KEY,
       bunnyStorageEndpoint: env.BUNNY_STORAGE_ENDPOINT,
       bunnyStorageZoneName: env.BUNNY_STORAGE_ZONE_NAME,
-      cdnBaseUrl: env.IMAGE_CDN_BASE_URL,
+      cdnBaseUrl: env.BUNNY_CDN_BASE_URL,
       dryRun: env.SCRAPER_DRY_RUN,
       provider: env.IMAGE_STORAGE_PROVIDER,
     },
@@ -86,7 +86,7 @@ export async function createScraperJobContext(
       redis.disconnect();
     },
     db,
-    imageFolderPrefix: env.IMAGE_FOLDER_PREFIX,
+    imageFolderPrefix: env.BUNNY_IMAGE_FOLDER_PREFIX,
     imageStorage: services.images,
     queues,
     redis,

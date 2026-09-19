@@ -17,11 +17,11 @@ function envValue(env: MutableEnv, key: string) {
 
 export function applyWebClientEnvAliases(env: MutableEnv = process.env) {
   const assetFolderPrefix = envValue(env, "ASSET_FOLDER_PREFIX");
-  const cdnBaseUrl = envValue(env, "RESOURCE_CDN_BASE_URL");
+  const cdnBaseUrl = envValue(env, "BUNNY_CDN_BASE_URL");
   const logDeploymentId = envValue(env, "LOG_DEPLOYMENT_ID");
   const logDeploymentTarget = envValue(env, "LOG_DEPLOYMENT_TARGET");
   const logProxyClientKey = envValue(env, "LOG_PROXY_CLIENT_KEY");
-  const resourceApiBaseUrl = envValue(env, "RESOURCE_API_BASE_URL");
+  const resourceApiBaseUrl = envValue(env, "API_URL");
 
   if (
     envValue(env, "VITE_ASSET_FOLDER_PREFIX") === undefined &&
@@ -59,10 +59,10 @@ export function applyWebClientEnvAliases(env: MutableEnv = process.env) {
   }
 
   if (
-    envValue(env, "VITE_RESOURCE_API_BASE_URL") === undefined &&
+    envValue(env, "VITE_API_URL") === undefined &&
     resourceApiBaseUrl !== undefined
   ) {
-    env.VITE_RESOURCE_API_BASE_URL = resourceApiBaseUrl;
+    env.VITE_API_URL = resourceApiBaseUrl;
   }
 }
 
@@ -81,7 +81,7 @@ export default defineConfig(async ({ mode }) => {
       VITE_LOG_DEPLOYMENT_ID: process.env.VITE_LOG_DEPLOYMENT_ID,
       VITE_LOG_DEPLOYMENT_TARGET: process.env.VITE_LOG_DEPLOYMENT_TARGET,
       VITE_LOG_PROXY_CLIENT_KEY: process.env.VITE_LOG_PROXY_CLIENT_KEY,
-      VITE_RESOURCE_API_BASE_URL: process.env.VITE_RESOURCE_API_BASE_URL,
+      VITE_API_URL: process.env.VITE_API_URL,
     });
     createWebServerEnv({
       ASSET_FOLDER_PREFIX: process.env.ASSET_FOLDER_PREFIX,
@@ -90,18 +90,18 @@ export default defineConfig(async ({ mode }) => {
       AXIOM_TOKEN: process.env.AXIOM_TOKEN,
       CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
       DATABASE_URL: process.env.DATABASE_URL,
-      IMAGE_FOLDER_PREFIX: process.env.IMAGE_FOLDER_PREFIX,
+      BUNNY_IMAGE_FOLDER_PREFIX: process.env.BUNNY_IMAGE_FOLDER_PREFIX,
       LOGGER: process.env.LOGGER,
       LOG_DEPLOYMENT_ID: process.env.LOG_DEPLOYMENT_ID,
       LOG_DEPLOYMENT_TARGET: process.env.LOG_DEPLOYMENT_TARGET,
       LOG_LEVEL: process.env.LOG_LEVEL,
       LOG_PROXY_CLIENT_KEY: process.env.LOG_PROXY_CLIENT_KEY,
-      RESOURCE_CDN_BASE_URL: process.env.RESOURCE_CDN_BASE_URL,
-      RESOURCE_CDN_TOKEN_KEY: process.env.RESOURCE_CDN_TOKEN_KEY,
-      RESOURCE_FOLDER_PREFIX: process.env.RESOURCE_FOLDER_PREFIX,
-      RESOURCE_STORAGE_ACCESS_KEY: process.env.RESOURCE_STORAGE_ACCESS_KEY,
-      RESOURCE_STORAGE_ENDPOINT: process.env.RESOURCE_STORAGE_ENDPOINT,
-      RESOURCE_STORAGE_ZONE_NAME: process.env.RESOURCE_STORAGE_ZONE_NAME,
+      BUNNY_CDN_BASE_URL: process.env.BUNNY_CDN_BASE_URL,
+      BUNNY_CDN_TOKEN_KEY: process.env.BUNNY_CDN_TOKEN_KEY,
+      BUNNY_RESOURCE_FOLDER_PREFIX: process.env.BUNNY_RESOURCE_FOLDER_PREFIX,
+      BUNNY_STORAGE_ACCESS_KEY: process.env.BUNNY_STORAGE_ACCESS_KEY,
+      BUNNY_STORAGE_ENDPOINT: process.env.BUNNY_STORAGE_ENDPOINT,
+      BUNNY_STORAGE_ZONE_NAME: process.env.BUNNY_STORAGE_ZONE_NAME,
     });
   }
 

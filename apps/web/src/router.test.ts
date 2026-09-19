@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/env/client", () => ({
-  clientEnv: { VITE_RESOURCE_API_BASE_URL: "https://api.example.test" },
+  clientEnv: { VITE_API_URL: "https://api.example.test" },
 }));
 
 import { getRouter } from "./router";
@@ -22,5 +22,16 @@ describe("resource management routes", () => {
     );
 
     expect(route?.parentRoute.fullPath).toBe("/resources");
+  });
+
+  it.each([
+    "/admin/resources/trash",
+    "/user/resources/trash",
+  ])("registers %s", (fullPath) => {
+    expect(
+      Object.values(getRouter().routesById).some(
+        (candidate) => candidate.fullPath === fullPath,
+      ),
+    ).toBe(true);
   });
 });

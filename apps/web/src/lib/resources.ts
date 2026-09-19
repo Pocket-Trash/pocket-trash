@@ -1,4 +1,5 @@
 import { auth } from "@clerk/tanstack-react-start/server";
+import type { ResourceTrashItem } from "@package/services";
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createServerFn } from "@tanstack/react-start";
 
@@ -22,7 +23,7 @@ export const createResource = createServerFn({ method: "POST" })
     return await s.resources.create({
       ...data,
       files: await Promise.all(data.files.map(toUploadInput)),
-      preview: data.preview ? await toUploadInput(data.preview) : undefined,
+      images: await Promise.all(data.images.map(toUploadInput)),
       uploaderClerkId: userId,
     });
   });
@@ -110,7 +111,28 @@ export const listOwnedResources = createServerFn({ method: "GET" }).handler(
   async () => {
     const userId = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    return await s.resources.listOwned(userId);
+    const directory = await s.resources.listDirectory([], {
+      clerkId: userId,
+    });
+    return directory.resources
+      .filter(({ uploaderClerkId }) => uploaderClerkId === userId)
+      .map((resource) => ({ ...resource, canEdit: true }));
+  },
+);
+
+export const listOwnerResourceTrash = createServerFn({ method: "GET" }).handler(
+  async (): Promise<ResourceTrashItem[]> => {
+    const userId = await requireResourceUploader();
+    const { s } = await import("@/lib/services");
+    return await s.resources.listOwnerTrash(userId);
+  },
+);
+
+export const listAdminResourceTrash = createServerFn({ method: "GET" }).handler(
+  async (): Promise<ResourceTrashItem[]> => {
+    await requireResourceAdmin();
+    const { s } = await import("@/lib/services");
+    return await s.resources.listAdminTrash();
   },
 );
 
@@ -151,6 +173,32 @@ export const setResourceVisibility = createServerFn({ method: "POST" })
     });
   });
 
+export const softDeleteResource = createServerFn({ method: "POST" })
+  .validator(parseResourceId)
+  .handler(async ({ data }) => {
+    const viewer = await getResourceViewer();
+    if (!viewer.clerkId) throw invalidResourceRequest();
+    const { s } = await import("@/lib/services");
+    return await s.resources.softDelete({
+      actorClerkId: viewer.clerkId,
+      actorIsAdmin: viewer.isAdmin,
+      resourceId: data.resourceId,
+    });
+  });
+
+export const restoreResource = createServerFn({ method: "POST" })
+  .validator(parseResourceId)
+  .handler(async ({ data }) => {
+    const viewer = await getResourceViewer();
+    if (!viewer.clerkId) throw invalidResourceRequest();
+    const { s } = await import("@/lib/services");
+    await s.resources.restore({
+      actorClerkId: viewer.clerkId,
+      actorIsAdmin: viewer.isAdmin,
+      resourceId: data.resourceId,
+    });
+  });
+
 export const updateResource = createServerFn({ method: "POST" })
   .validator(parseResourceUpdate)
   .handler(async ({ data }) => {
@@ -161,7 +209,7 @@ export const updateResource = createServerFn({ method: "POST" })
       ...data,
       actorClerkId: viewer.clerkId,
       actorIsAdmin: viewer.isAdmin,
-      preview: data.preview ? await toUploadInput(data.preview) : undefined,
+      images: await Promise.all(data.images.map(toUploadInput)),
     });
   });
 
@@ -235,8 +283,7 @@ export function parseResourceUpload(input: unknown) {
   const name = input.get("name");
   const description = input.get("description");
   const files = input.getAll("files");
-  const previewValue = input.get("preview");
-  const preview = isEmptyFile(previewValue) ? undefined : previewValue;
+  const images = input.getAll("images");
   const categories = input.getAll("categories");
 
   if (
@@ -245,7 +292,9 @@ export function parseResourceUpload(input: unknown) {
     files.length === 0 ||
     files.length > 10 ||
     files.some((file) => !isFile(file)) ||
-    (preview !== null && preview !== undefined && !isFile(preview)) ||
+    images.length === 0 ||
+    images.length > 10 ||
+    images.some((image) => !isFile(image)) ||
     categories.length === 0 ||
     categories.some((category) => typeof category !== "string")
   ) {
@@ -256,8 +305,8 @@ export function parseResourceUpload(input: unknown) {
     categories: categories as string[],
     description,
     files: files as File[],
+    images: images as File[],
     name,
-    preview: preview ?? undefined,
   };
 }
 
@@ -266,8 +315,8 @@ export function parseResourceUpdate(input: unknown) {
   const resourceId = Number(input.get("resourceId"));
   const name = input.get("name");
   const description = input.get("description");
-  const previewValue = input.get("preview");
-  const preview = isEmptyFile(previewValue) ? undefined : previewValue;
+  const images = input.getAll("images").filter(isFile);
+  const retainedImageIds = input.getAll("retainedImageIds").map(Number);
   const categories = input.getAll("categories");
 
   if (
@@ -275,7 +324,12 @@ export function parseResourceUpdate(input: unknown) {
     resourceId <= 0 ||
     typeof name !== "string" ||
     typeof description !== "string" ||
-    (preview !== null && preview !== undefined && !isFile(preview)) ||
+    images.length > 10 ||
+    retainedImageIds.some(
+      (imageId) => !Number.isSafeInteger(imageId) || imageId <= 0,
+    ) ||
+    images.length + retainedImageIds.length === 0 ||
+    images.length + retainedImageIds.length > 10 ||
     categories.length === 0 ||
     categories.some((category) => typeof category !== "string")
   ) {
@@ -285,8 +339,9 @@ export function parseResourceUpdate(input: unknown) {
   return {
     categories: categories as string[],
     description,
+    images: images as File[],
     name,
-    preview: preview ?? undefined,
+    retainedImageIds,
     resourceId,
   };
 }
@@ -371,15 +426,6 @@ async function toUploadInput(file: File) {
 
 function isFile(value: FormDataEntryValue | null): value is File {
   return typeof File !== "undefined" && value instanceof File && value.size > 0;
-}
-
-function isEmptyFile(value: FormDataEntryValue | null): boolean {
-  return (
-    typeof File !== "undefined" &&
-    value instanceof File &&
-    value.name === "" &&
-    value.size === 0
-  );
 }
 
 function invalidResourceRequest(): Error {
