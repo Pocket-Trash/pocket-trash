@@ -13,7 +13,7 @@ import {
   resolveLocale,
   type SupportedLocale,
 } from "@pocket-trash/localizations";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { hashLogIdentifier } from "../../logging.js";
 import type { UsersService } from "../users/index.js";
 
@@ -55,22 +55,20 @@ export const defaultUserSettings: UpsertUserSettingsInput = {
   weightUnit: "g",
 };
 
-function mergeLocaleSettings(
-  settings: UserSettings | null,
-  locale: SupportedLocale | null,
-): UpsertUserSettingsInput {
-  return {
-    currencyCode: settings?.currencyCode ?? defaultUserSettings.currencyCode,
-    dimensionUnit: settings?.dimensionUnit ?? defaultUserSettings.dimensionUnit,
-    locale,
-    theme: settings?.theme ?? defaultUserSettings.theme,
-    weightUnit: settings?.weightUnit ?? defaultUserSettings.weightUnit,
-  };
-}
-
 function normalizeSavedLocale(locale: string | null | undefined) {
   if (locale === "en") return "en-US";
   return locale ? resolveLocale(locale) : null;
+}
+
+function buildPatchConflictSet(settings: PatchUserSettingsInput) {
+  return Object.fromEntries(
+    (Object.keys(settings) as (keyof PatchUserSettingsInput)[])
+      .filter((key) => settings[key] !== undefined)
+      .map((key) => [
+        key,
+        sql.raw(`excluded.${schema.userSettings[key].name}`),
+      ]),
+  );
 }
 
 export function createUserSettingsService(
@@ -113,39 +111,16 @@ export function createUserSettingsService(
       return await logger.operation(
         loggerMessages.database.userSettings.patchForClerkId,
         async () => {
-          const existing = await this.getByClerkId(clerkId);
-          const mergedSettings: UpsertUserSettingsInput = {
-            currencyCode:
-              settings.currencyCode ??
-              existing?.currencyCode ??
-              defaultUserSettings.currencyCode,
-            dimensionUnit:
-              settings.dimensionUnit ??
-              existing?.dimensionUnit ??
-              defaultUserSettings.dimensionUnit,
-            locale:
-              settings.locale !== undefined
-                ? settings.locale
-                : (normalizeSavedLocale(existing?.locale) ??
-                  defaultUserSettings.locale),
-            theme:
-              settings.theme ?? existing?.theme ?? defaultUserSettings.theme,
-            weightUnit:
-              settings.weightUnit ??
-              existing?.weightUnit ??
-              defaultUserSettings.weightUnit,
-          };
-
           const user = await usersService.ensure({ clerkId });
 
           const [userSettings] = await db
             .insert(schema.userSettings)
             .values({
-              ...mergedSettings,
+              ...settings,
               userId: user.id,
             })
             .onConflictDoUpdate({
-              set: mergedSettings,
+              set: buildPatchConflictSet(settings),
               target: schema.userSettings.userId,
             })
             .returning();
@@ -174,20 +149,12 @@ export function createUserSettingsService(
         return locale;
       }
 
-      await this.upsertForClerkId(
-        clerkId,
-        mergeLocaleSettings(settings, locale),
-      );
+      await this.patchForClerkId(clerkId, { locale });
 
       return locale;
     },
     async updateLocaleForClerkId(clerkId, locale) {
-      const settings = await this.getByClerkId(clerkId);
-
-      await this.upsertForClerkId(
-        clerkId,
-        mergeLocaleSettings(settings, locale),
-      );
+      await this.patchForClerkId(clerkId, { locale });
 
       return locale;
     },
