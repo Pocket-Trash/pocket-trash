@@ -151,11 +151,11 @@ export function validateResourceImages(
   required = true,
 ): ResourceUploadValidationError | undefined {
   if (required && totalCount === 0) {
-    return { key: "web.resources.validation.requiredImage" as TranslationKey };
+    return { key: "web.resources.validation.requiredImage" };
   }
   if (totalCount > 10) {
     return {
-      key: "web.resources.validation.tooManyImages" as TranslationKey,
+      key: "web.resources.validation.tooManyImages",
       params: { maxImages: 10 },
     };
   }
@@ -164,12 +164,12 @@ export function validateResourceImages(
     const error = validateFile(image, imageMimeTypes);
     if (error?.key === "web.resources.validation.invalidFileType") {
       return {
-        key: "web.resources.validation.imageInvalidType" as TranslationKey,
+        key: "web.resources.validation.imageInvalidType",
       };
     }
     if (error?.key === "web.resources.validation.fileTooLarge") {
       return {
-        key: "web.resources.validation.imageTooLarge" as TranslationKey,
+        key: "web.resources.validation.imageTooLarge",
         params: { maxSize: "20 MiB" },
       };
     }

@@ -99,9 +99,9 @@ function ResourceTrashList({
               </h2>
               <Badge variant="secondary">
                 {t(
-                  (resource.isPrivate
+                  resource.isPrivate
                     ? "web.resources.visibility.private"
-                    : "web.resources.visibility.public") as TranslationKey,
+                    : "web.resources.visibility.public",
                 )}
               </Badge>
             </div>

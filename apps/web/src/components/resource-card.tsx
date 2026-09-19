@@ -144,7 +144,7 @@ function ResourceCardContent({
       <div className="relative">
         {resource.coverImageUrl ? (
           <img
-            alt={t("web.resources.detail.imageAlt" as TranslationKey, {
+            alt={t("web.resources.detail.imageAlt", {
               name: resource.name,
             })}
             className="aspect-4/3 w-full border-b border-border object-cover"
@@ -165,8 +165,8 @@ function ResourceCardContent({
             variant={resource.isPrivate ? "secondary" : "destructive"}
           >
             {resource.isPrivate
-              ? t("web.resources.visibility.private" as TranslationKey)
-              : t("web.resources.visibility.public" as TranslationKey)}
+              ? t("web.resources.visibility.private")
+              : t("web.resources.visibility.public")}
           </Badge>
         ) : null}
       </div>

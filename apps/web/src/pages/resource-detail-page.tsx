@@ -72,10 +72,9 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
         <section className="grid overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm md:grid-cols-[minmax(14rem,0.6fr)_minmax(0,1fr)]">
           {detail.images[0] ? (
             <button
-              aria-label={t(
-                "web.resources.detail.openImage" as TranslationKey,
-                { name: detail.images[0].fileName },
-              )}
+              aria-label={t("web.resources.detail.openImage", {
+                name: detail.images[0].fileName,
+              })}
               className="border-0 bg-transparent p-0 text-left"
               onClick={() => {
                 setSelectedImageIndex(0);
@@ -84,7 +83,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
               type="button"
             >
               <img
-                alt={t("web.resources.detail.imageAlt" as TranslationKey, {
+                alt={t("web.resources.detail.imageAlt", {
                   name: detail.name,
                 })}
                 className="aspect-4/3 h-full w-full border-b border-border object-cover md:border-r md:border-b-0"
@@ -95,7 +94,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
             <div className="flex aspect-4/3 items-center justify-center border-b border-border bg-muted text-muted-foreground md:border-r md:border-b-0">
               <File aria-hidden="true" className="size-14" />
               <span className="sr-only">
-                {t("web.resources.detail.noImage" as TranslationKey)}
+                {t("web.resources.detail.noImage")}
               </span>
             </div>
           )}
@@ -140,7 +139,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
             </div>
             <dl className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
               <div>
-                <dt>{t("web.resources.detail.sharedBy" as TranslationKey)}</dt>
+                <dt>{t("web.resources.detail.sharedBy")}</dt>
                 <dd className="m-0 text-foreground">
                   {detail.uploaderClerkId}
                 </dd>
@@ -179,15 +178,14 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
         </section>
 
         <section
-          aria-label={t("web.resources.upload.imagesLabel" as TranslationKey)}
+          aria-label={t("web.resources.upload.imagesLabel")}
           className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
         >
           {detail.images.map((image, index) => (
             <button
-              aria-label={t(
-                "web.resources.detail.openImage" as TranslationKey,
-                { name: image.fileName },
-              )}
+              aria-label={t("web.resources.detail.openImage", {
+                name: image.fileName,
+              })}
               className="overflow-hidden rounded-lg border border-border bg-card p-0 transition-colors hover:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
               key={image.id}
               onClick={() => {
@@ -197,7 +195,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
               type="button"
             >
               <img
-                alt={t("web.resources.detail.imageAlt" as TranslationKey, {
+                alt={t("web.resources.detail.imageAlt", {
                   name: detail.name,
                 })}
                 className="aspect-4/3 w-full object-cover"
@@ -227,9 +225,9 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
             <Button
               aria-expanded={historyExpanded}
               aria-label={t(
-                (historyExpanded
+                historyExpanded
                   ? "web.resources.action.collapseVersionHistory"
-                  : "web.resources.action.expandVersionHistory") as TranslationKey,
+                  : "web.resources.action.expandVersionHistory",
               )}
               onClick={() => setHistoryExpanded((expanded) => !expanded)}
               size="icon"
@@ -258,7 +256,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
           ) : null}
         </section>
         <dialog
-          aria-label={t("web.resources.upload.imagesLabel" as TranslationKey)}
+          aria-label={t("web.resources.upload.imagesLabel")}
           className="m-auto h-screen w-screen max-w-none bg-transparent p-4 text-white backdrop:bg-black/90"
           onKeyDown={(event) => {
             if (detail.images.length < 2) return;
@@ -276,9 +274,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
         >
           <div className="relative flex h-full items-center justify-center">
             <Button
-              aria-label={t(
-                "web.resources.action.closeImage" as TranslationKey,
-              )}
+              aria-label={t("web.resources.action.closeImage")}
               className="absolute top-0 right-0 z-10"
               onClick={() => imageDialogRef.current?.close()}
               size="icon"
@@ -289,9 +285,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
             </Button>
             {detail.images.length > 1 ? (
               <Button
-                aria-label={t(
-                  "web.resources.action.previousImage" as TranslationKey,
-                )}
+                aria-label={t("web.resources.action.previousImage")}
                 className="absolute left-0 z-10"
                 onClick={() =>
                   setSelectedImageIndex(
@@ -311,7 +305,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
             ) : null}
             {detail.images[selectedImageIndex] ? (
               <img
-                alt={t("web.resources.detail.imageAlt" as TranslationKey, {
+                alt={t("web.resources.detail.imageAlt", {
                   name: detail.name,
                 })}
                 className="max-h-full max-w-full object-contain"
@@ -320,9 +314,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
             ) : null}
             {detail.images.length > 1 ? (
               <Button
-                aria-label={t(
-                  "web.resources.action.nextImage" as TranslationKey,
-                )}
+                aria-label={t("web.resources.action.nextImage")}
                 className="absolute right-0 z-10"
                 onClick={() =>
                   setSelectedImageIndex(
@@ -456,9 +448,9 @@ function VersionCard({
           <Button
             aria-expanded={expanded}
             aria-label={t(
-              (expanded
+              expanded
                 ? "web.resources.action.collapseVersion"
-                : "web.resources.action.expandVersion") as TranslationKey,
+                : "web.resources.action.expandVersion",
               { version: version.version },
             )}
             onClick={() => setExpanded((value) => !value)}

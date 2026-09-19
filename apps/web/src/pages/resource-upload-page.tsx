@@ -40,7 +40,7 @@ export function ResourceUploadPage() {
   const [uploadStatus, setUploadStatus] = useState("");
 
   return (
-    <AppShell title={t("web.resources.add.title" as TranslationKey)}>
+    <AppShell title={t("web.resources.add.title")}>
       <main className="mx-auto w-full max-w-2xl px-4 py-8 md:px-6">
         <form
           aria-busy={submitting}
@@ -115,22 +115,17 @@ export function ResourceUploadPage() {
 
           <FileDropInput
             accept="image/jpeg,image/png,image/webp"
-            browseLabel={t(
-              "web.resources.upload.browseFiles" as TranslationKey,
-            )}
-            description={t(
-              "web.resources.upload.imagesHelp" as TranslationKey,
-              {
-                maxFileSize: "20 MiB",
-                maxImages: 10,
-                maxSessionSize: "100 MiB",
-              },
-            )}
+            browseLabel={t("web.resources.upload.browseFiles")}
+            description={t("web.resources.upload.imagesHelp", {
+              maxFileSize: "20 MiB",
+              maxImages: 10,
+              maxSessionSize: "100 MiB",
+            })}
             disabled={submitting}
             files={imageFiles}
-            fileTypes={t("web.resources.upload.imageTypes" as TranslationKey)}
+            fileTypes={t("web.resources.upload.imageTypes")}
             id="resource-images"
-            label={t("web.resources.upload.imagesLabel" as TranslationKey)}
+            label={t("web.resources.upload.imagesLabel")}
             multiple
             onFilesChange={(additions) =>
               setImageFiles(appendResourceUploadFiles(imageFiles, additions))
@@ -158,9 +153,7 @@ export function ResourceUploadPage() {
           </Field>
 
           <ResourceFileInput
-            browseLabel={t(
-              "web.resources.upload.browseFiles" as TranslationKey,
-            )}
+            browseLabel={t("web.resources.upload.browseFiles")}
             description={t("web.resources.upload.fileHelp", {
               maxFileSize: "20 MiB",
               maxFiles: 10,
@@ -197,7 +190,7 @@ export function ResourceUploadPage() {
             {submitting ? (
               <LoaderCircle aria-hidden="true" className="animate-spin" />
             ) : null}
-            {t("web.resources.action.add" as TranslationKey)}
+            {t("web.resources.action.add")}
           </Button>
           <p aria-live="polite" className="m-0 text-sm text-muted-foreground">
             {uploadStatus}

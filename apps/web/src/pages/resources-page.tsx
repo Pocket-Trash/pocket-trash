@@ -41,7 +41,7 @@ export function ResourcesPage({
         isSignedIn ? (
           <Button nativeButton={false} render={<Link to="/resources/add" />}>
             <Plus />
-            {t("web.resources.action.add" as TranslationKey)}
+            {t("web.resources.action.add")}
           </Button>
         ) : null
       }

@@ -64,7 +64,7 @@ export function ResourceManagementPage({
             </Button>
             <Button nativeButton={false} render={<Link to="/resources/add" />}>
               <Plus />
-              {t("web.resources.action.add" as TranslationKey)}
+              {t("web.resources.action.add")}
             </Button>
           </div>
         </div>
@@ -97,9 +97,7 @@ export function ResourceEditPage({ detail }: { detail: ResourceDetail }) {
   ) => formatTranslation(key, params, locale);
 
   return (
-    <UserPageShell
-      title={t("web.resources.management.editResources" as TranslationKey)}
-    >
+    <UserPageShell title={t("web.resources.management.editResources")}>
       <Tabs defaultValue="edit">
         <TabsList>
           <TabsTrigger value="edit">
@@ -206,7 +204,7 @@ function ResourceEditForm({ detail }: { detail: ResourceDetail }) {
           .map((image) => (
             <div className="relative" key={image.id}>
               <img
-                alt={t("web.resources.detail.imageAlt" as TranslationKey, {
+                alt={t("web.resources.detail.imageAlt", {
                   name: detail.name,
                 })}
                 className="aspect-4/3 w-full rounded-md border border-border object-cover"
@@ -231,17 +229,17 @@ function ResourceEditForm({ detail }: { detail: ResourceDetail }) {
       </div>
       <FileDropInput
         accept="image/jpeg,image/png,image/webp"
-        browseLabel={t("web.resources.upload.browseFiles" as TranslationKey)}
-        description={t("web.resources.upload.imagesHelp" as TranslationKey, {
+        browseLabel={t("web.resources.upload.browseFiles")}
+        description={t("web.resources.upload.imagesHelp", {
           maxFileSize: "20 MiB",
           maxImages: 10,
           maxSessionSize: "100 MiB",
         })}
         disabled={submitting}
         files={imageFiles}
-        fileTypes={t("web.resources.upload.imageTypes" as TranslationKey)}
+        fileTypes={t("web.resources.upload.imageTypes")}
         id="edit-resource-images"
-        label={t("web.resources.upload.imagesLabel" as TranslationKey)}
+        label={t("web.resources.upload.imagesLabel")}
         multiple
         onFilesChange={(additions) =>
           setImageFiles(appendResourceUploadFiles(imageFiles, additions))
@@ -368,7 +366,7 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
       }}
     >
       <ResourceFileInput
-        browseLabel={t("web.resources.upload.browseFiles" as TranslationKey)}
+        browseLabel={t("web.resources.upload.browseFiles")}
         description={t("web.resources.upload.fileHelp", {
           maxFiles: 10,
           maxFileSize: "20 MiB",
