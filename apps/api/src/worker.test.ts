@@ -45,11 +45,11 @@ describe("api worker", () => {
       new ApiEnvValidationError([
         "CLERK_SECRET_KEY",
         "DATABASE_URL",
-        "RESOURCE_CDN_BASE_URL",
-        "RESOURCE_FOLDER_PREFIX",
-        "RESOURCE_STORAGE_ACCESS_KEY",
-        "RESOURCE_STORAGE_ENDPOINT",
-        "RESOURCE_STORAGE_ZONE_NAME",
+        "BUNNY_CDN_BASE_URL",
+        "BUNNY_RESOURCE_FOLDER_PREFIX",
+        "BUNNY_STORAGE_ACCESS_KEY",
+        "BUNNY_STORAGE_ENDPOINT",
+        "BUNNY_STORAGE_ZONE_NAME",
       ]),
     );
     expect(isAllowedWebOrigin("http://localhost:4005", "development")).toBe(
