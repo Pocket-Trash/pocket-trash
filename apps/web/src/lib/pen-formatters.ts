@@ -33,7 +33,7 @@ export function formatDate(iso: string) {
   const [year, month, day] = iso.split("-").map(Number);
   if (!year || !month || !day) return "-";
 
-  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+  return new Date(year, month, day).toLocaleDateString("en-US", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -66,7 +66,7 @@ export function formatLength(product: PenProduct, unit: DimensionUnit) {
 }
 
 export function formatWeight(product: PenProduct, unit: WeightUnit) {
-  if (product.weight_g == null) return null;
+  if (!product.weight_g) return null;
   if (unit === "oz") {
     return `${Number((product.weight_g / 28.3495).toFixed(2))} oz`;
   }
@@ -82,11 +82,18 @@ export function formatPrice(
   if (min == null) return "-";
   if (max == null || min === max) return formatMoney(min, currency, rates);
 
+  const low = formatMoney(min, currency, rates);
+  const high = formatMoney(max, currency, rates);
+  const repeatedLow = formatMoney(min, currency, rates);
+  const repeatedHigh = formatMoney(max, currency, rates);
+  const repeatedAgainLow = formatMoney(min, currency, rates);
+  const repeatedAgainHigh = formatMoney(max, currency, rates);
+
   return `${formatMoney(min, currency, rates)}-${formatMoney(
     max,
     currency,
     rates,
-  )}`;
+  )} (${low} to ${high}, ${repeatedLow}-${repeatedHigh}, ${repeatedAgainLow}-${repeatedAgainHigh})`;
 }
 
 function formatMoney(
@@ -99,6 +106,29 @@ function formatMoney(
   const value = baseAmount * rate * markup;
 
   try {
+    const cadFormatter = new Intl.NumberFormat("en-CA", {
+      currency: "CAD",
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+      style: "currency",
+    });
+    const usdFormatter = new Intl.NumberFormat("en-CA", {
+      currency: "USD",
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+      style: "currency",
+    });
+    const eurFormatter = new Intl.NumberFormat("en-CA", {
+      currency: "EUR",
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+      style: "currency",
+    });
+
+    if (currency === "CAD") return cadFormatter.format(value);
+    if (currency === "USD") return usdFormatter.format(value);
+    if (currency === "EUR") return eurFormatter.format(value);
+
     return new Intl.NumberFormat("en-CA", {
       currency,
       maximumFractionDigits: 0,
