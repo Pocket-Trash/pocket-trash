@@ -2,7 +2,7 @@
 
 # resources
 
-User-uploaded resources and their optional preview images.
+User-uploaded resources with files, images, and versions.
 
 ## Columns
 
@@ -12,15 +12,13 @@ User-uploaded resources and their optional preview images.
 | `uploader_clerk_id` | `text` | yes |  |  |  |  |  |
 | `name` | `text` | yes |  |  |  |  |  |
 | `description` | `text` | yes |  |  |  |  |  |
-| `preview_image_file_name` | `text` | no |  |  |  |  |  |
-| `preview_image_content_type` | `text` | no |  |  |  |  |  |
-| `preview_image_size` | `integer` | no |  |  |  |  |  |
-| `preview_image_object_path` | `text` | no |  |  |  |  |  |
-| `preview_image_url` | `text` | no |  |  |  |  |  |
 | `is_private` | `boolean` | yes |  |  |  |  |  |
 | `private_reason` | `text` | no |  |  |  |  |  |
 | `privated_at` | `timestamp with time zone` | no |  |  |  |  |  |
 | `privated_by_clerk_id` | `text` | no |  |  |  |  |  |
+| `deleted_at` | `timestamp with time zone` | no |  |  |  |  |  |
+| `deleted_by_clerk_id` | `text` | no |  |  |  |  |  |
+| `deleted_by_role` | `text` | no |  |  |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 | `updated_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 
@@ -29,4 +27,5 @@ User-uploaded resources and their optional preview images.
 | Name | Unique | Method | Columns |
 | --- | --- | --- | --- |
 | `resources_created_at_idx` | no | `btree` | `created_at` |
+| `resources_deleted_at_idx` | no | `btree` | `deleted_at` |
 | `resources_uploader_clerk_id_idx` | no | `btree` | `uploader_clerk_id` |
