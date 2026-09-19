@@ -2,7 +2,7 @@ import type { TranslationKey } from "@pocket-trash/localizations";
 import { clientEnv } from "@/env/client";
 
 const maxFileBytes = 20 * 1024 * 1024;
-const maxSessionBytes = 50 * 1024 * 1024;
+const maxSessionBytes = 100 * 1024 * 1024;
 const resourceContentType = "application/octet-stream";
 const fileMimeTypes: Readonly<Record<string, readonly string[]>> = {
   ".3mf": [
@@ -20,7 +20,7 @@ const fileMimeTypes: Readonly<Record<string, readonly string[]>> = {
     "application/zip",
   ],
 };
-const previewMimeTypes: Readonly<Record<string, readonly string[]>> = {
+const imageMimeTypes: Readonly<Record<string, readonly string[]>> = {
   ".jpeg": ["image/jpeg"],
   ".jpg": ["image/jpeg"],
   ".png": ["image/png"],
@@ -48,7 +48,7 @@ type SessionResponse = {
   uploads: Array<
     UploadMetadata & {
       id: string;
-      kind: "preview" | "resource";
+      kind: "image" | "resource";
     }
   >;
 };
@@ -99,7 +99,8 @@ export function getResourceUploadErrorTranslation(
 
 export function validateResourceUpload(
   files: File[],
-  preview?: File,
+  images: File[] = [],
+  requireImages = false,
 ): ResourceUploadValidationError | undefined {
   if (files.length === 0) {
     return { key: "web.resources.validation.requiredFile" };
@@ -125,26 +126,69 @@ export function validateResourceUpload(
     names.add(normalizedName);
   }
 
-  if (preview) {
-    const error = validateFile(preview, previewMimeTypes);
+  const imageError = validateResourceImages(
+    images,
+    images.length,
+    requireImages,
+  );
+  if (imageError) return imageError;
+
+  const totalSize = [...files, ...images].reduce(
+    (total, file) => total + file.size,
+    0,
+  );
+  if (totalSize > maxSessionBytes) {
+    return {
+      key: "web.resources.validation.sessionTooLarge",
+      params: { maxSize: "100 MiB" },
+    };
+  }
+}
+
+export function validateResourceImages(
+  images: File[],
+  totalCount = images.length,
+  required = true,
+): ResourceUploadValidationError | undefined {
+  if (required && totalCount === 0) {
+    return { key: "web.resources.validation.requiredImage" as TranslationKey };
+  }
+  if (totalCount > 10) {
+    return {
+      key: "web.resources.validation.tooManyImages" as TranslationKey,
+      params: { maxImages: 10 },
+    };
+  }
+  const imageNames = new Set<string>();
+  for (const image of images) {
+    const error = validateFile(image, imageMimeTypes);
     if (error?.key === "web.resources.validation.invalidFileType") {
-      return { key: "web.resources.validation.previewInvalidType" };
+      return {
+        key: "web.resources.validation.imageInvalidType" as TranslationKey,
+      };
     }
     if (error?.key === "web.resources.validation.fileTooLarge") {
       return {
-        key: "web.resources.validation.previewTooLarge",
+        key: "web.resources.validation.imageTooLarge" as TranslationKey,
         params: { maxSize: "20 MiB" },
       };
     }
     if (error) return error;
+    const normalizedName = image.name.toLocaleLowerCase();
+    if (imageNames.has(normalizedName)) {
+      return {
+        key: "web.resources.validation.duplicateFilename",
+        params: { filename: image.name },
+      };
+    }
+    imageNames.add(normalizedName);
   }
 
-  const totalSize =
-    files.reduce((total, file) => total + file.size, 0) + (preview?.size ?? 0);
+  const totalSize = images.reduce((total, file) => total + file.size, 0);
   if (totalSize > maxSessionBytes) {
     return {
       key: "web.resources.validation.sessionTooLarge",
-      params: { maxSize: "50 MiB" },
+      params: { maxSize: "100 MiB" },
     };
   }
 }
@@ -155,12 +199,12 @@ export async function uploadResourceSession(input: {
   fetch?: typeof fetch;
   files: File[];
   getToken(): Promise<string | null>;
+  images?: File[];
   isPrivate?: boolean;
   name?: string;
   onProgress?(fileName: string, percent: number): void;
   onStage?(stage: "complete" | "upload"): void;
   operation: "create" | "version";
-  preview?: File;
   resourceId?: number;
   uploadFile?: FileUploader;
 }): Promise<{ resourceId: number; version: number }> {
@@ -174,20 +218,20 @@ export async function uploadResourceSession(input: {
   if (!token) throw new ResourceUploadRequestError("session", "unauthorized");
 
   const response = await fetcher(
-    `${trimTrailingSlash(clientEnv.VITE_RESOURCE_API_BASE_URL)}/api/v0/resource-upload-sessions`,
+    `${trimTrailingSlash(clientEnv.VITE_API_URL)}/api/v0/resource-upload-sessions`,
     {
       body: JSON.stringify({
         ...(input.operation === "create"
           ? {
               categories: input.categories,
               description: input.description,
+              images: (input.images ?? []).map((image) => toMetadata(image)),
               isPrivate: Boolean(input.isPrivate),
               name: input.name,
             }
           : { resourceId: input.resourceId }),
         files: input.files.map((file) => toMetadata(file, resourceContentType)),
         operation: input.operation,
-        preview: input.preview ? toMetadata(input.preview) : undefined,
       }),
       headers: {
         authorization: `Bearer ${token}`,
@@ -206,10 +250,9 @@ export async function uploadResourceSession(input: {
 
   input.onStage?.("upload");
   for (const upload of session.uploads) {
-    const file =
-      upload.kind === "preview"
-        ? input.preview
-        : input.files.find(({ name }) => name === upload.fileName);
+    const file = (upload.kind === "image" ? input.images : input.files)?.find(
+      ({ name }) => name === upload.fileName,
+    );
     if (!file) {
       throw new ResourceUploadRequestError(
         "file",
@@ -225,7 +268,7 @@ export async function uploadResourceSession(input: {
         "content-type": upload.contentType,
       },
       onProgress: (percent) => input.onProgress?.(file.name, percent),
-      url: `${trimTrailingSlash(clientEnv.VITE_RESOURCE_API_BASE_URL)}/api/v0/resource-upload-sessions/${encodeURIComponent(session.id)}/files/${encodeURIComponent(upload.id)}`,
+      url: `${trimTrailingSlash(clientEnv.VITE_API_URL)}/api/v0/resource-upload-sessions/${encodeURIComponent(session.id)}/files/${encodeURIComponent(upload.id)}`,
     });
     if (!uploadResponse.ok) {
       throw new ResourceUploadRequestError(
@@ -239,7 +282,7 @@ export async function uploadResourceSession(input: {
   input.onStage?.("complete");
   const complete = () =>
     fetcher(
-      `${trimTrailingSlash(clientEnv.VITE_RESOURCE_API_BASE_URL)}/api/v0/resource-upload-sessions/${encodeURIComponent(session.id)}/complete`,
+      `${trimTrailingSlash(clientEnv.VITE_API_URL)}/api/v0/resource-upload-sessions/${encodeURIComponent(session.id)}/complete`,
       {
         headers: { authorization: `Bearer ${token}` },
         method: "POST",

@@ -22,8 +22,10 @@ import { Route as ResourcesAddRouteImport } from './routes/resources.add'
 import { Route as ResourcesResourceIdRouteImport } from './routes/resources.$resourceId'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
+import { Route as UserResourcesTrashRouteImport } from './routes/user.resources_.trash'
 import { Route as ResourcesResourceIdEditRouteImport } from './routes/resources.$resourceId_.edit'
 import { Route as AdminSettingsFeatureFlagsRouteImport } from './routes/admin.settings.feature-flags'
+import { Route as AdminResourcesTrashRouteImport } from './routes/admin.resources.trash'
 import { Route as AdminResourcesNotificationsRouteImport } from './routes/admin.resources.notifications'
 import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId_.versions.new'
 
@@ -93,6 +95,11 @@ const UserSettingsBetaFeaturesRoute =
     path: '/settings/beta-features',
     getParentRoute: () => UserRoute,
   } as any)
+const UserResourcesTrashRoute = UserResourcesTrashRouteImport.update({
+  id: '/resources_/trash',
+  path: '/resources/trash',
+  getParentRoute: () => UserRoute,
+} as any)
 const ResourcesResourceIdEditRoute = ResourcesResourceIdEditRouteImport.update({
   id: '/$resourceId_/edit',
   path: '/$resourceId/edit',
@@ -104,6 +111,11 @@ const AdminSettingsFeatureFlagsRoute =
     path: '/admin/settings/feature-flags',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AdminResourcesTrashRoute = AdminResourcesTrashRouteImport.update({
+  id: '/admin/resources/trash',
+  path: '/admin/resources/trash',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminResourcesNotificationsRoute =
   AdminResourcesNotificationsRouteImport.update({
     id: '/admin/resources/notifications',
@@ -131,8 +143,10 @@ export interface FileRoutesByFullPath {
   '/user/resources': typeof UserResourcesRoute
   '/resources/': typeof ResourcesIndexRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
+  '/admin/resources/trash': typeof AdminResourcesTrashRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
   '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
+  '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
 }
@@ -149,8 +163,10 @@ export interface FileRoutesByTo {
   '/user/resources': typeof UserResourcesRoute
   '/resources': typeof ResourcesIndexRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
+  '/admin/resources/trash': typeof AdminResourcesTrashRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
   '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
+  '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
 }
@@ -169,8 +185,10 @@ export interface FileRoutesById {
   '/user/resources': typeof UserResourcesRoute
   '/resources/': typeof ResourcesIndexRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
+  '/admin/resources/trash': typeof AdminResourcesTrashRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
   '/resources/$resourceId_/edit': typeof ResourcesResourceIdEditRoute
+  '/user/resources_/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/resources/$resourceId_/versions/new': typeof ResourcesResourceIdVersionsNewRoute
 }
@@ -190,8 +208,10 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/resources/'
     | '/admin/resources/notifications'
+    | '/admin/resources/trash'
     | '/admin/settings/feature-flags'
     | '/resources/$resourceId/edit'
+    | '/user/resources/trash'
     | '/user/settings/beta-features'
     | '/resources/$resourceId/versions/new'
   fileRoutesByTo: FileRoutesByTo
@@ -208,8 +228,10 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/resources'
     | '/admin/resources/notifications'
+    | '/admin/resources/trash'
     | '/admin/settings/feature-flags'
     | '/resources/$resourceId/edit'
+    | '/user/resources/trash'
     | '/user/settings/beta-features'
     | '/resources/$resourceId/versions/new'
   id:
@@ -227,8 +249,10 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/resources/'
     | '/admin/resources/notifications'
+    | '/admin/resources/trash'
     | '/admin/settings/feature-flags'
     | '/resources/$resourceId_/edit'
+    | '/user/resources_/trash'
     | '/user/settings/beta-features'
     | '/resources/$resourceId_/versions/new'
   fileRoutesById: FileRoutesById
@@ -241,6 +265,7 @@ export interface RootRouteChildren {
   SignInSplatRoute: typeof SignInSplatRoute
   SignUpSplatRoute: typeof SignUpSplatRoute
   AdminResourcesNotificationsRoute: typeof AdminResourcesNotificationsRoute
+  AdminResourcesTrashRoute: typeof AdminResourcesTrashRoute
   AdminSettingsFeatureFlagsRoute: typeof AdminSettingsFeatureFlagsRoute
 }
 
@@ -337,6 +362,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserSettingsBetaFeaturesRouteImport
       parentRoute: typeof UserRoute
     }
+    '/user/resources_/trash': {
+      id: '/user/resources_/trash'
+      path: '/resources/trash'
+      fullPath: '/user/resources/trash'
+      preLoaderRoute: typeof UserResourcesTrashRouteImport
+      parentRoute: typeof UserRoute
+    }
     '/resources/$resourceId_/edit': {
       id: '/resources/$resourceId_/edit'
       path: '/$resourceId/edit'
@@ -349,6 +381,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/settings/feature-flags'
       fullPath: '/admin/settings/feature-flags'
       preLoaderRoute: typeof AdminSettingsFeatureFlagsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/resources/trash': {
+      id: '/admin/resources/trash'
+      path: '/admin/resources/trash'
+      fullPath: '/admin/resources/trash'
+      preLoaderRoute: typeof AdminResourcesTrashRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/resources/notifications': {
@@ -392,6 +431,7 @@ interface UserRouteChildren {
   UserAccountRoute: typeof UserAccountRoute
   UserCollectionsRoute: typeof UserCollectionsRoute
   UserResourcesRoute: typeof UserResourcesRoute
+  UserResourcesTrashRoute: typeof UserResourcesTrashRoute
   UserSettingsBetaFeaturesRoute: typeof UserSettingsBetaFeaturesRoute
 }
 
@@ -399,6 +439,7 @@ const UserRouteChildren: UserRouteChildren = {
   UserAccountRoute: UserAccountRoute,
   UserCollectionsRoute: UserCollectionsRoute,
   UserResourcesRoute: UserResourcesRoute,
+  UserResourcesTrashRoute: UserResourcesTrashRoute,
   UserSettingsBetaFeaturesRoute: UserSettingsBetaFeaturesRoute,
 }
 
@@ -412,6 +453,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignInSplatRoute: SignInSplatRoute,
   SignUpSplatRoute: SignUpSplatRoute,
   AdminResourcesNotificationsRoute: AdminResourcesNotificationsRoute,
+  AdminResourcesTrashRoute: AdminResourcesTrashRoute,
   AdminSettingsFeatureFlagsRoute: AdminSettingsFeatureFlagsRoute,
 }
 export const routeTree = rootRouteImport

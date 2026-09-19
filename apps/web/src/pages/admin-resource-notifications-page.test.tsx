@@ -17,8 +17,8 @@ vi.mock("@/providers/locale-provider", () => ({
 }));
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children }: { children: ReactNode }) => (
-    <a href="/resources/1000">{children}</a>
+  Link: ({ children, to }: { children: ReactNode; to: string }) => (
+    <a href={to.replace("$resourceId", "1000")}>{children}</a>
   ),
 }));
 
@@ -67,5 +67,6 @@ describe("admin resource notifications", () => {
     expect(html).toContain("Reason for delisting");
     expect(html).toContain("Delist");
     expect(html).toContain('href="/resources/1000"');
+    expect(html).toContain('href="/admin/resources/trash"');
   });
 });
