@@ -188,42 +188,42 @@ set_database_url() {
 }
 
 delete_existing_image_folder_prefix() {
-  delete_existing_env_var IMAGE_FOLDER_PREFIX \
+  delete_existing_env_var BUNNY_IMAGE_FOLDER_PREFIX \
     "ci.vercel.preview.imageFolderPrefix.missing" \
     "ci.vercel.preview.imageFolderPrefix.removed"
 }
 
 set_image_folder_prefix() {
-  require_env IMAGE_FOLDER_PREFIX
-  set_branch_env_var IMAGE_FOLDER_PREFIX "$IMAGE_FOLDER_PREFIX" \
+  require_env BUNNY_IMAGE_FOLDER_PREFIX
+  set_branch_env_var BUNNY_IMAGE_FOLDER_PREFIX "$BUNNY_IMAGE_FOLDER_PREFIX" \
     "ci.vercel.preview.imageFolderPrefix.set" \
     "ci.vercel.preview.imageFolderPrefix.missing" \
     "ci.vercel.preview.imageFolderPrefix.removed"
 }
 
 delete_existing_resource_folder_prefix() {
-  delete_existing_env_var RESOURCE_FOLDER_PREFIX \
+  delete_existing_env_var BUNNY_RESOURCE_FOLDER_PREFIX \
     "ci.vercel.preview.resourceFolderPrefix.missing" \
     "ci.vercel.preview.resourceFolderPrefix.removed"
 }
 
 set_resource_folder_prefix() {
-  require_env RESOURCE_FOLDER_PREFIX
-  set_branch_env_var RESOURCE_FOLDER_PREFIX "$RESOURCE_FOLDER_PREFIX" \
+  require_env BUNNY_RESOURCE_FOLDER_PREFIX
+  set_branch_env_var BUNNY_RESOURCE_FOLDER_PREFIX "$BUNNY_RESOURCE_FOLDER_PREFIX" \
     "ci.vercel.preview.resourceFolderPrefix.set" \
     "ci.vercel.preview.resourceFolderPrefix.missing" \
     "ci.vercel.preview.resourceFolderPrefix.removed"
 }
 
 delete_existing_resource_api_base_url() {
-  delete_existing_env_var RESOURCE_API_BASE_URL \
+  delete_existing_env_var API_URL \
     "ci.vercel.preview.resourceApiBaseUrl.missing" \
     "ci.vercel.preview.resourceApiBaseUrl.removed"
 }
 
 set_resource_api_base_url() {
-  require_env RESOURCE_API_BASE_URL
-  set_branch_env_var RESOURCE_API_BASE_URL "$RESOURCE_API_BASE_URL" \
+  require_env API_URL
+  set_branch_env_var API_URL "$API_URL" \
     "ci.vercel.preview.resourceApiBaseUrl.set" \
     "ci.vercel.preview.resourceApiBaseUrl.missing" \
     "ci.vercel.preview.resourceApiBaseUrl.removed"

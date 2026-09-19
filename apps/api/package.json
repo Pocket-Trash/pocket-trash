@@ -10,6 +10,8 @@
     "build:ci": "tsc -p tsconfig.json",
     "check": "biome check .",
     "cf-typegen": "wrangler types src/worker-configuration.d.ts --include-runtime false",
+    "deploy": "pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy -- pnpm exec wrangler deploy --config wrangler.jsonc --env=\"\" --keep-vars",
+    "deploy:preview": "pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy:preview -- pnpm exec wrangler deploy --config wrangler.jsonc --env=preview --keep-vars",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",

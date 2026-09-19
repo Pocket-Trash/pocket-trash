@@ -45,18 +45,18 @@ services.configure({
   },
   logger,
   resources:
-    serverEnv.RESOURCE_STORAGE_ACCESS_KEY &&
-    serverEnv.RESOURCE_CDN_BASE_URL &&
-    serverEnv.RESOURCE_CDN_TOKEN_KEY &&
-    serverEnv.RESOURCE_STORAGE_ENDPOINT &&
-    serverEnv.RESOURCE_STORAGE_ZONE_NAME
+    serverEnv.BUNNY_STORAGE_ACCESS_KEY &&
+    serverEnv.BUNNY_CDN_BASE_URL &&
+    serverEnv.BUNNY_CDN_TOKEN_KEY &&
+    serverEnv.BUNNY_STORAGE_ENDPOINT &&
+    serverEnv.BUNNY_STORAGE_ZONE_NAME
       ? {
-          accessKey: serverEnv.RESOURCE_STORAGE_ACCESS_KEY,
-          cdnBaseUrl: serverEnv.RESOURCE_CDN_BASE_URL,
-          endpoint: serverEnv.RESOURCE_STORAGE_ENDPOINT,
-          folderPrefix: serverEnv.RESOURCE_FOLDER_PREFIX,
-          tokenKey: serverEnv.RESOURCE_CDN_TOKEN_KEY,
-          zoneName: serverEnv.RESOURCE_STORAGE_ZONE_NAME,
+          accessKey: serverEnv.BUNNY_STORAGE_ACCESS_KEY,
+          cdnBaseUrl: serverEnv.BUNNY_CDN_BASE_URL,
+          endpoint: serverEnv.BUNNY_STORAGE_ENDPOINT,
+          folderPrefix: serverEnv.BUNNY_RESOURCE_FOLDER_PREFIX,
+          tokenKey: serverEnv.BUNNY_CDN_TOKEN_KEY,
+          zoneName: serverEnv.BUNNY_STORAGE_ZONE_NAME,
         }
       : undefined,
 });

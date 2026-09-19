@@ -20,9 +20,7 @@ function getEnvAliasRunnerOptions(args: readonly string[]) {
 
   return JSON.parse(args[runnerIndex + 1] ?? "{}") as {
     databaseUrlUserOverride?: boolean;
-    databaseUrlUserOverridePath?: string;
-    environmentSlug?: string;
-    secretPaths?: string[];
+    databaseUrlUserOverrideFilePaths?: string[];
   };
 }
 
@@ -43,7 +41,9 @@ describe("parseCliArguments", () => {
 });
 
 describe("buildInfisicalRunArgs", () => {
-  it("builds API dev args with web secrets and the database override", () => {
+  const quietArgs = ["--silent", "--log-level=error"];
+
+  it("builds API dev args with API and personal database secrets", () => {
     const args = buildInfisicalRunArgs({
       app: "api",
       command: "dev",
@@ -53,9 +53,38 @@ describe("buildInfisicalRunArgs", () => {
 
     expect(getEnvAliasRunnerOptions(args)).toMatchObject({
       databaseUrlUserOverride: true,
-      databaseUrlUserOverridePath: "/local/database",
-      secretPaths: ["/apps/web"],
+      databaseUrlUserOverrideFilePaths: [
+        "/repo/.env.local",
+        "/repo/packages/database/.env.local",
+      ],
     });
+    expect(args).toContain("--path=/apps/api");
+    expect(args).toContain("--path=/local/database");
+    expect(args).not.toContain("--path=/apps/web");
+  });
+
+  it.each([
+    ["deploy", "prod", ""],
+    ["deploy:preview", "preview", "preview"],
+  ])("builds API %s args with Cloudflare secrets", (command, env, workerEnv) => {
+    expect(
+      buildInfisicalRunArgs({
+        app: "api",
+        command,
+        commandArgs: ["wrangler", "deploy", `--env=${workerEnv}`],
+        repoRoot: "/repo",
+      }),
+    ).toEqual([
+      "run",
+      ...quietArgs,
+      "--project-config-dir=/repo",
+      `--env=${env}`,
+      "--path=/tools/cloudflare",
+      "--",
+      "wrangler",
+      "deploy",
+      `--env=${workerEnv}`,
+    ]);
   });
 
   it.each([
@@ -81,9 +110,10 @@ describe("buildInfisicalRunArgs", () => {
     expect(args).toContain("--path=/apps/scraper");
     expect(getEnvAliasRunnerOptions(args)).toMatchObject({
       databaseUrlUserOverride: true,
-      databaseUrlUserOverridePath: "/local/database",
-      environmentSlug: "dev",
-      secretPaths: ["/apps/scraper"],
+      databaseUrlUserOverrideFilePaths: [
+        "/repo/.env.local",
+        "/repo/packages/database/.env.local",
+      ],
     });
   });
 
@@ -108,6 +138,7 @@ describe("buildInfisicalRunArgs", () => {
       }),
     ).toEqual([
       "run",
+      ...quietArgs,
       "--project-config-dir=/repo",
       "--env=dev",
       "--path=/local/bunny",
@@ -127,9 +158,11 @@ describe("buildInfisicalRunArgs", () => {
       }),
     ).toEqual([
       "run",
+      ...quietArgs,
       "--project-config-dir=/repo",
       "--env=dev",
       "--path=/apps/web",
+      "--path=/local/database",
       "--",
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
@@ -150,9 +183,11 @@ describe("buildInfisicalRunArgs", () => {
       }),
     ).toEqual([
       "run",
+      ...quietArgs,
       "--project-config-dir=/repo",
       "--env=dev",
       "--path=/apps/scraper",
+      "--path=/local/database",
       "--",
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
@@ -175,9 +210,11 @@ describe("buildInfisicalRunArgs", () => {
       }),
     ).toEqual([
       "run",
+      ...quietArgs,
       "--project-config-dir=/repo",
       "--env=dev",
       "--path=/apps/scraper",
+      "--path=/local/database",
       "--",
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
@@ -200,6 +237,7 @@ describe("buildInfisicalRunArgs", () => {
       }),
     ).toEqual([
       "run",
+      ...quietArgs,
       "--projectId=project-1",
       "--project-config-dir=/repo",
       "--env=dev",
@@ -225,6 +263,7 @@ describe("buildInfisicalRunArgs", () => {
       }),
     ).toEqual([
       "run",
+      ...quietArgs,
       "--project-config-dir=/repo",
       "--env=dev",
       "--path=tools/github/secrets",
@@ -246,9 +285,11 @@ describe("buildInfisicalRunArgs", () => {
 
     expect(args).toEqual([
       "run",
+      ...quietArgs,
       "--project-config-dir=/repo",
       "--env=dev",
       "--path=/apps/web",
+      "--path=/local/database",
       "--",
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
@@ -260,9 +301,10 @@ describe("buildInfisicalRunArgs", () => {
     ]);
     expect(getEnvAliasRunnerOptions(args)).toMatchObject({
       databaseUrlUserOverride: true,
-      databaseUrlUserOverridePath: "/local/database",
-      environmentSlug: "dev",
-      secretPaths: ["/apps/web"],
+      databaseUrlUserOverrideFilePaths: [
+        "/repo/.env.local",
+        "/repo/packages/database/.env.local",
+      ],
     });
   });
 
@@ -282,9 +324,11 @@ describe("buildInfisicalRunArgs", () => {
 
     expect(args).toEqual([
       "run",
+      ...quietArgs,
       "--project-config-dir=/repo",
       "--env=dev",
       "--path=/apps/web",
+      "--path=/local/database",
       "--",
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
@@ -298,10 +342,25 @@ describe("buildInfisicalRunArgs", () => {
     ]);
     expect(getEnvAliasRunnerOptions(args)).toMatchObject({
       databaseUrlUserOverride: true,
-      databaseUrlUserOverridePath: "/local/database",
-      environmentSlug: "dev",
-      secretPaths: ["/apps/web"],
+      databaseUrlUserOverrideFilePaths: [
+        "/repo/.env.local",
+        "/repo/packages/database/.env.local",
+      ],
     });
+  });
+
+  it("shows provider information without enabling secret-dumping trace logs", () => {
+    const args = buildInfisicalRunArgs({
+      app: "web",
+      command: "dev",
+      commandArgs: ["vite", "dev"],
+      repoRoot: "/repo",
+      verbose: true,
+    });
+
+    expect(args).toContain("--log-level=info");
+    expect(args).not.toContain("--silent");
+    expect(args).not.toContain("--log-level=trace");
   });
 });
 

@@ -27,8 +27,8 @@ uploads.
 | Variable | Suggested value | Notes |
 | --- | --- | --- |
 | `IMAGE_STORAGE_PROVIDER` | unset, defaults to `bunny` | Set only to override provider selection. Unsupported values fail fast. |
-| `IMAGE_FOLDER_PREFIX` | production `images`; local `images/dev`; shared preview `images/preview`; isolated PR preview `images/preview/pr-<number>` | Complete image namespace prepended to upload folders. |
-| `IMAGE_CDN_BASE_URL` | `https://cdn.pocket-trash.app` | Shared public delivery root. |
+| `BUNNY_IMAGE_FOLDER_PREFIX` | production `images`; local `images/dev`; shared preview `images/preview`; isolated PR preview `images/preview/pr-<number>` | Complete image namespace prepended to upload folders. |
+| `BUNNY_CDN_BASE_URL` | `https://cdn.pocket-trash.app` | Shared public delivery root. |
 | `BUNNY_STORAGE_ZONE_NAME` | `pocket-trash-storage` | Shared Storage Zone name. |
 | `BUNNY_STORAGE_ENDPOINT` | `https://ny.storage.bunnycdn.com` | Use the endpoint shown in Bunny if it differs. |
 | `BUNNY_STORAGE_ACCESS_KEY` | Storage Zone password | Secret. Required outside dry-run mode. |
@@ -38,7 +38,7 @@ uploads.
 Upload folders are built from:
 
 ```text
-/<IMAGE_FOLDER_PREFIX>/products/<image-owner-key>
+/<BUNNY_IMAGE_FOLDER_PREFIX>/products/<image-owner-key>
 ```
 
 Before upload, Pocket Trash fetches the remote source image, auto-rotates it,
@@ -72,8 +72,8 @@ listing handle is a product variation under a stable Grimsmo product.
 
 ## Delivery And Transforms
 
-Stored image URLs are built from `IMAGE_CDN_BASE_URL` and the object path.
-`IMAGE_CDN_BASE_URL` must include the public Storage Zone path when the CDN
+Stored image URLs are built from `BUNNY_CDN_BASE_URL` and the object path.
+`BUNNY_CDN_BASE_URL` must include the public Storage Zone path when the CDN
 serves one. Thumbnail URLs use Bunny Dynamic Images query transforms, for
 example:
 
@@ -88,12 +88,12 @@ Bunny CDN caches served files and Optimizer transformations.
 The API deploy workflow selects the preview image prefix from the same DB-change
 detection that selects the database branch:
 
-- DB-changing PRs get `IMAGE_FOLDER_PREFIX=images/preview/pr-<number>`.
-- PRs without DB changes get `IMAGE_FOLDER_PREFIX=images/preview`.
+- DB-changing PRs get `BUNNY_IMAGE_FOLDER_PREFIX=images/preview/pr-<number>`.
+- PRs without DB changes get `BUNNY_IMAGE_FOLDER_PREFIX=images/preview`.
 - DB-changing PR scraper previews set `SCRAPER_CRON_ENABLED=true` because they
   have an isolated Neon branch. PRs without DB changes set
   `SCRAPER_CRON_ENABLED=false` because they share the preview database.
 
-The cleanup workflow removes branch-specific Vercel `IMAGE_FOLDER_PREFIX` when
+The cleanup workflow removes branch-specific Vercel `BUNNY_IMAGE_FOLDER_PREFIX` when
 the PR closes. Isolated PR image folders under `/images/preview/pr-<number>` are
 deleted from Bunny Storage.
