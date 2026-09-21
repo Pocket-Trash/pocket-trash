@@ -42,3 +42,4 @@ assets/
 /bunny-audit/
 plans/
 pr-summarys/
+.wrangler/

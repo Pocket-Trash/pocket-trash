@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import {
   type CommandSecretConfig,
   commandSecrets,
-  databaseUrlUserOverrideSecretPath,
   defaultEnvironmentSlug,
 } from "./config.js";
 
@@ -22,6 +21,7 @@ export type ParsedCliArguments = {
 export type InfisicalRunRequest = ParsedCliArguments & {
   infisicalProjectId?: string;
   repoRoot: string;
+  verbose?: boolean;
 };
 
 export function getRepoRoot(): string {
@@ -114,18 +114,19 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
     request.command,
   );
 
-  const runArgsForPath = (secretPath: string): string[] => [
+  const args = [
     "run",
+    ...(request.verbose
+      ? ["--log-level=info"]
+      : ["--silent", "--log-level=error"]),
     ...(request.infisicalProjectId
       ? [`--projectId=${request.infisicalProjectId}`]
       : []),
     `--project-config-dir=${request.repoRoot}`,
     `--env=${environmentSlug}`,
-    `--path=${secretPath}`,
-    "--",
+    ...getSecretPaths(config).map((secretPath) => `--path=${secretPath}`),
   ];
 
-  const paths = getSecretPaths(config);
   const innerCommand: string[] = [];
 
   if (config.envAliases?.length || config.databaseUrlUserOverride) {
@@ -136,27 +137,19 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
         "packages/infisical-runner/src/env-alias-runner.ts",
       ),
       JSON.stringify({
-        databaseUrlUserOverridePath: databaseUrlUserOverrideSecretPath,
+        databaseUrlUserOverrideFilePaths: [
+          join(request.repoRoot, ".env.local"),
+          join(request.repoRoot, "packages/database/.env.local"),
+        ],
         databaseUrlUserOverride: config.databaseUrlUserOverride ?? false,
         envAliases: config.envAliases ?? [],
-        environmentSlug,
-        infisicalProjectId: request.infisicalProjectId,
-        secretPaths: paths,
       }),
       "--",
     );
   }
 
   innerCommand.push(...request.commandArgs);
-
-  // Infisical accepts a single secret path per `run`, so nest runs to
-  // accumulate each path's secrets before the wrapped command executes.
-  let args = [...runArgsForPath(paths[paths.length - 1]!), ...innerCommand];
-  for (let index = paths.length - 2; index >= 0; index -= 1) {
-    args = [...runArgsForPath(paths[index]!), "infisical", ...args];
-  }
-
-  return args;
+  return [...args, "--", ...innerCommand];
 }
 
 export function hasInfisicalProjectConfig(repoRoot: string): boolean {
@@ -237,6 +230,8 @@ export function assertInfisicalAuthenticated(
       "secrets",
       "folders",
       "get",
+      "--silent",
+      "--log-level=error",
       `--env=${environmentSlug}`,
       "--path=/",
       "--output=json",

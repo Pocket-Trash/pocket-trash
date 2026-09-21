@@ -9,7 +9,7 @@ Join table connecting product aggregate rows to canonical product types.
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `product_id` | `bigint` | yes | FK |  | `tmp_products.id` (on delete cascade) | Product row being classified. | `1000` |
-| `product_type_id` | `bigint` | yes | FK |  | `product_type.id` (on delete restrict) | Canonical product type assigned to the product. | `1000` |
+| `product_type_id` | `bigint` | yes | FK |  | `product_types.id` (on delete restrict) | Canonical product type assigned to the product. | `1000` |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the product type assignment was created. | `2026-07-17T20:45:00.000Z` |
 
 ## Indexes

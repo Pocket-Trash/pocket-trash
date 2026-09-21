@@ -4,7 +4,14 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { Folder, LogOut, Settings, User } from "lucide-react";
+import {
+  Files,
+  FlaskConical,
+  Folder,
+  LogOut,
+  Settings,
+  User,
+} from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -87,9 +94,17 @@ export function UserMenu() {
           <Folder />
           {t("web.navigation.collections")}
         </DropdownMenuItem>
+        <DropdownMenuItem render={<Link to="/user/resources" />}>
+          <Files />
+          {t("web.resources.management.title")}
+        </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/settings" />}>
           <Settings />
           {t("web.settings.settings")}
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link to="/user/settings/beta-features" />}>
+          <FlaskConical />
+          {t("web.navigation.betaFeatures")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

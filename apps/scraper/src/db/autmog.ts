@@ -4,7 +4,7 @@ import {
   type ScraperRunStats,
   schema,
 } from "@package/database";
-import { and, eq, isNull, lt, notInArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, notInArray } from "drizzle-orm";
 import { type NormalizedAutmogPen, scraperSources } from "../scraper-types.js";
 import {
   createTmpProduct,
@@ -105,6 +105,27 @@ export type ScraperRunUpdate = {
   stats?: ScraperRunStats;
   status: "completed" | "failed";
 };
+
+export async function getAutmogPenSyncState(
+  db: Database,
+  sourceProductIds: readonly string[],
+) {
+  if (sourceProductIds.length === 0) {
+    return [];
+  }
+
+  return db
+    .select({
+      archivedAt: schema.tmpAutmogPens.archivedAt,
+      detailsHash: schema.tmpAutmogPens.detailsHash,
+      imageSetHash: schema.tmpAutmogPens.imageSetHash,
+      sourceProductId: schema.tmpAutmogPens.sourceProductId,
+    })
+    .from(schema.tmpAutmogPens)
+    .where(
+      inArray(schema.tmpAutmogPens.sourceProductId, [...sourceProductIds]),
+    );
+}
 
 export function createScraperDb(databaseUrl: string): Database {
   return createDb({ databaseUrl });

@@ -27,11 +27,13 @@ logger, and Discord jobs. Use `prod` for release and manual main deploy jobs.
 | `AXIOM_DATASET` | Required | Required |
 | `AXIOM_EDGE_DOMAIN` | Optional | Optional |
 | `AXIOM_TOKEN` | Required | Required |
-| `BUNNY_STORAGE_ACCESS_KEY` | Required | - |
-| `BUNNY_STORAGE_ENDPOINT` | Required | - |
-| `BUNNY_STORAGE_ZONE_NAME` | Required | - |
+| `ASSET_FOLDER_PREFIX` | Required | Required |
+| `BUNNY_CDN_BASE_URL` | Required | Required |
+| `BUNNY_STORAGE_ACCESS_KEY` | Required | Required |
+| `BUNNY_STORAGE_ENDPOINT` | Required | Required |
+| `BUNNY_STORAGE_ZONE_NAME` | Required | Required |
+| `CLERK_SECRET_KEY` | Required | Required |
 | `DISCORD_GITHUB_WEBHOOK_URL` | Required | - |
-| `IMAGE_CDN_BASE_URL` | Required | - |
 | `LOG_PROXY_CLIENT_KEY` | Required | - |
 | `NEON_API_KEY` | Required | Required |
 | `NEON_DATABASE_NAME` | Required | Required |
@@ -44,6 +46,11 @@ logger, and Discord jobs. Use `prod` for release and manual main deploy jobs.
 | `VERCEL_PROJECT_ID` | Required | Required |
 | `VERCEL_ORG_ID` | Required | Required |
 | `VERCEL_TOKEN` | Required | Required |
+
+The API deployment resolves `DATABASE_URL` from the matching Neon branch rather
+than storing it in `tools/github/secrets`. Preview deployments pass their Worker
+URL to the matching Vercel branch as `API_URL`; production uses
+`https://api.pocket-trash.app` in the Vercel production environment.
 
 ## Machine Identity
 

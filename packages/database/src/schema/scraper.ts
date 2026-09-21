@@ -136,7 +136,7 @@ export type ScraperRunStats = {
 };
 
 export const maker = pgTable(
-  "maker",
+  "makers",
   {
     id: bigint("id", { mode: "number" })
       .primaryKey()
@@ -189,7 +189,7 @@ export const scraperRuns = pgTable(
 );
 
 export const material = pgTable(
-  "material",
+  "materials",
   {
     id: bigint("id", { mode: "number" })
       .primaryKey()
@@ -209,7 +209,7 @@ export const material = pgTable(
 );
 
 export const mechanism = pgTable(
-  "mechanism",
+  "mechanisms",
   {
     id: bigint("id", { mode: "number" })
       .primaryKey()
@@ -229,7 +229,7 @@ export const mechanism = pgTable(
 );
 
 export const productType = pgTable(
-  "product_type",
+  "product_types",
   {
     id: bigint("id", { mode: "number" })
       .primaryKey()

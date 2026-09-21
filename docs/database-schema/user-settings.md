@@ -8,7 +8,7 @@ Per-user display and preference settings.
 
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `user_id` | `bigint` | yes | PK, FK |  | `user.id` (on delete cascade) | User row this settings record belongs to. | `1000` |
+| `user_id` | `bigint` | yes | PK, FK |  | `users.id` (on delete cascade) | User row this settings record belongs to. | `1000` |
 | `currency_code` | `currency_code` | yes |  | `'USD'` |  | Preferred currency for display. | `USD` |
 | `dimension_unit` | `dimension_unit` | yes |  | `'in'` |  | Preferred dimension unit for display. | `in` |
 | `locale` | `text` | no |  |  |  | Explicit supported locale for localized app text. | `es-MX` |

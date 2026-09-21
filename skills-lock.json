@@ -9,10 +9,10 @@
     },
     "pocket-trash": {
       "source": "pocket-trash/skills",
-      "ref": "v0.2.0",
+      "ref": "v0.3.1",
       "sourceType": "github",
       "skillPath": "skills/pocket-trash/SKILL.md",
-      "computedHash": "7ffc91e1c25ed8091c3d12899c9ac0ad0241dfaa5357bf33b7eb3da24c853863"
+      "computedHash": "a4582fd81d869f51cf246ff1439305252c2af7d22c7cefccafb37532b2c16891"
     },
     "ponytail": {
       "source": "dietrichgebert/ponytail",

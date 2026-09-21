@@ -2,6 +2,7 @@ import type { DatabaseConfig } from "@package/database";
 import { createDb } from "@package/database";
 import type { ImageStorageConfig } from "@package/images";
 import { createLogger, type Logger, type LoggerConfig } from "@package/logger";
+import type { ResourceStorageConfig } from "@package/resources";
 import { createDbServices, type DbServices } from "./db/index.js";
 
 export type {
@@ -25,6 +26,10 @@ import {
   type FeatureFlagsService,
 } from "./flags/index.js";
 import { createImagesService, type ImagesService } from "./images/index.js";
+import {
+  createConfiguredResourcesService,
+  type ResourcesService,
+} from "./resources/index.js";
 
 export type {
   AdminTargetingFeatureFlag,
@@ -39,6 +44,7 @@ export type ServicesConfig = {
   db?: DatabaseConfig;
   images?: ImageStorageConfig;
   logger?: ServicesLoggerConfig;
+  resources?: ResourceStorageConfig;
 };
 
 export class Services {
@@ -46,6 +52,7 @@ export class Services {
   #flags?: FeatureFlagsService;
   #images?: ImagesService;
   #logger?: Logger;
+  #resources?: ResourcesService;
 
   configure(config: ServicesConfig): void {
     if (config.db && !config.logger && !this.#logger) {
@@ -54,6 +61,10 @@ export class Services {
 
     if (config.images && !config.logger && !this.#logger) {
       throw new Error("Image services require logger configuration.");
+    }
+
+    if (config.resources && !config.db) {
+      throw new Error("Resource services require database configuration.");
     }
 
     if (config.logger) {
@@ -70,6 +81,13 @@ export class Services {
       const db = createDb(config.db);
       this.#db = createDbServices(db, this.#logger);
       this.#flags = createFeatureFlagsService(db, this.#db.users, this.#logger);
+      if (config.resources) {
+        this.#resources = createConfiguredResourcesService(
+          db,
+          config.resources,
+          this.#logger,
+        );
+      }
     }
 
     if (config.images) {
@@ -120,6 +138,16 @@ export class Services {
 
     return this.#images;
   }
+
+  get resources(): ResourcesService {
+    if (!this.#resources) {
+      throw new Error(
+        "Resource services have not been configured. Import the app-local services module and provide database and resource storage configuration before using s.resources.",
+      );
+    }
+
+    return this.#resources;
+  }
 }
 
 export function createServices(): Services {
@@ -147,5 +175,27 @@ export type {
   ImageUploadResult,
   RemoteImageUploadInput,
 } from "@package/images";
+export type {
+  ResourceStorageConfig,
+  ResourceUploadInput,
+  ResourceUploadResult,
+} from "@package/resources";
+export type {
+  CreateResourceInput,
+  ResourceDetail,
+  ResourceDirectory,
+  ResourceDirectoryItem,
+  ResourceImageDetail,
+  ResourceNotificationItem,
+  ResourcesService,
+  ResourceTrashItem,
+  ResourceVersionDetail,
+  UpdateResourceInput,
+  UploadResourceVersionInput,
+} from "./resources/index.js";
+export {
+  createConfiguredResourcesService,
+  createResourcesService,
+} from "./resources/index.js";
 export type { ImagesService };
 export { createImagesService };

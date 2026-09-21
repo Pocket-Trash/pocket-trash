@@ -10,7 +10,36 @@ export type SchemaDescription = {
 };
 
 export const schemaDescriptions = {
-  maker: {
+  resource_categories: {
+    description: "Reusable categories assigned to resources.",
+  },
+  resource_downloads: {
+    description: "Append-only download events for resource versions.",
+  },
+  resource_images: {
+    description: "Ordered resource images; position zero is the cover image.",
+  },
+  resource_notifications: {
+    description:
+      "Admin review events created for new resources and categories.",
+  },
+  resource_upload_files: {
+    description:
+      "Declared files and upload state for resumable resource upload sessions.",
+  },
+  resource_upload_sessions: {
+    description: "Authenticated resource creation and version upload sessions.",
+  },
+  resource_versions: {
+    description: "Immutable uploaded file versions for resources.",
+  },
+  resources: {
+    description: "User-uploaded resources with files, images, and versions.",
+  },
+  resources_to_categories: {
+    description: "Unique resource-to-category assignments.",
+  },
+  makers: {
     description:
       "Canonical source makers that scraped or user-created products can belong to.",
     columns: {
@@ -36,7 +65,7 @@ export const schemaDescriptions = {
       },
     },
   },
-  material: {
+  materials: {
     description:
       "Canonical material values shared across scraped and user-created products.",
     columns: {
@@ -62,7 +91,7 @@ export const schemaDescriptions = {
       },
     },
   },
-  mechanism: {
+  mechanisms: {
     description:
       "Canonical pen mechanism values shared across scraped and user-created products.",
     columns: {
@@ -88,7 +117,7 @@ export const schemaDescriptions = {
       },
     },
   },
-  product_type: {
+  product_types: {
     description:
       "Canonical product type values used to classify product aggregate rows.",
     columns: {
@@ -817,7 +846,7 @@ export const schemaDescriptions = {
       },
     },
   },
-  user: {
+  users: {
     description: "Application users mirrored from Clerk identity records.",
     columns: {
       id: {
