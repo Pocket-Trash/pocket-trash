@@ -298,11 +298,11 @@ export const resourceDownloads = pgTable(
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
     versionId: bigint("version_id", { mode: "number" }).references(
       () => resourceVersions.id,
-      { onDelete: "restrict" },
+      { onDelete: "cascade" },
     ),
     fileId: bigint("file_id", { mode: "number" }).references(
       () => resourceFiles.id,
-      { onDelete: "restrict" },
+      { onDelete: "cascade" },
     ),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()

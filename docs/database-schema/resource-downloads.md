@@ -9,8 +9,8 @@ Append-only download events for resource versions.
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | yes | PK |  |  |  |  |
-| `version_id` | `bigint` | no | FK |  | `resource_versions.id` (on delete restrict) |  |  |
-| `file_id` | `bigint` | no | FK |  | `resource_files.id` (on delete restrict) |  |  |
+| `version_id` | `bigint` | no | FK |  | `resource_versions.id` (on delete cascade) |  |  |
+| `file_id` | `bigint` | no | FK |  | `resource_files.id` (on delete cascade) |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 
 ## Indexes

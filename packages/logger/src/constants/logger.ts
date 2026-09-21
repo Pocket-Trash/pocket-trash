@@ -88,6 +88,7 @@ export const loggerMessages = {
     listOwnerTrash: "resources.listOwnerTrash",
     markNotificationRead: "resources.markNotificationRead",
     markPrivate: "resources.markPrivate",
+    permanentlyDelete: "resources.permanentlyDelete",
     restore: "resources.restore",
     softDelete: "resources.softDelete",
     update: "resources.update",

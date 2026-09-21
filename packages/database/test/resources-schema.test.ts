@@ -52,6 +52,11 @@ describe("resource schema", () => {
     expect(getTableName(resourceDownloads)).toBe("resource_downloads");
     expect(resourceDownloads.fileId.notNull).toBe(false);
     expect("resourceId" in resourceDownloads).toBe(false);
+    expect(
+      getTableConfig(resourceDownloads).foreignKeys.map(
+        ({ onDelete }) => onDelete,
+      ),
+    ).toEqual(["cascade", "cascade"]);
   });
 
   it("normalizes categories through a unique assignment table", () => {
@@ -64,6 +69,9 @@ describe("resource schema", () => {
     expect(
       assignmentConfig.primaryKeys[0]?.columns.map(({ name }) => name),
     ).toEqual(["resource_id", "category_id"]);
+    expect(
+      assignmentConfig.foreignKeys.map(({ onDelete }) => onDelete),
+    ).toEqual(["cascade", "restrict"]);
   });
 
   it("stores typed resource notifications with global read metadata", () => {

@@ -55,9 +55,13 @@ describe("resource trash", () => {
 
     expect(ownerHtml).toContain("Your resource trash");
     expect(ownerHtml).toContain("Restore");
+    expect(ownerHtml).not.toContain("Delete permanently");
     expect(ownerHtml).not.toContain("Deleted by admin_123");
     expect(adminHtml).toContain("Resource trash");
     expect(adminHtml).toContain("Deleted by admin_123");
     expect(adminHtml).toContain("Deleted by an admin");
+    expect(adminHtml).toContain("Delete permanently");
+    expect(adminHtml).toContain("Permanently delete resource");
+    expect(adminHtml).toContain("This cannot be undone.");
   });
 });
