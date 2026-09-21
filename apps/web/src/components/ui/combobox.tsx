@@ -1,5 +1,6 @@
 import { Combobox } from "@base-ui/react/combobox";
 import { Check, ChevronDown, X } from "lucide-react";
+import * as React from "react";
 
 export type ComboboxOption = { id: number | string; name: string };
 
@@ -20,13 +21,20 @@ export function CatalogCombobox({
   showSelectedPill?: boolean;
   value: ComboboxOption | null;
 }) {
+  const [open, setOpen] = React.useState(false);
+
   return (
     <div className="grid gap-2">
       <Combobox.Root
         isItemEqualToValue={(item, selected) => item.id === selected.id}
         itemToStringLabel={(item) => item.name}
         items={items}
-        onValueChange={onValueChange}
+        onOpenChange={setOpen}
+        onValueChange={(nextValue) => {
+          onValueChange(nextValue);
+          setOpen(false);
+        }}
+        open={open}
         value={value}
       >
         <ComboboxControl ariaLabel={ariaLabel} placeholder={placeholder} />
@@ -59,6 +67,8 @@ export function CatalogMultiCombobox({
   removeLabel: string;
   value: ComboboxOption[];
 }) {
+  const [open, setOpen] = React.useState(false);
+
   return (
     <div className="grid gap-2">
       <Combobox.Root
@@ -66,7 +76,12 @@ export function CatalogMultiCombobox({
         itemToStringLabel={(item) => item.name}
         items={items}
         multiple
-        onValueChange={onValueChange}
+        onOpenChange={setOpen}
+        onValueChange={(nextValue) => {
+          onValueChange(nextValue);
+          setOpen(false);
+        }}
+        open={open}
         value={value}
       >
         <ComboboxControl ariaLabel={ariaLabel} placeholder={placeholder} />
