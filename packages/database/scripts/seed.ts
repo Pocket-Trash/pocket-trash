@@ -56,9 +56,22 @@ export const seedFinishes = [
 ] as const;
 
 export const seedColors = [
-  { name: "Blue", slug: "blue" },
-  { name: "Green", slug: "green" },
-  { name: "Purple", slug: "purple" },
+  { hex: "#000000", name: "Black", slug: "black" },
+  { hex: "#FFFFFF", name: "White", slug: "white" },
+  { hex: "#808080", name: "Grey", slug: "grey" },
+  { hex: "#C0C0C0", name: "Silver", slug: "silver" },
+  { hex: "#DC2626", name: "Red", slug: "red" },
+  { hex: "#F97316", name: "Orange", slug: "orange" },
+  { hex: "#EAB308", name: "Yellow", slug: "yellow" },
+  { hex: "#16A34A", name: "Green", slug: "green" },
+  { hex: "#2563EB", name: "Blue", slug: "blue" },
+  { hex: "#9333EA", name: "Purple", slug: "purple" },
+  { hex: "#EC4899", name: "Pink", slug: "pink" },
+  { hex: "#92400E", name: "Brown", slug: "brown" },
+  { hex: "#CD7F32", name: "Bronze", slug: "bronze" },
+  { hex: "#D4AF37", name: "Gold", slug: "gold" },
+  { hex: "#0D9488", name: "Teal", slug: "teal" },
+  { hex: "#06B6D4", name: "Cyan", slug: "cyan" },
 ] as const;
 
 export const seedColorEffects = [
@@ -110,7 +123,6 @@ export async function seedCatalog(db: ReturnType<typeof createDb>) {
 
   for (const [table, values] of [
     [finish, seedFinishes],
-    [color, seedColors],
     [colorEffect, seedColorEffects],
   ] as const) {
     for (const value of values) {
@@ -122,6 +134,16 @@ export async function seedCatalog(db: ReturnType<typeof createDb>) {
           target: table.slug,
         });
     }
+  }
+
+  for (const value of seedColors) {
+    await db
+      .insert(color)
+      .values(value)
+      .onConflictDoUpdate({
+        set: { hex: value.hex, name: value.name, updatedAt: new Date() },
+        target: color.slug,
+      });
   }
 }
 

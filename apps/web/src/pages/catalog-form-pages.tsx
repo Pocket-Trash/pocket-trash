@@ -1,4 +1,5 @@
 import type {
+  CatalogColor,
   CatalogFinishOption,
   CatalogLookup,
   CatalogProduct,
@@ -629,8 +630,9 @@ type LookupDialogProps = (
         rootUrl: string | null;
       }) => void;
     }
+  | { kind: "color"; onCreated: (value: CatalogColor) => void }
   | {
-      kind: "color" | "finish" | "material";
+      kind: "finish" | "material";
       onCreated: (value: CatalogLookup) => void;
     }
 ) & { t: ReturnType<typeof useCatalogCopy> };
@@ -641,6 +643,7 @@ function LookupDialog(props: LookupDialogProps) {
   const dialogId = React.useId();
   const titleId = React.useId();
   const [name, setName] = React.useState("");
+  const [hex, setHex] = React.useState("#808080");
   const [rootUrl, setRootUrl] = React.useState("");
   const [fieldErrors, setFieldErrors] = React.useState<
     Record<string, string[] | undefined>
@@ -679,7 +682,7 @@ function LookupDialog(props: LookupDialogProps) {
       }
       props.onCreated(result.finish);
     } else {
-      const result = await createCatalogColor({ data: { name } });
+      const result = await createCatalogColor({ data: { hex, name } });
       if (!result.ok) {
         setFieldErrors(result.fieldErrors);
         setError(result.formError);
@@ -688,6 +691,7 @@ function LookupDialog(props: LookupDialogProps) {
       props.onCreated(result.color);
     }
     setName("");
+    setHex("#808080");
     setRootUrl("");
     setFieldErrors({});
     setError(null);
@@ -747,6 +751,17 @@ function LookupDialog(props: LookupDialogProps) {
               />
             </Field>
           )}
+          {kind === "color" ? (
+            <Field label={t("web.catalog.field.colors")}>
+              <Input
+                aria-label={t("web.catalog.field.colors")}
+                onChange={(event) => setHex(event.target.value.toUpperCase())}
+                required
+                type="color"
+                value={hex}
+              />
+            </Field>
+          ) : null}
           {error ? <Notice>{t(error)}</Notice> : null}
           <div className="flex justify-end gap-2">
             <Button

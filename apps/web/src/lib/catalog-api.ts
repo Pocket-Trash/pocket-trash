@@ -1,5 +1,6 @@
 import { auth } from "@clerk/tanstack-react-start/server";
 import type {
+  CatalogColor,
   CatalogLookup,
   CatalogProduct,
   CatalogProductType,
@@ -144,10 +145,19 @@ const materialSchema = z.object({
 });
 
 const finishSchema = z.object({ name: slugNameSchema });
-const colorSchema = z.object({ name: slugNameSchema });
+const colorSchema = z.object({
+  hex: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "web.catalog.error.form")
+    .transform((value) => value.toUpperCase()),
+  name: slugNameSchema,
+});
 
-type CatalogLookupMutationResult<K extends string> =
-  | ({ ok: true } & Record<K, CatalogLookup>)
+type CatalogLookupMutationResult<
+  K extends string,
+  T extends CatalogLookup = CatalogLookup,
+> =
+  | ({ ok: true } & Record<K, T>)
   | {
       fieldErrors: Record<string, string[] | undefined>;
       formError: string;
@@ -381,27 +391,32 @@ export const createCatalogFinish = createServerFn({ method: "POST" })
 
 export const createCatalogColor = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
-  .handler(async ({ data }): Promise<CatalogLookupMutationResult<"color">> => {
-    const actorClerkId = await requireActor();
-    const parsed = colorSchema.safeParse(data);
-    if (!parsed.success) return validationFailure(parsed.error);
+  .handler(
+    async ({
+      data,
+    }): Promise<CatalogLookupMutationResult<"color", CatalogColor>> => {
+      const actorClerkId = await requireActor();
+      const parsed = colorSchema.safeParse(data);
+      if (!parsed.success) return validationFailure(parsed.error);
 
-    const { s } = await import("@/lib/services");
-    const colors = await s.db.catalog.listColors();
-    try {
-      const color = await s.db.catalog.createColor({
-        actorClerkId,
-        name: parsed.data.name,
-        slug: nextAvailableSlug(
-          parsed.data.name,
-          colors.map(({ slug }) => slug),
-        ),
-      });
-      return { color, ok: true as const };
-    } catch (error) {
-      return mutationFailure(error);
-    }
-  });
+      const { s } = await import("@/lib/services");
+      const colors = await s.db.catalog.listColors();
+      try {
+        const color = await s.db.catalog.createColor({
+          actorClerkId,
+          hex: parsed.data.hex,
+          name: parsed.data.name,
+          slug: nextAvailableSlug(
+            parsed.data.name,
+            colors.map(({ slug }) => slug),
+          ),
+        });
+        return { color, ok: true as const };
+      } catch (error) {
+        return mutationFailure(error);
+      }
+    },
+  );
 
 export const saveCatalogProduct = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)

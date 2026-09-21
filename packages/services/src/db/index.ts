@@ -32,6 +32,7 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
 }
 
 export type {
+  CatalogColor,
   CatalogFinishOption,
   CatalogLookup,
   CatalogProduct,
@@ -39,6 +40,7 @@ export type {
   CatalogService,
   CollectionsService,
   ProductWriteInput,
+  PublicCollectionOwner,
   UserCollectionItem,
 } from "./catalog/index.js";
 export type {

@@ -10,6 +10,7 @@ describe("catalog schema", () => {
     const maker = getTableConfig(schema.maker);
     const productType = getTableConfig(schema.productType);
     const finishOption = getTableConfig(schema.finishOption);
+    const color = getTableConfig(schema.color);
 
     expect(product.columns.map(({ name }) => name)).toEqual([
       "id",
@@ -19,6 +20,9 @@ describe("catalog schema", () => {
       "slug",
     ]);
     expect(productMaterial.primaryKeys).toHaveLength(1);
+    expect(color.columns.find(({ name }) => name === "hex")?.notNull).toBe(
+      true,
+    );
     expect(
       finishOption.foreignKeys.find(({ reference }) =>
         reference().columns.some(

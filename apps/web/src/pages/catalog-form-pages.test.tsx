@@ -247,9 +247,13 @@ function collectionFixture(
     collectionItemId,
     finishOption: product.finishOptions[0] ?? null,
     installedButtonId: null,
+    makerId: product.makerId,
+    makerName: product.makerName,
     material: product.materials[0] ?? null,
     name: product.name,
+    ownerUserId: 1,
     productId: product.id,
+    productTypeName: product.productTypeName,
     productTypeSlug: product.productTypeSlug as "spinner" | "spinner-button",
     sourceProductFinishOptionId,
   };

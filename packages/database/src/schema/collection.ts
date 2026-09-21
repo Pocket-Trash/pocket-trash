@@ -94,9 +94,17 @@ export const finish = pgTable("finish", lookupColumns(), (table) => [
   uniqueIndex("finish_slug_unique").on(table.slug),
 ]);
 
-export const color = pgTable("color", lookupColumns(), (table) => [
-  uniqueIndex("color_slug_unique").on(table.slug),
-]);
+export const color = pgTable(
+  "color",
+  {
+    ...lookupColumns(),
+    hex: text("hex").notNull(),
+  },
+  (table) => [
+    uniqueIndex("color_slug_unique").on(table.slug),
+    check("color_hex_check", sql`${table.hex} ~ '^#[0-9A-Fa-f]{6}$'`),
+  ],
+);
 
 export const colorEffect = pgTable("color_effect", lookupColumns(), (table) => [
   uniqueIndex("color_effect_slug_unique").on(table.slug),

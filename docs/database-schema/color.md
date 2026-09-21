@@ -13,6 +13,7 @@ Canonical atomic colour values used by finish options.
 | `slug` | `text` | yes | unique |  |  | Stable colour slug. | `blue` |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the colour was created. |  |
 | `updated_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the colour was last updated. |  |
+| `hex` | `text` | yes |  |  |  | Six-digit display colour. | `#2563EB` |
 
 ## Indexes
 

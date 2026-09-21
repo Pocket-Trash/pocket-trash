@@ -370,6 +370,7 @@ describe("catalog lookup writes", () => {
         case "color":
           return service.createColor({
             actorClerkId: "user-secret",
+            hex: "#CD7F32",
             name: "bronze",
             slug: "bronze-2",
           });

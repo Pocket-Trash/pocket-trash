@@ -212,6 +212,7 @@ export const schemaDescriptions = {
       id: { description: "Internal colour identifier.", example: 1000 },
       name: { description: "Human-readable colour name.", example: "Blue" },
       slug: { description: "Stable colour slug.", example: "blue" },
+      hex: { description: "Six-digit display colour.", example: "#2563EB" },
       created_at: { description: "Timestamp when the colour was created." },
       updated_at: {
         description: "Timestamp when the colour was last updated.",

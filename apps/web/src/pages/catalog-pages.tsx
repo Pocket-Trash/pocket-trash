@@ -1,6 +1,7 @@
 import type {
   CatalogFinishOption,
   CatalogProduct,
+  PublicCollectionOwner,
   UserCollectionItem,
 } from "@package/services";
 import {
@@ -12,6 +13,13 @@ import { UserRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { buttonVariants } from "@/components/ui/button";
 import { finishOptionLabel } from "@/lib/catalog";
+import {
+  type CatalogFilters,
+  collectionFilterItem,
+  emptyCatalogFilters,
+  matchesCatalogFilters,
+  productFilterItem,
+} from "@/lib/catalog-filters";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -59,8 +67,18 @@ export function ResourcesPage() {
   );
 }
 
-export function ProductsPage({ products }: { products: CatalogProduct[] }) {
+export function ProductsPage({
+  filters = emptyCatalogFilters(),
+  products,
+}: {
+  filters?: CatalogFilters;
+  onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
+  products: CatalogProduct[];
+}) {
   const t = useCatalogCopy();
+  const filtered = products.filter((product) =>
+    matchesCatalogFilters(productFilterItem(product), filters),
+  );
   return (
     <AppShell
       headerActions={
@@ -70,7 +88,7 @@ export function ProductsPage({ products }: { products: CatalogProduct[] }) {
       }
       title={t("web.navigation.products")}
     >
-      <ProductGrid products={products} />
+      <ProductGrid products={filtered} />
     </AppShell>
   );
 }
@@ -172,11 +190,20 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
 }
 
 export function PublicCollectionsPage({
+  filters = emptyCatalogFilters(),
   owners,
 }: {
-  owners: Array<{ clerkId: string; itemCount: number; userId: number }>;
+  filters?: CatalogFilters;
+  onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
+  owners: PublicCollectionOwner[];
 }) {
   const t = useCatalogCopy();
+  const filteredOwners = owners.flatMap((owner) => {
+    const matchingItemCount = owner.items.filter((item) =>
+      matchesCatalogFilters(collectionFilterItem(item), filters),
+    ).length;
+    return matchingItemCount ? [{ ...owner, matchingItemCount }] : [];
+  });
   return (
     <AppShell
       headerActions={
@@ -187,8 +214,8 @@ export function PublicCollectionsPage({
       title={t("web.navigation.collections")}
     >
       <main className="grid gap-[18px] p-4 sm:grid-cols-2 lg:grid-cols-3 md:p-[18px_22px_22px]">
-        {owners.length ? (
-          owners.map((owner) => (
+        {filteredOwners.length ? (
+          filteredOwners.map((owner) => (
             <article
               className="flex items-center gap-4 rounded-xl border border-border bg-card p-5 text-card-foreground"
               key={owner.userId}
@@ -203,9 +230,14 @@ export function PublicCollectionsPage({
               <div>
                 <h2 className="font-semibold">{owner.clerkId}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {t("web.collections.directory.itemCount", {
-                    count: owner.itemCount,
-                  })}
+                  {owner.matchingItemCount === owner.itemCount
+                    ? t("web.collections.directory.itemCount", {
+                        count: owner.itemCount,
+                      })
+                    : t("web.archive.itemCount", {
+                        total: owner.itemCount,
+                        visible: owner.matchingItemCount,
+                      })}
                 </p>
               </div>
             </article>
@@ -218,8 +250,18 @@ export function PublicCollectionsPage({
   );
 }
 
-export function UserCollectionPage({ items }: { items: UserCollectionItem[] }) {
+export function UserCollectionPage({
+  filters = emptyCatalogFilters(),
+  items,
+}: {
+  filters?: CatalogFilters;
+  items: UserCollectionItem[];
+  onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
+}) {
   const t = useCatalogCopy();
+  const filtered = items.filter((item) =>
+    matchesCatalogFilters(collectionFilterItem(item), filters),
+  );
   return (
     <AppShell
       headerActions={
@@ -230,8 +272,8 @@ export function UserCollectionPage({ items }: { items: UserCollectionItem[] }) {
       title={t("web.navigation.collections")}
     >
       <main className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
-        {items.length ? (
-          items.map((item) => (
+        {filtered.length ? (
+          filtered.map((item) => (
             <Link
               className="rounded-xl border border-border bg-card p-5 font-semibold text-card-foreground hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               key={item.collectionItemId}

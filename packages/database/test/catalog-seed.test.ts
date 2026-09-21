@@ -25,14 +25,19 @@ function createSeedDb() {
   >();
   const materials = new Map<string, { name: string; slug: string }>();
   const finishes = new Map<string, { name: string; slug: string }>();
-  const colors = new Map<string, { name: string; slug: string }>();
+  const colors = new Map<string, { hex: string; name: string; slug: string }>();
   const colorEffects = new Map<string, { name: string; slug: string }>();
   const productTypes = new Map<string, { name: string; slug: string }>();
 
   const db = {
     insert: vi.fn((table: unknown) => ({
       values: vi.fn(
-        (value: { name: string; rootUrl?: string | null; slug?: string }) => {
+        (value: {
+          hex?: string;
+          name: string;
+          rootUrl?: string | null;
+          slug?: string;
+        }) => {
           const insert = () => {
             if (table === maker) {
               makers.set(value.name.toLowerCase(), {
@@ -44,8 +49,12 @@ function createSeedDb() {
               materials.set(value.slug, { name: value.name, slug: value.slug });
             } else if (table === finish && value.slug) {
               finishes.set(value.slug, { name: value.name, slug: value.slug });
-            } else if (table === color && value.slug) {
-              colors.set(value.slug, { name: value.name, slug: value.slug });
+            } else if (table === color && value.slug && value.hex) {
+              colors.set(value.slug, {
+                hex: value.hex,
+                name: value.name,
+                slug: value.slug,
+              });
             } else if (table === colorEffect && value.slug) {
               colorEffects.set(value.slug, {
                 name: value.name,
@@ -105,6 +114,7 @@ describe("catalog seed", () => {
       "Machine finished",
     );
     expect(state.colors.get("purple")?.name).toBe("Purple");
+    expect(state.colors.get("purple")?.hex).toBe("#9333EA");
     expect(state.colorEffects.get("fade")?.name).toBe("Fade");
     expect(state.materials.get("bronze")?.name).toBe("Bronze");
     expect(state.makers.get("autmog")?.rootUrl).toBe("https://www.autmog.com");

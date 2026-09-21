@@ -5,6 +5,7 @@ import { createLogger, type Logger, type LoggerConfig } from "@package/logger";
 import { createDbServices, type DbServices } from "./db/index.js";
 
 export type {
+  CatalogColor,
   CatalogFinishOption,
   CatalogLookup,
   CatalogProduct,
@@ -12,6 +13,7 @@ export type {
   CatalogService,
   CollectionsService,
   ProductWriteInput,
+  PublicCollectionOwner,
   UpsertUserSettingsInput,
   UserCollectionItem,
   UserSettingsService,

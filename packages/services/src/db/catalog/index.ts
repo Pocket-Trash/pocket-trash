@@ -10,9 +10,11 @@ export type CatalogProductType = "spinner" | "spinner-button";
 
 export type CatalogLookup = { id: number; name: string; slug: string };
 
+export type CatalogColor = CatalogLookup & { hex: string };
+
 export type CatalogFinishOption = {
   colorEffect: CatalogLookup | null;
-  colors: CatalogLookup[];
+  colors: CatalogColor[];
   finishes: CatalogLookup[];
   id: number;
 };
@@ -70,9 +72,10 @@ export type ProductWriteInput = {
 export type CatalogService = {
   createColor(input: {
     actorClerkId: string;
+    hex: string;
     name: string;
     slug: string;
-  }): Promise<CatalogLookup>;
+  }): Promise<CatalogColor>;
   createFinish(input: {
     actorClerkId: string;
     name: string;
@@ -94,7 +97,7 @@ export type CatalogService = {
     productSlug: string,
   ): Promise<CatalogProduct | null>;
   listColorEffects(): Promise<CatalogLookup[]>;
-  listColors(): Promise<CatalogLookup[]>;
+  listColors(): Promise<CatalogColor[]>;
   listFinishes(): Promise<CatalogLookup[]>;
   listMakers(): Promise<
     Array<{ id: number; name: string; rootUrl: string | null }>
@@ -117,11 +120,22 @@ export type UserCollectionItem = {
   collectionItemId: number;
   finishOption: CatalogFinishOption | null;
   installedButtonId: number | null;
+  makerId: number;
+  makerName: string;
   material: CatalogLookup | null;
   name: string;
+  ownerUserId: number;
   productId: number;
+  productTypeName: string;
   productTypeSlug: CatalogProductType;
   sourceProductFinishOptionId: number | null;
+};
+
+export type PublicCollectionOwner = {
+  clerkId: string;
+  itemCount: number;
+  items: UserCollectionItem[];
+  userId: number;
 };
 
 export type CollectionsService = {
@@ -152,9 +166,7 @@ export type CollectionsService = {
     collectionItemId: number,
   ): Promise<UserCollectionItem | null>;
   listOwned(actorClerkId: string): Promise<UserCollectionItem[]>;
-  listOwners(): Promise<
-    Array<{ clerkId: string; itemCount: number; userId: number }>
-  >;
+  listOwners(): Promise<PublicCollectionOwner[]>;
   updateItem(input: {
     actorClerkId: string;
     collectionItemId: number;
@@ -190,8 +202,9 @@ export function createCatalogService(
 
           const [row] = await db
             .insert(schema.color)
-            .values({ name: input.name, slug: input.slug })
+            .values({ hex: input.hex, name: input.name, slug: input.slug })
             .returning({
+              hex: schema.color.hex,
               id: schema.color.id,
               name: schema.color.name,
               slug: schema.color.slug,
@@ -378,6 +391,7 @@ export function createCatalogService(
         async () =>
           await db
             .select({
+              hex: schema.color.hex,
               id: schema.color.id,
               name: schema.color.name,
               slug: schema.color.slug,
@@ -672,36 +686,43 @@ export function createCollectionsService(
       return await queryOwnedItems(db, actorClerkId);
     },
     async listOwners() {
-      return await db
-        .select({
-          clerkId: schema.user.clerkId,
-          itemCount: count(schema.collectionItem.id),
-          userId: schema.user.id,
-        })
-        .from(schema.user)
-        .innerJoin(
-          schema.collectionItem,
-          eq(schema.user.id, schema.collectionItem.ownerId),
-        )
-        .leftJoin(
-          schema.collectionSpinner,
-          eq(schema.collectionItem.id, schema.collectionSpinner.id),
-        )
-        .leftJoin(
-          schema.collectionSpinnerButton,
-          eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
-        )
-        .where(
-          and(
-            eq(schema.collectionItem.owned, true),
-            or(
-              isNotNull(schema.collectionSpinner.id),
-              isNotNull(schema.collectionSpinnerButton.id),
+      const [owners, items] = await Promise.all([
+        db
+          .select({
+            clerkId: schema.user.clerkId,
+            itemCount: count(schema.collectionItem.id),
+            userId: schema.user.id,
+          })
+          .from(schema.user)
+          .innerJoin(
+            schema.collectionItem,
+            eq(schema.user.id, schema.collectionItem.ownerId),
+          )
+          .leftJoin(
+            schema.collectionSpinner,
+            eq(schema.collectionItem.id, schema.collectionSpinner.id),
+          )
+          .leftJoin(
+            schema.collectionSpinnerButton,
+            eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
+          )
+          .where(
+            and(
+              eq(schema.collectionItem.owned, true),
+              or(
+                isNotNull(schema.collectionSpinner.id),
+                isNotNull(schema.collectionSpinnerButton.id),
+              ),
             ),
-          ),
-        )
-        .groupBy(schema.user.id)
-        .orderBy(asc(schema.user.clerkId));
+          )
+          .groupBy(schema.user.id)
+          .orderBy(asc(schema.user.clerkId)),
+        queryOwnedItems(db),
+      ]);
+      return owners.map((owner) => ({
+        ...owner,
+        items: items.filter(({ ownerUserId }) => ownerUserId === owner.userId),
+      }));
     },
     async updateItem(input) {
       await logger.operation(
@@ -1034,6 +1055,7 @@ async function loadFinishOptionComponents(
     db
       .select({
         finishOptionId: schema.finishOptionColor.finishOptionId,
+        hex: schema.color.hex,
         id: schema.color.id,
         name: schema.color.name,
         slug: schema.color.slug,
@@ -1060,7 +1082,7 @@ async function loadFinishOptionComponents(
           : null,
       colors: colors
         .filter(({ finishOptionId }) => finishOptionId === option.id)
-        .map(({ id, name, slug }) => ({ id, name, slug })),
+        .map(({ hex, id, name, slug }) => ({ hex, id, name, slug })),
       finishes: finishes
         .filter(({ finishOptionId }) => finishOptionId === option.id)
         .map(({ id, name, slug }) => ({ id, name, slug })),
@@ -1072,13 +1094,13 @@ async function loadFinishOptionComponents(
 
 async function queryOwnedItems(
   db: Database,
-  actorClerkId: string,
+  actorClerkId?: string,
   collectionItemId?: number,
 ): Promise<UserCollectionItem[]> {
-  const conditions = [
-    eq(schema.user.clerkId, actorClerkId),
-    eq(schema.collectionItem.owned, true),
-  ];
+  const conditions = [eq(schema.collectionItem.owned, true)];
+  if (actorClerkId !== undefined) {
+    conditions.push(eq(schema.user.clerkId, actorClerkId));
+  }
   if (collectionItemId !== undefined) {
     conditions.push(eq(schema.collectionItem.id, collectionItemId));
   }
@@ -1090,11 +1112,15 @@ async function queryOwnedItems(
       colorEffectSlug: schema.colorEffect.slug,
       finishOptionId: schema.finishOption.id,
       installedButtonId: schema.collectionSpinner.installedButtonId,
+      makerId: schema.maker.id,
+      makerName: schema.maker.name,
       materialId: schema.material.id,
       materialName: schema.material.name,
       materialSlug: schema.material.slug,
       name: schema.product.name,
+      ownerUserId: schema.user.id,
       productId: schema.product.id,
+      productTypeName: schema.productType.name,
       sourceProductFinishOptionId:
         schema.finishOption.sourceProductFinishOptionId,
       spinnerId: schema.collectionSpinner.id,
@@ -1129,6 +1155,11 @@ async function queryOwnedItems(
         sql`coalesce(${schema.collectionSpinner.productSpinnerId}, ${schema.collectionSpinnerButton.productSpinnerButtonId})`,
       ),
     )
+    .innerJoin(schema.maker, eq(schema.product.makerId, schema.maker.id))
+    .innerJoin(
+      schema.productType,
+      eq(schema.product.productTypeId, schema.productType.id),
+    )
     .where(and(...conditions))
     .orderBy(asc(schema.product.name));
   const finishOptions = await loadFinishOptionComponents(
@@ -1152,6 +1183,8 @@ async function queryOwnedItems(
       ? (finishOptions.get(row.finishOptionId) ?? null)
       : null,
     installedButtonId: row.installedButtonId,
+    makerId: row.makerId,
+    makerName: row.makerName,
     material:
       row.materialId && row.materialName && row.materialSlug
         ? {
@@ -1161,7 +1194,9 @@ async function queryOwnedItems(
           }
         : null,
     name: row.name,
+    ownerUserId: row.ownerUserId,
     productId: row.productId,
+    productTypeName: row.productTypeName,
     productTypeSlug: row.spinnerId ? "spinner" : "spinner-button",
     sourceProductFinishOptionId: row.sourceProductFinishOptionId,
   }));
