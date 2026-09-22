@@ -10,11 +10,11 @@ try {
 
 async function main(): Promise<void> {
   const result = await deletePreviewResourceFolder({
-    accessKey: readRequiredEnv("RESOURCE_STORAGE_ACCESS_KEY"),
-    cdnBaseUrl: readRequiredEnv("RESOURCE_CDN_BASE_URL"),
-    endpoint: readRequiredEnv("RESOURCE_STORAGE_ENDPOINT"),
+    accessKey: readRequiredEnv("BUNNY_STORAGE_ACCESS_KEY"),
+    cdnBaseUrl: readRequiredEnv("BUNNY_CDN_BASE_URL"),
+    endpoint: readRequiredEnv("BUNNY_STORAGE_ENDPOINT"),
     prNumber: readPositiveIntegerEnv("PR_NUMBER"),
-    zoneName: readRequiredEnv("RESOURCE_STORAGE_ZONE_NAME"),
+    zoneName: readRequiredEnv("BUNNY_STORAGE_ZONE_NAME"),
   });
 
   writeGithubOutput("folder_path", result.folderPath);

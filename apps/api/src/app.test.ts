@@ -140,6 +140,13 @@ describe("api", () => {
             size: 3,
           },
         ],
+        images: [
+          {
+            contentType: "image/webp",
+            fileName: "tool.webp",
+            size: 3,
+          },
+        ],
         isPrivate: true,
         name: "Tool",
         operation: "create",

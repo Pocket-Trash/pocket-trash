@@ -17,6 +17,7 @@ import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  appendResourceUploadFiles,
   getResourceUploadErrorTranslation,
   uploadResourceSession,
   validateResourceUpload,
@@ -33,13 +34,13 @@ export function ResourceUploadPage() {
   ) => formatTranslation(key, params, locale);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
-  const [previewFiles, setPreviewFiles] = useState<File[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isPublic, setIsPublic] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
 
   return (
-    <AppShell title={t("web.resources.add.title" as TranslationKey)}>
+    <AppShell title={t("web.resources.add.title")}>
       <main className="mx-auto w-full max-w-2xl px-4 py-8 md:px-6">
         <form
           aria-busy={submitting}
@@ -53,8 +54,7 @@ export function ResourceUploadPage() {
             }
 
             const formData = new FormData(event.currentTarget);
-            const preview = previewFiles[0];
-            const validation = validateResourceUpload(files, preview);
+            const validation = validateResourceUpload(files, imageFiles, true);
             if (validation) {
               toast.error(t(validation.key, validation.params));
               return;
@@ -68,6 +68,7 @@ export function ResourceUploadPage() {
                 description: String(formData.get("description") ?? ""),
                 files,
                 getToken,
+                images: imageFiles,
                 isPrivate: !isPublic,
                 name: String(formData.get("name") ?? ""),
                 onProgress: (filename, percent) =>
@@ -80,7 +81,6 @@ export function ResourceUploadPage() {
                   }
                 },
                 operation: "create",
-                preview,
               });
               toast.success(t("web.resources.upload.success"));
               await navigate({
@@ -115,17 +115,26 @@ export function ResourceUploadPage() {
 
           <FileDropInput
             accept="image/jpeg,image/png,image/webp"
-            browseLabel={t(
-              "web.resources.upload.browseFiles" as TranslationKey,
-            )}
-            description={t("web.resources.upload.previewHelp")}
+            browseLabel={t("web.resources.upload.browseFiles")}
+            description={t("web.resources.upload.imagesHelp", {
+              maxFileSize: "20 MiB",
+              maxImages: 10,
+              maxSessionSize: "100 MiB",
+            })}
             disabled={submitting}
-            files={previewFiles}
-            fileTypes={t("web.resources.upload.previewTypes")}
-            id="resource-preview"
-            label={t("web.resources.upload.previewLabel")}
-            onFilesChange={setPreviewFiles}
-            onRemove={() => setPreviewFiles([])}
+            files={imageFiles}
+            fileTypes={t("web.resources.upload.imageTypes")}
+            id="resource-images"
+            label={t("web.resources.upload.imagesLabel")}
+            multiple
+            onFilesChange={(additions) =>
+              setImageFiles(appendResourceUploadFiles(imageFiles, additions))
+            }
+            onRemove={(index) =>
+              setImageFiles(
+                imageFiles.filter((_, itemIndex) => itemIndex !== index),
+              )
+            }
             removeFileLabel={t("web.resources.action.removeFile")}
           />
 
@@ -144,13 +153,11 @@ export function ResourceUploadPage() {
           </Field>
 
           <ResourceFileInput
-            browseLabel={t(
-              "web.resources.upload.browseFiles" as TranslationKey,
-            )}
+            browseLabel={t("web.resources.upload.browseFiles")}
             description={t("web.resources.upload.fileHelp", {
               maxFileSize: "20 MiB",
               maxFiles: 10,
-              maxSessionSize: "50 MiB",
+              maxSessionSize: "100 MiB",
             })}
             disabled={submitting}
             files={files}
@@ -183,7 +190,7 @@ export function ResourceUploadPage() {
             {submitting ? (
               <LoaderCircle aria-hidden="true" className="animate-spin" />
             ) : null}
-            {t("web.resources.action.add" as TranslationKey)}
+            {t("web.resources.action.add")}
           </Button>
           <p aria-live="polite" className="m-0 text-sm text-muted-foreground">
             {uploadStatus}

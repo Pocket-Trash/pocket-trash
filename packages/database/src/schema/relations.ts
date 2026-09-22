@@ -4,6 +4,7 @@ import {
   resourceCategories,
   resourceDownloads,
   resourceFiles,
+  resourceImages,
   resourceNotifications,
   resources,
   resourcesToCategories,
@@ -49,6 +50,7 @@ export const userSettingsRelations = relations(userSettings, ({ one }) => ({
 
 export const resourcesRelations = relations(resources, ({ many }) => ({
   categories: many(resourcesToCategories),
+  images: many(resourceImages),
   notifications: many(resourceNotifications),
   versions: many(resourceVersions),
   completedUploadSessions: many(resourceUploadSessions, {
@@ -56,6 +58,13 @@ export const resourcesRelations = relations(resources, ({ many }) => ({
   }),
   uploadSessions: many(resourceUploadSessions, {
     relationName: "resourceUploadSessionTarget",
+  }),
+}));
+
+export const resourceImagesRelations = relations(resourceImages, ({ one }) => ({
+  resource: one(resources, {
+    fields: [resourceImages.resourceId],
+    references: [resources.id],
   }),
 }));
 

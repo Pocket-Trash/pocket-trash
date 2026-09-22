@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/env/client", () => ({
-  clientEnv: { VITE_RESOURCE_API_BASE_URL: "https://api.example.test" },
+  clientEnv: { VITE_API_URL: "https://api.example.test" },
 }));
 
 import {
@@ -93,10 +93,13 @@ describe("resource upload sessions", () => {
         file("one.stl", 18 * 1024 * 1024),
         file("two.stl", 18 * 1024 * 1024),
         file("three.stl", 18 * 1024 * 1024),
+        file("four.stl", 18 * 1024 * 1024),
+        file("five.stl", 18 * 1024 * 1024),
+        file("six.stl", 18 * 1024 * 1024),
       ]),
     ).toEqual({
       key: "web.resources.validation.sessionTooLarge",
-      params: { maxSize: "50 MiB" },
+      params: { maxSize: "100 MiB" },
     });
   });
 
@@ -122,8 +125,8 @@ describe("resource upload sessions", () => {
             .concat({
               contentType: preview.type,
               fileName: preview.name,
-              id: "preview-file",
-              kind: "preview",
+              id: "image-file",
+              kind: "image",
               size: preview.size,
             }),
         });
@@ -141,9 +144,9 @@ describe("resource upload sessions", () => {
         fetch: fetchMock,
         files,
         getToken: async () => "token",
+        images: [preview],
         name: "Tool",
         operation: "create",
-        preview,
       }),
     ).resolves.toEqual({ resourceId: 1000, version: 1 });
 

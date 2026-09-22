@@ -5,11 +5,13 @@
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
+      "passThroughEnv": ["INFISICAL_RUNNER_VERBOSE"],
       "persistent": true
     },
     "dev:web": {
       "dependsOn": ["^build"],
       "cache": false,
+      "passThroughEnv": ["INFISICAL_RUNNER_VERBOSE"],
       "persistent": true
     },
     "build": {
@@ -28,13 +30,13 @@
         "LOG_PROXY_URL",
         "NITRO_PRESET",
         "PORT",
-        "RESOURCE_CDN_BASE_URL",
-        "RESOURCE_CDN_TOKEN_KEY",
-        "RESOURCE_FOLDER_PREFIX",
-        "RESOURCE_API_BASE_URL",
-        "RESOURCE_STORAGE_ACCESS_KEY",
-        "RESOURCE_STORAGE_ENDPOINT",
-        "RESOURCE_STORAGE_ZONE_NAME",
+        "BUNNY_CDN_BASE_URL",
+        "BUNNY_CDN_TOKEN_KEY",
+        "BUNNY_RESOURCE_FOLDER_PREFIX",
+        "API_URL",
+        "BUNNY_STORAGE_ACCESS_KEY",
+        "BUNNY_STORAGE_ENDPOINT",
+        "BUNNY_STORAGE_ZONE_NAME",
         "SITE_URL",
         "VERCEL_ENV",
         "VERCEL_GIT_PULL_REQUEST_ID",
@@ -45,7 +47,7 @@
         "VITE_CLERK_SIGN_UP_URL",
         "VITE_LOG_PROXY_CLIENT_KEY",
         "VITE_LOG_PROXY_URL",
-        "VITE_RESOURCE_API_BASE_URL"
+        "VITE_API_URL"
       ],
       "outputs": ["dist/**", "build/**", ".output/**", ".vercel/output/**"]
     },
@@ -65,13 +67,13 @@
         "LOG_PROXY_URL",
         "NITRO_PRESET",
         "PORT",
-        "RESOURCE_CDN_BASE_URL",
-        "RESOURCE_CDN_TOKEN_KEY",
-        "RESOURCE_FOLDER_PREFIX",
-        "RESOURCE_API_BASE_URL",
-        "RESOURCE_STORAGE_ACCESS_KEY",
-        "RESOURCE_STORAGE_ENDPOINT",
-        "RESOURCE_STORAGE_ZONE_NAME",
+        "BUNNY_CDN_BASE_URL",
+        "BUNNY_CDN_TOKEN_KEY",
+        "BUNNY_RESOURCE_FOLDER_PREFIX",
+        "API_URL",
+        "BUNNY_STORAGE_ACCESS_KEY",
+        "BUNNY_STORAGE_ENDPOINT",
+        "BUNNY_STORAGE_ZONE_NAME",
         "SITE_URL",
         "VERCEL_ENV",
         "VERCEL_GIT_PULL_REQUEST_ID",
@@ -82,7 +84,7 @@
         "VITE_CLERK_SIGN_UP_URL",
         "VITE_LOG_PROXY_CLIENT_KEY",
         "VITE_LOG_PROXY_URL",
-        "VITE_RESOURCE_API_BASE_URL"
+        "VITE_API_URL"
       ],
       "outputs": ["dist/**", "build/**", ".output/**", ".vercel/output/**"]
     },
@@ -101,6 +103,10 @@
       "outputs": []
     },
     "test:ci": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "test-storybook": {
       "dependsOn": ["^build"],
       "outputs": []
     },

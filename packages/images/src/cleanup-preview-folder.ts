@@ -15,7 +15,7 @@ async function main(): Promise<void> {
     bunnyStorageAccessKey: readRequiredEnv("BUNNY_STORAGE_ACCESS_KEY"),
     bunnyStorageEndpoint: readRequiredEnv("BUNNY_STORAGE_ENDPOINT"),
     bunnyStorageZoneName: readRequiredEnv("BUNNY_STORAGE_ZONE_NAME"),
-    cdnBaseUrl: readRequiredEnv("IMAGE_CDN_BASE_URL"),
+    cdnBaseUrl: readRequiredEnv("BUNNY_CDN_BASE_URL"),
     dryRun: readBooleanEnv("IMAGE_CLEANUP_DRY_RUN"),
     prNumber,
   });

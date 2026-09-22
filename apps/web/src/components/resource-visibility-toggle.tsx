@@ -26,7 +26,7 @@ export function PublicResourceSwitch({
   const id = useId();
   const { locale } = useLocale();
   const publicLabel = formatTranslation(
-    "web.resources.visibility.public" as TranslationKey,
+    "web.resources.visibility.public",
     {},
     locale,
   );
@@ -130,9 +130,7 @@ export function ResourceVisibilityToggle({
         <Tooltip>
           <TooltipTrigger render={<div />}>{toggle}</TooltipTrigger>
           <TooltipContent side="top">
-            {t(
-              "web.resources.visibility.adminPrivateTooltip" as TranslationKey,
-            )}
+            {t("web.resources.visibility.adminPrivateTooltip")}
           </TooltipContent>
         </Tooltip>
       ) : (

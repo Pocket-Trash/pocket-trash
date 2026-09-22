@@ -4,7 +4,7 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { Check, ShieldMinus } from "lucide-react";
+import { Check, ShieldMinus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
@@ -58,9 +58,19 @@ export function AdminResourceNotificationsPage({
       title={t("web.resources.notification.title")}
     >
       <main className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-6 md:px-6">
-        <p className="m-0 text-sm text-muted-foreground">
-          {t("web.resources.notification.description")}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <p className="m-0 text-sm text-muted-foreground">
+            {t("web.resources.notification.description")}
+          </p>
+          <Button
+            nativeButton={false}
+            render={<Link to="/admin/resources/trash" />}
+            variant="outline"
+          >
+            <Trash2 />
+            {t("web.resources.trash.adminTitle")}
+          </Button>
+        </div>
         {notifications.length === 0 ? (
           <p className="m-0 rounded-lg border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
             {t("web.resources.notification.empty")}

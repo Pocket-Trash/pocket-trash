@@ -48,7 +48,8 @@ export type ResourceDeleteResult = "deleted" | "missing";
 export type ResourceStorage = {
   createUploadTarget(
     input: ResourceUploadMetadata,
-    kind?: "preview" | "resource",
+    resourceId: number,
+    kind?: "image" | "resource",
   ): ResourceUploadTarget;
   delete(objectPath: string): Promise<ResourceDeleteResult>;
   uploadStream(input: {
@@ -57,8 +58,14 @@ export type ResourceStorage = {
     contentType: string;
     objectPath: string;
   }): Promise<void>;
-  upload(input: ResourceUploadInput): Promise<ResourceUploadResult>;
-  uploadPreview(input: ResourceUploadInput): Promise<ResourceUploadResult>;
+  upload(
+    input: ResourceUploadInput,
+    resourceId: number,
+  ): Promise<ResourceUploadResult>;
+  uploadImage(
+    input: ResourceUploadInput,
+    resourceId: number,
+  ): Promise<ResourceUploadResult>;
 };
 
 type BunnyConfig = {
@@ -78,7 +85,7 @@ type BunnyObject = {
 
 export const maxBufferedResourceBytes = 4 * 1024 * 1024;
 export const maxSessionFileBytes = 20 * 1024 * 1024;
-export const maxSessionBytes = 50 * 1024 * 1024;
+export const maxSessionBytes = 100 * 1024 * 1024;
 export const resourceUrlLifetimeSeconds = 120;
 const allowedMimeTypes = {
   ".3mf": [
@@ -96,7 +103,7 @@ const allowedMimeTypes = {
     "application/zip",
   ],
 } as const;
-const allowedPreviewMimeTypes = {
+const allowedImageMimeTypes = {
   ".jpeg": ["image/jpeg"],
   ".jpg": ["image/jpeg"],
   ".png": ["image/png"],
@@ -128,13 +135,14 @@ export function createResourceStorage(
   const config = readConfig(input);
 
   return {
-    createUploadTarget(metadata, kind = "resource") {
+    createUploadTarget(metadata, resourceId, kind = "resource") {
+      assertResourceId(resourceId);
       const extension = validateUploadMetadata(
         metadata,
-        kind === "preview" ? allowedPreviewMimeTypes : allowedMimeTypes,
+        kind === "image" ? allowedImageMimeTypes : allowedMimeTypes,
         maxSessionFileBytes,
       );
-      const objectPath = `${config.folderPrefix}/${config.randomUUID()}${extension}`;
+      const objectPath = `${config.folderPrefix}/${resourceId}/${config.randomUUID()}${extension}`;
 
       return {
         ...metadata,
@@ -176,11 +184,11 @@ export function createResourceStorage(
         method: "PUT",
       });
     },
-    async upload(input) {
-      return upload(config, input, allowedMimeTypes);
+    async upload(input, resourceId) {
+      return upload(config, input, allowedMimeTypes, resourceId);
     },
-    async uploadPreview(input) {
-      return upload(config, input, allowedPreviewMimeTypes);
+    async uploadImage(input, resourceId) {
+      return upload(config, input, allowedImageMimeTypes, resourceId);
     },
   };
 }
@@ -193,8 +201,8 @@ export async function signResourceUrl(input: {
 }): Promise<string> {
   const cdnBaseUrl = input.cdnBaseUrl?.trim();
   const tokenKey = input.tokenKey?.trim();
-  if (!cdnBaseUrl) throw new Error("RESOURCE_CDN_BASE_URL is required.");
-  if (!tokenKey) throw new Error("RESOURCE_CDN_TOKEN_KEY is required.");
+  if (!cdnBaseUrl) throw new Error("BUNNY_CDN_BASE_URL is required.");
+  if (!tokenKey) throw new Error("BUNNY_CDN_TOKEN_KEY is required.");
 
   const expiresAt =
     input.expiresAt ??
@@ -245,13 +253,15 @@ async function upload(
   config: BunnyConfig,
   input: ResourceUploadInput,
   allowedTypes: Readonly<Record<string, readonly string[]>>,
+  resourceId: number,
 ): Promise<ResourceUploadResult> {
+  assertResourceId(resourceId);
   const extension = validateUploadMetadata(
     { ...input, size: input.bytes.byteLength },
     allowedTypes,
     maxBufferedResourceBytes,
   );
-  const objectPath = `${config.folderPrefix}/${config.randomUUID()}${extension}`;
+  const objectPath = `${config.folderPrefix}/${resourceId}/${config.randomUUID()}${extension}`;
   await bunnyRequest(config, objectPath, {
     body: Uint8Array.from(input.bytes),
     expectedStatuses: [200, 201],
@@ -266,6 +276,12 @@ async function upload(
     size: input.bytes.byteLength,
     url: buildUrl(config.cdnBaseUrl, objectPath),
   };
+}
+
+function assertResourceId(resourceId: number): void {
+  if (!Number.isSafeInteger(resourceId) || resourceId <= 0) {
+    throw new Error("Resource ID must be a positive integer.");
+  }
 }
 
 export function validateUploadMetadata(
@@ -380,19 +396,19 @@ function readConfig(input: ResourceStorageConfig): BunnyConfig {
   const zoneName = input.zoneName?.trim();
 
   if (!accessKey) {
-    throw new Error("RESOURCE_STORAGE_ACCESS_KEY is required.");
+    throw new Error("BUNNY_STORAGE_ACCESS_KEY is required.");
   }
 
   if (!cdnBaseUrl) {
-    throw new Error("RESOURCE_CDN_BASE_URL is required.");
+    throw new Error("BUNNY_CDN_BASE_URL is required.");
   }
 
   if (!endpoint) {
-    throw new Error("RESOURCE_STORAGE_ENDPOINT is required.");
+    throw new Error("BUNNY_STORAGE_ENDPOINT is required.");
   }
 
   if (!zoneName) {
-    throw new Error("RESOURCE_STORAGE_ZONE_NAME is required.");
+    throw new Error("BUNNY_STORAGE_ZONE_NAME is required.");
   }
 
   return {
@@ -421,7 +437,7 @@ function normalizeFolderPrefix(folderPrefix: string | undefined): string {
     !normalized ||
     !/^resources\/(?:dev|files|preview(?:\/pr-[1-9]\d*)?)$/u.test(normalized)
   ) {
-    throw new Error("RESOURCE_FOLDER_PREFIX is invalid.");
+    throw new Error("BUNNY_RESOURCE_FOLDER_PREFIX is invalid.");
   }
 
   return normalized;

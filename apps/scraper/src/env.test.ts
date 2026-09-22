@@ -74,8 +74,8 @@ describe("scraper env", () => {
       BUNNY_STORAGE_ENDPOINT: "https://ny.storage.bunnycdn.com",
       BUNNY_STORAGE_ZONE_NAME: "pocket-trash-storage",
       DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
-      IMAGE_CDN_BASE_URL: "https://cdn.pocket-trash.app",
-      IMAGE_FOLDER_PREFIX: "images/preview/pr-52",
+      BUNNY_CDN_BASE_URL: "https://cdn.pocket-trash.app",
+      BUNNY_IMAGE_FOLDER_PREFIX: "images/preview/pr-52",
       REDIS_URL: "redis://localhost:4008",
       GRIMSMO_PROXY_URL: "https://proxy.example.com",
       SCRAPER_AUTMOG_INTERVAL_MINUTES: "45",
@@ -100,8 +100,8 @@ describe("scraper env", () => {
     expect(env.BUNNY_STORAGE_ACCESS_KEY).toBe("storage-key");
     expect(env.BUNNY_STORAGE_ENDPOINT).toBe("https://ny.storage.bunnycdn.com");
     expect(env.BUNNY_STORAGE_ZONE_NAME).toBe("pocket-trash-storage");
-    expect(env.IMAGE_CDN_BASE_URL).toBe("https://cdn.pocket-trash.app");
-    expect(env.IMAGE_FOLDER_PREFIX).toBe("images/preview/pr-52");
+    expect(env.BUNNY_CDN_BASE_URL).toBe("https://cdn.pocket-trash.app");
+    expect(env.BUNNY_IMAGE_FOLDER_PREFIX).toBe("images/preview/pr-52");
     expect(env.IMAGE_STORAGE_PROVIDER).toBe("bunny");
     expect(env.REDIS_URL).toBe("redis://localhost:4008");
     expect(env.GRIMSMO_PROXY_URL).toBe("https://proxy.example.com");
@@ -150,7 +150,7 @@ describe("scraper env", () => {
     const env = createScraperJobEnv({
       DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
       REDIS: "redis://localhost:4008",
-      REDIS_URL: "${{scraper-queue.REDIS_PUBLIC_URL}}",
+      REDIS_URL: `\${{scraper-queue.REDIS_PUBLIC_URL}}`,
     });
 
     expect(env.REDIS_URL).toBe("redis://localhost:4008");
@@ -160,8 +160,8 @@ describe("scraper env", () => {
     expect(() =>
       createScraperJobEnv({
         DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
-        REDIS: "${{shared.REDIS}}",
-        REDIS_URL: "${{scraper-queue.REDIS_PUBLIC_URL}}",
+        REDIS: `\${{shared.REDIS}}`,
+        REDIS_URL: `\${{scraper-queue.REDIS_PUBLIC_URL}}`,
       }),
     ).toThrow("Invalid environment variables: REDIS_URL");
   });

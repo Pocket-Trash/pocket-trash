@@ -5,6 +5,7 @@ import {
   resourceCategories,
   resourceDownloads,
   resourceFiles,
+  resourceImages,
   resourceNotifications,
   resources,
   resourcesToCategories,
@@ -20,7 +21,18 @@ describe("resource schema", () => {
     expect(resources.uploaderClerkId.notNull).toBe(true);
     expect(resources.isPrivate.notNull).toBe(true);
     expect(resources.isPrivate.default).toBe(false);
+    expect(resources.deletedAt.notNull).toBe(false);
+    expect(resources.deletedByClerkId.notNull).toBe(false);
+    expect(resources.deletedByRole.notNull).toBe(false);
     expect("downloadCount" in resources).toBe(false);
+
+    const resourceConfig = getTableConfig(resources);
+    expect(resourceConfig.checks.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "resources_deletion_metadata_consistent",
+        "resources_deleted_by_role_valid",
+      ]),
+    );
 
     const versionConfig = getTableConfig(resourceVersions);
     expect(getTableName(resourceVersions)).toBe("resource_versions");
@@ -32,9 +44,19 @@ describe("resource schema", () => {
     expect(resourceFiles.versionId.notNull).toBe(true);
     expect(resourceFiles.objectPath.notNull).toBe(true);
 
+    expect(getTableName(resourceImages)).toBe("resource_images");
+    expect(resourceImages.resourceId.notNull).toBe(true);
+    expect(resourceImages.position.notNull).toBe(true);
+    expect(resourceImages.objectPath.notNull).toBe(true);
+
     expect(getTableName(resourceDownloads)).toBe("resource_downloads");
     expect(resourceDownloads.fileId.notNull).toBe(false);
     expect("resourceId" in resourceDownloads).toBe(false);
+    expect(
+      getTableConfig(resourceDownloads).foreignKeys.map(
+        ({ onDelete }) => onDelete,
+      ),
+    ).toEqual(["cascade", "cascade"]);
   });
 
   it("normalizes categories through a unique assignment table", () => {
@@ -47,6 +69,9 @@ describe("resource schema", () => {
     expect(
       assignmentConfig.primaryKeys[0]?.columns.map(({ name }) => name),
     ).toEqual(["resource_id", "category_id"]);
+    expect(
+      assignmentConfig.foreignKeys.map(({ onDelete }) => onDelete),
+    ).toEqual(["cascade", "restrict"]);
   });
 
   it("stores typed resource notifications with global read metadata", () => {
@@ -66,9 +91,11 @@ describe("resource schema", () => {
     expect(resourceUploadSessions.isPrivate.notNull).toBe(true);
     expect(resourceUploadSessions.expiresAt.notNull).toBe(true);
     expect(resourceUploadSessions.completedAt.notNull).toBe(false);
+    expect(resourceUploadSessions.reservedResourceId.notNull).toBe(false);
 
     expect(getTableName(resourceUploadFiles)).toBe("resource_upload_files");
     expect(resourceUploadFiles.sessionId.notNull).toBe(true);
+    expect(resourceUploadFiles.position.notNull).toBe(true);
     expect(resourceUploadFiles.uploadedAt.notNull).toBe(false);
   });
 });

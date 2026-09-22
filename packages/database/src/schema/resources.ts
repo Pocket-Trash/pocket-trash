@@ -20,7 +20,8 @@ export const resourceNotificationTypes = [
   "category_created",
 ] as const;
 export const resourceUploadOperations = ["create", "version"] as const;
-export const resourceUploadFileKinds = ["resource", "preview"] as const;
+export const resourceUploadFileKinds = ["resource", "image"] as const;
+export const resourceDeletionRoles = ["owner", "admin"] as const;
 
 export const resources = pgTable(
   "resources",
@@ -31,15 +32,15 @@ export const resources = pgTable(
     uploaderClerkId: text("uploader_clerk_id").notNull(),
     name: text("name").notNull(),
     description: text("description").notNull(),
-    previewImageFileName: text("preview_image_file_name"),
-    previewImageContentType: text("preview_image_content_type"),
-    previewImageSize: integer("preview_image_size"),
-    previewImageObjectPath: text("preview_image_object_path"),
-    previewImageUrl: text("preview_image_url"),
     isPrivate: boolean("is_private").default(false).notNull(),
     privateReason: text("private_reason"),
     privatedAt: timestamp("privated_at", { mode: "date", withTimezone: true }),
     privatedByClerkId: text("privated_by_clerk_id"),
+    deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
+    deletedByClerkId: text("deleted_by_clerk_id"),
+    deletedByRole: text("deleted_by_role", {
+      enum: resourceDeletionRoles,
+    }),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -49,15 +50,52 @@ export const resources = pgTable(
   },
   (table) => [
     index("resources_created_at_idx").on(table.createdAt),
+    index("resources_deleted_at_idx").on(table.deletedAt),
     index("resources_uploader_clerk_id_idx").on(table.uploaderClerkId),
-    check(
-      "resources_preview_metadata_consistent",
-      sql`num_nonnulls(${table.previewImageFileName}, ${table.previewImageContentType}, ${table.previewImageSize}, ${table.previewImageObjectPath}, ${table.previewImageUrl}) in (0, 5)`,
-    ),
     check(
       "resources_private_metadata_consistent",
       sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
     ),
+    check(
+      "resources_deletion_metadata_consistent",
+      sql`num_nonnulls(${table.deletedAt}, ${table.deletedByClerkId}, ${table.deletedByRole}) in (0, 3)`,
+    ),
+    check(
+      "resources_deleted_by_role_valid",
+      sql`${table.deletedByRole} is null or ${table.deletedByRole} in ('owner', 'admin')`,
+    ),
+  ],
+);
+
+export const resourceImages = pgTable(
+  "resource_images",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    resourceId: bigint("resource_id", { mode: "number" })
+      .notNull()
+      .references(() => resources.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    fileName: text("file_name").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    storageProvider: text("storage_provider").notNull().default("bunny"),
+    objectPath: text("object_path").notNull(),
+    url: text("url").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("resource_images_resource_id_idx").on(table.resourceId),
+    unique("resource_images_resource_position_unique").on(
+      table.resourceId,
+      table.position,
+    ),
+    unique("resource_images_object_path_unique").on(table.objectPath),
+    check("resource_images_position_valid", sql`${table.position} >= 0`),
+    check("resource_images_size_positive", sql`${table.size} > 0`),
   ],
 );
 
@@ -135,6 +173,7 @@ export const resourceUploadSessions = pgTable(
       () => resources.id,
       { onDelete: "cascade" },
     ),
+    reservedResourceId: bigint("reserved_resource_id", { mode: "number" }),
     name: text("name"),
     description: text("description"),
     categories: jsonb("categories")
@@ -169,7 +208,7 @@ export const resourceUploadSessions = pgTable(
     ),
     check(
       "resource_upload_sessions_metadata_consistent",
-      sql`(${table.operation} = 'create' and ${table.resourceId} is null and num_nonnulls(${table.name}, ${table.description}) = 2 and jsonb_array_length(${table.categories}) between 1 and 10) or (${table.operation} = 'version' and ${table.resourceId} is not null and num_nonnulls(${table.name}, ${table.description}) = 0 and ${table.categories} = '[]'::jsonb and not ${table.isPrivate})`,
+      sql`(${table.operation} = 'create' and ${table.resourceId} is null and ${table.reservedResourceId} is not null and num_nonnulls(${table.name}, ${table.description}) = 2 and jsonb_array_length(${table.categories}) between 1 and 10) or (${table.operation} = 'version' and ${table.resourceId} is not null and ${table.reservedResourceId} is null and num_nonnulls(${table.name}, ${table.description}) = 0 and ${table.categories} = '[]'::jsonb and not ${table.isPrivate})`,
     ),
     check(
       "resource_upload_sessions_completion_consistent",
@@ -186,6 +225,7 @@ export const resourceUploadFiles = pgTable(
       .notNull()
       .references(() => resourceUploadSessions.id, { onDelete: "cascade" }),
     kind: text("kind", { enum: resourceUploadFileKinds }).notNull(),
+    position: integer("position").notNull(),
     fileName: text("file_name").notNull(),
     contentType: text("content_type").notNull(),
     size: integer("size").notNull(),
@@ -205,13 +245,16 @@ export const resourceUploadFiles = pgTable(
     uniqueIndex("resource_upload_files_session_file_name_unique")
       .on(table.sessionId, sql`lower(${table.fileName})`)
       .where(sql`${table.kind} = 'resource'`),
-    uniqueIndex("resource_upload_files_session_preview_unique")
-      .on(table.sessionId)
-      .where(sql`${table.kind} = 'preview'`),
+    unique("resource_upload_files_session_kind_position_unique").on(
+      table.sessionId,
+      table.kind,
+      table.position,
+    ),
     check(
       "resource_upload_files_kind_valid",
-      sql`${table.kind} in ('resource', 'preview')`,
+      sql`${table.kind} in ('resource', 'image')`,
     ),
+    check("resource_upload_files_position_valid", sql`${table.position} >= 0`),
     check("resource_upload_files_size_positive", sql`${table.size} > 0`),
   ],
 );
@@ -255,11 +298,11 @@ export const resourceDownloads = pgTable(
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
     versionId: bigint("version_id", { mode: "number" }).references(
       () => resourceVersions.id,
-      { onDelete: "restrict" },
+      { onDelete: "cascade" },
     ),
     fileId: bigint("file_id", { mode: "number" }).references(
       () => resourceFiles.id,
-      { onDelete: "restrict" },
+      { onDelete: "cascade" },
     ),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
@@ -320,6 +363,8 @@ export type NewResourceUploadSession =
   typeof resourceUploadSessions.$inferInsert;
 export type ResourceUploadFile = typeof resourceUploadFiles.$inferSelect;
 export type NewResourceUploadFile = typeof resourceUploadFiles.$inferInsert;
+export type ResourceImage = typeof resourceImages.$inferSelect;
+export type NewResourceImage = typeof resourceImages.$inferInsert;
 export type ResourceCategory = typeof resourceCategories.$inferSelect;
 export type NewResourceCategory = typeof resourceCategories.$inferInsert;
 export type ResourceDownload = typeof resourceDownloads.$inferSelect;

@@ -16,6 +16,9 @@ export const schemaDescriptions = {
   resource_downloads: {
     description: "Append-only download events for resource versions.",
   },
+  resource_images: {
+    description: "Ordered resource images; position zero is the cover image.",
+  },
   resource_notifications: {
     description:
       "Admin review events created for new resources and categories.",
@@ -31,7 +34,7 @@ export const schemaDescriptions = {
     description: "Immutable uploaded file versions for resources.",
   },
   resources: {
-    description: "User-uploaded resources and their optional preview images.",
+    description: "User-uploaded resources with files, images, and versions.",
   },
   resources_to_categories: {
     description: "Unique resource-to-category assignments.",

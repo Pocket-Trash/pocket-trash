@@ -54,7 +54,7 @@ describe("resource storage", () => {
   it("uploads an allowed file without accepting an object path", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       expect(toUrl(input).href).toBe(
-        "https://ny.storage.bunnycdn.com/pocket-trash-storage/resources/dev/00000000-0000-4000-8000-000000000001.stl",
+        "https://ny.storage.bunnycdn.com/pocket-trash-storage/resources/dev/1005/00000000-0000-4000-8000-000000000001.stl",
       );
       expect(init).toMatchObject({
         body: new Uint8Array([1, 2, 3]),
@@ -70,17 +70,20 @@ describe("resource storage", () => {
     const storage = createResourceStorage({ ...config, fetch: fetchMock });
 
     await expect(
-      storage.upload({
-        bytes: new Uint8Array([1, 2, 3]),
-        contentType: "application/octet-stream",
-        fileName: "clip.stl",
-      }),
+      storage.upload(
+        {
+          bytes: new Uint8Array([1, 2, 3]),
+          contentType: "application/octet-stream",
+          fileName: "clip.stl",
+        },
+        1005,
+      ),
     ).resolves.toEqual({
       contentType: "application/octet-stream",
       fileName: "clip.stl",
-      objectPath: "resources/dev/00000000-0000-4000-8000-000000000001.stl",
+      objectPath: "resources/dev/1005/00000000-0000-4000-8000-000000000001.stl",
       size: 3,
-      url: "https://cdn.pocket-trash.app/resources/dev/00000000-0000-4000-8000-000000000001.stl",
+      url: "https://cdn.pocket-trash.app/resources/dev/1005/00000000-0000-4000-8000-000000000001.stl",
     });
   });
 
@@ -93,7 +96,7 @@ describe("resource storage", () => {
     });
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       expect(toUrl(input).pathname).toBe(
-        "/pocket-trash-storage/resources/dev/00000000-0000-4000-8000-000000000001.stl",
+        "/pocket-trash-storage/resources/dev/1005/00000000-0000-4000-8000-000000000001.stl",
       );
       expect(init).toMatchObject({
         body,
@@ -107,14 +110,17 @@ describe("resource storage", () => {
       return new Response(null, { status: 201 });
     });
     const storage = createResourceStorage({ ...config, fetch: fetchMock });
-    const target = storage.createUploadTarget({
-      contentType: "application/octet-stream",
-      fileName: "clip.stl",
-      size: 3,
-    });
+    const target = storage.createUploadTarget(
+      {
+        contentType: "application/octet-stream",
+        fileName: "clip.stl",
+        size: 3,
+      },
+      1005,
+    );
 
     expect(target.objectPath).toBe(
-      "resources/dev/00000000-0000-4000-8000-000000000001.stl",
+      "resources/dev/1005/00000000-0000-4000-8000-000000000001.stl",
     );
     await expect(
       storage.uploadStream({
@@ -163,19 +169,22 @@ describe("resource storage", () => {
       "zip",
     ]) {
       expect(() =>
-        storage.createUploadTarget({
-          contentType: "application/octet-stream",
-          fileName: `resource.${extension}`,
-          size: 1,
-        }),
+        storage.createUploadTarget(
+          {
+            contentType: "application/octet-stream",
+            fileName: `resource.${extension}`,
+            size: 1,
+          },
+          1005,
+        ),
       ).not.toThrow();
     }
   });
 
-  it("uploads an optional preview image through a separate allowlist", async () => {
+  it("uploads a resource image through a separate allowlist", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       expect(toUrl(input).pathname).toBe(
-        "/pocket-trash-storage/resources/dev/00000000-0000-4000-8000-000000000001.webp",
+        "/pocket-trash-storage/resources/dev/1005/00000000-0000-4000-8000-000000000001.webp",
       );
       expect(init?.headers).toMatchObject({ "content-type": "image/webp" });
       return new Response(null, { status: 201 });
@@ -183,22 +192,29 @@ describe("resource storage", () => {
     const storage = createResourceStorage({ ...config, fetch: fetchMock });
 
     await expect(
-      storage.uploadPreview({
-        bytes: new Uint8Array([1, 2, 3]),
-        contentType: "image/webp",
-        fileName: "clip.webp",
-      }),
+      storage.uploadImage(
+        {
+          bytes: new Uint8Array([1, 2, 3]),
+          contentType: "image/webp",
+          fileName: "clip.webp",
+        },
+        1005,
+      ),
     ).resolves.toMatchObject({
       contentType: "image/webp",
-      objectPath: "resources/dev/00000000-0000-4000-8000-000000000001.webp",
+      objectPath:
+        "resources/dev/1005/00000000-0000-4000-8000-000000000001.webp",
     });
 
     await expect(
-      storage.upload({
-        bytes: new Uint8Array([1]),
-        contentType: "image/webp",
-        fileName: "clip.webp",
-      }),
+      storage.upload(
+        {
+          bytes: new Uint8Array([1]),
+          contentType: "image/webp",
+          fileName: "clip.webp",
+        },
+        1005,
+      ),
     ).rejects.toThrow("Resource file extension and MIME type do not match.");
   });
 
@@ -207,25 +223,34 @@ describe("resource storage", () => {
     const storage = createResourceStorage({ ...config, fetch: fetchMock });
 
     await expect(
-      storage.upload({
-        bytes: new Uint8Array(4 * 1024 * 1024 + 1),
-        contentType: "model/stl",
-        fileName: "clip.stl",
-      }),
+      storage.upload(
+        {
+          bytes: new Uint8Array(4 * 1024 * 1024 + 1),
+          contentType: "model/stl",
+          fileName: "clip.stl",
+        },
+        1005,
+      ),
     ).rejects.toThrow("Resource file exceeds the configured size limit.");
     await expect(
-      storage.upload({
-        bytes: new Uint8Array([1]),
-        contentType: "application/pdf",
-        fileName: "clip.stl",
-      }),
+      storage.upload(
+        {
+          bytes: new Uint8Array([1]),
+          contentType: "application/pdf",
+          fileName: "clip.stl",
+        },
+        1005,
+      ),
     ).rejects.toThrow("Resource file extension and MIME type do not match.");
     await expect(
-      storage.upload({
-        bytes: new Uint8Array([1]),
-        contentType: "model/stl",
-        fileName: "../clip.stl",
-      }),
+      storage.upload(
+        {
+          bytes: new Uint8Array([1]),
+          contentType: "model/stl",
+          fileName: "../clip.stl",
+        },
+        1005,
+      ),
     ).rejects.toThrow("Resource file name is unsafe.");
     expect(fetchMock).not.toHaveBeenCalled();
   });

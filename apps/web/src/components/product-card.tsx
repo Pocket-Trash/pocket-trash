@@ -153,6 +153,7 @@ function ProductTag({
       className={cn(
         "rounded-sm px-1.5 py-0.5 text-[11px] tracking-[0.3px] whitespace-nowrap",
         className,
+        "text-foreground",
       )}
     >
       {children}

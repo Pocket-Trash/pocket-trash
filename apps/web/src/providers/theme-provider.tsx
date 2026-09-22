@@ -18,13 +18,15 @@ import {
 } from "@/lib/user-settings";
 import { useLocale } from "@/providers/locale-provider";
 
-type ThemeProviderValue = {
+export type ThemeProviderValue = {
   saving: boolean;
   setTheme: (theme: ThemeMode) => void;
   theme: ThemeMode;
 };
 
-const ThemeContext = React.createContext<ThemeProviderValue | null>(null);
+export const ThemeContext = React.createContext<ThemeProviderValue | null>(
+  null,
+);
 const useIsomorphicLayoutEffect =
   typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
 

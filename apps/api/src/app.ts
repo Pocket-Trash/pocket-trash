@@ -33,11 +33,11 @@ export type ApiBindings = Omit<Env, "APP_ENV"> & {
   LOG_DEPLOYMENT_TARGET?: string;
   LOG_LEVEL?: string;
   LOG_PROXY_CLIENT_KEY?: string;
-  RESOURCE_CDN_BASE_URL?: string;
-  RESOURCE_FOLDER_PREFIX?: string;
-  RESOURCE_STORAGE_ACCESS_KEY?: string;
-  RESOURCE_STORAGE_ENDPOINT?: string;
-  RESOURCE_STORAGE_ZONE_NAME?: string;
+  BUNNY_CDN_BASE_URL?: string;
+  BUNNY_RESOURCE_FOLDER_PREFIX?: string;
+  BUNNY_STORAGE_ACCESS_KEY?: string;
+  BUNNY_STORAGE_ENDPOINT?: string;
+  BUNNY_STORAGE_ZONE_NAME?: string;
 };
 
 type RuntimeConfig = {
@@ -94,15 +94,14 @@ const ResourceUploadSessionSchema = z.discriminatedUnion("operation", [
     categories: z.array(z.string().min(1).max(60)).min(1).max(10),
     description: z.string().min(1).max(5000),
     files: z.array(ResourceUploadFileSchema).min(1).max(10),
+    images: z.array(ResourceUploadFileSchema).min(1).max(10),
     isPrivate: z.boolean().default(false),
     name: z.string().min(1).max(120),
     operation: z.literal("create"),
-    preview: ResourceUploadFileSchema.optional(),
   }),
   z.object({
     files: z.array(ResourceUploadFileSchema).min(1).max(10),
     operation: z.literal("version"),
-    preview: ResourceUploadFileSchema.optional(),
     resourceId: z.number().int().positive(),
   }),
 ]);
