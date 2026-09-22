@@ -25,7 +25,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
-const sidebarOpenStorageKey = "pocket-trash.sidebarOpen";
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
@@ -42,15 +41,6 @@ type SidebarContextProps = {
 };
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
-
-function readSidebarOpen(defaultOpen: boolean) {
-  if (typeof window === "undefined") return defaultOpen;
-
-  const stored = window.localStorage.getItem(sidebarOpenStorageKey);
-  if (stored === "true") return true;
-  if (stored === "false") return false;
-  return defaultOpen;
-}
 
 function useSidebar() {
   const context = React.useContext(SidebarContext);
@@ -79,7 +69,7 @@ function SidebarProvider({
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(() => readSidebarOpen(defaultOpen));
+  const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
@@ -89,8 +79,6 @@ function SidebarProvider({
       } else {
         _setOpen(openState);
       }
-
-      window.localStorage.setItem(sidebarOpenStorageKey, String(openState));
     },
     [setOpenProp, open],
   );
