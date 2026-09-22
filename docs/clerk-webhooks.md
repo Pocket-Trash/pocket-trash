@@ -25,6 +25,9 @@ pnpm dev:web:webhooks
 The stable development API must already be deployed so its
 `CLERK_WEBHOOK_TARGETS` namespace is available.
 
+Before the feature reaches `main`, run the `Deploy` GitHub Actions workflow
+from the feature branch with the `development` target.
+
 The command starts `dev:web`, creates a temporary Clerk relay, registers
 `target:local:<INITIALS>` for 24 hours, and removes it on normal termination.
 It stops before creating the relay unless the Clerk CLI is linked to the app

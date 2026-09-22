@@ -21,6 +21,15 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      target:
+        description: Deployment target
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+          - development
 
 permissions:
   contents: read
@@ -857,7 +866,7 @@ jobs:
 
   development-api:
     name: Development API
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.target == 'development')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -995,7 +1004,7 @@ jobs:
 
   production:
     name: Production
-    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.target == 'production')
     runs-on: ubuntu-latest
     permissions:
       contents: read
