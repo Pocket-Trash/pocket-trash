@@ -6,7 +6,11 @@ import {
   type UpsertUserSettingsInput,
   type UserSettingsService,
 } from "./user-settings/index.js";
-import { createUsersService, type UsersService } from "./users/index.js";
+import {
+  createUsersService,
+  type UserSyncResult,
+  type UsersService,
+} from "./users/index.js";
 
 export type DbServices = {
   userSettings: UserSettingsService;
@@ -22,5 +26,10 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
   };
 }
 
-export type { UpsertUserSettingsInput, UserSettingsService };
+export type {
+  UpsertUserSettingsInput,
+  UserSettingsService,
+  UserSyncResult,
+  UsersService,
+};
 export { defaultUserSettings };

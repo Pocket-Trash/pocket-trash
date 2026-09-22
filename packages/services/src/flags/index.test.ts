@@ -16,6 +16,7 @@ function createUsersServiceMock(): UsersService {
   return {
     ensure: vi.fn(),
     getByClerkId: vi.fn(),
+    syncFromClerk: vi.fn(),
   };
 }
 

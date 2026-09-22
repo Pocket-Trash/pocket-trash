@@ -34,14 +34,14 @@ export const getResourceDetail = createServerFn({ method: "GET" })
     const { s } = await import("@/lib/services");
     const viewer = await getResourceViewer();
     const detail = await s.resources.getDetail(data.resourceId, viewer);
-    return detail
-      ? {
-          ...detail,
-          canAdminister: viewer.isAdmin,
-          canEdit: viewer.isAdmin || detail.uploaderClerkId === viewer.clerkId,
-          isOwner: detail.uploaderClerkId === viewer.clerkId,
-        }
-      : null;
+    if (!detail) return null;
+    const { uploaderClerkId, ...browserDetail } = detail;
+    return {
+      ...browserDetail,
+      canAdminister: viewer.isAdmin,
+      canEdit: viewer.isAdmin || uploaderClerkId === viewer.clerkId,
+      isOwner: uploaderClerkId === viewer.clerkId,
+    };
   });
 
 export const getEditableResourceDetail = createServerFn({ method: "GET" })
@@ -51,12 +51,13 @@ export const getEditableResourceDetail = createServerFn({ method: "GET" })
     if (!viewer.clerkId) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     const detail = await s.resources.getDetail(data.resourceId, viewer);
-    return detail &&
-      (viewer.isAdmin || detail.uploaderClerkId === viewer.clerkId)
+    if (!detail) return null;
+    const { uploaderClerkId, ...browserDetail } = detail;
+    return viewer.isAdmin || uploaderClerkId === viewer.clerkId
       ? {
-          ...detail,
+          ...browserDetail,
           canAdminister: viewer.isAdmin,
-          isOwner: detail.uploaderClerkId === viewer.clerkId,
+          isOwner: uploaderClerkId === viewer.clerkId,
         }
       : null;
   });
@@ -69,7 +70,10 @@ export const getOwnedResourceDetail = createServerFn({ method: "GET" })
     const detail = await s.resources.getDetail(data.resourceId, {
       clerkId: userId,
     });
-    return detail?.uploaderClerkId === userId ? detail : null;
+    if (!detail) return null;
+    const { uploaderClerkId, ...browserDetail } = detail;
+    if (uploaderClerkId !== userId) return null;
+    return browserDetail;
   });
 
 export const listResourceCategories = createServerFn({ method: "GET" })
@@ -100,10 +104,12 @@ export const listResourceDirectory = createServerFn({ method: "GET" })
     );
     return {
       ...directory,
-      resources: directory.resources.map((resource) => ({
-        ...resource,
-        canEdit: viewer.isAdmin || resource.uploaderClerkId === viewer.clerkId,
-      })),
+      resources: directory.resources.map(
+        ({ uploaderClerkId, ...resource }) => ({
+          ...resource,
+          canEdit: viewer.isAdmin || uploaderClerkId === viewer.clerkId,
+        }),
+      ),
     };
   });
 
@@ -114,9 +120,9 @@ export const listOwnedResources = createServerFn({ method: "GET" }).handler(
     const directory = await s.resources.listDirectory([], {
       clerkId: userId,
     });
-    return directory.resources
-      .filter(({ uploaderClerkId }) => uploaderClerkId === userId)
-      .map((resource) => ({ ...resource, canEdit: true }));
+    return directory.resources.flatMap(({ uploaderClerkId, ...resource }) =>
+      uploaderClerkId === userId ? [{ ...resource, canEdit: true }] : [],
+    );
   },
 );
 

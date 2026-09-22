@@ -7,6 +7,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import {
   apiDocsPath,
+  clerkWebhookPath,
   createApp,
   healthPath,
   logsPath,
@@ -118,6 +119,23 @@ describe("api", () => {
         method: "POST",
       }),
     ).resolves.toMatchObject({ status: 400 });
+  });
+
+  it("accepts only the configured local webhook initials", async () => {
+    const handle = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    const app = createApp({
+      clerkWebhookRuntime: { expectedInitials: "RA", handle },
+    });
+
+    expect(
+      (await app.request(`${clerkWebhookPath}/ra`, { method: "POST" })).status,
+    ).toBe(204);
+    expect(
+      (await app.request(`${clerkWebhookPath}/rb`, { method: "POST" })).status,
+    ).toBe(404);
+    expect(handle).toHaveBeenCalledOnce();
   });
 
   it("authenticates session creation and streams each declared file", async () => {

@@ -8,6 +8,7 @@ import {
 } from "@package/logger";
 import { maxSessionFileBytes } from "@package/resources";
 import { Scalar } from "@scalar/hono-api-reference";
+import { clerkWebhookPath } from "./clerk-webhooks.js";
 import {
   ResourceUploadSessionError,
   type ResourceUploadSessionInput,
@@ -20,6 +21,7 @@ export const logsPath = `${apiPrefix}/logs`;
 export const resourceUploadSessionsPath = `${apiPrefix}/resource-upload-sessions`;
 export const openApiJsonPath = `${apiPrefix}/openapi.json`;
 export const apiDocsPath = `${apiPrefix}/docs`;
+export { clerkWebhookPath };
 
 export type ApiBindings = Omit<Env, "APP_ENV"> & {
   APP_ENV?: string;
@@ -27,12 +29,15 @@ export type ApiBindings = Omit<Env, "APP_ENV"> & {
   AXIOM_EDGE_DOMAIN?: string;
   AXIOM_TOKEN?: string;
   CLERK_SECRET_KEY?: string;
+  CLERK_WEBHOOK_SIGNING_SECRET?: string;
+  CLERK_WEBHOOK_TARGETS?: KVNamespace;
   DATABASE_URL?: string;
   LOGGER?: string;
   LOG_DEPLOYMENT_ID?: string;
   LOG_DEPLOYMENT_TARGET?: string;
   LOG_LEVEL?: string;
   LOG_PROXY_CLIENT_KEY?: string;
+  URL_INITIALS?: string;
   BUNNY_CDN_BASE_URL?: string;
   BUNNY_RESOURCE_FOLDER_PREFIX?: string;
   BUNNY_STORAGE_ACCESS_KEY?: string;
@@ -54,6 +59,15 @@ type AppDependencies = {
     bindings: ApiBindings,
   ) => Promise<ResourceUploadRuntime> | ResourceUploadRuntime;
   resourceUploadRuntime?: ResourceUploadRuntime;
+  getClerkWebhookRuntime?: (
+    bindings: ApiBindings,
+  ) => Promise<ClerkWebhookRuntime> | ClerkWebhookRuntime;
+  clerkWebhookRuntime?: ClerkWebhookRuntime;
+};
+
+export type ClerkWebhookRuntime = {
+  expectedInitials?: string;
+  handle(request: Request, targetKind: "local" | "primary"): Promise<Response>;
 };
 
 export type ResourceUploadRuntime = {
@@ -159,6 +173,20 @@ export function createApp(dependencies: AppDependencies = {}) {
   api.openapi(HealthRoute, (context) =>
     context.json({ ok: true, service: "api" }, 200),
   );
+
+  api.post("/webhooks/clerk", async (context) => {
+    const runtime = await requireClerkWebhookRuntime(dependencies, context.env);
+    return await runtime.handle(context.req.raw, "primary");
+  });
+
+  api.post("/webhooks/clerk/:initials", async (context) => {
+    const runtime = await requireClerkWebhookRuntime(dependencies, context.env);
+    const initials = context.req.param("initials").toUpperCase();
+    if (!runtime.expectedInitials || initials !== runtime.expectedInitials) {
+      return context.body(null, 404);
+    }
+    return await runtime.handle(context.req.raw, "local");
+  });
 
   api.openAPIRegistry.registerPath({
     method: "post",
@@ -398,6 +426,17 @@ async function resolveResourceUploadRuntime(
     (await dependencies.getResourceUploadRuntime?.(bindings)) ??
     dependencies.resourceUploadRuntime
   );
+}
+
+async function requireClerkWebhookRuntime(
+  dependencies: AppDependencies,
+  bindings: ApiBindings,
+): Promise<ClerkWebhookRuntime> {
+  const runtime =
+    (await dependencies.getClerkWebhookRuntime?.(bindings)) ??
+    dependencies.clerkWebhookRuntime;
+  if (!runtime) throw new Error("Clerk webhooks are not configured.");
+  return runtime;
 }
 
 async function requireResourceUploadRuntime(

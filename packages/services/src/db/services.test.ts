@@ -27,12 +27,14 @@ function captureLogger(events: LogEvent[]) {
 function createDbMock(input: {
   insertRows?: unknown[][];
   selectRows?: unknown[][];
+  updateRows?: unknown[][];
 }): Database & {
   conflictSets: unknown[];
   insertValues: unknown[];
 } {
   const insertRows = [...(input.insertRows ?? [])];
   const selectRows = [...(input.selectRows ?? [])];
+  const updateRows = [...(input.updateRows ?? [])];
   const conflictSets: unknown[] = [];
   const insertValues: unknown[] = [];
 
@@ -42,6 +44,9 @@ function createDbMock(input: {
         insertValues.push(value);
 
         return {
+          onConflictDoNothing: vi.fn(() => ({
+            returning: vi.fn().mockResolvedValue(insertRows.shift() ?? []),
+          })),
           onConflictDoUpdate: vi.fn((config: { set: unknown }) => {
             conflictSets.push(config.set);
 
@@ -51,6 +56,13 @@ function createDbMock(input: {
           }),
         };
       }),
+    })),
+    update: vi.fn(() => ({
+      set: vi.fn(() => ({
+        where: vi.fn(() => ({
+          returning: vi.fn().mockResolvedValue(updateRows.shift() ?? []),
+        })),
+      })),
     })),
     select: vi.fn(() => ({
       from: vi.fn(() => ({
@@ -73,7 +85,9 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const user: User = {
       clerkId,
+      clerkUpdatedAt: null,
       id: 1000,
+      username: null,
     };
     const db = createDbMock({
       insertRows: [[user]],
@@ -93,6 +107,28 @@ describe("database service logging", () => {
       outcome: "success",
     });
     expect(JSON.stringify(events)).not.toContain(clerkId);
+  });
+
+  it.each([
+    ["updated", [[{ id: 1000 }]], []],
+    ["inserted", [[]], [[{ id: 1000 }]]],
+    ["unchanged", [[]], [[]]],
+  ] as const)("reports Clerk user syncs as %s", async (expected, updateRows, insertRows) => {
+    const users = createUsersService(
+      createDbMock({
+        insertRows: insertRows.map((row) => [...row]),
+        updateRows: updateRows.map((row) => [...row]),
+      }),
+      captureLogger([]),
+    );
+
+    await expect(
+      users.syncFromClerk({
+        clerkId: "user_123",
+        clerkUpdatedAt: new Date("2026-09-22T12:00:00.000Z"),
+        username: "roy",
+      }),
+    ).resolves.toBe(expected);
   });
 
   it("logs users.ensure failures with a failure outcome", async () => {
@@ -160,7 +196,9 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const user: User = {
       clerkId,
+      clerkUpdatedAt: null,
       id: 1000,
+      username: null,
     };
     const settings = {
       currencyCode: "USD",
@@ -212,7 +250,9 @@ describe("database service logging", () => {
     };
     const user: User = {
       clerkId,
+      clerkUpdatedAt: null,
       id: 1000,
+      username: null,
     };
     const patchedSettings: UserSettings = {
       ...existingSettings,
@@ -266,7 +306,9 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const user: User = {
       clerkId,
+      clerkUpdatedAt: null,
       id: 1000,
+      username: null,
     };
     const patchedSettings: UserSettings = {
       currencyCode: "USD",
@@ -336,7 +378,9 @@ describe("database service logging", () => {
     };
     const user: User = {
       clerkId,
+      clerkUpdatedAt: null,
       id: existingSettings.userId,
+      username: null,
     };
     const db = createDbMock({
       insertRows: [[user], [savedSettings]],

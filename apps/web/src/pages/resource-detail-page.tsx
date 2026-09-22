@@ -141,7 +141,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
               <div>
                 <dt>{t("web.resources.detail.sharedBy")}</dt>
                 <dd className="m-0 text-foreground">
-                  {detail.uploaderClerkId}
+                  {detail.uploaderUsername}
                 </dd>
               </div>
               <DetailRow

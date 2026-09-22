@@ -37,12 +37,12 @@ vi.mock("@/providers/locale-provider", () => ({
 describe("resource trash", () => {
   const deletedResource = {
     deletedAt: new Date("2026-09-18T12:00:00Z"),
-    deletedByClerkId: "admin_123",
+    deletedByUsername: "admin",
     deletedByRole: "admin" as const,
     id: 1000,
     isPrivate: false,
     name: "Pocket clip",
-    uploaderClerkId: "user_123",
+    uploaderUsername: "roy",
   };
 
   it("shows owner restore controls and admin deletion attribution", () => {
@@ -56,9 +56,9 @@ describe("resource trash", () => {
     expect(ownerHtml).toContain("Your resource trash");
     expect(ownerHtml).toContain("Restore");
     expect(ownerHtml).not.toContain("Delete permanently");
-    expect(ownerHtml).not.toContain("Deleted by admin_123");
+    expect(ownerHtml).not.toContain("Deleted by admin");
     expect(adminHtml).toContain("Resource trash");
-    expect(adminHtml).toContain("Deleted by admin_123");
+    expect(adminHtml).toContain("Deleted by admin");
     expect(adminHtml).toContain("Deleted by an admin");
     expect(adminHtml).toContain("Delete permanently");
     expect(adminHtml).toContain("Permanently delete resource");

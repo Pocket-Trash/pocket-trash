@@ -8,6 +8,8 @@ import { createDbServices, type DbServices } from "./db/index.js";
 export type {
   UpsertUserSettingsInput,
   UserSettingsService,
+  UserSyncResult,
+  UsersService,
 } from "./db/index.js";
 export { defaultUserSettings } from "./db/index.js";
 

@@ -1,5 +1,6 @@
 export const loggerMessages = {
   api: {
+    clerkWebhookDelivery: "api.clerkWebhook.delivery",
     cronHourly: "api.cron.hourly",
     healthChecked: "api.health.checked",
     serverListening: "api.server.listening",
@@ -65,6 +66,7 @@ export const loggerMessages = {
     users: {
       ensure: "database.users.ensure",
       getByClerkId: "database.users.getByClerkId",
+      syncFromClerk: "database.users.syncFromClerk",
     },
   },
   featureFlags: {

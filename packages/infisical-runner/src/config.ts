@@ -2,6 +2,7 @@ export const defaultEnvironmentSlug = "dev";
 
 const apiSecretPath = "/apps/api";
 const bunnyLocalSecretPath = "/local/bunny";
+const clerkLocalSecretPath = "/local/clerk";
 const cloudflareToolsSecretPath = "/tools/cloudflare";
 const databaseLocalSecretPath = "/local/database";
 const scraperSecretPath = "/apps/scraper";
@@ -42,11 +43,17 @@ export const commandSecrets = {
       environmentSlug: "prod",
       paths: [cloudflareToolsSecretPath],
     },
+    "deploy:development": {
+      allowServerSecrets: true,
+      environmentSlug: "dev",
+      paths: [cloudflareToolsSecretPath],
+    },
     "deploy:preview": {
       allowServerSecrets: true,
       environmentSlug: "preview",
       paths: [cloudflareToolsSecretPath],
     },
+    "users:reconcile": apiCommandSecretConfig,
   },
   bunny: {
     audit: {
@@ -114,6 +121,12 @@ export const commandSecrets = {
       allowServerSecrets: true,
       databaseUrlUserOverride: true,
       paths: [webSecretPath, databaseLocalSecretPath],
+    },
+  },
+  webhooks: {
+    listen: {
+      allowServerSecrets: true,
+      paths: [clerkLocalSecretPath, cloudflareToolsSecretPath],
     },
   },
 } as const satisfies Record<string, Record<string, CommandSecretConfig>>;
