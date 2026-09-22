@@ -92,7 +92,7 @@ export function ResourceCategoryInput({
         open={open}
         value={null}
       >
-        <ComboboxInput placeholder={placeholder} />
+        <ComboboxInput aria-label={placeholder} placeholder={placeholder} />
         <ComboboxContent>
           <ComboboxEmpty>{noResultsLabel}</ComboboxEmpty>
           <ComboboxList>

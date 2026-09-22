@@ -92,7 +92,7 @@ export function CatalogMultiCombobox({
         <div className="flex flex-wrap gap-1.5">
           {value.map((selected) => (
             <SelectionPill
-              className="bg-chart-1/15 text-chart-1"
+              className="bg-secondary text-secondary-foreground"
               key={selected.id}
               onRemove={() =>
                 onValueChange(value.filter(({ id }) => id !== selected.id))
@@ -199,7 +199,10 @@ function ComboboxInput({ className, ...props }: ComboboxPrimitive.Input.Props) {
         )}
         {...props}
       />
-      <ComboboxPrimitive.Trigger className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground outline-none">
+      <ComboboxPrimitive.Trigger
+        aria-label={props["aria-label"] ?? props.placeholder}
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground outline-none"
+      >
         <ChevronDown aria-hidden="true" className="size-4" />
       </ComboboxPrimitive.Trigger>
     </div>
