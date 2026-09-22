@@ -1035,7 +1035,9 @@ async function drainQueue<TJobData>({
   batchSize: number;
   concurrency: number;
   connection: Redis;
-  handler: (job: Job<TJobData>) => Promise<"completed" | "skipped" | void>;
+  handler: (
+    job: Job<TJobData>,
+  ) => Promise<"completed" | "skipped"> | Promise<void>;
   logger: Logger;
   queueName: string;
 }): Promise<QueueDrainStats> {
