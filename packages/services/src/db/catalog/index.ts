@@ -5,11 +5,11 @@ import {
   and,
   asc,
   count,
+  desc,
   eq,
   inArray,
   isNotNull,
   isNull,
-  or,
   sql,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -45,7 +45,10 @@ export type CatalogImage = {
   url: string;
 };
 
-export type CatalogImageTargetType = "collection_item" | "product";
+export type CatalogImageTargetType =
+  | "collection"
+  | "collection_item"
+  | "product";
 export type CatalogImageTrashItem = CatalogImage & {
   ownerClerkId: string;
   targetId: number;
@@ -189,6 +192,8 @@ export type UserCollectionItem = {
   canAdminister: boolean;
   canEdit: boolean;
   collectionIsPrivate: boolean;
+  collectionId: number;
+  collectionName: string;
   collectionItemId: number;
   finishOption: CatalogFinishOption | null;
   imageCount: number;
@@ -210,17 +215,32 @@ export type UserCollectionItem = {
 };
 
 export type PublicCollectionOwner = {
-  clerkId: string;
+  collections: UserCollectionSummary[];
   itemCount: number;
-  isPrivate: boolean;
   items: UserCollectionItem[];
   userId: number;
+  username: string;
 };
 
 export type UserCollectionSummary = {
+  coverImage: CatalogImage | null;
+  coverImages: CatalogImage[];
+  createdAt: Date;
+  description: string | null;
+  id: number;
   isAdminPrivate: boolean;
   isPrivate: boolean;
+  itemCount: number;
+  name: string;
   ownerUserId: number;
+  updatedAt: Date;
+};
+
+export type CollectionWriteInput = {
+  description: string | null;
+  isPrivate: boolean;
+  name: string;
+  reason?: string;
 };
 
 export type CollectionsService = {
@@ -234,6 +254,8 @@ export type CollectionsService = {
     spinnerCustomFinish: ProductWriteFinishOption | null;
     spinnerMaterialId: number;
     spinnerProductId: number;
+    collectionId?: number | null;
+    newCollection?: CollectionWriteInput | null;
   }): Promise<{ buttonItemId: number | null; spinnerItemId: number }>;
   addSpinnerButton(input: {
     actorClerkId: string;
@@ -241,7 +263,14 @@ export type CollectionsService = {
     finishOptionId: number | null;
     materialId: number;
     productId: number;
+    collectionId?: number | null;
+    newCollection?: CollectionWriteInput | null;
   }): Promise<number>;
+  createCollection(
+    input: CollectionWriteInput & {
+      actorClerkId: string;
+    },
+  ): Promise<UserCollectionSummary>;
   countOwnedProducts(input: {
     actorClerkId: string;
     productIds: number[];
@@ -251,24 +280,38 @@ export type CollectionsService = {
     collectionItemId: number,
     actorIsAdmin?: boolean,
   ): Promise<UserCollectionItem | null>;
+  getDefaultCollectionName(actorClerkId: string): Promise<string>;
   getOwnedCollection(
     actorClerkId: string,
+    collectionId: number,
+    actorIsAdmin?: boolean,
   ): Promise<UserCollectionSummary | null>;
+  getPublicCollection(input: {
+    collectionId: number;
+    ownerUserId: number;
+    viewer?: CatalogViewer;
+  }): Promise<UserCollectionSummary | null>;
   getPublicItem(input: {
     collectionItemId: number;
+    collectionId: number;
     ownerUserId: number;
     viewer?: CatalogViewer;
   }): Promise<UserCollectionItem | null>;
   listOwned(
     actorClerkId: string,
     actorIsAdmin?: boolean,
+    collectionId?: number,
   ): Promise<UserCollectionItem[]>;
+  listOwnedCollections(
+    actorClerkId: string,
+    actorIsAdmin?: boolean,
+  ): Promise<UserCollectionSummary[]>;
   listOwners(viewer?: CatalogViewer): Promise<PublicCollectionOwner[]>;
   setCollectionVisibility(input: {
     actorClerkId: string;
     actorIsAdmin: boolean;
+    collectionId: number;
     isPrivate: boolean;
-    ownerUserId: number;
     reason?: string;
   }): Promise<void>;
   setItemVisibility(input: {
@@ -281,6 +324,7 @@ export type CollectionsService = {
   updateItem(input: {
     actorClerkId: string;
     actorIsAdmin?: boolean;
+    collectionId?: number;
     collectionItemId: number;
     customFinish: ProductWriteFinishOption | null;
     finishOptionId: number | null;
@@ -292,6 +336,13 @@ export type CollectionsService = {
     } | null;
     materialId: number;
   }): Promise<void>;
+  updateCollection(
+    input: CollectionWriteInput & {
+      actorClerkId: string;
+      actorIsAdmin: boolean;
+      collectionId: number;
+    },
+  ): Promise<UserCollectionSummary>;
 };
 
 export function createCatalogService(
@@ -698,16 +749,39 @@ export function createCollectionsService(
   logger: Logger,
 ): CollectionsService {
   return {
+    async createCollection(input) {
+      return await logger.operation(
+        loggerMessages.database.collections.create,
+        async () => {
+          const owner = await users.ensure({ clerkId: input.actorClerkId });
+          const collectionId = await db.transaction(async (tx) =>
+            insertCollection(tx, owner.id, input),
+          );
+          const collection = (
+            await queryCollections(db, {
+              collectionId,
+              includePrivate: true,
+              ownerUserId: owner.id,
+              viewerClerkId: input.actorClerkId,
+            })
+          )[0];
+          if (!collection) throw new Error("Failed to load collection.");
+          return collection;
+        },
+        actorAttributes(input.actorClerkId),
+      );
+    },
     async addSpinner(input) {
       return await logger.operation(
         loggerMessages.database.collections.addSpinner,
         async () => {
           const owner = await users.ensure({ clerkId: input.actorClerkId });
           return await db.transaction(async (tx) => {
-            await tx
-              .insert(schema.userCollection)
-              .values({ ownerId: owner.id })
-              .onConflictDoNothing();
+            const collectionId = await resolveCollectionForWrite(tx, {
+              collectionId: input.collectionId ?? null,
+              newCollection: input.newCollection ?? null,
+              ownerId: owner.id,
+            });
             let buttonItemId: number | null = null;
             if (
               input.buttonProductId === null &&
@@ -733,6 +807,7 @@ export function createCollectionsService(
               const [buttonItem] = await tx
                 .insert(schema.collectionItem)
                 .values({
+                  collectionId,
                   materialId: input.buttonMaterialId,
                   ownerId: owner.id,
                 })
@@ -759,6 +834,7 @@ export function createCollectionsService(
             const [spinnerItem] = await tx
               .insert(schema.collectionItem)
               .values({
+                collectionId,
                 materialId: input.spinnerMaterialId,
                 ownerId: owner.id,
               })
@@ -775,6 +851,7 @@ export function createCollectionsService(
               productFinishOptionId: input.spinnerFinishOptionId,
               productId: input.spinnerProductId,
             });
+            await touchCollection(tx, collectionId);
             return { buttonItemId, spinnerItemId: spinnerItem.id };
           });
         },
@@ -790,14 +867,19 @@ export function createCollectionsService(
         async () => {
           const owner = await users.ensure({ clerkId: input.actorClerkId });
           return await db.transaction(async (tx) => {
-            await tx
-              .insert(schema.userCollection)
-              .values({ ownerId: owner.id })
-              .onConflictDoNothing();
+            const collectionId = await resolveCollectionForWrite(tx, {
+              collectionId: input.collectionId ?? null,
+              newCollection: input.newCollection ?? null,
+              ownerId: owner.id,
+            });
             await assertProductMaterial(tx, input.productId, input.materialId);
             const [item] = await tx
               .insert(schema.collectionItem)
-              .values({ materialId: input.materialId, ownerId: owner.id })
+              .values({
+                collectionId,
+                materialId: input.materialId,
+                ownerId: owner.id,
+              })
               .returning({ id: schema.collectionItem.id });
             if (!item) throw new Error("Failed to create collection item.");
             await tx.insert(schema.collectionSpinnerButton).values({
@@ -810,6 +892,7 @@ export function createCollectionsService(
               productFinishOptionId: input.finishOptionId,
               productId: input.productId,
             });
+            await touchCollection(tx, collectionId);
             return item.id;
           });
         },
@@ -868,35 +951,36 @@ export function createCollectionsService(
         )[0] ?? null
       );
     },
-    async getOwnedCollection(actorClerkId) {
-      const [collection] = await db
-        .select({
-          isPrivate: schema.userCollection.isPrivate,
-          ownerUserId: schema.userCollection.ownerId,
-          privatedByClerkId: schema.userCollection.privatedByClerkId,
-        })
-        .from(schema.userCollection)
-        .innerJoin(
-          schema.user,
-          eq(schema.userCollection.ownerId, schema.user.id),
-        )
+    async getDefaultCollectionName(actorClerkId) {
+      const [owner] = await db
+        .select({ username: sql<string | null>`${schema.user}."username"` })
+        .from(schema.user)
         .where(eq(schema.user.clerkId, actorClerkId))
         .limit(1);
-      return collection
-        ? {
-            isAdminPrivate:
-              collection.isPrivate &&
-              collection.privatedByClerkId !== null &&
-              collection.privatedByClerkId !== actorClerkId,
-            isPrivate: collection.isPrivate,
-            ownerUserId: collection.ownerUserId,
-          }
-        : null;
+      if (!owner?.username) {
+        throw new Error("User profile sync is incomplete. Please retry.");
+      }
+      return `${owner.username}'s Collection`;
     },
-    async getPublicItem({ collectionItemId, ownerUserId, viewer }) {
+    async getOwnedCollection(actorClerkId, collectionId, actorIsAdmin = false) {
+      const owner = await users.getByClerkId(actorClerkId);
+      if (!owner && !actorIsAdmin) return null;
       return (
         (
-          await queryOwnedItems(db, undefined, collectionItemId, {
+          await queryCollections(db, {
+            collectionId,
+            includePrivate: true,
+            ownerUserId: actorIsAdmin ? undefined : owner?.id,
+            viewerClerkId: actorClerkId,
+          })
+        )[0] ?? null
+      );
+    },
+    async getPublicCollection({ collectionId, ownerUserId, viewer }) {
+      return (
+        (
+          await queryCollections(db, {
+            collectionId,
             includePrivate: Boolean(viewer?.isAdmin),
             ownerUserId,
             viewerClerkId: viewer?.clerkId,
@@ -904,73 +988,84 @@ export function createCollectionsService(
         )[0] ?? null
       );
     },
-    async listOwned(actorClerkId, actorIsAdmin = false) {
+    async getPublicItem({
+      collectionId,
+      collectionItemId,
+      ownerUserId,
+      viewer,
+    }) {
+      return (
+        (
+          await queryOwnedItems(db, undefined, collectionItemId, {
+            collectionId,
+            includePrivate: Boolean(viewer?.isAdmin),
+            ownerUserId,
+            viewerClerkId: viewer?.clerkId,
+          })
+        )[0] ?? null
+      );
+    },
+    async listOwned(actorClerkId, actorIsAdmin = false, collectionId) {
       return await queryOwnedItems(
         db,
         actorIsAdmin ? undefined : actorClerkId,
         undefined,
         {
+          collectionId,
           includePrivate: true,
         },
       );
     },
+    async listOwnedCollections(actorClerkId, actorIsAdmin = false) {
+      const owner = await users.getByClerkId(actorClerkId);
+      if (!owner && !actorIsAdmin) return [];
+      return await queryCollections(db, {
+        includePrivate: true,
+        ownerUserId: actorIsAdmin ? undefined : owner?.id,
+        viewerClerkId: actorClerkId,
+      });
+    },
     async listOwners(viewer) {
-      const [owners, items] = await Promise.all([
+      const items = await queryOwnedItems(db, undefined, undefined, {
+        includePrivate: Boolean(viewer?.isAdmin),
+        viewerClerkId: viewer?.clerkId,
+      });
+      const ownerIds = [
+        ...new Set(items.map(({ ownerUserId }) => ownerUserId)),
+      ];
+      if (!ownerIds.length) return [];
+      const [owners, collections] = await Promise.all([
         db
           .select({
-            clerkId: schema.user.clerkId,
-            itemCount: count(schema.collectionItem.id),
-            isPrivate: schema.userCollection.isPrivate,
             userId: schema.user.id,
+            username: sql<string | null>`${schema.user}."username"`,
           })
           .from(schema.user)
-          .innerJoin(
-            schema.collectionItem,
-            eq(schema.user.id, schema.collectionItem.ownerId),
-          )
-          .innerJoin(
-            schema.userCollection,
-            eq(schema.user.id, schema.userCollection.ownerId),
-          )
-          .leftJoin(
-            schema.collectionSpinner,
-            eq(schema.collectionItem.id, schema.collectionSpinner.id),
-          )
-          .leftJoin(
-            schema.collectionSpinnerButton,
-            eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
-          )
-          .where(
-            and(
-              eq(schema.collectionItem.owned, true),
-              viewer?.isAdmin
-                ? undefined
-                : or(
-                    and(
-                      eq(schema.userCollection.isPrivate, false),
-                      eq(schema.collectionItem.isPrivate, false),
-                    ),
-                    viewer?.clerkId
-                      ? eq(schema.user.clerkId, viewer.clerkId)
-                      : undefined,
-                  ),
-              or(
-                isNotNull(schema.collectionSpinner.id),
-                isNotNull(schema.collectionSpinnerButton.id),
-              ),
-            ),
-          )
-          .groupBy(schema.user.id, schema.userCollection.isPrivate)
-          .orderBy(asc(schema.user.clerkId)),
-        queryOwnedItems(db, undefined, undefined, {
+          .where(inArray(schema.user.id, ownerIds)),
+        queryCollections(db, {
           includePrivate: Boolean(viewer?.isAdmin),
           viewerClerkId: viewer?.clerkId,
         }),
       ]);
-      return owners.map((owner) => ({
-        ...owner,
-        items: items.filter(({ ownerUserId }) => ownerUserId === owner.userId),
-      }));
+      return owners
+        .flatMap((owner) => {
+          if (!owner.username) return [];
+          const ownerItems = items.filter(
+            ({ ownerUserId }) => ownerUserId === owner.userId,
+          );
+          return [
+            {
+              collections: collections.filter(
+                ({ ownerUserId }) => ownerUserId === owner.userId,
+              ),
+              itemCount: ownerItems.length,
+              items: ownerItems,
+              userId: owner.userId,
+              username: owner.username,
+            },
+          ];
+        })
+        .sort((left, right) => left.username.localeCompare(right.username));
     },
     async setCollectionVisibility(input) {
       const owner = await users.getByClerkId(input.actorClerkId);
@@ -983,7 +1078,7 @@ export function createCollectionsService(
           privatedByClerkId: schema.userCollection.privatedByClerkId,
         })
         .from(schema.userCollection)
-        .where(eq(schema.userCollection.ownerId, input.ownerUserId))
+        .where(eq(schema.userCollection.id, input.collectionId))
         .limit(1);
       if (
         !collection ||
@@ -1005,7 +1100,69 @@ export function createCollectionsService(
       await db
         .update(schema.userCollection)
         .set(privacyUpdate(input))
-        .where(eq(schema.userCollection.ownerId, input.ownerUserId));
+        .where(eq(schema.userCollection.id, input.collectionId));
+    },
+    async updateCollection(input) {
+      return await logger.operation(
+        loggerMessages.database.collections.update,
+        async () => {
+          const owner = await users.getByClerkId(input.actorClerkId);
+          const [current] = await db
+            .select({
+              isPrivate: schema.userCollection.isPrivate,
+              ownerId: schema.userCollection.ownerId,
+              privatedByClerkId: schema.userCollection.privatedByClerkId,
+            })
+            .from(schema.userCollection)
+            .where(eq(schema.userCollection.id, input.collectionId))
+            .limit(1);
+          if (
+            !current ||
+            (!input.actorIsAdmin && current.ownerId !== owner?.id)
+          ) {
+            throw new Error("Collection does not exist.");
+          }
+          if (
+            !input.isPrivate &&
+            current.privatedByClerkId &&
+            current.privatedByClerkId !== input.actorClerkId &&
+            !input.actorIsAdmin
+          ) {
+            throw new Error("Collection is private by an administrator.");
+          }
+          if (
+            input.actorIsAdmin &&
+            input.isPrivate !== current.isPrivate &&
+            input.isPrivate &&
+            !input.reason?.trim()
+          ) {
+            throw new Error("A privacy reason is required.");
+          }
+          const values = validatedCollectionValues(input);
+          await db
+            .update(schema.userCollection)
+            .set({
+              ...values,
+              ...(input.isPrivate === current.isPrivate
+                ? { updatedAt: new Date() }
+                : privacyUpdate(input)),
+            })
+            .where(eq(schema.userCollection.id, input.collectionId));
+          const collection = (
+            await queryCollections(db, {
+              collectionId: input.collectionId,
+              includePrivate: true,
+              ownerUserId: current.ownerId,
+              viewerClerkId: input.actorClerkId,
+            })
+          )[0];
+          if (!collection) throw new Error("Failed to load collection.");
+          return collection;
+        },
+        actorAttributes(input.actorClerkId, {
+          collectionId: input.collectionId,
+        }),
+      );
     },
     async setItemVisibility(input) {
       const owner = await users.getByClerkId(input.actorClerkId);
@@ -1046,6 +1203,9 @@ export function createCollectionsService(
               .select({
                 buttonProductId:
                   schema.collectionSpinnerButton.productSpinnerButtonId,
+                collectionId: schema.collectionItem.collectionId,
+                installedButtonId: schema.collectionSpinner.installedButtonId,
+                ownerId: schema.collectionItem.ownerId,
                 spinnerProductId: schema.collectionSpinner.productSpinnerId,
               })
               .from(schema.collectionItem)
@@ -1073,6 +1233,48 @@ export function createCollectionsService(
               item?.spinnerProductId ?? item?.buttonProductId ?? null;
             if (!item || productId === null) {
               throw new Error("Collection item does not exist.");
+            }
+
+            const targetCollectionId = input.collectionId ?? item.collectionId;
+            const [targetCollection] = await tx
+              .select({ id: schema.userCollection.id })
+              .from(schema.userCollection)
+              .where(
+                and(
+                  eq(schema.userCollection.id, targetCollectionId),
+                  eq(schema.userCollection.ownerId, item.ownerId),
+                ),
+              )
+              .limit(1);
+            if (!targetCollection)
+              throw new Error("Collection does not exist.");
+
+            if (item.collectionId !== targetCollectionId) {
+              const linkedItemIds = [input.collectionItemId];
+              if (item.installedButtonId !== null) {
+                linkedItemIds.push(item.installedButtonId);
+              }
+              const linkedSpinners = await tx
+                .select({ id: schema.collectionSpinner.id })
+                .from(schema.collectionSpinner)
+                .where(
+                  eq(
+                    schema.collectionSpinner.installedButtonId,
+                    input.collectionItemId,
+                  ),
+                );
+              linkedItemIds.push(...linkedSpinners.map(({ id }) => id));
+              await tx
+                .update(schema.collectionItem)
+                .set({
+                  collectionId: targetCollectionId,
+                  updatedAt: new Date(),
+                })
+                .where(inArray(schema.collectionItem.id, linkedItemIds));
+              await Promise.all([
+                touchCollection(tx, item.collectionId),
+                touchCollection(tx, targetCollectionId),
+              ]);
             }
 
             await updateCollectionItemSnapshot(tx, {
@@ -1120,6 +1322,13 @@ export function createCollectionsService(
                 if (!button) {
                   throw new Error("Installed button does not exist.");
                 }
+                await tx
+                  .update(schema.collectionItem)
+                  .set({
+                    collectionId: targetCollectionId,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(schema.collectionItem.id, button.id));
                 await updateCollectionItemSnapshot(tx, {
                   ...input.installedButton,
                   productId: button.productId,
@@ -1133,6 +1342,7 @@ export function createCollectionsService(
                 })
                 .where(eq(schema.collectionSpinner.id, input.collectionItemId));
             }
+            await touchCollection(tx, targetCollectionId);
           });
         },
         actorAttributes(input.actorClerkId, {
@@ -1143,6 +1353,229 @@ export function createCollectionsService(
       );
     },
   };
+}
+
+export function normalizeCollectionName(name: string) {
+  return name
+    .trim()
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+function validatedCollectionValues(input: CollectionWriteInput) {
+  const name = input.name.trim();
+  const nameLength = [...name].length;
+  if (nameLength < 2 || nameLength > 80) {
+    throw new Error("Collection name must be between 2 and 80 characters.");
+  }
+  const normalizedName = normalizeCollectionName(name);
+  if (!normalizedName) throw new Error("Collection name is invalid.");
+  const description = input.description?.trim() || null;
+  if (description && description.split(/\s+/u).length > 200) {
+    throw new Error("Collection description must be 200 words or fewer.");
+  }
+  return { description, name, normalizedName };
+}
+
+async function insertCollection(
+  tx: CatalogTransaction,
+  ownerId: number,
+  input: CollectionWriteInput,
+) {
+  const [collection] = await tx
+    .insert(schema.userCollection)
+    .values({
+      ...validatedCollectionValues(input),
+      isPrivate: input.isPrivate,
+      ownerId,
+    })
+    .returning({ id: schema.userCollection.id });
+  if (!collection) throw new Error("Failed to create collection.");
+  return collection.id;
+}
+
+async function resolveCollectionForWrite(
+  tx: CatalogTransaction,
+  input: {
+    collectionId: number | null;
+    newCollection: CollectionWriteInput | null;
+    ownerId: number;
+  },
+) {
+  if (input.collectionId !== null && input.newCollection !== null) {
+    throw new Error("Choose an existing or new collection, not both.");
+  }
+  if (input.newCollection !== null) {
+    return await insertCollection(tx, input.ownerId, input.newCollection);
+  }
+  if (input.collectionId !== null) {
+    const [collection] = await tx
+      .select({ id: schema.userCollection.id })
+      .from(schema.userCollection)
+      .where(
+        and(
+          eq(schema.userCollection.id, input.collectionId),
+          eq(schema.userCollection.ownerId, input.ownerId),
+        ),
+      )
+      .limit(1);
+    if (!collection) throw new Error("Collection does not exist.");
+    return collection.id;
+  }
+
+  const collections = await tx
+    .select({ id: schema.userCollection.id })
+    .from(schema.userCollection)
+    .where(eq(schema.userCollection.ownerId, input.ownerId))
+    .limit(2);
+  if (collections.length > 1) throw new Error("Choose a collection.");
+  const existingCollection = collections[0];
+  if (existingCollection) return existingCollection.id;
+
+  const [owner] = await tx
+    .select({ username: sql<string | null>`${schema.user}."username"` })
+    .from(schema.user)
+    .where(eq(schema.user.id, input.ownerId))
+    .limit(1);
+  if (!owner?.username) {
+    throw new Error("User profile sync is incomplete. Please retry.");
+  }
+  return await insertCollection(tx, input.ownerId, {
+    description: null,
+    isPrivate: true,
+    name: `${owner.username}'s Collection`,
+  });
+}
+
+async function touchCollection(tx: CatalogTransaction, collectionId: number) {
+  await tx
+    .update(schema.userCollection)
+    .set({ updatedAt: new Date() })
+    .where(eq(schema.userCollection.id, collectionId));
+}
+
+async function queryCollections(
+  db: Database,
+  options: {
+    collectionId?: number;
+    includePrivate?: boolean;
+    ownerUserId?: number;
+    viewerClerkId?: string;
+  } = {},
+): Promise<UserCollectionSummary[]> {
+  const conditions = [];
+  if (options.collectionId !== undefined) {
+    conditions.push(eq(schema.userCollection.id, options.collectionId));
+  }
+  if (options.ownerUserId !== undefined) {
+    conditions.push(eq(schema.userCollection.ownerId, options.ownerUserId));
+  }
+  if (!options.includePrivate) {
+    conditions.push(
+      options.viewerClerkId
+        ? sql`(${schema.userCollection.isPrivate} = false or ${schema.user.clerkId} = ${options.viewerClerkId})`
+        : eq(schema.userCollection.isPrivate, false),
+    );
+  }
+  const rows = await db
+    .select({
+      createdAt: schema.userCollection.createdAt,
+      description: schema.userCollection.description,
+      id: schema.userCollection.id,
+      isPrivate: schema.userCollection.isPrivate,
+      name: schema.userCollection.name,
+      ownerClerkId: schema.user.clerkId,
+      ownerUserId: schema.userCollection.ownerId,
+      privatedByClerkId: schema.userCollection.privatedByClerkId,
+      updatedAt: schema.userCollection.updatedAt,
+    })
+    .from(schema.userCollection)
+    .innerJoin(schema.user, eq(schema.userCollection.ownerId, schema.user.id))
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(schema.userCollection.updatedAt));
+  if (!rows.length) return [];
+  const collectionIds = rows.map(({ id }) => id);
+  const [counts, covers] = await Promise.all([
+    db
+      .select({
+        collectionId: schema.collectionItem.collectionId,
+        itemCount: count(schema.collectionItem.id),
+      })
+      .from(schema.collectionItem)
+      .where(
+        and(
+          inArray(schema.collectionItem.collectionId, collectionIds),
+          eq(schema.collectionItem.owned, true),
+          options.includePrivate
+            ? undefined
+            : eq(schema.collectionItem.isPrivate, false),
+        ),
+      )
+      .groupBy(schema.collectionItem.collectionId),
+    db
+      .select()
+      .from(schema.collectionImage)
+      .where(inArray(schema.collectionImage.collectionId, collectionIds))
+      .orderBy(desc(schema.collectionImage.position)),
+  ]);
+  const countByCollection = new Map(
+    counts.map(({ collectionId, itemCount }) => [
+      collectionId,
+      Number(itemCount),
+    ]),
+  );
+  const coverByCollection = new Map(
+    covers
+      .filter(({ isCurrent }) => isCurrent)
+      .map((cover) => [
+        cover.collectionId,
+        {
+          contentType: cover.contentType,
+          createdAt: cover.createdAt,
+          deletedAt: null,
+          deletedByClerkId: null,
+          deletedByRole: null,
+          fileName: cover.fileName,
+          id: cover.id,
+          objectPath: cover.objectPath,
+          position: cover.position,
+          size: cover.size,
+          url: cover.url,
+        } satisfies CatalogImage,
+      ]),
+  );
+  return rows.map((row) => ({
+    coverImage: coverByCollection.get(row.id) ?? null,
+    coverImages: covers
+      .filter(({ collectionId }) => collectionId === row.id)
+      .map((cover) => ({
+        contentType: cover.contentType,
+        createdAt: cover.createdAt,
+        deletedAt: null,
+        deletedByClerkId: null,
+        deletedByRole: null,
+        fileName: cover.fileName,
+        id: cover.id,
+        objectPath: cover.objectPath,
+        position: cover.position,
+        size: cover.size,
+        url: cover.url,
+      })),
+    createdAt: row.createdAt,
+    description: row.description,
+    id: row.id,
+    isAdminPrivate:
+      row.isPrivate &&
+      row.privatedByClerkId !== null &&
+      row.privatedByClerkId !== row.ownerClerkId,
+    isPrivate: row.isPrivate,
+    itemCount: countByCollection.get(row.id) ?? 0,
+    name: row.name,
+    ownerUserId: row.ownerUserId,
+    updatedAt: row.updatedAt,
+  }));
 }
 
 async function updateCollectionItemSnapshot(
@@ -1490,6 +1923,7 @@ async function queryOwnedItems(
   actorClerkId?: string,
   collectionItemId?: number,
   options: {
+    collectionId?: number;
     includePrivate?: boolean;
     ownerUserId?: number;
     viewerClerkId?: string;
@@ -1501,6 +1935,11 @@ async function queryOwnedItems(
   }
   if (collectionItemId !== undefined) {
     conditions.push(eq(schema.collectionItem.id, collectionItemId));
+  }
+  if (options.collectionId !== undefined) {
+    conditions.push(
+      eq(schema.collectionItem.collectionId, options.collectionId),
+    );
   }
   if (options.ownerUserId !== undefined) {
     conditions.push(eq(schema.collectionItem.ownerId, options.ownerUserId));
@@ -1515,8 +1954,10 @@ async function queryOwnedItems(
   }
   const rows = await db
     .select({
+      collectionId: schema.userCollection.id,
       collectionItemId: schema.collectionItem.id,
       collectionIsPrivate: schema.userCollection.isPrivate,
+      collectionName: schema.userCollection.name,
       colorEffectId: schema.colorEffect.id,
       colorEffectName: schema.colorEffect.name,
       colorEffectSlug: schema.colorEffect.slug,
@@ -1538,12 +1979,13 @@ async function queryOwnedItems(
         schema.finishOption.sourceProductFinishOptionId,
       spinnerId: schema.collectionSpinner.id,
       buttonId: schema.collectionSpinnerButton.id,
+      updatedAt: schema.collectionItem.updatedAt,
     })
     .from(schema.collectionItem)
     .innerJoin(schema.user, eq(schema.collectionItem.ownerId, schema.user.id))
     .innerJoin(
       schema.userCollection,
-      eq(schema.collectionItem.ownerId, schema.userCollection.ownerId),
+      eq(schema.collectionItem.collectionId, schema.userCollection.id),
     )
     .leftJoin(
       schema.material,
@@ -1578,7 +2020,7 @@ async function queryOwnedItems(
       eq(schema.product.productTypeId, schema.productType.id),
     )
     .where(and(...conditions))
-    .orderBy(asc(schema.product.name));
+    .orderBy(desc(schema.collectionItem.updatedAt));
   const finishOptions = await loadFinishOptionComponents(
     db,
     rows.flatMap((row) =>
@@ -1600,7 +2042,9 @@ async function queryOwnedItems(
       options.includePrivate || options.viewerClerkId === row.ownerClerkId,
     ),
     collectionIsPrivate: row.collectionIsPrivate,
+    collectionId: row.collectionId,
     collectionItemId: row.collectionItemId,
+    collectionName: row.collectionName,
     finishOption: row.finishOptionId
       ? (finishOptions.get(row.finishOptionId) ?? null)
       : null,

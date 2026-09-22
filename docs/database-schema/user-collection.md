@@ -2,14 +2,18 @@
 
 # user_collection
 
-No table description has been added yet.
+A named collection owned by one user.
 
 ## Columns
 
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `owner_id` | `bigint` | yes | PK, FK |  | `users.id` (on delete cascade) |  |  |
-| `is_private` | `boolean` | yes |  | `true` |  |  |  |
+| `id` | `bigint` | yes | PK |  |  | Internal collection identifier. | `1000` |
+| `owner_id` | `bigint` | yes | FK |  | `users.id` (on delete cascade) | User who owns the collection. | `1000` |
+| `name` | `text` | yes |  |  |  | Display name of the collection. | `Daily Carry` |
+| `normalized_name` | `text` | yes |  |  |  | Canonical per-owner key used to prevent duplicate names. | `dailycarry` |
+| `description` | `text` | no |  |  |  | Optional description of the collection. | `Everyday carry spinners.` |
+| `is_private` | `boolean` | yes |  | `true` |  | Whether public routes hide the collection and its items. | `true` |
 | `private_reason` | `text` | no |  |  |  |  |  |
 | `privated_at` | `timestamp with time zone` | no |  |  |  |  |  |
 | `privated_by_clerk_id` | `text` | no |  |  |  |  |  |
@@ -20,4 +24,4 @@ No table description has been added yet.
 
 | Name | Unique | Method | Columns |
 | --- | --- | --- | --- |
-| `user_collection_visibility_idx` | no | `btree` | `is_private` |
+| `user_collection_owner_visibility_idx` | no | `btree` | `owner_id`, `is_private` |

@@ -13,6 +13,7 @@ No table description has been added yet.
 | `target_type` | `text` | yes |  |  |  |  |  |
 | `product_id` | `bigint` | no | FK |  | `product.id` (on delete cascade) |  |  |
 | `collection_item_id` | `bigint` | no | FK |  | `collection_item.id` (on delete cascade) |  |  |
+| `collection_id` | `bigint` | no | FK |  | `user_collection.id` (on delete cascade) |  |  |
 | `expires_at` | `timestamp with time zone` | yes |  |  |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 

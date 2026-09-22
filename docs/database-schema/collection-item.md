@@ -9,7 +9,8 @@ Shared ownership and lifecycle row for user collection items.
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | yes | PK |  |  | Internal collection item row identifier. | `1000` |
-| `owner_id` | `bigint` | yes | FK |  | `users.id` (on delete cascade) | User who owns or owned the collection item. | `1000` |
+| `owner_id` | `bigint` | yes | FK |  | `users.id` (on delete cascade), `user_collection.owner_id` (on delete cascade) | User who owns or owned the collection item. | `1000` |
+| `collection_id` | `bigint` | yes | FK |  | `user_collection.id` (on delete cascade) | Named collection containing the item. | `1000` |
 | `material_id` | `bigint` | no | FK |  | `materials.id` (on delete restrict) | Exact material of the owned physical item. | `1000` |
 | `purchased_at` | `timestamp with time zone` | no |  |  |  | Timestamp when the item was purchased. | `2026-07-17T20:45:00.000Z` |
 | `sold_at` | `timestamp with time zone` | no |  |  |  | Timestamp when the item was sold. | `2026-08-17T20:45:00.000Z` |
@@ -29,4 +30,4 @@ Shared ownership and lifecycle row for user collection items.
 
 | Name | Unique | Method | Columns |
 | --- | --- | --- | --- |
-| `collection_item_owner_visibility_idx` | no | `btree` | `owner_id`, `is_private` |
+| `collection_item_collection_visibility_idx` | no | `btree` | `collection_id`, `owner_id`, `is_private` |

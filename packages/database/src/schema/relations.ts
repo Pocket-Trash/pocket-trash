@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import {
   catalogImageUploadFile,
   catalogImageUploadSession,
+  collectionImage,
   collectionItem,
   collectionItemImage,
   collectionSpinner,
@@ -58,17 +59,22 @@ import { userSettings } from "./user-settings.js";
 import { user } from "./users.js";
 
 export const usersRelations = relations(user, ({ many, one }) => ({
-  collection: one(userCollection),
+  collections: many(userCollection),
   collectionItems: many(collectionItem),
   settings: one(userSettings),
 }));
 
-export const userCollectionRelations = relations(userCollection, ({ one }) => ({
-  owner: one(user, {
-    fields: [userCollection.ownerId],
-    references: [user.id],
+export const userCollectionRelations = relations(
+  userCollection,
+  ({ many, one }) => ({
+    images: many(collectionImage),
+    items: many(collectionItem),
+    owner: one(user, {
+      fields: [userCollection.ownerId],
+      references: [user.id],
+    }),
   }),
-}));
+);
 
 export const userSettingsRelations = relations(userSettings, ({ one }) => ({
   user: one(user, {
@@ -105,6 +111,16 @@ export const resourceVersionsRelations = relations(
     resource: one(resources, {
       fields: [resourceVersions.resourceId],
       references: [resources.id],
+    }),
+  }),
+);
+
+export const collectionImageRelations = relations(
+  collectionImage,
+  ({ one }) => ({
+    collection: one(userCollection, {
+      fields: [collectionImage.collectionId],
+      references: [userCollection.id],
     }),
   }),
 );
@@ -242,6 +258,10 @@ export const scraperRunsRelations = relations(scraperRuns, () => ({}));
 export const collectionItemRelations = relations(
   collectionItem,
   ({ many, one }) => ({
+    collection: one(userCollection, {
+      fields: [collectionItem.collectionId],
+      references: [userCollection.id],
+    }),
     finishOption: one(finishOption),
     images: many(collectionItemImage),
     material: one(material, {
@@ -313,6 +333,10 @@ export const productImageRelations = relations(productImage, ({ one }) => ({
 export const catalogImageUploadSessionRelations = relations(
   catalogImageUploadSession,
   ({ many, one }) => ({
+    collection: one(userCollection, {
+      fields: [catalogImageUploadSession.collectionId],
+      references: [userCollection.id],
+    }),
     collectionItem: one(collectionItem, {
       fields: [catalogImageUploadSession.collectionItemId],
       references: [collectionItem.id],

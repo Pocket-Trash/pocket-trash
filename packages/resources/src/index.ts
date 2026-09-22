@@ -48,7 +48,7 @@ export type ResourceDeleteResult = "deleted" | "missing";
 export type ResourceStorage = {
   createCatalogImageUploadTarget?(
     input: ResourceUploadMetadata,
-    targetType: "collection-item" | "product",
+    targetType: "collection" | "collection-item" | "product",
     targetId: number,
   ): ResourceUploadTarget;
   createUploadTarget(

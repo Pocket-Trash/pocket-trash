@@ -122,7 +122,7 @@ const CatalogImageUploadSessionSchema = z.object({
     .min(1)
     .max(maxCatalogImageFiles),
   targetId: z.number().int().positive(),
-  targetType: z.enum(["product", "collection_item"]),
+  targetType: z.enum(["product", "collection", "collection_item"]),
 });
 
 const ResourceUploadSessionSchema = z.discriminatedUnion("operation", [
@@ -290,7 +290,10 @@ export function createApp(dependencies: AppDependencies = {}) {
           "access-control-allow-headers",
           "authorization, content-type",
         );
-        context.header("access-control-allow-methods", "POST, PUT, OPTIONS");
+        context.header(
+          "access-control-allow-methods",
+          "DELETE, PATCH, POST, PUT, OPTIONS",
+        );
         return context.body(null, 204);
       }
       await next();
@@ -391,6 +394,71 @@ export function createApp(dependencies: AppDependencies = {}) {
       return catalogImageUploadErrorResponse(error);
     }
   });
+
+  api.patch(
+    "/catalog-image-upload-sessions/collections/:collectionId/cover",
+    async (context) => {
+      const runtime = await requireCatalogImageUploadRuntime(
+        dependencies,
+        context.env,
+      );
+      const actor = await runtime.authenticate(context.req.raw);
+      if (!actor) return context.json({ error: "unauthorized" }, 401);
+      const parsed = z
+        .object({ imageId: z.number().int().positive().nullable() })
+        .safeParse(await context.req.json().catch(() => null));
+      const collectionId = Number(context.req.param("collectionId"));
+      if (
+        !parsed.success ||
+        !Number.isSafeInteger(collectionId) ||
+        collectionId <= 0
+      ) {
+        return context.json({ error: "invalid_request" }, 400);
+      }
+      try {
+        await runtime.service.selectCollectionCover(
+          collectionId,
+          parsed.data.imageId,
+          actor,
+        );
+        return context.body(null, 204);
+      } catch (error) {
+        return catalogImageUploadErrorResponse(error);
+      }
+    },
+  );
+
+  api.delete(
+    "/catalog-image-upload-sessions/collections/:collectionId/covers/:imageId",
+    async (context) => {
+      const runtime = await requireCatalogImageUploadRuntime(
+        dependencies,
+        context.env,
+      );
+      const actor = await runtime.authenticate(context.req.raw);
+      if (!actor) return context.json({ error: "unauthorized" }, 401);
+      const collectionId = Number(context.req.param("collectionId"));
+      const imageId = Number(context.req.param("imageId"));
+      if (
+        !Number.isSafeInteger(collectionId) ||
+        collectionId <= 0 ||
+        !Number.isSafeInteger(imageId) ||
+        imageId <= 0
+      ) {
+        return context.json({ error: "invalid_request" }, 400);
+      }
+      try {
+        await runtime.service.deleteCollectionCover(
+          collectionId,
+          imageId,
+          actor,
+        );
+        return context.body(null, 204);
+      } catch (error) {
+        return catalogImageUploadErrorResponse(error);
+      }
+    },
+  );
 
   api.put(
     "/catalog-image-upload-sessions/:sessionId/files/:fileId",

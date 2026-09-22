@@ -6,9 +6,12 @@ import {
   type ResourceStorage,
   type ResourceUploadMetadata,
 } from "@package/resources";
-import { and, eq, isNull, lt, max } from "drizzle-orm";
+import { and, eq, isNull, lt, max, sql } from "drizzle-orm";
 
-export type CatalogImageTargetType = "collection_item" | "product";
+export type CatalogImageTargetType =
+  | "collection"
+  | "collection_item"
+  | "product";
 export type CatalogImageActor = { clerkId: string; isAdmin: boolean };
 
 export type CatalogImageUploadInput = {
@@ -96,23 +99,11 @@ export function createCatalogImageUploadSessionsService(input: {
     ) {
       validateManifest(sessionInput);
       await assertCanEditTarget(input.db, sessionInput, actor);
-      const imageTable =
-        sessionInput.targetType === "product"
-          ? schema.productImage
-          : schema.collectionItemImage;
-      const targetColumn =
-        sessionInput.targetType === "product"
-          ? schema.productImage.productId
-          : schema.collectionItemImage.collectionItemId;
-      const existing = await input.db
-        .select({
-          deletedAt: imageTable.deletedAt,
-          deletedByRole: imageTable.deletedByRole,
-          id: imageTable.id,
-          sha256: imageTable.sha256,
-        })
-        .from(imageTable)
-        .where(eq(targetColumn, sessionInput.targetId));
+      const existing = await loadExistingImages(
+        input.db,
+        sessionInput.targetType,
+        sessionInput.targetId,
+      );
       for (const file of sessionInput.files) {
         const duplicate = existing.find(({ sha256 }) => sha256 === file.sha256);
         if (!duplicate) continue;
@@ -142,9 +133,9 @@ export function createCatalogImageUploadSessionsService(input: {
             sha256: file.sha256,
             ...createUploadTarget(
               file,
-              sessionInput.targetType === "product"
-                ? "product"
-                : "collection-item",
+              sessionInput.targetType === "collection_item"
+                ? "collection-item"
+                : sessionInput.targetType,
               sessionInput.targetId,
             ),
           }));
@@ -153,6 +144,10 @@ export function createCatalogImageUploadSessionsService(input: {
         }
       })();
       await input.db.insert(schema.catalogImageUploadSession).values({
+        collectionId:
+          sessionInput.targetType === "collection"
+            ? sessionInput.targetId
+            : null,
         collectionItemId:
           sessionInput.targetType === "collection_item"
             ? sessionInput.targetId
@@ -196,6 +191,79 @@ export function createCatalogImageUploadSessionsService(input: {
       };
     },
 
+    async deleteCollectionCover(
+      collectionId: number,
+      imageId: number,
+      actor: CatalogImageActor,
+    ) {
+      await assertCanEditTarget(
+        input.db,
+        { targetId: collectionId, targetType: "collection" },
+        actor,
+      );
+      const [image] = await input.db
+        .select({
+          isCurrent: schema.collectionImage.isCurrent,
+          objectPath: schema.collectionImage.objectPath,
+        })
+        .from(schema.collectionImage)
+        .where(
+          and(
+            eq(schema.collectionImage.id, imageId),
+            eq(schema.collectionImage.collectionId, collectionId),
+          ),
+        )
+        .limit(1);
+      if (!image || image.isCurrent) {
+        throw new CatalogImageUploadError("invalid_request", 400);
+      }
+      await input.storage.delete(image.objectPath);
+      await input.db
+        .delete(schema.collectionImage)
+        .where(eq(schema.collectionImage.id, imageId));
+    },
+
+    async selectCollectionCover(
+      collectionId: number,
+      imageId: number | null,
+      actor: CatalogImageActor,
+    ) {
+      await assertCanEditTarget(
+        input.db,
+        { targetId: collectionId, targetType: "collection" },
+        actor,
+      );
+      if (imageId !== null) {
+        const [image] = await input.db
+          .select({ id: schema.collectionImage.id })
+          .from(schema.collectionImage)
+          .where(
+            and(
+              eq(schema.collectionImage.id, imageId),
+              eq(schema.collectionImage.collectionId, collectionId),
+            ),
+          )
+          .limit(1);
+        if (!image) throw new CatalogImageUploadError("invalid_request", 400);
+      }
+      await input.db.transaction(async (tx) => {
+        await tx
+          .update(schema.collectionImage)
+          .set({ isCurrent: false })
+          .where(eq(schema.collectionImage.collectionId, collectionId));
+        if (imageId !== null) {
+          await tx
+            .update(schema.collectionImage)
+            .set({ isCurrent: true })
+            .where(eq(schema.collectionImage.id, imageId));
+        }
+        await tx
+          .update(schema.userCollection)
+          .set({ updatedAt: now() })
+          .where(eq(schema.userCollection.id, collectionId));
+      });
+    },
+
     async upload(
       sessionId: string,
       fileId: string,
@@ -204,6 +272,7 @@ export function createCatalogImageUploadSessionsService(input: {
     ) {
       const [file] = await input.db
         .select({
+          collectionId: schema.catalogImageUploadSession.collectionId,
           collectionItemId: schema.catalogImageUploadSession.collectionItemId,
           contentType: schema.catalogImageUploadFile.contentType,
           expiresAt: schema.catalogImageUploadSession.expiresAt,
@@ -238,7 +307,8 @@ export function createCatalogImageUploadSessionsService(input: {
       if (file.expiresAt <= now()) {
         throw new CatalogImageUploadError("session_expired", 409);
       }
-      const targetId = file.productId ?? file.collectionItemId;
+      const targetId =
+        file.productId ?? file.collectionId ?? file.collectionItemId;
       if (targetId === null) {
         throw new CatalogImageUploadError("session_not_found", 404);
       }
@@ -296,6 +366,33 @@ export function createCatalogImageUploadSessionsService(input: {
             size: file.size,
             uploadedByClerkId: actor.clerkId,
             url: file.url,
+          });
+        } else if (file.targetType === "collection") {
+          if (file.collectionId === null) {
+            throw new CatalogImageUploadError("session_not_found", 404);
+          }
+          const collectionId = file.collectionId;
+          await input.db.transaction(async (tx) => {
+            await tx
+              .update(schema.collectionImage)
+              .set({ isCurrent: false })
+              .where(eq(schema.collectionImage.collectionId, collectionId));
+            await tx.insert(schema.collectionImage).values({
+              collectionId,
+              contentType: file.contentType,
+              fileName: file.fileName,
+              isCurrent: true,
+              objectPath: file.objectPath,
+              position,
+              sha256: file.sha256,
+              size: file.size,
+              uploadedByClerkId: actor.clerkId,
+              url: file.url,
+            });
+            await tx
+              .update(schema.userCollection)
+              .set({ updatedAt: now() })
+              .where(eq(schema.userCollection.id, collectionId));
           });
         } else {
           if (file.collectionItemId === null) {
@@ -370,6 +467,21 @@ async function assertCanEditTarget(
     }
     return;
   }
+  if (target.targetType === "collection") {
+    const [collection] = await db
+      .select({ ownerClerkId: schema.user.clerkId })
+      .from(schema.userCollection)
+      .innerJoin(schema.user, eq(schema.userCollection.ownerId, schema.user.id))
+      .where(eq(schema.userCollection.id, target.targetId))
+      .limit(1);
+    if (
+      !collection ||
+      (!actor.isAdmin && collection.ownerClerkId !== actor.clerkId)
+    ) {
+      throw new CatalogImageUploadError("session_not_found", 404);
+    }
+    return;
+  }
   const [item] = await db
     .select({ ownerClerkId: schema.user.clerkId })
     .from(schema.collectionItem)
@@ -401,6 +513,13 @@ async function nextPosition(
   targetType: CatalogImageTargetType,
   targetId: number,
 ) {
+  if (targetType === "collection") {
+    const [{ position = null } = {}] = await db
+      .select({ position: max(schema.collectionImage.position) })
+      .from(schema.collectionImage)
+      .where(eq(schema.collectionImage.collectionId, targetId));
+    return (position ?? -1) + 1;
+  }
   const imageTable =
     targetType === "product" ? schema.productImage : schema.collectionItemImage;
   const targetColumn =
@@ -412,6 +531,44 @@ async function nextPosition(
     .from(imageTable)
     .where(and(eq(targetColumn, targetId), isNull(imageTable.deletedAt)));
   return (position ?? -1) + 1;
+}
+
+async function loadExistingImages(
+  db: Database,
+  targetType: CatalogImageTargetType,
+  targetId: number,
+) {
+  if (targetType === "collection") {
+    return await db
+      .select({
+        deletedAt: sql<Date | null>`null`,
+        deletedByRole: sql<"admin" | "owner" | null>`null`,
+        id: schema.collectionImage.id,
+        sha256: schema.collectionImage.sha256,
+      })
+      .from(schema.collectionImage)
+      .where(eq(schema.collectionImage.collectionId, targetId));
+  }
+  if (targetType === "product") {
+    return await db
+      .select({
+        deletedAt: schema.productImage.deletedAt,
+        deletedByRole: schema.productImage.deletedByRole,
+        id: schema.productImage.id,
+        sha256: schema.productImage.sha256,
+      })
+      .from(schema.productImage)
+      .where(eq(schema.productImage.productId, targetId));
+  }
+  return await db
+    .select({
+      deletedAt: schema.collectionItemImage.deletedAt,
+      deletedByRole: schema.collectionItemImage.deletedByRole,
+      id: schema.collectionItemImage.id,
+      sha256: schema.collectionItemImage.sha256,
+    })
+    .from(schema.collectionItemImage)
+    .where(eq(schema.collectionItemImage.collectionItemId, targetId));
 }
 
 function toHex(buffer: ArrayBuffer) {

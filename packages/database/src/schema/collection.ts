@@ -5,6 +5,7 @@ import {
   boolean,
   check,
   decimal,
+  foreignKey,
   index,
   integer,
   pgTable,
@@ -19,14 +20,24 @@ import { maker, material, productType } from "./scraper.js";
 import { user } from "./users.js";
 
 export const catalogDeletionRoles = ["owner", "admin"] as const;
-export const catalogImageTargetTypes = ["product", "collection_item"] as const;
+export const catalogImageTargetTypes = [
+  "product",
+  "collection",
+  "collection_item",
+] as const;
 
 export const userCollection = pgTable(
   "user_collection",
   {
-    ownerId: bigint("owner_id", { mode: "number" })
+    id: bigint("id", { mode: "number" })
       .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    ownerId: bigint("owner_id", { mode: "number" })
+      .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    description: text("description"),
     isPrivate: boolean("is_private").default(true).notNull(),
     privateReason: text("private_reason"),
     privatedAt: timestamp("privated_at", { mode: "date", withTimezone: true }),
@@ -39,7 +50,19 @@ export const userCollection = pgTable(
       .notNull(),
   },
   (table) => [
-    index("user_collection_visibility_idx").on(table.isPrivate),
+    unique("user_collection_id_owner_unique").on(table.id, table.ownerId),
+    unique("user_collection_owner_name_unique").on(
+      table.ownerId,
+      table.normalizedName,
+    ),
+    index("user_collection_owner_visibility_idx").on(
+      table.ownerId,
+      table.isPrivate,
+    ),
+    check(
+      "user_collection_name_length_valid",
+      sql`char_length(trim(${table.name})) between 2 and 80`,
+    ),
     check(
       "user_collection_private_metadata_consistent",
       sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
@@ -56,6 +79,7 @@ export const collectionItem = pgTable(
     ownerId: bigint("owner_id", { mode: "number" })
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    collectionId: bigint("collection_id", { mode: "number" }).notNull(),
     materialId: bigint("material_id", { mode: "number" }).references(
       () => material.id,
       { onDelete: "restrict" },
@@ -84,13 +108,61 @@ export const collectionItem = pgTable(
       .notNull(),
   },
   (table) => [
-    index("collection_item_owner_visibility_idx").on(
+    foreignKey({
+      columns: [table.collectionId, table.ownerId],
+      foreignColumns: [userCollection.id, userCollection.ownerId],
+      name: "collection_item_collection_owner_fk",
+    }).onDelete("cascade"),
+    index("collection_item_collection_visibility_idx").on(
+      table.collectionId,
       table.ownerId,
       table.isPrivate,
     ),
     check(
       "collection_item_private_metadata_consistent",
       sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
+    ),
+  ],
+);
+
+export const collectionImage = pgTable(
+  "collection_image",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    collectionId: bigint("collection_id", { mode: "number" })
+      .notNull()
+      .references(() => userCollection.id, { onDelete: "cascade" }),
+    isCurrent: boolean("is_current").default(false).notNull(),
+    position: integer("position").notNull(),
+    fileName: text("file_name").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    sha256: text("sha256").notNull(),
+    storageProvider: text("storage_provider").default("bunny").notNull(),
+    objectPath: text("object_path").notNull(),
+    url: text("url").notNull(),
+    uploadedByClerkId: text("uploaded_by_clerk_id").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("collection_image_collection_id_idx").on(table.collectionId),
+    uniqueIndex("collection_image_current_unique")
+      .on(table.collectionId)
+      .where(sql`${table.isCurrent}`),
+    unique("collection_image_object_path_unique").on(table.objectPath),
+    unique("collection_image_collection_hash_unique").on(
+      table.collectionId,
+      table.sha256,
+    ),
+    check("collection_image_position_valid", sql`${table.position} >= 0`),
+    check("collection_image_size_positive", sql`${table.size} > 0`),
+    check(
+      "collection_image_sha256_valid",
+      sql`${table.sha256} ~ '^[0-9a-f]{64}$'`,
     ),
   ],
 );
@@ -245,6 +317,10 @@ export const catalogImageUploadSession = pgTable(
     collectionItemId: bigint("collection_item_id", {
       mode: "number",
     }).references(() => collectionItem.id, { onDelete: "cascade" }),
+    collectionId: bigint("collection_id", { mode: "number" }).references(
+      () => userCollection.id,
+      { onDelete: "cascade" },
+    ),
     expiresAt: timestamp("expires_at", {
       mode: "date",
       withTimezone: true,
@@ -257,7 +333,7 @@ export const catalogImageUploadSession = pgTable(
     index("catalog_image_upload_session_expires_at_idx").on(table.expiresAt),
     check(
       "catalog_image_upload_session_target_consistent",
-      sql`(${table.targetType} = 'product' and ${table.productId} is not null and ${table.collectionItemId} is null) or (${table.targetType} = 'collection_item' and ${table.productId} is null and ${table.collectionItemId} is not null)`,
+      sql`(${table.targetType} = 'product' and ${table.productId} is not null and ${table.collectionId} is null and ${table.collectionItemId} is null) or (${table.targetType} = 'collection' and ${table.productId} is null and ${table.collectionId} is not null and ${table.collectionItemId} is null) or (${table.targetType} = 'collection_item' and ${table.productId} is null and ${table.collectionId} is null and ${table.collectionItemId} is not null)`,
     ),
   ],
 );
@@ -494,6 +570,8 @@ export const collectionSpinner = pgTable("collection_spinner", {
 
 export type CollectionItem = typeof collectionItem.$inferSelect;
 export type NewCollectionItem = typeof collectionItem.$inferInsert;
+export type CollectionImage = typeof collectionImage.$inferSelect;
+export type NewCollectionImage = typeof collectionImage.$inferInsert;
 export type UserCollection = typeof userCollection.$inferSelect;
 export type NewUserCollection = typeof userCollection.$inferInsert;
 export type Product = typeof product.$inferSelect;

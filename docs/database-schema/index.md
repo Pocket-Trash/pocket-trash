@@ -6,6 +6,7 @@ Generated schema documentation for committed Drizzle tables.
 
 - [`catalog_image_upload_file`](./catalog-image-upload-file.md)
 - [`catalog_image_upload_session`](./catalog-image-upload-session.md)
+- [`collection_image`](./collection-image.md)
 - [`collection_item`](./collection-item.md)
 - [`collection_item_image`](./collection-item-image.md)
 - [`collection_spinner`](./collection-spinner.md)

@@ -155,6 +155,10 @@ export const schemaDescriptions = {
         description: "User who owns or owned the collection item.",
         example: 1000,
       },
+      collection_id: {
+        description: "Named collection containing the item.",
+        example: 1000,
+      },
       material_id: {
         description: "Exact material of the owned physical item.",
         example: 1000,
@@ -188,6 +192,68 @@ export const schemaDescriptions = {
       owned: {
         description: "Whether the item is currently owned by the owner.",
         example: true,
+      },
+    },
+  },
+  user_collection: {
+    description: "A named collection owned by one user.",
+    columns: {
+      id: { description: "Internal collection identifier.", example: 1000 },
+      owner_id: { description: "User who owns the collection.", example: 1000 },
+      name: {
+        description: "Display name of the collection.",
+        example: "Daily Carry",
+      },
+      normalized_name: {
+        description: "Canonical per-owner key used to prevent duplicate names.",
+        example: "dailycarry",
+      },
+      description: {
+        description: "Optional description of the collection.",
+        example: "Everyday carry spinners.",
+      },
+      is_private: {
+        description: "Whether public routes hide the collection and its items.",
+        example: true,
+      },
+    },
+  },
+  collection_image: {
+    description: "Current and previous cover images for a collection.",
+    columns: {
+      id: { description: "Internal cover image identifier.", example: 1000 },
+      collection_id: {
+        description: "Collection that owns the cover image.",
+        example: 1000,
+      },
+      is_current: {
+        description: "Whether this image is the collection's active cover.",
+        example: true,
+      },
+      position: {
+        description: "Stable upload order within the collection.",
+        example: 0,
+      },
+      file_name: {
+        description: "Original uploaded file name.",
+        example: "cover.webp",
+      },
+      content_type: {
+        description: "Validated image MIME type.",
+        example: "image/webp",
+      },
+      size: { description: "Uploaded file size in bytes.", example: 1024 },
+      sha256: {
+        description: "Exact-byte duplicate detection hash.",
+        example: "a".repeat(64),
+      },
+      object_path: {
+        description: "Storage-provider object path.",
+        example: "collections/1000/cover.webp",
+      },
+      url: {
+        description: "Unsigned CDN URL stored for the image.",
+        example: "https://cdn.example.test/collections/1000/cover.webp",
       },
     },
   },

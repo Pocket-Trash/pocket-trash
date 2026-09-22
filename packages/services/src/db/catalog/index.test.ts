@@ -6,7 +6,19 @@ import {
   assertValidFinishOptions,
   createCatalogService,
   createCollectionsService,
+  normalizeCollectionName,
 } from "./index.js";
+
+describe("collection name normalization", () => {
+  it("collapses case, spacing, punctuation, and diacritics", () => {
+    expect(["Roy's", " roys ", "RÓY’S"].map(normalizeCollectionName)).toEqual([
+      "roys",
+      "roys",
+      "roys",
+    ]);
+    expect(normalizeCollectionName(" --- ")).toBe("");
+  });
+});
 
 function setup(returningRows: unknown[][], selectRows: unknown[][]) {
   const updates: Array<{ table: unknown; value: unknown }> = [];
@@ -52,6 +64,7 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
     })),
   };
   const db = {
+    select: vi.fn(query),
     transaction: vi.fn(async (callback: (value: typeof tx) => unknown) =>
       callback(tx),
     ),
@@ -75,10 +88,27 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
 }
 
 describe("collection catalog writes", () => {
+  it("uses the synchronized username for the default collection name", async () => {
+    const { service } = setup([], [[{ username: "royanger" }]]);
+
+    await expect(service.getDefaultCollectionName("user-secret")).resolves.toBe(
+      "royanger's Collection",
+    );
+  });
+
+  it("rejects automatic collection creation while user sync is incomplete", async () => {
+    const { service } = setup([], [[]]);
+
+    await expect(
+      service.getDefaultCollectionName("user-secret"),
+    ).rejects.toThrow(/sync is incomplete/i);
+  });
+
   it("creates a spinner with its custom owned button in one transaction", async () => {
     const { db, service, writes } = setup(
       [[{ id: 2000 }], [{ id: 3000 }], [{ id: 2001 }], [{ id: 3001 }]],
       [
+        [{ id: 900 }],
         [{ materialId: 1201 }],
         [{ colorEffectId: null }],
         [{ finishId: 1202, position: 0 }],
@@ -97,6 +127,7 @@ describe("collection catalog writes", () => {
         buttonFinishOptionId: 1202,
         buttonMaterialId: 1201,
         buttonProductId: 1200,
+        collectionId: 900,
         spinnerFinishOptionId: 1102,
         spinnerCustomFinish: null,
         spinnerMaterialId: 1101,
@@ -109,7 +140,7 @@ describe("collection catalog writes", () => {
       expect.arrayContaining([
         {
           table: schema.collectionItem,
-          value: { materialId: 1201, ownerId: 1000 },
+          value: { collectionId: 900, materialId: 1201, ownerId: 1000 },
         },
         {
           table: schema.collectionSpinnerButton,
@@ -126,7 +157,7 @@ describe("collection catalog writes", () => {
         },
         {
           table: schema.collectionItem,
-          value: { materialId: 1101, ownerId: 1000 },
+          value: { collectionId: 900, materialId: 1101, ownerId: 1000 },
         },
         {
           table: schema.collectionSpinner,
@@ -144,6 +175,7 @@ describe("collection catalog writes", () => {
     const { service, writes } = setup(
       [[{ id: 2001 }], [{ id: 3001 }]],
       [
+        [{ id: 900 }],
         [{ materialId: 1101 }],
         [{ colorEffectId: null }],
         [{ finishId: 1102, position: 0 }],
@@ -158,6 +190,7 @@ describe("collection catalog writes", () => {
         buttonFinishOptionId: null,
         buttonMaterialId: null,
         buttonProductId: null,
+        collectionId: 900,
         spinnerFinishOptionId: 1102,
         spinnerCustomFinish: null,
         spinnerMaterialId: 1101,
@@ -168,7 +201,7 @@ describe("collection catalog writes", () => {
     expect(writes).toEqual([
       {
         table: schema.collectionItem,
-        value: { materialId: 1101, ownerId: 1000 },
+        value: { collectionId: 900, materialId: 1101, ownerId: 1000 },
       },
       {
         table: schema.collectionSpinner,
@@ -197,7 +230,7 @@ describe("collection catalog writes", () => {
   it("stores a private custom finish with ordered fade colors", async () => {
     const { service, writes } = setup(
       [[{ id: 2000 }], [{ id: 3000 }]],
-      [[{ materialId: 1201 }], [{ id: 10, slug: "fade" }]],
+      [[{ id: 900 }], [{ materialId: 1201 }], [{ id: 10, slug: "fade" }]],
     );
 
     await expect(
@@ -209,6 +242,7 @@ describe("collection catalog writes", () => {
           finishIds: [31, 32],
         },
         finishOptionId: null,
+        collectionId: 900,
         materialId: 1201,
         productId: 1200,
       }),
@@ -267,7 +301,16 @@ describe("collection catalog writes", () => {
     const { db, service, updates } = setup(
       [],
       [
-        [{ buttonProductId: null, spinnerProductId: 1100 }],
+        [
+          {
+            buttonProductId: null,
+            collectionId: 900,
+            installedButtonId: 2000,
+            ownerId: 1000,
+            spinnerProductId: 1100,
+          },
+        ],
+        [{ id: 900 }],
         [{ materialId: 1101 }],
         [{ id: 3100 }],
         [{ id: 2000, productId: 1200 }],
@@ -279,6 +322,7 @@ describe("collection catalog writes", () => {
     await expect(
       service.updateItem({
         actorClerkId: "user-secret",
+        collectionId: 900,
         collectionItemId: 2001,
         customFinish: null,
         finishOptionId: null,
@@ -305,8 +349,47 @@ describe("collection catalog writes", () => {
     );
   });
 
+  it("moves a spinner and its linked items to the selected collection", async () => {
+    const { service, updates } = setup(
+      [],
+      [
+        [
+          {
+            buttonProductId: null,
+            collectionId: 900,
+            installedButtonId: 2000,
+            ownerId: 1000,
+            spinnerProductId: 1100,
+          },
+        ],
+        [{ id: 901 }],
+        [{ id: 2002 }],
+        [{ materialId: 1101 }],
+        [{ id: 3100 }],
+      ],
+    );
+
+    await service.updateItem({
+      actorClerkId: "user-secret",
+      collectionId: 901,
+      collectionItemId: 2001,
+      customFinish: null,
+      finishOptionId: null,
+      materialId: 1101,
+    });
+
+    expect(updates).toEqual(
+      expect.arrayContaining([
+        {
+          table: schema.collectionItem,
+          value: { collectionId: 901, updatedAt: expect.any(Date) },
+        },
+      ]),
+    );
+  });
+
   it("rejects a material not offered by the selected product", async () => {
-    const { service, writes } = setup([], [[]]);
+    const { service, writes } = setup([], [[{ id: 900 }], []]);
 
     await expect(
       service.addSpinner({
@@ -315,6 +398,7 @@ describe("collection catalog writes", () => {
         buttonFinishOptionId: null,
         buttonMaterialId: null,
         buttonProductId: null,
+        collectionId: 900,
         spinnerFinishOptionId: 1102,
         spinnerCustomFinish: null,
         spinnerMaterialId: 9999,
@@ -325,7 +409,10 @@ describe("collection catalog writes", () => {
   });
 
   it("rejects a finish option from another product", async () => {
-    const { service } = setup([[{ id: 2001 }]], [[{ materialId: 1101 }], []]);
+    const { service } = setup(
+      [[{ id: 2001 }]],
+      [[{ id: 900 }], [{ materialId: 1101 }], []],
+    );
 
     await expect(
       service.addSpinner({
@@ -334,6 +421,7 @@ describe("collection catalog writes", () => {
         buttonFinishOptionId: null,
         buttonMaterialId: null,
         buttonProductId: null,
+        collectionId: 900,
         spinnerFinishOptionId: 9999,
         spinnerCustomFinish: null,
         spinnerMaterialId: 1101,
