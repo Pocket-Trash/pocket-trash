@@ -50,9 +50,10 @@ const db = createDb({
 });
 ```
 
-`DATABASE_URL` is stored in Infisical at `/apps/web` for web and migration commands. The web app keeps its deploy copy in `/apps/web`. The Railway scraper
-app keeps its runtime copy in `/apps/scraper`, or receives the equivalent value
-through Railway service configuration.
+`DATABASE_URL` is stored in each app's Infisical path. In the `dev` environment,
+it points to the shared `development` Neon branch. Web and migration commands use
+`/apps/web`, API commands use `/apps/api`, and scraper commands use
+`/apps/scraper`.
 
 ## Migrations
 
@@ -71,8 +72,17 @@ pnpm db:migrate
 ```
 
 `pnpm db:migrate` runs through the Infisical runner so `DATABASE_URL` is loaded
-from `/apps/web`. Personal developer overrides such as `DATABASE_URL_RA` are
-looked up only from `/local/database`.
+from `/apps/web`. To opt into a personal database branch, store its URL in
+Infisical `/local/database` as `DATABASE_URL_<INITIALS>`, then select it in
+`.env.local` at the repository root or `packages/database`:
+
+```dotenv
+DATABASE_URL_INITIALS=RA
+```
+
+When the selector is absent, local commands keep using the shared `DATABASE_URL`.
+When it is present but the matching Infisical secret is missing, the command
+fails before accessing a database.
 
 Generated migration files are committed under `packages/database/drizzle/`. Schema source of truth remains in `packages/database/src/schema/`.
 
@@ -194,12 +204,14 @@ for production:
 | --- | --- | --- | --- |
 | `production` | permanent | root | Production data and schema. |
 | `preview` | permanent | `production` | Shared non-production data for previews that do not change DB schema. |
-| `dev-<name>` | permanent | `production` | Developer-owned local work branch. |
+| `development` | permanent | `production` | Shared default database for local development. |
+| Developer-specific | permanent | `production` | Optional personal local work branch selected through `.env.local`. |
 | `preview-pr-<number>` | ephemeral | `production` | Isolated PR database, created only for DB-changing PRs. |
 
-Local development should use a developer branch. `drizzle-kit push` is allowed
-only against developer branches for rapid iteration. Before opening or updating
-a PR with schema changes, generate committed migrations with `pnpm db:generate`.
+Local development uses `development` unless the repository-root `.env.local`
+selects a personal Infisical secret with `DATABASE_URL_INITIALS`. Before opening
+or updating a PR with schema changes, generate committed migrations with
+`pnpm db:generate`.
 
 PR branches are disposable, but DB-changing PR updates reuse the existing
 `preview-pr-<number>` branch when it already exists. The Deploy workflow creates

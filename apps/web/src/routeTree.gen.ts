@@ -10,24 +10,49 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UserRouteImport } from './routes/user'
+import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
+import { Route as UserResourcesRouteImport } from './routes/user.resources'
 import { Route as UserCollectionsRouteImport } from './routes/user.collections'
 import { Route as UserAccountRouteImport } from './routes/user.account'
 import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
+import { Route as ResourcesAddRouteImport } from './routes/resources.add'
+import { Route as ResourcesResourceIdRouteImport } from './routes/resources.$resourceId'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
+import { Route as UserResourcesTrashRouteImport } from './routes/user.resources_.trash'
+import { Route as ResourcesResourceIdEditRouteImport } from './routes/resources.$resourceId_.edit'
 import { Route as AdminSettingsFeatureFlagsRouteImport } from './routes/admin.settings.feature-flags'
+import { Route as AdminResourcesTrashRouteImport } from './routes/admin.resources.trash'
+import { Route as AdminResourcesNotificationsRouteImport } from './routes/admin.resources.notifications'
+import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId_.versions.new'
 
 const UserRoute = UserRouteImport.update({
   id: '/user',
   path: '/user',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResourcesRoute = ResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ResourcesIndexRoute = ResourcesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ResourcesRoute,
+} as any)
+const UserResourcesRoute = UserResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => UserRoute,
 } as any)
 const UserCollectionsRoute = UserCollectionsRouteImport.update({
   id: '/collections',
@@ -49,6 +74,16 @@ const SignInSplatRoute = SignInSplatRouteImport.update({
   path: '/sign-in/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResourcesAddRoute = ResourcesAddRouteImport.update({
+  id: '/add',
+  path: '/add',
+  getParentRoute: () => ResourcesRoute,
+} as any)
+const ResourcesResourceIdRoute = ResourcesResourceIdRouteImport.update({
+  id: '/$resourceId',
+  path: '/$resourceId',
+  getParentRoute: () => ResourcesRoute,
+} as any)
 const PensPenIdRoute = PensPenIdRouteImport.update({
   id: '/pens/$penId',
   path: '/pens/$penId',
@@ -60,89 +95,177 @@ const UserSettingsBetaFeaturesRoute =
     path: '/settings/beta-features',
     getParentRoute: () => UserRoute,
   } as any)
+const UserResourcesTrashRoute = UserResourcesTrashRouteImport.update({
+  id: '/resources_/trash',
+  path: '/resources/trash',
+  getParentRoute: () => UserRoute,
+} as any)
+const ResourcesResourceIdEditRoute = ResourcesResourceIdEditRouteImport.update({
+  id: '/$resourceId_/edit',
+  path: '/$resourceId/edit',
+  getParentRoute: () => ResourcesRoute,
+} as any)
 const AdminSettingsFeatureFlagsRoute =
   AdminSettingsFeatureFlagsRouteImport.update({
     id: '/admin/settings/feature-flags',
     path: '/admin/settings/feature-flags',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AdminResourcesTrashRoute = AdminResourcesTrashRouteImport.update({
+  id: '/admin/resources/trash',
+  path: '/admin/resources/trash',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminResourcesNotificationsRoute =
+  AdminResourcesNotificationsRouteImport.update({
+    id: '/admin/resources/notifications',
+    path: '/admin/resources/notifications',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ResourcesResourceIdVersionsNewRoute =
+  ResourcesResourceIdVersionsNewRouteImport.update({
+    id: '/$resourceId_/versions/new',
+    path: '/$resourceId/versions/new',
+    getParentRoute: () => ResourcesRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/resources': typeof ResourcesRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
+  '/resources/$resourceId': typeof ResourcesResourceIdRoute
+  '/resources/add': typeof ResourcesAddRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/user/resources': typeof UserResourcesRoute
+  '/resources/': typeof ResourcesIndexRoute
+  '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
+  '/admin/resources/trash': typeof AdminResourcesTrashRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
+  '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
+  '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
+  '/resources/$resourceId': typeof ResourcesResourceIdRoute
+  '/resources/add': typeof ResourcesAddRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/user/resources': typeof UserResourcesRoute
+  '/resources': typeof ResourcesIndexRoute
+  '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
+  '/admin/resources/trash': typeof AdminResourcesTrashRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
+  '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
+  '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/resources': typeof ResourcesRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/pens/$penId': typeof PensPenIdRoute
+  '/resources/$resourceId': typeof ResourcesResourceIdRoute
+  '/resources/add': typeof ResourcesAddRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/user/resources': typeof UserResourcesRoute
+  '/resources/': typeof ResourcesIndexRoute
+  '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
+  '/admin/resources/trash': typeof AdminResourcesTrashRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
+  '/resources/$resourceId_/edit': typeof ResourcesResourceIdEditRoute
+  '/user/resources_/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/resources/$resourceId_/versions/new': typeof ResourcesResourceIdVersionsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/resources'
     | '/user'
     | '/pens/$penId'
+    | '/resources/$resourceId'
+    | '/resources/add'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/user/resources'
+    | '/resources/'
+    | '/admin/resources/notifications'
+    | '/admin/resources/trash'
     | '/admin/settings/feature-flags'
+    | '/resources/$resourceId/edit'
+    | '/user/resources/trash'
     | '/user/settings/beta-features'
+    | '/resources/$resourceId/versions/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/user'
     | '/pens/$penId'
+    | '/resources/$resourceId'
+    | '/resources/add'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/user/resources'
+    | '/resources'
+    | '/admin/resources/notifications'
+    | '/admin/resources/trash'
     | '/admin/settings/feature-flags'
+    | '/resources/$resourceId/edit'
+    | '/user/resources/trash'
     | '/user/settings/beta-features'
+    | '/resources/$resourceId/versions/new'
   id:
     | '__root__'
     | '/'
+    | '/resources'
     | '/user'
     | '/pens/$penId'
+    | '/resources/$resourceId'
+    | '/resources/add'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/user/resources'
+    | '/resources/'
+    | '/admin/resources/notifications'
+    | '/admin/resources/trash'
     | '/admin/settings/feature-flags'
+    | '/resources/$resourceId_/edit'
+    | '/user/resources_/trash'
     | '/user/settings/beta-features'
+    | '/resources/$resourceId_/versions/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ResourcesRoute: typeof ResourcesRouteWithChildren
   UserRoute: typeof UserRouteWithChildren
   PensPenIdRoute: typeof PensPenIdRoute
   SignInSplatRoute: typeof SignInSplatRoute
   SignUpSplatRoute: typeof SignUpSplatRoute
+  AdminResourcesNotificationsRoute: typeof AdminResourcesNotificationsRoute
+  AdminResourcesTrashRoute: typeof AdminResourcesTrashRoute
   AdminSettingsFeatureFlagsRoute: typeof AdminSettingsFeatureFlagsRoute
 }
 
@@ -155,12 +278,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/resources': {
+      id: '/resources'
+      path: '/resources'
+      fullPath: '/resources'
+      preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/resources/': {
+      id: '/resources/'
+      path: '/'
+      fullPath: '/resources/'
+      preLoaderRoute: typeof ResourcesIndexRouteImport
+      parentRoute: typeof ResourcesRoute
+    }
+    '/user/resources': {
+      id: '/user/resources'
+      path: '/resources'
+      fullPath: '/user/resources'
+      preLoaderRoute: typeof UserResourcesRouteImport
+      parentRoute: typeof UserRoute
     }
     '/user/collections': {
       id: '/user/collections'
@@ -190,6 +334,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignInSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/resources/add': {
+      id: '/resources/add'
+      path: '/add'
+      fullPath: '/resources/add'
+      preLoaderRoute: typeof ResourcesAddRouteImport
+      parentRoute: typeof ResourcesRoute
+    }
+    '/resources/$resourceId': {
+      id: '/resources/$resourceId'
+      path: '/$resourceId'
+      fullPath: '/resources/$resourceId'
+      preLoaderRoute: typeof ResourcesResourceIdRouteImport
+      parentRoute: typeof ResourcesRoute
+    }
     '/pens/$penId': {
       id: '/pens/$penId'
       path: '/pens/$penId'
@@ -204,6 +362,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserSettingsBetaFeaturesRouteImport
       parentRoute: typeof UserRoute
     }
+    '/user/resources_/trash': {
+      id: '/user/resources_/trash'
+      path: '/resources/trash'
+      fullPath: '/user/resources/trash'
+      preLoaderRoute: typeof UserResourcesTrashRouteImport
+      parentRoute: typeof UserRoute
+    }
+    '/resources/$resourceId_/edit': {
+      id: '/resources/$resourceId_/edit'
+      path: '/$resourceId/edit'
+      fullPath: '/resources/$resourceId/edit'
+      preLoaderRoute: typeof ResourcesResourceIdEditRouteImport
+      parentRoute: typeof ResourcesRoute
+    }
     '/admin/settings/feature-flags': {
       id: '/admin/settings/feature-flags'
       path: '/admin/settings/feature-flags'
@@ -211,18 +383,63 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsFeatureFlagsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/resources/trash': {
+      id: '/admin/resources/trash'
+      path: '/admin/resources/trash'
+      fullPath: '/admin/resources/trash'
+      preLoaderRoute: typeof AdminResourcesTrashRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/resources/notifications': {
+      id: '/admin/resources/notifications'
+      path: '/admin/resources/notifications'
+      fullPath: '/admin/resources/notifications'
+      preLoaderRoute: typeof AdminResourcesNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resources/$resourceId_/versions/new': {
+      id: '/resources/$resourceId_/versions/new'
+      path: '/$resourceId/versions/new'
+      fullPath: '/resources/$resourceId/versions/new'
+      preLoaderRoute: typeof ResourcesResourceIdVersionsNewRouteImport
+      parentRoute: typeof ResourcesRoute
+    }
   }
 }
+
+interface ResourcesRouteChildren {
+  ResourcesResourceIdRoute: typeof ResourcesResourceIdRoute
+  ResourcesAddRoute: typeof ResourcesAddRoute
+  ResourcesIndexRoute: typeof ResourcesIndexRoute
+  ResourcesResourceIdEditRoute: typeof ResourcesResourceIdEditRoute
+  ResourcesResourceIdVersionsNewRoute: typeof ResourcesResourceIdVersionsNewRoute
+}
+
+const ResourcesRouteChildren: ResourcesRouteChildren = {
+  ResourcesResourceIdRoute: ResourcesResourceIdRoute,
+  ResourcesAddRoute: ResourcesAddRoute,
+  ResourcesIndexRoute: ResourcesIndexRoute,
+  ResourcesResourceIdEditRoute: ResourcesResourceIdEditRoute,
+  ResourcesResourceIdVersionsNewRoute: ResourcesResourceIdVersionsNewRoute,
+}
+
+const ResourcesRouteWithChildren = ResourcesRoute._addFileChildren(
+  ResourcesRouteChildren,
+)
 
 interface UserRouteChildren {
   UserAccountRoute: typeof UserAccountRoute
   UserCollectionsRoute: typeof UserCollectionsRoute
+  UserResourcesRoute: typeof UserResourcesRoute
+  UserResourcesTrashRoute: typeof UserResourcesTrashRoute
   UserSettingsBetaFeaturesRoute: typeof UserSettingsBetaFeaturesRoute
 }
 
 const UserRouteChildren: UserRouteChildren = {
   UserAccountRoute: UserAccountRoute,
   UserCollectionsRoute: UserCollectionsRoute,
+  UserResourcesRoute: UserResourcesRoute,
+  UserResourcesTrashRoute: UserResourcesTrashRoute,
   UserSettingsBetaFeaturesRoute: UserSettingsBetaFeaturesRoute,
 }
 
@@ -230,10 +447,13 @@ const UserRouteWithChildren = UserRoute._addFileChildren(UserRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ResourcesRoute: ResourcesRouteWithChildren,
   UserRoute: UserRouteWithChildren,
   PensPenIdRoute: PensPenIdRoute,
   SignInSplatRoute: SignInSplatRoute,
   SignUpSplatRoute: SignUpSplatRoute,
+  AdminResourcesNotificationsRoute: AdminResourcesNotificationsRoute,
+  AdminResourcesTrashRoute: AdminResourcesTrashRoute,
   AdminSettingsFeatureFlagsRoute: AdminSettingsFeatureFlagsRoute,
 }
 export const routeTree = rootRouteImport

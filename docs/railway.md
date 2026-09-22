@@ -1,14 +1,13 @@
 # Railway
 
 `apps/scraper` runs as one TypeScript cron service on Railway. Railway starts the
-service on a cron schedule, the scraper runs due source and queue jobs, then the
-process exits. The scraper is separate from the web app because scraper runs may
-exceed web request time limits.
+service on a cron schedule, the scraper runs every source producer and the queue
+processor, then the process exits. The scraper is separate from the web app
+because scraper runs may exceed web request time limits.
 
 Railway hosts the scheduled scraper service and Redis. Postgres remains the
 durable source of truth for scraped rows, image state, run records, and version
-history. Redis is the BullMQ work queue and stores lightweight cron state, such
-as the last successful source run time.
+history. Redis is the BullMQ work queue.
 
 ## Services
 
@@ -30,7 +29,7 @@ Create these Railway services/resources:
 
 | Service | Type | Command | Schedule |
 | --- | --- | --- | --- |
-| `pocket-trash` / `apps-scraper` | Cron service | `pnpm --filter @app/scraper run cron:run` | Railway cron `*/5 * * * *`; runs due source jobs and queue processing, then exits. |
+| `pocket-trash` / `apps-scraper` | Cron service | `pnpm --filter @app/scraper run cron:run` | Railway cron `0 * * * *`; runs every source producer and the queue processor, then exits. |
 | `redis` | Redis database | Railway Redis template | Always available to the scraper service. |
 
 Do not create one Railway service per scraped site. Adding Autmog, Grimsmo, FH,
@@ -61,33 +60,29 @@ only for the non-cron server command.
 ## Schedule Behavior
 
 The scraper service uses Railway cron instead of in-process schedules. Railway
-runs the service every 5 minutes with:
+runs the service once per hour with:
 
 ```cron
-*/5 * * * *
+0 * * * *
 ```
 
-Each cron execution runs `cron:run`. The queue processor runs every execution.
-Autmog runs when its configured interval has elapsed; by default that is hourly.
-The first cron execution after a fresh Redis state runs Autmog immediately.
+Each cron execution runs every source sequentially, then runs the queue
+processor. Railway owns the hourly cadence, so launch jitter cannot defer a
+source until the following hour.
 
 `railway.json` sets `deploy.cronSchedule`, so the value applies through
 Railway's config-as-code path. Railway's docs note that config-as-code values do
 not backfill the Settings form; verify the cron value in the deployment details,
-or set the same `*/5 * * * *` value manually in the Railway Settings page if you
+or set the same `0 * * * *` value manually in the Railway Settings page if you
 want the form itself populated.
 
 Railway cron services must exit after the job finishes. If a previous cron
 execution is still active when the next schedule is due, Railway skips the new
 execution.
 
-Source due state is stored in Redis. Keep handlers idempotent anyway; BullMQ
-delivery is at-least-once, and clearing Redis can cause a source producer to run
-earlier than its usual interval.
+Keep handlers idempotent; BullMQ delivery is at-least-once.
 
-Future source schedules should be added in `apps/scraper` and staggered in code
-or configuration inside the `cron:run` command. Do not add one Railway service
-per scraped site.
+Do not add one Railway service per scraped site.
 
 Preview cron runs are gated by `SCRAPER_CRON_ENABLED`. When `APP_ENV=preview`,
 `cron:run` exits before opening DB or Redis connections unless
@@ -110,8 +105,8 @@ pnpm scraper:cron
 ```
 
 This starts or reuses local Docker/OrbStack Redis, injects `/apps/scraper`
-secrets, runs due source jobs and queue processing once, then exits. It does not
-start a local timer.
+secrets, runs every source producer and the queue processor once, then exits. It
+does not start a local timer.
 
 Inside a Railway shell, the service already has its environment variables, so
 the package command can be used directly:
@@ -204,10 +199,10 @@ Required groups:
 - Grimsmo proxying: try direct fetches without `GRIMSMO_PROXY_URL` first; add
   `GRIMSMO_PROXY_URL` only if Railway/direct IP fetches are blocked
 
-Grimsmo producers run hourly and are staggered by default: Saga at the top of
-the hour, Rask around `:15`, Fjell around `:30`, and Norseman around `:45`.
-Railway still invokes the single cron service every 5 minutes; the scraper
-checks Redis state and runs only due producers.
+Railway runs all producers sequentially at the top of each hour. The
+configurable Grimsmo start delays apply only to the in-process scheduler, which
+staggers Saga, Rask, Fjell, and Norseman at `:00`, `:15`, `:30`, and `:45` by
+default.
 
 ## Production Deploys
 
@@ -280,7 +275,7 @@ from the preview database workflow.
 
 - Keep one Railway service for `apps/scraper`.
 - Run the scheduled service with `pnpm --filter @app/scraper run cron:run`.
-- Set the Railway cron schedule to `*/5 * * * *`.
+- Set the Railway cron schedule to `0 * * * *`.
 - Do not configure a Railway healthcheck for the cron service.
 - Set `DATABASE_URL` and `REDIS_URL` before enabling the cron service; cron
   executions validate job dependencies before running.

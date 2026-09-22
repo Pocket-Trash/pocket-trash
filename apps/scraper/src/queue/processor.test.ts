@@ -62,30 +62,31 @@ describe("createProcessorErrorCounter", () => {
 });
 
 describe("buildImageFolder", () => {
-  it("builds production product folders without a prefix", () => {
+  it("builds production product folders in the images namespace", () => {
     expect(
       buildImageFolder({
         entityId: "1000",
+        prefix: "images",
       }),
-    ).toBe("/products/1000");
+    ).toBe("/images/products/1000");
   });
 
   it("builds isolated preview product folders with the PR prefix", () => {
     expect(
       buildImageFolder({
         entityId: "1000-1001",
-        prefix: "preview/pr-52",
+        prefix: "images/preview/pr-52",
       }),
-    ).toBe("/preview/pr-52/products/1000-1001");
+    ).toBe("/images/preview/pr-52/products/1000-1001");
   });
 
   it("normalizes surrounding slashes in the folder prefix", () => {
     expect(
       buildImageFolder({
         entityId: "1000",
-        prefix: "/preview/",
+        prefix: "/images/preview/",
       }),
-    ).toBe("/preview/products/1000");
+    ).toBe("/images/preview/products/1000");
   });
 });
 

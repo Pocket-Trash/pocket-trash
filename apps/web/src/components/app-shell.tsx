@@ -16,6 +16,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { UserMenu } from "@/components/user-menu";
+import { clientEnv } from "@/env/client";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -50,6 +51,7 @@ export function AppShell({
   // moves to a top-bar avatar. Pages without a bottom bar keep the original
   // compact header (hamburger opens the sidebar) unchanged.
   const hasBottomBar = Boolean(bottomBar);
+  const logoUrl = `${(clientEnv.VITE_CDN_BASE_URL ?? "https://cdn.pocket-trash.app").replace(/\/+$/u, "")}/${clientEnv.VITE_ASSET_FOLDER_PREFIX ?? "assets"}/trash-panda-logo.png`;
   return (
     <SidebarProvider
       defaultOpen={defaultSidebarOpen}
@@ -86,6 +88,13 @@ export function AppShell({
             <SidebarTrigger
               aria-label={t("web.sidebar.toggle")}
               className={cn(hasBottomBar && "hidden md:inline-flex")}
+            />
+            <img
+              alt=""
+              className="size-8 rounded-full"
+              height={32}
+              src={logoUrl}
+              width={32}
             />
             <h1 className="m-0 text-[16px] font-bold tracking-[0.5px] md:text-lg">
               {title}

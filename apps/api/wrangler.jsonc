@@ -1,0 +1,47 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pocket-trash-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": true,
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+      "persist": true
+    },
+    "traces": {
+      "enabled": true,
+      "persist": true
+    }
+  },
+  "routes": [
+    {
+      "pattern": "api.pocket-trash.app",
+      "custom_domain": true
+    }
+  ],
+  "triggers": {
+    "crons": ["15 * * * *"]
+  },
+  "vars": {
+    "APP_ENV": "production"
+  },
+  "env": {
+    "preview": {
+      "name": "pocket-trash-api-preview",
+      "preview_urls": true,
+      "routes": [],
+      "triggers": {
+        "crons": []
+      },
+      "workers_dev": false,
+      "vars": {
+        "APP_ENV": "preview"
+      }
+    }
+  }
+}
