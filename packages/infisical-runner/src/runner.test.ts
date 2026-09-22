@@ -181,7 +181,6 @@ describe("buildInfisicalRunArgs", () => {
       "--project-config-dir=/repo",
       "--env=dev",
       "--path=/local/clerk",
-      "--path=/tools/cloudflare",
       "--",
       "node",
       "scripts/dev-webhooks.mjs",

@@ -22,6 +22,9 @@ Set `URL_INITIALS` in repository-root `.env.local` or `.env`, then run:
 pnpm dev:web:webhooks
 ```
 
+The stable development API must already be deployed so its
+`CLERK_WEBHOOK_TARGETS` namespace is available.
+
 The command starts `dev:web`, creates a temporary Clerk relay, registers
 `target:local:<INITIALS>` for 24 hours, and removes it on normal termination.
 It stops before creating the relay unless the Clerk CLI is linked to the app

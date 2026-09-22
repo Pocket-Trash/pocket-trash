@@ -126,7 +126,7 @@ export const commandSecrets = {
   webhooks: {
     listen: {
       allowServerSecrets: true,
-      paths: [clerkLocalSecretPath, cloudflareToolsSecretPath],
+      paths: [clerkLocalSecretPath],
     },
   },
 } as const satisfies Record<string, Record<string, CommandSecretConfig>>;

@@ -156,7 +156,20 @@ function waitForRelayUrl(child) {
 }
 
 function wrangler(args) {
-  return run("pnpm", ["--filter", "@app/api", "exec", "wrangler", ...args]);
+  return run("pnpm", [
+    "exec",
+    "tsx",
+    join(repoRoot, "packages/infisical-runner/src/cli.ts"),
+    "api",
+    "deploy:preview",
+    "--",
+    "pnpm",
+    "--filter",
+    "@app/api",
+    "exec",
+    "wrangler",
+    ...args,
+  ]);
 }
 
 async function assertClerkLink() {
