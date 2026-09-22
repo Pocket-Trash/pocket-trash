@@ -43,7 +43,7 @@ export async function uploadCatalogImages(input: {
   getToken(): Promise<string | null>;
   onOwnerDeletedDuplicate?(imageId: number): Promise<boolean>;
   targetId: number;
-  targetType: "collection_item" | "product";
+  targetType: "collection" | "collection_item" | "product";
 }): Promise<{ failed: File[]; uploaded: File[] }> {
   if (!input.files.length)
     return { failed: [] as File[], uploaded: [] as File[] };
@@ -148,6 +148,54 @@ export async function uploadCatalogImages(input: {
       result?.uploaded ? [result.file] : [],
     ),
   };
+}
+
+export async function selectCollectionCover(input: {
+  collectionId: number;
+  getToken(): Promise<string | null>;
+  imageId: number | null;
+}) {
+  await mutateCollectionCover(input, "PATCH");
+}
+
+export async function deleteCollectionCover(input: {
+  collectionId: number;
+  getToken(): Promise<string | null>;
+  imageId: number;
+}) {
+  await mutateCollectionCover(input, "DELETE");
+}
+
+async function mutateCollectionCover(
+  input: {
+    collectionId: number;
+    getToken(): Promise<string | null>;
+    imageId: number | null;
+  },
+  method: "DELETE" | "PATCH",
+) {
+  const token = await input.getToken();
+  if (!token) throw { key: "error.generic" } satisfies CatalogImageUploadError;
+  const baseUrl = `${clientEnv.VITE_API_URL.replace(/\/$/u, "")}/api/v0/catalog-image-upload-sessions/collections/${input.collectionId}`;
+  const response = await fetch(
+    method === "DELETE"
+      ? `${baseUrl}/covers/${input.imageId}`
+      : `${baseUrl}/cover`,
+    {
+      body:
+        method === "PATCH"
+          ? JSON.stringify({ imageId: input.imageId })
+          : undefined,
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(method === "PATCH" ? { "content-type": "application/json" } : {}),
+      },
+      method,
+    },
+  );
+  if (!response.ok) {
+    throw { key: "error.generic" } satisfies CatalogImageUploadError;
+  }
 }
 
 async function sha256(file: File) {

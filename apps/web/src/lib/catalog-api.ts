@@ -6,6 +6,7 @@ import type {
   CatalogProduct,
   CatalogProductType,
   ProductWriteInput,
+  UserCollectionSummary,
 } from "@package/services";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -155,6 +156,19 @@ const colorSchema = z.object({
   name: slugNameSchema,
 });
 
+const collectionWriteSchema = z.object({
+  description: z
+    .string()
+    .trim()
+    .refine(
+      (value) => !value || value.split(/\s+/u).length <= 200,
+      requiredMessage,
+    )
+    .transform((value) => value || null),
+  isPrivate: z.boolean(),
+  name: z.string().trim().min(2, requiredMessage).max(80, requiredMessage),
+});
+
 type CatalogLookupMutationResult<
   K extends string,
   T extends CatalogLookup = CatalogLookup,
@@ -172,10 +186,12 @@ const collectionAddSchema = z
     buttonFinishOptionId: idSchema.nullable(),
     buttonMaterialId: idSchema.nullable(),
     buttonProductId: idSchema.nullable(),
+    collectionId: idSchema.nullable().optional().default(null),
     confirmed: z.boolean(),
     customFinish: finishOptionSchema.nullable(),
     finishOptionId: idSchema.nullable(),
     materialId: idSchema,
+    newCollection: collectionWriteSchema.nullable().optional().default(null),
     productId: idSchema,
     productTypeSlug: productTypeSchema,
   })
@@ -215,6 +231,7 @@ const collectionAddSchema = z
 
 const collectionEditSchema = z
   .object({
+    collectionId: idSchema.optional(),
     collectionItemId: idSchema,
     customFinish: finishOptionSchema.nullable(),
     finishOptionId: idSchema.nullable(),
@@ -546,6 +563,8 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
                   : null,
                 spinnerMaterialId: parsed.data.materialId,
                 spinnerProductId: parsed.data.productId,
+                collectionId: parsed.data.collectionId,
+                newCollection: parsed.data.newCollection,
               })
             ).spinnerItemId
           : await s.db.collections.addSpinnerButton({
@@ -555,9 +574,21 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
                 : null,
               finishOptionId: parsed.data.finishOptionId,
               materialId: parsed.data.materialId,
+              collectionId: parsed.data.collectionId,
+              newCollection: parsed.data.newCollection,
               productId: parsed.data.productId,
             });
-      return { collectionItemId, ok: true as const };
+      const item = await s.db.collections.getOwnedItem(
+        actor.clerkId,
+        collectionItemId,
+        actor.isAdmin,
+      );
+      if (!item) throw new Error("Failed to load collection item.");
+      return {
+        collectionId: item.collectionId,
+        collectionItemId,
+        ok: true as const,
+      };
     } catch (error) {
       return mutationFailure(error);
     }
@@ -586,11 +617,18 @@ export const getPublicCollectionOwner = createServerFn({ method: "GET" })
 
 export const getPublicCollectionItem = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
-    z.object({ collectionItemId: idSchema, userId: idSchema }).parse(input),
+    z
+      .object({
+        collectionId: idSchema,
+        collectionItemId: idSchema,
+        userId: idSchema,
+      })
+      .parse(input),
   )
   .handler(async ({ data }) => {
     const { s } = await import("@/lib/services");
     const item = await s.db.collections.getPublicItem({
+      collectionId: data.collectionId,
       collectionItemId: data.collectionItemId,
       ownerUserId: data.userId,
       viewer: await getResourceViewer(),
@@ -613,13 +651,149 @@ export const getUserCollection = createServerFn({ method: "GET" }).handler(
   },
 );
 
-export const getUserCollectionSummary = createServerFn({
+export const getUserCollections = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    return await signCollectionSummaries(
+      await s.db.collections.listOwnedCollections(actor.clerkId, actor.isAdmin),
+    );
+  },
+);
+
+export const getCollectionAddContext = createServerFn({
   method: "GET",
 }).handler(async () => {
   const actor = await requireActor();
   const { s } = await import("@/lib/services");
-  return await s.db.collections.getOwnedCollection(actor.clerkId);
+  const collections = await s.db.collections.listOwnedCollections(
+    actor.clerkId,
+    actor.isAdmin,
+  );
+  let defaultCollectionName: string | null = null;
+  let syncIncomplete = false;
+  if (collections.length === 0) {
+    try {
+      defaultCollectionName = await s.db.collections.getDefaultCollectionName(
+        actor.clerkId,
+      );
+    } catch {
+      syncIncomplete = true;
+    }
+  }
+  return {
+    collections: await signCollectionSummaries(collections),
+    defaultCollectionName,
+    syncIncomplete,
+  };
 });
+
+export const getUserCollectionById = createServerFn({ method: "GET" })
+  .validator((input: unknown) =>
+    z.object({ collectionId: idSchema }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    const [collection, items] = await Promise.all([
+      s.db.collections.getOwnedCollection(
+        actor.clerkId,
+        data.collectionId,
+        actor.isAdmin,
+      ),
+      s.db.collections.listOwned(
+        actor.clerkId,
+        actor.isAdmin,
+        data.collectionId,
+      ),
+    ]);
+    if (!collection) return null;
+    const [signedCollection] = await signCollectionSummaries([collection]);
+    if (!signedCollection) return null;
+    return {
+      collection: signedCollection,
+      items: await Promise.all(items.map(signCollectionItem)),
+    };
+  });
+
+export const getPublicCollection = createServerFn({ method: "GET" })
+  .validator((input: unknown) =>
+    z.object({ collectionId: idSchema, userId: idSchema }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { s } = await import("@/lib/services");
+    const viewer = await getResourceViewer();
+    const [collection, owner] = await Promise.all([
+      s.db.collections.getPublicCollection({
+        collectionId: data.collectionId,
+        ownerUserId: data.userId,
+        viewer,
+      }),
+      s.db.collections.listOwners(viewer),
+    ]);
+    if (!collection) return null;
+    const matchingOwner = owner.find(({ userId }) => userId === data.userId);
+    const items =
+      matchingOwner?.items.filter(
+        ({ collectionId }) => collectionId === data.collectionId,
+      ) ?? [];
+    const [signedCollection] = await signCollectionSummaries([collection]);
+    if (!signedCollection) return null;
+    return {
+      collection: signedCollection,
+      items: await Promise.all(items.map(signCollectionItem)),
+      ownerUsername: matchingOwner?.username,
+    };
+  });
+
+export const saveCollection = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    collectionWriteSchema
+      .and(z.object({ collectionId: idSchema.nullable() }))
+      .safeParse(input),
+  )
+  .handler(async ({ data: parsed }) => {
+    if (!parsed.success) return validationFailure(parsed.error);
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    try {
+      const collection = parsed.data.collectionId
+        ? await s.db.collections.updateCollection({
+            ...parsed.data,
+            actorClerkId: actor.clerkId,
+            actorIsAdmin: actor.isAdmin,
+            collectionId: parsed.data.collectionId,
+          })
+        : await s.db.collections.createCollection({
+            ...parsed.data,
+            actorClerkId: actor.clerkId,
+          });
+      const [signedCollection] = await signCollectionSummaries([collection]);
+      if (!signedCollection) throw new Error("Failed to sign collection.");
+      return {
+        collection: signedCollection,
+        ok: true as const,
+      };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
+
+export const getUserCollectionSummary = createServerFn({
+  method: "GET",
+})
+  .validator((input: unknown) =>
+    z.object({ collectionId: idSchema }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    return await s.db.collections.getOwnedCollection(
+      actor.clerkId,
+      data.collectionId,
+      actor.isAdmin,
+    );
+  });
 
 export const getCollectionEditData = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
@@ -636,20 +810,26 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
     if (!item) {
       return {
         buttonProducts: [],
+        collections: [],
         item: null,
         ownedButtons: [],
         product: null,
       };
     }
-    const [items, products, buttonProducts] = await Promise.all([
+    const [items, products, buttonProducts, collections] = await Promise.all([
       s.db.collections.listOwned(actorClerkId.clerkId, actorClerkId.isAdmin),
       s.db.catalog.listProducts(item.productTypeSlug, actorClerkId),
       item.productTypeSlug === "spinner"
         ? s.db.catalog.listProducts("spinner-button", actorClerkId)
         : Promise.resolve([]),
+      s.db.collections.listOwnedCollections(
+        actorClerkId.clerkId,
+        actorClerkId.isAdmin,
+      ),
     ]);
     return {
       buttonProducts,
+      collections: await signCollectionSummaries(collections),
       item: await signCollectionItem(item),
       ownedButtons: items.filter(
         (candidate) => candidate.productTypeSlug === "spinner-button",
@@ -770,7 +950,7 @@ export const setCollectionVisibility = createServerFn({ method: "POST" })
     z
       .object({
         isPrivate: z.boolean(),
-        ownerUserId: idSchema,
+        collectionId: idSchema,
         reason: z.string().max(1000).optional(),
       })
       .parse(input),
@@ -894,14 +1074,33 @@ async function signCollectionItem<
   return { ...item, images, productImages };
 }
 
+async function signCollectionSummaries(
+  collections: UserCollectionSummary[],
+): Promise<UserCollectionSummary[]> {
+  return await Promise.all(
+    collections.map(async (collection) => {
+      const [coverImage] = collection.coverImage
+        ? await signCatalogImages([collection.coverImage])
+        : [];
+      return {
+        ...collection,
+        coverImage: coverImage ?? null,
+        coverImages: await signCatalogImages(collection.coverImages),
+      };
+    }),
+  );
+}
+
 async function signCollectionOwners<
   T extends {
+    collections: UserCollectionSummary[];
     items: Array<{ images: CatalogImage[]; productImages: CatalogImage[] }>;
   },
 >(owners: T[]): Promise<T[]> {
   return await Promise.all(
     owners.map(async (owner) => ({
       ...owner,
+      collections: await signCollectionSummaries(owner.collections),
       items: await Promise.all(owner.items.map(signCollectionItem)),
     })),
   );

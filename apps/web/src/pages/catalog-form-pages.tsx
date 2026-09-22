@@ -7,6 +7,7 @@ import type {
   CatalogProduct,
   CatalogProductType,
   UserCollectionItem,
+  UserCollectionSummary,
 } from "@package/services";
 import {
   formatTranslation,
@@ -19,6 +20,12 @@ import { RotateCcw, Trash2 } from "lucide-react";
 import * as React from "react";
 import { z } from "zod";
 import { AppShell } from "@/components/app-shell";
+import {
+  CollectionCoverManager,
+  CollectionForm,
+  type CollectionFormValue,
+} from "@/components/collection-form";
+import { CollectionSelector } from "@/components/collection-selector";
 import { FileDropInput } from "@/components/resource-file-input";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,11 +49,14 @@ import {
   productTypeIsSupported,
   restoreCatalogImage,
   saveCatalogProduct,
+  saveCollection,
   softDeleteCatalogImage,
   updateCollectionItem,
 } from "@/lib/catalog-api";
 import {
   type CatalogImageUploadError,
+  deleteCollectionCover,
+  selectCollectionCover,
   uploadCatalogImages,
   validateCatalogImages,
 } from "@/lib/catalog-image-uploads";
@@ -873,23 +883,222 @@ function LookupDialog(props: LookupDialogProps) {
   );
 }
 
+export function CollectionFormPage({
+  collection,
+}: {
+  collection?: UserCollectionSummary;
+}) {
+  const t = useCatalogCopy();
+  const navigate = useNavigate();
+  const { getToken } = useAuth();
+  const [current, setCurrent] = React.useState(collection);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const copy = {
+    browse: t("web.resources.upload.browseFiles"),
+    cover: t("web.collections.field.cover"),
+    description: t("web.collections.field.description"),
+    descriptionPlaceholder: t("web.collections.placeholder.description"),
+    imageHelp: t("web.resources.upload.imagesHelp", {
+      maxFileSize: "25 MiB",
+      maxImages: 1,
+      maxSessionSize: "25 MiB",
+    }),
+    imageTypes: t("web.resources.upload.imageTypes"),
+    name: t("web.collections.field.name"),
+    namePlaceholder: t("web.collections.placeholder.name"),
+    public: t("web.resources.visibility.public"),
+    removeFile: t("web.resources.action.removeFile"),
+    submit: t("action.save"),
+  };
+
+  async function submit(value: CollectionFormValue, cover: File | null) {
+    setSaving(true);
+    setError(null);
+    const result = await saveCollection({
+      data: {
+        collectionId: current?.id ?? null,
+        description: value.description,
+        isPrivate: value.isPrivate,
+        name: value.name,
+      },
+    });
+    if (!result.ok) {
+      setError(t(result.formError));
+      setSaving(false);
+      return;
+    }
+    setCurrent(result.collection);
+    if (cover) {
+      try {
+        const upload = await uploadCatalogImages({
+          files: [cover],
+          getToken,
+          targetId: result.collection.id,
+          targetType: "collection",
+        });
+        if (upload.failed.length) {
+          setError(t("web.collections.error.upload"));
+          setSaving(false);
+          return;
+        }
+      } catch {
+        setError(t("web.collections.error.upload"));
+        setSaving(false);
+        return;
+      }
+    }
+    await navigate({
+      params: { collectionId: result.collection.id },
+      to: "/user/collections/$collectionId",
+    });
+  }
+
+  async function updateCover(action: () => Promise<void>) {
+    if (!current) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await action();
+      window.location.reload();
+    } catch {
+      setError(t("error.generic"));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AppShell
+      breadcrumbItems={[
+        { label: t("web.navigation.collections"), to: "/user/collections" },
+      ]}
+      title={
+        current
+          ? t("web.collections.edit.title")
+          : t("web.collections.add.title")
+      }
+    >
+      <main className="grid gap-6 p-6">
+        <CollectionForm
+          copy={copy}
+          disabled={saving}
+          error={error}
+          initialValue={
+            current
+              ? {
+                  description: current.description ?? "",
+                  isPrivate: current.isPrivate,
+                  name: current.name,
+                }
+              : undefined
+          }
+          onSubmit={submit}
+        />
+        {current?.coverImages.length ? (
+          <CollectionCoverManager
+            collection={current}
+            copy={{
+              clear: t("web.action.clearCover"),
+              clearConfirmation: t("web.collections.cover.clearConfirmation"),
+              current: t("web.collections.cover.current"),
+              delete: t("web.action.deleteCover"),
+              deleteConfirmation: t("web.collections.cover.deleteConfirmation"),
+              history: t("web.collections.cover.history"),
+              select: t("web.action.selectCover"),
+            }}
+            disabled={saving}
+            onClear={() =>
+              updateCover(() =>
+                selectCollectionCover({
+                  collectionId: current.id,
+                  getToken,
+                  imageId: null,
+                }),
+              )
+            }
+            onDelete={(image) =>
+              updateCover(() =>
+                deleteCollectionCover({
+                  collectionId: current.id,
+                  getToken,
+                  imageId: image.id,
+                }),
+              )
+            }
+            onSelect={(image) =>
+              updateCover(() =>
+                selectCollectionCover({
+                  collectionId: current.id,
+                  getToken,
+                  imageId: image.id,
+                }),
+              )
+            }
+          />
+        ) : null}
+      </main>
+    </AppShell>
+  );
+}
+
 export function CollectionAddPage({
-  collectionIsPrivate = true,
+  collections,
+  defaultCollectionName,
+  initialProductId,
+  syncIncomplete = false,
   options: initialOptions,
   products,
 }: {
-  collectionIsPrivate?: boolean;
+  collections: UserCollectionSummary[];
+  defaultCollectionName: string | null;
+  initialProductId?: number;
   options: CatalogOptions;
   products: CatalogProduct[];
+  syncIncomplete?: boolean;
 }) {
   const t = useCatalogCopy();
   const navigate = useNavigate();
   const { getToken } = useAuth();
   const [images, setImages] = React.useState<File[]>([]);
+  const collectionDialog = React.useRef<HTMLDialogElement>(null);
+  const [newCollection, setNewCollection] =
+    React.useState<CollectionFormValue | null>(() =>
+      collections.length === 0 && defaultCollectionName
+        ? {
+            description: "",
+            isPrivate: true,
+            name: defaultCollectionName,
+          }
+        : null,
+    );
+  const [collectionCover, setCollectionCover] = React.useState<File | null>(
+    null,
+  );
+  const [selectedCollectionId, setSelectedCollectionId] = React.useState<
+    number | null
+  >(() =>
+    collections.length === 1
+      ? (collections[0]?.id ?? null)
+      : newCollection
+        ? -1
+        : null,
+  );
   const [savedItemId, setSavedItemId] = React.useState<number | null>(null);
+  const [savedCollectionId, setSavedCollectionId] = React.useState<
+    number | null
+  >(null);
   const [options, setOptions] = React.useState(initialOptions);
-  const [type, setType] = React.useState<ComboboxOption | null>(null);
-  const [product, setProduct] = React.useState<CatalogProduct | null>(null);
+  const initialProduct = products.find(({ id }) => id === initialProductId);
+  const [type, setType] = React.useState<ComboboxOption | null>(() =>
+    initialProduct
+      ? (initialOptions.productTypes.find(
+          ({ slug }) => slug === initialProduct.productTypeSlug,
+        ) ?? null)
+      : null,
+  );
+  const [product, setProduct] = React.useState<CatalogProduct | null>(
+    initialProduct ?? null,
+  );
   const [material, setMaterial] = React.useState<CatalogLookup | null>(null);
   const [finish, setFinish] = React.useState<ComboboxOption | null>(null);
   const [customFinish, setCustomFinish] = React.useState(emptyFinishOption);
@@ -919,10 +1128,34 @@ export function CollectionAddPage({
     finishOptionSchema.safeParse(customFinish).success;
   const buttonCustomFinishIsValid =
     finishOptionSchema.safeParse(buttonCustomFinish).success;
+  const selectedCollection = collections.find(
+    ({ id }) => id === selectedCollectionId,
+  );
+  const collectionIsPrivate =
+    selectedCollection?.isPrivate ?? newCollection?.isPrivate ?? true;
+  const collectionChoices = newCollection
+    ? [
+        ...collections,
+        {
+          coverImage: null,
+          coverImages: [],
+          createdAt: new Date(0),
+          description: newCollection.description || null,
+          id: -1,
+          isAdminPrivate: false,
+          isPrivate: newCollection.isPrivate,
+          itemCount: 0,
+          name: newCollection.name,
+          ownerUserId: 0,
+          updatedAt: new Date(0),
+        },
+      ]
+    : collections;
 
   const submit = async (confirmed: boolean) => {
     if (
       !product ||
+      selectedCollectionId === null ||
       !material ||
       !finish ||
       (finish.id === "custom" && !customFinishIsValid) ||
@@ -939,38 +1172,38 @@ export function CollectionAddPage({
       setFormError(imageError.key);
       return;
     }
-    if (savedItemId) {
-      if (!images.length) {
-        await navigate({ to: "/user/collections" });
-        return;
-      }
+    if (savedItemId && savedCollectionId) {
       try {
-        const uploads = await uploadCatalogImages({
-          files: images,
-          getToken,
-          onOwnerDeletedDuplicate: async (imageId) => {
-            if (
-              !window.confirm(
-                t("web.resources.trash.restoreConfirmationDescription", {
-                  name: product.name,
-                }),
-              )
-            )
-              return false;
-            await restoreCatalogImage({
-              data: { imageId, targetType: "collection_item" },
-            });
-            return true;
-          },
-          targetId: savedItemId,
-          targetType: "collection_item",
-        });
-        setImages(uploads.failed);
-        if (uploads.failed.length) {
-          setFormError("web.resources.upload.sessionFailure");
-          return;
+        if (images.length) {
+          const uploads = await uploadCatalogImages({
+            files: images,
+            getToken,
+            targetId: savedItemId,
+            targetType: "collection_item",
+          });
+          setImages(uploads.failed);
+          if (uploads.failed.length) {
+            setFormError("web.resources.upload.sessionFailure");
+            return;
+          }
         }
-        await navigate({ to: "/user/collections" });
+        if (collectionCover) {
+          const coverUpload = await uploadCatalogImages({
+            files: [collectionCover],
+            getToken,
+            targetId: savedCollectionId,
+            targetType: "collection",
+          });
+          if (coverUpload.failed.length) {
+            setFormError("web.collections.error.upload");
+            return;
+          }
+          setCollectionCover(null);
+        }
+        await navigate({
+          params: { collectionId: savedCollectionId },
+          to: "/user/collections/$collectionId",
+        });
       } catch (error) {
         setFormError((error as CatalogImageUploadError).key ?? "error.generic");
       }
@@ -988,10 +1221,19 @@ export function CollectionAddPage({
             : null,
         buttonMaterialId: selectedButton ? (buttonMaterial?.id ?? null) : null,
         buttonProductId: selectedButton?.id ?? null,
+        collectionId: selectedCollectionId === -1 ? null : selectedCollectionId,
         confirmed,
         customFinish: finish.id === "custom" ? customFinish : null,
         finishOptionId: finish.id === "custom" ? null : Number(finish.id),
         materialId: material.id,
+        newCollection:
+          selectedCollectionId === -1 && newCollection
+            ? {
+                description: newCollection.description || null,
+                isPrivate: newCollection.isPrivate,
+                name: newCollection.name,
+              }
+            : null,
         productId: product.id,
         productTypeSlug: product.productTypeSlug,
       },
@@ -1005,6 +1247,7 @@ export function CollectionAddPage({
       return;
     }
     setSavedItemId(result.collectionItemId);
+    setSavedCollectionId(result.collectionId);
     if (images.length) {
       try {
         const uploads = await uploadCatalogImages({
@@ -1037,7 +1280,27 @@ export function CollectionAddPage({
         return;
       }
     }
-    await navigate({ to: "/user/collections" });
+    if (collectionCover) {
+      try {
+        const upload = await uploadCatalogImages({
+          files: [collectionCover],
+          getToken,
+          targetId: result.collectionId,
+          targetType: "collection",
+        });
+        if (upload.failed.length) {
+          setFormError("web.collections.error.upload");
+          return;
+        }
+      } catch {
+        setFormError("web.collections.error.upload");
+        return;
+      }
+    }
+    await navigate({
+      params: { collectionId: result.collectionId },
+      to: "/user/collections/$collectionId",
+    });
   };
 
   return (
@@ -1048,6 +1311,66 @@ export function CollectionAddPage({
       title={t("web.action.addToCollection")}
     >
       <main className="grid max-w-5xl gap-6 p-6">
+        {syncIncomplete ? (
+          <Notice>{t("web.collections.error.syncIncomplete")}</Notice>
+        ) : null}
+        <CollectionSelector
+          addLabel={t("web.collections.select.addNew")}
+          collections={collectionChoices}
+          label={t("web.collections.field.collection")}
+          onAdd={() => collectionDialog.current?.showModal()}
+          onChange={(collectionId) => {
+            setSelectedCollectionId(collectionId);
+            if (collectionId !== -1) {
+              setNewCollection(null);
+              setCollectionCover(null);
+            }
+          }}
+          placeholder={t("web.collections.select.placeholder")}
+          selectedId={selectedCollectionId}
+        />
+        <dialog
+          className="m-auto w-[min(48rem,calc(100%-2rem))] rounded-xl border border-border bg-background p-0 text-foreground backdrop:bg-black/60"
+          ref={collectionDialog}
+        >
+          <div className="p-4">
+            <CollectionForm
+              copy={{
+                browse: t("web.resources.upload.browseFiles"),
+                cover: t("web.collections.field.cover"),
+                description: t("web.collections.field.description"),
+                descriptionPlaceholder: t(
+                  "web.collections.placeholder.description",
+                ),
+                imageHelp: t("web.resources.upload.imagesHelp", {
+                  maxFileSize: "25 MiB",
+                  maxImages: 1,
+                  maxSessionSize: "25 MiB",
+                }),
+                imageTypes: t("web.resources.upload.imageTypes"),
+                name: t("web.collections.field.name"),
+                namePlaceholder: t("web.collections.placeholder.name"),
+                public: t("web.resources.visibility.public"),
+                removeFile: t("web.resources.action.removeFile"),
+                submit: t("action.save"),
+              }}
+              onSubmit={(value, cover) => {
+                setNewCollection(value);
+                setCollectionCover(cover);
+                setSelectedCollectionId(-1);
+                collectionDialog.current?.close();
+              }}
+            />
+            <Button
+              className="mt-3"
+              onClick={() => collectionDialog.current?.close()}
+              type="button"
+              variant="outline"
+            >
+              {t("action.cancel")}
+            </Button>
+          </div>
+        </dialog>
         <Field label={t("web.catalog.field.productType")}>
           <CatalogCombobox
             ariaLabel={t("web.catalog.field.productType")}
@@ -1111,7 +1434,7 @@ export function CollectionAddPage({
           />
         ) : null}
         {product && collectionIsPrivate ? (
-          <Notice>{t("web.resources.visibility.private")}</Notice>
+          <Notice>{t("web.collections.visibility.privateCallout")}</Notice>
         ) : null}
         {product ? (
           <Button
@@ -1340,12 +1663,14 @@ function localizedFinishLabel(
 
 export function CollectionEditPage({
   buttonProducts,
+  collections,
   item,
   options: initialOptions,
   ownedButtons,
   product,
 }: {
   buttonProducts: CatalogProduct[];
+  collections: UserCollectionSummary[];
   item: UserCollectionItem;
   options: CatalogOptions;
   ownedButtons: UserCollectionItem[];
@@ -1356,6 +1681,7 @@ export function CollectionEditPage({
   const { getToken } = useAuth();
   const [images, setImages] = React.useState<File[]>([]);
   const [existingImages, setExistingImages] = React.useState(item.images);
+  const [collectionId, setCollectionId] = React.useState(item.collectionId);
   const [options, setOptions] = React.useState(initialOptions);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [material, setMaterial] = React.useState<CatalogLookup | null>(
@@ -1417,6 +1743,16 @@ export function CollectionEditPage({
       title={item.name}
     >
       <main className="grid max-w-xl gap-5 p-6">
+        <CollectionSelector
+          addLabel={t("web.collections.select.addNew")}
+          collections={collections}
+          label={t("web.collections.field.collection")}
+          onChange={(nextCollectionId) => {
+            if (nextCollectionId) setCollectionId(nextCollectionId);
+          }}
+          placeholder={t("web.collections.select.placeholder")}
+          selectedId={collectionId}
+        />
         <CollectionProductFields
           currentFinish={item.finishOption}
           customFinish={customFinish}
@@ -1436,10 +1772,16 @@ export function CollectionEditPage({
               ariaLabel={t("web.catalog.field.button")}
               items={[
                 { id: "default", name: t("web.catalog.defaultButton") },
-                ...ownedButtons.map(({ collectionItemId, name }) => ({
-                  id: collectionItemId,
-                  name,
-                })),
+                ...ownedButtons
+                  .filter(
+                    (candidate) =>
+                      candidate.collectionId === collectionId ||
+                      candidate.collectionItemId === item.installedButtonId,
+                  )
+                  .map(({ collectionItemId, name }) => ({
+                    id: collectionItemId,
+                    name,
+                  })),
               ]}
               onValueChange={(value) => {
                 setButton(value);
@@ -1560,6 +1902,7 @@ export function CollectionEditPage({
             }
             const result = await updateCollectionItem({
               data: {
+                collectionId,
                 collectionItemId: item.collectionItemId,
                 customFinish: finish.id === "custom" ? customFinish : null,
                 finishOptionId:
@@ -1613,7 +1956,10 @@ export function CollectionEditPage({
                   return;
                 }
               }
-              await navigate({ to: "/user/collections" });
+              await navigate({
+                params: { collectionId },
+                to: "/user/collections/$collectionId",
+              });
             } else {
               setFormError(result.formError);
             }

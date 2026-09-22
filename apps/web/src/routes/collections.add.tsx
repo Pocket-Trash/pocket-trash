@@ -2,25 +2,29 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { getAuthState } from "@/lib/auth";
 import {
   getCatalogOptions,
-  getUserCollectionSummary,
+  getCollectionAddContext,
   listCatalogProducts,
 } from "@/lib/catalog-api";
 import { CollectionAddPage } from "@/pages/catalog-form-pages";
 
 export const Route = createFileRoute("/collections/add")({
+  validateSearch: (search: Record<string, unknown>): { product?: number } => {
+    const product = Number(search.product);
+    return Number.isSafeInteger(product) && product > 0 ? { product } : {};
+  },
   beforeLoad: async () => {
     if (!(await getAuthState()).isAuthenticated) {
       throw redirect({ params: { _splat: "" }, to: "/sign-in/$" });
     }
   },
   loader: async () => {
-    const [options, products, collection] = await Promise.all([
+    const [options, products, collectionContext] = await Promise.all([
       getCatalogOptions(),
       listCatalogProducts(),
-      getUserCollectionSummary(),
+      getCollectionAddContext(),
     ]);
     return {
-      collectionIsPrivate: collection?.isPrivate ?? true,
+      ...collectionContext,
       options,
       products,
     };
@@ -29,5 +33,10 @@ export const Route = createFileRoute("/collections/add")({
 });
 
 function CollectionAddRoute() {
-  return <CollectionAddPage {...Route.useLoaderData()} />;
+  return (
+    <CollectionAddPage
+      {...Route.useLoaderData()}
+      initialProductId={Route.useSearch().product}
+    />
+  );
 }

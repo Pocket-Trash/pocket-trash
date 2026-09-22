@@ -199,6 +199,21 @@ describe("finish option editor", () => {
     const html = renderToStaticMarkup(
       createElement(CollectionEditPage, {
         buttonProducts: [button],
+        collections: [
+          {
+            coverImage: null,
+            coverImages: [],
+            createdAt: new Date(0),
+            description: null,
+            id: 1000,
+            isAdminPrivate: false,
+            isPrivate: false,
+            itemCount: 2,
+            name: "Test collection",
+            ownerUserId: 1,
+            updatedAt: new Date(0),
+          },
+        ],
         item: spinnerItem,
         options: emptyCatalogOptions,
         ownedButtons: [buttonItem],
@@ -264,8 +279,10 @@ function collectionFixture(
   return {
     canAdminister: false,
     canEdit: true,
+    collectionId: 1000,
     collectionItemId,
     collectionIsPrivate: false,
+    collectionName: "Test collection",
     finishOption: product.finishOptions[0] ?? null,
     imageCount: 0,
     images: [],

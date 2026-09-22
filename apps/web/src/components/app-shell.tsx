@@ -17,7 +17,7 @@ import { useLocale } from "@/providers/locale-provider";
 type AppShellProps = {
   breadcrumbItems?: Array<{
     label: string;
-    to: "/collections" | "/products" | "/user/account";
+    to?: "/collections" | "/products" | "/user/account" | "/user/collections";
   }>;
   children: React.ReactNode;
   headerActions?: React.ReactNode;
@@ -64,15 +64,22 @@ export function AppShell({
               >
                 <Home aria-hidden="true" className="size-3.5" />
               </Link>
-              {breadcrumbItems.map((item) => (
-                <span className="contents" key={item.to}>
+              {breadcrumbItems.map((item, index) => (
+                <span className="contents" key={`${item.label}-${index}`}>
                   <ChevronRight
                     aria-hidden="true"
                     className="size-3.5 shrink-0"
                   />
-                  <Link className="truncate hover:text-foreground" to={item.to}>
-                    {item.label}
-                  </Link>
+                  {item.to ? (
+                    <Link
+                      className="truncate hover:text-foreground"
+                      to={item.to}
+                    >
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <span className="truncate">{item.label}</span>
+                  )}
                 </span>
               ))}
               <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />

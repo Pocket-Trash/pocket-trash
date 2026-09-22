@@ -31,16 +31,20 @@ import { Route as CollectionsUserIdRouteImport } from './routes/collections.$use
 import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
 import { Route as UserResourcesTrashRouteImport } from './routes/user.resources_.trash'
+import { Route as UserCollectionsAddRouteImport } from './routes/user.collections_.add'
+import { Route as UserCollectionsCollectionIdRouteImport } from './routes/user.collections_.$collectionId'
 import { Route as ResourcesResourceIdEditRouteImport } from './routes/resources.$resourceId_.edit'
 import { Route as ProductsProductTypeSlugProductSlugRouteImport } from './routes/products.$productTypeSlug.$productSlug'
+import { Route as CollectionsUserIdCollectionIdRouteImport } from './routes/collections_.$userId.$collectionId'
 import { Route as CollectionsEditCollectionItemIdRouteImport } from './routes/collections.edit.$collectionItemId'
-import { Route as CollectionsUserIdCollectionItemIdRouteImport } from './routes/collections.$userId.$collectionItemId'
 import { Route as AdminSettingsFeatureFlagsRouteImport } from './routes/admin.settings.feature-flags'
 import { Route as AdminResourcesTrashRouteImport } from './routes/admin.resources.trash'
 import { Route as AdminResourcesNotificationsRouteImport } from './routes/admin.resources.notifications'
 import { Route as AdminCatalogImagesTrashRouteImport } from './routes/admin.catalog-images.trash'
+import { Route as UserCollectionsCollectionIdEditRouteImport } from './routes/user.collections_.$collectionId_.edit'
 import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId_.versions.new'
 import { Route as ProductsProductTypeSlugProductSlugEditRouteImport } from './routes/products.$productTypeSlug.$productSlug_.edit'
+import { Route as CollectionsUserIdCollectionIdCollectionItemIdRouteImport } from './routes/collections_.$userId.$collectionId_.$collectionItemId'
 
 const UserRoute = UserRouteImport.update({
   id: '/user',
@@ -153,6 +157,17 @@ const UserResourcesTrashRoute = UserResourcesTrashRouteImport.update({
   path: '/resources/trash',
   getParentRoute: () => UserRoute,
 } as any)
+const UserCollectionsAddRoute = UserCollectionsAddRouteImport.update({
+  id: '/collections_/add',
+  path: '/collections/add',
+  getParentRoute: () => UserRoute,
+} as any)
+const UserCollectionsCollectionIdRoute =
+  UserCollectionsCollectionIdRouteImport.update({
+    id: '/collections_/$collectionId',
+    path: '/collections/$collectionId',
+    getParentRoute: () => UserRoute,
+  } as any)
 const ResourcesResourceIdEditRoute = ResourcesResourceIdEditRouteImport.update({
   id: '/$resourceId_/edit',
   path: '/$resourceId/edit',
@@ -164,17 +179,17 @@ const ProductsProductTypeSlugProductSlugRoute =
     path: '/products/$productTypeSlug/$productSlug',
     getParentRoute: () => rootRouteImport,
   } as any)
+const CollectionsUserIdCollectionIdRoute =
+  CollectionsUserIdCollectionIdRouteImport.update({
+    id: '/collections_/$userId/$collectionId',
+    path: '/collections/$userId/$collectionId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const CollectionsEditCollectionItemIdRoute =
   CollectionsEditCollectionItemIdRouteImport.update({
     id: '/collections/edit/$collectionItemId',
     path: '/collections/edit/$collectionItemId',
     getParentRoute: () => rootRouteImport,
-  } as any)
-const CollectionsUserIdCollectionItemIdRoute =
-  CollectionsUserIdCollectionItemIdRouteImport.update({
-    id: '/$collectionItemId',
-    path: '/$collectionItemId',
-    getParentRoute: () => CollectionsUserIdRoute,
   } as any)
 const AdminSettingsFeatureFlagsRoute =
   AdminSettingsFeatureFlagsRouteImport.update({
@@ -198,6 +213,12 @@ const AdminCatalogImagesTrashRoute = AdminCatalogImagesTrashRouteImport.update({
   path: '/admin/catalog-images/trash',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UserCollectionsCollectionIdEditRoute =
+  UserCollectionsCollectionIdEditRouteImport.update({
+    id: '/collections_/$collectionId_/edit',
+    path: '/collections/$collectionId/edit',
+    getParentRoute: () => UserRoute,
+  } as any)
 const ResourcesResourceIdVersionsNewRoute =
   ResourcesResourceIdVersionsNewRouteImport.update({
     id: '/$resourceId_/versions/new',
@@ -210,6 +231,12 @@ const ProductsProductTypeSlugProductSlugEditRoute =
     path: '/products/$productTypeSlug/$productSlug/edit',
     getParentRoute: () => rootRouteImport,
   } as any)
+const CollectionsUserIdCollectionIdCollectionItemIdRoute =
+  CollectionsUserIdCollectionIdCollectionItemIdRouteImport.update({
+    id: '/collections_/$userId/$collectionId_/$collectionItemId',
+    path: '/collections/$userId/$collectionId/$collectionItemId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -217,7 +244,7 @@ export interface FileRoutesByFullPath {
   '/resources': typeof ResourcesRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
-  '/collections/$userId': typeof CollectionsUserIdRouteWithChildren
+  '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
@@ -236,21 +263,25 @@ export interface FileRoutesByFullPath {
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/resources/trash': typeof AdminResourcesTrashRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
-  '/collections/$userId/$collectionItemId': typeof CollectionsUserIdCollectionItemIdRoute
   '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
+  '/collections/$userId/$collectionId': typeof CollectionsUserIdCollectionIdRoute
   '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
   '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
+  '/user/collections/$collectionId': typeof UserCollectionsCollectionIdRoute
+  '/user/collections/add': typeof UserCollectionsAddRoute
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/collections/$userId/$collectionId/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
   '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
+  '/user/collections/$collectionId/edit': typeof UserCollectionsCollectionIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/autmog': typeof AutmogRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
-  '/collections/$userId': typeof CollectionsUserIdRouteWithChildren
+  '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
@@ -269,14 +300,18 @@ export interface FileRoutesByTo {
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/resources/trash': typeof AdminResourcesTrashRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
-  '/collections/$userId/$collectionItemId': typeof CollectionsUserIdCollectionItemIdRoute
   '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
+  '/collections/$userId/$collectionId': typeof CollectionsUserIdCollectionIdRoute
   '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
   '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
+  '/user/collections/$collectionId': typeof UserCollectionsCollectionIdRoute
+  '/user/collections/add': typeof UserCollectionsAddRoute
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/collections/$userId/$collectionId/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
   '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
+  '/user/collections/$collectionId/edit': typeof UserCollectionsCollectionIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -285,7 +320,7 @@ export interface FileRoutesById {
   '/resources': typeof ResourcesRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
-  '/collections/$userId': typeof CollectionsUserIdRouteWithChildren
+  '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
@@ -304,14 +339,18 @@ export interface FileRoutesById {
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/resources/trash': typeof AdminResourcesTrashRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
-  '/collections/$userId/$collectionItemId': typeof CollectionsUserIdCollectionItemIdRoute
   '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
+  '/collections_/$userId/$collectionId': typeof CollectionsUserIdCollectionIdRoute
   '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
   '/resources/$resourceId_/edit': typeof ResourcesResourceIdEditRoute
+  '/user/collections_/$collectionId': typeof UserCollectionsCollectionIdRoute
+  '/user/collections_/add': typeof UserCollectionsAddRoute
   '/user/resources_/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/collections_/$userId/$collectionId_/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug_/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
   '/resources/$resourceId_/versions/new': typeof ResourcesResourceIdVersionsNewRoute
+  '/user/collections_/$collectionId_/edit': typeof UserCollectionsCollectionIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -340,14 +379,18 @@ export interface FileRouteTypes {
     | '/admin/resources/notifications'
     | '/admin/resources/trash'
     | '/admin/settings/feature-flags'
-    | '/collections/$userId/$collectionItemId'
     | '/collections/edit/$collectionItemId'
+    | '/collections/$userId/$collectionId'
     | '/products/$productTypeSlug/$productSlug'
     | '/resources/$resourceId/edit'
+    | '/user/collections/$collectionId'
+    | '/user/collections/add'
     | '/user/resources/trash'
     | '/user/settings/beta-features'
+    | '/collections/$userId/$collectionId/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug/edit'
     | '/resources/$resourceId/versions/new'
+    | '/user/collections/$collectionId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -373,14 +416,18 @@ export interface FileRouteTypes {
     | '/admin/resources/notifications'
     | '/admin/resources/trash'
     | '/admin/settings/feature-flags'
-    | '/collections/$userId/$collectionItemId'
     | '/collections/edit/$collectionItemId'
+    | '/collections/$userId/$collectionId'
     | '/products/$productTypeSlug/$productSlug'
     | '/resources/$resourceId/edit'
+    | '/user/collections/$collectionId'
+    | '/user/collections/add'
     | '/user/resources/trash'
     | '/user/settings/beta-features'
+    | '/collections/$userId/$collectionId/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug/edit'
     | '/resources/$resourceId/versions/new'
+    | '/user/collections/$collectionId/edit'
   id:
     | '__root__'
     | '/'
@@ -407,14 +454,18 @@ export interface FileRouteTypes {
     | '/admin/resources/notifications'
     | '/admin/resources/trash'
     | '/admin/settings/feature-flags'
-    | '/collections/$userId/$collectionItemId'
     | '/collections/edit/$collectionItemId'
+    | '/collections_/$userId/$collectionId'
     | '/products/$productTypeSlug/$productSlug'
     | '/resources/$resourceId_/edit'
+    | '/user/collections_/$collectionId'
+    | '/user/collections_/add'
     | '/user/resources_/trash'
     | '/user/settings/beta-features'
+    | '/collections_/$userId/$collectionId_/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug_/edit'
     | '/resources/$resourceId_/versions/new'
+    | '/user/collections_/$collectionId_/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -422,7 +473,7 @@ export interface RootRouteChildren {
   AutmogRoute: typeof AutmogRouteWithChildren
   ResourcesRoute: typeof ResourcesRouteWithChildren
   UserRoute: typeof UserRouteWithChildren
-  CollectionsUserIdRoute: typeof CollectionsUserIdRouteWithChildren
+  CollectionsUserIdRoute: typeof CollectionsUserIdRoute
   CollectionsAddRoute: typeof CollectionsAddRoute
   PensPenIdRoute: typeof PensPenIdRoute
   ProductsAddRoute: typeof ProductsAddRoute
@@ -435,7 +486,9 @@ export interface RootRouteChildren {
   AdminResourcesTrashRoute: typeof AdminResourcesTrashRoute
   AdminSettingsFeatureFlagsRoute: typeof AdminSettingsFeatureFlagsRoute
   CollectionsEditCollectionItemIdRoute: typeof CollectionsEditCollectionItemIdRoute
+  CollectionsUserIdCollectionIdRoute: typeof CollectionsUserIdCollectionIdRoute
   ProductsProductTypeSlugProductSlugRoute: typeof ProductsProductTypeSlugProductSlugRoute
+  CollectionsUserIdCollectionIdCollectionItemIdRoute: typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   ProductsProductTypeSlugProductSlugEditRoute: typeof ProductsProductTypeSlugProductSlugEditRoute
 }
 
@@ -595,6 +648,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserResourcesTrashRouteImport
       parentRoute: typeof UserRoute
     }
+    '/user/collections_/add': {
+      id: '/user/collections_/add'
+      path: '/collections/add'
+      fullPath: '/user/collections/add'
+      preLoaderRoute: typeof UserCollectionsAddRouteImport
+      parentRoute: typeof UserRoute
+    }
+    '/user/collections_/$collectionId': {
+      id: '/user/collections_/$collectionId'
+      path: '/collections/$collectionId'
+      fullPath: '/user/collections/$collectionId'
+      preLoaderRoute: typeof UserCollectionsCollectionIdRouteImport
+      parentRoute: typeof UserRoute
+    }
     '/resources/$resourceId_/edit': {
       id: '/resources/$resourceId_/edit'
       path: '/$resourceId/edit'
@@ -609,19 +676,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductsProductTypeSlugProductSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/collections_/$userId/$collectionId': {
+      id: '/collections_/$userId/$collectionId'
+      path: '/collections/$userId/$collectionId'
+      fullPath: '/collections/$userId/$collectionId'
+      preLoaderRoute: typeof CollectionsUserIdCollectionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/collections/edit/$collectionItemId': {
       id: '/collections/edit/$collectionItemId'
       path: '/collections/edit/$collectionItemId'
       fullPath: '/collections/edit/$collectionItemId'
       preLoaderRoute: typeof CollectionsEditCollectionItemIdRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/collections/$userId/$collectionItemId': {
-      id: '/collections/$userId/$collectionItemId'
-      path: '/$collectionItemId'
-      fullPath: '/collections/$userId/$collectionItemId'
-      preLoaderRoute: typeof CollectionsUserIdCollectionItemIdRouteImport
-      parentRoute: typeof CollectionsUserIdRoute
     }
     '/admin/settings/feature-flags': {
       id: '/admin/settings/feature-flags'
@@ -651,6 +718,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCatalogImagesTrashRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/user/collections_/$collectionId_/edit': {
+      id: '/user/collections_/$collectionId_/edit'
+      path: '/collections/$collectionId/edit'
+      fullPath: '/user/collections/$collectionId/edit'
+      preLoaderRoute: typeof UserCollectionsCollectionIdEditRouteImport
+      parentRoute: typeof UserRoute
+    }
     '/resources/$resourceId_/versions/new': {
       id: '/resources/$resourceId_/versions/new'
       path: '/$resourceId/versions/new'
@@ -663,6 +737,13 @@ declare module '@tanstack/react-router' {
       path: '/products/$productTypeSlug/$productSlug/edit'
       fullPath: '/products/$productTypeSlug/$productSlug/edit'
       preLoaderRoute: typeof ProductsProductTypeSlugProductSlugEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collections_/$userId/$collectionId_/$collectionItemId': {
+      id: '/collections_/$userId/$collectionId_/$collectionItemId'
+      path: '/collections/$userId/$collectionId/$collectionItemId'
+      fullPath: '/collections/$userId/$collectionId/$collectionItemId'
+      preLoaderRoute: typeof CollectionsUserIdCollectionIdCollectionItemIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -704,8 +785,11 @@ interface UserRouteChildren {
   UserCollectionsRoute: typeof UserCollectionsRoute
   UserResourcesRoute: typeof UserResourcesRoute
   UserSettingsRoute: typeof UserSettingsRoute
+  UserCollectionsCollectionIdRoute: typeof UserCollectionsCollectionIdRoute
+  UserCollectionsAddRoute: typeof UserCollectionsAddRoute
   UserResourcesTrashRoute: typeof UserResourcesTrashRoute
   UserSettingsBetaFeaturesRoute: typeof UserSettingsBetaFeaturesRoute
+  UserCollectionsCollectionIdEditRoute: typeof UserCollectionsCollectionIdEditRoute
 }
 
 const UserRouteChildren: UserRouteChildren = {
@@ -713,30 +797,21 @@ const UserRouteChildren: UserRouteChildren = {
   UserCollectionsRoute: UserCollectionsRoute,
   UserResourcesRoute: UserResourcesRoute,
   UserSettingsRoute: UserSettingsRoute,
+  UserCollectionsCollectionIdRoute: UserCollectionsCollectionIdRoute,
+  UserCollectionsAddRoute: UserCollectionsAddRoute,
   UserResourcesTrashRoute: UserResourcesTrashRoute,
   UserSettingsBetaFeaturesRoute: UserSettingsBetaFeaturesRoute,
+  UserCollectionsCollectionIdEditRoute: UserCollectionsCollectionIdEditRoute,
 }
 
 const UserRouteWithChildren = UserRoute._addFileChildren(UserRouteChildren)
-
-interface CollectionsUserIdRouteChildren {
-  CollectionsUserIdCollectionItemIdRoute: typeof CollectionsUserIdCollectionItemIdRoute
-}
-
-const CollectionsUserIdRouteChildren: CollectionsUserIdRouteChildren = {
-  CollectionsUserIdCollectionItemIdRoute:
-    CollectionsUserIdCollectionItemIdRoute,
-}
-
-const CollectionsUserIdRouteWithChildren =
-  CollectionsUserIdRoute._addFileChildren(CollectionsUserIdRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AutmogRoute: AutmogRouteWithChildren,
   ResourcesRoute: ResourcesRouteWithChildren,
   UserRoute: UserRouteWithChildren,
-  CollectionsUserIdRoute: CollectionsUserIdRouteWithChildren,
+  CollectionsUserIdRoute: CollectionsUserIdRoute,
   CollectionsAddRoute: CollectionsAddRoute,
   PensPenIdRoute: PensPenIdRoute,
   ProductsAddRoute: ProductsAddRoute,
@@ -749,8 +824,11 @@ const rootRouteChildren: RootRouteChildren = {
   AdminResourcesTrashRoute: AdminResourcesTrashRoute,
   AdminSettingsFeatureFlagsRoute: AdminSettingsFeatureFlagsRoute,
   CollectionsEditCollectionItemIdRoute: CollectionsEditCollectionItemIdRoute,
+  CollectionsUserIdCollectionIdRoute: CollectionsUserIdCollectionIdRoute,
   ProductsProductTypeSlugProductSlugRoute:
     ProductsProductTypeSlugProductSlugRoute,
+  CollectionsUserIdCollectionIdCollectionItemIdRoute:
+    CollectionsUserIdCollectionIdCollectionItemIdRoute,
   ProductsProductTypeSlugProductSlugEditRoute:
     ProductsProductTypeSlugProductSlugEditRoute,
 }
