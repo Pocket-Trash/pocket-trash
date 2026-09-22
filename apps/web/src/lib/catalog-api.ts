@@ -1,6 +1,7 @@
 import { auth } from "@clerk/tanstack-react-start/server";
 import type {
   CatalogColor,
+  CatalogImage,
   CatalogLookup,
   CatalogProduct,
   CatalogProductType,
@@ -15,6 +16,7 @@ import {
   slugify,
   slugPattern,
 } from "./catalog";
+import { getResourceViewer } from "./resources";
 import { localizedServerError } from "./server-errors";
 
 const requiredMessage = "web.catalog.error.required";
@@ -263,6 +265,7 @@ export type CatalogOptions = {
 export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
   async (): Promise<CatalogOptions> => {
     const { s } = await import("@/lib/services");
+    const viewer = await getResourceViewer();
     const [
       colorEffects,
       colors,
@@ -278,7 +281,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       listMakers(),
       listMaterials(),
       listProductTypes(),
-      s.db.catalog.listProducts("spinner-button"),
+      s.db.catalog.listProducts("spinner-button", viewer),
     ]);
     return {
       colorEffects,
@@ -301,36 +304,46 @@ export const listCatalogProducts = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }): Promise<CatalogProduct[]> => {
     const { s } = await import("@/lib/services");
+    const viewer = await getResourceViewer();
     if (data?.productTypeSlug) {
-      return await s.db.catalog.listProducts(data.productTypeSlug);
+      return await signCatalogProducts(
+        await s.db.catalog.listProducts(data.productTypeSlug, viewer),
+      );
     }
     const products = await Promise.all(
-      productTypeSchema.options.map((type) => s.db.catalog.listProducts(type)),
+      productTypeSchema.options.map((type) =>
+        s.db.catalog.listProducts(type, viewer),
+      ),
     );
-    return products.flat().sort((a, b) => a.name.localeCompare(b.name));
+    return await signCatalogProducts(
+      products.flat().sort((a, b) => a.name.localeCompare(b.name)),
+    );
   });
 
 export const getCatalogProduct = createServerFn({ method: "GET" })
   .validator((input: unknown) => productLookupSchema.parse(input))
   .handler(async ({ data }): Promise<CatalogProduct | null> => {
     const { s } = await import("@/lib/services");
-    return await s.db.catalog.getProduct(
+    const viewer = await getResourceViewer();
+    const product = await s.db.catalog.getProduct(
       data.productTypeSlug,
       data.productSlug,
+      viewer,
     );
+    return product ? ((await signCatalogProducts([product]))[0] ?? null) : null;
   });
 
 export const createCatalogMaker = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireActor();
+    const actor = await requireActor();
     const parsed = makerSchema.safeParse(data);
     if (!parsed.success) return validationFailure(parsed.error);
 
     const { s } = await import("@/lib/services");
     try {
       const maker = await s.db.catalog.createMaker({
-        actorClerkId,
+        actorClerkId: actor.clerkId,
         name: parsed.data.name,
         rootUrl: normalizeOptionalUrl(parsed.data.rootUrl),
       });
@@ -343,7 +356,7 @@ export const createCatalogMaker = createServerFn({ method: "POST" })
 export const createCatalogMaterial = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireActor();
+    const actor = await requireActor();
     const parsed = materialSchema.safeParse(data);
     if (!parsed.success) return validationFailure(parsed.error);
 
@@ -355,7 +368,7 @@ export const createCatalogMaterial = createServerFn({ method: "POST" })
     );
     try {
       const material = await s.db.catalog.createMaterial({
-        actorClerkId,
+        actorClerkId: actor.clerkId,
         name: parsed.data.name,
         slug,
       });
@@ -368,7 +381,7 @@ export const createCatalogMaterial = createServerFn({ method: "POST" })
 export const createCatalogFinish = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }): Promise<CatalogLookupMutationResult<"finish">> => {
-    const actorClerkId = await requireActor();
+    const actor = await requireActor();
     const parsed = finishSchema.safeParse(data);
     if (!parsed.success) return validationFailure(parsed.error);
 
@@ -376,7 +389,7 @@ export const createCatalogFinish = createServerFn({ method: "POST" })
     const finishes = await s.db.catalog.listFinishes();
     try {
       const finish = await s.db.catalog.createFinish({
-        actorClerkId,
+        actorClerkId: actor.clerkId,
         name: parsed.data.name,
         slug: nextAvailableSlug(
           parsed.data.name,
@@ -395,7 +408,7 @@ export const createCatalogColor = createServerFn({ method: "POST" })
     async ({
       data,
     }): Promise<CatalogLookupMutationResult<"color", CatalogColor>> => {
-      const actorClerkId = await requireActor();
+      const actor = await requireActor();
       const parsed = colorSchema.safeParse(data);
       if (!parsed.success) return validationFailure(parsed.error);
 
@@ -403,7 +416,7 @@ export const createCatalogColor = createServerFn({ method: "POST" })
       const colors = await s.db.catalog.listColors();
       try {
         const color = await s.db.catalog.createColor({
-          actorClerkId,
+          actorClerkId: actor.clerkId,
           hex: parsed.data.hex,
           name: parsed.data.name,
           slug: nextAvailableSlug(
@@ -421,14 +434,14 @@ export const createCatalogColor = createServerFn({ method: "POST" })
 export const saveCatalogProduct = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireActor();
+    const actor = await requireActor();
     const parsed = productFormSchema.safeParse(data);
     if (!parsed.success) return validationFailure(parsed.error);
 
     const { s } = await import("@/lib/services");
     if (parsed.data.compatibleButtonId) {
       const compatibleButton = (
-        await s.db.catalog.listProducts("spinner-button")
+        await s.db.catalog.listProducts("spinner-button", actor)
       ).find(({ id }) => id === parsed.data.compatibleButtonId);
       if (
         !compatibleButton ||
@@ -452,7 +465,8 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     );
     const slug = nextAvailableSlug(parsed.data.name, slugs);
     const input: ProductWriteInput = {
-      actorClerkId,
+      actorClerkId: actor.clerkId,
+      actorIsAdmin: actor.isAdmin,
       finishOptions: parsed.data.finishOptions.map(
         ({ colorEffectId, colorIds, finishIds }) => ({
           colorEffectId,
@@ -493,7 +507,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
 export const addCollectionProduct = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireActor();
+    const actor = await requireActor();
     const parsed = collectionAddSchema.safeParse(data);
     if (!parsed.success) return validationFailure(parsed.error);
 
@@ -504,7 +518,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
         ...(parsed.data.buttonProductId ? [parsed.data.buttonProductId] : []),
       ];
       const duplicateCounts = await s.db.collections.countOwnedProducts({
-        actorClerkId,
+        actorClerkId: actor.clerkId,
         productIds,
       });
       if (!parsed.data.confirmed && Object.keys(duplicateCounts).length) {
@@ -519,7 +533,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
         parsed.data.productTypeSlug === "spinner"
           ? (
               await s.db.collections.addSpinner({
-                actorClerkId,
+                actorClerkId: actor.clerkId,
                 buttonCustomFinish: parsed.data.buttonCustomFinish
                   ? toFinishWriteOption(parsed.data.buttonCustomFinish)
                   : null,
@@ -535,7 +549,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
               })
             ).spinnerItemId
           : await s.db.collections.addSpinnerButton({
-              actorClerkId,
+              actorClerkId: actor.clerkId,
               customFinish: parsed.data.customFinish
                 ? toFinishWriteOption(parsed.data.customFinish)
                 : null,
@@ -553,16 +567,59 @@ export const getPublicCollectionOwners = createServerFn({
   method: "GET",
 }).handler(async () => {
   const { s } = await import("@/lib/services");
-  return await s.db.collections.listOwners();
+  return await signCollectionOwners(
+    await s.db.collections.listOwners(await getResourceViewer()),
+  );
 });
+
+export const getPublicCollectionOwner = createServerFn({ method: "GET" })
+  .validator((input: unknown) => z.object({ userId: idSchema }).parse(input))
+  .handler(async ({ data }) => {
+    const { s } = await import("@/lib/services");
+    const viewer = await getResourceViewer();
+    const owner =
+      (await s.db.collections.listOwners(viewer)).find(
+        ({ userId }) => userId === data.userId,
+      ) ?? null;
+    return owner ? ((await signCollectionOwners([owner]))[0] ?? null) : null;
+  });
+
+export const getPublicCollectionItem = createServerFn({ method: "GET" })
+  .validator((input: unknown) =>
+    z.object({ collectionItemId: idSchema, userId: idSchema }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { s } = await import("@/lib/services");
+    const item = await s.db.collections.getPublicItem({
+      collectionItemId: data.collectionItemId,
+      ownerUserId: data.userId,
+      viewer: await getResourceViewer(),
+    });
+    return item ? await signCollectionItem(item) : null;
+  });
 
 export const getUserCollection = createServerFn({ method: "GET" }).handler(
   async () => {
     const actorClerkId = await requireActor();
     const { s } = await import("@/lib/services");
-    return await s.db.collections.listOwned(actorClerkId);
+    return await Promise.all(
+      (
+        await s.db.collections.listOwned(
+          actorClerkId.clerkId,
+          actorClerkId.isAdmin,
+        )
+      ).map(signCollectionItem),
+    );
   },
 );
+
+export const getUserCollectionSummary = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const actor = await requireActor();
+  const { s } = await import("@/lib/services");
+  return await s.db.collections.getOwnedCollection(actor.clerkId);
+});
 
 export const getCollectionEditData = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
@@ -572,8 +629,9 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
     const actorClerkId = await requireActor();
     const { s } = await import("@/lib/services");
     const item = await s.db.collections.getOwnedItem(
-      actorClerkId,
+      actorClerkId.clerkId,
       data.collectionItemId,
+      actorClerkId.isAdmin,
     );
     if (!item) {
       return {
@@ -584,19 +642,24 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
       };
     }
     const [items, products, buttonProducts] = await Promise.all([
-      s.db.collections.listOwned(actorClerkId),
-      s.db.catalog.listProducts(item.productTypeSlug),
+      s.db.collections.listOwned(actorClerkId.clerkId, actorClerkId.isAdmin),
+      s.db.catalog.listProducts(item.productTypeSlug, actorClerkId),
       item.productTypeSlug === "spinner"
-        ? s.db.catalog.listProducts("spinner-button")
+        ? s.db.catalog.listProducts("spinner-button", actorClerkId)
         : Promise.resolve([]),
     ]);
     return {
       buttonProducts,
-      item,
+      item: await signCollectionItem(item),
       ownedButtons: items.filter(
         (candidate) => candidate.productTypeSlug === "spinner-button",
       ),
-      product: products.find(({ id }) => id === item.productId) ?? null,
+      product: await (async () => {
+        const product = products.find(({ id }) => id === item.productId);
+        return product
+          ? ((await signCatalogProducts([product]))[0] ?? null)
+          : null;
+      })(),
     };
   });
 
@@ -610,7 +673,8 @@ export const updateCollectionItem = createServerFn({ method: "POST" })
     const { s } = await import("@/lib/services");
     try {
       await s.db.collections.updateItem({
-        actorClerkId,
+        actorClerkId: actorClerkId.clerkId,
+        actorIsAdmin: actorClerkId.isAdmin,
         ...parsed.data,
         customFinish: parsed.data.customFinish
           ? toFinishWriteOption(parsed.data.customFinish)
@@ -628,6 +692,117 @@ export const updateCollectionItem = createServerFn({ method: "POST" })
     } catch (error) {
       return mutationFailure(error);
     }
+  });
+
+export const softDeleteCatalogImage = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z
+      .object({
+        imageId: idSchema,
+        targetType: z.enum(["product", "collection_item"]),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    await s.db.catalog.softDeleteImage({
+      actorClerkId: actor.clerkId,
+      actorIsAdmin: actor.isAdmin,
+      ...data,
+    });
+  });
+
+export const restoreCatalogImage = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z
+      .object({
+        imageId: idSchema,
+        targetType: z.enum(["product", "collection_item"]),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    await s.db.catalog.restoreImage({
+      actorClerkId: actor.clerkId,
+      actorIsAdmin: actor.isAdmin,
+      ...data,
+    });
+  });
+
+export const listCatalogImageTrash = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    return await signCatalogImages(
+      await s.db.catalog.listImageTrash({
+        actorClerkId: actor.clerkId,
+        actorIsAdmin: actor.isAdmin,
+      }),
+    );
+  },
+);
+
+export const setProductVisibility = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z
+      .object({
+        isPrivate: z.boolean(),
+        productId: idSchema,
+        reason: z.string().max(1000).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    await s.db.catalog.setVisibility({
+      actorClerkId: actor.clerkId,
+      actorIsAdmin: actor.isAdmin,
+      ...data,
+    });
+  });
+
+export const setCollectionVisibility = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z
+      .object({
+        isPrivate: z.boolean(),
+        ownerUserId: idSchema,
+        reason: z.string().max(1000).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    await s.db.collections.setCollectionVisibility({
+      actorClerkId: actor.clerkId,
+      actorIsAdmin: actor.isAdmin,
+      ...data,
+    });
+  });
+
+export const setCollectionItemVisibility = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z
+      .object({
+        collectionItemId: idSchema,
+        isPrivate: z.boolean(),
+        reason: z.string().max(1000).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    await s.db.collections.setItemVisibility({
+      actorClerkId: actor.clerkId,
+      actorIsAdmin: actor.isAdmin,
+      ...data,
+    });
   });
 
 function toFinishWriteOption(
@@ -670,10 +845,13 @@ async function listProductTypes() {
   return await s.db.catalog.listProductTypes();
 }
 
-async function requireActor(): Promise<string> {
-  const { isAuthenticated, userId } = await auth();
+async function requireActor(): Promise<{ clerkId: string; isAdmin: boolean }> {
+  const { isAuthenticated, sessionClaims, userId } = await auth();
   if (!isAuthenticated || !userId) throw localizedServerError("error.generic");
-  return userId;
+  return {
+    clerkId: userId,
+    isAdmin: (sessionClaims as { role?: unknown } | null)?.role === "admin",
+  };
 }
 
 function validationFailure(error: z.ZodError) {
@@ -695,6 +873,59 @@ function mutationFailure(error: unknown) {
     ok: false as const,
     requiresConfirmation: false as const,
   };
+}
+
+async function signCatalogProducts(products: CatalogProduct[]) {
+  return await Promise.all(
+    products.map(async (product) => ({
+      ...product,
+      images: await signCatalogImages(product.images),
+    })),
+  );
+}
+
+async function signCollectionItem<
+  T extends { images: CatalogImage[]; productImages: CatalogImage[] },
+>(item: T): Promise<T> {
+  const [images, productImages] = await Promise.all([
+    signCatalogImages(item.images),
+    signCatalogImages(item.productImages),
+  ]);
+  return { ...item, images, productImages };
+}
+
+async function signCollectionOwners<
+  T extends {
+    items: Array<{ images: CatalogImage[]; productImages: CatalogImage[] }>;
+  },
+>(owners: T[]): Promise<T[]> {
+  return await Promise.all(
+    owners.map(async (owner) => ({
+      ...owner,
+      items: await Promise.all(owner.items.map(signCollectionItem)),
+    })),
+  );
+}
+
+async function signCatalogImages<T extends CatalogImage>(
+  images: T[],
+): Promise<T[]> {
+  const [{ signResourceUrl }, { serverEnv }] = await Promise.all([
+    import("@package/resources"),
+    import("@/env/server"),
+  ]);
+  if (!serverEnv.BUNNY_CDN_BASE_URL || !serverEnv.BUNNY_CDN_TOKEN_KEY)
+    return images;
+  return await Promise.all(
+    images.map(async (image) => ({
+      ...image,
+      url: await signResourceUrl({
+        cdnBaseUrl: serverEnv.BUNNY_CDN_BASE_URL,
+        objectPath: image.objectPath,
+        tokenKey: serverEnv.BUNNY_CDN_TOKEN_KEY,
+      }),
+    })),
+  );
 }
 
 export function productTypeIsSupported(

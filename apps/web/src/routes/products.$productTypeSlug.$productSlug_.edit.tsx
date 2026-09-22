@@ -28,7 +28,7 @@ export const Route = createFileRoute(
       getCatalogProduct({ data: params }),
       getCatalogOptions(),
     ]);
-    if (!initialProduct) throw notFound();
+    if (!initialProduct?.canEdit) throw notFound();
     return { initialProduct, options };
   },
   component: ProductEditRoute,

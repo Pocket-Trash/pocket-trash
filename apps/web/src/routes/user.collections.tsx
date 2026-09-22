@@ -1,12 +1,18 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { getUserCollection } from "@/lib/catalog-api";
+import { getUserCollection, getUserCollectionSummary } from "@/lib/catalog-api";
 import { parseCatalogFilterSearch } from "@/lib/catalog-filters";
 import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { UserCollectionPage } from "@/pages/catalog-pages";
 
 export const Route = createFileRoute("/user/collections")({
   validateSearch: parseCatalogFilterSearch,
-  loader: () => getUserCollection(),
+  loader: async () => {
+    const [items, collection] = await Promise.all([
+      getUserCollection(),
+      getUserCollectionSummary(),
+    ]);
+    return { collection, items };
+  },
   component: UserCollectionsRoute,
 });
 
@@ -19,8 +25,9 @@ function UserCollectionsRoute() {
   );
   return (
     <UserCollectionPage
+      collection={Route.useLoaderData().collection}
       filters={filters}
-      items={Route.useLoaderData()}
+      items={Route.useLoaderData().items}
       onFiltersChange={setFilters}
     />
   );

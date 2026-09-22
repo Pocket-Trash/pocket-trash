@@ -8,15 +8,20 @@ import { createDbServices, type DbServices } from "./db/index.js";
 export type {
   CatalogColor,
   CatalogFinishOption,
+  CatalogImage,
+  CatalogImageTargetType,
+  CatalogImageTrashItem,
   CatalogLookup,
   CatalogProduct,
   CatalogProductType,
   CatalogService,
+  CatalogViewer,
   CollectionsService,
   ProductWriteInput,
   PublicCollectionOwner,
   UpsertUserSettingsInput,
   UserCollectionItem,
+  UserCollectionSummary,
   UserSettingsService,
 } from "./db/index.js";
 export { defaultUserSettings } from "./db/index.js";

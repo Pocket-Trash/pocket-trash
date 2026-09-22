@@ -247,6 +247,7 @@ function chain(rows: unknown[]) {
 
 function storageMock() {
   return {
+    createCatalogImageUploadTarget: vi.fn(),
     createUploadTarget: vi.fn(),
     delete: vi.fn(async () => "deleted" as const),
     upload: vi.fn(),

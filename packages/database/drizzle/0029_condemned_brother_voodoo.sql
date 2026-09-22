@@ -1,0 +1,5 @@
+ALTER TABLE "catalog_image_upload_file" ADD CONSTRAINT "catalog_image_upload_file_sha256_valid" CHECK ("catalog_image_upload_file"."sha256" ~ '^[0-9a-f]{64}$');--> statement-breakpoint
+ALTER TABLE "collection_item_image" ADD CONSTRAINT "collection_item_image_sha256_valid" CHECK ("collection_item_image"."sha256" ~ '^[0-9a-f]{64}$');--> statement-breakpoint
+ALTER TABLE "collection_item_image" ADD CONSTRAINT "collection_item_image_deleted_by_role_valid" CHECK ("collection_item_image"."deleted_by_role" is null or "collection_item_image"."deleted_by_role" in ('owner', 'admin'));--> statement-breakpoint
+ALTER TABLE "product_image" ADD CONSTRAINT "product_image_sha256_valid" CHECK ("product_image"."sha256" ~ '^[0-9a-f]{64}$');--> statement-breakpoint
+ALTER TABLE "product_image" ADD CONSTRAINT "product_image_deleted_by_role_valid" CHECK ("product_image"."deleted_by_role" is null or "product_image"."deleted_by_role" in ('owner', 'admin'));

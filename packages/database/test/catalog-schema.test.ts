@@ -16,8 +16,15 @@ describe("catalog schema", () => {
       "id",
       "product_type_id",
       "maker_id",
+      "owner_clerk_id",
       "name",
       "slug",
+      "is_private",
+      "private_reason",
+      "privated_at",
+      "privated_by_clerk_id",
+      "created_at",
+      "updated_at",
     ]);
     expect(productMaterial.primaryKeys).toHaveLength(1);
     expect(color.columns.find(({ name }) => name === "hex")?.notNull).toBe(

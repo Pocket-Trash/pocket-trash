@@ -46,6 +46,11 @@ export type ResourceUploadTarget = ResourceUploadMetadata & {
 export type ResourceDeleteResult = "deleted" | "missing";
 
 export type ResourceStorage = {
+  createCatalogImageUploadTarget?(
+    input: ResourceUploadMetadata,
+    targetType: "collection-item" | "product",
+    targetId: number,
+  ): ResourceUploadTarget;
   createUploadTarget(
     input: ResourceUploadMetadata,
     resourceId: number,
@@ -84,6 +89,9 @@ type BunnyObject = {
 };
 
 export const maxBufferedResourceBytes = 4 * 1024 * 1024;
+export const maxCatalogImageFiles = 20;
+export const maxCatalogImageFileBytes = 25 * 1024 * 1024;
+export const maxCatalogImageSessionBytes = 200 * 1024 * 1024;
 export const maxSessionFileBytes = 20 * 1024 * 1024;
 export const maxSessionBytes = 100 * 1024 * 1024;
 export const resourceUrlLifetimeSeconds = 120;
@@ -135,6 +143,21 @@ export function createResourceStorage(
   const config = readConfig(input);
 
   return {
+    createCatalogImageUploadTarget(metadata, targetType, targetId) {
+      assertResourceId(targetId);
+      const extension = validateUploadMetadata(
+        metadata,
+        allowedImageMimeTypes,
+        maxCatalogImageFileBytes,
+      );
+      const objectPath = `${config.folderPrefix}/catalog/${targetType}/${targetId}/${config.randomUUID()}${extension}`;
+
+      return {
+        ...metadata,
+        objectPath,
+        url: buildUrl(config.cdnBaseUrl, objectPath),
+      };
+    },
     createUploadTarget(metadata, resourceId, kind = "resource") {
       assertResourceId(resourceId);
       const extension = validateUploadMetadata(

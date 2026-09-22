@@ -35,8 +35,9 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
   const tx = {
     insert: vi.fn((table: unknown) => ({
       values: vi.fn((value: unknown) => {
-        writes.push({ table, value });
+        if (table !== schema.userCollection) writes.push({ table, value });
         return {
+          onConflictDoNothing: vi.fn(async () => []),
           returning: vi.fn(async () => returningRows.shift() ?? []),
         };
       }),

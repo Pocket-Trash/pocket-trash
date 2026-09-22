@@ -12,6 +12,10 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
 }));
 
+vi.mock("@clerk/tanstack-react-start", () => ({
+  useAuth: () => ({ getToken: vi.fn() }),
+}));
+
 vi.mock("@/components/app-shell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
@@ -87,6 +91,8 @@ describe("finish option editor", () => {
   it("renders the owned material and product finish choices", () => {
     const product: CatalogProduct = {
       buttonDiameterMm: null,
+      canAdminister: false,
+      canEdit: true,
       compatibleButtonId: null,
       compatibleButtonName: null,
       createdAt: new Date(0),
@@ -99,12 +105,17 @@ describe("finish option editor", () => {
           id: 1002,
         },
       ],
+      imageCount: 0,
+      images: [],
       id: 1000,
       lengthMm: null,
       makerId: 1000,
       makerName: "Maker",
       materials: [{ id: 1000, name: "Bronze", slug: "bronze" }],
       name: "Spinner",
+      ownerClerkId: "user_test",
+      isAdminPrivate: false,
+      isPrivate: false,
       productTypeId: 1000,
       productTypeName: "Spinner",
       productTypeSlug: "spinner",
@@ -208,6 +219,8 @@ function productFixture(
 ): CatalogProduct {
   return {
     buttonDiameterMm: null,
+    canAdminister: false,
+    canEdit: true,
     compatibleButtonId: null,
     compatibleButtonName: null,
     createdAt: new Date(0),
@@ -220,12 +233,17 @@ function productFixture(
         id: id + 3,
       },
     ],
+    imageCount: 0,
+    images: [],
     id,
     lengthMm: null,
     makerId: 1,
     makerName: "Maker",
     materials: [{ id: id + 1, name: "Bronze", slug: "bronze" }],
     name,
+    ownerClerkId: "user_test",
+    isAdminPrivate: false,
+    isPrivate: false,
     productTypeId: 1,
     productTypeName: productTypeSlug === "spinner" ? "Spinner" : "Button",
     productTypeSlug,
@@ -244,17 +262,26 @@ function collectionFixture(
   sourceProductFinishOptionId: number,
 ): UserCollectionItem {
   return {
+    canAdminister: false,
+    canEdit: true,
     collectionItemId,
+    collectionIsPrivate: false,
     finishOption: product.finishOptions[0] ?? null,
+    imageCount: 0,
+    images: [],
+    isAdminPrivate: false,
+    isPrivate: false,
     installedButtonId: null,
     makerId: product.makerId,
     makerName: product.makerName,
     material: product.materials[0] ?? null,
     name: product.name,
+    ownerClerkId: "user_test",
     ownerUserId: 1,
     productId: product.id,
     productTypeName: product.productTypeName,
     productTypeSlug: product.productTypeSlug as "spinner" | "spinner-button",
+    productImages: [],
     sourceProductFinishOptionId,
   };
 }

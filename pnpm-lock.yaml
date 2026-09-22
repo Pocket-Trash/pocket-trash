@@ -173,12 +173,15 @@ importers:
       '@package/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@package/resources':
+        specifier: workspace:*
+        version: link:../../packages/resources
       '@package/services':
         specifier: workspace:*
         version: link:../../packages/services
       '@pocket-trash/localizations':
-        specifier: ^0.5.0
-        version: 0.5.0
+        specifier: ^0.5.1
+        version: 0.5.1
       '@t3-oss/env-core':
         specifier: ^0.13.11
         version: 0.13.11(typescript@6.0.3)(zod@4.4.3)
@@ -423,8 +426,8 @@ importers:
         specifier: workspace:*
         version: link:../resources
       '@pocket-trash/localizations':
-        specifier: ^0.5.0
-        version: 0.5.0
+        specifier: ^0.5.1
+        version: 0.5.1
       drizzle-orm:
         specifier: latest
         version: 0.45.2(@cloudflare/workers-types@5.20260917.1)(@neondatabase/serverless@1.1.0)(expo-sqlite@57.0.0(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native/jest-preset@0.86.0(@babel/core@7.29.7)(react@19.2.7))(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.7)(utf-8-validate@5.0.10))(react@19.2.7))
@@ -2496,8 +2499,8 @@ packages:
   '@oxc-project/types@0.137.0':
     resolution: {integrity: sha512-WT+Gb24i8hmvo85AIv2oEYouEXkRlKAlT9WaCa3TfLgNCN+GhrJOGZuIlMouAh38Qe4QOx26eUOVsq70qXrywA==}
 
-  '@pocket-trash/localizations@0.5.0':
-    resolution: {integrity: sha512-FVip+OmcO5D7XoTgCQPbeqXBG/rdYGTzfyUSAAZxl+yuI90GrIo34D1xw5btFXi+BH72+p0LeIDbxUcsh9midA==}
+  '@pocket-trash/localizations@0.5.1':
+    resolution: {integrity: sha512-cd1ZtYbKABKdaqu0T4hxXCz2FpqUihU1o4cHBIZIfpZAsfJNP85hFI2unuokU/ufB/beuHF4kQ7/V1f4hE6dHQ==}
     engines: {node: '>=20'}
 
   '@poppinss/colors@4.1.6':
@@ -10730,7 +10733,7 @@ snapshots:
 
   '@oxc-project/types@0.137.0': {}
 
-  '@pocket-trash/localizations@0.5.0':
+  '@pocket-trash/localizations@0.5.1':
     dependencies:
       lts: 2.0.0
     transitivePeerDependencies:

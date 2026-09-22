@@ -4,7 +4,10 @@
 
 Generated schema documentation for committed Drizzle tables.
 
+- [`catalog_image_upload_file`](./catalog-image-upload-file.md)
+- [`catalog_image_upload_session`](./catalog-image-upload-session.md)
 - [`collection_item`](./collection-item.md)
+- [`collection_item_image`](./collection-item-image.md)
 - [`collection_spinner`](./collection-spinner.md)
 - [`collection_spinner_button`](./collection-spinner-button.md)
 - [`color`](./color.md)
@@ -19,6 +22,7 @@ Generated schema documentation for committed Drizzle tables.
 - [`materials`](./materials.md)
 - [`mechanisms`](./mechanisms.md)
 - [`product`](./product.md)
+- [`product_image`](./product-image.md)
 - [`product_material`](./product-material.md)
 - [`product_spinner`](./product-spinner.md)
 - [`product_spinner_button`](./product-spinner-button.md)
@@ -49,5 +53,6 @@ Generated schema documentation for committed Drizzle tables.
 - [`tmp_product_product_types`](./tmp-product-product-types.md)
 - [`tmp_product_variations`](./tmp-product-variations.md)
 - [`tmp_products`](./tmp-products.md)
+- [`user_collection`](./user-collection.md)
 - [`user_settings`](./user-settings.md)
 - [`users`](./users.md)

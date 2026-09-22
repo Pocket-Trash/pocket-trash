@@ -1,6 +1,9 @@
 import { relations } from "drizzle-orm";
 import {
+  catalogImageUploadFile,
+  catalogImageUploadSession,
   collectionItem,
+  collectionItemImage,
   collectionSpinner,
   collectionSpinnerButton,
   color,
@@ -10,9 +13,11 @@ import {
   finishOptionColor,
   finishOptionFinish,
   product,
+  productImage,
   productMaterial,
   productSpinner,
   productSpinnerButton,
+  userCollection,
 } from "./collection.js";
 import { featureFlags, featureFlagUserOverrides } from "./feature-flags.js";
 import {
@@ -53,8 +58,16 @@ import { userSettings } from "./user-settings.js";
 import { user } from "./users.js";
 
 export const usersRelations = relations(user, ({ many, one }) => ({
+  collection: one(userCollection),
   collectionItems: many(collectionItem),
   settings: one(userSettings),
+}));
+
+export const userCollectionRelations = relations(userCollection, ({ one }) => ({
+  owner: one(user, {
+    fields: [userCollection.ownerId],
+    references: [user.id],
+  }),
 }));
 
 export const userSettingsRelations = relations(userSettings, ({ one }) => ({
@@ -226,36 +239,51 @@ export const productTypesRelations = relations(productType, ({ many }) => ({
 
 export const scraperRunsRelations = relations(scraperRuns, () => ({}));
 
-export const collectionItemRelations = relations(collectionItem, ({ one }) => ({
-  finishOption: one(finishOption),
-  material: one(material, {
-    fields: [collectionItem.materialId],
-    references: [material.id],
+export const collectionItemRelations = relations(
+  collectionItem,
+  ({ many, one }) => ({
+    finishOption: one(finishOption),
+    images: many(collectionItemImage),
+    material: one(material, {
+      fields: [collectionItem.materialId],
+      references: [material.id],
+    }),
+    owner: one(user, {
+      fields: [collectionItem.ownerId],
+      references: [user.id],
+    }),
+    purchasedFromUser: one(user, {
+      fields: [collectionItem.purchasedFromUserId],
+      references: [user.id],
+    }),
+    soldToUser: one(user, {
+      fields: [collectionItem.soldToUserId],
+      references: [user.id],
+    }),
+    spinner: one(collectionSpinner, {
+      fields: [collectionItem.id],
+      references: [collectionSpinner.id],
+    }),
+    spinnerButton: one(collectionSpinnerButton, {
+      fields: [collectionItem.id],
+      references: [collectionSpinnerButton.id],
+    }),
   }),
-  owner: one(user, {
-    fields: [collectionItem.ownerId],
-    references: [user.id],
+);
+
+export const collectionItemImageRelations = relations(
+  collectionItemImage,
+  ({ one }) => ({
+    collectionItem: one(collectionItem, {
+      fields: [collectionItemImage.collectionItemId],
+      references: [collectionItem.id],
+    }),
   }),
-  purchasedFromUser: one(user, {
-    fields: [collectionItem.purchasedFromUserId],
-    references: [user.id],
-  }),
-  soldToUser: one(user, {
-    fields: [collectionItem.soldToUserId],
-    references: [user.id],
-  }),
-  spinner: one(collectionSpinner, {
-    fields: [collectionItem.id],
-    references: [collectionSpinner.id],
-  }),
-  spinnerButton: one(collectionSpinnerButton, {
-    fields: [collectionItem.id],
-    references: [collectionSpinnerButton.id],
-  }),
-}));
+);
 
 export const productRelations = relations(product, ({ many, one }) => ({
   finishOptions: many(finishOption),
+  images: many(productImage),
   maker: one(maker, {
     fields: [product.makerId],
     references: [maker.id],
@@ -274,6 +302,38 @@ export const productRelations = relations(product, ({ many, one }) => ({
     references: [productSpinnerButton.id],
   }),
 }));
+
+export const productImageRelations = relations(productImage, ({ one }) => ({
+  product: one(product, {
+    fields: [productImage.productId],
+    references: [product.id],
+  }),
+}));
+
+export const catalogImageUploadSessionRelations = relations(
+  catalogImageUploadSession,
+  ({ many, one }) => ({
+    collectionItem: one(collectionItem, {
+      fields: [catalogImageUploadSession.collectionItemId],
+      references: [collectionItem.id],
+    }),
+    files: many(catalogImageUploadFile),
+    product: one(product, {
+      fields: [catalogImageUploadSession.productId],
+      references: [product.id],
+    }),
+  }),
+);
+
+export const catalogImageUploadFileRelations = relations(
+  catalogImageUploadFile,
+  ({ one }) => ({
+    session: one(catalogImageUploadSession, {
+      fields: [catalogImageUploadFile.sessionId],
+      references: [catalogImageUploadSession.id],
+    }),
+  }),
+);
 
 export const productMaterialRelations = relations(
   productMaterial,

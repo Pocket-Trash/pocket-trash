@@ -18,3 +18,15 @@ Shared ownership and lifecycle row for user collection items.
 | `sold_to_user_id` | `bigint` | no | FK |  | `users.id` (on delete set null) | Known application user the item was sold to. | `1002` |
 | `sold_to_user` | `text` | no |  |  |  | Free-text buyer name when no application user row exists. | `Private buyer` |
 | `owned` | `boolean` | yes |  | `true` |  | Whether the item is currently owned by the owner. | `true` |
+| `is_private` | `boolean` | yes |  |  |  |  |  |
+| `private_reason` | `text` | no |  |  |  |  |  |
+| `privated_at` | `timestamp with time zone` | no |  |  |  |  |  |
+| `privated_by_clerk_id` | `text` | no |  |  |  |  |  |
+| `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
+| `updated_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
+
+## Indexes
+
+| Name | Unique | Method | Columns |
+| --- | --- | --- | --- |
+| `collection_item_owner_visibility_idx` | no | `btree` | `owner_id`, `is_private` |

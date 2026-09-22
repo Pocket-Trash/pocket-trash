@@ -1,6 +1,8 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import type {
   CatalogColor,
   CatalogFinishOption,
+  CatalogImage,
   CatalogLookup,
   CatalogProduct,
   CatalogProductType,
@@ -13,9 +15,11 @@ import {
 } from "@pocket-trash/localizations";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
+import { RotateCcw, Trash2 } from "lucide-react";
 import * as React from "react";
 import { z } from "zod";
 import { AppShell } from "@/components/app-shell";
+import { FileDropInput } from "@/components/resource-file-input";
 import { Button } from "@/components/ui/button";
 import {
   CatalogCombobox,
@@ -36,9 +40,16 @@ import {
   productFormSchema,
   productSlugPreview,
   productTypeIsSupported,
+  restoreCatalogImage,
   saveCatalogProduct,
+  softDeleteCatalogImage,
   updateCollectionItem,
 } from "@/lib/catalog-api";
+import {
+  type CatalogImageUploadError,
+  uploadCatalogImages,
+  validateCatalogImages,
+} from "@/lib/catalog-image-uploads";
 import { useLocale } from "@/providers/locale-provider";
 
 const translationKeySet: ReadonlySet<string> = new Set(translationKeys);
@@ -123,7 +134,15 @@ function ProductEditor({
 }) {
   const t = useCatalogCopy();
   const navigate = useNavigate();
+  const { getToken } = useAuth();
   const [options, setOptions] = React.useState(initialOptions);
+  const [images, setImages] = React.useState<File[]>([]);
+  const [existingImages, setExistingImages] = React.useState(
+    initialProduct?.images ?? [],
+  );
+  const [savedProductId, setSavedProductId] = React.useState<number | null>(
+    initialProduct?.id ?? null,
+  );
   const [serverErrors, setServerErrors] = React.useState<
     Record<string, string[] | undefined>
   >({});
@@ -171,11 +190,53 @@ function ProductEditor({
         setFormError("web.catalog.error.form");
         return;
       }
-      const result = await saveCatalogProduct({ data: value });
+      const imageError = validateCatalogImages(images);
+      if (imageError) {
+        setFormError(imageError.key);
+        return;
+      }
+      const result = await saveCatalogProduct({
+        data: { ...value, productId: savedProductId ?? value.productId },
+      });
       if (!result.ok) {
         setServerErrors(result.fieldErrors);
         setFormError(result.formError);
         return;
+      }
+      setSavedProductId(result.product.id);
+      if (images.length) {
+        try {
+          const uploads = await uploadCatalogImages({
+            files: images,
+            getToken,
+            onOwnerDeletedDuplicate: async (imageId) => {
+              if (
+                !window.confirm(
+                  t("web.resources.trash.restoreConfirmationDescription", {
+                    name: result.product.name,
+                  }),
+                )
+              )
+                return false;
+              await restoreCatalogImage({
+                data: { imageId, targetType: "product" },
+              });
+              return true;
+            },
+            targetId: result.product.id,
+            targetType: "product",
+          });
+          setImages(uploads.failed);
+          if (uploads.failed.length) {
+            setFormError("web.resources.upload.sessionFailure");
+            return;
+          }
+        } catch (error) {
+          setFormError(
+            (error as CatalogImageUploadError).key ?? "error.generic",
+          );
+          return;
+        }
       }
       await navigate({
         params: {
@@ -397,6 +458,37 @@ function ProductEditor({
       ) : null}
 
       {formError ? <Notice>{t(formError)}</Notice> : null}
+      <FileDropInput
+        accept=".jpeg,.jpg,.png,.webp"
+        browseLabel={t("web.resources.upload.browseFiles")}
+        description={t("web.resources.upload.imagesHelp", {
+          maxFileSize: "25 MiB",
+          maxImages: 20,
+          maxSessionSize: "200 MiB",
+        })}
+        fileTypes={t("web.resources.upload.imageTypes")}
+        files={images}
+        id="product-images"
+        label={t("web.resources.upload.imagesLabel")}
+        multiple
+        onFilesChange={(additions) =>
+          setImages((current) => [...current, ...additions])
+        }
+        onRemove={(index) =>
+          setImages((current) =>
+            current.filter((_, candidate) => candidate !== index),
+          )
+        }
+        removeFileLabel={t("web.action.close")}
+      />
+      {initialProduct ? (
+        <CatalogImageEditor
+          images={existingImages}
+          onChange={setExistingImages}
+          t={t}
+          targetType="product"
+        />
+      ) : null}
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(isSubmitting) => (
           <Button disabled={isSubmitting} type="submit">
@@ -782,14 +874,19 @@ function LookupDialog(props: LookupDialogProps) {
 }
 
 export function CollectionAddPage({
+  collectionIsPrivate = true,
   options: initialOptions,
   products,
 }: {
+  collectionIsPrivate?: boolean;
   options: CatalogOptions;
   products: CatalogProduct[];
 }) {
   const t = useCatalogCopy();
   const navigate = useNavigate();
+  const { getToken } = useAuth();
+  const [images, setImages] = React.useState<File[]>([]);
+  const [savedItemId, setSavedItemId] = React.useState<number | null>(null);
   const [options, setOptions] = React.useState(initialOptions);
   const [type, setType] = React.useState<ComboboxOption | null>(null);
   const [product, setProduct] = React.useState<CatalogProduct | null>(null);
@@ -837,6 +934,48 @@ export function CollectionAddPage({
     ) {
       return;
     }
+    const imageError = validateCatalogImages(images);
+    if (imageError) {
+      setFormError(imageError.key);
+      return;
+    }
+    if (savedItemId) {
+      if (!images.length) {
+        await navigate({ to: "/user/collections" });
+        return;
+      }
+      try {
+        const uploads = await uploadCatalogImages({
+          files: images,
+          getToken,
+          onOwnerDeletedDuplicate: async (imageId) => {
+            if (
+              !window.confirm(
+                t("web.resources.trash.restoreConfirmationDescription", {
+                  name: product.name,
+                }),
+              )
+            )
+              return false;
+            await restoreCatalogImage({
+              data: { imageId, targetType: "collection_item" },
+            });
+            return true;
+          },
+          targetId: savedItemId,
+          targetType: "collection_item",
+        });
+        setImages(uploads.failed);
+        if (uploads.failed.length) {
+          setFormError("web.resources.upload.sessionFailure");
+          return;
+        }
+        await navigate({ to: "/user/collections" });
+      } catch (error) {
+        setFormError((error as CatalogImageUploadError).key ?? "error.generic");
+      }
+      return;
+    }
     const result = await addCollectionProduct({
       data: {
         buttonCustomFinish:
@@ -864,6 +1003,39 @@ export function CollectionAddPage({
     if (!result.ok) {
       setFormError(result.formError);
       return;
+    }
+    setSavedItemId(result.collectionItemId);
+    if (images.length) {
+      try {
+        const uploads = await uploadCatalogImages({
+          files: images,
+          getToken,
+          onOwnerDeletedDuplicate: async (imageId) => {
+            if (
+              !window.confirm(
+                t("web.resources.trash.restoreConfirmationDescription", {
+                  name: product.name,
+                }),
+              )
+            )
+              return false;
+            await restoreCatalogImage({
+              data: { imageId, targetType: "collection_item" },
+            });
+            return true;
+          },
+          targetId: result.collectionItemId,
+          targetType: "collection_item",
+        });
+        setImages(uploads.failed);
+        if (uploads.failed.length) {
+          setFormError("web.resources.upload.sessionFailure");
+          return;
+        }
+      } catch (error) {
+        setFormError((error as CatalogImageUploadError).key ?? "error.generic");
+        return;
+      }
     }
     await navigate({ to: "/user/collections" });
   };
@@ -938,6 +1110,19 @@ export function CollectionAddPage({
             t={t}
           />
         ) : null}
+        {product && collectionIsPrivate ? (
+          <Notice>{t("web.resources.visibility.private")}</Notice>
+        ) : null}
+        {product ? (
+          <Button
+            aria-pressed
+            disabled={collectionIsPrivate}
+            type="button"
+            variant="outline"
+          >
+            {t("web.resources.visibility.public")}
+          </Button>
+        ) : null}
         {product?.productTypeSlug === "spinner" ? (
           <Field label={t("web.catalog.field.button")}>
             <CatalogCombobox
@@ -1001,6 +1186,31 @@ export function CollectionAddPage({
                 ))}
             </ul>
           </Notice>
+        ) : null}
+        {product ? (
+          <FileDropInput
+            accept=".jpeg,.jpg,.png,.webp"
+            browseLabel={t("web.resources.upload.browseFiles")}
+            description={t("web.resources.upload.imagesHelp", {
+              maxFileSize: "25 MiB",
+              maxImages: 20,
+              maxSessionSize: "200 MiB",
+            })}
+            fileTypes={t("web.resources.upload.imageTypes")}
+            files={images}
+            id="collection-item-images"
+            label={t("web.resources.upload.imagesLabel")}
+            multiple
+            onFilesChange={(additions) =>
+              setImages((current) => [...current, ...additions])
+            }
+            onRemove={(index) =>
+              setImages((current) =>
+                current.filter((_, candidate) => candidate !== index),
+              )
+            }
+            removeFileLabel={t("web.action.close")}
+          />
         ) : null}
         {formError ? <Notice>{t(formError)}</Notice> : null}
         {product && material && finish ? (
@@ -1143,6 +1353,9 @@ export function CollectionEditPage({
 }) {
   const t = useCatalogCopy();
   const navigate = useNavigate();
+  const { getToken } = useAuth();
+  const [images, setImages] = React.useState<File[]>([]);
+  const [existingImages, setExistingImages] = React.useState(item.images);
   const [options, setOptions] = React.useState(initialOptions);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [material, setMaterial] = React.useState<CatalogLookup | null>(
@@ -1266,6 +1479,35 @@ export function CollectionEditPage({
             t={t}
           />
         ) : null}
+        <FileDropInput
+          accept=".jpeg,.jpg,.png,.webp"
+          browseLabel={t("web.resources.upload.browseFiles")}
+          description={t("web.resources.upload.imagesHelp", {
+            maxFileSize: "25 MiB",
+            maxImages: 20,
+            maxSessionSize: "200 MiB",
+          })}
+          fileTypes={t("web.resources.upload.imageTypes")}
+          files={images}
+          id="collection-edit-images"
+          label={t("web.resources.upload.imagesLabel")}
+          multiple
+          onFilesChange={(additions) =>
+            setImages((current) => [...current, ...additions])
+          }
+          onRemove={(index) =>
+            setImages((current) =>
+              current.filter((_, candidate) => candidate !== index),
+            )
+          }
+          removeFileLabel={t("web.action.close")}
+        />
+        <CatalogImageEditor
+          images={existingImages}
+          onChange={setExistingImages}
+          t={t}
+          targetType="collection_item"
+        />
         <Button
           disabled={
             !material ||
@@ -1331,6 +1573,46 @@ export function CollectionEditPage({
               },
             });
             if (result.ok) {
+              const imageError = validateCatalogImages(images);
+              if (imageError) {
+                setFormError(imageError.key);
+                return;
+              }
+              if (images.length) {
+                try {
+                  const uploads = await uploadCatalogImages({
+                    files: images,
+                    getToken,
+                    onOwnerDeletedDuplicate: async (imageId) => {
+                      if (
+                        !window.confirm(
+                          t(
+                            "web.resources.trash.restoreConfirmationDescription",
+                            { name: item.name },
+                          ),
+                        )
+                      )
+                        return false;
+                      await restoreCatalogImage({
+                        data: { imageId, targetType: "collection_item" },
+                      });
+                      return true;
+                    },
+                    targetId: item.collectionItemId,
+                    targetType: "collection_item",
+                  });
+                  setImages(uploads.failed);
+                  if (uploads.failed.length) {
+                    setFormError("web.resources.upload.sessionFailure");
+                    return;
+                  }
+                } catch (error) {
+                  setFormError(
+                    (error as CatalogImageUploadError).key ?? "error.generic",
+                  );
+                  return;
+                }
+              }
               await navigate({ to: "/user/collections" });
             } else {
               setFormError(result.formError);
@@ -1358,6 +1640,89 @@ function Field({
       <span>{label}</span>
       {children}
     </div>
+  );
+}
+
+function CatalogImageEditor({
+  images,
+  onChange,
+  t,
+  targetType,
+}: {
+  images: CatalogImage[];
+  onChange(images: CatalogImage[]): void;
+  t: ReturnType<typeof useCatalogCopy>;
+  targetType: "collection_item" | "product";
+}) {
+  if (!images.length) return null;
+  return (
+    <section
+      aria-label={t("web.resources.upload.imagesLabel")}
+      className="grid gap-3"
+    >
+      {images.map((image) => (
+        <div
+          className="flex items-center gap-3 rounded-lg border border-border p-3"
+          key={image.id}
+        >
+          <img
+            alt={t("web.resources.detail.imageAlt", { name: image.fileName })}
+            className="size-16 rounded-md object-cover"
+            src={image.url}
+          />
+          <span className="min-w-0 flex-1 truncate text-sm">
+            {image.fileName}
+          </span>
+          <Button
+            aria-label={`${t(image.deletedAt ? "web.resources.action.restore" : "web.resources.action.delete")} ${image.fileName}`}
+            onClick={async () => {
+              if (image.deletedAt) {
+                await restoreCatalogImage({
+                  data: { imageId: image.id, targetType },
+                });
+                onChange(
+                  images.map((candidate) =>
+                    candidate.id === image.id
+                      ? {
+                          ...candidate,
+                          deletedAt: null,
+                          deletedByClerkId: null,
+                          deletedByRole: null,
+                        }
+                      : candidate,
+                  ),
+                );
+              } else {
+                await softDeleteCatalogImage({
+                  data: { imageId: image.id, targetType },
+                });
+                onChange(
+                  images.map((candidate) =>
+                    candidate.id === image.id
+                      ? {
+                          ...candidate,
+                          deletedAt: new Date(),
+                          deletedByRole: "owner",
+                        }
+                      : candidate,
+                  ),
+                );
+              }
+            }}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {image.deletedAt ? <RotateCcw /> : <Trash2 />}
+            {t(
+              image.deletedAt
+                ? "web.resources.action.restore"
+                : "web.resources.action.delete",
+            )}
+          </Button>
+        </div>
+      ))}
+    </section>
   );
 }
 

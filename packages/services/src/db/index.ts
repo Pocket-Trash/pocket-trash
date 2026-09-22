@@ -34,14 +34,19 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
 export type {
   CatalogColor,
   CatalogFinishOption,
+  CatalogImage,
+  CatalogImageTargetType,
+  CatalogImageTrashItem,
   CatalogLookup,
   CatalogProduct,
   CatalogProductType,
   CatalogService,
+  CatalogViewer,
   CollectionsService,
   ProductWriteInput,
   PublicCollectionOwner,
   UserCollectionItem,
+  UserCollectionSummary,
 } from "./catalog/index.js";
 export type {
   UpsertUserSettingsInput,

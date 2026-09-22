@@ -1,6 +1,10 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { getAuthState } from "@/lib/auth";
-import { getCatalogOptions, listCatalogProducts } from "@/lib/catalog-api";
+import {
+  getCatalogOptions,
+  getUserCollectionSummary,
+  listCatalogProducts,
+} from "@/lib/catalog-api";
 import { CollectionAddPage } from "@/pages/catalog-form-pages";
 
 export const Route = createFileRoute("/collections/add")({
@@ -10,11 +14,16 @@ export const Route = createFileRoute("/collections/add")({
     }
   },
   loader: async () => {
-    const [options, products] = await Promise.all([
+    const [options, products, collection] = await Promise.all([
       getCatalogOptions(),
       listCatalogProducts(),
+      getUserCollectionSummary(),
     ]);
-    return { options, products };
+    return {
+      collectionIsPrivate: collection?.isPrivate ?? true,
+      options,
+      products,
+    };
   },
   component: CollectionAddRoute,
 });
