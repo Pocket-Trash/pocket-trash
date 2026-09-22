@@ -62,7 +62,7 @@ try {
     "key",
     "put",
     key,
-    "",
+    "enabled",
     "--binding",
     "CLERK_WEBHOOK_TARGETS",
     "--env",

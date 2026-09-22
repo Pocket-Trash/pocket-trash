@@ -504,7 +504,7 @@ jobs:
 
           pnpm exec tsx src/scripts/reconcile-clerk-users.ts
           target_url="${PREVIEW_URL}/api/v0/webhooks/clerk"
-          pnpm exec wrangler kv key put "target:preview:${PR_NUMBER}" "" \
+          pnpm exec wrangler kv key put "target:preview:${PR_NUMBER}" "enabled" \
             --binding CLERK_WEBHOOK_TARGETS \
             --env development \
             --remote \
