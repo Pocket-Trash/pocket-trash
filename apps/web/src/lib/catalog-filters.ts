@@ -83,7 +83,7 @@ export function parseCatalogFilterSearch(
     .filter((value) => value.split(".").length >= 2);
   return {
     color: numbers(search.color),
-    fade: [...new Set(fade)],
+    fade: fade.length ? [...new Set(fade)] : undefined,
     finish: numbers(search.finish),
     maker: numbers(search.maker),
     material: numbers(search.material),
@@ -235,6 +235,15 @@ export function buildCatalogFacets(
     }
   >();
 
+  for (const item of items) {
+    const type = productTypes.get(item.productTypeSlug);
+    productTypes.set(item.productTypeSlug, {
+      count: (type?.count ?? 0) + 1,
+      name: item.productTypeName,
+      slug: item.productTypeSlug,
+    });
+  }
+
   for (const item of scoped) {
     incrementUnique(materials, item.materials);
     incrementUnique(
@@ -251,13 +260,6 @@ export function buildCatalogFacets(
       id: item.makerId,
       name: item.makerName,
     });
-    const type = productTypes.get(item.productTypeSlug);
-    productTypes.set(item.productTypeSlug, {
-      count: (type?.count ?? 0) + 1,
-      name: item.productTypeName,
-      slug: item.productTypeSlug,
-    });
-
     const seenFades = new Set<string>();
     for (const option of item.finishOptions) {
       if (option.colorEffect?.slug !== "fade" || option.colors.length < 2) {

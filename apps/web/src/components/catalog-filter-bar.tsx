@@ -71,6 +71,7 @@ export function CatalogFilterBar({
   onChange: (filters: CatalogFilters) => void;
 }) {
   const [advancedOpen, setAdvancedOpen] = React.useState(false);
+  const advancedId = React.useId();
   const facetKey = JSON.stringify({
     colors: facets.colors.map(({ id }) => id),
     fades: facets.fades.map(({ key }) => key),
@@ -148,6 +149,7 @@ export function CatalogFilterBar({
         onChange={onChange}
       />
       <Button
+        aria-controls={advancedId}
         aria-expanded={advancedOpen}
         className="max-[880px]:hidden"
         onClick={() => setAdvancedOpen((open) => !open)}
@@ -185,7 +187,10 @@ export function CatalogFilterBar({
         </Button>
       ) : null}
       {advancedOpen ? (
-        <section className="absolute top-[calc(100%+0.5rem)] left-0 z-40 hidden min-h-48 w-[min(40rem,calc(100vw-2.5rem))] gap-5 rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-lg min-[881px]:grid">
+        <section
+          className="absolute top-[calc(100%+0.5rem)] left-0 z-40 hidden min-h-48 w-[min(40rem,calc(100vw-2.5rem))] gap-5 rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-lg min-[881px]:grid"
+          id={advancedId}
+        >
           {advanced}
         </section>
       ) : null}

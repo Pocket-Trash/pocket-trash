@@ -53,6 +53,10 @@ function item(finishOptions: CatalogFinishOption[]): FilterableCatalogItem {
 }
 
 describe("catalog filters", () => {
+  it("does not create an empty fade search parameter", () => {
+    expect(parseCatalogFilterSearch({}).fade).toBeUndefined();
+  });
+
   it("uses OR within facets, AND across facets, and one finish option", () => {
     const filters = {
       ...emptyCatalogFilters(),
@@ -149,5 +153,23 @@ describe("catalog filters", () => {
       makerIds: [100],
       materialIds: [10],
     });
+  });
+
+  it("keeps product types stable while scoping the other facets", () => {
+    const spinner = item([option([blue])]);
+    const button = {
+      ...item([option([purple])]),
+      materials: [lookup(20, "Zirconium")],
+      productTypeName: "Spinner Button",
+      productTypeSlug: "spinner-button",
+    };
+    const facets = buildCatalogFacets([spinner, button], "spinner");
+
+    expect(facets.productTypes.map(({ slug }) => slug)).toEqual([
+      "spinner",
+      "spinner-button",
+    ]);
+    expect(facets.materials.map(({ name }) => name)).toEqual(["Titanium"]);
+    expect(facets.colors.map(({ name }) => name)).toEqual(["Blue"]);
   });
 });

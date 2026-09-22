@@ -164,7 +164,7 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 - **Autmog Desktop Grid:** `grid-template-columns: 290px 1fr`, `gap: 20px`, `padding: 18px 22px 22px`.
 - **Filter Sidebar:** Sticky below the two-row shared header at `top: 112px`, max height `calc(100svh - 128px)`, `10px` radius, hidden scrollbar, scrollable content.
 - **Product Grid:** CSS grid with max 5 columns: `repeat(auto-fill, minmax(max(240px, calc((100% - 4 * 18px) / 5)), 1fr))`; `gap: 18px`.
-- **Responsive Breakpoints:** At `max-width: 880px`, filters become a fixed slide-in drawer with scrim and grid becomes full width; at `max-width: 480px`, product grid becomes single column.
+- **Responsive Breakpoints:** At `max-width: 880px`, Autmog filters become a fixed slide-in drawer with scrim and its grid becomes full width; at `max-width: 480px`, product grids become single column. Catalog filters use their mobile sheet through 880px and their desktop overlay from 881px.
 - **Mobile Grid:** `repeat(auto-fill, minmax(160px, 1fr))` between 480px and 880px.
 - **Header Mobile Behavior:** Header wraps; search takes its own full-width row below title/count/sort/settings.
 - **Card Constraints:** Product images use `aspect-ratio: 4 / 3`; cards reserve heights for headline, subtitle, metadata, dimensions, and tags to prevent uneven layout jumps.
@@ -178,7 +178,18 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 - Route-specific actions and metadata wrap onto a separate header row when present.
 - Inputs use Tailwind theme tokens: `bg-background`, `border-input`, `text-foreground`, `ring-ring`, and inherited font.
 
-### Filter Chips
+### Catalog Filters
+- `/products`, `/collections`, and `/user/collections` own a compact filter row beneath the breadcrumbs. It is route content, not global App Shell content. Keep the primary route action on the same row when space permits.
+- Product Type is a combobox and scopes the available Material, Finish, Colour, fade, and Maker facets. Product Type choices remain stable while the scope changes.
+- Material and Finish expose the five most common values as checkboxes. Colour combines solid colours and fades, orders them by occurrence, and exposes the five most common choices as toggle buttons. Each facet's More control overlays additional choices instead of moving the product or collection grid.
+- Frequency comes from product associations on `/products` and collection-item occurrences on collection routes. Ordinary filter selections do not remove available facet choices; changing Product Type may prune selections unavailable in the new scope.
+- A colour swatch shows its stored hex value. A fade swatch uses overlapping circles in its stored display order. Every swatch has a name tooltip and accessible label, and communicates selection with both `aria-pressed` and a visible border.
+- More Filters opens an anchored overlay on desktop without changing document flow and a bottom sheet through 880px. The expanded controls contain Maker and Match Mode; the desktop layout starts at 881px.
+- The default Any mode uses OR within a facet and AND between facets. Finish, colour, and fade criteria must match the same finish option. All mode changes within-facet matching to AND. Fade matching is direction-insensitive and accepts close variations containing all selected colours, including repeated or intermediate colours.
+- Clear filters restores the unfiltered state. Filter state persists in URL search parameters; URL writes use a 300ms debounce and replace the current history entry.
+- These filters are separate from Autmog and do not change Autmog's sidebar, chips, matching, or persistence behavior.
+
+### Autmog Filter Chips
 - Filters are grouped by Category, Size, Material, Refill, Mechanism, Clip, Body details, Tip / Nose, and Finish.
 - Chips are rounded pills with small count badges.
 - Active chips invert to accent fill and `--chip-on-text`.
@@ -218,6 +229,7 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 - **Hover States:** Accent border/color is the standard hover affordance for cards, chips, buttons, links, and controls.
 - **Search:** Debounced at `150ms`; multi-token AND search across title, tags, price, and body text.
 - **Sorting:** Supports date, price, weight, diameter, and title.
+- **Catalog Filter Persistence:** Product and collection filters serialize to route search parameters after a `300ms` debounce and replace the current history entry.
 - **Persistence:** Theme mode (`light`, `dark`, `system`) persists as `pocket-trash.theme`; language persists in local storage; units, weight, and currency persist through user settings where available.
 
 ## 6. Content & Data Rules
@@ -231,6 +243,7 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 - Dark and light theme tokens must be checked for readable contrast in the implemented UI states.
 - System theme mode must respect `prefers-color-scheme` and update without requiring a page refresh.
 - Search, sort, settings, filters, and dialogs include ARIA labels or dialog roles.
+- Catalog colour and fade toggles include tooltips, accessible names, `aria-pressed`, and a non-colour selected-state border.
 - Links are underlined in the footer so they are distinguishable without color alone.
 - Mobile Autmog filters use a scrim and bottom-sheet controls.
 - Layout reserves space for dynamic controls and text blocks to reduce layout shift.
