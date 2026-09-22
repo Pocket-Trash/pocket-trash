@@ -2,11 +2,11 @@ import type { GrimsmoVariationImageRecord } from "@package/database";
 import { htmlToMarkdown } from "@package/markdown";
 import { hashObject, hashString } from "../lib/hash.js";
 import { htmlToText, normalizeWhitespace } from "../lib/text.js";
-import {
-  type GrimsmoCollectionKind,
-  type NormalizedGrimsmoKnifeVariation,
-  type NormalizedGrimsmoPenVariation,
-  type NormalizedGrimsmoProduct,
+import type {
+  GrimsmoCollectionKind,
+  NormalizedGrimsmoKnifeVariation,
+  NormalizedGrimsmoPenVariation,
+  NormalizedGrimsmoProduct,
   scraperSources,
 } from "../scraper-types.js";
 import type { ShopifyProduct } from "../shopify.js";

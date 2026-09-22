@@ -1,10 +1,18 @@
 {
   "extends": "@package/tsconfig/react.json",
   "compilerOptions": {
+    "allowJs": true,
+    "allowImportingTsExtensions": true,
     "noEmit": true,
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": [
+    ".storybook/**/*.ts",
+    "__mocks__/**/*.js",
+    "src",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
 }
