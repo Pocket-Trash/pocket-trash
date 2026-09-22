@@ -86,8 +86,14 @@ export function isServerSecretPath(secretPath: string): boolean {
   return secretPath.endsWith("/server") || secretPath.includes("/server/");
 }
 
-export function getSecretPaths(config: CommandSecretConfig): string[] {
-  return [...new Set(config.paths)];
+export function getSecretPaths(
+  config: CommandSecretConfig,
+): [string, ...string[]] {
+  const [firstPath, ...remainingPaths] = config.paths;
+  return [
+    firstPath,
+    ...new Set(remainingPaths.filter((path) => path !== firstPath)),
+  ];
 }
 
 export function validateSecretPaths(
@@ -151,18 +157,13 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
 
   // Infisical accepts a single secret path per `run`, so nest runs to
   // accumulate each path's secrets before the wrapped command executes.
-  const reversedPaths = [...paths].reverse();
-  const innermostPath = reversedPaths[0];
-  if (!innermostPath) {
-    throw new RunnerError("Expected at least one Infisical secret path.");
+  const [outermostPath, ...remainingPaths] = paths;
+  const args = runArgsForPath(outermostPath);
+  for (const secretPath of remainingPaths) {
+    args.push("infisical", ...runArgsForPath(secretPath));
   }
 
-  let args = [...runArgsForPath(innermostPath), ...innerCommand];
-  for (const secretPath of reversedPaths.slice(1)) {
-    args = [...runArgsForPath(secretPath), "infisical", ...args];
-  }
-
-  return args;
+  return [...args, ...innerCommand];
 }
 
 export function hasInfisicalProjectConfig(repoRoot: string): boolean {

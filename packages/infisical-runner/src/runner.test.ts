@@ -303,13 +303,13 @@ describe("infisical auth checks", () => {
 });
 
 describe("secret path policy", () => {
-  it("deduplicates configured paths", () => {
+  it("deduplicates configured paths in order", () => {
     expect(
       getSecretPaths({
         allowServerSecrets: false,
-        paths: ["/apps/web", "/apps/web"],
+        paths: ["/apps/web", "/shared", "/apps/web"],
       }),
-    ).toEqual(["/apps/web"]);
+    ).toEqual(["/apps/web", "/shared"]);
   });
 
   it("rejects server-only paths for client commands", () => {

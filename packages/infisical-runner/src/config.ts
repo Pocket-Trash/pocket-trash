@@ -12,7 +12,7 @@ export type CommandSecretConfig = {
   databaseUrlUserOverride?: boolean;
   envAliases?: readonly EnvironmentAlias[];
   environmentSlug?: string;
-  paths: readonly string[];
+  paths: readonly [string, ...string[]];
 };
 
 export type EnvironmentAlias = {
