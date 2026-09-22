@@ -1,4 +1,9 @@
-import type { Database, User, UserSettings } from "@package/database";
+import {
+  type Database,
+  schema,
+  type User,
+  type UserSettings,
+} from "@package/database";
 import {
   createLogger,
   type LogEvent,
@@ -27,18 +32,21 @@ function captureLogger(events: LogEvent[]) {
 function createDbMock(input: {
   insertRows?: unknown[][];
   selectRows?: unknown[][];
+  settingsRow?: UserSettings;
 }): Database & {
   conflictSets: unknown[];
+  getSettingsRow(): UserSettings | undefined;
   insertValues: unknown[];
 } {
   const insertRows = [...(input.insertRows ?? [])];
   const selectRows = [...(input.selectRows ?? [])];
   const conflictSets: unknown[] = [];
   const insertValues: unknown[] = [];
+  let settingsRow = input.settingsRow;
 
   const db = {
-    insert: vi.fn(() => ({
-      values: vi.fn((value: unknown) => {
+    insert: vi.fn((table: unknown) => ({
+      values: vi.fn((value: Record<string, unknown>) => {
         insertValues.push(value);
 
         return {
@@ -46,7 +54,19 @@ function createDbMock(input: {
             conflictSets.push(config.set);
 
             return {
-              returning: vi.fn().mockResolvedValue(insertRows.shift() ?? []),
+              returning: vi.fn(() => {
+                if (table === schema.userSettings && settingsRow) {
+                  for (const key of Object.keys(
+                    config.set as Record<string, unknown>,
+                  )) {
+                    settingsRow = { ...settingsRow, [key]: value[key] };
+                  }
+
+                  return Promise.resolve([settingsRow]);
+                }
+
+                return Promise.resolve(insertRows.shift() ?? []);
+              }),
             };
           }),
         };
@@ -63,7 +83,11 @@ function createDbMock(input: {
     })),
   } as unknown as Database;
 
-  return Object.assign(db, { conflictSets, insertValues });
+  return Object.assign(db, {
+    conflictSets,
+    getSettingsRow: () => settingsRow,
+    insertValues,
+  });
 }
 
 describe("database service logging", () => {
@@ -220,7 +244,6 @@ describe("database service logging", () => {
     };
     const db = createDbMock({
       insertRows: [[user], [patchedSettings]],
-      selectRows: [[existingSettings]],
     });
     const users = createUsersService(db, logger);
     const service = createUserSettingsService(db, users, logger);
@@ -231,11 +254,10 @@ describe("database service logging", () => {
     await logger.flush();
 
     expect(events.map((event) => event.message)).toEqual([
-      `${loggerMessages.database.userSettings.getByClerkId}.succeeded`,
       `${loggerMessages.database.users.ensure}.succeeded`,
       `${loggerMessages.database.userSettings.patchForClerkId}.succeeded`,
     ]);
-    expect(events[2]?.attributes).toMatchObject({
+    expect(events[1]?.attributes).toMatchObject({
       clerkIdHash: hashLogIdentifier(clerkId),
       operation: loggerMessages.database.userSettings.patchForClerkId,
       outcome: "success",
@@ -243,20 +265,10 @@ describe("database service logging", () => {
       settings: { theme: "system" },
     });
     expect(db.insertValues[1]).toEqual({
-      currencyCode: "CAD",
-      dimensionUnit: "in",
-      locale: null,
       theme: "system",
       userId: user.id,
-      weightUnit: "g",
     });
-    expect(db.conflictSets[1]).toEqual({
-      currencyCode: "CAD",
-      dimensionUnit: "in",
-      locale: null,
-      theme: "system",
-      weightUnit: "g",
-    });
+    expect(Object.keys(db.conflictSets[1] as object)).toEqual(["theme"]);
     expect(JSON.stringify(events)).not.toContain(clerkId);
   });
 
@@ -278,7 +290,6 @@ describe("database service logging", () => {
     };
     const db = createDbMock({
       insertRows: [[user], [patchedSettings]],
-      selectRows: [[]],
     });
     const users = createUsersService(db, logger);
     const service = createUserSettingsService(db, users, logger);
@@ -289,11 +300,10 @@ describe("database service logging", () => {
     await logger.flush();
 
     expect(events.map((event) => event.message)).toEqual([
-      `${loggerMessages.database.userSettings.getByClerkId}.succeeded`,
       `${loggerMessages.database.users.ensure}.succeeded`,
       `${loggerMessages.database.userSettings.patchForClerkId}.succeeded`,
     ]);
-    expect(events[2]?.attributes).toMatchObject({
+    expect(events[1]?.attributes).toMatchObject({
       clerkIdHash: hashLogIdentifier(clerkId),
       operation: loggerMessages.database.userSettings.patchForClerkId,
       outcome: "success",
@@ -301,21 +311,50 @@ describe("database service logging", () => {
       settings: { theme: "light" },
     });
     expect(db.insertValues[1]).toEqual({
-      currencyCode: "USD",
-      dimensionUnit: "in",
-      locale: null,
       theme: "light",
       userId: user.id,
-      weightUnit: "g",
     });
-    expect(db.conflictSets[1]).toEqual({
+    expect(Object.keys(db.conflictSets[1] as object)).toEqual(["theme"]);
+    expect(JSON.stringify(events)).not.toContain(clerkId);
+  });
+
+  it("preserves simultaneous patches to different settings", async () => {
+    const events: LogEvent[] = [];
+    const clerkId = "clerk-patch-concurrent-1";
+    const logger = captureLogger(events);
+    const user: User = {
+      clerkId,
+      id: 1000,
+    };
+    const settings: UserSettings = {
       currencyCode: "USD",
       dimensionUnit: "in",
       locale: null,
-      theme: "light",
+      theme: "system",
+      userId: user.id,
       weightUnit: "g",
+    };
+    const db = createDbMock({
+      insertRows: [[user], [user]],
+      selectRows: [[settings], [settings]],
+      settingsRow: settings,
     });
-    expect(JSON.stringify(events)).not.toContain(clerkId);
+    const service = createUserSettingsService(
+      db,
+      createUsersService(db, logger),
+      logger,
+    );
+
+    await Promise.all([
+      service.patchForClerkId(clerkId, { currencyCode: "EUR" }),
+      service.patchForClerkId(clerkId, { theme: "dark" }),
+    ]);
+
+    expect(db.getSettingsRow()).toEqual({
+      ...settings,
+      currencyCode: "EUR",
+      theme: "dark",
+    });
   });
 
   it("persists a resolved locale when settings have no saved locale", async () => {
@@ -353,16 +392,13 @@ describe("database service logging", () => {
     expect(events.map((event) => event.message)).toEqual([
       `${loggerMessages.database.userSettings.getByClerkId}.succeeded`,
       `${loggerMessages.database.users.ensure}.succeeded`,
-      `${loggerMessages.database.userSettings.upsertForClerkId}.succeeded`,
+      `${loggerMessages.database.userSettings.patchForClerkId}.succeeded`,
     ]);
     expect(db.insertValues[1]).toEqual({
-      currencyCode: "CAD",
-      dimensionUnit: "mm",
       locale: "es-MX",
-      theme: "light",
       userId: user.id,
-      weightUnit: "oz",
     });
+    expect(Object.keys(db.conflictSets[1] as object)).toEqual(["locale"]);
     expect(JSON.stringify(events)).not.toContain(clerkId);
   });
 
