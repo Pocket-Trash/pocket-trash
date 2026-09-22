@@ -1,3 +1,3 @@
 import reactConfig from "@package/eslint/react";
 
-export default [...reactConfig];
+export default [...reactConfig, { ignores: ["storybook-static/**"] }];
