@@ -19,6 +19,17 @@
 
 
 
+
+## 0.4.0
+
+### Minor Changes
+
+* Add an Advent of Code-inspired theme and composable account panels. (@app/web)
+
+### Patch Changes
+
+* Prevent successful Railway releases from failing during deployment verification. (@app/scraper)
+
 ## 0.3.1
 
 ### Patch Changes
