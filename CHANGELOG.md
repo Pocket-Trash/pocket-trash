@@ -22,6 +22,13 @@
 
 
 
+
+## 0.5.0
+
+### Minor Changes
+
+* Add product catalogs, composable finishes, image galleries, filtering, and multiple collections. (@app/web, @app/api, @app/scraper, @package/database, @package/infisical-runner, @package/logger, @package/resources, @package/services)
+
 ## 0.4.2
 
 ### Patch Changes
