@@ -15,7 +15,7 @@ describe("schema repair migrations", () => {
 
   it("reuses catalog tables created by the pre-merge migration history", () => {
     const migration = readFileSync(
-      new URL("../drizzle/0027_giant_serpent_society.sql", import.meta.url),
+      new URL("../drizzle/0028_tidy_luke_cage.sql", import.meta.url),
       "utf8",
     );
 
@@ -28,7 +28,7 @@ describe("schema repair migrations", () => {
 
   it("backfills catalog ownership and keeps existing collections public", () => {
     const migration = readFileSync(
-      new URL("../drizzle/0028_pink_ricochet.sql", import.meta.url),
+      new URL("../drizzle/0028_tidy_luke_cage.sql", import.meta.url),
       "utf8",
     );
 

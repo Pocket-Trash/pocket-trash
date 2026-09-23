@@ -1,4 +1,9 @@
-import type { Database, User, UserSettings } from "@package/database";
+import {
+  type Database,
+  schema,
+  type User,
+  type UserSettings,
+} from "@package/database";
 import {
   createLogger,
   type LogEvent,
@@ -27,30 +32,57 @@ function captureLogger(events: LogEvent[]) {
 function createDbMock(input: {
   insertRows?: unknown[][];
   selectRows?: unknown[][];
+  settingsRow?: UserSettings;
+  updateRows?: unknown[][];
 }): Database & {
   conflictSets: unknown[];
+  getSettingsRow(): UserSettings | undefined;
   insertValues: unknown[];
 } {
   const insertRows = [...(input.insertRows ?? [])];
   const selectRows = [...(input.selectRows ?? [])];
+  const updateRows = [...(input.updateRows ?? [])];
   const conflictSets: unknown[] = [];
   const insertValues: unknown[] = [];
+  let settingsRow = input.settingsRow;
 
   const db = {
-    insert: vi.fn(() => ({
-      values: vi.fn((value: unknown) => {
+    insert: vi.fn((table: unknown) => ({
+      values: vi.fn((value: Record<string, unknown>) => {
         insertValues.push(value);
 
         return {
+          onConflictDoNothing: vi.fn(() => ({
+            returning: vi.fn().mockResolvedValue(insertRows.shift() ?? []),
+          })),
           onConflictDoUpdate: vi.fn((config: { set: unknown }) => {
             conflictSets.push(config.set);
 
             return {
-              returning: vi.fn().mockResolvedValue(insertRows.shift() ?? []),
+              returning: vi.fn(() => {
+                if (table === schema.userSettings && settingsRow) {
+                  for (const key of Object.keys(
+                    config.set as Record<string, unknown>,
+                  )) {
+                    settingsRow = { ...settingsRow, [key]: value[key] };
+                  }
+
+                  return Promise.resolve([settingsRow]);
+                }
+
+                return Promise.resolve(insertRows.shift() ?? []);
+              }),
             };
           }),
         };
       }),
+    })),
+    update: vi.fn(() => ({
+      set: vi.fn(() => ({
+        where: vi.fn(() => ({
+          returning: vi.fn().mockResolvedValue(updateRows.shift() ?? []),
+        })),
+      })),
     })),
     select: vi.fn(() => ({
       from: vi.fn(() => ({
@@ -63,7 +95,11 @@ function createDbMock(input: {
     })),
   } as unknown as Database;
 
-  return Object.assign(db, { conflictSets, insertValues });
+  return Object.assign(db, {
+    conflictSets,
+    getSettingsRow: () => settingsRow,
+    insertValues,
+  });
 }
 
 describe("database service logging", () => {
@@ -73,7 +109,9 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const user: User = {
       clerkId,
+      clerkUpdatedAt: null,
       id: 1000,
+      username: null,
     };
     const db = createDbMock({
       insertRows: [[user]],
@@ -93,6 +131,28 @@ describe("database service logging", () => {
       outcome: "success",
     });
     expect(JSON.stringify(events)).not.toContain(clerkId);
+  });
+
+  it.each([
+    ["updated", [[{ id: 1000 }]], []],
+    ["inserted", [[]], [[{ id: 1000 }]]],
+    ["unchanged", [[]], [[]]],
+  ] as const)("reports Clerk user syncs as %s", async (expected, updateRows, insertRows) => {
+    const users = createUsersService(
+      createDbMock({
+        insertRows: insertRows.map((row) => [...row]),
+        updateRows: updateRows.map((row) => [...row]),
+      }),
+      captureLogger([]),
+    );
+
+    await expect(
+      users.syncFromClerk({
+        clerkId: "user_123",
+        clerkUpdatedAt: new Date("2026-09-22T12:00:00.000Z"),
+        username: "roy",
+      }),
+    ).resolves.toBe(expected);
   });
 
   it("logs users.ensure failures with a failure outcome", async () => {
@@ -160,7 +220,9 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const user: User = {
       clerkId,
+      clerkUpdatedAt: null,
       id: 1000,
+      username: null,
     };
     const settings = {
       currencyCode: "USD",
@@ -212,7 +274,9 @@ describe("database service logging", () => {
     };
     const user: User = {
       clerkId,
+      clerkUpdatedAt: null,
       id: 1000,
+      username: null,
     };
     const patchedSettings: UserSettings = {
       ...existingSettings,
@@ -220,7 +284,6 @@ describe("database service logging", () => {
     };
     const db = createDbMock({
       insertRows: [[user], [patchedSettings]],
-      selectRows: [[existingSettings]],
     });
     const users = createUsersService(db, logger);
     const service = createUserSettingsService(db, users, logger);
@@ -231,11 +294,10 @@ describe("database service logging", () => {
     await logger.flush();
 
     expect(events.map((event) => event.message)).toEqual([
-      `${loggerMessages.database.userSettings.getByClerkId}.succeeded`,
       `${loggerMessages.database.users.ensure}.succeeded`,
       `${loggerMessages.database.userSettings.patchForClerkId}.succeeded`,
     ]);
-    expect(events[2]?.attributes).toMatchObject({
+    expect(events[1]?.attributes).toMatchObject({
       clerkIdHash: hashLogIdentifier(clerkId),
       operation: loggerMessages.database.userSettings.patchForClerkId,
       outcome: "success",
@@ -243,20 +305,10 @@ describe("database service logging", () => {
       settings: { theme: "system" },
     });
     expect(db.insertValues[1]).toEqual({
-      currencyCode: "CAD",
-      dimensionUnit: "in",
-      locale: null,
       theme: "system",
       userId: user.id,
-      weightUnit: "g",
     });
-    expect(db.conflictSets[1]).toEqual({
-      currencyCode: "CAD",
-      dimensionUnit: "in",
-      locale: null,
-      theme: "system",
-      weightUnit: "g",
-    });
+    expect(Object.keys(db.conflictSets[1] as object)).toEqual(["theme"]);
     expect(JSON.stringify(events)).not.toContain(clerkId);
   });
 
@@ -266,7 +318,9 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const user: User = {
       clerkId,
+      clerkUpdatedAt: null,
       id: 1000,
+      username: null,
     };
     const patchedSettings: UserSettings = {
       currencyCode: "USD",
@@ -278,7 +332,6 @@ describe("database service logging", () => {
     };
     const db = createDbMock({
       insertRows: [[user], [patchedSettings]],
-      selectRows: [[]],
     });
     const users = createUsersService(db, logger);
     const service = createUserSettingsService(db, users, logger);
@@ -289,11 +342,10 @@ describe("database service logging", () => {
     await logger.flush();
 
     expect(events.map((event) => event.message)).toEqual([
-      `${loggerMessages.database.userSettings.getByClerkId}.succeeded`,
       `${loggerMessages.database.users.ensure}.succeeded`,
       `${loggerMessages.database.userSettings.patchForClerkId}.succeeded`,
     ]);
-    expect(events[2]?.attributes).toMatchObject({
+    expect(events[1]?.attributes).toMatchObject({
       clerkIdHash: hashLogIdentifier(clerkId),
       operation: loggerMessages.database.userSettings.patchForClerkId,
       outcome: "success",
@@ -301,21 +353,52 @@ describe("database service logging", () => {
       settings: { theme: "light" },
     });
     expect(db.insertValues[1]).toEqual({
-      currencyCode: "USD",
-      dimensionUnit: "in",
-      locale: null,
       theme: "light",
       userId: user.id,
-      weightUnit: "g",
     });
-    expect(db.conflictSets[1]).toEqual({
+    expect(Object.keys(db.conflictSets[1] as object)).toEqual(["theme"]);
+    expect(JSON.stringify(events)).not.toContain(clerkId);
+  });
+
+  it("preserves simultaneous patches to different settings", async () => {
+    const events: LogEvent[] = [];
+    const clerkId = "clerk-patch-concurrent-1";
+    const logger = captureLogger(events);
+    const user: User = {
+      clerkId,
+      clerkUpdatedAt: null,
+      id: 1000,
+      username: null,
+    };
+    const settings: UserSettings = {
       currencyCode: "USD",
       dimensionUnit: "in",
       locale: null,
-      theme: "light",
+      theme: "system",
+      userId: user.id,
       weightUnit: "g",
+    };
+    const db = createDbMock({
+      insertRows: [[user], [user]],
+      selectRows: [[settings], [settings]],
+      settingsRow: settings,
     });
-    expect(JSON.stringify(events)).not.toContain(clerkId);
+    const service = createUserSettingsService(
+      db,
+      createUsersService(db, logger),
+      logger,
+    );
+
+    await Promise.all([
+      service.patchForClerkId(clerkId, { currencyCode: "EUR" }),
+      service.patchForClerkId(clerkId, { theme: "dark" }),
+    ]);
+
+    expect(db.getSettingsRow()).toEqual({
+      ...settings,
+      currencyCode: "EUR",
+      theme: "dark",
+    });
   });
 
   it("persists a resolved locale when settings have no saved locale", async () => {
@@ -336,7 +419,9 @@ describe("database service logging", () => {
     };
     const user: User = {
       clerkId,
+      clerkUpdatedAt: null,
       id: existingSettings.userId,
+      username: null,
     };
     const db = createDbMock({
       insertRows: [[user], [savedSettings]],
@@ -353,16 +438,13 @@ describe("database service logging", () => {
     expect(events.map((event) => event.message)).toEqual([
       `${loggerMessages.database.userSettings.getByClerkId}.succeeded`,
       `${loggerMessages.database.users.ensure}.succeeded`,
-      `${loggerMessages.database.userSettings.upsertForClerkId}.succeeded`,
+      `${loggerMessages.database.userSettings.patchForClerkId}.succeeded`,
     ]);
     expect(db.insertValues[1]).toEqual({
-      currencyCode: "CAD",
-      dimensionUnit: "mm",
       locale: "es-MX",
-      theme: "light",
       userId: user.id,
-      weightUnit: "oz",
     });
+    expect(Object.keys(db.conflictSets[1] as object)).toEqual(["locale"]);
     expect(JSON.stringify(events)).not.toContain(clerkId);
   });
 

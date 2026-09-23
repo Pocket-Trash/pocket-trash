@@ -74,10 +74,10 @@ pnpm db:migrate
 `pnpm db:migrate` runs through the Infisical runner so `DATABASE_URL` is loaded
 from `/apps/web`. To opt into a personal database branch, store its URL in
 Infisical `/local/database` as `DATABASE_URL_<INITIALS>`, then select it in
-`.env.local` at the repository root or `packages/database`:
+repository-root `.env.local` or `.env` (`.env.local` takes precedence):
 
 ```dotenv
-DATABASE_URL_INITIALS=RA
+URL_INITIALS=RA
 ```
 
 When the selector is absent, local commands keep using the shared `DATABASE_URL`.
@@ -208,8 +208,8 @@ for production:
 | Developer-specific | permanent | `production` | Optional personal local work branch selected through `.env.local`. |
 | `preview-pr-<number>` | ephemeral | `production` | Isolated PR database, created only for DB-changing PRs. |
 
-Local development uses `development` unless the repository-root `.env.local`
-selects a personal Infisical secret with `DATABASE_URL_INITIALS`. Before opening
+Local development uses `development` unless repository-root `.env.local` or
+`.env` selects a personal Infisical secret with `URL_INITIALS`. Before opening
 or updating a PR with schema changes, generate committed migrations with
 `pnpm db:generate`.
 

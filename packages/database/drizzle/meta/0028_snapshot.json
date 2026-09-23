@@ -1,6 +1,6 @@
 {
-  "id": "fc1f4fe8-6e56-425d-b610-322f687f68a9",
-  "prevId": "050dd0fc-6512-4339-b446-1b657675ef59",
+  "id": "20a89f74-4273-4741-872c-2c97c5f3fc6a",
+  "prevId": "46a14980-4621-46c8-904e-4a94ee37f1f8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -131,6 +131,10 @@
         "catalog_image_upload_file_size_positive": {
           "name": "catalog_image_upload_file_size_positive",
           "value": "\"catalog_image_upload_file\".\"size\" > 0"
+        },
+        "catalog_image_upload_file_sha256_valid": {
+          "name": "catalog_image_upload_file_sha256_valid",
+          "value": "\"catalog_image_upload_file\".\"sha256\" ~ '^[0-9a-f]{64}$'"
         }
       },
       "isRLSEnabled": false
@@ -165,6 +169,12 @@
         },
         "collection_item_id": {
           "name": "collection_item_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "collection_id": {
+          "name": "collection_id",
           "type": "bigint",
           "primaryKey": false,
           "notNull": false
@@ -218,6 +228,15 @@
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "catalog_image_upload_session_collection_id_user_collection_id_fk": {
+          "name": "catalog_image_upload_session_collection_id_user_collection_id_fk",
+          "tableFrom": "catalog_image_upload_session",
+          "tableTo": "user_collection",
+          "columnsFrom": ["collection_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -226,7 +245,178 @@
       "checkConstraints": {
         "catalog_image_upload_session_target_consistent": {
           "name": "catalog_image_upload_session_target_consistent",
-          "value": "(\"catalog_image_upload_session\".\"target_type\" = 'product' and \"catalog_image_upload_session\".\"product_id\" is not null and \"catalog_image_upload_session\".\"collection_item_id\" is null) or (\"catalog_image_upload_session\".\"target_type\" = 'collection_item' and \"catalog_image_upload_session\".\"product_id\" is null and \"catalog_image_upload_session\".\"collection_item_id\" is not null)"
+          "value": "(\"catalog_image_upload_session\".\"target_type\" = 'product' and \"catalog_image_upload_session\".\"product_id\" is not null and \"catalog_image_upload_session\".\"collection_id\" is null and \"catalog_image_upload_session\".\"collection_item_id\" is null) or (\"catalog_image_upload_session\".\"target_type\" = 'collection' and \"catalog_image_upload_session\".\"product_id\" is null and \"catalog_image_upload_session\".\"collection_id\" is not null and \"catalog_image_upload_session\".\"collection_item_id\" is null) or (\"catalog_image_upload_session\".\"target_type\" = 'collection_item' and \"catalog_image_upload_session\".\"product_id\" is null and \"catalog_image_upload_session\".\"collection_id\" is null and \"catalog_image_upload_session\".\"collection_item_id\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.collection_image": {
+      "name": "collection_image",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "collection_image_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1000",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "collection_id": {
+          "name": "collection_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_current": {
+          "name": "is_current",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_name": {
+          "name": "file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size": {
+          "name": "size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "storage_provider": {
+          "name": "storage_provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'bunny'"
+        },
+        "object_path": {
+          "name": "object_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uploaded_by_clerk_id": {
+          "name": "uploaded_by_clerk_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "collection_image_collection_id_idx": {
+          "name": "collection_image_collection_id_idx",
+          "columns": [
+            {
+              "expression": "collection_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "collection_image_current_unique": {
+          "name": "collection_image_current_unique",
+          "columns": [
+            {
+              "expression": "collection_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"collection_image\".\"is_current\"",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "collection_image_collection_id_user_collection_id_fk": {
+          "name": "collection_image_collection_id_user_collection_id_fk",
+          "tableFrom": "collection_image",
+          "tableTo": "user_collection",
+          "columnsFrom": ["collection_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "collection_image_object_path_unique": {
+          "name": "collection_image_object_path_unique",
+          "nullsNotDistinct": false,
+          "columns": ["object_path"]
+        },
+        "collection_image_collection_hash_unique": {
+          "name": "collection_image_collection_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": ["collection_id", "sha256"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "collection_image_position_valid": {
+          "name": "collection_image_position_valid",
+          "value": "\"collection_image\".\"position\" >= 0"
+        },
+        "collection_image_size_positive": {
+          "name": "collection_image_size_positive",
+          "value": "\"collection_image\".\"size\" > 0"
+        },
+        "collection_image_sha256_valid": {
+          "name": "collection_image_sha256_valid",
+          "value": "\"collection_image\".\"sha256\" ~ '^[0-9a-f]{64}$'"
         }
       },
       "isRLSEnabled": false
@@ -254,6 +444,12 @@
         },
         "owner_id": {
           "name": "owner_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "collection_id": {
+          "name": "collection_id",
           "type": "bigint",
           "primaryKey": false,
           "notNull": true
@@ -348,9 +544,15 @@
         }
       },
       "indexes": {
-        "collection_item_owner_visibility_idx": {
-          "name": "collection_item_owner_visibility_idx",
+        "collection_item_collection_visibility_idx": {
+          "name": "collection_item_collection_visibility_idx",
           "columns": [
+            {
+              "expression": "collection_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
             {
               "expression": "owner_id",
               "isExpression": false,
@@ -405,6 +607,15 @@
           "columnsFrom": ["sold_to_user_id"],
           "columnsTo": ["id"],
           "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "collection_item_collection_owner_fk": {
+          "name": "collection_item_collection_owner_fk",
+          "tableFrom": "collection_item",
+          "tableTo": "user_collection",
+          "columnsFrom": ["collection_id", "owner_id"],
+          "columnsTo": ["id", "owner_id"],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -578,9 +789,17 @@
           "name": "collection_item_image_size_positive",
           "value": "\"collection_item_image\".\"size\" > 0"
         },
+        "collection_item_image_sha256_valid": {
+          "name": "collection_item_image_sha256_valid",
+          "value": "\"collection_item_image\".\"sha256\" ~ '^[0-9a-f]{64}$'"
+        },
         "collection_item_image_deletion_metadata_consistent": {
           "name": "collection_item_image_deletion_metadata_consistent",
           "value": "num_nonnulls(\"collection_item_image\".\"deleted_at\", \"collection_item_image\".\"deleted_by_clerk_id\", \"collection_item_image\".\"deleted_by_role\") in (0, 3)"
+        },
+        "collection_item_image_deleted_by_role_valid": {
+          "name": "collection_item_image_deleted_by_role_valid",
+          "value": "\"collection_item_image\".\"deleted_by_role\" is null or \"collection_item_image\".\"deleted_by_role\" in ('owner', 'admin')"
         }
       },
       "isRLSEnabled": false
@@ -1556,9 +1775,17 @@
           "name": "product_image_size_positive",
           "value": "\"product_image\".\"size\" > 0"
         },
+        "product_image_sha256_valid": {
+          "name": "product_image_sha256_valid",
+          "value": "\"product_image\".\"sha256\" ~ '^[0-9a-f]{64}$'"
+        },
         "product_image_deletion_metadata_consistent": {
           "name": "product_image_deletion_metadata_consistent",
           "value": "num_nonnulls(\"product_image\".\"deleted_at\", \"product_image\".\"deleted_by_clerk_id\", \"product_image\".\"deleted_by_role\") in (0, 3)"
+        },
+        "product_image_deleted_by_role_valid": {
+          "name": "product_image_deleted_by_role_valid",
+          "value": "\"product_image\".\"deleted_by_role\" is null or \"product_image\".\"deleted_by_role\" in ('owner', 'admin')"
         }
       },
       "isRLSEnabled": false
@@ -1771,11 +1998,46 @@
       "name": "user_collection",
       "schema": "",
       "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "user_collection_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1000",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
         "owner_id": {
           "name": "owner_id",
           "type": "bigint",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalized_name": {
+          "name": "normalized_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "is_private": {
           "name": "is_private",
@@ -1818,9 +2080,15 @@
         }
       },
       "indexes": {
-        "user_collection_visibility_idx": {
-          "name": "user_collection_visibility_idx",
+        "user_collection_owner_visibility_idx": {
+          "name": "user_collection_owner_visibility_idx",
           "columns": [
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
             {
               "expression": "is_private",
               "isExpression": false,
@@ -1846,9 +2114,24 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "user_collection_id_owner_unique": {
+          "name": "user_collection_id_owner_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "owner_id"]
+        },
+        "user_collection_owner_name_unique": {
+          "name": "user_collection_owner_name_unique",
+          "nullsNotDistinct": false,
+          "columns": ["owner_id", "normalized_name"]
+        }
+      },
       "policies": {},
       "checkConstraints": {
+        "user_collection_name_length_valid": {
+          "name": "user_collection_name_length_valid",
+          "value": "char_length(trim(\"user_collection\".\"name\")) between 2 and 80"
+        },
         "user_collection_private_metadata_consistent": {
           "name": "user_collection_private_metadata_consistent",
           "value": "(\"user_collection\".\"is_private\" and num_nonnulls(\"user_collection\".\"private_reason\", \"user_collection\".\"privated_at\", \"user_collection\".\"privated_by_clerk_id\") in (0, 3)) or (not \"user_collection\".\"is_private\" and num_nonnulls(\"user_collection\".\"private_reason\", \"user_collection\".\"privated_at\", \"user_collection\".\"privated_by_clerk_id\") = 0)"
@@ -6345,6 +6628,18 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "clerk_updated_at": {
+          "name": "clerk_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},

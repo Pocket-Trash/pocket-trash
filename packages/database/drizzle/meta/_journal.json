@@ -194,29 +194,15 @@
     {
       "idx": 27,
       "version": "7",
-      "when": 1790006565856,
-      "tag": "0027_giant_serpent_society",
+      "when": 1790107020928,
+      "tag": "0027_mature_famine",
       "breakpoints": true
     },
     {
       "idx": 28,
       "version": "7",
-      "when": 1790052583019,
-      "tag": "0028_pink_ricochet",
-      "breakpoints": true
-    },
-    {
-      "idx": 29,
-      "version": "7",
-      "when": 1790052672473,
-      "tag": "0029_condemned_brother_voodoo",
-      "breakpoints": true
-    },
-    {
-      "idx": 30,
-      "version": "7",
-      "when": 1790107581099,
-      "tag": "0030_naive_firelord",
+      "when": 1790125028080,
+      "tag": "0028_tidy_luke_cage",
       "breakpoints": true
     }
   ]

@@ -53,10 +53,7 @@ describe("buildInfisicalRunArgs", () => {
 
     expect(getEnvAliasRunnerOptions(args)).toMatchObject({
       databaseUrlUserOverride: true,
-      databaseUrlUserOverrideFilePaths: [
-        "/repo/.env.local",
-        "/repo/packages/database/.env.local",
-      ],
+      databaseUrlUserOverrideFilePaths: ["/repo/.env.local", "/repo/.env"],
     });
     expect(args).toContain("--path=/apps/api");
     expect(args).toContain("--path=/local/database");
@@ -110,10 +107,7 @@ describe("buildInfisicalRunArgs", () => {
     expect(args).toContain("--path=/apps/scraper");
     expect(getEnvAliasRunnerOptions(args)).toMatchObject({
       databaseUrlUserOverride: true,
-      databaseUrlUserOverrideFilePaths: [
-        "/repo/.env.local",
-        "/repo/packages/database/.env.local",
-      ],
+      databaseUrlUserOverrideFilePaths: ["/repo/.env.local", "/repo/.env"],
     });
   });
 
@@ -170,6 +164,26 @@ describe("buildInfisicalRunArgs", () => {
       "--",
       "vite",
       "build",
+    ]);
+  });
+
+  it("loads local Clerk IDs for the webhook listener", () => {
+    expect(
+      buildInfisicalRunArgs({
+        app: "webhooks",
+        command: "listen",
+        commandArgs: ["node", "scripts/dev-webhooks.mjs"],
+        repoRoot: "/repo",
+      }),
+    ).toEqual([
+      "run",
+      ...quietArgs,
+      "--project-config-dir=/repo",
+      "--env=dev",
+      "--path=/local/clerk",
+      "--",
+      "node",
+      "scripts/dev-webhooks.mjs",
     ]);
   });
 
@@ -301,10 +315,7 @@ describe("buildInfisicalRunArgs", () => {
     ]);
     expect(getEnvAliasRunnerOptions(args)).toMatchObject({
       databaseUrlUserOverride: true,
-      databaseUrlUserOverrideFilePaths: [
-        "/repo/.env.local",
-        "/repo/packages/database/.env.local",
-      ],
+      databaseUrlUserOverrideFilePaths: ["/repo/.env.local", "/repo/.env"],
     });
   });
 
@@ -332,10 +343,7 @@ describe("buildInfisicalRunArgs", () => {
     ]);
     expect(getEnvAliasRunnerOptions(args)).toMatchObject({
       databaseUrlUserOverride: true,
-      databaseUrlUserOverrideFilePaths: [
-        "/repo/.env.local",
-        "/repo/packages/database/.env.local",
-      ],
+      databaseUrlUserOverrideFilePaths: ["/repo/.env.local", "/repo/.env"],
     });
   });
 
@@ -373,10 +381,7 @@ describe("buildInfisicalRunArgs", () => {
     ]);
     expect(getEnvAliasRunnerOptions(args)).toMatchObject({
       databaseUrlUserOverride: true,
-      databaseUrlUserOverrideFilePaths: [
-        "/repo/.env.local",
-        "/repo/packages/database/.env.local",
-      ],
+      databaseUrlUserOverrideFilePaths: ["/repo/.env.local", "/repo/.env"],
     });
   });
 

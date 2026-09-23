@@ -326,19 +326,24 @@ describe("resources service", () => {
       .fn()
       .mockReturnValueOnce({
         from: () => ({
-          where: () => ({
-            limit: async () => [
-              {
-                createdAt,
-                description: "A useful clip.",
-                id: 1000,
-                isPrivate: false,
-                name: "Pocket clip",
-                privateReason: null,
-                privatedAt: null,
-                uploaderClerkId: "user_123",
-              },
-            ],
+          innerJoin: () => ({
+            where: () => ({
+              limit: async () => [
+                {
+                  resource: {
+                    createdAt,
+                    description: "A useful clip.",
+                    id: 1000,
+                    isPrivate: false,
+                    name: "Pocket clip",
+                    privateReason: null,
+                    privatedAt: null,
+                    uploaderClerkId: "user_123",
+                  },
+                  uploaderUsername: "roy",
+                },
+              ],
+            }),
           }),
         }),
       })
@@ -412,6 +417,7 @@ describe("resources service", () => {
       privateReason: null,
       privatedAt: null,
       uploaderClerkId: "user_123",
+      uploaderUsername: "roy",
       versions: [currentVersion],
     });
   });
@@ -419,14 +425,19 @@ describe("resources service", () => {
   it("returns no detail for a private resource viewed by an unrelated user", async () => {
     const select = vi.fn().mockReturnValue({
       from: () => ({
-        where: () => ({
-          limit: async () => [
-            {
-              id: 1000,
-              isPrivate: true,
-              uploaderClerkId: "user_owner",
-            },
-          ],
+        innerJoin: () => ({
+          where: () => ({
+            limit: async () => [
+              {
+                resource: {
+                  id: 1000,
+                  isPrivate: true,
+                  uploaderClerkId: "user_owner",
+                },
+                uploaderUsername: "owner",
+              },
+            ],
+          }),
         }),
       }),
     });
@@ -457,6 +468,8 @@ describe("resources service", () => {
         id: 1000,
         name: "Pocket clip",
         coverImageObjectPath: "resources/dev/preview.webp",
+        uploaderClerkId: "user_123",
+        uploaderUsername: "roy",
       },
     ];
     const execute = vi
@@ -487,6 +500,8 @@ describe("resources service", () => {
           downloadCount: 3,
           id: 1000,
           name: "Pocket clip",
+          uploaderClerkId: "user_123",
+          uploaderUsername: "roy",
           coverImageUrl:
             "https://cdn.example.test/resources/dev/preview.webp?token=signed",
         },
@@ -499,6 +514,8 @@ describe("resources service", () => {
     });
     expect(execute).toHaveBeenCalledTimes(3);
     const query = new PgDialect().sqlToQuery(execute.mock.calls[1]?.[0]);
+    expect(query.sql).toContain("inner join users");
+    expect(query.sql).toContain('users.username as "uploaderUsername"');
     expect(query.sql).toContain("order by resources.created_at desc");
     expect(query.sql).toContain('"resources"."deleted_at" is null');
     expect(query.params).toEqual([false, "", "3d-printing"]);
@@ -512,11 +529,11 @@ describe("resources service", () => {
       id: 1000,
       isPrivate: false,
       readAt: null,
-      readByClerkId: null,
+      readByUsername: null,
       resourceId: 1001,
       resourceName: "Pocket clip",
       type: "resource_created" as const,
-      uploaderClerkId: "user_123",
+      uploaderUsername: "roy",
     };
     const execute = vi
       .fn()
@@ -538,6 +555,8 @@ describe("resources service", () => {
       "order by resource_notifications.created_at desc",
     );
     expect(listQuery.sql).toContain("resources.deleted_at is null");
+    expect(listQuery.sql).toContain('uploader.username as "uploaderUsername"');
+    expect(listQuery.sql).not.toContain('as "uploaderClerkId"');
     const updateQuery = new PgDialect().sqlToQuery(execute.mock.calls[1]?.[0]);
     expect(updateQuery.sql).toContain("where id = $2 and read_at is null");
     expect(updateQuery.params).toEqual(["admin_123", 1000]);
@@ -1017,12 +1036,12 @@ describe("resources service", () => {
     const deletedAt = new Date("2026-09-18T12:00:00Z");
     const item = {
       deletedAt,
-      deletedByClerkId: "user_owner",
+      deletedByUsername: "owner",
       deletedByRole: "owner" as const,
       id: 1000,
       isPrivate: true,
       name: "Pocket clip",
-      uploaderClerkId: "user_owner",
+      uploaderUsername: "owner",
     };
     const execute = vi
       .fn()
@@ -1038,7 +1057,7 @@ describe("resources service", () => {
     await expect(service.listAdminTrash()).resolves.toEqual([item]);
 
     const ownerQuery = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
-    expect(ownerQuery.sql).toContain("where deleted_at is not null");
+    expect(ownerQuery.sql).toContain("where resources.deleted_at is not null");
     expect(ownerQuery.sql).toContain("resources.deleted_by_role = 'owner'");
     expect(ownerQuery.params).toEqual(["user_owner", "user_owner"]);
     const adminQuery = new PgDialect().sqlToQuery(execute.mock.calls[1]?.[0]);

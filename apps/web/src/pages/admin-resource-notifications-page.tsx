@@ -132,7 +132,7 @@ export function AdminResourceNotificationsPage({
                   </span>
                   <span className="text-muted-foreground">
                     {t("web.resources.notification.uploader", {
-                      uploader: notification.uploaderClerkId,
+                      uploader: notification.uploaderUsername,
                     })}
                   </span>
                   <span className="text-muted-foreground">

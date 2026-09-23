@@ -35,11 +35,11 @@ describe("admin resource notifications", () => {
             id: 1000,
             isPrivate: false,
             readAt: null,
-            readByClerkId: null,
+            readByUsername: null,
             resourceId: 1000,
             resourceName: "Pocket clip",
             type: "resource_created",
-            uploaderClerkId: "user_123",
+            uploaderUsername: "roy",
           },
           {
             categories: ["3D printing"],
@@ -48,11 +48,11 @@ describe("admin resource notifications", () => {
             id: 1001,
             isPrivate: false,
             readAt: createdAt,
-            readByClerkId: "admin_123",
+            readByUsername: "admin",
             resourceId: 1000,
             resourceName: "Pocket clip",
             type: "category_created",
-            uploaderClerkId: "user_123",
+            uploaderUsername: "roy",
           },
         ]}
       />,
@@ -62,7 +62,7 @@ describe("admin resource notifications", () => {
     expect(html).toContain("Category created");
     expect(html).toContain("Resource: Pocket clip");
     expect(html).toContain("Category: 3D printing");
-    expect(html).toContain("Uploader: user_123");
+    expect(html).toContain("Uploader: roy");
     expect(html).toContain("Mark private");
     expect(html).toContain("Reason for delisting");
     expect(html).toContain("Delist");

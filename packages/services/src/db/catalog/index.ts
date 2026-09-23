@@ -953,7 +953,7 @@ export function createCollectionsService(
     },
     async getDefaultCollectionName(actorClerkId) {
       const [owner] = await db
-        .select({ username: sql<string | null>`${schema.user}."username"` })
+        .select({ username: schema.user.username })
         .from(schema.user)
         .where(eq(schema.user.clerkId, actorClerkId))
         .limit(1);
@@ -1038,7 +1038,7 @@ export function createCollectionsService(
         db
           .select({
             userId: schema.user.id,
-            username: sql<string | null>`${schema.user}."username"`,
+            username: schema.user.username,
           })
           .from(schema.user)
           .where(inArray(schema.user.id, ownerIds)),
@@ -1435,7 +1435,7 @@ async function resolveCollectionForWrite(
   if (existingCollection) return existingCollection.id;
 
   const [owner] = await tx
-    .select({ username: sql<string | null>`${schema.user}."username"` })
+    .select({ username: schema.user.username })
     .from(schema.user)
     .where(eq(schema.user.id, input.ownerId))
     .limit(1);

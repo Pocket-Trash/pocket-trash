@@ -191,6 +191,9 @@ function ResourceCardContent({
         </div>
 
         <div className="mt-auto grid gap-1 text-sm text-muted-foreground">
+          <span>
+            {t("web.resources.detail.sharedBy")} {resource.uploaderUsername}
+          </span>
           {resource.isPrivate && resource.privateReason ? (
             <span>
               {t("web.resources.moderation.privateReason", {

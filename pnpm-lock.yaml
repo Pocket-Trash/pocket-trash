@@ -82,6 +82,9 @@ importers:
       '@package/resources':
         specifier: workspace:*
         version: link:../../packages/resources
+      '@package/services':
+        specifier: workspace:*
+        version: link:../../packages/services
       '@scalar/hono-api-reference':
         specifier: ^0.12.2
         version: 0.12.4(hono@4.13.8)

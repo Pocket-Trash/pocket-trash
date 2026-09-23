@@ -23,6 +23,8 @@ export type {
   UserCollectionItem,
   UserCollectionSummary,
   UserSettingsService,
+  UserSyncResult,
+  UsersService,
 } from "./db/index.js";
 export { defaultUserSettings } from "./db/index.js";
 

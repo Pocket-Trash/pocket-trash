@@ -14,7 +14,7 @@ const resource = {
   isPrivate: false,
   name: "Spinner model",
   privateReason: null,
-  uploaderClerkId: "user_123",
+  uploaderUsername: "roy",
 } satisfies ResourceCardItem;
 
 const meta = {

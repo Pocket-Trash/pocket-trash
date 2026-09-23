@@ -16,6 +16,9 @@ jobs:
     name: Preview Infrastructure Closed
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    concurrency:
+      group: preview-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     permissions:
       contents: read
       id-token: write
@@ -51,6 +54,15 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Remove preview webhook target
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler kv key delete "target:preview:${{ github.event.pull_request.number }}" \
+            --binding CLERK_WEBHOOK_TARGETS \
+            --env development \
+            --remote
 
       - name: Delete Neon PR branch
         id: neon_cleanup

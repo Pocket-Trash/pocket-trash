@@ -923,6 +923,14 @@ export const schemaDescriptions = {
         description: "Clerk user identifier.",
         example: "user_2abc123",
       },
+      clerk_updated_at: {
+        description: "Clerk profile timestamp used to ignore stale updates.",
+        example: "2026-09-22T12:00:00.000Z",
+      },
+      username: {
+        description: "Display username mirrored from Clerk.",
+        example: "roy",
+      },
     },
   },
 } satisfies Record<string, SchemaDescription>;

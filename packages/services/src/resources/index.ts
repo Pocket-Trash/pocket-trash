@@ -16,6 +16,7 @@ import {
   desc,
   eq,
   ilike,
+  isNotNull,
   isNull,
   type SQL,
   sql,
@@ -92,6 +93,7 @@ export type ResourceDetail = {
   privateReason: string | null;
   privatedAt: Date | null;
   uploaderClerkId: string;
+  uploaderUsername: string;
   versions: ResourceVersionDetail[];
 };
 
@@ -116,6 +118,7 @@ export type ResourceDirectoryItem = {
   name: string;
   privateReason: string | null;
   uploaderClerkId: string;
+  uploaderUsername: string;
 };
 
 export type ResourceNotificationItem = {
@@ -125,21 +128,21 @@ export type ResourceNotificationItem = {
   id: number;
   isPrivate: boolean;
   readAt: Date | null;
-  readByClerkId: string | null;
+  readByUsername: string | null;
   resourceId: number;
   resourceName: string;
   type: (typeof schema.resourceNotificationTypes)[number];
-  uploaderClerkId: string;
+  uploaderUsername: string;
 };
 
 export type ResourceTrashItem = {
   deletedAt: Date;
-  deletedByClerkId: string;
+  deletedByUsername: string;
   deletedByRole: (typeof schema.resourceDeletionRoles)[number];
   id: number;
   isPrivate: boolean;
   name: string;
-  uploaderClerkId: string;
+  uploaderUsername: string;
 };
 
 export type ResourcesService = {
@@ -391,18 +394,32 @@ export function createResourcesService(
         loggerMessages.resources.getDetail,
         async () => {
           assertPositiveInteger(resourceId, "resourceId");
-          const [resource] = await db
-            .select()
+          const [record] = await db
+            .select({
+              resource: schema.resources,
+              uploaderUsername: schema.user.username,
+            })
             .from(schema.resources)
+            .innerJoin(
+              schema.user,
+              eq(schema.user.clerkId, schema.resources.uploaderClerkId),
+            )
             .where(
               and(
                 eq(schema.resources.id, resourceId),
                 isNull(schema.resources.deletedAt),
+                isNotNull(schema.user.username),
               ),
             )
             .limit(1);
 
-          if (!resource || !canViewResource(resource, viewer)) return null;
+          if (
+            !record?.uploaderUsername ||
+            !canViewResource(record.resource, viewer)
+          ) {
+            return null;
+          }
+          const resource = record.resource;
 
           const [images, versions, files, categories, totals] =
             await Promise.all([
@@ -527,6 +544,7 @@ export function createResourcesService(
             privateReason: resource.privateReason,
             privatedAt: resource.privatedAt,
             uploaderClerkId: resource.uploaderClerkId,
+            uploaderUsername: record.uploaderUsername,
             versions: versionDetails,
           };
         },
@@ -580,6 +598,7 @@ export function createResourcesService(
               resources.id,
               resources.name,
               resources.uploader_clerk_id as "uploaderClerkId",
+              users.username as "uploaderUsername",
               resources.is_private as "isPrivate",
               resources.private_reason as "privateReason",
               resources.created_at as "createdAt",
@@ -601,6 +620,7 @@ export function createResourcesService(
                 '[]'::jsonb
               ) as categories
             from resources
+            inner join users on users.clerk_id = resources.uploader_clerk_id
             inner join lateral (
               select resource_versions.id, first_file.id as file_id,
                 first_file.file_name
@@ -637,9 +657,10 @@ export function createResourcesService(
                 or ${Boolean(viewer.isAdmin)}
                 or ${schema.resources.uploaderClerkId} = ${viewer.clerkId ?? ""})
               and ${schema.resources.deletedAt} is null
+              and users.username is not null
               and ${filter}
             group by resources.id, current_version.id, current_version.file_id,
-              current_version.file_name, cover_image.object_path
+              current_version.file_name, cover_image.object_path, users.id
             order by resources.created_at desc
           `);
 
@@ -745,13 +766,18 @@ export function createResourcesService(
                 ) filter (where assigned_category.id is not null),
                 array[]::text[]
               ) as categories,
-              resource_notifications.uploader_clerk_id as "uploaderClerkId",
+              uploader.username as "uploaderUsername",
               resource_notifications.created_at as "createdAt",
               resource_notifications.read_at as "readAt",
-              resource_notifications.read_by_clerk_id as "readByClerkId"
+              reader.username as "readByUsername"
             from resource_notifications
             inner join resources
               on resources.id = resource_notifications.resource_id
+            inner join users uploader
+              on uploader.clerk_id = resource_notifications.uploader_clerk_id
+              and uploader.username is not null
+            left join users reader
+              on reader.clerk_id = resource_notifications.read_by_clerk_id
             left join resource_categories notification_category
               on notification_category.id = resource_notifications.category_id
             left join resources_to_categories
@@ -760,7 +786,7 @@ export function createResourcesService(
               on assigned_category.id = resources_to_categories.category_id
             where resources.deleted_at is null
             group by resource_notifications.id, resources.id,
-              notification_category.id
+              notification_category.id, uploader.id, reader.id
             order by resource_notifications.created_at desc,
               resource_notifications.id desc
           `);
@@ -1269,13 +1295,20 @@ async function listTrash(
   filter: SQL,
 ): Promise<ResourceTrashItem[]> {
   const result = await db.execute<ResourceTrashItem>(sql`
-    select id, name, uploader_clerk_id as "uploaderClerkId",
+    select resources.id, resources.name,
+      uploader.username as "uploaderUsername",
       is_private as "isPrivate", deleted_at as "deletedAt",
-      deleted_by_clerk_id as "deletedByClerkId",
+      deleted_by.username as "deletedByUsername",
       deleted_by_role as "deletedByRole"
     from resources
-    where deleted_at is not null and ${filter}
-    order by deleted_at desc, id desc
+    inner join users uploader
+      on uploader.clerk_id = resources.uploader_clerk_id
+      and uploader.username is not null
+    inner join users deleted_by
+      on deleted_by.clerk_id = resources.deleted_by_clerk_id
+      and deleted_by.username is not null
+    where resources.deleted_at is not null and ${filter}
+    order by resources.deleted_at desc, resources.id desc
   `);
   return result.rows;
 }
