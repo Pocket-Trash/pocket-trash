@@ -139,7 +139,7 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
       JSON.stringify({
         databaseUrlUserOverrideFilePaths: [
           join(request.repoRoot, ".env.local"),
-          join(request.repoRoot, "packages/database/.env.local"),
+          join(request.repoRoot, ".env"),
         ],
         databaseUrlUserOverride: config.databaseUrlUserOverride ?? false,
         envAliases: config.envAliases ?? [],

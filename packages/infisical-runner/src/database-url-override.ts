@@ -1,18 +1,18 @@
 import { existsSync, readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 
-const databaseUrlInitialsPattern = /^[A-Z0-9]+$/;
+const urlInitialsPattern = /^[A-Z0-9]+$/;
 
 export function getDatabaseUrlOverride(
   filePaths: readonly string[],
   environment: NodeJS.ProcessEnv = process.env,
-): { name: string; value: string } | undefined {
+): { initials: string; name: string; value: string } | undefined {
   for (const filePath of filePaths) {
     if (!existsSync(filePath)) {
       continue;
     }
 
-    const { DATABASE_URL_INITIALS: configuredInitials } = parseEnv(
+    const { URL_INITIALS: configuredInitials } = parseEnv(
       readFileSync(filePath, "utf8"),
     );
 
@@ -22,9 +22,9 @@ export function getDatabaseUrlOverride(
 
     const initials = configuredInitials.trim().toUpperCase();
 
-    if (!initials || !databaseUrlInitialsPattern.test(initials)) {
+    if (!initials || !urlInitialsPattern.test(initials)) {
       throw new Error(
-        `DATABASE_URL_INITIALS in ${filePath} must contain only letters and numbers.`,
+        `URL_INITIALS in ${filePath} must contain only letters and numbers.`,
       );
     }
 
@@ -37,8 +37,20 @@ export function getDatabaseUrlOverride(
       );
     }
 
-    return { name, value };
+    return { initials, name, value };
   }
 
   return undefined;
+}
+
+export function applyDatabaseUrlOverride(
+  filePaths: readonly string[],
+  environment: NodeJS.ProcessEnv = process.env,
+) {
+  const override = getDatabaseUrlOverride(filePaths, environment);
+  if (override) {
+    environment.DATABASE_URL = override.value;
+    environment.URL_INITIALS = override.initials;
+  }
+  return override;
 }

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { getDatabaseUrlOverride } from "./database-url-override.js";
+import { applyDatabaseUrlOverride } from "./database-url-override.js";
 
 type EnvironmentAlias = {
   from: string;
@@ -41,16 +41,15 @@ function applyDatabaseUrlUserOverride(filePaths: string[] | undefined): void {
     return;
   }
 
-  const override = getDatabaseUrlOverride(filePaths);
+  const override = applyDatabaseUrlOverride(filePaths);
 
   if (!override) {
     process.stderr.write(
-      `Infisical runner: no DATABASE_URL_INITIALS found; using DATABASE_URL.\n`,
+      `Infisical runner: no URL_INITIALS found; using DATABASE_URL.\n`,
     );
     return;
   }
 
-  process.env.DATABASE_URL = override.value;
   process.stderr.write(
     `Infisical runner: using ${override.name} from Infisical /local/database instead of DATABASE_URL.\n`,
   );

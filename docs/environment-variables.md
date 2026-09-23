@@ -52,16 +52,18 @@ the scraper on Railway. Browser logs are forwarded to Axiom through the API.
 The Infisical `dev` value for `DATABASE_URL` is the shared default and points to
 the `development` Neon branch. To opt into a personal branch, store its URL in
 Infisical `/local/database` as `DATABASE_URL_<INITIALS>`, then add its initials
-to `.env.local` at the repository root or `packages/database`:
+to `.env.local` or `.env` at the repository root (`.env.local` takes
+precedence):
 
 ```dotenv
-DATABASE_URL_INITIALS=RA
+URL_INITIALS=RA
 ```
 
 The runner promotes the matching injected value (`DATABASE_URL_RA` in this
 example) to `DATABASE_URL` for local web, API, scraper, and database commands.
-If `.env.local` is missing or contains no selector, the shared Infisical value
-remains active. A configured selector with no matching secret fails explicitly.
+If neither root file contains a selector, the shared Infisical value remains
+active. A configured selector with no matching secret fails explicitly. The
+runner exposes the normalized `URL_INITIALS` to child processes.
 
 ## API
 
@@ -69,12 +71,20 @@ remains active. A configured selector with no matching secret fails explicitly.
 | --- | --- | --- |
 | `DATABASE_URL` | Secret | Neon Postgres connection string. GitHub Actions resolves the deployment-specific branch URL. |
 | `CLERK_SECRET_KEY` | Secret | Verifies Clerk bearer tokens. |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | Secret | Verifies Clerk `user.created` and `user.updated` webhooks. |
+| `URL_INITIALS` | Local server | Normalized developer selector exposed by the Infisical runner. |
 | `BUNNY_CDN_BASE_URL` | Worker | Public Bunny delivery origin. |
 | `BUNNY_RESOURCE_FOLDER_PREFIX` | Worker | Resource namespace selected for the deployment. |
 | `BUNNY_STORAGE_ACCESS_KEY` | Secret | Bunny Storage Zone password. |
 | `BUNNY_STORAGE_ENDPOINT` | Worker | Regional Bunny Storage API origin. |
 | `BUNNY_STORAGE_ZONE_NAME` | Worker | Shared `pocket-trash-storage` Storage Zone name. |
 | `AXIOM_TOKEN`, `AXIOM_DATASET`, `AXIOM_EDGE_DOMAIN`, `LOG_LEVEL`, `LOGGER` | Worker | Shared logger configuration. |
+
+Production Clerk sends webhooks to
+`https://api.pocket-trash.app/api/v0/webhooks/clerk`; development Clerk sends
+them to `https://dev-api.pocket-trash.app/api/v0/webhooks/clerk`. Run
+`pnpm dev:web:webhooks` to register a 24-hour local relay target. PR previews
+receive development events only while labeled `preview:webhooks`.
 
 ## Scraper
 

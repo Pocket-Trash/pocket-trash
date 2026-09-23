@@ -118,7 +118,7 @@ function ResourceTrashList({
               <div className="grid gap-1 text-sm text-muted-foreground">
                 <span>
                   {t("web.resources.trash.deletedBy", {
-                    user: resource.deletedByClerkId,
+                    user: resource.deletedByUsername,
                   })}
                 </span>
                 <span>

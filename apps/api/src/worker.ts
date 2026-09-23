@@ -11,10 +11,42 @@ import {
   normalizeLogLevel,
 } from "@package/logger";
 import { createResourceStorage } from "@package/resources";
+import { createServices } from "@package/services";
 import { type ApiBindings, createApp } from "./app.js";
+import { createClerkWebhookHandler } from "./clerk-webhooks.js";
 import { createResourceUploadSessionsService } from "./resource-upload-sessions.js";
 
 const app = createApp({
+  getClerkWebhookRuntime(bindings) {
+    validateClerkWebhookBindings(bindings);
+    const logger = createApiLogger(bindings);
+    const services = createServices();
+    services.configure({
+      db: { databaseUrl: bindings.DATABASE_URL as string },
+      logger,
+    });
+    const handle = createClerkWebhookHandler({
+      logger,
+      signingSecret: bindings.CLERK_WEBHOOK_SIGNING_SECRET as string,
+      targets: bindings.CLERK_WEBHOOK_TARGETS,
+      users: services.db.users,
+    });
+
+    return {
+      expectedInitials: bindings.URL_INITIALS?.trim().toUpperCase(),
+      handle: (request, target) =>
+        handle(
+          request,
+          target === "local"
+            ? "local"
+            : bindings.APP_ENV === "production"
+              ? "production"
+              : bindings.APP_ENV === "preview"
+                ? "preview"
+                : "development",
+        ),
+    };
+  },
   getRuntimeConfig(bindings) {
     validateApiBindings(bindings);
 
@@ -87,6 +119,14 @@ export function validateResourceUploadBindings(env: ApiBindings) {
   ] as const;
   const invalidVariables = required.filter((name) => !env[name]?.trim());
 
+  if (invalidVariables.length > 0) {
+    throw new ApiEnvValidationError(invalidVariables);
+  }
+}
+
+export function validateClerkWebhookBindings(env: ApiBindings) {
+  const required = ["CLERK_WEBHOOK_SIGNING_SECRET", "DATABASE_URL"] as const;
+  const invalidVariables = required.filter((name) => !env[name]?.trim());
   if (invalidVariables.length > 0) {
     throw new ApiEnvValidationError(invalidVariables);
   }

@@ -11,12 +11,14 @@
     "check": "biome check .",
     "cf-typegen": "wrangler types src/worker-configuration.d.ts --include-runtime false",
     "deploy": "pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy -- pnpm exec wrangler deploy --config wrangler.jsonc --env=\"\" --keep-vars",
+    "deploy:development": "pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy:development -- pnpm exec wrangler deploy --config wrangler.jsonc --env=development --keep-vars",
     "deploy:preview": "pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy:preview -- pnpm exec wrangler deploy --config wrangler.jsonc --env=preview --keep-vars",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:ci": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "users:reconcile": "tsx ../../packages/infisical-runner/src/cli.ts api users:reconcile -- tsx src/scripts/reconcile-clerk-users.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.11.0",
@@ -24,6 +26,7 @@
     "@package/database": "workspace:*",
     "@package/logger": "workspace:*",
     "@package/resources": "workspace:*",
+    "@package/services": "workspace:*",
     "@scalar/hono-api-reference": "^0.12.2",
     "drizzle-orm": "latest",
     "hono": "^4.13.8"
