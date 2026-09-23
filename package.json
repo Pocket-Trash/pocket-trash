@@ -23,7 +23,7 @@
     "scraper:scrape:grimsmo-saga": "node scripts/scraper-command.mjs scrape:grimsmo-saga",
     "storybook": "pnpm --filter @app/web storybook --no-open",
     "dev:web": "turbo run dev:web --filter=@app/api --filter=@app/web --filter=@package/logger",
-    "dev:web:webhooks": "tsx packages/infisical-runner/src/cli.ts webhooks listen -- node scripts/dev-webhooks.mjs",
+    "dev:web:webhooks": "pnpm users:reconcile && tsx packages/infisical-runner/src/cli.ts webhooks listen -- node scripts/dev-webhooks.mjs",
     "dev:web:verbose": "INFISICAL_RUNNER_VERBOSE=1 turbo run dev:web --filter=@app/api --filter=@app/web --filter=@package/logger",
     "build": "turbo run build",
     "build:ci": "turbo run build:ci",
