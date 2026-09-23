@@ -220,8 +220,7 @@ The production workflow:
    `LOG_DEPLOYMENT_TARGET=railway`.
 4. Uploads the checked-out release source to Railway with
    `railway up --ci --message "Production release for vX.Y.Z"`.
-5. Verifies that the Railway production deployment whose message matches the
-   release tag finishes with `SUCCESS`.
+5. Waits for that Railway production deployment to finish with `SUCCESS`.
 
 Do not move Drizzle migrations into the Railway build, pre-deploy, start, or
 cron command. Railway production deploys must remain downstream of the release

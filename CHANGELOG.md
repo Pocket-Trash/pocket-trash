@@ -19,6 +19,32 @@
 
 
 
+
+
+
+## 0.4.2
+
+### Patch Changes
+
+* Wait for production deployment and GitHub release before the release command completes. (@app/api, @app/scraper, @app/web)
+
+## 0.4.1
+
+### Patch Changes
+
+* Set Railway production metadata in one request. (@app/scraper)
+* Remove stale Expo dependencies from the workspace. (@app/api, @app/scraper, @app/web, @package/database, @package/services)
+
+## 0.4.0
+
+### Minor Changes
+
+* Add an Advent of Code-inspired theme and composable account panels. (@app/web)
+
+### Patch Changes
+
+* Prevent successful Railway releases from failing during deployment verification. (@app/scraper)
+
 ## 0.3.1
 
 ### Patch Changes
