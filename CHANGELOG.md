@@ -17,6 +17,34 @@
 
 
 
+
+## 0.3.0
+
+### Minor Changes
+
+- **pocket-trash.app**: Move web UI text to shared localizations.
+- **@pocket-trash/repo**: Allow administrators to permanently delete soft-deleted resources and their stored files.
+- **@pocket-trash/repo**: Add the resource directory, management workflows, and streamed uploads.
+- **@pocket-trash/repo**: Add resource galleries, organized Bunny storage, and reversible deletion.
+- **@pocket-trash/repo**: Add secure multi-file resource uploads, management, and delivery.
+- **@pocket-trash/repo**: Sync Clerk usernames for resource attribution.
+
+### Patch Changes
+
+- **@package/services**: Preserve concurrent partial user settings updates.
+- **@app/web**: Installed pocket-trash skills v0.1.1
+- **@app/scraper**: Filter unchanged scraper items before queueing and run source scrapes hourly.
+- **@pocket-trash/repo**: Fix Railway release deployment verification.
+- **@pocket-trash/repo**: Add `@pocket-trash/repo` as a repo-level Changesets option and include selected packages in changelog entries.
+- **pocket-trash.app**: Add Storybook component stories, coverage support, and a dedicated CI check.
+- **pocket-trash.app**: Update Pocket Trash skills to v0.1.2.
+- **pocket-trash.app**: Update Pocket Trash skills to v0.2.0.
+- **pocket-trash.app**: Update Pocket Trash skills to v0.3.1.
+- **@pocket-trash/repo**: Move repo agent skills to the shared skills repo.
+- **@pocket-trash/repo**: Use the shared Pocket Trash skill router.
+- **@pocket-trash/repo**: Pin shared Pocket Trash skills by version, scope installed skills, and add install/update checks.
+- **@pocket-trash/repo**: Added i-have-adhd and ponytail skills
+
 ## 0.2.8
 
 ### Patch Changes
