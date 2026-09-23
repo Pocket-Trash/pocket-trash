@@ -1032,77 +1032,70 @@ export function createCollectionsService(
       );
     },
     async listOwned(actorClerkId, actorIsAdmin = false, collectionId) {
-      return await queryOwnedItems(
-        db,
-        actorIsAdmin ? undefined : actorClerkId,
-        undefined,
-        {
-          collectionId,
-          includePrivate: true,
-          viewerClerkId: actorClerkId,
-          viewerIsAdmin: actorIsAdmin,
-        },
-      );
+      return await queryOwnedItems(db, actorClerkId, undefined, {
+        collectionId,
+        includePrivate: true,
+        viewerClerkId: actorClerkId,
+        viewerIsAdmin: actorIsAdmin,
+      });
     },
     async listOwnedCollections(actorClerkId, actorIsAdmin = false) {
       const owner = await users.getByClerkId(actorClerkId);
-      if (!owner && !actorIsAdmin) return [];
+      if (!owner) return [];
       return await queryCollections(db, {
         includePrivate: true,
-        ownerUserId: actorIsAdmin ? undefined : owner?.id,
+        ownerUserId: owner.id,
         viewerClerkId: actorClerkId,
         viewerIsAdmin: actorIsAdmin,
       });
     },
     async listProductItems(productId, viewer) {
       return await queryOwnedItems(db, undefined, undefined, {
-        includePrivate: Boolean(viewer?.isAdmin),
         productId,
+        publicOnly: true,
         viewerClerkId: viewer?.clerkId,
         viewerIsAdmin: viewer?.isAdmin,
       });
     },
     async listOwners(viewer) {
-      const items = await queryOwnedItems(db, undefined, undefined, {
-        includePrivate: Boolean(viewer?.isAdmin),
-        viewerClerkId: viewer?.clerkId,
-        viewerIsAdmin: viewer?.isAdmin,
-      });
-      const ownerIds = [
-        ...new Set(items.map(({ ownerUserId }) => ownerUserId)),
-      ];
-      if (!ownerIds.length) return [];
-      const [owners, collections] = await Promise.all([
-        db
-          .select({
-            userId: schema.user.id,
-            username: schema.user.username,
-          })
-          .from(schema.user)
-          .where(inArray(schema.user.id, ownerIds)),
+      const [items, collections] = await Promise.all([
+        queryOwnedItems(db, undefined, undefined, {
+          publicOnly: true,
+          viewerClerkId: viewer?.clerkId,
+          viewerIsAdmin: viewer?.isAdmin,
+        }),
         queryCollections(db, {
-          includePrivate: Boolean(viewer?.isAdmin),
+          publicOnly: true,
           viewerClerkId: viewer?.clerkId,
           viewerIsAdmin: viewer?.isAdmin,
         }),
       ]);
+      const ownerIds = [
+        ...new Set(collections.map(({ ownerUserId }) => ownerUserId)),
+      ];
+      if (!ownerIds.length) return [];
+      const owners = await db
+        .select({
+          clerkId: schema.user.clerkId,
+          userId: schema.user.id,
+          username: schema.user.username,
+        })
+        .from(schema.user)
+        .where(inArray(schema.user.id, ownerIds));
       return owners
-        .flatMap((owner) => {
-          if (!owner.username) return [];
+        .map((owner) => {
           const ownerItems = items.filter(
             ({ ownerUserId }) => ownerUserId === owner.userId,
           );
-          return [
-            {
-              collections: collections.filter(
-                ({ ownerUserId }) => ownerUserId === owner.userId,
-              ),
-              itemCount: ownerItems.length,
-              items: ownerItems,
-              userId: owner.userId,
-              username: owner.username,
-            },
-          ];
+          return {
+            collections: collections.filter(
+              ({ ownerUserId }) => ownerUserId === owner.userId,
+            ),
+            itemCount: ownerItems.length,
+            items: ownerItems,
+            userId: owner.userId,
+            username: owner.username ?? owner.clerkId,
+          };
         })
         .sort((left, right) => left.username.localeCompare(right.username));
     },
@@ -1515,6 +1508,7 @@ async function queryCollections(
     collectionId?: number;
     includePrivate?: boolean;
     ownerUserId?: number;
+    publicOnly?: boolean;
     viewerClerkId?: string;
     viewerIsAdmin?: boolean;
   } = {},
@@ -1526,7 +1520,9 @@ async function queryCollections(
   if (options.ownerUserId !== undefined) {
     conditions.push(eq(schema.userCollection.ownerId, options.ownerUserId));
   }
-  if (!options.includePrivate) {
+  if (options.publicOnly) {
+    conditions.push(eq(schema.userCollection.isPrivate, false));
+  } else if (!options.includePrivate) {
     conditions.push(
       options.viewerClerkId
         ? sql`(${schema.userCollection.isPrivate} = false or ${schema.user.clerkId} = ${options.viewerClerkId})`
@@ -1549,8 +1545,14 @@ async function queryCollections(
     .innerJoin(schema.user, eq(schema.userCollection.ownerId, schema.user.id))
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(schema.userCollection.updatedAt));
-  if (!rows.length) return [];
-  const collectionIds = rows.map(({ id }) => id);
+  const visibleRows = rows.filter(
+    ({ isPrivate, ownerUserId }) =>
+      (!options.publicOnly || !isPrivate) &&
+      (options.ownerUserId === undefined ||
+        ownerUserId === options.ownerUserId),
+  );
+  if (!visibleRows.length) return [];
+  const collectionIds = visibleRows.map(({ id }) => id);
   const [counts, covers] = await Promise.all([
     db
       .select({
@@ -1600,7 +1602,7 @@ async function queryCollections(
         } satisfies CatalogImage,
       ]),
   );
-  return rows.map((row) => ({
+  return visibleRows.map((row) => ({
     canAdminister: Boolean(options.viewerIsAdmin),
     canEdit: Boolean(
       options.viewerIsAdmin || options.viewerClerkId === row.ownerClerkId,
@@ -1989,6 +1991,7 @@ async function queryOwnedItems(
     includePrivate?: boolean;
     ownerUserId?: number;
     productId?: number;
+    publicOnly?: boolean;
     viewerClerkId?: string;
     viewerIsAdmin?: boolean;
   } = {},
@@ -2011,8 +2014,10 @@ async function queryOwnedItems(
   if (options.productId !== undefined) {
     conditions.push(eq(schema.product.id, options.productId));
   }
-  if (!options.includePrivate) {
-    const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false)`;
+  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false)`;
+  if (options.publicOnly) {
+    conditions.push(publicItem);
+  } else if (!options.includePrivate) {
     conditions.push(
       options.viewerClerkId
         ? sql`(${publicItem} or ${schema.user.clerkId} = ${options.viewerClerkId})`
@@ -2092,9 +2097,16 @@ async function queryOwnedItems(
     )
     .where(and(...conditions))
     .orderBy(desc(schema.collectionItem.updatedAt));
+  const visibleRows = rows.filter(
+    ({ collectionIsPrivate, isPrivate, ownerClerkId, ownerUserId }) =>
+      (!options.publicOnly || (!collectionIsPrivate && !isPrivate)) &&
+      (actorClerkId === undefined || ownerClerkId === actorClerkId) &&
+      (options.ownerUserId === undefined ||
+        ownerUserId === options.ownerUserId),
+  );
   const finishOptions = await loadFinishOptionComponents(
     db,
-    rows.flatMap((row) =>
+    visibleRows.flatMap((row) =>
       row.finishOptionId
         ? [
             {
@@ -2107,7 +2119,7 @@ async function queryOwnedItems(
         : [],
     ),
   );
-  const items: UserCollectionItem[] = rows.map((row) => ({
+  const items: UserCollectionItem[] = visibleRows.map((row) => ({
     canAdminister: Boolean(options.viewerIsAdmin),
     canEdit: Boolean(
       options.viewerIsAdmin || options.viewerClerkId === row.ownerClerkId,

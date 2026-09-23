@@ -34,6 +34,7 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
     };
     for (const method of [
       "from",
+      "groupBy",
       "innerJoin",
       "leftJoin",
       "orderBy",
@@ -90,6 +91,122 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
 }
 
 describe("collection catalog writes", () => {
+  it("excludes private collections from product relationships", async () => {
+    const { service } = setup(
+      [],
+      [
+        [
+          {
+            buttonId: null,
+            collectionId: 900,
+            collectionIsPrivate: true,
+            collectionItemId: 2001,
+            collectionName: "Private collection",
+            colorEffectId: null,
+            colorEffectName: null,
+            colorEffectSlug: null,
+            displayName: "My spinner",
+            finishOptionId: null,
+            installedButtonId: null,
+            isPrivate: false,
+            makerId: 100,
+            makerName: "KAP EDC",
+            makerUrl: null,
+            materialId: null,
+            materialName: null,
+            materialSlug: null,
+            name: "Catla",
+            ownerClerkId: "user-secret",
+            ownerUserId: 1000,
+            ownerUsername: "ranger",
+            privatedByClerkId: null,
+            productId: 1100,
+            productSlug: "catla",
+            productTypeName: "Spinner",
+            sourceProductFinishOptionId: null,
+            spinnerId: 2001,
+            updatedAt: new Date("2026-09-23"),
+          },
+        ],
+        [],
+        [],
+      ],
+    );
+
+    await expect(
+      service.listProductItems(1100, {
+        clerkId: "user-secret",
+        isAdmin: true,
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("lists public collections that have no public items", async () => {
+    const createdAt = new Date("2026-09-23T22:59:55.454Z");
+    const updatedAt = new Date("2026-09-23T23:02:19.572Z");
+    const { service } = setup(
+      [],
+      [
+        [],
+        [
+          {
+            createdAt,
+            description: null,
+            id: 1000,
+            isPrivate: false,
+            name: "Roy's Collection",
+            ownerClerkId: "user-secret",
+            ownerUserId: 1015,
+            privatedByClerkId: null,
+            updatedAt,
+          },
+        ],
+        [],
+        [],
+        [{ clerkId: "user-secret", userId: 1015, username: null }],
+      ],
+    );
+
+    await expect(service.listOwners()).resolves.toEqual([
+      expect.objectContaining({
+        collections: [
+          expect.objectContaining({ id: 1000, name: "Roy's Collection" }),
+        ],
+        itemCount: 0,
+        items: [],
+        userId: 1015,
+        username: "user-secret",
+      }),
+    ]);
+  });
+
+  it("keeps an admin personal collection list scoped to that admin", async () => {
+    const { service } = setup(
+      [],
+      [
+        [
+          {
+            createdAt: new Date("2026-09-23"),
+            description: null,
+            id: 1001,
+            isPrivate: false,
+            name: "ranger's Collection",
+            ownerClerkId: "other-user",
+            ownerUserId: 1015,
+            privatedByClerkId: null,
+            updatedAt: new Date("2026-09-23"),
+          },
+        ],
+        [],
+        [],
+      ],
+    );
+
+    await expect(
+      service.listOwnedCollections("user-secret", true),
+    ).resolves.toEqual([]);
+  });
+
   it("treats an admin changing their own collection as an owner action", async () => {
     const { service, updates } = setup(
       [],
