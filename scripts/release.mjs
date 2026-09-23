@@ -251,6 +251,57 @@ function tagExists(tagName) {
   return result.status === 0;
 }
 
+function findTagRunId(output, tagName) {
+  return JSON.parse(output || "[]").find(
+    (workflowRun) => workflowRun.headBranch === tagName,
+  )?.databaseId;
+}
+
+function waitForGitHubRelease(tagName) {
+  let runId;
+
+  // ponytail: one-minute lookup window; raise it if tag-run creation exceeds this.
+  for (let attempt = 0; attempt < 20 && !runId; attempt += 1) {
+    runId = findTagRunId(
+      run(
+        "gh",
+        [
+          "run",
+          "list",
+          "--workflow",
+          "deploy.yml",
+          "--event",
+          "push",
+          "--branch",
+          tagName,
+          "--json",
+          "databaseId,headBranch",
+          "--limit",
+          "1",
+        ],
+        { capture: true },
+      ),
+      tagName,
+    );
+
+    if (!runId && attempt < 19) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 3_000);
+    }
+  }
+
+  if (!runId) {
+    throw new Error(`No Deploy workflow run found for ${tagName}.`);
+  }
+
+  run("gh", ["run", "watch", String(runId), "--compact", "--exit-status"]);
+  run("gh", ["release", "view", tagName], { capture: true });
+}
+
+function pushRelease(releaseBranch, tagName) {
+  git(["push", "--atomic", "origin", releaseBranch, tagName]);
+  waitForGitHubRelease(tagName);
+}
+
 function createInitialRelease(changesets, releaseBranch) {
   const tagName = `v${initialVersion}`;
 
@@ -280,7 +331,7 @@ function createInitialRelease(changesets, releaseBranch) {
   }
 
   git(["tag", "-a", tagName, "-m", tagName]);
-  git(["push", "--atomic", "origin", releaseBranch, tagName]);
+  pushRelease(releaseBranch, tagName);
 }
 
 function createChangesetRelease(changesets, releaseBranch) {
@@ -312,7 +363,7 @@ function createChangesetRelease(changesets, releaseBranch) {
   ]);
   git(["commit", "-m", `chore(release): ${tagName}`]);
   git(["tag", "-a", tagName, "-m", tagName]);
-  git(["push", "--atomic", "origin", releaseBranch, tagName]);
+  pushRelease(releaseBranch, tagName);
 }
 
 function main() {
@@ -321,6 +372,7 @@ function main() {
   assertCleanWorktree();
   const releaseBranch = assertMainMatchesOrigin();
 
+  run("gh", ["auth", "status"]);
   run("pnpm", ["install", "--frozen-lockfile"]);
   run("pnpm", ["format"]);
   run("pnpm", ["test"]);
@@ -345,7 +397,12 @@ function main() {
   createChangesetRelease(changesets, releaseBranch);
 }
 
-export { createChangelogEntry, createReleaseNotes, parseChangeset };
+export {
+  createChangelogEntry,
+  createReleaseNotes,
+  findTagRunId,
+  parseChangeset,
+};
 
 if (
   process.argv[1] &&
