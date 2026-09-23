@@ -176,6 +176,8 @@ describe("UserCollectionsPage", () => {
     );
 
     expect(html).toContain('data-breadcrumbs="User &gt; Collections"');
+    expect(html).not.toContain("Add to collection");
+    expect(html).toContain("Add collection");
   });
 });
 
@@ -194,6 +196,8 @@ describe("CollectionPage", () => {
 
     expect(html).toContain("Edit");
     expect(html).toContain("Public");
+    expect(html).toContain('href="/collections/add"');
+    expect(html).toContain("Add to collection");
     expect(html.indexOf("Edit")).toBeLessThan(html.indexOf("Public"));
   });
 });

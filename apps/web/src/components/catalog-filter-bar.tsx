@@ -61,11 +61,13 @@ export type CatalogFilterCopy = {
 };
 
 export function CatalogFilterBar({
+  action,
   copy,
   facets,
   filters,
   onChange,
 }: {
+  action?: React.ReactNode;
   copy: CatalogFilterCopy;
   facets: CatalogFacets;
   filters: CatalogFilters;
@@ -134,90 +136,97 @@ export function CatalogFilterBar({
 
   return (
     <div
-      className="flex min-w-0 flex-1 flex-wrap items-end gap-3"
+      className="relative grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-end gap-1.5"
       ref={desktopRootRef}
     >
-      <div className="grid min-w-48 gap-1 text-xs font-semibold text-foreground">
-        <span>{copy.productType}</span>
-        <CatalogCombobox
-          ariaLabel={copy.productType}
-          items={productTypes}
-          onValueChange={(value) =>
-            onChange({
-              ...filters,
-              productType:
-                value?.id === "spinner" || value?.id === "spinner-button"
-                  ? value.id
-                  : null,
-            })
-          }
-          placeholder={copy.selectProductType}
-          value={productType}
+      <div className="flex min-w-0 flex-wrap items-end gap-1.5">
+        <div className="grid min-w-40 gap-1 text-xs font-semibold text-foreground">
+          <span>{copy.productType}</span>
+          <CatalogCombobox
+            ariaLabel={copy.productType}
+            items={productTypes}
+            onValueChange={(value) =>
+              onChange({
+                ...filters,
+                productType:
+                  value?.id === "spinner" || value?.id === "spinner-button"
+                    ? value.id
+                    : null,
+              })
+            }
+            placeholder={copy.selectProductType}
+            value={productType}
+          />
+        </div>
+        <CheckboxFacet
+          copy={copy}
+          label={copy.materials}
+          onChange={(materialIds) => onChange({ ...filters, materialIds })}
+          options={facets.materials}
+          selected={filters.materialIds}
         />
-      </div>
-      <CheckboxFacet
-        copy={copy}
-        label={copy.materials}
-        onChange={(materialIds) => onChange({ ...filters, materialIds })}
-        options={facets.materials}
-        selected={filters.materialIds}
-      />
-      <CheckboxFacet
-        copy={copy}
-        label={copy.finishes}
-        onChange={(finishIds) => onChange({ ...filters, finishIds })}
-        options={facets.finishes}
-        selected={filters.finishIds}
-      />
-      <ColorFacet
-        copy={copy}
-        facets={facets}
-        filters={filters}
-        onChange={onChange}
-      />
-      <Button
-        aria-controls={advancedId}
-        aria-expanded={desktopAdvancedOpen}
-        className="max-[880px]:hidden"
-        onClick={() => setDesktopAdvancedOpen((open) => !open)}
-        type="button"
-        variant="outline"
-      >
-        <SlidersHorizontal aria-hidden="true" />
-        {copy.moreFilters}
-      </Button>
-      <Sheet open={mobileAdvancedOpen} onOpenChange={setMobileAdvancedOpen}>
-        <SheetTrigger
-          className="min-[881px]:hidden"
-          render={
-            <Button type="button" variant="outline">
-              <SlidersHorizontal aria-hidden="true" />
-              {copy.moreFilters}
-            </Button>
-          }
+        <CheckboxFacet
+          copy={copy}
+          label={copy.finishes}
+          onChange={(finishIds) => onChange({ ...filters, finishIds })}
+          options={facets.finishes}
+          selected={filters.finishIds}
         />
-        <SheetContent side="bottom">
-          <SheetHeader>
-            <SheetTitle>{copy.filters}</SheetTitle>
-            <SheetDescription>{copy.description}</SheetDescription>
-          </SheetHeader>
-          <div className="grid gap-5 overflow-y-auto px-6 pb-6">
-            {advanced}
-            <Button onClick={() => setMobileAdvancedOpen(false)} type="button">
-              {copy.apply}
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
-      {hasCatalogFilters(filters) ? (
+        <ColorFacet
+          copy={copy}
+          facets={facets}
+          filters={filters}
+          onChange={onChange}
+        />
         <Button
-          onClick={() => onChange(emptyCatalogFilters())}
+          aria-controls={advancedId}
+          aria-expanded={desktopAdvancedOpen}
+          className="max-[880px]:hidden"
+          onClick={() => setDesktopAdvancedOpen((open) => !open)}
+          size="sm"
           type="button"
-          variant="ghost"
+          variant="outline"
         >
-          {copy.clear}
+          <SlidersHorizontal aria-hidden="true" />
+          {copy.moreFilters}
         </Button>
-      ) : null}
+        <Sheet open={mobileAdvancedOpen} onOpenChange={setMobileAdvancedOpen}>
+          <SheetTrigger
+            className="min-[881px]:hidden"
+            render={
+              <Button type="button" variant="outline">
+                <SlidersHorizontal aria-hidden="true" />
+                {copy.moreFilters}
+              </Button>
+            }
+          />
+          <SheetContent side="bottom">
+            <SheetHeader>
+              <SheetTitle>{copy.filters}</SheetTitle>
+              <SheetDescription>{copy.description}</SheetDescription>
+            </SheetHeader>
+            <div className="grid gap-5 overflow-y-auto px-6 pb-6">
+              {advanced}
+              <Button
+                onClick={() => setMobileAdvancedOpen(false)}
+                type="button"
+              >
+                {copy.apply}
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+        {hasCatalogFilters(filters) ? (
+          <Button
+            onClick={() => onChange(emptyCatalogFilters())}
+            type="button"
+            variant="ghost"
+          >
+            {copy.clear}
+          </Button>
+        ) : null}
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
       {desktopAdvancedOpen ? (
         <section
           aria-label={copy.filters}
@@ -251,8 +260,8 @@ function CheckboxFacet({
   options: CatalogFacet[];
   selected: number[];
 }) {
-  const quick = options.slice(0, 5);
-  const more = options.slice(5);
+  const quick = options.slice(0, 4);
+  const more = options.slice(4);
   const checkbox = (option: CatalogFacet) => (
     <label className="flex items-center gap-1.5 text-xs" key={option.id}>
       <input
@@ -268,7 +277,7 @@ function CheckboxFacet({
   return (
     <fieldset className="grid gap-1">
       <legend className="text-xs font-semibold text-foreground">{label}</legend>
-      <div className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="flex min-h-9 flex-wrap items-center gap-x-1 gap-y-1">
         {quick.map(checkbox)}
         {more.length ? (
           <DropdownMenu>
@@ -276,6 +285,7 @@ function CheckboxFacet({
               render={
                 <Button
                   aria-label={copy.moreOptions(label)}
+                  className="px-2"
                   size="sm"
                   type="button"
                   variant="ghost"

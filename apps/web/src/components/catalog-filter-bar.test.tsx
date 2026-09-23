@@ -129,6 +129,27 @@ describe("CatalogFilterBar", () => {
     expect(container.querySelector("section")).not.toBeNull();
   });
 
+  it("renders a route action after More filters", () => {
+    act(() =>
+      root.render(
+        <CatalogFilterBar
+          action={<a href="/products/add">Add product</a>}
+          copy={copy}
+          facets={facets}
+          filters={filters}
+          onChange={vi.fn()}
+        />,
+      ),
+    );
+
+    const labels = [...container.querySelectorAll("button, a")].map(
+      (candidate) => candidate.textContent?.trim(),
+    );
+    expect(labels.indexOf("Add product")).toBeGreaterThan(
+      labels.indexOf("More filters"),
+    );
+  });
+
   it("closes the anchored panel from Apply or an outside click", () => {
     act(() =>
       root.render(

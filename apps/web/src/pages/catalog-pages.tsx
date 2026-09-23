@@ -140,6 +140,14 @@ export function ProductsPage({
       headerActions={
         onFiltersChange ? (
           <CatalogFilterBar
+            action={
+              <Link
+                className={buttonVariants({ size: "sm" })}
+                to="/products/add"
+              >
+                {t("web.action.addProduct")}
+              </Link>
+            }
             copy={catalogFilterCopy(t)}
             facets={facets}
             filters={filters}
@@ -529,9 +537,6 @@ export function UserCollectionsPage({
               onChange={onFiltersChange}
             />
           ) : null}
-          <Link className={buttonVariants()} to="/collections/add">
-            {t("web.action.addToCollection")}
-          </Link>
           <Link
             className={buttonVariants({ variant: "outline" })}
             to="/user/collections/add"
@@ -621,6 +626,9 @@ export function CollectionPage({
           ) : null}
           {collection.canEdit ? (
             <>
+              <Link className={buttonVariants()} to="/collections/add">
+                {t("web.action.addToCollection")}
+              </Link>
               <Link
                 className={buttonVariants({ variant: "outline" })}
                 params={{ collectionId: collection.id }}
