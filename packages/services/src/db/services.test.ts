@@ -33,6 +33,7 @@ function createDbMock(input: {
   insertRows?: unknown[][];
   selectRows?: unknown[][];
   settingsRow?: UserSettings;
+  updateRows?: unknown[][];
 }): Database & {
   conflictSets: unknown[];
   getSettingsRow(): UserSettings | undefined;
@@ -365,7 +366,9 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const user: User = {
       clerkId,
+      clerkUpdatedAt: null,
       id: 1000,
+      username: null,
     };
     const settings: UserSettings = {
       currencyCode: "USD",
