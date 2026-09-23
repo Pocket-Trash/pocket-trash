@@ -20,6 +20,14 @@
 
 
 
+
+## 0.4.1
+
+### Patch Changes
+
+* Set Railway production metadata in one request. (@app/scraper)
+* Remove stale Expo dependencies from the workspace. (@app/api, @app/scraper, @app/web, @package/database, @package/services)
+
 ## 0.4.0
 
 ### Minor Changes
