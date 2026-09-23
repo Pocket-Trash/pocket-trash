@@ -24,6 +24,8 @@ Run releases from `main`:
 pnpm release
 ```
 
+The command requires an authenticated GitHub CLI (`gh`).
+
 The command:
 
 1. Requires a clean worktree on `main`.
@@ -35,6 +37,8 @@ The command:
 6. Adds Changeset descriptions to `CHANGELOG.md`.
 7. Commits the release metadata, creates the annotated `v*` tag, then pushes
    `main` and the tag atomically.
+8. Waits for the tag's deployment workflow and verifies the GitHub Release was
+   published.
 
 If all pending Changesets are `patch`, the release bumps only the patch version.
 
