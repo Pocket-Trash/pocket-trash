@@ -883,7 +883,7 @@ jobs:
           oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
           domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
-          env-slug: dev
+          env-slug: preview
           secret-path: tools/github/secrets
 
       - name: Fetch API secrets from Infisical
