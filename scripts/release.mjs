@@ -9,23 +9,15 @@ import {
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { getWorkspacePackages } from "./workspace-packages.mjs";
+
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const changesetDirectory = join(repoRoot, ".changeset");
 const changelogPath = join(repoRoot, "CHANGELOG.md");
 const versionPackagePaths = [
-  "package.json",
-  "packages/repo/package.json",
-  "apps/web/package.json",
-  "packages/database/package.json",
-  "packages/eslint/package.json",
-  "packages/figjam/package.json",
-  "packages/github-discord-notifier/package.json",
-  "packages/infisical-runner/package.json",
-  "packages/json-data/package.json",
-  "packages/logger/package.json",
-  "packages/services/package.json",
-  "packages/tsconfig/package.json",
-].map((path) => join(repoRoot, path));
+  join(repoRoot, "package.json"),
+  ...getWorkspacePackages(repoRoot).map(({ manifestPath }) => manifestPath),
+];
 const bumpOrder = ["patch", "minor", "major"];
 const initialVersion = "0.0.1";
 
@@ -257,26 +249,6 @@ function tagExists(tagName) {
   return result.status === 0;
 }
 
-function createGitHubRelease(tagName, notes) {
-  const notesPath = join(repoRoot, ".release-notes.md");
-
-  writeFileSync(notesPath, notes);
-
-  try {
-    run("gh", [
-      "release",
-      "create",
-      tagName,
-      "--title",
-      tagName,
-      "--notes-file",
-      notesPath,
-    ]);
-  } finally {
-    rmSync(notesPath, { force: true });
-  }
-}
-
 function createInitialRelease(changesets, releaseBranch) {
   const tagName = `v${initialVersion}`;
 
@@ -303,12 +275,10 @@ function createInitialRelease(changesets, releaseBranch) {
 
   if (git(["status", "--porcelain"], { capture: true })) {
     git(["commit", "-m", `chore(release): ${tagName}`]);
-    git(["push", "origin", releaseBranch]);
   }
 
   git(["tag", "-a", tagName, "-m", tagName]);
-  git(["push", "origin", tagName]);
-  createGitHubRelease(tagName, createReleaseNotes(initialVersion));
+  git(["push", "--atomic", "origin", releaseBranch, tagName]);
 }
 
 function createChangesetRelease(changesets, releaseBranch) {
@@ -339,10 +309,8 @@ function createChangesetRelease(changesets, releaseBranch) {
       .filter((path) => path !== "package.json"),
   ]);
   git(["commit", "-m", `chore(release): ${tagName}`]);
-  git(["push", "origin", releaseBranch]);
   git(["tag", "-a", tagName, "-m", tagName]);
-  git(["push", "origin", tagName]);
-  createGitHubRelease(tagName, createReleaseNotes(nextVersion));
+  git(["push", "--atomic", "origin", releaseBranch, tagName]);
 }
 
 function main() {
@@ -351,6 +319,7 @@ function main() {
   assertCleanWorktree();
   const releaseBranch = assertMainMatchesOrigin();
 
+  run("pnpm", ["install", "--frozen-lockfile"]);
   run("pnpm", ["format"]);
   run("pnpm", ["test"]);
   run("pnpm", ["lint"]);
@@ -374,14 +343,26 @@ function main() {
   createChangesetRelease(changesets, releaseBranch);
 }
 
-export { createChangelogEntry, parseChangeset };
+export { createChangelogEntry, createReleaseNotes, parseChangeset };
 
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   try {
-    main();
+    const releaseNotesIndex = process.argv.indexOf("--release-notes");
+
+    if (releaseNotesIndex === -1) {
+      main();
+    } else {
+      const version = process.argv[releaseNotesIndex + 1];
+
+      if (!version) {
+        throw new Error("--release-notes requires a version.");
+      }
+
+      process.stdout.write(createReleaseNotes(version));
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);

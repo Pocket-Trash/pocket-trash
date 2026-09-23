@@ -422,8 +422,6 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/repo: {}
-
   packages/resources:
     devDependencies:
       '@package/eslint':
