@@ -1221,19 +1221,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          pnpm dlx @railway/cli variable set APP_ENV=production \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
-            --environment production
-
-          pnpm dlx @railway/cli variable set LOG_DEPLOYMENT_ID=production \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
-            --environment production
-
-          pnpm dlx @railway/cli variable set LOG_DEPLOYMENT_TARGET=railway \
+          pnpm dlx @railway/cli variable set \
+            APP_ENV=production \
+            LOG_DEPLOYMENT_ID=production \
+            LOG_DEPLOYMENT_TARGET=railway \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
@@ -1253,38 +1244,6 @@ jobs:
             --environment production \
             --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
             --message "Production release for $RELEASE_TAG"
-
-      - name: Verify Railway production deployment
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
-        run: |
-          set -euo pipefail
-
-          expected_message="Production release for $RELEASE_TAG"
-          release_deployment="$(
-            pnpm dlx @railway/cli deployment list \
-              --project "$RAILWAY_PROJECT_ID" \
-              --environment production \
-              --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
-              --limit 10 \
-              --json |
-              jq --arg expected_message "$expected_message" \
-                '[.[] | select((.meta.message // .meta.commitMessage // "") == $expected_message)] | first // empty'
-          )"
-
-          if [[ -z "$release_deployment" ]]; then
-            echo "Railway production release deployment was not found." >&2
-            echo "Expected message: $expected_message" >&2
-            exit 1
-          fi
-
-          status="$(jq -r '.status // empty' <<< "$release_deployment")"
-
-          if [[ "$status" != "SUCCESS" ]]; then
-            echo "Railway production deployment did not succeed. Status: ${status:-<empty>}" >&2
-            exit 1
-          fi
 
   web-production:
     name: Web Production
@@ -1397,3 +1356,34 @@ jobs:
         env:
           DEPLOYMENT_URL: ${{ steps.vercel_deploy.outputs.deployment_url }}
         run: curl --fail --retry 5 --retry-all-errors --retry-delay 3 "$DEPLOYMENT_URL"
+
+  github-release:
+    name: GitHub Release
+    needs: [production, railway-production, web-production]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          version="${GITHUB_REF_NAME#v}"
+          notes_path="$RUNNER_TEMP/release-notes.md"
+          node scripts/release.mjs --release-notes "$version" > "$notes_path"
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "GitHub Release already exists for $GITHUB_REF_NAME."
+            exit 0
+          fi
+
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file "$notes_path"

@@ -106,6 +106,9 @@ export default defineConfig(async ({ mode }) => {
   }
 
   return {
+    optimizeDeps: {
+      include: ["@clerk/tanstack-react-start", "@clerk/ui/experimental"],
+    },
     plugins: [
       tanstackStart(),
       ...(isTest ? [] : [nitro()]),

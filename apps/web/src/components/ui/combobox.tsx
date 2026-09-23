@@ -55,17 +55,29 @@ export function CatalogCombobox({
 
 export function CatalogMultiCombobox({
   ariaLabel,
+  disabled = false,
+  emptyLabel,
+  filter,
+  inputValue,
   items,
+  onInputValueChange,
   onValueChange,
   placeholder,
+  removeDisabled = false,
   removeLabel,
   value,
 }: {
   ariaLabel: string;
+  disabled?: boolean;
+  emptyLabel?: string;
+  filter?: null;
+  inputValue?: string;
   items: ComboboxOption[];
+  onInputValueChange?: (value: string) => void;
   onValueChange: (value: ComboboxOption[]) => void;
   placeholder: string;
-  removeLabel: string;
+  removeDisabled?: boolean;
+  removeLabel: string | ((name: string) => string);
   value: ComboboxOption[];
 }) {
   const [open, setOpen] = React.useState(false);
@@ -73,10 +85,14 @@ export function CatalogMultiCombobox({
   return (
     <div className="grid gap-2">
       <ComboboxPrimitive.Root
+        disabled={disabled}
+        filter={filter}
+        inputValue={inputValue}
         isItemEqualToValue={(item, selected) => item.id === selected.id}
         itemToStringLabel={(item) => item.name}
         items={items}
         multiple
+        onInputValueChange={onInputValueChange}
         onOpenChange={setOpen}
         onValueChange={(nextValue) => {
           onValueChange(nextValue);
@@ -86,13 +102,17 @@ export function CatalogMultiCombobox({
         value={value}
       >
         <ComboboxControl ariaLabel={ariaLabel} placeholder={placeholder} />
-        <ComboboxOptions placeholder={placeholder} />
+        <ComboboxOptions
+          emptyLabel={emptyLabel ?? placeholder}
+          placeholder={placeholder}
+        />
       </ComboboxPrimitive.Root>
       {value.length ? (
         <div className="flex flex-wrap gap-1.5">
           {value.map((selected) => (
             <SelectionPill
               className="bg-secondary text-secondary-foreground"
+              disabled={removeDisabled}
               key={selected.id}
               onRemove={() =>
                 onValueChange(value.filter(({ id }) => id !== selected.id))
@@ -131,13 +151,19 @@ function ComboboxControl({
   );
 }
 
-function ComboboxOptions({ placeholder }: { placeholder: string }) {
+function ComboboxOptions({
+  placeholder,
+  emptyLabel = placeholder,
+}: {
+  emptyLabel?: string;
+  placeholder: string;
+}) {
   return (
     <ComboboxPrimitive.Portal>
       <ComboboxPrimitive.Positioner className="z-50" sideOffset={4}>
         <ComboboxPrimitive.Popup className="max-h-72 min-w-[var(--anchor-width)] overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
           <ComboboxPrimitive.Empty className="px-3 py-2 text-sm text-muted-foreground">
-            {placeholder}
+            {emptyLabel}
           </ComboboxPrimitive.Empty>
           <ComboboxPrimitive.List>
             {(item: ComboboxOption) => (
@@ -161,13 +187,15 @@ function ComboboxOptions({ placeholder }: { placeholder: string }) {
 
 function SelectionPill({
   className,
+  disabled = false,
   onRemove,
   removeLabel,
   value,
 }: {
   className: string;
+  disabled?: boolean;
   onRemove: () => void;
-  removeLabel: string;
+  removeLabel: string | ((name: string) => string);
   value: ComboboxOption;
 }) {
   return (
@@ -176,8 +204,13 @@ function SelectionPill({
     >
       {value.name}
       <button
-        aria-label={`${removeLabel}: ${value.name}`}
-        className="rounded-full p-0.5 outline-none hover:bg-background/60 focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={
+          typeof removeLabel === "function"
+            ? removeLabel(value.name)
+            : `${removeLabel}: ${value.name}`
+        }
+        className="rounded-full p-0.5 outline-none hover:bg-background/60 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+        disabled={disabled}
         onClick={onRemove}
         type="button"
       >

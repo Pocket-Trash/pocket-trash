@@ -1,13 +1,7 @@
-import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import {
-  Combobox,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
+  CatalogMultiCombobox,
+  type ComboboxOption,
 } from "@/components/ui/combobox";
 import { listResourceCategories } from "@/lib/resources";
 
@@ -31,7 +25,6 @@ export function ResourceCategoryInput({
   selected: string[];
 }) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const normalizedQuery = query.trim();
 
@@ -52,77 +45,55 @@ export function ResourceCategoryInput({
           name.toLocaleLowerCase() === normalizedQuery.toLocaleLowerCase(),
       )
     ) {
-      return [
-        ...categories,
-        { id: -1, name: normalizedQuery, slug: normalizedQuery },
-      ];
+      return [...categories, { id: -1, name: normalizedQuery }];
     }
     return categories;
-  }, [categories, normalizedQuery]);
-
-  function addCategory(category: Category | null) {
-    if (
-      !category ||
-      selected.length >= 10 ||
-      selected.some(
-        (name) =>
-          name.toLocaleLowerCase() === category.name.toLocaleLowerCase(),
-      )
-    ) {
-      return;
-    }
-    onChange([...selected, category.name]);
-    setOpen(false);
-    setQuery("");
-  }
+  }, [categories, normalizedQuery]).map(({ name }) => ({ id: name, name }));
+  const selectedOptions: ComboboxOption[] = selected.map((name) => ({
+    id: name,
+    name,
+  }));
 
   return (
     <div className="grid gap-2 text-sm font-medium">
       <span>{label}</span>
-      <Combobox
-        autoHighlight
+      <CatalogMultiCombobox
+        ariaLabel={placeholder}
         disabled={disabled || selected.length >= 10}
+        emptyLabel={noResultsLabel}
         filter={null}
         inputValue={query}
         items={options}
-        itemToStringLabel={(category: Category) => category.name}
         onInputValueChange={setQuery}
-        onOpenChange={setOpen}
-        onValueChange={addCategory}
-        open={open}
-        value={null}
-      >
-        <ComboboxInput aria-label={placeholder} placeholder={placeholder} />
-        <ComboboxContent>
-          <ComboboxEmpty>{noResultsLabel}</ComboboxEmpty>
-          <ComboboxList>
-            {(category: Category) => (
-              <ComboboxItem key={category.id} value={category}>
-                {category.name}
-              </ComboboxItem>
-            )}
-          </ComboboxList>
-        </ComboboxContent>
-      </Combobox>
-      <div className="flex flex-wrap gap-2">
-        {selected.map((category) => (
-          <Badge className="gap-1 pr-1" key={category} variant="secondary">
-            {category}
-            <button
-              aria-label={removeLabel(category)}
-              className="rounded-full p-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              disabled={disabled}
-              onClick={() =>
-                onChange(selected.filter((selected) => selected !== category))
-              }
-              type="button"
-            >
-              <X className="size-3" />
-            </button>
-            <input name="categories" type="hidden" value={category} />
-          </Badge>
-        ))}
-      </div>
+        onValueChange={(values) => {
+          onChange(
+            values
+              .map(({ name }) => name)
+              .filter(
+                (name, index, names) =>
+                  names.findIndex(
+                    (candidate) =>
+                      candidate.toLocaleLowerCase() ===
+                      name.toLocaleLowerCase(),
+                  ) === index,
+              )
+              .slice(0, 10),
+          );
+          setQuery("");
+        }}
+        placeholder={placeholder}
+        removeDisabled={disabled}
+        removeLabel={removeLabel}
+        value={selectedOptions}
+      />
+      {selected.map((category) => (
+        <input
+          key={category}
+          name="categories"
+          type="hidden"
+          value={category}
+        />
+      ))}
     </div>
   );
 }

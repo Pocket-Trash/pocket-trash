@@ -103,6 +103,7 @@ describe("logger", () => {
       web: {
         accountLoaded: "web.account.loaded",
         fxRatesFetchFailed: "web.fxRates.fetch.failed",
+        localizationKeyMissing: "web.localization.key.missing",
         localeSyncFailed: "web.locale.sync.failed",
         userSettingsFetchFailed: "web.userSettings.fetch.failed",
         userSettingsSaveFailed: "web.userSettings.save.failed",

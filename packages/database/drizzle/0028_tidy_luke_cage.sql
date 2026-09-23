@@ -240,7 +240,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "finish_option_color_position_unique" ON "fini
 CREATE UNIQUE INDEX IF NOT EXISTS "finish_option_finish_position_unique" ON "finish_option_finish" USING btree ("finish_option_id","position");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "product_type_slug_unique" ON "product" USING btree ("product_type_id","slug");
 
-CREATE TABLE "catalog_image_upload_file" (
+CREATE TABLE IF NOT EXISTS "catalog_image_upload_file" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"session_id" uuid NOT NULL,
 	"position" integer NOT NULL,
@@ -259,7 +259,7 @@ CREATE TABLE "catalog_image_upload_file" (
 	CONSTRAINT "catalog_image_upload_file_size_positive" CHECK ("catalog_image_upload_file"."size" > 0)
 );
 --> statement-breakpoint
-CREATE TABLE "catalog_image_upload_session" (
+CREATE TABLE IF NOT EXISTS "catalog_image_upload_session" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"uploader_clerk_id" text NOT NULL,
 	"target_type" text NOT NULL,
@@ -270,7 +270,7 @@ CREATE TABLE "catalog_image_upload_session" (
 	CONSTRAINT "catalog_image_upload_session_target_consistent" CHECK (("catalog_image_upload_session"."target_type" = 'product' and "catalog_image_upload_session"."product_id" is not null and "catalog_image_upload_session"."collection_item_id" is null) or ("catalog_image_upload_session"."target_type" = 'collection_item' and "catalog_image_upload_session"."product_id" is null and "catalog_image_upload_session"."collection_item_id" is not null))
 );
 --> statement-breakpoint
-CREATE TABLE "collection_item_image" (
+CREATE TABLE IF NOT EXISTS "collection_item_image" (
 	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "collection_item_image_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1000 CACHE 1),
 	"collection_item_id" bigint NOT NULL,
 	"position" integer NOT NULL,
@@ -293,7 +293,7 @@ CREATE TABLE "collection_item_image" (
 	CONSTRAINT "collection_item_image_deletion_metadata_consistent" CHECK (num_nonnulls("collection_item_image"."deleted_at", "collection_item_image"."deleted_by_clerk_id", "collection_item_image"."deleted_by_role") in (0, 3))
 );
 --> statement-breakpoint
-CREATE TABLE "product_image" (
+CREATE TABLE IF NOT EXISTS "product_image" (
 	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "product_image_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1000 CACHE 1),
 	"product_id" bigint NOT NULL,
 	"position" integer NOT NULL,
@@ -316,7 +316,7 @@ CREATE TABLE "product_image" (
 	CONSTRAINT "product_image_deletion_metadata_consistent" CHECK (num_nonnulls("product_image"."deleted_at", "product_image"."deleted_by_clerk_id", "product_image"."deleted_by_role") in (0, 3))
 );
 --> statement-breakpoint
-CREATE TABLE "user_collection" (
+CREATE TABLE IF NOT EXISTS "user_collection" (
 	"owner_id" bigint PRIMARY KEY NOT NULL,
 	"is_private" boolean DEFAULT true NOT NULL,
 	"private_reason" text,
@@ -327,41 +327,54 @@ CREATE TABLE "user_collection" (
 	CONSTRAINT "user_collection_private_metadata_consistent" CHECK (("user_collection"."is_private" and num_nonnulls("user_collection"."private_reason", "user_collection"."privated_at", "user_collection"."privated_by_clerk_id") in (0, 3)) or (not "user_collection"."is_private" and num_nonnulls("user_collection"."private_reason", "user_collection"."privated_at", "user_collection"."privated_by_clerk_id") = 0))
 );
 --> statement-breakpoint
-ALTER TABLE "collection_item" ADD COLUMN "is_private" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "collection_item" ADD COLUMN "private_reason" text;--> statement-breakpoint
-ALTER TABLE "collection_item" ADD COLUMN "privated_at" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "collection_item" ADD COLUMN "privated_by_clerk_id" text;--> statement-breakpoint
-ALTER TABLE "collection_item" ADD COLUMN "created_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
-ALTER TABLE "collection_item" ADD COLUMN "updated_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
-ALTER TABLE "product" ADD COLUMN "owner_clerk_id" text;--> statement-breakpoint
+ALTER TABLE "collection_item" ADD COLUMN IF NOT EXISTS "is_private" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "collection_item" ADD COLUMN IF NOT EXISTS "private_reason" text;--> statement-breakpoint
+ALTER TABLE "collection_item" ADD COLUMN IF NOT EXISTS "privated_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "collection_item" ADD COLUMN IF NOT EXISTS "privated_by_clerk_id" text;--> statement-breakpoint
+ALTER TABLE "collection_item" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+ALTER TABLE "collection_item" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "owner_clerk_id" text;--> statement-breakpoint
 UPDATE "product" SET "owner_clerk_id" = 'user_3FrjTtIKHL0ptK6jeljcf5kCM7J' WHERE "owner_clerk_id" IS NULL;--> statement-breakpoint
 ALTER TABLE "product" ALTER COLUMN "owner_clerk_id" SET NOT NULL;--> statement-breakpoint
-ALTER TABLE "product" ADD COLUMN "is_private" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "product" ADD COLUMN "private_reason" text;--> statement-breakpoint
-ALTER TABLE "product" ADD COLUMN "privated_at" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "product" ADD COLUMN "privated_by_clerk_id" text;--> statement-breakpoint
-ALTER TABLE "product" ADD COLUMN "created_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
-ALTER TABLE "product" ADD COLUMN "updated_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "is_private" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "private_reason" text;--> statement-breakpoint
+ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "privated_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "privated_by_clerk_id" text;--> statement-breakpoint
+ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
 INSERT INTO "user_collection" ("owner_id", "is_private")
 SELECT DISTINCT "owner_id", false FROM "collection_item"
 ON CONFLICT ("owner_id") DO NOTHING;--> statement-breakpoint
+ALTER TABLE "catalog_image_upload_file" DROP CONSTRAINT IF EXISTS "catalog_image_upload_file_session_id_catalog_image_upload_session_id_fk";--> statement-breakpoint
+ALTER TABLE "catalog_image_upload_session" DROP CONSTRAINT IF EXISTS "catalog_image_upload_session_product_id_product_id_fk";--> statement-breakpoint
+ALTER TABLE "catalog_image_upload_session" DROP CONSTRAINT IF EXISTS "catalog_image_upload_session_collection_item_id_collection_item_id_fk";--> statement-breakpoint
+ALTER TABLE "collection_item_image" DROP CONSTRAINT IF EXISTS "collection_item_image_collection_item_id_collection_item_id_fk";--> statement-breakpoint
+ALTER TABLE "product_image" DROP CONSTRAINT IF EXISTS "product_image_product_id_product_id_fk";--> statement-breakpoint
+ALTER TABLE "user_collection" DROP CONSTRAINT IF EXISTS "user_collection_owner_id_users_id_fk";--> statement-breakpoint
 ALTER TABLE "catalog_image_upload_file" ADD CONSTRAINT "catalog_image_upload_file_session_id_catalog_image_upload_session_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."catalog_image_upload_session"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog_image_upload_session" ADD CONSTRAINT "catalog_image_upload_session_product_id_product_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."product"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "catalog_image_upload_session" ADD CONSTRAINT "catalog_image_upload_session_collection_item_id_collection_item_id_fk" FOREIGN KEY ("collection_item_id") REFERENCES "public"."collection_item"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "collection_item_image" ADD CONSTRAINT "collection_item_image_collection_item_id_collection_item_id_fk" FOREIGN KEY ("collection_item_id") REFERENCES "public"."collection_item"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "product_image" ADD CONSTRAINT "product_image_product_id_product_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."product"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_collection" ADD CONSTRAINT "user_collection_owner_id_users_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "catalog_image_upload_file_session_id_idx" ON "catalog_image_upload_file" USING btree ("session_id");--> statement-breakpoint
-CREATE INDEX "catalog_image_upload_session_expires_at_idx" ON "catalog_image_upload_session" USING btree ("expires_at");--> statement-breakpoint
-CREATE INDEX "collection_item_image_item_id_idx" ON "collection_item_image" USING btree ("collection_item_id");--> statement-breakpoint
-CREATE INDEX "product_image_product_id_idx" ON "product_image" USING btree ("product_id");--> statement-breakpoint
-CREATE INDEX "user_collection_visibility_idx" ON "user_collection" USING btree ("is_private");--> statement-breakpoint
-CREATE INDEX "collection_item_owner_visibility_idx" ON "collection_item" USING btree ("owner_id","is_private");--> statement-breakpoint
-CREATE INDEX "product_owner_clerk_id_idx" ON "product" USING btree ("owner_clerk_id");--> statement-breakpoint
-CREATE INDEX "product_visibility_idx" ON "product" USING btree ("is_private");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "catalog_image_upload_file_session_id_idx" ON "catalog_image_upload_file" USING btree ("session_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "catalog_image_upload_session_expires_at_idx" ON "catalog_image_upload_session" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "collection_item_image_item_id_idx" ON "collection_item_image" USING btree ("collection_item_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "product_image_product_id_idx" ON "product_image" USING btree ("product_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "user_collection_visibility_idx" ON "user_collection" USING btree ("is_private");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "collection_item_owner_visibility_idx" ON "collection_item" USING btree ("owner_id","is_private");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "product_owner_clerk_id_idx" ON "product" USING btree ("owner_clerk_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "product_visibility_idx" ON "product" USING btree ("is_private");--> statement-breakpoint
+ALTER TABLE "collection_item" DROP CONSTRAINT IF EXISTS "collection_item_private_metadata_consistent";--> statement-breakpoint
+ALTER TABLE "product" DROP CONSTRAINT IF EXISTS "product_private_metadata_consistent";--> statement-breakpoint
 ALTER TABLE "collection_item" ADD CONSTRAINT "collection_item_private_metadata_consistent" CHECK (("collection_item"."is_private" and num_nonnulls("collection_item"."private_reason", "collection_item"."privated_at", "collection_item"."privated_by_clerk_id") in (0, 3)) or (not "collection_item"."is_private" and num_nonnulls("collection_item"."private_reason", "collection_item"."privated_at", "collection_item"."privated_by_clerk_id") = 0));--> statement-breakpoint
 ALTER TABLE "product" ADD CONSTRAINT "product_private_metadata_consistent" CHECK (("product"."is_private" and num_nonnulls("product"."private_reason", "product"."privated_at", "product"."privated_by_clerk_id") in (0, 3)) or (not "product"."is_private" and num_nonnulls("product"."private_reason", "product"."privated_at", "product"."privated_by_clerk_id") = 0));
 
+ALTER TABLE "catalog_image_upload_file" DROP CONSTRAINT IF EXISTS "catalog_image_upload_file_sha256_valid";--> statement-breakpoint
+ALTER TABLE "collection_item_image" DROP CONSTRAINT IF EXISTS "collection_item_image_sha256_valid";--> statement-breakpoint
+ALTER TABLE "collection_item_image" DROP CONSTRAINT IF EXISTS "collection_item_image_deleted_by_role_valid";--> statement-breakpoint
+ALTER TABLE "product_image" DROP CONSTRAINT IF EXISTS "product_image_sha256_valid";--> statement-breakpoint
+ALTER TABLE "product_image" DROP CONSTRAINT IF EXISTS "product_image_deleted_by_role_valid";--> statement-breakpoint
 ALTER TABLE "catalog_image_upload_file" ADD CONSTRAINT "catalog_image_upload_file_sha256_valid" CHECK ("catalog_image_upload_file"."sha256" ~ '^[0-9a-f]{64}$');--> statement-breakpoint
 ALTER TABLE "collection_item_image" ADD CONSTRAINT "collection_item_image_sha256_valid" CHECK ("collection_item_image"."sha256" ~ '^[0-9a-f]{64}$');--> statement-breakpoint
 ALTER TABLE "collection_item_image" ADD CONSTRAINT "collection_item_image_deleted_by_role_valid" CHECK ("collection_item_image"."deleted_by_role" is null or "collection_item_image"."deleted_by_role" in ('owner', 'admin'));--> statement-breakpoint
@@ -381,21 +394,21 @@ BEGIN
 	END IF;
 END $$;
 --> statement-breakpoint
-ALTER TABLE "catalog_image_upload_session" DROP CONSTRAINT "catalog_image_upload_session_target_consistent";
+ALTER TABLE "catalog_image_upload_session" DROP CONSTRAINT IF EXISTS "catalog_image_upload_session_target_consistent";
 --> statement-breakpoint
-DROP INDEX "collection_item_owner_visibility_idx";
+DROP INDEX IF EXISTS "collection_item_owner_visibility_idx";
 --> statement-breakpoint
-DROP INDEX "user_collection_visibility_idx";
+DROP INDEX IF EXISTS "user_collection_visibility_idx";
 --> statement-breakpoint
-ALTER TABLE "catalog_image_upload_session" ADD COLUMN "collection_id" bigint;
+ALTER TABLE "catalog_image_upload_session" ADD COLUMN IF NOT EXISTS "collection_id" bigint;
 --> statement-breakpoint
-ALTER TABLE "user_collection" ADD COLUMN "id" bigint GENERATED ALWAYS AS IDENTITY (sequence name "user_collection_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1000 CACHE 1);
+ALTER TABLE "user_collection" ADD COLUMN IF NOT EXISTS "id" bigint GENERATED ALWAYS AS IDENTITY (sequence name "user_collection_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1000 CACHE 1);
 --> statement-breakpoint
-ALTER TABLE "user_collection" ADD COLUMN "name" text;
+ALTER TABLE "user_collection" ADD COLUMN IF NOT EXISTS "name" text;
 --> statement-breakpoint
-ALTER TABLE "user_collection" ADD COLUMN "normalized_name" text;
+ALTER TABLE "user_collection" ADD COLUMN IF NOT EXISTS "normalized_name" text;
 --> statement-breakpoint
-ALTER TABLE "user_collection" ADD COLUMN "description" text;
+ALTER TABLE "user_collection" ADD COLUMN IF NOT EXISTS "description" text;
 --> statement-breakpoint
 UPDATE "user_collection" AS collection
 SET
@@ -408,7 +421,8 @@ SET
 	)
 FROM "users"
 WHERE collection."owner_id" = "users"."id"
-	AND "users"."username" IS NOT NULL;
+	AND "users"."username" IS NOT NULL
+	AND collection."name" IS NULL;
 --> statement-breakpoint
 DO $$
 BEGIN
@@ -426,20 +440,29 @@ ALTER TABLE "user_collection" ALTER COLUMN "name" SET NOT NULL;
 --> statement-breakpoint
 ALTER TABLE "user_collection" ALTER COLUMN "normalized_name" SET NOT NULL;
 --> statement-breakpoint
-ALTER TABLE "user_collection" DROP CONSTRAINT "user_collection_pkey";
+ALTER TABLE IF EXISTS "collection_image" DROP CONSTRAINT IF EXISTS "collection_image_collection_id_user_collection_id_fk";
+--> statement-breakpoint
+ALTER TABLE "catalog_image_upload_session" DROP CONSTRAINT IF EXISTS "catalog_image_upload_session_collection_id_user_collection_id_fk";
+--> statement-breakpoint
+ALTER TABLE "collection_item" DROP CONSTRAINT IF EXISTS "collection_item_collection_owner_fk";
+--> statement-breakpoint
+ALTER TABLE "user_collection" DROP CONSTRAINT IF EXISTS "user_collection_id_owner_unique";
+--> statement-breakpoint
+ALTER TABLE "user_collection" DROP CONSTRAINT IF EXISTS "user_collection_pkey";
 --> statement-breakpoint
 ALTER TABLE "user_collection" ADD CONSTRAINT "user_collection_pkey" PRIMARY KEY ("id");
 --> statement-breakpoint
-ALTER TABLE "collection_item" ADD COLUMN "collection_id" bigint;
+ALTER TABLE "collection_item" ADD COLUMN IF NOT EXISTS "collection_id" bigint;
 --> statement-breakpoint
 UPDATE "collection_item" AS item
 SET "collection_id" = collection."id"
 FROM "user_collection" AS collection
-WHERE item."owner_id" = collection."owner_id";
+WHERE item."owner_id" = collection."owner_id"
+	AND item."collection_id" IS NULL;
 --> statement-breakpoint
 ALTER TABLE "collection_item" ALTER COLUMN "collection_id" SET NOT NULL;
 --> statement-breakpoint
-CREATE TABLE "collection_image" (
+CREATE TABLE IF NOT EXISTS "collection_image" (
 	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "collection_image_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1000 CACHE 1),
 	"collection_id" bigint NOT NULL,
 	"is_current" boolean DEFAULT false NOT NULL,
@@ -468,16 +491,22 @@ ALTER TABLE "user_collection" ADD CONSTRAINT "user_collection_id_owner_unique" U
 --> statement-breakpoint
 ALTER TABLE "collection_item" ADD CONSTRAINT "collection_item_collection_owner_fk" FOREIGN KEY ("collection_id","owner_id") REFERENCES "public"."user_collection"("id","owner_id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
-CREATE INDEX "collection_image_collection_id_idx" ON "collection_image" USING btree ("collection_id");
+CREATE INDEX IF NOT EXISTS "collection_image_collection_id_idx" ON "collection_image" USING btree ("collection_id");
 --> statement-breakpoint
-CREATE UNIQUE INDEX "collection_image_current_unique" ON "collection_image" USING btree ("collection_id") WHERE "collection_image"."is_current";
+CREATE UNIQUE INDEX IF NOT EXISTS "collection_image_current_unique" ON "collection_image" USING btree ("collection_id") WHERE "collection_image"."is_current";
 --> statement-breakpoint
-CREATE INDEX "collection_item_collection_visibility_idx" ON "collection_item" USING btree ("collection_id","owner_id","is_private");
+CREATE INDEX IF NOT EXISTS "collection_item_collection_visibility_idx" ON "collection_item" USING btree ("collection_id","owner_id","is_private");
 --> statement-breakpoint
-CREATE INDEX "user_collection_owner_visibility_idx" ON "user_collection" USING btree ("owner_id","is_private");
+CREATE INDEX IF NOT EXISTS "user_collection_owner_visibility_idx" ON "user_collection" USING btree ("owner_id","is_private");
+--> statement-breakpoint
+ALTER TABLE "user_collection" DROP CONSTRAINT IF EXISTS "user_collection_owner_name_unique";
 --> statement-breakpoint
 ALTER TABLE "user_collection" ADD CONSTRAINT "user_collection_owner_name_unique" UNIQUE("owner_id","normalized_name");
 --> statement-breakpoint
+ALTER TABLE "catalog_image_upload_session" DROP CONSTRAINT IF EXISTS "catalog_image_upload_session_target_consistent";
+--> statement-breakpoint
 ALTER TABLE "catalog_image_upload_session" ADD CONSTRAINT "catalog_image_upload_session_target_consistent" CHECK (("catalog_image_upload_session"."target_type" = 'product' and "catalog_image_upload_session"."product_id" is not null and "catalog_image_upload_session"."collection_id" is null and "catalog_image_upload_session"."collection_item_id" is null) or ("catalog_image_upload_session"."target_type" = 'collection' and "catalog_image_upload_session"."product_id" is null and "catalog_image_upload_session"."collection_id" is not null and "catalog_image_upload_session"."collection_item_id" is null) or ("catalog_image_upload_session"."target_type" = 'collection_item' and "catalog_image_upload_session"."product_id" is null and "catalog_image_upload_session"."collection_id" is null and "catalog_image_upload_session"."collection_item_id" is not null));
+--> statement-breakpoint
+ALTER TABLE "user_collection" DROP CONSTRAINT IF EXISTS "user_collection_name_length_valid";
 --> statement-breakpoint
 ALTER TABLE "user_collection" ADD CONSTRAINT "user_collection_name_length_valid" CHECK (char_length(trim("user_collection"."name")) between 2 and 80);

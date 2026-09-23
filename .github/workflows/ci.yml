@@ -28,6 +28,92 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node scripts/check-pr-changeset.mjs
 
+  scraper-artifact:
+    name: Scraper Artifact
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Railway upload context
+        run: node scripts/check-railway-context.mjs
+
+      - name: Build scraper artifact
+        run: pnpm --filter @app/scraper... build
+
+  api-artifact:
+    name: API Artifact
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build API workspace dependencies
+        run: pnpm exec turbo run build:ci --filter=@app/api
+
+      - name: Build Cloudflare Worker artifact
+        run: pnpm --filter @app/api exec wrangler deploy --dry-run --env="" --outdir "$RUNNER_TEMP/api-worker"
+
+  web-artifact:
+    name: Web Artifact
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Vercel artifact
+        env:
+          CLERK_SECRET_KEY: ci-placeholder
+          DATABASE_URL: postgres://ci:ci@localhost/ci
+          NITRO_PRESET: vercel
+          VITE_API_URL: https://example.com
+          VITE_CLERK_PUBLISHABLE_KEY: ci-placeholder
+          VITE_CLERK_SIGN_IN_URL: /sign-in
+          VITE_CLERK_SIGN_UP_URL: /sign-up
+        run: pnpm build:ci --filter=@app/web
+
+      - name: Validate Vercel Build Output
+        run: test -f .vercel/output/config.json || test -f apps/web/.vercel/output/config.json
+
   lint:
     name: Lint and Typecheck
     runs-on: ubuntu-latest

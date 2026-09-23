@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { productFormSchema } from "./catalog-api";
+import { collectionWriteSchema, productFormSchema } from "./catalog-api";
 
 const base = {
   buttonDiameterMm: null,
@@ -112,5 +112,17 @@ describe("product finish options", () => {
         ],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("collection writes", () => {
+  it("accepts the null description sent by the combined collection flow", () => {
+    const result = collectionWriteSchema.safeParse({
+      description: null,
+      isPrivate: true,
+      name: "New collection",
+    });
+
+    expect(result.success).toBe(true);
   });
 });

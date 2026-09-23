@@ -28,8 +28,9 @@ The stable development API must already be deployed so its
 Before the feature reaches `main`, run the `Deploy` GitHub Actions workflow
 from the feature branch with the `development` target.
 
-The command starts `dev:web`, creates a temporary Clerk relay, registers
-`target:local:<INITIALS>` for 24 hours, and removes it on normal termination.
+The command first reconciles existing Clerk users, then starts `dev:web`,
+creates a temporary Clerk relay, registers `target:local:<INITIALS>` for 24
+hours, and removes it on normal termination.
 It stops before creating the relay unless the Clerk CLI is linked to the app
 and development instance identified by `APP_ID` and `INS_ID` in the Infisical
 development `/local/clerk` path.

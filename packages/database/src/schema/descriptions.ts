@@ -159,6 +159,11 @@ export const schemaDescriptions = {
         description: "Named collection containing the item.",
         example: 1000,
       },
+      display_name: {
+        description:
+          "Optional owner-defined name shown instead of the product name.",
+        example: "Blue Katla",
+      },
       material_id: {
         description: "Exact material of the owned physical item.",
         example: 1000,

@@ -29,6 +29,8 @@
 !packages/logger/**
 !packages/markdown/
 !packages/markdown/**
+!packages/resources/
+!packages/resources/**
 !packages/services/
 !packages/services/**
 !packages/tsconfig/

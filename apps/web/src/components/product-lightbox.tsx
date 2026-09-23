@@ -226,10 +226,10 @@ export function ProductLightbox({
         </Badge>
       ) : null}
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 rounded-lg border border-border bg-secondary p-4">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 rounded-lg border border-border bg-secondary p-4 text-secondary-foreground">
         {specs.map(({ icon: Icon, label, value }) => (
           <div className="flex flex-col gap-1" key={label}>
-            <span className="text-[10px] tracking-[0.8px] text-foreground uppercase">
+            <span className="text-[10px] tracking-[0.8px] uppercase">
               {label}
             </span>
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold">

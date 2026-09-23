@@ -56,7 +56,7 @@ describe("scraper CLI", () => {
       reference: false,
       value: "redis://redacted:redacted@example.com:6379/0",
     });
-    const railwayReference = `\${{scraper-queue.REDIS_PUBLIC_URL}}`;
+    const railwayReference = "$" + "{{scraper-queue.REDIS_PUBLIC_URL}}";
 
     expect(formatRedisEnvDebugValue(railwayReference)).toEqual({
       length: railwayReference.length,

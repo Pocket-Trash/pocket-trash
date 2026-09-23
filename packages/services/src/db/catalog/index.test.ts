@@ -34,6 +34,7 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
     };
     for (const method of [
       "from",
+      "groupBy",
       "innerJoin",
       "leftJoin",
       "orderBy",
@@ -44,6 +45,12 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
     chain.limit = vi.fn(take);
     return chain;
   };
+  const update = (table: unknown) => ({
+    set: vi.fn((value: unknown) => {
+      updates.push({ table, value });
+      return { where: vi.fn(async () => []) };
+    }),
+  });
   const tx = {
     insert: vi.fn((table: unknown) => ({
       values: vi.fn((value: unknown) => {
@@ -56,18 +63,14 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
     })),
     delete: vi.fn(() => ({ where: vi.fn(async () => []) })),
     select: vi.fn(query),
-    update: vi.fn((table: unknown) => ({
-      set: vi.fn((value: unknown) => {
-        updates.push({ table, value });
-        return { where: vi.fn(async () => []) };
-      }),
-    })),
+    update: vi.fn(update),
   };
   const db = {
     select: vi.fn(query),
     transaction: vi.fn(async (callback: (value: typeof tx) => unknown) =>
       callback(tx),
     ),
+    update: vi.fn(update),
   } as unknown as Database;
   const users = {
     ensure: vi.fn().mockResolvedValue({ clerkId: "user-secret", id: 1000 }),
@@ -88,6 +91,162 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
 }
 
 describe("collection catalog writes", () => {
+  it("excludes private collections from product relationships", async () => {
+    const { service } = setup(
+      [],
+      [
+        [
+          {
+            buttonId: null,
+            collectionId: 900,
+            collectionIsPrivate: true,
+            collectionItemId: 2001,
+            collectionName: "Private collection",
+            colorEffectId: null,
+            colorEffectName: null,
+            colorEffectSlug: null,
+            displayName: "My spinner",
+            finishOptionId: null,
+            installedButtonId: null,
+            isPrivate: false,
+            makerId: 100,
+            makerName: "KAP EDC",
+            makerUrl: null,
+            materialId: null,
+            materialName: null,
+            materialSlug: null,
+            name: "Catla",
+            ownerClerkId: "user-secret",
+            ownerUserId: 1000,
+            ownerUsername: "ranger",
+            privatedByClerkId: null,
+            productId: 1100,
+            productSlug: "catla",
+            productTypeName: "Spinner",
+            sourceProductFinishOptionId: null,
+            spinnerId: 2001,
+            updatedAt: new Date("2026-09-23"),
+          },
+        ],
+        [],
+        [],
+      ],
+    );
+
+    await expect(
+      service.listProductItems(1100, {
+        clerkId: "user-secret",
+        isAdmin: true,
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("lists public collections that have no public items", async () => {
+    const createdAt = new Date("2026-09-23T22:59:55.454Z");
+    const updatedAt = new Date("2026-09-23T23:02:19.572Z");
+    const { service } = setup(
+      [],
+      [
+        [],
+        [
+          {
+            createdAt,
+            description: null,
+            id: 1000,
+            isPrivate: false,
+            name: "Roy's Collection",
+            ownerClerkId: "user-secret",
+            ownerUserId: 1015,
+            privatedByClerkId: null,
+            updatedAt,
+          },
+        ],
+        [],
+        [],
+        [{ clerkId: "user-secret", userId: 1015, username: null }],
+      ],
+    );
+
+    await expect(service.listOwners()).resolves.toEqual([
+      expect.objectContaining({
+        collections: [
+          expect.objectContaining({ id: 1000, name: "Roy's Collection" }),
+        ],
+        itemCount: 0,
+        items: [],
+        userId: 1015,
+        username: "user-secret",
+      }),
+    ]);
+  });
+
+  it("keeps an admin personal collection list scoped to that admin", async () => {
+    const { service } = setup(
+      [],
+      [
+        [
+          {
+            createdAt: new Date("2026-09-23"),
+            description: null,
+            id: 1001,
+            isPrivate: false,
+            name: "ranger's Collection",
+            ownerClerkId: "other-user",
+            ownerUserId: 1015,
+            privatedByClerkId: null,
+            updatedAt: new Date("2026-09-23"),
+          },
+        ],
+        [],
+        [],
+      ],
+    );
+
+    await expect(
+      service.listOwnedCollections("user-secret", true),
+    ).resolves.toEqual([]);
+  });
+
+  it("treats an admin changing their own collection as an owner action", async () => {
+    const { service, updates } = setup(
+      [],
+      [[{ isPrivate: false, ownerId: 1000, privatedByClerkId: null }]],
+    );
+
+    await expect(
+      service.setCollectionVisibility({
+        actorClerkId: "user-secret",
+        actorIsAdmin: true,
+        collectionId: 900,
+        isPrivate: true,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(updates[0]?.value).toEqual(
+      expect.objectContaining({ isPrivate: true, privateReason: "" }),
+    );
+  });
+
+  it("treats an admin changing their own collection item as an owner action", async () => {
+    const { service, updates } = setup(
+      [],
+      [[{ ownerId: 1000, privatedByClerkId: null }]],
+    );
+
+    await expect(
+      service.setItemVisibility({
+        actorClerkId: "user-secret",
+        actorIsAdmin: true,
+        collectionItemId: 900,
+        isPrivate: true,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(updates[0]?.value).toEqual(
+      expect.objectContaining({ isPrivate: true, privateReason: "" }),
+    );
+  });
+
   it("uses the synchronized username for the default collection name", async () => {
     const { service } = setup([], [[{ username: "royanger" }]]);
 
@@ -128,6 +287,7 @@ describe("collection catalog writes", () => {
         buttonMaterialId: 1201,
         buttonProductId: 1200,
         collectionId: 900,
+        displayName: "My spinner",
         spinnerFinishOptionId: 1102,
         spinnerCustomFinish: null,
         spinnerMaterialId: 1101,
@@ -157,7 +317,12 @@ describe("collection catalog writes", () => {
         },
         {
           table: schema.collectionItem,
-          value: { collectionId: 900, materialId: 1101, ownerId: 1000 },
+          value: {
+            collectionId: 900,
+            displayName: "My spinner",
+            materialId: 1101,
+            ownerId: 1000,
+          },
         },
         {
           table: schema.collectionSpinner,
@@ -191,6 +356,7 @@ describe("collection catalog writes", () => {
         buttonMaterialId: null,
         buttonProductId: null,
         collectionId: 900,
+        displayName: "My spinner",
         spinnerFinishOptionId: 1102,
         spinnerCustomFinish: null,
         spinnerMaterialId: 1101,
@@ -201,7 +367,12 @@ describe("collection catalog writes", () => {
     expect(writes).toEqual([
       {
         table: schema.collectionItem,
-        value: { collectionId: 900, materialId: 1101, ownerId: 1000 },
+        value: {
+          collectionId: 900,
+          displayName: "My spinner",
+          materialId: 1101,
+          ownerId: 1000,
+        },
       },
       {
         table: schema.collectionSpinner,
@@ -243,6 +414,7 @@ describe("collection catalog writes", () => {
         },
         finishOptionId: null,
         collectionId: 900,
+        displayName: "My button",
         materialId: 1201,
         productId: 1200,
       }),
@@ -290,6 +462,7 @@ describe("collection catalog writes", () => {
         actorClerkId: "other-user",
         collectionItemId: 2001,
         customFinish: null,
+        displayName: "My spinner",
         finishOptionId: 1102,
         materialId: 1101,
       }),
@@ -325,6 +498,7 @@ describe("collection catalog writes", () => {
         collectionId: 900,
         collectionItemId: 2001,
         customFinish: null,
+        displayName: "My spinner",
         finishOptionId: null,
         installedButton: {
           collectionItemId: 2000,
@@ -374,6 +548,7 @@ describe("collection catalog writes", () => {
       collectionId: 901,
       collectionItemId: 2001,
       customFinish: null,
+      displayName: "My spinner",
       finishOptionId: null,
       materialId: 1101,
     });
@@ -399,6 +574,7 @@ describe("collection catalog writes", () => {
         buttonMaterialId: null,
         buttonProductId: null,
         collectionId: 900,
+        displayName: "My spinner",
         spinnerFinishOptionId: 1102,
         spinnerCustomFinish: null,
         spinnerMaterialId: 9999,
@@ -422,6 +598,7 @@ describe("collection catalog writes", () => {
         buttonMaterialId: null,
         buttonProductId: null,
         collectionId: 900,
+        displayName: "My spinner",
         spinnerFinishOptionId: 9999,
         spinnerCustomFinish: null,
         spinnerMaterialId: 1101,
@@ -432,6 +609,93 @@ describe("collection catalog writes", () => {
 });
 
 describe("catalog lookup writes", () => {
+  it("treats an admin changing their own product as an owner action", async () => {
+    const { db, updates } = setup(
+      [],
+      [[{ ownerClerkId: "user-secret", privatedByClerkId: null }]],
+    );
+    const service = createCatalogService(
+      db,
+      createLogger({ app: "api", environment: "test" }),
+    );
+
+    await expect(
+      service.setVisibility({
+        actorClerkId: "user-secret",
+        actorIsAdmin: true,
+        isPrivate: true,
+        productId: 900,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(updates[0]?.value).toEqual(
+      expect.objectContaining({ isPrivate: true, privateReason: "" }),
+    );
+  });
+
+  it("records an admin deleting their own image as an owner action", async () => {
+    const { db, updates } = setup(
+      [],
+      [[{ deletedAt: null, ownerClerkId: "user-secret" }]],
+    );
+    const service = createCatalogService(
+      db,
+      createLogger({ app: "api", environment: "test" }),
+    );
+
+    await service.softDeleteImage({
+      actorClerkId: "user-secret",
+      actorIsAdmin: true,
+      imageId: 1000,
+      targetType: "product",
+    });
+
+    expect(updates[0]?.value).toEqual(
+      expect.objectContaining({ deletedByRole: "owner" }),
+    );
+  });
+
+  it.each([
+    "product",
+    "collection_item",
+  ] as const)("treats an already-deleted %s image as a successful delete", async (targetType) => {
+    const update = vi.fn();
+    const db = {
+      select: vi.fn((fields: Record<string, unknown>) => {
+        const rows = Object.hasOwn(fields, "deletedAt")
+          ? [
+              {
+                deletedAt: new Date("2026-09-23T03:57:30.447Z"),
+                ownerClerkId: "user-secret",
+              },
+            ]
+          : [];
+        const query = {
+          from: vi.fn(() => query),
+          innerJoin: vi.fn(() => query),
+          where: vi.fn(() => query),
+          limit: vi.fn().mockResolvedValue(rows),
+        };
+        return query;
+      }),
+      update,
+    } as unknown as Database;
+    const service = createCatalogService(
+      db,
+      createLogger({ app: "api", environment: "test" }),
+    );
+
+    await expect(
+      service.softDeleteImage({
+        actorClerkId: "user-secret",
+        actorIsAdmin: false,
+        imageId: 1000,
+        targetType,
+      }),
+    ).resolves.toBeUndefined();
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it.each([
     "color",
     "finish",

@@ -25,9 +25,9 @@ export const Route = createFileRoute(
     ) {
       throw notFound();
     }
-    const item = await getPublicCollectionItem({ data: params });
-    if (!item) throw notFound();
-    return item;
+    const detail = await getPublicCollectionItem({ data: params });
+    if (!detail) throw notFound();
+    return detail;
   },
-  component: () => <CollectionItemDetailPage item={Route.useLoaderData()} />,
+  component: () => <CollectionItemDetailPage {...Route.useLoaderData()} />,
 });

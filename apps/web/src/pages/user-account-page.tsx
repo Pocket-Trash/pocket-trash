@@ -1,8 +1,9 @@
+import { ClerkLoaded, ClerkLoading } from "@clerk/tanstack-react-start";
 import {
-  ClerkLoaded,
-  ClerkLoading,
-  UserProfile,
-} from "@clerk/tanstack-react-start";
+  UserProfileAccountPanel,
+  UserProfileProvider,
+  UserProfileSecurityPanel,
+} from "@clerk/ui/experimental";
 import {
   formatTranslation,
   type TranslationKey,
@@ -21,7 +22,10 @@ export function UserAccountPage() {
         <UserProfileSkeleton />
       </ClerkLoading>
       <ClerkLoaded>
-        <UserProfile routing="hash" />
+        <UserProfileProvider>
+          <UserProfileAccountPanel />
+          <UserProfileSecurityPanel />
+        </UserProfileProvider>
       </ClerkLoaded>
     </UserPageShell>
   );

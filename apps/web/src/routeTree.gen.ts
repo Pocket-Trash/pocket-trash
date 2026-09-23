@@ -13,8 +13,10 @@ import { Route as UserRouteImport } from './routes/user'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as AutmogRouteImport } from './routes/autmog'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as UserIndexRouteImport } from './routes/user.index'
 import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
 import { Route as ProductsIndexRouteImport } from './routes/products.index'
+import { Route as HelpIndexRouteImport } from './routes/help.index'
 import { Route as CollectionsIndexRouteImport } from './routes/collections.index'
 import { Route as UserSettingsRouteImport } from './routes/user.settings_'
 import { Route as UserResourcesRouteImport } from './routes/user.resources'
@@ -26,6 +28,7 @@ import { Route as ResourcesAddRouteImport } from './routes/resources.add'
 import { Route as ResourcesResourceIdRouteImport } from './routes/resources.$resourceId'
 import { Route as ProductsAddRouteImport } from './routes/products.add'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
+import { Route as HelpSlugRouteImport } from './routes/help.$slug'
 import { Route as CollectionsAddRouteImport } from './routes/collections.add'
 import { Route as CollectionsUserIdRouteImport } from './routes/collections.$userId'
 import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
@@ -66,6 +69,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UserIndexRoute = UserIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => UserRoute,
+} as any)
 const ResourcesIndexRoute = ResourcesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -74,6 +82,11 @@ const ResourcesIndexRoute = ResourcesIndexRouteImport.update({
 const ProductsIndexRoute = ProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelpIndexRoute = HelpIndexRouteImport.update({
+  id: '/help/',
+  path: '/help/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CollectionsIndexRoute = CollectionsIndexRouteImport.update({
@@ -129,6 +142,11 @@ const ProductsAddRoute = ProductsAddRouteImport.update({
 const PensPenIdRoute = PensPenIdRouteImport.update({
   id: '/pens/$penId',
   path: '/pens/$penId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelpSlugRoute = HelpSlugRouteImport.update({
+  id: '/help/$slug',
+  path: '/help/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CollectionsAddRoute = CollectionsAddRouteImport.update({
@@ -246,6 +264,7 @@ export interface FileRoutesByFullPath {
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/help/$slug': typeof HelpSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
   '/resources/$resourceId': typeof ResourcesResourceIdRoute
@@ -257,8 +276,10 @@ export interface FileRoutesByFullPath {
   '/user/resources': typeof UserResourcesRoute
   '/user/settings': typeof UserSettingsRoute
   '/collections/': typeof CollectionsIndexRoute
+  '/help/': typeof HelpIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
+  '/user/': typeof UserIndexRoute
   '/admin/catalog-images/trash': typeof AdminCatalogImagesTrashRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/resources/trash': typeof AdminResourcesTrashRoute
@@ -279,10 +300,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/autmog': typeof AutmogRouteWithChildren
-  '/user': typeof UserRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/help/$slug': typeof HelpSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
   '/resources/$resourceId': typeof ResourcesResourceIdRoute
@@ -294,8 +315,10 @@ export interface FileRoutesByTo {
   '/user/resources': typeof UserResourcesRoute
   '/user/settings': typeof UserSettingsRoute
   '/collections': typeof CollectionsIndexRoute
+  '/help': typeof HelpIndexRoute
   '/products': typeof ProductsIndexRoute
   '/resources': typeof ResourcesIndexRoute
+  '/user': typeof UserIndexRoute
   '/admin/catalog-images/trash': typeof AdminCatalogImagesTrashRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/resources/trash': typeof AdminResourcesTrashRoute
@@ -322,6 +345,7 @@ export interface FileRoutesById {
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/help/$slug': typeof HelpSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
   '/resources/$resourceId': typeof ResourcesResourceIdRoute
@@ -333,8 +357,10 @@ export interface FileRoutesById {
   '/user/resources': typeof UserResourcesRoute
   '/user/settings_': typeof UserSettingsRoute
   '/collections/': typeof CollectionsIndexRoute
+  '/help/': typeof HelpIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
+  '/user/': typeof UserIndexRoute
   '/admin/catalog-images/trash': typeof AdminCatalogImagesTrashRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/resources/trash': typeof AdminResourcesTrashRoute
@@ -362,6 +388,7 @@ export interface FileRouteTypes {
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/help/$slug'
     | '/pens/$penId'
     | '/products/add'
     | '/resources/$resourceId'
@@ -373,8 +400,10 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/user/settings'
     | '/collections/'
+    | '/help/'
     | '/products/'
     | '/resources/'
+    | '/user/'
     | '/admin/catalog-images/trash'
     | '/admin/resources/notifications'
     | '/admin/resources/trash'
@@ -395,10 +424,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/autmog'
-    | '/user'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/help/$slug'
     | '/pens/$penId'
     | '/products/add'
     | '/resources/$resourceId'
@@ -410,8 +439,10 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/user/settings'
     | '/collections'
+    | '/help'
     | '/products'
     | '/resources'
+    | '/user'
     | '/admin/catalog-images/trash'
     | '/admin/resources/notifications'
     | '/admin/resources/trash'
@@ -437,6 +468,7 @@ export interface FileRouteTypes {
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/help/$slug'
     | '/pens/$penId'
     | '/products/add'
     | '/resources/$resourceId'
@@ -448,8 +480,10 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/user/settings_'
     | '/collections/'
+    | '/help/'
     | '/products/'
     | '/resources/'
+    | '/user/'
     | '/admin/catalog-images/trash'
     | '/admin/resources/notifications'
     | '/admin/resources/trash'
@@ -475,11 +509,13 @@ export interface RootRouteChildren {
   UserRoute: typeof UserRouteWithChildren
   CollectionsUserIdRoute: typeof CollectionsUserIdRoute
   CollectionsAddRoute: typeof CollectionsAddRoute
+  HelpSlugRoute: typeof HelpSlugRoute
   PensPenIdRoute: typeof PensPenIdRoute
   ProductsAddRoute: typeof ProductsAddRoute
   SignInSplatRoute: typeof SignInSplatRoute
   SignUpSplatRoute: typeof SignUpSplatRoute
   CollectionsIndexRoute: typeof CollectionsIndexRoute
+  HelpIndexRoute: typeof HelpIndexRoute
   ProductsIndexRoute: typeof ProductsIndexRoute
   AdminCatalogImagesTrashRoute: typeof AdminCatalogImagesTrashRoute
   AdminResourcesNotificationsRoute: typeof AdminResourcesNotificationsRoute
@@ -522,6 +558,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/user/': {
+      id: '/user/'
+      path: '/'
+      fullPath: '/user/'
+      preLoaderRoute: typeof UserIndexRouteImport
+      parentRoute: typeof UserRoute
+    }
     '/resources/': {
       id: '/resources/'
       path: '/'
@@ -534,6 +577,13 @@ declare module '@tanstack/react-router' {
       path: '/products'
       fullPath: '/products/'
       preLoaderRoute: typeof ProductsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help/': {
+      id: '/help/'
+      path: '/help'
+      fullPath: '/help/'
+      preLoaderRoute: typeof HelpIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/collections/': {
@@ -611,6 +661,13 @@ declare module '@tanstack/react-router' {
       path: '/pens/$penId'
       fullPath: '/pens/$penId'
       preLoaderRoute: typeof PensPenIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help/$slug': {
+      id: '/help/$slug'
+      path: '/help/$slug'
+      fullPath: '/help/$slug'
+      preLoaderRoute: typeof HelpSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/collections/add': {
@@ -785,6 +842,7 @@ interface UserRouteChildren {
   UserCollectionsRoute: typeof UserCollectionsRoute
   UserResourcesRoute: typeof UserResourcesRoute
   UserSettingsRoute: typeof UserSettingsRoute
+  UserIndexRoute: typeof UserIndexRoute
   UserCollectionsCollectionIdRoute: typeof UserCollectionsCollectionIdRoute
   UserCollectionsAddRoute: typeof UserCollectionsAddRoute
   UserResourcesTrashRoute: typeof UserResourcesTrashRoute
@@ -797,6 +855,7 @@ const UserRouteChildren: UserRouteChildren = {
   UserCollectionsRoute: UserCollectionsRoute,
   UserResourcesRoute: UserResourcesRoute,
   UserSettingsRoute: UserSettingsRoute,
+  UserIndexRoute: UserIndexRoute,
   UserCollectionsCollectionIdRoute: UserCollectionsCollectionIdRoute,
   UserCollectionsAddRoute: UserCollectionsAddRoute,
   UserResourcesTrashRoute: UserResourcesTrashRoute,
@@ -813,11 +872,13 @@ const rootRouteChildren: RootRouteChildren = {
   UserRoute: UserRouteWithChildren,
   CollectionsUserIdRoute: CollectionsUserIdRoute,
   CollectionsAddRoute: CollectionsAddRoute,
+  HelpSlugRoute: HelpSlugRoute,
   PensPenIdRoute: PensPenIdRoute,
   ProductsAddRoute: ProductsAddRoute,
   SignInSplatRoute: SignInSplatRoute,
   SignUpSplatRoute: SignUpSplatRoute,
   CollectionsIndexRoute: CollectionsIndexRoute,
+  HelpIndexRoute: HelpIndexRoute,
   ProductsIndexRoute: ProductsIndexRoute,
   AdminCatalogImagesTrashRoute: AdminCatalogImagesTrashRoute,
   AdminResourcesNotificationsRoute: AdminResourcesNotificationsRoute,

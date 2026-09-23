@@ -3,8 +3,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
+  CollectionAddPage,
   CollectionEditPage,
   CollectionProductFields,
+  collectionEditSubmissionMode,
   FinishOptionsEditor,
 } from "./catalog-form-pages";
 
@@ -111,6 +113,7 @@ describe("finish option editor", () => {
       lengthMm: null,
       makerId: 1000,
       makerName: "Maker",
+      makerUrl: null,
       materials: [{ id: 1000, name: "Bronze", slug: "bronze" }],
       name: "Spinner",
       ownerClerkId: "user_test",
@@ -227,6 +230,52 @@ describe("finish option editor", () => {
   });
 });
 
+describe("collection edit submission", () => {
+  it("allows pending images to upload without valid legacy details", () => {
+    expect(collectionEditSubmissionMode(false, 0)).toBe("disabled");
+    expect(collectionEditSubmissionMode(false, 3)).toBe("upload");
+    expect(collectionEditSubmissionMode(true, 0)).toBe("save");
+  });
+});
+
+describe("collection add form", () => {
+  it("renders localized collection copy and a disabled primary action", () => {
+    const product = productFixture(1003, "Zoom Zoom", "spinner");
+    const html = renderToStaticMarkup(
+      createElement(CollectionAddPage, {
+        collections: [
+          {
+            coverImage: null,
+            coverImages: [],
+            createdAt: new Date(0),
+            description: null,
+            id: 1000,
+            isAdminPrivate: false,
+            isPrivate: false,
+            itemCount: 0,
+            name: "Test collection",
+            ownerUserId: 1,
+            updatedAt: new Date(0),
+          },
+        ],
+        defaultCollectionName: null,
+        initialProductId: product.id,
+        options: {
+          ...emptyCatalogOptions,
+          productTypes: [{ id: 1, name: "Spinner", slug: "spinner" }],
+        },
+        products: [product],
+      }),
+    );
+
+    expect(html).not.toContain("Something went wrong");
+    expect(html).toContain(">Collection<");
+    expect(html).toContain(">Add new collection<");
+    expect(html).toContain(">Add to collection<");
+    expect(html).toContain("disabled");
+  });
+});
+
 function productFixture(
   id: number,
   name: string,
@@ -254,6 +303,7 @@ function productFixture(
     lengthMm: null,
     makerId: 1,
     makerName: "Maker",
+    makerUrl: null,
     materials: [{ id: id + 1, name: "Bronze", slug: "bronze" }],
     name,
     ownerClerkId: "user_test",
@@ -283,6 +333,7 @@ function collectionFixture(
     collectionItemId,
     collectionIsPrivate: false,
     collectionName: "Test collection",
+    displayName: product.name,
     finishOption: product.finishOptions[0] ?? null,
     imageCount: 0,
     images: [],
@@ -291,11 +342,14 @@ function collectionFixture(
     installedButtonId: null,
     makerId: product.makerId,
     makerName: product.makerName,
+    makerUrl: product.makerUrl,
     material: product.materials[0] ?? null,
     name: product.name,
     ownerClerkId: "user_test",
+    ownerUsername: "tester",
     ownerUserId: 1,
     productId: product.id,
+    productSlug: product.slug,
     productTypeName: product.productTypeName,
     productTypeSlug: product.productTypeSlug as "spinner" | "spinner-button",
     productImages: [],

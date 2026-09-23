@@ -53,6 +53,7 @@ const facets = {
 const copy = {
   all: "All",
   any: "Any",
+  apply: "Apply",
   clear: "Clear",
   close: "Remove",
   colors: "Colour",
@@ -83,7 +84,7 @@ const meta = {
   decorators: [
     (Story) => (
       <StoryProviders>
-        <div className="min-h-72 w-[75rem] max-w-[calc(100vw-2rem)] p-4">
+        <div className="relative min-h-72 w-[75rem] max-w-[calc(100vw-2rem)] p-4">
           <Story />
         </div>
       </StoryProviders>

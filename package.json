@@ -1,6 +1,6 @@
 {
   "name": "pocket-trash.app",
-  "version": "0.3.0",
+  "version": "0.4.2",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.33.2",
@@ -23,7 +23,7 @@
     "scraper:scrape:grimsmo-saga": "node scripts/scraper-command.mjs scrape:grimsmo-saga",
     "storybook": "pnpm --filter @app/web storybook --no-open",
     "dev:web": "turbo run dev:web --filter=@app/api --filter=@app/web --filter=@package/logger",
-    "dev:web:webhooks": "tsx packages/infisical-runner/src/cli.ts webhooks listen -- node scripts/dev-webhooks.mjs",
+    "dev:web:webhooks": "pnpm users:reconcile && tsx packages/infisical-runner/src/cli.ts webhooks listen -- node scripts/dev-webhooks.mjs",
     "dev:web:verbose": "INFISICAL_RUNNER_VERBOSE=1 turbo run dev:web --filter=@app/api --filter=@app/web --filter=@package/logger",
     "build": "turbo run build",
     "build:ci": "turbo run build:ci",
@@ -80,6 +80,7 @@
   "pnpm": {
     "overrides": {
       "drizzle-orm": "0.45.3",
+      "drizzle-orm@0.45.3>expo-sqlite": "-",
       "lightningcss": "1.30.1",
       "utf-8-validate": "5.0.10"
     }

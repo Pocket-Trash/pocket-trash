@@ -47,6 +47,8 @@ describe("AppShell", () => {
     expect(html).toContain("Products");
     expect(html).toContain("Add product");
     expect(html).not.toContain('data-slot="sidebar"');
+    expect(html).toContain("container mx-auto");
+    expect(html).not.toContain("flex-1 flex justify-center");
 
     const language = html.indexOf("language-control");
     const theme = html.indexOf("theme-control");

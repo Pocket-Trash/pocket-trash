@@ -3,8 +3,18 @@ import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect, fn } from "storybook/test";
 import { CollectionCoverManager } from "./collection-form";
 
-const current = image(1000, "current.webp", 1);
-const previous = image(1001, "previous.webp", 0);
+const current = image(
+  1000,
+  "one.webp",
+  1,
+  "https://cdn.pocket-trash.app/assets/storybook/collection-images/one.webp",
+);
+const previous = image(
+  1001,
+  "three.webp",
+  0,
+  "https://cdn.pocket-trash.app/assets/storybook/collection-images/three.webp",
+);
 const collection: UserCollectionSummary = {
   coverImage: current,
   coverImages: [current, previous],
@@ -77,7 +87,12 @@ export const ConfirmDelete: Story = {
   },
 };
 
-function image(id: number, fileName: string, position: number): CatalogImage {
+function image(
+  id: number,
+  fileName: string,
+  position: number,
+  url: string,
+): CatalogImage {
   return {
     contentType: "image/webp",
     createdAt: new Date("2026-01-01"),
@@ -89,6 +104,6 @@ function image(id: number, fileName: string, position: number): CatalogImage {
     objectPath: `collections/1000/${fileName}`,
     position,
     size: 1024,
-    url: `https://placehold.co/640x480/webp?text=${fileName}`,
+    url,
   };
 }

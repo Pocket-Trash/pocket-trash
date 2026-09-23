@@ -12,14 +12,29 @@ import { PageFooter } from "@/components/page-footer";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { updateLocaleSetting } from "@/lib/locale-api";
+import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 type AppShellProps = {
-  breadcrumbItems?: Array<{
-    label: string;
-    to?: "/collections" | "/products" | "/user/account" | "/user/collections";
-  }>;
+  breadcrumbItems?: Array<
+    | {
+        label: string;
+        to?:
+          | "/collections"
+          | "/help"
+          | "/products"
+          | "/user"
+          | "/user/account"
+          | "/user/collections";
+      }
+    | {
+        label: string;
+        params: { userId: number };
+        to: "/collections/$userId";
+      }
+  >;
   children: React.ReactNode;
+  contained?: boolean;
   headerActions?: React.ReactNode;
   meta?: React.ReactNode;
   title: string;
@@ -28,6 +43,7 @@ type AppShellProps = {
 export function AppShell({
   breadcrumbItems = [],
   children,
+  contained = true,
   headerActions,
   meta,
   title,
@@ -47,10 +63,15 @@ export function AppShell({
   };
 
   return (
-    <div className="flex min-h-svh flex-col bg-background text-foreground">
-      <header className="sticky top-0 z-30 flex flex-wrap items-start gap-x-4 gap-y-3 border-b border-border bg-background/90 px-3.5 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2.5 backdrop-blur md:px-5 md:pt-[max(0.875rem,env(safe-area-inset-top))] md:pb-3.5">
+    <div
+      className={cn(
+        "flex min-h-svh flex-col bg-background text-foreground",
+        contained && "container mx-auto",
+      )}
+    >
+      <header className="relative sticky top-0 z-30 flex flex-wrap items-start gap-x-4 gap-y-3 border-b border-border bg-background/90 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 backdrop-blur">
         <div className="min-w-0 flex-1">
-          <h1 className="m-0 text-[16px] font-bold tracking-[0.5px] max-[480px]:text-[15px] md:text-lg">
+          <h1 className="m-0 text-lg font-bold tracking-[0.5px]">
             <Link className="hover:text-primary" to="/">
               {siteName}
             </Link>
@@ -70,7 +91,15 @@ export function AppShell({
                     aria-hidden="true"
                     className="size-3.5 shrink-0"
                   />
-                  {item.to ? (
+                  {item.to === "/collections/$userId" ? (
+                    <Link
+                      className="truncate hover:text-foreground"
+                      params={item.params}
+                      to={item.to}
+                    >
+                      {item.label}
+                    </Link>
+                  ) : item.to ? (
                     <Link
                       className="truncate hover:text-foreground"
                       to={item.to}
@@ -101,9 +130,7 @@ export function AppShell({
         {meta || headerActions ? (
           <div className="flex w-full flex-wrap items-center gap-3">
             {meta ? (
-              <span className="text-xs text-muted-foreground md:text-sm">
-                {meta}
-              </span>
+              <span className="text-sm text-muted-foreground">{meta}</span>
             ) : null}
             {headerActions ? (
               <div className="ml-auto flex flex-1 flex-wrap items-center justify-end gap-2">
@@ -113,7 +140,9 @@ export function AppShell({
           </div>
         ) : null}
       </header>
-      <div className="flex-1">{children}</div>
+      <div className={cn("flex-1", contained && "[&>*]:mx-auto [&>*]:w-full")}>
+        {children}
+      </div>
       <PageFooter />
     </div>
   );

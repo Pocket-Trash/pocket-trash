@@ -28,6 +28,12 @@ const preview: Preview = {
   parameters: {
     a11y: { test: "error" },
     layout: "centered",
+    options: {
+      storySort: {
+        method: "alphabetical",
+        order: ["Components", "Pages", "UI"],
+      },
+    },
   },
 };
 
