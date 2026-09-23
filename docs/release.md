@@ -28,13 +28,13 @@ The command:
 
 1. Requires a clean worktree on `main`.
 2. Fetches `origin/main` and tags only after local `HEAD` matches it.
-3. Runs `pnpm format`, `pnpm test`, `pnpm lint`, and `pnpm typecheck`.
+3. Runs a frozen install, `pnpm format`, `pnpm test`, `pnpm lint`, and
+   `pnpm typecheck`.
 4. Reads pending Changesets and chooses the highest bump.
-5. Updates package versions, `apps/web/app.json`, and
-   `apps/web/src/lib/app-version.ts`.
+5. Updates the root and every workspace package version.
 6. Adds Changeset descriptions to `CHANGELOG.md`.
-7. Commits the release metadata, pushes `main`, creates and pushes the
-   annotated `v*` tag, then creates the matching GitHub Release.
+7. Commits the release metadata, creates the annotated `v*` tag, then pushes
+   `main` and the tag atomically.
 
 If all pending Changesets are `patch`, the release bumps only the patch version.
 
@@ -51,8 +51,9 @@ That creates `v0.0.1` and the matching GitHub Release from the baseline commit.
 ## Deployment
 
 The pushed `v*` tag triggers `Deploy`, which runs production migrations, deploys
-the production Railway scraper, deploys the production Vercel web app, and
-smoke-tests the web deployment.
+the production API, Railway scraper, and Vercel web app, and smoke-tests the
+deployments. The workflow creates the GitHub Release only after every production
+deployment succeeds.
 
 Vercel production Git deployment gating is documented in
 [vercel.md](./vercel.md).

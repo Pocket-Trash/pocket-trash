@@ -8,7 +8,7 @@
 
 ## 2. Primitive & Semantic Design Tokens
 ### Typography
-- **Font Family:** `ui-sans-serif`, `system-ui`, `-apple-system`, `BlinkMacSystemFont`, `"Segoe UI"`, `Roboto`, `"Helvetica Neue"`, `Arial`, `"Noto Sans"`, sans-serif.
+- **Font Family:** `"Geist Mono Variable"`, `"Geist Mono"`, monospace for sans, serif, and mono roles.
 - **Base:** `15px/1.5` on `html, body`.
 - **Header Title:** `18px`, `letter-spacing: 0.5px`; mobile `16px`, then `15px` below 480px.
 - **Card Headline:** `15px/1.3`, `600`, clamped to 2 lines with reserved height.
@@ -20,81 +20,85 @@
 ### Tailwind Theme Tokens
 Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document root for dark mode and remove it for light mode. The `system` theme setting follows `prefers-color-scheme` and updates when the system preference changes.
 
+The Advent of Code palette is the visual source. The foreground, focus-ring, and control-border adjustments below preserve its colors while meeting normal-text and interactive-control contrast requirements.
+
 ```css
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --radius: 0.625rem;
+  color-scheme: light;
+  --background: #f7f7f7;
+  --foreground: #333333;
+  --card: #ffffff;
+  --card-foreground: #333333;
+  --popover: #ffffff;
+  --popover-foreground: #333333;
+  --primary: #705800;
+  --primary-foreground: #ffffff;
+  --secondary: #3178c6;
+  --secondary-foreground: #ffffff;
+  --muted: #aaaaaa;
+  --muted-foreground: #333333;
+  --accent: #f7dc6f;
+  --accent-foreground: #333333;
+  --destructive: #cc3737;
+  --destructive-foreground: #ffffff;
+  --border: #cccccc;
+  --input: #ffffff;
+  --control-border: #8c8c8c;
+  --ring: #3178c6;
+  --chart-1: #f7dc6f;
+  --chart-2: #3178c6;
+  --chart-3: #8e44ad;
+  --chart-4: #1abc9c;
+  --chart-5: #16a085;
+  --sidebar: #f7f7f7;
+  --sidebar-foreground: #333333;
+  --sidebar-primary: #705800;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f7dc6f;
+  --sidebar-accent-foreground: #333333;
+  --sidebar-border: #cccccc;
+  --sidebar-ring: #3178c6;
+  --font-sans: "Geist Mono Variable", "Geist Mono", monospace;
+  --font-serif: "Geist Mono Variable", "Geist Mono", monospace;
+  --font-mono: "Geist Mono Variable", "Geist Mono", monospace;
+  --radius: 0px;
 }
 
 .dark {
-  --background: oklch(0.000 0.000 0.000);
-  --foreground: oklch(0.832 0.015 43.985);
-  --card: oklch(0.000 0.000 0.000);
-  --card-foreground: oklch(1.000 0.000 263.283);
-  --popover: oklch(0.000 0.000 0.000);
-  --popover-foreground: oklch(1.000 0.000 263.283);
-  --primary: oklch(0.926 0.195 104.561);
-  --primary-foreground: oklch(0.000 0.000 0.000);
-  --secondary: oklch(0.521 0.000 263.283);
-  --secondary-foreground: oklch(1.000 0.000 263.283);
-  --muted: oklch(0.000 0.000 0.000);
-  --muted-foreground: oklch(1.000 0.000 263.283);
-  --accent: oklch(0.315 0.087 281.076);
-  --accent-foreground: oklch(1.000 0.000 263.283);
-  --destructive: oklch(0.579 0.136 336.939);
-  --border: oklch(1.000 0.000 263.283 / 6%);
-  --input: oklch(0.000 0.000 0.000);
-  --ring: oklch(0.926 0.195 104.561);
-  --chart-1: oklch(0.464 0.078 219.573);
-  --chart-2: oklch(0.753 0.207 146.722);
-  --chart-3: oklch(0.926 0.195 104.561);
-  --chart-4: oklch(0.579 0.136 336.939);
-  --chart-5: oklch(0.632 0.254 21.746);
-  --sidebar: oklch(0.000 0.000 0.000);
-  --sidebar-foreground: oklch(1.000 0.000 263.283);
-  --sidebar-primary: oklch(0.926 0.195 104.561);
-  --sidebar-primary-foreground: oklch(0.000 0.000 0.000);
-  --sidebar-accent: oklch(1.000 0.000 263.283 / 6%);
-  --sidebar-accent-foreground: oklch(1.000 0.000 263.283);
-  --sidebar-border: oklch(0.5 0 0);
-  --sidebar-ring: oklch(0.315 0.087 281.076);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --radius: 0.625rem;
+  color-scheme: dark;
+  --background: #333333;
+  --foreground: #ffffff;
+  --card: #444444;
+  --card-foreground: #ffffff;
+  --popover: #444444;
+  --popover-foreground: #ffffff;
+  --primary: #f2c464;
+  --primary-foreground: #333333;
+  --secondary: #6688cc;
+  --secondary-foreground: #111111;
+  --muted: #666666;
+  --muted-foreground: #ffffff;
+  --accent: #f2c464;
+  --accent-foreground: #333333;
+  --destructive: #cc3737;
+  --destructive-foreground: #ffffff;
+  --border: #555555;
+  --input: #444444;
+  --control-border: #909090;
+  --ring: #f2c464;
+  --chart-1: #f2c464;
+  --chart-2: #6688cc;
+  --chart-3: #7a288a;
+  --chart-4: #1abc9c;
+  --chart-5: #16a085;
+  --sidebar: #333333;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #f2c464;
+  --sidebar-primary-foreground: #333333;
+  --sidebar-accent: #f2c464;
+  --sidebar-accent-foreground: #333333;
+  --sidebar-border: #555555;
+  --sidebar-ring: #f2c464;
 }
 
 @theme inline {
@@ -113,8 +117,9 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
-  --color-input: var(--input);
+  --color-input: var(--control-border);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -132,10 +137,10 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: var(--radius);
 }
 ```
 
@@ -158,11 +163,10 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 - **Archived:** `bg-accent text-accent-foreground` or `border-border text-muted-foreground` when lower emphasis is needed.
 
 ## 3. Structural Layout Rules
-- **Page Shell:** Sticky top header, route content, and a centered footer. The shell never owns route-specific sidebars or bottom toolbars.
-- **Form Alignment:** Product, collection, edit, and User Settings forms are left-aligned inside route content. Keep readable route-level maximum widths, existing field widths, and `p-6` page spacing; authentication screens remain centered.
-- **Autmog Route Shell:** Only `/autmog` owns the Autmog filter sidebar and mobile filter toolbar. Both render below the shared site header and never appear on other routes.
-- **Autmog Desktop Grid:** `grid-template-columns: 290px 1fr`, `gap: 20px`, `padding: 18px 22px 22px`.
-- **Filter Sidebar:** Sticky below the two-row shared header at `top: 112px`, max height `calc(100svh - 128px)`, `10px` radius, hidden scrollbar, scrollable content.
+- **Page Shell:** Sticky top header, two-column main area, footer centered below grid.
+- **Desktop Main Grid:** `grid-template-columns: 290px 1fr`, `gap: 20px`, `padding: 18px 22px 22px`.
+- **Filter Sidebar:** Sticky at `top: 70px`, max height `calc(100vh - 90px)`, square corners, hidden scrollbar, scrollable content.
+- **Collapsed Filters:** Body class `filters-closed` changes main to `0 1fr`, sets `gap: 0`, and reveals a fixed vertical edge tab.
 - **Product Grid:** CSS grid with max 5 columns: `repeat(auto-fill, minmax(max(240px, calc((100% - 4 * 18px) / 5)), 1fr))`; `gap: 18px`.
 - **Responsive Breakpoints:** At `max-width: 880px`, Autmog filters become a fixed slide-in drawer with scrim and its grid becomes full width; at `max-width: 480px`, product grids become single column. Catalog filters use their mobile sheet through 880px and their desktop overlay from 881px.
 - **Mobile Grid:** `repeat(auto-fill, minmax(160px, 1fr))` between 480px and 880px.
@@ -214,7 +218,7 @@ Use Tailwind v4 CSS-first tokens. The app must apply `.dark` on the document roo
 ### Lightbox
 - Full-screen dialog with dark blurred overlay.
 - Desktop layout is two columns: image area `1.1fr`, info area `1fr`.
-- Container max width `1280px`, border radius `14px`, heavy shadow.
+- Container max width `1280px`, square corners, heavy shadow.
 - Opens from clicked card using FLIP-style transform and rotate animation.
 - Includes carousel navigation, image counter, swipe navigation on touch, Escape close, and arrow-key image navigation.
 - Mobile lightbox stacks image above info, uses a scrollable container, and pins close button near safe-area top.

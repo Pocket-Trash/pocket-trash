@@ -42,6 +42,14 @@ describe("parseCliArguments", () => {
 
 describe("buildInfisicalRunArgs", () => {
   const quietArgs = ["--silent", "--log-level=error"];
+  const quietRunArgs = (path: string) => [
+    "run",
+    ...quietArgs,
+    "--project-config-dir=/repo",
+    "--env=dev",
+    `--path=${path}`,
+    "--",
+  ];
 
   it("builds API dev args with API and personal database secrets", () => {
     const args = buildInfisicalRunArgs({
@@ -151,13 +159,9 @@ describe("buildInfisicalRunArgs", () => {
         repoRoot: "/repo",
       }),
     ).toEqual([
-      "run",
-      ...quietArgs,
-      "--project-config-dir=/repo",
-      "--env=dev",
-      "--path=/apps/web",
-      "--path=/local/database",
-      "--",
+      ...quietRunArgs("/apps/web"),
+      "infisical",
+      ...quietRunArgs("/local/database"),
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
       expect.stringContaining("databaseUrlUserOverride"),
@@ -196,13 +200,9 @@ describe("buildInfisicalRunArgs", () => {
         repoRoot: "/repo",
       }),
     ).toEqual([
-      "run",
-      ...quietArgs,
-      "--project-config-dir=/repo",
-      "--env=dev",
-      "--path=/apps/scraper",
-      "--path=/local/database",
-      "--",
+      ...quietRunArgs("/apps/scraper"),
+      "infisical",
+      ...quietRunArgs("/local/database"),
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
       expect.stringContaining("databaseUrlUserOverride"),
@@ -223,13 +223,9 @@ describe("buildInfisicalRunArgs", () => {
         repoRoot: "/repo",
       }),
     ).toEqual([
-      "run",
-      ...quietArgs,
-      "--project-config-dir=/repo",
-      "--env=dev",
-      "--path=/apps/scraper",
-      "--path=/local/database",
-      "--",
+      ...quietRunArgs("/apps/scraper"),
+      "infisical",
+      ...quietRunArgs("/local/database"),
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
       expect.stringContaining("databaseUrlUserOverride"),
@@ -298,13 +294,9 @@ describe("buildInfisicalRunArgs", () => {
     });
 
     expect(args).toEqual([
-      "run",
-      ...quietArgs,
-      "--project-config-dir=/repo",
-      "--env=dev",
-      "--path=/apps/web",
-      "--path=/local/database",
-      "--",
+      ...quietRunArgs("/apps/web"),
+      "infisical",
+      ...quietRunArgs("/local/database"),
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
       expect.stringContaining("databaseUrlUserOverride"),
@@ -362,13 +354,9 @@ describe("buildInfisicalRunArgs", () => {
     });
 
     expect(args).toEqual([
-      "run",
-      ...quietArgs,
-      "--project-config-dir=/repo",
-      "--env=dev",
-      "--path=/apps/web",
-      "--path=/local/database",
-      "--",
+      ...quietRunArgs("/apps/web"),
+      "infisical",
+      ...quietRunArgs("/local/database"),
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
       expect.stringContaining("databaseUrlUserOverride"),
@@ -413,13 +401,13 @@ describe("infisical auth checks", () => {
 });
 
 describe("secret path policy", () => {
-  it("deduplicates configured paths", () => {
+  it("deduplicates configured paths in order", () => {
     expect(
       getSecretPaths({
         allowServerSecrets: false,
-        paths: ["/apps/web", "/apps/web"],
+        paths: ["/apps/web", "/shared", "/apps/web"],
       }),
-    ).toEqual(["/apps/web"]);
+    ).toEqual(["/apps/web", "/shared"]);
   });
 
   it("rejects server-only paths for client commands", () => {
