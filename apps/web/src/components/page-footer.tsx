@@ -33,7 +33,7 @@ export function PageFooter() {
           u/BVG_Digital
         </a>
       </div>
-      <div className="mx-auto mt-3 max-w-[640px] border-t border-border pt-3 text-[11.5px] leading-5 opacity-70">
+      <div className="mx-auto mt-3 max-w-[640px] border-t border-border pt-3 text-[11.5px] leading-5">
         {t("web.archive.footer.productOwnership")}{" "}
         {t("web.archive.footer.fanMade")}
       </div>

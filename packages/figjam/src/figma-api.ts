@@ -1,8 +1,4 @@
-import {
-  type FigjamSnapshot,
-  type FigmaApiConfig,
-  type FigmaComment,
-} from "./types.js";
+import type { FigjamSnapshot, FigmaApiConfig, FigmaComment } from "./types.js";
 import { assertAllowedFileKey, parseAllowedFileKeys } from "./validation.js";
 
 const figmaApiBaseUrl = "https://api.figma.com/v1";
