@@ -28,6 +28,6 @@ Improve release notes.
   );
   assert.match(
     createChangelogEntry("1.2.3", [parseChangeset(changesetPath)]),
-    /- \*\*@app\/web, @package\/logger\*\*: Improve release notes\./,
+    /\* Improve release notes\. \(@app\/web, @package\/logger\)/,
   );
 });

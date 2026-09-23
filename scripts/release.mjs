@@ -196,14 +196,16 @@ function formatBullets(changesets, bump) {
   const bullets = entries
     .map((entry) => {
       const description = entry.description || "No description provided.";
-      const packagePrefix =
-        entry.packages?.length > 0 ? `**${entry.packages.join(", ")}**: ` : "";
+      const lines = description.split("\n").filter(Boolean);
+      const packageSuffix =
+        entry.packages?.length > 0 ? ` (${entry.packages.join(", ")})` : "";
 
-      return description
-        .split("\n")
-        .filter(Boolean)
-        .map((line, index) =>
-          index === 0 ? `- ${packagePrefix}${line}` : `  ${line}`,
+      return lines
+        .map(
+          (line, index) =>
+            `${index === 0 ? "* " : "  "}${line}${
+              index === lines.length - 1 ? packageSuffix : ""
+            }`,
         )
         .join("\n");
     })
