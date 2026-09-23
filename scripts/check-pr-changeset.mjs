@@ -9,19 +9,20 @@ const changesetDirectory = ".changeset";
 const allowedBumps = new Set(["major", "minor", "patch"]);
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
-function git(args) {
-  return execFileSync("git", args, { encoding: "utf8" }).trim();
+function git(args, cwd = repoRoot) {
+  return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
 
-function getChangedFiles() {
-  const baseSha = process.env.BASE_SHA;
-  const headSha = process.env.HEAD_SHA;
-
+function getChangedFiles({
+  baseSha = process.env.BASE_SHA,
+  headSha = process.env.HEAD_SHA,
+  cwd = repoRoot,
+} = {}) {
   if (!baseSha || !headSha) {
     throw new Error("BASE_SHA and HEAD_SHA are required.");
   }
 
-  return git(["diff", "--name-only", baseSha, headSha])
+  return git(["diff", "--name-only", `${baseSha}...${headSha}`], cwd)
     .split("\n")
     .filter(Boolean);
 }
@@ -102,7 +103,7 @@ function main() {
   console.log(`Found valid Changeset marker: ${validChangesets.join(", ")}`);
 }
 
-export { parseChangesetEntries, validateChangesetEntries };
+export { getChangedFiles, parseChangesetEntries, validateChangesetEntries };
 
 if (
   process.argv[1] &&
