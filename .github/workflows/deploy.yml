@@ -1221,19 +1221,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          pnpm dlx @railway/cli variable set APP_ENV=production \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
-            --environment production
-
-          pnpm dlx @railway/cli variable set LOG_DEPLOYMENT_ID=production \
-            --skip-deploys \
-            --project "$RAILWAY_PROJECT_ID" \
-            --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
-            --environment production
-
-          pnpm dlx @railway/cli variable set LOG_DEPLOYMENT_TARGET=railway \
+          pnpm dlx @railway/cli variable set \
+            APP_ENV=production \
+            LOG_DEPLOYMENT_ID=production \
+            LOG_DEPLOYMENT_TARGET=railway \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
