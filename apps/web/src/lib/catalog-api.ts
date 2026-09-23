@@ -6,6 +6,7 @@ import type {
   CatalogProduct,
   CatalogProductType,
   ProductWriteInput,
+  UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
 import { createServerFn } from "@tanstack/react-start";
@@ -34,6 +35,7 @@ const slugNameSchema = z
   .trim()
   .min(1, requiredMessage)
   .refine((value) => slugify(value).length > 0, requiredMessage);
+const displayNameSchema = z.string().trim().min(1, requiredMessage);
 
 export const finishOptionSchema = z
   .object({
@@ -156,10 +158,11 @@ const colorSchema = z.object({
   name: slugNameSchema,
 });
 
-const collectionWriteSchema = z.object({
+export const collectionWriteSchema = z.object({
   description: z
     .string()
     .trim()
+    .nullable()
     .refine(
       (value) => !value || value.split(/\s+/u).length <= 200,
       requiredMessage,
@@ -189,6 +192,7 @@ const collectionAddSchema = z
     collectionId: idSchema.nullable().optional().default(null),
     confirmed: z.boolean(),
     customFinish: finishOptionSchema.nullable(),
+    displayName: displayNameSchema,
     finishOptionId: idSchema.nullable(),
     materialId: idSchema,
     newCollection: collectionWriteSchema.nullable().optional().default(null),
@@ -234,6 +238,7 @@ const collectionEditSchema = z
     collectionId: idSchema.optional(),
     collectionItemId: idSchema,
     customFinish: finishOptionSchema.nullable(),
+    displayName: displayNameSchema,
     finishOptionId: idSchema.nullable(),
     installedButton: z
       .object({
@@ -349,6 +354,37 @@ export const getCatalogProduct = createServerFn({ method: "GET" })
     );
     return product ? ((await signCatalogProducts([product]))[0] ?? null) : null;
   });
+
+export const getCatalogProductDetail = createServerFn({ method: "GET" })
+  .validator((input: unknown) => productLookupSchema.parse(input))
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      collectionItems: UserCollectionItem[];
+      product: CatalogProduct;
+    } | null> => {
+      const { s } = await import("@/lib/services");
+      const viewer = await getResourceViewer();
+      const product = await s.db.catalog.getProduct(
+        data.productTypeSlug,
+        data.productSlug,
+        viewer,
+      );
+      if (!product) return null;
+      const [signedProduct, collectionItems] = await Promise.all([
+        signCatalogProducts([product]),
+        s.db.collections.listProductItems(product.id, viewer),
+      ]);
+      if (!signedProduct[0]) return null;
+      return {
+        collectionItems: await Promise.all(
+          collectionItems.map(signCollectionItem),
+        ),
+        product: signedProduct[0],
+      };
+    },
+  );
 
 export const createCatalogMaker = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
@@ -564,6 +600,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
                 spinnerMaterialId: parsed.data.materialId,
                 spinnerProductId: parsed.data.productId,
                 collectionId: parsed.data.collectionId,
+                displayName: parsed.data.displayName,
                 newCollection: parsed.data.newCollection,
               })
             ).spinnerItemId
@@ -575,6 +612,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
               finishOptionId: parsed.data.finishOptionId,
               materialId: parsed.data.materialId,
               collectionId: parsed.data.collectionId,
+              displayName: parsed.data.displayName,
               newCollection: parsed.data.newCollection,
               productId: parsed.data.productId,
             });
@@ -627,13 +665,28 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }) => {
     const { s } = await import("@/lib/services");
+    const viewer = await getResourceViewer();
     const item = await s.db.collections.getPublicItem({
       collectionId: data.collectionId,
       collectionItemId: data.collectionItemId,
       ownerUserId: data.userId,
-      viewer: await getResourceViewer(),
+      viewer,
     });
-    return item ? await signCollectionItem(item) : null;
+    if (!item) return null;
+    const installedButton = item.installedButtonId
+      ? await s.db.collections.getPublicItem({
+          collectionId: data.collectionId,
+          collectionItemId: item.installedButtonId,
+          ownerUserId: data.userId,
+          viewer,
+        })
+      : null;
+    return {
+      installedButton: installedButton
+        ? await signCollectionItem(installedButton)
+        : null,
+      item: await signCollectionItem(item),
+    };
   });
 
 export const getUserCollection = createServerFn({ method: "GET" }).handler(

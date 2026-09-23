@@ -9,11 +9,7 @@ import type {
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
-import {
-  formatTranslation,
-  type TranslationKey,
-  translationKeys,
-} from "@pocket-trash/localizations";
+import type { TranslationKey } from "@pocket-trash/localizations";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 import { RotateCcw, Trash2 } from "lucide-react";
@@ -53,6 +49,7 @@ import {
   softDeleteCatalogImage,
   updateCollectionItem,
 } from "@/lib/catalog-api";
+import { useCatalogCopy } from "@/lib/catalog-copy";
 import {
   type CatalogImageUploadError,
   deleteCollectionCover,
@@ -60,23 +57,8 @@ import {
   uploadCatalogImages,
   validateCatalogImages,
 } from "@/lib/catalog-image-uploads";
+import { getImageUploadGuidance } from "@/lib/help-content";
 import { useLocale } from "@/providers/locale-provider";
-
-const translationKeySet: ReadonlySet<string> = new Set(translationKeys);
-
-function isTranslationKey(key: string): key is TranslationKey {
-  return translationKeySet.has(key);
-}
-
-function useCatalogCopy() {
-  const { locale } = useLocale();
-  return (key: string, values: Readonly<Record<string, unknown>> = {}) =>
-    formatTranslation(
-      isTranslationKey(key) ? key : "error.generic",
-      values,
-      locale,
-    );
-}
 
 export function ProductFormPage({
   initialProduct,
@@ -143,6 +125,8 @@ function ProductEditor({
   productTypeSlug: CatalogProductType;
 }) {
   const t = useCatalogCopy();
+  const { locale } = useLocale();
+  const imageGuidance = getImageUploadGuidance(locale);
   const navigate = useNavigate();
   const { getToken } = useAuth();
   const [options, setOptions] = React.useState(initialOptions);
@@ -470,6 +454,10 @@ function ProductEditor({
       {formError ? <Notice>{t(formError)}</Notice> : null}
       <FileDropInput
         accept=".jpeg,.jpg,.png,.webp"
+        aspectRatio={4 / 3}
+        aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+        aspectRatioHelpLabel={imageGuidance.helpLabel}
+        aspectRatioWarning={imageGuidance.warning}
         browseLabel={t("web.resources.upload.browseFiles")}
         description={t("web.resources.upload.imagesHelp", {
           maxFileSize: "25 MiB",
@@ -1057,6 +1045,9 @@ export function CollectionAddPage({
   syncIncomplete?: boolean;
 }) {
   const t = useCatalogCopy();
+  const { locale } = useLocale();
+  const imageGuidance = getImageUploadGuidance(locale);
+  const displayNameLabel = t("web.collections.field.displayName");
   const navigate = useNavigate();
   const { getToken } = useAuth();
   const [images, setImages] = React.useState<File[]>([]);
@@ -1098,6 +1089,9 @@ export function CollectionAddPage({
   );
   const [product, setProduct] = React.useState<CatalogProduct | null>(
     initialProduct ?? null,
+  );
+  const [displayName, setDisplayName] = React.useState(
+    initialProduct?.name ?? "",
   );
   const [material, setMaterial] = React.useState<CatalogLookup | null>(null);
   const [finish, setFinish] = React.useState<ComboboxOption | null>(null);
@@ -1153,8 +1147,10 @@ export function CollectionAddPage({
     : collections;
 
   const submit = async (confirmed: boolean) => {
+    setFormError(null);
     if (
       !product ||
+      !displayName.trim() ||
       selectedCollectionId === null ||
       !material ||
       !finish ||
@@ -1224,6 +1220,7 @@ export function CollectionAddPage({
         collectionId: selectedCollectionId === -1 ? null : selectedCollectionId,
         confirmed,
         customFinish: finish.id === "custom" ? customFinish : null,
+        displayName,
         finishOptionId: finish.id === "custom" ? null : Number(finish.id),
         materialId: material.id,
         newCollection:
@@ -1311,6 +1308,14 @@ export function CollectionAddPage({
       title={t("web.action.addToCollection")}
     >
       <main className="grid max-w-5xl gap-6 p-6">
+        <Field label={displayNameLabel}>
+          <Input
+            disabled={!product}
+            onChange={(event) => setDisplayName(event.target.value)}
+            required
+            value={displayName}
+          />
+        </Field>
         {syncIncomplete ? (
           <Notice>{t("web.collections.error.syncIncomplete")}</Notice>
         ) : null}
@@ -1378,6 +1383,7 @@ export function CollectionAddPage({
             onValueChange={(value) => {
               setType(value);
               setProduct(null);
+              setDisplayName("");
               setMaterial(null);
               setFinish(null);
               setCustomFinish(emptyFinishOption());
@@ -1402,6 +1408,7 @@ export function CollectionAddPage({
               key={candidate.id}
               onClick={() => {
                 setProduct(candidate);
+                setDisplayName(candidate.name);
                 setMaterial(null);
                 setFinish(null);
                 setCustomFinish(emptyFinishOption());
@@ -1513,6 +1520,10 @@ export function CollectionAddPage({
         {product ? (
           <FileDropInput
             accept=".jpeg,.jpg,.png,.webp"
+            aspectRatio={4 / 3}
+            aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+            aspectRatioHelpLabel={imageGuidance.helpLabel}
+            aspectRatioWarning={imageGuidance.warning}
             browseLabel={t("web.resources.upload.browseFiles")}
             description={t("web.resources.upload.imagesHelp", {
               maxFileSize: "25 MiB",
@@ -1536,10 +1547,13 @@ export function CollectionAddPage({
           />
         ) : null}
         {formError ? <Notice>{t(formError)}</Notice> : null}
-        {product && material && finish ? (
+        {product ? (
           <Button
             disabled={Boolean(
-              (finish.id === "custom" && !customFinishIsValid) ||
+              !material ||
+                !displayName.trim() ||
+                !finish ||
+                (finish.id === "custom" && !customFinishIsValid) ||
                 (selectedButton &&
                   (!buttonMaterial ||
                     !buttonFinish ||
@@ -1677,11 +1691,15 @@ export function CollectionEditPage({
   product: CatalogProduct;
 }) {
   const t = useCatalogCopy();
+  const { locale } = useLocale();
+  const imageGuidance = getImageUploadGuidance(locale);
+  const displayNameLabel = t("web.collections.field.displayName");
   const navigate = useNavigate();
   const { getToken } = useAuth();
   const [images, setImages] = React.useState<File[]>([]);
   const [existingImages, setExistingImages] = React.useState(item.images);
   const [collectionId, setCollectionId] = React.useState(item.collectionId);
+  const [displayName, setDisplayName] = React.useState(item.displayName);
   const [options, setOptions] = React.useState(initialOptions);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [material, setMaterial] = React.useState<CatalogLookup | null>(
@@ -1698,7 +1716,7 @@ export function CollectionEditPage({
   );
   const [button, setButton] = React.useState<ComboboxOption | null>(() => {
     return initialButton
-      ? { id: initialButton.collectionItemId, name: initialButton.name }
+      ? { id: initialButton.collectionItemId, name: initialButton.displayName }
       : { id: "default", name: t("web.catalog.defaultButton") };
   });
   const [buttonMaterial, setButtonMaterial] =
@@ -1734,15 +1752,34 @@ export function CollectionEditPage({
     Boolean(buttonFinish) &&
     (buttonFinish?.id !== "custom" ||
       finishOptionSchema.safeParse(buttonCustomFinish).success);
+  const detailsAreValid = Boolean(
+    displayName.trim() &&
+      material &&
+      finish &&
+      finishSelectionIsValid &&
+      buttonSelectionIsValid &&
+      (!selectedButton || buttonFinishSelectionIsValid),
+  );
+  const submissionMode = collectionEditSubmissionMode(
+    detailsAreValid,
+    images.length,
+  );
 
   return (
     <AppShell
       breadcrumbItems={[
         { label: t("web.navigation.collections"), to: "/collections" },
       ]}
-      title={item.name}
+      title={item.displayName}
     >
       <main className="grid max-w-xl gap-5 p-6">
+        <Field label={displayNameLabel}>
+          <Input
+            onChange={(event) => setDisplayName(event.target.value)}
+            required
+            value={displayName}
+          />
+        </Field>
         <CollectionSelector
           addLabel={t("web.collections.select.addNew")}
           collections={collections}
@@ -1778,9 +1815,9 @@ export function CollectionEditPage({
                       candidate.collectionId === collectionId ||
                       candidate.collectionItemId === item.installedButtonId,
                   )
-                  .map(({ collectionItemId, name }) => ({
+                  .map(({ collectionItemId, displayName }) => ({
                     id: collectionItemId,
-                    name,
+                    name: displayName,
                   })),
               ]}
               onValueChange={(value) => {
@@ -1823,6 +1860,10 @@ export function CollectionEditPage({
         ) : null}
         <FileDropInput
           accept=".jpeg,.jpg,.png,.webp"
+          aspectRatio={4 / 3}
+          aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+          aspectRatioHelpLabel={imageGuidance.helpLabel}
+          aspectRatioWarning={imageGuidance.warning}
           browseLabel={t("web.resources.upload.browseFiles")}
           description={t("web.resources.upload.imagesHelp", {
             maxFileSize: "25 MiB",
@@ -1851,21 +1892,60 @@ export function CollectionEditPage({
           targetType="collection_item"
         />
         <Button
-          disabled={
-            !material ||
-            !finishSelectionIsValid ||
-            !buttonSelectionIsValid ||
-            (selectedButton ? !buttonFinishSelectionIsValid : false)
-          }
+          disabled={submissionMode === "disabled"}
           onClick={async () => {
-            if (
-              !material ||
-              !finish ||
-              !finishSelectionIsValid ||
-              !buttonSelectionIsValid
-            ) {
+            if (submissionMode === "disabled") {
               return;
             }
+            setFormError(null);
+            const imageError = validateCatalogImages(images);
+            if (imageError) {
+              setFormError(imageError.key);
+              return;
+            }
+            if (images.length) {
+              try {
+                const uploads = await uploadCatalogImages({
+                  files: images,
+                  getToken,
+                  onOwnerDeletedDuplicate: async (imageId) => {
+                    if (
+                      !window.confirm(
+                        t(
+                          "web.resources.trash.restoreConfirmationDescription",
+                          { name: item.displayName },
+                        ),
+                      )
+                    )
+                      return false;
+                    await restoreCatalogImage({
+                      data: { imageId, targetType: "collection_item" },
+                    });
+                    return true;
+                  },
+                  targetId: item.collectionItemId,
+                  targetType: "collection_item",
+                });
+                setImages(uploads.failed);
+                if (uploads.failed.length) {
+                  setFormError("web.resources.upload.sessionFailure");
+                  return;
+                }
+              } catch (error) {
+                setFormError(
+                  (error as CatalogImageUploadError).key ?? "error.generic",
+                );
+                return;
+              }
+            }
+            if (submissionMode === "upload") {
+              await navigate({
+                params: { collectionId },
+                to: "/user/collections/$collectionId",
+              });
+              return;
+            }
+            if (!material || !finish) return;
             let installedButton:
               | {
                   collectionItemId: number;
@@ -1905,6 +1985,7 @@ export function CollectionEditPage({
                 collectionId,
                 collectionItemId: item.collectionItemId,
                 customFinish: finish.id === "custom" ? customFinish : null,
+                displayName,
                 finishOptionId:
                   finish.id === "current" || finish.id === "custom"
                     ? null
@@ -1916,46 +1997,6 @@ export function CollectionEditPage({
               },
             });
             if (result.ok) {
-              const imageError = validateCatalogImages(images);
-              if (imageError) {
-                setFormError(imageError.key);
-                return;
-              }
-              if (images.length) {
-                try {
-                  const uploads = await uploadCatalogImages({
-                    files: images,
-                    getToken,
-                    onOwnerDeletedDuplicate: async (imageId) => {
-                      if (
-                        !window.confirm(
-                          t(
-                            "web.resources.trash.restoreConfirmationDescription",
-                            { name: item.name },
-                          ),
-                        )
-                      )
-                        return false;
-                      await restoreCatalogImage({
-                        data: { imageId, targetType: "collection_item" },
-                      });
-                      return true;
-                    },
-                    targetId: item.collectionItemId,
-                    targetType: "collection_item",
-                  });
-                  setImages(uploads.failed);
-                  if (uploads.failed.length) {
-                    setFormError("web.resources.upload.sessionFailure");
-                    return;
-                  }
-                } catch (error) {
-                  setFormError(
-                    (error as CatalogImageUploadError).key ?? "error.generic",
-                  );
-                  return;
-                }
-              }
               await navigate({
                 params: { collectionId },
                 to: "/user/collections/$collectionId",
@@ -1972,6 +2013,14 @@ export function CollectionEditPage({
       </main>
     </AppShell>
   );
+}
+
+export function collectionEditSubmissionMode(
+  detailsAreValid: boolean,
+  pendingImageCount: number,
+): "disabled" | "save" | "upload" {
+  if (detailsAreValid) return "save";
+  return pendingImageCount > 0 ? "upload" : "disabled";
 }
 
 function Field({

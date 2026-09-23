@@ -39,7 +39,6 @@ function UserCollectionRoute() {
   );
   return (
     <CollectionPage
-      canEdit
       collection={data.collection}
       filters={filters}
       items={data.items}

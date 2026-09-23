@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 export type CatalogFilterCopy = {
   all: string;
   any: string;
+  apply: string;
   clear: string;
   close: string;
   colors: string;
@@ -70,7 +71,9 @@ export function CatalogFilterBar({
   filters: CatalogFilters;
   onChange: (filters: CatalogFilters) => void;
 }) {
-  const [advancedOpen, setAdvancedOpen] = React.useState(false);
+  const [desktopAdvancedOpen, setDesktopAdvancedOpen] = React.useState(false);
+  const [mobileAdvancedOpen, setMobileAdvancedOpen] = React.useState(false);
+  const desktopRootRef = React.useRef<HTMLDivElement>(null);
   const advancedId = React.useId();
   const facetKey = JSON.stringify({
     colors: facets.colors.map(({ id }) => id),
@@ -83,6 +86,27 @@ export function CatalogFilterBar({
     const next = pruneCatalogFilters(filters, facets);
     if (JSON.stringify(next) !== JSON.stringify(filters)) onChange(next);
   }, [facetKey, facets, filters, onChange]);
+  React.useEffect(() => {
+    if (!desktopAdvancedOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Element;
+      const inFilterPopup = target.closest(
+        '[role="listbox"], [data-slot="dropdown-menu-content"]',
+      );
+      if (!desktopRootRef.current?.contains(target) && !inFilterPopup) {
+        setDesktopAdvancedOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDesktopAdvancedOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [desktopAdvancedOpen]);
   const productType = filters.productType
     ? (() => {
         const selected = facets.productTypes.find(
@@ -109,7 +133,10 @@ export function CatalogFilterBar({
   );
 
   return (
-    <div className="relative flex min-w-0 flex-1 flex-wrap items-end gap-3">
+    <div
+      className="flex min-w-0 flex-1 flex-wrap items-end gap-3"
+      ref={desktopRootRef}
+    >
       <div className="grid min-w-48 gap-1 text-xs font-semibold text-foreground">
         <span>{copy.productType}</span>
         <CatalogCombobox
@@ -150,16 +177,16 @@ export function CatalogFilterBar({
       />
       <Button
         aria-controls={advancedId}
-        aria-expanded={advancedOpen}
+        aria-expanded={desktopAdvancedOpen}
         className="max-[880px]:hidden"
-        onClick={() => setAdvancedOpen((open) => !open)}
+        onClick={() => setDesktopAdvancedOpen((open) => !open)}
         type="button"
         variant="outline"
       >
         <SlidersHorizontal aria-hidden="true" />
         {copy.moreFilters}
       </Button>
-      <Sheet open={advancedOpen} onOpenChange={setAdvancedOpen}>
+      <Sheet open={mobileAdvancedOpen} onOpenChange={setMobileAdvancedOpen}>
         <SheetTrigger
           className="min-[881px]:hidden"
           render={
@@ -174,7 +201,12 @@ export function CatalogFilterBar({
             <SheetTitle>{copy.filters}</SheetTitle>
             <SheetDescription>{copy.description}</SheetDescription>
           </SheetHeader>
-          <div className="grid gap-5 overflow-y-auto px-6 pb-6">{advanced}</div>
+          <div className="grid gap-5 overflow-y-auto px-6 pb-6">
+            {advanced}
+            <Button onClick={() => setMobileAdvancedOpen(false)} type="button">
+              {copy.apply}
+            </Button>
+          </div>
         </SheetContent>
       </Sheet>
       {hasCatalogFilters(filters) ? (
@@ -186,12 +218,20 @@ export function CatalogFilterBar({
           {copy.clear}
         </Button>
       ) : null}
-      {advancedOpen ? (
+      {desktopAdvancedOpen ? (
         <section
-          className="absolute top-[calc(100%+0.5rem)] left-0 z-40 hidden min-h-48 w-[min(40rem,calc(100vw-2.5rem))] gap-5 rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-lg min-[881px]:grid"
+          aria-label={copy.filters}
+          className="absolute inset-x-0 top-full z-40 hidden min-h-96 grid-cols-[minmax(0,1fr)_minmax(16rem,0.5fr)] content-start gap-5 rounded-b-xl border-x border-b border-border bg-popover p-5 text-popover-foreground shadow-lg min-[881px]:grid"
           id={advancedId}
         >
           {advanced}
+          <Button
+            className="col-span-full mt-auto ml-auto self-end"
+            onClick={() => setDesktopAdvancedOpen(false)}
+            type="button"
+          >
+            {copy.apply}
+          </Button>
         </section>
       ) : null}
     </div>

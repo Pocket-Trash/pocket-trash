@@ -5,13 +5,8 @@ import type {
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
-import {
-  formatTranslation,
-  type TranslationKey,
-  translationKeys,
-} from "@pocket-trash/localizations";
+import type { TranslationKey } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { UserRound } from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
@@ -20,6 +15,9 @@ import {
 } from "@/components/catalog-filter-bar";
 import { CollectionCard } from "@/components/collection-card";
 import { ImageGallery } from "@/components/image-gallery";
+import { MakerLink } from "@/components/maker-link";
+import { ProductCard } from "@/components/product-card";
+import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { finishOptionLabel } from "@/lib/catalog";
@@ -28,6 +26,7 @@ import {
   setCollectionVisibility,
   setProductVisibility,
 } from "@/lib/catalog-api";
+import { useCatalogCopy } from "@/lib/catalog-copy";
 import {
   buildCatalogFacets,
   type CatalogFilters,
@@ -38,19 +37,6 @@ import {
   productFilterItem,
 } from "@/lib/catalog-filters";
 import { cn } from "@/lib/utils";
-import { useLocale } from "@/providers/locale-provider";
-
-function useCatalogCopy() {
-  const { locale } = useLocale();
-  return (key: string, values: Readonly<Record<string, unknown>> = {}) =>
-    formatTranslation(
-      (translationKeys as readonly string[]).includes(key)
-        ? (key as TranslationKey)
-        : "error.generic",
-      values,
-      locale,
-    );
-}
 
 function catalogFilterCopy(
   t: ReturnType<typeof useCatalogCopy>,
@@ -58,6 +44,7 @@ function catalogFilterCopy(
   return {
     all: t("web.archive.filter.all"),
     any: t("web.archive.filter.any"),
+    apply: t("action.save"),
     clear: t("web.action.clearAllFilters"),
     close: t("web.action.close"),
     colors: t("web.catalog.field.colors"),
@@ -151,19 +138,14 @@ export function ProductsPage({
   return (
     <AppShell
       headerActions={
-        <>
-          {onFiltersChange ? (
-            <CatalogFilterBar
-              copy={catalogFilterCopy(t)}
-              facets={facets}
-              filters={filters}
-              onChange={onFiltersChange}
-            />
-          ) : null}
-          <Link className={buttonVariants()} to="/products/add">
-            {t("web.action.addProduct")}
-          </Link>
-        </>
+        onFiltersChange ? (
+          <CatalogFilterBar
+            copy={catalogFilterCopy(t)}
+            facets={facets}
+            filters={filters}
+            onChange={onFiltersChange}
+          />
+        ) : undefined
       }
       title={t("web.navigation.products")}
     >
@@ -172,7 +154,13 @@ export function ProductsPage({
   );
 }
 
-export function ProductDetailPage({ product }: { product: CatalogProduct }) {
+export function ProductDetailPage({
+  collectionItems = [],
+  product,
+}: {
+  collectionItems?: UserCollectionItem[];
+  product: CatalogProduct;
+}) {
   const t = useCatalogCopy();
   if (
     product.productTypeSlug !== "spinner" &&
@@ -227,17 +215,6 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
           </Link>
           {product.canEdit ? (
             <>
-              <VisibilityButton
-                canAdminister={product.canAdminister}
-                initialPrivate={product.isPrivate}
-                isAdminPrivate={product.isAdminPrivate}
-                onChange={(isPrivate, reason) =>
-                  setProductVisibility({
-                    data: { isPrivate, productId: product.id, reason },
-                  })
-                }
-                t={t}
-              />
               <Link
                 className={buttonVariants({ variant: "outline" })}
                 params={{
@@ -248,6 +225,18 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
               >
                 {t("web.action.edit")}
               </Link>
+              <VisibilityButton
+                canAdminister={product.canAdminister}
+                initialPrivate={product.isPrivate}
+                isAdminPrivate={product.isAdminPrivate}
+                isOwner={Boolean(product.isOwner)}
+                onChange={(isPrivate, reason) =>
+                  setProductVisibility({
+                    data: { isPrivate, productId: product.id, reason },
+                  })
+                }
+                t={t}
+              />
             </>
           ) : null}
         </div>
@@ -263,7 +252,7 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
         {product.images.find(({ deletedAt }) => !deletedAt) ? (
           <img
             alt={t("web.resources.detail.imageAlt", { name: product.name })}
-            className="aspect-4/3 max-h-[36rem] w-full rounded-xl border border-border object-cover"
+            className="aspect-4/3 w-full rounded-xl border border-border object-cover"
             src={product.images.find(({ deletedAt }) => !deletedAt)?.url}
           />
         ) : null}
@@ -282,7 +271,7 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
             {product.productTypeName}
           </Detail>
           <Detail label={t("web.catalog.field.maker")}>
-            {product.makerName}
+            <MakerLink name={product.makerName} url={product.makerUrl} />
           </Detail>
           <Detail label={t("web.catalog.field.materials")}>
             {product.materials.map(({ name }) => name).join(", ")}
@@ -309,6 +298,66 @@ export function ProductDetailPage({ product }: { product: CatalogProduct }) {
             ) : null,
           )}
         </dl>
+        <section className="grid gap-4">
+          <h2 className="text-lg font-semibold">
+            {t("web.catalog.collectionsWithProduct")}
+          </h2>
+          {collectionItems.length ? (
+            <ul className="grid gap-3 lg:grid-cols-2">
+              {collectionItems.map((item) => (
+                <li
+                  className="grid gap-3 rounded-xl border border-border bg-card p-4"
+                  key={item.collectionItemId}
+                >
+                  <div>
+                    <h3 className="font-semibold">{item.collectionName}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {item.displayName}
+                      {item.ownerUsername ? ` · ${item.ownerUsername}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Link
+                      className={buttonVariants({
+                        size: "sm",
+                        variant: "outline",
+                      })}
+                      params={{
+                        collectionId: item.collectionId,
+                        collectionItemId: item.collectionItemId,
+                        userId: item.ownerUserId,
+                      }}
+                      to="/collections/$userId/$collectionId/$collectionItemId"
+                    >
+                      <span className="sm:hidden">{t("web.action.view")}</span>
+                      <span className="hidden sm:inline">
+                        {t("web.action.viewItem")}
+                      </span>
+                    </Link>
+                    <Link
+                      className={buttonVariants({
+                        size: "sm",
+                        variant: "outline",
+                      })}
+                      params={{
+                        collectionId: item.collectionId,
+                        userId: item.ownerUserId,
+                      }}
+                      to="/collections/$userId/$collectionId"
+                    >
+                      <span className="sm:hidden">
+                        {t("web.collections.field.collection")}
+                      </span>
+                      <span className="hidden sm:inline">
+                        {t("web.action.viewCollection")}
+                      </span>
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
       </main>
     </AppShell>
   );
@@ -324,64 +373,72 @@ export function PublicCollectionsPage({
   owners: PublicCollectionOwner[];
 }) {
   const t = useCatalogCopy();
-  const filteredOwners = owners.flatMap((owner) => {
-    const matchingItemCount = owner.items.filter((item) =>
-      matchesCatalogFilters(collectionFilterItem(item), filters),
-    ).length;
-    return matchingItemCount ? [{ ...owner, matchingItemCount }] : [];
-  });
+  const publicItems = owners.flatMap(({ items }) =>
+    items.filter(
+      ({ collectionIsPrivate, isPrivate }) =>
+        !(collectionIsPrivate || isPrivate),
+    ),
+  );
+  const matchingCollectionIds = new Set(
+    publicItems
+      .filter((item) =>
+        matchesCatalogFilters(collectionFilterItem(item), filters),
+      )
+      .map(({ collectionId }) => collectionId),
+  );
+  const collections = owners
+    .flatMap((owner) =>
+      owner.collections
+        .filter(({ isPrivate }) => !isPrivate)
+        .map((collection) => ({ collection, owner })),
+    )
+    .filter(
+      ({ collection }) =>
+        !hasCatalogFilters(filters) || matchingCollectionIds.has(collection.id),
+    )
+    .sort(
+      (left, right) =>
+        right.collection.updatedAt.getTime() -
+        left.collection.updatedAt.getTime(),
+    );
   const facets = buildCatalogFacets(
-    owners.flatMap(({ items }) => items.map(collectionFilterItem)),
+    publicItems.map(collectionFilterItem),
     filters.productType,
   );
   return (
     <AppShell
       headerActions={
-        <>
-          {onFiltersChange ? (
-            <CatalogFilterBar
-              copy={catalogFilterCopy(t)}
-              facets={facets}
-              filters={filters}
-              onChange={onFiltersChange}
-            />
-          ) : null}
-          <Link className={buttonVariants()} to="/collections/add">
-            {t("web.action.addToCollection")}
-          </Link>
-        </>
+        onFiltersChange ? (
+          <CatalogFilterBar
+            copy={catalogFilterCopy(t)}
+            facets={facets}
+            filters={filters}
+            onChange={onFiltersChange}
+          />
+        ) : undefined
       }
       title={t("web.navigation.collections")}
     >
       <main className="grid gap-[18px] p-4 sm:grid-cols-2 lg:grid-cols-3 md:p-[18px_22px_22px]">
-        {filteredOwners.length ? (
-          filteredOwners.map((owner) => (
+        {collections.length ? (
+          collections.map(({ collection, owner }) => (
             <Link
-              className="flex items-center gap-4 rounded-xl border border-border bg-card p-5 text-card-foreground transition-transform hover:-translate-y-0.5 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              key={owner.userId}
-              params={{ userId: owner.userId }}
-              to="/collections/$userId"
+              className="group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              key={collection.id}
+              params={{ collectionId: collection.id, userId: owner.userId }}
+              to="/collections/$userId/$collectionId"
             >
-              <div
-                aria-label={t("web.collections.directory.avatar")}
-                className="flex size-12 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
-                role="img"
-              >
-                <UserRound aria-hidden="true" />
-              </div>
-              <div>
-                <h2 className="font-semibold">{owner.username}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {owner.matchingItemCount === owner.itemCount
-                    ? t("web.collections.directory.itemCount", {
-                        count: owner.itemCount,
-                      })
-                    : t("web.archive.itemCount", {
-                        total: owner.itemCount,
-                        visible: owner.matchingItemCount,
-                      })}
-                </p>
-              </div>
+              <CollectionCard
+                collection={collection}
+                coverAlt={t("web.resources.detail.imageAlt", {
+                  name: collection.name,
+                })}
+                itemCountLabel={t("web.collections.directory.itemCount", {
+                  count: collection.itemCount,
+                })}
+                ownerName={owner.username}
+                privateLabel={t("web.resources.visibility.private")}
+              />
             </Link>
           ))
         ) : (
@@ -461,6 +518,7 @@ export function UserCollectionsPage({
   );
   return (
     <AppShell
+      breadcrumbItems={[{ label: t("web.navigation.user"), to: "/user" }]}
       headerActions={
         <>
           {onFiltersChange ? (
@@ -514,14 +572,12 @@ export function UserCollectionsPage({
 }
 
 export function CollectionPage({
-  canEdit = false,
   collection,
   filters = emptyCatalogFilters(),
   items,
   onFiltersChange,
   ownerUsername,
 }: {
-  canEdit?: boolean;
   collection: UserCollectionSummary;
   filters?: CatalogFilters;
   items: UserCollectionItem[];
@@ -541,9 +597,17 @@ export function CollectionPage({
       breadcrumbItems={[
         {
           label: t("web.navigation.collections"),
-          to: canEdit ? "/user/collections" : "/collections",
+          to: collection.isOwner ? "/user/collections" : "/collections",
         },
-        ...(ownerUsername ? [{ label: ownerUsername }] : []),
+        ...(ownerUsername
+          ? [
+              {
+                label: ownerUsername,
+                params: { userId: collection.ownerUserId },
+                to: "/collections/$userId" as const,
+              },
+            ]
+          : []),
       ]}
       headerActions={
         <>
@@ -555,7 +619,7 @@ export function CollectionPage({
               onChange={onFiltersChange}
             />
           ) : null}
-          {canEdit ? (
+          {collection.canEdit ? (
             <>
               <Link
                 className={buttonVariants({ variant: "outline" })}
@@ -565,9 +629,10 @@ export function CollectionPage({
                 {t("web.action.edit")}
               </Link>
               <VisibilityButton
-                canAdminister={false}
+                canAdminister={Boolean(collection.canAdminister)}
                 initialPrivate={collection.isPrivate}
                 isAdminPrivate={collection.isAdminPrivate}
+                isOwner={Boolean(collection.isOwner)}
                 onChange={(isPrivate, reason) =>
                   setCollectionVisibility({
                     data: { collectionId: collection.id, isPrivate, reason },
@@ -584,51 +649,71 @@ export function CollectionPage({
       })}
       title={collection.name}
     >
-      <main className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
-        {filtered.length ? (
-          filtered.map((item) => (
-            <Link
-              className="rounded-xl border border-border bg-card p-5 text-card-foreground hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              key={item.collectionItemId}
-              params={{
-                collectionId: collection.id,
-                collectionItemId: item.collectionItemId,
-                userId: item.ownerUserId,
-              }}
-              to="/collections/$userId/$collectionId/$collectionItemId"
-            >
-              {[...item.images, ...item.productImages].find(
-                ({ deletedAt }) => !deletedAt,
-              ) ? (
-                <img
-                  alt={t("web.resources.detail.imageAlt", { name: item.name })}
-                  className="mb-3 aspect-4/3 w-full rounded-lg object-cover"
-                  src={
-                    [...item.images, ...item.productImages].find(
-                      ({ deletedAt }) => !deletedAt,
-                    )?.url
-                  }
-                />
-              ) : null}
-              <h2 className="font-semibold">{item.name}</h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {item.productTypeName} · {item.makerName}
-              </p>
-              {item.material ? (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  {item.material.name}
-                </p>
-              ) : null}
-              {item.finishOption ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {localizedFinishLabel(item.finishOption, t)}
-                </p>
-              ) : null}
-            </Link>
-          ))
-        ) : (
-          <EmptyState>{t("web.collections.empty")}</EmptyState>
-        )}
+      <main className="grid gap-6 p-3 md:p-[18px_22px_22px]">
+        {collection.coverImage ? (
+          <img
+            alt={t("web.resources.detail.imageAlt", {
+              name: collection.name,
+            })}
+            className="mx-auto aspect-4/3 w-full max-w-5xl rounded-xl border border-border object-cover"
+            src={collection.coverImage.url}
+          />
+        ) : null}
+        <section className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
+          {filtered.length ? (
+            filtered.map((item) => (
+              <article
+                className="group relative flex h-[28rem] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground hover:border-primary focus-within:ring-2 focus-within:ring-ring"
+                key={item.collectionItemId}
+              >
+                <Link
+                  className="absolute inset-0 z-10 outline-none"
+                  params={{
+                    collectionId: collection.id,
+                    collectionItemId: item.collectionItemId,
+                    userId: item.ownerUserId,
+                  }}
+                  to="/collections/$userId/$collectionId/$collectionItemId"
+                >
+                  <span className="sr-only">{item.displayName}</span>
+                </Link>
+                {[...item.images, ...item.productImages].find(
+                  ({ deletedAt }) => !deletedAt,
+                ) ? (
+                  <img
+                    alt={t("web.resources.detail.imageAlt", {
+                      name: item.displayName,
+                    })}
+                    className="aspect-4/3 w-full shrink-0 border-b border-border object-cover"
+                    src={
+                      [...item.images, ...item.productImages].find(
+                        ({ deletedAt }) => !deletedAt,
+                      )?.url
+                    }
+                  />
+                ) : null}
+                <div className="p-5">
+                  <h2 className="font-semibold">{item.displayName}</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {item.productTypeName} · {item.makerName}
+                  </p>
+                  {item.material ? (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      {item.material.name}
+                    </p>
+                  ) : null}
+                  {item.finishOption ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {localizedFinishLabel(item.finishOption, t)}
+                    </p>
+                  ) : null}
+                </div>
+              </article>
+            ))
+          ) : (
+            <EmptyState>{t("web.collections.empty")}</EmptyState>
+          )}
+        </section>
       </main>
     </AppShell>
   );
@@ -642,59 +727,45 @@ export function ProductGrid({ products }: { products: CatalogProduct[] }) {
   return (
     <section className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
       {products.map((product) => (
-        <Link
-          className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground transition-transform hover:-translate-y-0.5 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        <div
+          className="group relative h-full focus-within:ring-2 focus-within:ring-ring"
           key={product.id}
-          params={{
-            productSlug: product.slug,
-            productTypeSlug: product.productTypeSlug,
-          }}
-          to="/products/$productTypeSlug/$productSlug"
         >
-          {product.images.find(({ deletedAt }) => !deletedAt) ? (
-            <img
-              alt={t("web.resources.detail.imageAlt", { name: product.name })}
-              className="aspect-4/3 w-full object-cover"
-              src={product.images.find(({ deletedAt }) => !deletedAt)?.url}
-            />
-          ) : null}
-          <div className="p-5">
-            {product.isPrivate ? (
-              <Badge className="mb-2" variant="secondary">
-                {t("web.resources.moderation.privateBadge")}
-              </Badge>
-            ) : null}
-            <h2 className="line-clamp-2 min-h-[2.6em] text-[15px] leading-[1.3] font-semibold">
-              {product.name}
-            </h2>
-            <p className="mt-1 min-h-[2.9em] text-[12.5px] leading-[1.45] text-muted-foreground">
-              {product.productTypeName} · {product.makerName}
-            </p>
-            <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
-              <span>
-                {t("web.catalog.materialCount", {
-                  count: product.materials.length,
-                })}
-              </span>
-              <span>
-                {t("web.catalog.finishOptionCount", {
-                  count: product.finishOptions.length,
-                })}
-              </span>
-              <span>
-                {t("web.resources.upload.imagesLabel")}: {product.imageCount}
-              </span>
-            </div>
-          </div>
-        </Link>
+          <Link
+            className="absolute inset-0 z-10 outline-none"
+            params={{
+              productSlug: product.slug,
+              productTypeSlug: product.productTypeSlug,
+            }}
+            to="/products/$productTypeSlug/$productSlug"
+          >
+            <span className="sr-only">{product.name}</span>
+          </Link>
+          <ProductCard
+            finishOptionCountLabel={t("web.catalog.finishOptionCount", {
+              count: product.finishOptions.length,
+            })}
+            imageAlt={t("web.resources.detail.imageAlt", {
+              name: product.name,
+            })}
+            imageCountLabel={`${t("web.resources.upload.imagesLabel")}: ${product.imageCount}`}
+            materialCountLabel={t("web.catalog.materialCount", {
+              count: product.materials.length,
+            })}
+            privateLabel={t("web.resources.moderation.privateBadge")}
+            product={product}
+          />
+        </div>
       ))}
     </section>
   );
 }
 
 export function CollectionItemDetailPage({
+  installedButton = null,
   item,
 }: {
+  installedButton?: UserCollectionItem | null;
   item: UserCollectionItem;
 }) {
   const t = useCatalogCopy();
@@ -706,15 +777,33 @@ export function CollectionItemDetailPage({
     <AppShell
       breadcrumbItems={[
         { label: t("web.navigation.collections"), to: "/collections" },
+        ...(item.ownerUsername
+          ? [
+              {
+                label: item.ownerUsername,
+                params: { userId: item.ownerUserId },
+                to: "/collections/$userId" as const,
+              },
+              { label: item.collectionName },
+            ]
+          : []),
       ]}
       headerActions={
         item.canEdit ? (
           <div className="flex items-center gap-2">
+            <Link
+              className={buttonVariants({ variant: "outline" })}
+              params={{ collectionItemId: item.collectionItemId }}
+              to="/collections/edit/$collectionItemId"
+            >
+              {t("web.action.edit")}
+            </Link>
             <VisibilityButton
               canAdminister={item.canAdminister}
               disabled={item.collectionIsPrivate}
               initialPrivate={item.isPrivate}
               isAdminPrivate={item.isAdminPrivate}
+              isOwner={Boolean(item.isOwner)}
               onChange={(isPrivate, reason) =>
                 setCollectionItemVisibility({
                   data: {
@@ -726,17 +815,10 @@ export function CollectionItemDetailPage({
               }
               t={t}
             />
-            <Link
-              className={buttonVariants({ variant: "outline" })}
-              params={{ collectionItemId: item.collectionItemId }}
-              to="/collections/edit/$collectionItemId"
-            >
-              {t("web.action.edit")}
-            </Link>
           </div>
         ) : null
       }
-      title={item.name}
+      title={item.displayName}
     >
       <main className="mx-auto grid w-full max-w-5xl gap-6 p-6">
         {item.isPrivate || item.collectionIsPrivate ? (
@@ -746,16 +828,21 @@ export function CollectionItemDetailPage({
         ) : null}
         {[...ownImages, ...productImages][0] ? (
           <img
-            alt={t("web.resources.detail.imageAlt", { name: item.name })}
-            className="aspect-4/3 max-h-[36rem] w-full rounded-xl border border-border object-cover"
+            alt={t("web.resources.detail.imageAlt", {
+              name: item.displayName,
+            })}
+            className="aspect-4/3 w-full rounded-xl border border-border object-cover"
             src={[...ownImages, ...productImages][0]?.url}
           />
         ) : null}
         <dl className="grid gap-4 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
+          <Detail label={t("web.catalog.field.name")}>{item.name}</Detail>
           <Detail label={t("web.catalog.field.productType")}>
             {item.productTypeName}
           </Detail>
-          <Detail label={t("web.catalog.field.maker")}>{item.makerName}</Detail>
+          <Detail label={t("web.catalog.field.maker")}>
+            <MakerLink name={item.makerName} url={item.makerUrl} />
+          </Detail>
           {item.material ? (
             <Detail label={t("web.catalog.field.materials")}>
               {item.material.name}
@@ -766,9 +853,42 @@ export function CollectionItemDetailPage({
               {localizedFinishLabel(item.finishOption, t)}
             </Detail>
           ) : null}
+          {item.productTypeSlug === "spinner" ? (
+            <Detail label={t("web.catalog.field.button")}>
+              {installedButton ? (
+                <div className="grid gap-1">
+                  <span>{installedButton.displayName}</span>
+                  {installedButton.material ? (
+                    <span className="text-sm text-muted-foreground">
+                      {installedButton.material.name}
+                    </span>
+                  ) : null}
+                  {installedButton.finishOption ? (
+                    <span className="text-sm text-muted-foreground">
+                      {localizedFinishLabel(installedButton.finishOption, t)}
+                    </span>
+                  ) : null}
+                </div>
+              ) : (
+                t("web.catalog.defaultButton")
+              )}
+            </Detail>
+          ) : null}
         </dl>
+        <Link
+          className={buttonVariants({ variant: "outline" })}
+          params={{
+            productSlug: item.productSlug,
+            productTypeSlug: item.productTypeSlug,
+          }}
+          to="/products/$productTypeSlug/$productSlug"
+        >
+          {t("web.action.viewProductDetails")}
+        </Link>
         <ImageGallery
-          alt={t("web.resources.detail.imageAlt", { name: item.name })}
+          alt={t("web.resources.detail.imageAlt", {
+            name: item.displayName,
+          })}
           closeLabel={t("web.resources.action.closeImage")}
           groups={[
             { images: ownImages },
@@ -788,6 +908,7 @@ function VisibilityButton({
   disabled = false,
   initialPrivate,
   isAdminPrivate,
+  isOwner,
   onChange,
   t,
 }: {
@@ -795,11 +916,26 @@ function VisibilityButton({
   disabled?: boolean;
   initialPrivate: boolean;
   isAdminPrivate: boolean;
+  isOwner: boolean;
   onChange(isPrivate: boolean, reason?: string): Promise<unknown>;
   t: ReturnType<typeof useCatalogCopy>;
 }) {
   const [isPrivate, setIsPrivate] = useState(initialPrivate);
-  const locked = disabled || (isAdminPrivate && !canAdminister);
+  const actorIsModerating = canAdminister && !isOwner;
+  const locked = disabled || (isAdminPrivate && !actorIsModerating);
+
+  if (!actorIsModerating) {
+    return (
+      <PublicResourceSwitch
+        checked={!isPrivate}
+        disabled={locked}
+        onCheckedChange={(isPublic) => {
+          void onChange(!isPublic).then(() => setIsPrivate(!isPublic));
+        }}
+      />
+    );
+  }
+
   return (
     <button
       aria-pressed={!isPrivate}
@@ -808,10 +944,10 @@ function VisibilityButton({
       onClick={async () => {
         const nextPrivate = !isPrivate;
         const reason =
-          canAdminister && nextPrivate
+          actorIsModerating && nextPrivate
             ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
             : undefined;
-        if (canAdminister && nextPrivate && !reason) return;
+        if (actorIsModerating && nextPrivate && !reason) return;
         await onChange(nextPrivate, reason);
         setIsPrivate(nextPrivate);
       }}

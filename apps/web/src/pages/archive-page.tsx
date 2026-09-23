@@ -6,9 +6,9 @@ import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import * as React from "react";
 import { AppShell } from "@/components/app-shell";
+import { AutmogProductCard } from "@/components/autmog-product-card";
 import { FilterSidebar } from "@/components/filter-sidebar";
 import { MobileToolbar } from "@/components/mobile-toolbar";
-import { ProductCard } from "@/components/product-card";
 import { ProductLightbox } from "@/components/product-lightbox";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { ProductGridSkeleton } from "@/components/skeletons/product-grid-skeleton";
@@ -180,6 +180,7 @@ export function ArchivePage() {
 
   return (
     <AppShell
+      contained={false}
       headerActions={
         <>
           <label
@@ -243,7 +244,7 @@ export function ArchivePage() {
                 <ProductGridSkeleton count={12} />
               ) : visibleProducts.length > 0 ? (
                 visibleProducts.map((product) => (
-                  <ProductCard
+                  <AutmogProductCard
                     currency={currency}
                     key={product.id}
                     onOpen={(nextProduct) =>

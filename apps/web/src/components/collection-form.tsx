@@ -4,6 +4,8 @@ import { FileDropInput } from "@/components/resource-file-input";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getImageUploadGuidance } from "@/lib/help-content";
+import { useLocale } from "@/providers/locale-provider";
 
 export type CollectionFormValue = {
   description: string;
@@ -39,6 +41,8 @@ export function CollectionForm({
     cover: File | null,
   ): void | Promise<void>;
 }) {
+  const { locale } = useLocale();
+  const imageGuidance = getImageUploadGuidance(locale);
   const nameId = useId();
   const descriptionId = useId();
   const [value, setValue] = useState<CollectionFormValue>(
@@ -92,6 +96,10 @@ export function CollectionForm({
       </div>
       <FileDropInput
         accept=".jpeg,.jpg,.png,.webp"
+        aspectRatio={4 / 3}
+        aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+        aspectRatioHelpLabel={imageGuidance.helpLabel}
+        aspectRatioWarning={imageGuidance.warning}
         browseLabel={copy.browse}
         description={copy.imageHelp}
         disabled={disabled}

@@ -180,6 +180,9 @@ importers:
       '@package/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@package/markdown':
+        specifier: workspace:*
+        version: link:../../packages/markdown
       '@package/resources':
         specifier: workspace:*
         version: link:../../packages/resources
@@ -187,8 +190,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/services
       '@pocket-trash/localizations':
-        specifier: ^0.5.1
-        version: 0.5.1
+        specifier: ^0.7.0
+        version: 0.7.0
       '@t3-oss/env-core':
         specifier: ^0.13.11
         version: 0.13.11(typescript@6.0.3)(zod@4.4.3)
@@ -2833,6 +2836,10 @@ packages:
 
   '@pocket-trash/localizations@0.5.1':
     resolution: {integrity: sha512-cd1ZtYbKABKdaqu0T4hxXCz2FpqUihU1o4cHBIZIfpZAsfJNP85hFI2unuokU/ufB/beuHF4kQ7/V1f4hE6dHQ==}
+    engines: {node: '>=20'}
+
+  '@pocket-trash/localizations@0.7.0':
+    resolution: {integrity: sha512-EYvMnt9YrAY7vfKDPvLNjf1kzEXaAq7Up34HC1/ySECtzazAihNTOL/GpPXHSpbtcHtKPPv1rMuIE06CpWdJtw==}
     engines: {node: '>=20'}
 
   '@polka/url@1.0.0-next.29':
@@ -11737,6 +11744,12 @@ snapshots:
     optional: true
 
   '@pocket-trash/localizations@0.5.1':
+    dependencies:
+      lts: 2.0.0
+    transitivePeerDependencies:
+      - supports-color
+
+  '@pocket-trash/localizations@0.7.0':
     dependencies:
       lts: 2.0.0
     transitivePeerDependencies:

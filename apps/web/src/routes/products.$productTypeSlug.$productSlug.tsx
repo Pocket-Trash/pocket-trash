@@ -1,6 +1,6 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { slugPattern } from "@/lib/catalog";
-import { getCatalogProduct } from "@/lib/catalog-api";
+import { getCatalogProductDetail } from "@/lib/catalog-api";
 import { ProductDetailPage } from "@/pages/catalog-pages";
 
 export const Route = createFileRoute("/products/$productTypeSlug/$productSlug")(
@@ -17,14 +17,17 @@ export const Route = createFileRoute("/products/$productTypeSlug/$productSlug")(
       },
     },
     loader: async ({ params }) => {
-      const product = await getCatalogProduct({ data: params });
-      if (!product) throw notFound();
-      return product;
+      const detail = await getCatalogProductDetail({ data: params });
+      if (!detail) throw notFound();
+      return detail;
     },
     component: ProductRoute,
   },
 );
 
 function ProductRoute() {
-  return <ProductDetailPage product={Route.useLoaderData()} />;
+  const { collectionItems, product } = Route.useLoaderData();
+  return (
+    <ProductDetailPage collectionItems={collectionItems} product={product} />
+  );
 }

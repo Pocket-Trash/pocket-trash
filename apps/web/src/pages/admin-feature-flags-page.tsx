@@ -16,6 +16,13 @@ import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { ClerkUserSearchResult } from "@/lib/feature-flags";
 import {
   archiveAdminFeatureFlag,
@@ -241,23 +248,33 @@ export function AdminFeatureFlagsPage() {
                 placeholder={t("web.admin.featureFlags.description")}
                 value={form.description}
               />
-              <select
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              <Select
                 disabled={Boolean(editingSlug)}
-                onChange={(event) =>
+                items={audiences.map((audience) => ({
+                  label: audience,
+                  value: audience,
+                }))}
+                onValueChange={(audience) =>
                   setForm((current) => ({
                     ...current,
-                    audience: event.target.value as FeatureFlagAudience,
+                    audience: audience as FeatureFlagAudience,
                   }))
                 }
                 value={form.audience}
               >
-                {audiences.map((audience) => (
-                  <option key={audience} value={audience}>
-                    {audience}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  aria-label={t("web.admin.featureFlags.audience")}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {audiences.map((audience) => (
+                    <SelectItem key={audience} value={audience}>
+                      {audience}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <label className="flex items-center gap-2 text-sm">
                 <input
                   checked={form.defaultEnabled}
