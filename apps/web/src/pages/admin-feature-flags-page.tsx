@@ -126,7 +126,9 @@ export function AdminFeatureFlagsPage() {
               </p>
             </div>
             {status ? (
-              <Badge className="bg-destructive text-white">{status}</Badge>
+              <Badge className="bg-destructive text-destructive-foreground">
+                {status}
+              </Badge>
             ) : null}
           </div>
           <div className="overflow-hidden rounded-lg border border-border bg-card">

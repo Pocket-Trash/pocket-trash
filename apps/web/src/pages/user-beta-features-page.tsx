@@ -35,7 +35,9 @@ export function UserBetaFeaturesPage() {
     <UserPageShell title={t("web.navigation.betaFeatures")}>
       <div className="mx-auto grid max-w-3xl gap-3">
         {status ? (
-          <Badge className="bg-destructive text-white">{status}</Badge>
+          <Badge className="bg-destructive text-destructive-foreground">
+            {status}
+          </Badge>
         ) : null}
         <div className="overflow-hidden rounded-lg border border-border bg-card">
           {flags.length === 0 ? (
