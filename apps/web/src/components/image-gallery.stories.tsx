@@ -3,23 +3,33 @@ import { expect, within } from "storybook/test";
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { ImageGallery } from "./image-gallery";
 
-const productImage = {
-  fileName: "product.jpg",
-  id: 1,
-  url: "/images/navigation/q3d-seigaiha.jpg",
-};
-const collectionImage = {
-  fileName: "collection.webp",
-  id: 2,
-  url: "/images/navigation/collections.webp",
-};
-const images = [productImage, collectionImage];
+const productImages = [
+  image(1, "one.webp", "product-images"),
+  image(2, "eleven.webp", "product-images"),
+  image(3, "five.webp", "product-images"),
+  image(4, "four.webp", "product-images"),
+  image(5, "nine.webp", "product-images"),
+  image(6, "seven.webp", "product-images"),
+  image(7, "six.webp", "product-images"),
+  image(8, "ten.webp", "product-images"),
+  image(9, "three.webp", "product-images"),
+  image(10, "twelve.webp", "product-images"),
+];
+const collectionImages = [
+  image(101, "thirteen.webp", "collection-images"),
+  image(102, "two.webp", "collection-images"),
+];
+const firstProductImage = productImages[0];
+const secondProductImage = productImages[1];
+if (!firstProductImage || !secondProductImage) {
+  throw new Error("Image gallery stories require product images.");
+}
 
 const meta = {
   args: {
     alt: "Catalog item",
     closeLabel: "Close image",
-    groups: [{ images }],
+    groups: [{ images: productImages }],
     label: "Images",
     nextLabel: "Next image",
     previousLabel: "Previous image",
@@ -28,7 +38,7 @@ const meta = {
   decorators: [
     (Story) => (
       <StoryProviders>
-        <div className="w-[44rem] max-w-full">
+        <div className="w-[68rem] max-w-full">
           <Story />
         </div>
       </StoryProviders>
@@ -45,9 +55,21 @@ export const Thumbnails: Story = {};
 export const Grouped: Story = {
   args: {
     groups: [
-      { images: [productImage], label: "Collection images" },
-      { images: [collectionImage], label: "Product images" },
+      { images: collectionImages, label: "Collection images" },
+      { images: productImages, label: "Product images" },
     ],
+  },
+};
+
+export const GroupedCollectionOnly: Story = {
+  args: {
+    groups: [{ images: collectionImages, label: "Collection images" }],
+  },
+};
+
+export const GroupedProductOnly: Story = {
+  args: {
+    groups: [{ images: productImages, label: "Product images" }],
   },
 };
 
@@ -56,7 +78,9 @@ export const Empty: Story = { args: { groups: [] } };
 export const LightboxNavigation: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     await userEvent.click(
-      canvas.getByRole("button", { name: "Images: product.jpg" }),
+      canvas.getByRole("button", {
+        name: `Images: ${firstProductImage.fileName}`,
+      }),
     );
     const dialog = within(canvasElement.ownerDocument.body).getByRole(
       "dialog",
@@ -68,7 +92,7 @@ export const LightboxNavigation: Story = {
     );
     await expect(within(dialog).getByRole("img")).toHaveAttribute(
       "src",
-      collectionImage.url,
+      secondProductImage.url,
     );
     await userEvent.click(
       within(dialog).getByRole("button", { name: "Close image" }),
@@ -76,3 +100,11 @@ export const LightboxNavigation: Story = {
     await expect(dialog).not.toBeVisible();
   },
 };
+
+function image(id: number, fileName: string, folder: string) {
+  return {
+    fileName,
+    id,
+    url: `https://cdn.pocket-trash.app/assets/storybook/${folder}/${fileName}`,
+  };
+}

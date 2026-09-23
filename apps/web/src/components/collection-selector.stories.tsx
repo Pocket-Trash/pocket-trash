@@ -29,6 +29,7 @@ const meta = {
     placeholder: "Select a collection",
     selectedId: null,
   },
+  title: "Components/CollectionSelector",
 } satisfies Meta<typeof CollectionSelector>;
 
 export default meta;
