@@ -80,6 +80,7 @@ export const collectionItem = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     collectionId: bigint("collection_id", { mode: "number" }).notNull(),
+    displayName: text("display_name"),
     materialId: bigint("material_id", { mode: "number" }).references(
       () => material.id,
       { onDelete: "restrict" },

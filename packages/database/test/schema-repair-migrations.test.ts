@@ -39,4 +39,21 @@ describe("schema repair migrations", () => {
       'SELECT DISTINCT "owner_id", false FROM "collection_item"',
     );
   });
+
+  it("can resume after the former catalog migrations were applied", () => {
+    const migration = readFileSync(
+      new URL("../drizzle/0028_tidy_luke_cage.sql", import.meta.url),
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      'CREATE TABLE IF NOT EXISTS "catalog_image_upload_file"',
+    );
+    expect(migration).toContain(
+      'ALTER TABLE "collection_item" ADD COLUMN IF NOT EXISTS "collection_id"',
+    );
+    expect(migration).toContain(
+      'ALTER TABLE "catalog_image_upload_session" DROP CONSTRAINT IF EXISTS "catalog_image_upload_session_target_consistent"',
+    );
+  });
 });
