@@ -130,8 +130,6 @@ Use normal dev commands:
 
 ```sh
 pnpm dev:web
-pnpm dev:ios
-pnpm dev:android
 ```
 
 ## Development Terminal Logs

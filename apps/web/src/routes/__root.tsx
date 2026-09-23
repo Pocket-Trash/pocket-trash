@@ -13,7 +13,6 @@ import {
   getCurrentUserSettingsState,
   type UserSettingsState,
 } from "@/lib/user-settings";
-import { NotFoundPage } from "@/pages/not-found-page";
 import { AppProviders } from "@/providers/app-providers";
 import "../styles.css";
 
@@ -27,7 +26,6 @@ export const Route = createRootRoute({
       themeBootstrap: resolveServerThemeBootstrap(settingsState),
     };
   },
-  notFoundComponent: RootNotFoundDocument,
   head: () => ({
     meta: [
       {
@@ -75,14 +73,6 @@ function RootDocument({ children }: { children?: React.ReactNode }) {
         <Scripts />
       </body>
     </html>
-  );
-}
-
-function RootNotFoundDocument() {
-  return (
-    <RootDocument>
-      <NotFoundPage />
-    </RootDocument>
   );
 }
 

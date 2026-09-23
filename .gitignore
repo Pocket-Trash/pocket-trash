@@ -10,6 +10,7 @@ build/
 .tanstack/
 .turbo/
 coverage/
+storybook-static/
 
 # Logs
 *.log
@@ -42,3 +43,4 @@ assets/
 /bunny-audit/
 plans/
 pr-summarys/
+.wrangler/

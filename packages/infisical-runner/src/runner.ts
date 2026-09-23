@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import {
   type CommandSecretConfig,
   commandSecrets,
-  databaseUrlUserOverrideSecretPath,
   defaultEnvironmentSlug,
 } from "./config.js";
 
@@ -22,6 +21,7 @@ export type ParsedCliArguments = {
 export type InfisicalRunRequest = ParsedCliArguments & {
   infisicalProjectId?: string;
   repoRoot: string;
+  verbose?: boolean;
 };
 
 export function getRepoRoot(): string {
@@ -122,6 +122,9 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
 
   const runArgsForPath = (secretPath: string): string[] => [
     "run",
+    ...(request.verbose
+      ? ["--log-level=info"]
+      : ["--silent", "--log-level=error"]),
     ...(request.infisicalProjectId
       ? [`--projectId=${request.infisicalProjectId}`]
       : []),
@@ -142,12 +145,12 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
         "packages/infisical-runner/src/env-alias-runner.ts",
       ),
       JSON.stringify({
-        databaseUrlUserOverridePath: databaseUrlUserOverrideSecretPath,
+        databaseUrlUserOverrideFilePaths: [
+          join(request.repoRoot, ".env.local"),
+          join(request.repoRoot, "packages/database/.env.local"),
+        ],
         databaseUrlUserOverride: config.databaseUrlUserOverride ?? false,
         envAliases: config.envAliases ?? [],
-        environmentSlug,
-        infisicalProjectId: request.infisicalProjectId,
-        secretPaths: paths,
       }),
       "--",
     );
@@ -244,6 +247,8 @@ export function assertInfisicalAuthenticated(
       "secrets",
       "folders",
       "get",
+      "--silent",
+      "--log-level=error",
       `--env=${environmentSlug}`,
       "--path=/",
       "--output=json",

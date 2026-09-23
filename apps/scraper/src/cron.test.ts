@@ -6,11 +6,7 @@ import {
   loggerMessages,
 } from "@package/logger";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  getRecurringTaskDueState,
-  runRailwayCronJob,
-  shouldRunRailwayCron,
-} from "./cron.js";
+import { runRailwayCronJob, shouldRunRailwayCron } from "./cron.js";
 import {
   runQueueProcessorJob,
   runSourceProducerJob,
@@ -32,19 +28,6 @@ describe("Railway scraper cron", () => {
   afterEach(() => {
     vi.mocked(runQueueProcessorJob).mockReset();
     vi.mocked(runSourceProducerJob).mockReset();
-  });
-
-  it("runs a recurring task that has never completed", () => {
-    expect(
-      getRecurringTaskDueState({
-        intervalMinutes: 60,
-        lastRunAt: null,
-        now: new Date("2026-07-16T12:00:00.000Z"),
-      }),
-    ).toEqual({
-      due: true,
-      reason: "never-run",
-    });
   });
 
   it("disables preview cron unless explicitly enabled", () => {
@@ -77,38 +60,6 @@ describe("Railway scraper cron", () => {
     ).toBe(false);
   });
 
-  it("skips a recurring task before the interval has elapsed", () => {
-    expect(
-      getRecurringTaskDueState({
-        intervalMinutes: 60,
-        lastRunAt: "2026-07-16T11:15:00.000Z",
-        now: new Date("2026-07-16T12:00:00.000Z"),
-      }),
-    ).toEqual({
-      due: false,
-      lastRunAt: "2026-07-16T11:15:00.000Z",
-      minutesSinceLastRun: 45,
-      nextRunAt: "2026-07-16T12:15:00.000Z",
-      reason: "interval-not-elapsed",
-    });
-  });
-
-  it("runs a recurring task after the interval has elapsed", () => {
-    expect(
-      getRecurringTaskDueState({
-        intervalMinutes: 60,
-        lastRunAt: "2026-07-16T11:00:00.000Z",
-        now: new Date("2026-07-16T12:02:00.000Z"),
-      }),
-    ).toEqual({
-      due: true,
-      lastRunAt: "2026-07-16T11:00:00.000Z",
-      minutesSinceLastRun: 62,
-      nextRunAt: "2026-07-16T12:00:00.000Z",
-      reason: "interval-elapsed",
-    });
-  });
-
   it("logs task failures without rejecting the cron run", async () => {
     vi.mocked(runSourceProducerJob).mockRejectedValueOnce(
       new Error("producer failed"),
@@ -123,10 +74,16 @@ describe("Railway scraper cron", () => {
         now: new Date("2026-07-16T12:00:00.000Z"),
       }),
     ).resolves.toBeUndefined();
-    expect(runSourceProducerJob).toHaveBeenCalledTimes(2);
+    expect(runSourceProducerJob).toHaveBeenCalledTimes(5);
     expect(
       vi.mocked(runSourceProducerJob).mock.calls.map(([input]) => input.source),
-    ).toEqual(["autmog", "grimsmo-saga"]);
+    ).toEqual([
+      "autmog",
+      "grimsmo-fjell",
+      "grimsmo-norseman",
+      "grimsmo-rask",
+      "grimsmo-saga",
+    ]);
     expect(runQueueProcessorJob).toHaveBeenCalledOnce();
   });
 
@@ -166,7 +123,7 @@ describe("Railway scraper cron", () => {
     });
   });
 
-  it("waits for Grimsmo stagger offsets on first run", async () => {
+  it("runs every source once per hourly invocation", async () => {
     vi.mocked(runSourceProducerJob).mockResolvedValue(undefined);
     vi.mocked(runQueueProcessorJob).mockResolvedValue(undefined);
 
@@ -174,28 +131,18 @@ describe("Railway scraper cron", () => {
       context: createContext(),
       env: createEnv(),
       logger: createNoopLogger(),
-      now: new Date("2026-07-16T12:14:00.000Z"),
+      now: new Date("2026-07-16T12:00:00.000Z"),
     });
 
     expect(
       vi.mocked(runSourceProducerJob).mock.calls.map(([input]) => input.source),
-    ).toEqual(["autmog", "grimsmo-saga"]);
-  });
-
-  it("runs a staggered Grimsmo knife source once its offset is reached", async () => {
-    vi.mocked(runSourceProducerJob).mockResolvedValue(undefined);
-    vi.mocked(runQueueProcessorJob).mockResolvedValue(undefined);
-
-    await runRailwayCronJob({
-      context: createContext(),
-      env: createEnv(),
-      logger: createNoopLogger(),
-      now: new Date("2026-07-16T12:15:00.000Z"),
-    });
-
-    expect(
-      vi.mocked(runSourceProducerJob).mock.calls.map(([input]) => input.source),
-    ).toEqual(["autmog", "grimsmo-saga", "grimsmo-rask"]);
+    ).toEqual([
+      "autmog",
+      "grimsmo-fjell",
+      "grimsmo-norseman",
+      "grimsmo-rask",
+      "grimsmo-saga",
+    ]);
   });
 });
 

@@ -1,6 +1,18 @@
 import { relations } from "drizzle-orm";
 import { featureFlags, featureFlagUserOverrides } from "./feature-flags.js";
 import {
+  resourceCategories,
+  resourceDownloads,
+  resourceFiles,
+  resourceImages,
+  resourceNotifications,
+  resources,
+  resourcesToCategories,
+  resourceUploadFiles,
+  resourceUploadSessions,
+  resourceVersions,
+} from "./resources.js";
+import {
   makers,
   materials,
   mechanisms,
@@ -35,6 +47,126 @@ export const userSettingsRelations = relations(userSettings, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+export const resourcesRelations = relations(resources, ({ many }) => ({
+  categories: many(resourcesToCategories),
+  images: many(resourceImages),
+  notifications: many(resourceNotifications),
+  versions: many(resourceVersions),
+  completedUploadSessions: many(resourceUploadSessions, {
+    relationName: "resourceUploadSessionCompletedResource",
+  }),
+  uploadSessions: many(resourceUploadSessions, {
+    relationName: "resourceUploadSessionTarget",
+  }),
+}));
+
+export const resourceImagesRelations = relations(resourceImages, ({ one }) => ({
+  resource: one(resources, {
+    fields: [resourceImages.resourceId],
+    references: [resources.id],
+  }),
+}));
+
+export const resourceVersionsRelations = relations(
+  resourceVersions,
+  ({ many, one }) => ({
+    files: many(resourceFiles),
+    legacyDownloads: many(resourceDownloads),
+    resource: one(resources, {
+      fields: [resourceVersions.resourceId],
+      references: [resources.id],
+    }),
+  }),
+);
+
+export const resourceFilesRelations = relations(
+  resourceFiles,
+  ({ many, one }) => ({
+    downloads: many(resourceDownloads),
+    version: one(resourceVersions, {
+      fields: [resourceFiles.versionId],
+      references: [resourceVersions.id],
+    }),
+  }),
+);
+
+export const resourceUploadSessionsRelations = relations(
+  resourceUploadSessions,
+  ({ many, one }) => ({
+    files: many(resourceUploadFiles),
+    resource: one(resources, {
+      fields: [resourceUploadSessions.resourceId],
+      references: [resources.id],
+      relationName: "resourceUploadSessionTarget",
+    }),
+    completedResource: one(resources, {
+      fields: [resourceUploadSessions.completedResourceId],
+      references: [resources.id],
+      relationName: "resourceUploadSessionCompletedResource",
+    }),
+  }),
+);
+
+export const resourceUploadFilesRelations = relations(
+  resourceUploadFiles,
+  ({ one }) => ({
+    session: one(resourceUploadSessions, {
+      fields: [resourceUploadFiles.sessionId],
+      references: [resourceUploadSessions.id],
+    }),
+  }),
+);
+
+export const resourceCategoriesRelations = relations(
+  resourceCategories,
+  ({ many }) => ({
+    notifications: many(resourceNotifications),
+    resources: many(resourcesToCategories),
+  }),
+);
+
+export const resourceNotificationsRelations = relations(
+  resourceNotifications,
+  ({ one }) => ({
+    category: one(resourceCategories, {
+      fields: [resourceNotifications.categoryId],
+      references: [resourceCategories.id],
+    }),
+    resource: one(resources, {
+      fields: [resourceNotifications.resourceId],
+      references: [resources.id],
+    }),
+  }),
+);
+
+export const resourcesToCategoriesRelations = relations(
+  resourcesToCategories,
+  ({ one }) => ({
+    category: one(resourceCategories, {
+      fields: [resourcesToCategories.categoryId],
+      references: [resourceCategories.id],
+    }),
+    resource: one(resources, {
+      fields: [resourcesToCategories.resourceId],
+      references: [resources.id],
+    }),
+  }),
+);
+
+export const resourceDownloadsRelations = relations(
+  resourceDownloads,
+  ({ one }) => ({
+    file: one(resourceFiles, {
+      fields: [resourceDownloads.fileId],
+      references: [resourceFiles.id],
+    }),
+    legacyVersion: one(resourceVersions, {
+      fields: [resourceDownloads.versionId],
+      references: [resourceVersions.id],
+    }),
+  }),
+);
 
 export const featureFlagsRelations = relations(featureFlags, ({ many }) => ({
   userOverrides: many(featureFlagUserOverrides),
