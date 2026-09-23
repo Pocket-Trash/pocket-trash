@@ -1397,3 +1397,34 @@ jobs:
         env:
           DEPLOYMENT_URL: ${{ steps.vercel_deploy.outputs.deployment_url }}
         run: curl --fail --retry 5 --retry-all-errors --retry-delay 3 "$DEPLOYMENT_URL"
+
+  github-release:
+    name: GitHub Release
+    needs: [production, railway-production, web-production]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          version="${GITHUB_REF_NAME#v}"
+          notes_path="$RUNNER_TEMP/release-notes.md"
+          node scripts/release.mjs --release-notes "$version" > "$notes_path"
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "GitHub Release already exists for $GITHUB_REF_NAME."
+            exit 0
+          fi
+
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file "$notes_path"

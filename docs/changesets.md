@@ -13,7 +13,7 @@ Use this shape:
 
 ```md
 ---
-"@pocket-trash/repo": patch
+"@app/web": patch
 ---
 
 Add release automation.
@@ -24,7 +24,7 @@ Guidelines:
 - Use `patch` for fixes, docs, tests, internal tooling, and compatible chores.
 - Use `minor` for new compatible user-facing behavior or workflows.
 - Use `major` for breaking API, database, or mobile compatibility changes.
-- Select `@pocket-trash/repo` for root-level changes that are not part of an app or package.
+- Select the real apps and packages affected by root-level tooling changes.
 - Keep the description terse, human friendly, and changelog-ready.
 - Write what changed, not why the PR exists.
 
