@@ -102,7 +102,7 @@ export const BasicSignedInUser: Story = {
     mocked(useUser).mockReturnValue(signedInUser);
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /Ada Lovelace/ }));
+    await userEvent.click(canvas.getByRole("button", { name: "Account menu" }));
 
     const page = within(canvasElement.ownerDocument.body);
     await expect(await page.findByText("ada@example.com")).toBeVisible();
@@ -128,7 +128,7 @@ export const AdminUser: Story = {
     mocked(useUser).mockReturnValue(signedInUser);
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /Ada Lovelace/ }));
+    await userEvent.click(canvas.getByRole("button", { name: "Account menu" }));
 
     const page = within(canvasElement.ownerDocument.body);
     await expect(
@@ -142,7 +142,7 @@ export const SignOut: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = canvasElement.ownerDocument.body;
 
-    await userEvent.click(canvas.getByRole("button", { name: /Ada Lovelace/ }));
+    await userEvent.click(canvas.getByRole("button", { name: "Account menu" }));
     await userEvent.click(
       await within(page).findByRole("menuitem", {
         name: "Log out",
@@ -159,7 +159,7 @@ export const SignOut: Story = {
 export const KeyboardDismiss: Story = {
   beforeEach: BasicSignedInUser.beforeEach,
   play: async ({ canvas, canvasElement, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /Ada Lovelace/ }));
+    await userEvent.click(canvas.getByRole("button", { name: "Account menu" }));
 
     const page = canvasElement.ownerDocument.body;
     await expect(

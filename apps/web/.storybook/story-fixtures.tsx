@@ -1,4 +1,10 @@
 import { useAuth, useClerk, useUser } from "@clerk/tanstack-react-start";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from "@tanstack/react-router";
 import * as React from "react";
 import { fn, mocked } from "storybook/test";
 import { products } from "../src/lib/pen-data";
@@ -71,12 +77,27 @@ export function mockStoryAuth() {
 
 export function StoryProviders({ children }: { children: React.ReactNode }) {
   return (
-    <LocaleProvider initialSettingsState={storySettings}>
-      <StoryThemeProvider>
-        <TooltipProvider>{children}</TooltipProvider>
-      </StoryThemeProvider>
-    </LocaleProvider>
+    <StoryRouter>
+      <LocaleProvider initialSettingsState={storySettings}>
+        <StoryThemeProvider>
+          <TooltipProvider>{children}</TooltipProvider>
+        </StoryThemeProvider>
+      </LocaleProvider>
+    </StoryRouter>
   );
+}
+
+function StoryRouter({ children }: { children: React.ReactNode }) {
+  const router = React.useMemo(
+    () =>
+      createRouter({
+        history: createMemoryHistory({ initialEntries: ["/"] }),
+        routeTree: createRootRoute({ component: () => children }),
+      }),
+    [children],
+  );
+
+  return <RouterProvider router={router as never} />;
 }
 
 function currentStorybookTheme(): ThemeMode {

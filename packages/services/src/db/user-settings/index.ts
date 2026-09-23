@@ -92,10 +92,10 @@ export function createUserSettingsService(
             })
             .from(schema.userSettings)
             .innerJoin(
-              schema.users,
-              eq(schema.userSettings.userId, schema.users.id),
+              schema.user,
+              eq(schema.userSettings.userId, schema.user.id),
             )
-            .where(eq(schema.users.clerkId, clerkId))
+            .where(eq(schema.user.clerkId, clerkId))
             .limit(1);
 
           return row ?? null;

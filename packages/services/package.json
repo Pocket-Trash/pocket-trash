@@ -28,7 +28,7 @@
     "@package/images": "workspace:*",
     "@package/logger": "workspace:*",
     "@package/resources": "workspace:*",
-    "@pocket-trash/localizations": "^0.5.0",
+    "@pocket-trash/localizations": "^0.5.1",
     "drizzle-orm": "latest"
   },
   "devDependencies": {

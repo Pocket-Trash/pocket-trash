@@ -6,7 +6,22 @@ import type { ResourceStorageConfig } from "@package/resources";
 import { createDbServices, type DbServices } from "./db/index.js";
 
 export type {
+  CatalogColor,
+  CatalogFinishOption,
+  CatalogImage,
+  CatalogImageTargetType,
+  CatalogImageTrashItem,
+  CatalogLookup,
+  CatalogProduct,
+  CatalogProductType,
+  CatalogService,
+  CatalogViewer,
+  CollectionsService,
+  ProductWriteInput,
+  PublicCollectionOwner,
   UpsertUserSettingsInput,
+  UserCollectionItem,
+  UserCollectionSummary,
   UserSettingsService,
   UserSyncResult,
   UsersService,

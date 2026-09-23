@@ -67,6 +67,11 @@ export const commandSecrets = {
       databaseUrlUserOverride: true,
       paths: [webSecretPath, databaseLocalSecretPath],
     },
+    "db:seed": {
+      allowServerSecrets: true,
+      databaseUrlUserOverride: true,
+      paths: [webSecretPath],
+    },
     "db:studio": {
       allowServerSecrets: true,
       databaseUrlUserOverride: true,

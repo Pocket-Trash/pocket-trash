@@ -397,18 +397,18 @@ export function createResourcesService(
           const [record] = await db
             .select({
               resource: schema.resources,
-              uploaderUsername: schema.users.username,
+              uploaderUsername: schema.user.username,
             })
             .from(schema.resources)
             .innerJoin(
-              schema.users,
-              eq(schema.users.clerkId, schema.resources.uploaderClerkId),
+              schema.user,
+              eq(schema.user.clerkId, schema.resources.uploaderClerkId),
             )
             .where(
               and(
                 eq(schema.resources.id, resourceId),
                 isNull(schema.resources.deletedAt),
-                isNotNull(schema.users.username),
+                isNotNull(schema.user.username),
               ),
             )
             .limit(1);

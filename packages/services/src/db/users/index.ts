@@ -48,11 +48,11 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
           assertClerkId(clerkId);
 
           const [user] = await db
-            .insert(schema.users)
+            .insert(schema.user)
             .values({ clerkId })
             .onConflictDoUpdate({
               set: { clerkId },
-              target: schema.users.clerkId,
+              target: schema.user.clerkId,
             })
             .returning();
 
@@ -77,8 +77,8 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
 
           const [user] = await db
             .select()
-            .from(schema.users)
-            .where(eq(schema.users.clerkId, clerkId))
+            .from(schema.user)
+            .where(eq(schema.user.clerkId, clerkId))
             .limit(1);
 
           return user ?? null;
@@ -97,28 +97,28 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
           try {
             const normalized = normalizeSyncInput(input);
             const updated = await db
-              .update(schema.users)
+              .update(schema.user)
               .set({
                 clerkUpdatedAt: normalized.clerkUpdatedAt,
                 username: normalized.username,
               })
               .where(
                 and(
-                  eq(schema.users.clerkId, normalized.clerkId),
+                  eq(schema.user.clerkId, normalized.clerkId),
                   or(
-                    isNull(schema.users.clerkUpdatedAt),
-                    lt(schema.users.clerkUpdatedAt, normalized.clerkUpdatedAt),
+                    isNull(schema.user.clerkUpdatedAt),
+                    lt(schema.user.clerkUpdatedAt, normalized.clerkUpdatedAt),
                   ),
                 ),
               )
-              .returning({ id: schema.users.id });
+              .returning({ id: schema.user.id });
             if (updated.length > 0) return "updated";
 
             const inserted = await db
-              .insert(schema.users)
+              .insert(schema.user)
               .values(normalized)
-              .onConflictDoNothing({ target: schema.users.clerkId })
-              .returning({ id: schema.users.id });
+              .onConflictDoNothing({ target: schema.user.clerkId })
+              .returning({ id: schema.user.id });
 
             return inserted.length > 0 ? "inserted" : "unchanged";
           } catch {

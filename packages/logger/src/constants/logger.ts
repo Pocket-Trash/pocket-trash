@@ -46,6 +46,24 @@ export const loggerMessages = {
   },
   common: {},
   database: {
+    catalog: {
+      createColor: "database.catalog.createColor",
+      createFinish: "database.catalog.createFinish",
+      createMaker: "database.catalog.createMaker",
+      createMaterial: "database.catalog.createMaterial",
+      createProduct: "database.catalog.createProduct",
+      listColorEffects: "database.catalog.listColorEffects",
+      listColors: "database.catalog.listColors",
+      listFinishes: "database.catalog.listFinishes",
+      updateProduct: "database.catalog.updateProduct",
+    },
+    collections: {
+      addSpinner: "database.collections.addSpinner",
+      addSpinnerButton: "database.collections.addSpinnerButton",
+      create: "database.collections.create",
+      update: "database.collections.update",
+      updateItem: "database.collections.updateItem",
+    },
     featureFlags: {
       archive: "database.featureFlags.archive",
       create: "database.featureFlags.create",
@@ -171,6 +189,7 @@ export const loggerMessages = {
   web: {
     accountLoaded: "web.account.loaded",
     fxRatesFetchFailed: "web.fxRates.fetch.failed",
+    localizationKeyMissing: "web.localization.key.missing",
     localeSyncFailed: "web.locale.sync.failed",
     userSettingsFetchFailed: "web.userSettings.fetch.failed",
     userSettingsSaveFailed: "web.userSettings.save.failed",

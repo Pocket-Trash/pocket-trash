@@ -47,7 +47,7 @@ export function ResourceManagementPage({
   ) => formatTranslation(key, params, locale);
 
   return (
-    <AppShell sidebarContent={null} title={t("web.resources.management.title")}>
+    <AppShell title={t("web.resources.management.title")}>
       <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 md:px-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="m-0 text-sm text-muted-foreground">

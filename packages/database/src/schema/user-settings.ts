@@ -5,7 +5,7 @@ import {
   themeModes,
   weightUnits,
 } from "./enums.js";
-import { users } from "./users.js";
+import { user } from "./users.js";
 
 export const currencyCodeEnum = pgEnum("currency_code", currencyCodes);
 export const dimensionUnitEnum = pgEnum("dimension_unit", dimensionUnits);
@@ -15,7 +15,7 @@ export const weightUnitEnum = pgEnum("weight_unit", weightUnits);
 export const userSettings = pgTable("user_settings", {
   userId: bigint("user_id", { mode: "number" })
     .primaryKey()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => user.id, { onDelete: "cascade" }),
   currencyCode: currencyCodeEnum("currency_code").notNull().default("USD"),
   dimensionUnit: dimensionUnitEnum("dimension_unit").notNull().default("in"),
   locale: text("locale"),

@@ -1,6 +1,6 @@
 import { bigint, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
-export const users = pgTable("users", {
+export const user = pgTable("users", {
   id: bigint("id", { mode: "number" })
     .primaryKey()
     .generatedAlwaysAsIdentity({ startWith: 1000 }),
@@ -12,5 +12,5 @@ export const users = pgTable("users", {
   username: text("username"),
 });
 
-export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
+export type User = typeof user.$inferSelect;
+export type NewUser = typeof user.$inferInsert;

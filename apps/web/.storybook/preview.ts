@@ -5,6 +5,7 @@ import "../src/styles.css";
 
 sb.mock(import("@clerk/tanstack-react-start"));
 sb.mock(import("../src/lib/locale-api.ts"));
+sb.mock(import("../src/lib/resources.ts"));
 
 const preview: Preview = {
   decorators: [
@@ -27,6 +28,12 @@ const preview: Preview = {
   parameters: {
     a11y: { test: "error" },
     layout: "centered",
+    options: {
+      storySort: {
+        method: "alphabetical",
+        order: ["Components", "Pages", "UI"],
+      },
+    },
   },
 };
 

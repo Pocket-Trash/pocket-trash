@@ -2,6 +2,7 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
+import { Link } from "@tanstack/react-router";
 import { useLocale } from "@/providers/locale-provider";
 
 export function PageFooter() {
@@ -32,6 +33,11 @@ export function PageFooter() {
         >
           u/BVG_Digital
         </a>
+      </div>
+      <div>
+        <Link className="text-primary underline underline-offset-2" to="/help">
+          {t("web.navigation.help")}
+        </Link>
       </div>
       <div className="mx-auto mt-3 max-w-[640px] border-t border-border pt-3 text-[11.5px] leading-5">
         {t("web.archive.footer.productOwnership")}{" "}

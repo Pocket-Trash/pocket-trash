@@ -31,7 +31,7 @@ export function ThemeToggle() {
   return (
     <ToggleGroup
       aria-label={t("web.settings.theme")}
-      className="mx-auto h-9 w-fit gap-0.5 rounded-full border-sidebar-border bg-secondary/20 p-1"
+      className="h-9 w-fit gap-0.5 rounded-full border-border bg-secondary/20 p-1"
       onValueChange={(value) => {
         if (value) setTheme(value as ThemeMode);
       }}
@@ -48,7 +48,7 @@ export function ThemeToggle() {
               render={
                 <ToggleGroupItem
                   aria-label={label}
-                  className="size-7 flex-none rounded-full p-0 text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[pressed]:bg-background data-[pressed]:text-foreground data-[pressed]:shadow-sm [&_svg]:size-4"
+                  className="size-7 flex-none rounded-full p-0 text-muted-foreground hover:bg-accent hover:text-accent-foreground data-[pressed]:bg-background data-[pressed]:text-foreground data-[pressed]:shadow-sm [&_svg]:size-4"
                   disabled={saving}
                   value={option.value}
                 />

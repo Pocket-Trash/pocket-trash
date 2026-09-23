@@ -19,6 +19,7 @@
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts && pnpm run db:generate:docs",
     "db:generate:docs": "tsx scripts/generate-schema-docs.ts",
     "db:migrate": "tsx ../infisical-runner/src/cli.ts database db:migrate -- drizzle-kit migrate --config=drizzle.config.ts",
+    "db:seed": "tsx ../infisical-runner/src/cli.ts database db:seed -- tsx scripts/seed.ts",
     "db:resolve-conflicts": "node scripts/print-resolve-conflicts-prompt.js",
     "db:studio": "tsx ../infisical-runner/src/cli.ts database db:studio -- drizzle-kit studio --config=drizzle.config.ts --host=127.0.0.1 --port=4009",
     "db:view": "concurrently --kill-others --names studio,visualizer,view \"pnpm db:studio\" \"pnpm db:visualizer\" \"wait-on tcp:127.0.0.1:4009 tcp:127.0.0.1:4010 && pnpm db:view:shell\"",

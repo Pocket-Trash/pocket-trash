@@ -4,7 +4,7 @@
 - **Visual Identity:** Theme-aware archival product browser for machined pens; compact, technical, image-led, and filter-heavy.
 - **Aesthetic Inspiration:** Precision-tool catalog and enthusiast archive rather than marketing site. The UI emphasizes scannability, specs, materials, and product photography.
 - **Tone:** Utilitarian, quiet, data-rich, and maker-focused. Copy is direct and factual; interface labels are short.
-- **Primary Experience:** A searchable/filterable grid of product cards with a persistent filter sidebar, settings drawer, and image/spec lightbox.
+- **Primary Experience:** Shared site chrome around route-owned content. Autmog provides its own searchable/filterable product grid, desktop filter panel, settings controls, and image/spec lightbox.
 
 ## 2. Primitive & Semantic Design Tokens
 ### Typography
@@ -168,18 +168,32 @@ The Advent of Code palette is the visual source. The foreground, focus-ring, and
 - **Filter Sidebar:** Sticky at `top: 70px`, max height `calc(100vh - 90px)`, square corners, hidden scrollbar, scrollable content.
 - **Collapsed Filters:** Body class `filters-closed` changes main to `0 1fr`, sets `gap: 0`, and reveals a fixed vertical edge tab.
 - **Product Grid:** CSS grid with max 5 columns: `repeat(auto-fill, minmax(max(240px, calc((100% - 4 * 18px) / 5)), 1fr))`; `gap: 18px`.
-- **Responsive Breakpoints:** At `max-width: 880px`, filters become a fixed slide-in drawer with scrim and grid becomes full width; at `max-width: 480px`, product grid becomes single column.
+- **Responsive Breakpoints:** At `max-width: 880px`, Autmog filters become a fixed slide-in drawer with scrim and its grid becomes full width; at `max-width: 480px`, product grids become single column. Catalog filters use their mobile sheet through 880px and their desktop overlay from 881px.
 - **Mobile Grid:** `repeat(auto-fill, minmax(160px, 1fr))` between 480px and 880px.
 - **Header Mobile Behavior:** Header wraps; search takes its own full-width row below title/count/sort/settings.
 - **Card Constraints:** Product images use `aspect-ratio: 4 / 3`; cards reserve heights for headline, subtitle, metadata, dimensions, and tags to prevent uneven layout jumps.
 
 ## 4. Component Patterns
-### Header
+### Shared Header
 - Sticky, translucent, blurred background using `bg-background/90`, `backdrop-blur`, and `border-border`.
-- Contains title, item count, search, sort select, and icon-only settings button.
+- Keeps the Pocket Trash site name at the upper left with route breadcrumbs directly below it.
+- Places the language selector, theme toggle, and account control at the upper right in that order.
+- Signed-in users receive an avatar menu; signed-out users receive an explicit Sign In button.
+- Route-specific actions and metadata wrap onto a separate header row when present.
 - Inputs use Tailwind theme tokens: `bg-background`, `border-input`, `text-foreground`, `ring-ring`, and inherited font.
 
-### Filter Chips
+### Catalog Filters
+- `/products`, `/collections`, and `/user/collections` own a compact filter row beneath the breadcrumbs. It is route content, not global App Shell content. Keep the primary route action on the same row when space permits.
+- Product Type is a combobox and scopes the available Material, Finish, Colour, fade, and Maker facets. Product Type choices remain stable while the scope changes.
+- Material and Finish expose the four most common values as checkboxes. Colour combines solid colours and fades, orders them by occurrence, and exposes the five most common choices as toggle buttons. Each facet's More control overlays additional choices instead of moving the product or collection grid.
+- Frequency comes from product associations on `/products` and collection-item occurrences on collection routes. Ordinary filter selections do not remove available facet choices; changing Product Type may prune selections unavailable in the new scope.
+- A colour swatch shows its stored hex value. A fade swatch uses overlapping circles in its stored display order. Every swatch has a name tooltip and accessible label, and communicates selection with both `aria-pressed` and a visible border.
+- More Filters opens an anchored overlay on desktop without changing document flow and a bottom sheet through 880px. The expanded controls contain Maker and Match Mode; the desktop layout starts at 881px.
+- The default Any mode uses OR within a facet and AND between facets. Finish, colour, and fade criteria must match the same finish option. All mode changes within-facet matching to AND. Fade matching is direction-insensitive and accepts close variations containing all selected colours, including repeated or intermediate colours.
+- Clear filters restores the unfiltered state. Filter state persists in URL search parameters; URL writes use a 300ms debounce and replace the current history entry.
+- These filters are separate from Autmog and do not change Autmog's sidebar, chips, matching, or persistence behavior.
+
+### Autmog Filter Chips
 - Filters are grouped by Category, Size, Material, Refill, Mechanism, Clip, Body details, Tip / Nose, and Finish.
 - Chips are rounded pills with small count badges.
 - Active chips invert to accent fill and `--chip-on-text`.
@@ -195,12 +209,11 @@ The Advent of Code palette is the visual source. The foreground, focus-ring, and
 - Dimensions use compact symbols for weight, diameter, and length.
 - Tags use semantic colors for size, material, refill, and nose.
 
-### Settings Drawer
-- Right-side fixed drawer, `360px` wide, `max-width: 92vw`.
-- Opens over a dark scrim with blur.
-- Uses segmented controls for theme (`Light`, `Dark`, `System`), dimensions, and weight; select menu for currency.
-- Gear button rotates when drawer is open.
-- Theme mode persists in `localStorage` under `pocket-trash.theme`; units and weight persist under `pocket-trash.settings`; currency persists separately.
+### User Settings
+- Signed-in display preferences live at `/user/settings` in a left-aligned, readable-width form.
+- Uses segmented controls for dimensions and weight and a select menu for currency.
+- Language is available globally in the shared header; signed-out choices persist locally, while authenticated choices sync to user settings.
+- Theme is available globally in the shared header and persists in `localStorage` under `pocket-trash.theme`.
 
 ### Lightbox
 - Full-screen dialog with dark blurred overlay.
@@ -216,11 +229,12 @@ The Advent of Code palette is the visual source. The foreground, focus-ring, and
 
 ## 5. Interaction & Motion
 - **Motion Curve:** Primary expand/collapse transitions use `cubic-bezier(0.22, 0.65, 0.27, 1)`.
-- **Durations:** Sidebar collapse around `280ms`; settings drawer `350ms`; lightbox enter `520ms`, exit `380ms`.
+- **Durations:** Autmog filter drawer transitions use the primary motion curve; lightbox enter is `520ms` and exit is `380ms`.
 - **Hover States:** Accent border/color is the standard hover affordance for cards, chips, buttons, links, and controls.
 - **Search:** Debounced at `150ms`; multi-token AND search across title, tags, price, and body text.
 - **Sorting:** Supports date, price, weight, diameter, and title.
-- **Persistence:** Theme mode (`light`, `dark`, `system`) persists as `pocket-trash.theme`; units, weight, currency, and desktop filter collapsed state persist locally.
+- **Catalog Filter Persistence:** Product and collection filters serialize to route search parameters after a `300ms` debounce and replace the current history entry.
+- **Persistence:** Theme mode (`light`, `dark`, `system`) persists as `pocket-trash.theme`; language persists in local storage; units, weight, and currency persist through user settings where available.
 
 ## 6. Content & Data Rules
 - **Catalog Model:** Products are pens or accessories with titles, dates, price range, archived state, specs, local images, body text, and tag arrays.
@@ -233,6 +247,7 @@ The Advent of Code palette is the visual source. The foreground, focus-ring, and
 - Dark and light theme tokens must be checked for readable contrast in the implemented UI states.
 - System theme mode must respect `prefers-color-scheme` and update without requiring a page refresh.
 - Search, sort, settings, filters, and dialogs include ARIA labels or dialog roles.
+- Catalog colour and fade toggles include tooltips, accessible names, `aria-pressed`, and a non-colour selected-state border.
 - Links are underlined in the footer so they are distinguishable without color alone.
-- Mobile filters use a scrim and larger edge-tab tap target.
+- Mobile Autmog filters use a scrim and bottom-sheet controls.
 - Layout reserves space for dynamic controls and text blocks to reduce layout shift.

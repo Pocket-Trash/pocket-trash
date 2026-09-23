@@ -143,6 +143,340 @@ export const schemaDescriptions = {
       },
     },
   },
+  collection_item: {
+    description:
+      "Shared ownership and lifecycle row for user collection items.",
+    columns: {
+      id: {
+        description: "Internal collection item row identifier.",
+        example: 1000,
+      },
+      owner_id: {
+        description: "User who owns or owned the collection item.",
+        example: 1000,
+      },
+      collection_id: {
+        description: "Named collection containing the item.",
+        example: 1000,
+      },
+      display_name: {
+        description:
+          "Optional owner-defined name shown instead of the product name.",
+        example: "Blue Katla",
+      },
+      material_id: {
+        description: "Exact material of the owned physical item.",
+        example: 1000,
+      },
+      purchased_at: {
+        description: "Timestamp when the item was purchased.",
+        example: "2026-07-17T20:45:00.000Z",
+      },
+      sold_at: {
+        description: "Timestamp when the item was sold.",
+        example: "2026-08-17T20:45:00.000Z",
+      },
+      purchased_from_user_id: {
+        description: "Known application user the item was purchased from.",
+        example: 1001,
+      },
+      purchased_from_user: {
+        description:
+          "Free-text seller name when no application user row exists.",
+        example: "KAP EDC",
+      },
+      sold_to_user_id: {
+        description: "Known application user the item was sold to.",
+        example: 1002,
+      },
+      sold_to_user: {
+        description:
+          "Free-text buyer name when no application user row exists.",
+        example: "Private buyer",
+      },
+      owned: {
+        description: "Whether the item is currently owned by the owner.",
+        example: true,
+      },
+    },
+  },
+  user_collection: {
+    description: "A named collection owned by one user.",
+    columns: {
+      id: { description: "Internal collection identifier.", example: 1000 },
+      owner_id: { description: "User who owns the collection.", example: 1000 },
+      name: {
+        description: "Display name of the collection.",
+        example: "Daily Carry",
+      },
+      normalized_name: {
+        description: "Canonical per-owner key used to prevent duplicate names.",
+        example: "dailycarry",
+      },
+      description: {
+        description: "Optional description of the collection.",
+        example: "Everyday carry spinners.",
+      },
+      is_private: {
+        description: "Whether public routes hide the collection and its items.",
+        example: true,
+      },
+    },
+  },
+  collection_image: {
+    description: "Current and previous cover images for a collection.",
+    columns: {
+      id: { description: "Internal cover image identifier.", example: 1000 },
+      collection_id: {
+        description: "Collection that owns the cover image.",
+        example: 1000,
+      },
+      is_current: {
+        description: "Whether this image is the collection's active cover.",
+        example: true,
+      },
+      position: {
+        description: "Stable upload order within the collection.",
+        example: 0,
+      },
+      file_name: {
+        description: "Original uploaded file name.",
+        example: "cover.webp",
+      },
+      content_type: {
+        description: "Validated image MIME type.",
+        example: "image/webp",
+      },
+      size: { description: "Uploaded file size in bytes.", example: 1024 },
+      sha256: {
+        description: "Exact-byte duplicate detection hash.",
+        example: "a".repeat(64),
+      },
+      object_path: {
+        description: "Storage-provider object path.",
+        example: "collections/1000/cover.webp",
+      },
+      url: {
+        description: "Unsigned CDN URL stored for the image.",
+        example: "https://cdn.example.test/collections/1000/cover.webp",
+      },
+    },
+  },
+  product: {
+    description: "Shared catalog product identity for supported product types.",
+    columns: {
+      id: { description: "Internal product identifier.", example: 1000 },
+      product_type_id: {
+        description: "Product type classification.",
+        example: 1000,
+      },
+      maker_id: {
+        description: "Maker that produced the product.",
+        example: 1000,
+      },
+      name: {
+        description: "Human-readable product name.",
+        example: "Standard Katla",
+      },
+      slug: {
+        description: "Stable product slug within its type.",
+        example: "standard-katla",
+      },
+    },
+  },
+  product_material: {
+    description: "Materials in which a catalog product is available.",
+    columns: {
+      product_id: { description: "Catalog product.", example: 1000 },
+      material_id: {
+        description: "Available canonical material.",
+        example: 1000,
+      },
+    },
+  },
+  finish: {
+    description: "Canonical atomic product finish values.",
+    columns: {
+      id: { description: "Internal finish identifier.", example: 1000 },
+      name: { description: "Human-readable finish name.", example: "Polished" },
+      slug: { description: "Stable finish slug.", example: "polished" },
+      created_at: { description: "Timestamp when the finish was created." },
+      updated_at: {
+        description: "Timestamp when the finish was last updated.",
+      },
+    },
+  },
+  color: {
+    description: "Canonical atomic colour values used by finish options.",
+    columns: {
+      id: { description: "Internal colour identifier.", example: 1000 },
+      name: { description: "Human-readable colour name.", example: "Blue" },
+      slug: { description: "Stable colour slug.", example: "blue" },
+      hex: { description: "Six-digit display colour.", example: "#2563EB" },
+      created_at: { description: "Timestamp when the colour was created." },
+      updated_at: {
+        description: "Timestamp when the colour was last updated.",
+      },
+    },
+  },
+  color_effect: {
+    description: "Supported relationships between finish-option colours.",
+    columns: {
+      id: { description: "Internal colour-effect identifier.", example: 1000 },
+      name: { description: "Human-readable effect name.", example: "Fade" },
+      slug: { description: "Stable colour-effect slug.", example: "fade" },
+      created_at: { description: "Timestamp when the effect was created." },
+      updated_at: {
+        description: "Timestamp when the effect was last updated.",
+      },
+    },
+  },
+  finish_option: {
+    description:
+      "Ordered finish composition owned by one product or collection item.",
+    columns: {
+      id: { description: "Internal finish-option identifier.", example: 1000 },
+      product_id: {
+        description: "Product that offers this option.",
+        example: 1000,
+      },
+      collection_item_id: {
+        description: "Collection item that owns this snapshot.",
+        example: 1000,
+      },
+      source_product_finish_option_id: {
+        description: "Product option copied into a collection snapshot.",
+        example: 1001,
+      },
+      color_effect_id: {
+        description: "Optional relationship between selected colours.",
+        example: 1000,
+      },
+      position: { description: "Zero-based option display order.", example: 0 },
+    },
+  },
+  finish_option_finish: {
+    description: "Ordered atomic finishes in a finish option.",
+    columns: {
+      finish_option_id: { description: "Owning finish option.", example: 1000 },
+      finish_id: { description: "Selected atomic finish.", example: 1000 },
+      position: { description: "Zero-based finish display order.", example: 0 },
+    },
+  },
+  finish_option_color: {
+    description: "Ordered atomic colours in a finish option.",
+    columns: {
+      finish_option_id: { description: "Owning finish option.", example: 1000 },
+      color_id: { description: "Selected atomic colour.", example: 1000 },
+      position: { description: "Zero-based colour display order.", example: 0 },
+    },
+  },
+  product_spinner: {
+    description: "Catalog spinner product row.",
+    columns: {
+      id: {
+        description: "Internal product spinner row identifier.",
+        example: 1000,
+      },
+      weight_g: {
+        description: "Spinner weight in grams.",
+        example: "72.5",
+      },
+      length_mm: {
+        description: "Spinner length in millimeters.",
+        example: "50.0",
+      },
+      width_mm: {
+        description: "Spinner width in millimeters.",
+        example: "24.5",
+      },
+      thickness_mm: {
+        description: "Spinner body thickness in millimeters.",
+        example: "10.0",
+      },
+      thickness_with_button_mm: {
+        description:
+          "Spinner thickness including installed buttons in millimeters.",
+        example: "17.0",
+      },
+      button_diameter_mm: {
+        description: "Compatible button diameter in millimeters.",
+        example: "24.5",
+      },
+      compatible_button_id: {
+        description: "Catalog spinner button selected for this spinner.",
+        example: 1001,
+      },
+      created_at: {
+        description: "Timestamp when the spinner row was created.",
+        example: "2026-07-17T20:45:00.000Z",
+      },
+      updated_at: {
+        description: "Timestamp when the spinner row was last updated.",
+        example: "2026-07-17T20:45:00.000Z",
+      },
+    },
+  },
+  product_spinner_button: {
+    description: "Catalog spinner button product row.",
+    columns: {
+      id: {
+        description: "Internal product spinner button row identifier.",
+        example: 1000,
+      },
+      weight_g: {
+        description: "Spinner button weight in grams.",
+        example: "8.4",
+      },
+      diameter_mm: {
+        description: "Spinner button diameter in millimeters.",
+        example: "24.5",
+      },
+      thickness_mm: {
+        description: "Spinner button thickness in millimeters.",
+        example: "7.0",
+      },
+      created_at: {
+        description: "Timestamp when the spinner button row was created.",
+        example: "2026-07-17T20:45:00.000Z",
+      },
+      updated_at: {
+        description: "Timestamp when the spinner button row was last updated.",
+        example: "2026-07-17T20:45:00.000Z",
+      },
+    },
+  },
+  collection_spinner: {
+    description: "User collection row for a spinner.",
+    columns: {
+      id: {
+        description: "Collection item row identifier for this spinner.",
+        example: 1000,
+      },
+      product_spinner_id: {
+        description: "Catalog spinner this collection item represents.",
+        example: 1000,
+      },
+      installed_button_id: {
+        description:
+          "Owned spinner button currently installed on this spinner.",
+        example: 1001,
+      },
+    },
+  },
+  collection_spinner_button: {
+    description: "User collection row for a spinner button.",
+    columns: {
+      id: {
+        description: "Collection item row identifier for this spinner button.",
+        example: 1001,
+      },
+      product_spinner_button_id: {
+        description: "Catalog spinner button this collection item represents.",
+        example: 1000,
+      },
+    },
+  },
   scraper_runs: {
     description:
       "Execution log for scraper producer, processor, and dead-letter jobs.",
@@ -244,16 +578,16 @@ export const schemaDescriptions = {
       image_file_id: {
         description:
           "Image storage file identifier used for updates and deletes.",
-        example: "/images/preview/pr-52/products/1000-1001/image.webp",
+        example: "/preview/pr-52/products/1000-1001/image.webp",
       },
       image_path: {
         description: "Image storage object path.",
-        example: "/images/preview/pr-52/products/1000-1001/image.webp",
+        example: "/preview/pr-52/products/1000-1001/image.webp",
       },
       image_url: {
         description: "Optimized uploaded image URL.",
         example:
-          "https://cdn.pocket-trash.app/images/preview/pr-52/products/1000-1001/image.webp",
+          "https://cdn.pocket-trash.app/preview/pr-52/products/1000-1001/image.webp",
       },
       status: {
         description: "Image upload/delete lifecycle status.",

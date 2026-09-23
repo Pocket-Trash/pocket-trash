@@ -64,3 +64,19 @@ export function resolveWebLocale(
 ) {
   return normalizeSavedLocale(storedLocale) ?? resolveLocale(...preferences);
 }
+
+export function resolveAuthenticatedLocale(
+  settingsState: { settings: { locale: SupportedLocale | null } } | null,
+  storedLocale: SupportedLocale | null,
+) {
+  const serverLocale = settingsState?.settings.locale ?? null;
+
+  if (serverLocale) {
+    return { locale: serverLocale, shouldPersist: false } as const;
+  }
+
+  return {
+    locale: storedLocale,
+    shouldPersist: storedLocale !== null,
+  } as const;
+}

@@ -13,6 +13,7 @@ import {
 import { createResourceStorage } from "@package/resources";
 import { createServices } from "@package/services";
 import { type ApiBindings, createApp } from "./app.js";
+import { createCatalogImageUploadSessionsService } from "./catalog-image-upload-sessions.js";
 import { createClerkWebhookHandler } from "./clerk-webhooks.js";
 import { createResourceUploadSessionsService } from "./resource-upload-sessions.js";
 
@@ -68,6 +69,28 @@ const app = createApp({
       }),
     });
 
+    return {
+      authenticate: (request: Request) =>
+        authenticateClerkRequest(request, bindings).then(
+          (actor) => actor?.clerkId ?? null,
+        ),
+      isAllowedOrigin: (origin: string) =>
+        isAllowedWebOrigin(origin, bindings.APP_ENV),
+      service,
+    };
+  },
+  getCatalogImageUploadRuntime(bindings) {
+    validateResourceUploadBindings(bindings);
+    const service = createCatalogImageUploadSessionsService({
+      db: createDb({ databaseUrl: bindings.DATABASE_URL as string }),
+      storage: createResourceStorage({
+        accessKey: bindings.BUNNY_STORAGE_ACCESS_KEY,
+        cdnBaseUrl: bindings.BUNNY_CDN_BASE_URL,
+        endpoint: bindings.BUNNY_STORAGE_ENDPOINT,
+        folderPrefix: bindings.BUNNY_RESOURCE_FOLDER_PREFIX,
+        zoneName: bindings.BUNNY_STORAGE_ZONE_NAME,
+      }),
+    });
     return {
       authenticate: (request: Request) =>
         authenticateClerkRequest(request, bindings),
@@ -171,6 +194,16 @@ export async function handleWorkerScheduled(
             zoneName: env.BUNNY_STORAGE_ZONE_NAME,
           }),
         }).cleanupExpired();
+        await createCatalogImageUploadSessionsService({
+          db: createDb({ databaseUrl: env.DATABASE_URL as string }),
+          storage: createResourceStorage({
+            accessKey: env.BUNNY_STORAGE_ACCESS_KEY,
+            cdnBaseUrl: env.BUNNY_CDN_BASE_URL,
+            endpoint: env.BUNNY_STORAGE_ENDPOINT,
+            folderPrefix: env.BUNNY_RESOURCE_FOLDER_PREFIX,
+            zoneName: env.BUNNY_STORAGE_ZONE_NAME,
+          }),
+        }).cleanupExpired();
       } catch (error) {
         await logWorkerException(
           error,
@@ -209,7 +242,7 @@ export function isAllowedWebOrigin(
 async function authenticateClerkRequest(
   request: Request,
   env: ApiBindings,
-): Promise<string | null> {
+): Promise<{ clerkId: string; isAdmin: boolean } | null> {
   const authorization = request.headers.get("authorization");
   const origin = request.headers.get("origin");
   const token = authorization?.match(/^Bearer (.+)$/u)?.[1];
@@ -227,7 +260,10 @@ async function authenticateClerkRequest(
       authorizedParties: [origin],
       secretKey: env.CLERK_SECRET_KEY,
     });
-    return payload.sub;
+    return {
+      clerkId: payload.sub,
+      isAdmin: (payload as { role?: unknown }).role === "admin",
+    };
   } catch {
     return null;
   }

@@ -19,9 +19,9 @@ Temporary scraper image rows shared by all scraped products and variations.
 | `height` | `integer` | no |  |  |  | Uploaded optimized image height in pixels. | `1333` |
 | `source_hash` | `text` | yes |  |  |  | Stable hash of the source image identity used to dedupe image rows within a product or variation. | `sha256:db2ef0e97513c1dc9d75f55ee8c014c06fc31a459c1c25b12904696bf2ab1c55` |
 | `image_provider` | `text` | no |  |  |  | Image storage provider that owns the uploaded file. | `bunny` |
-| `image_file_id` | `text` | no |  |  |  | Image storage file identifier used for updates and deletes. | `/images/preview/pr-52/products/1000-1001/image.webp` |
-| `image_path` | `text` | no |  |  |  | Image storage object path. | `/images/preview/pr-52/products/1000-1001/image.webp` |
-| `image_url` | `text` | no |  |  |  | Optimized uploaded image URL. | `https://cdn.pocket-trash.app/images/preview/pr-52/products/1000-1001/image.webp` |
+| `image_file_id` | `text` | no |  |  |  | Image storage file identifier used for updates and deletes. | `/preview/pr-52/products/1000-1001/image.webp` |
+| `image_path` | `text` | no |  |  |  | Image storage object path. | `/preview/pr-52/products/1000-1001/image.webp` |
+| `image_url` | `text` | no |  |  |  | Optimized uploaded image URL. | `https://cdn.pocket-trash.app/preview/pr-52/products/1000-1001/image.webp` |
 | `status` | `text` | yes |  | `'pending_upload'` |  | Image upload/delete lifecycle status. | `uploaded` |
 | `uploaded_at` | `timestamp with time zone` | no |  |  |  | Timestamp when the image upload completed. | `2026-07-17T20:45:42.000Z` |
 | `pending_delete_at` | `timestamp with time zone` | no |  |  |  | Timestamp when the image was marked for deletion. | `2026-07-18T20:45:42.000Z` |

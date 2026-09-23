@@ -6,12 +6,11 @@ import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import * as React from "react";
 import { AppShell } from "@/components/app-shell";
+import { AutmogProductCard } from "@/components/autmog-product-card";
 import { FilterSidebar } from "@/components/filter-sidebar";
 import { MobileToolbar } from "@/components/mobile-toolbar";
-import { ProductCard } from "@/components/product-card";
 import { ProductLightbox } from "@/components/product-lightbox";
 import { PullToRefresh } from "@/components/pull-to-refresh";
-import { SettingsDrawer } from "@/components/settings-drawer";
 import { ProductGridSkeleton } from "@/components/skeletons/product-grid-skeleton";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,11 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  useCurrencyRates,
-  useFiltersOpen,
-  usePenSettings,
-} from "@/hooks/use-pen-settings";
+import { useCurrencyRates, usePenSettings } from "@/hooks/use-pen-settings";
 import { type PenProduct, products } from "@/lib/pen-data";
 import {
   createDefaultMatchModes,
@@ -69,15 +64,13 @@ export function ArchivePage() {
     key: TranslationKey,
     values: Readonly<Record<string, unknown>> = {},
   ) => formatTranslation(key, values, locale);
-  // `/` and `/pens/$penId` both render this page, so the open pen is read from
+  // `/autmog` and `/autmog/$penId` both render this page, so the open pen is read from
   // the URL rather than local state — that is what makes each pen shareable.
   const { penId } = useParams({ strict: false });
   const { img } = useSearch({ strict: false }) as { img?: number };
 
-  const { currency, saving, setCurrency, setUnits, setWeight, units, weight } =
-    usePenSettings();
+  const { currency, units, weight } = usePenSettings();
   const { rates, refreshRates } = useCurrencyRates();
-  const [filtersOpen, setFiltersOpen] = useFiltersOpen();
   const [refreshing, setRefreshing] = React.useState(false);
   const [query, setQuery] = React.useState(browseState.query);
   const [debouncedQuery, setDebouncedQuery] = React.useState(browseState.query);
@@ -168,35 +161,30 @@ export function ArchivePage() {
     ]).finally(() => setRefreshing(false));
   }, [refreshRates]);
 
+  const mobileToolbar = (
+    <MobileToolbar
+      active={active}
+      filterCount={filterCount}
+      matchModes={matchModes}
+      onClearFilters={clearFilters}
+      onMatchModeChange={setMatchMode}
+      onQueryChange={setQuery}
+      onSortChange={setSort}
+      onToggleFilter={toggleFilter}
+      products={products}
+      query={query}
+      sort={sort}
+      sortOptions={localizedSortOptions}
+    />
+  );
+
   return (
     <AppShell
-      bottomBar={
-        <MobileToolbar
-          active={active}
-          currency={currency}
-          settingsDisabled={saving}
-          filterCount={filterCount}
-          matchModes={matchModes}
-          onClearFilters={clearFilters}
-          onCurrencyChange={setCurrency}
-          onMatchModeChange={setMatchMode}
-          onQueryChange={setQuery}
-          onSortChange={setSort}
-          onToggleFilter={toggleFilter}
-          onUnitsChange={setUnits}
-          onWeightChange={setWeight}
-          products={products}
-          query={query}
-          sort={sort}
-          sortOptions={localizedSortOptions}
-          units={units}
-          weight={weight}
-        />
-      }
+      contained={false}
       headerActions={
         <>
           <label
-            className="relative order-99 w-full md:order-none md:w-[260px]"
+            className="relative order-99 w-full min-[881px]:order-none min-[881px]:w-[260px]"
             htmlFor={searchInputId}
           >
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -230,72 +218,65 @@ export function ArchivePage() {
               ))}
             </SelectContent>
           </Select>
-          <SettingsDrawer
-            currency={currency}
-            disabled={saving}
-            onCurrencyChange={setCurrency}
-            onUnitsChange={setUnits}
-            onWeightChange={setWeight}
-            units={units}
-            weight={weight}
-          />
         </>
       }
       meta={t("web.archive.itemCount", {
         total: products.length,
         visible: visibleProducts.length,
       })}
-      onSidebarOpenChange={setFiltersOpen}
-      sidebarContent={
-        <FilterSidebar
-          active={active}
-          matchModes={matchModes}
-          onClear={clearFilters}
-          onMatchModeChange={setMatchMode}
-          onToggleFilter={toggleFilter}
-          products={products}
-        />
-      }
-      sidebarOpen={filtersOpen}
       title={t("web.site.name")}
     >
-      <PullToRefresh onRefresh={handleRefresh} refreshing={refreshing}>
-        <section className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
-          {refreshing ? (
-            <ProductGridSkeleton count={12} />
-          ) : visibleProducts.length > 0 ? (
-            visibleProducts.map((product) => (
-              <ProductCard
-                currency={currency}
-                key={product.id}
-                onOpen={(nextProduct) =>
-                  navigate({
-                    to: "/pens/$penId",
-                    params: { penId: penParam(nextProduct) },
-                  })
-                }
-                product={product}
-                rates={rates}
-                units={units}
-                weight={weight}
-              />
-            ))
-          ) : (
-            <div className="col-span-full rounded-lg border border-dashed border-border p-16 text-center text-muted-foreground">
-              {t("web.archive.noItems")}
-            </div>
-          )}
-        </section>
-      </PullToRefresh>
+      <div className="grid min-[881px]:grid-cols-[290px_minmax(0,1fr)] min-[881px]:gap-5 min-[881px]:p-[18px_22px_22px]">
+        <aside className="scrollbar-none sticky top-28 hidden max-h-[calc(100svh-8rem)] self-start overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar p-2 min-[881px]:block">
+          <FilterSidebar
+            active={active}
+            matchModes={matchModes}
+            onClear={clearFilters}
+            onMatchModeChange={setMatchMode}
+            onToggleFilter={toggleFilter}
+            products={products}
+          />
+        </aside>
+        <div className="min-w-0">
+          <PullToRefresh onRefresh={handleRefresh} refreshing={refreshing}>
+            <section className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] min-[881px]:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] min-[881px]:p-0">
+              {refreshing ? (
+                <ProductGridSkeleton count={12} />
+              ) : visibleProducts.length > 0 ? (
+                visibleProducts.map((product) => (
+                  <AutmogProductCard
+                    currency={currency}
+                    key={product.id}
+                    onOpen={(nextProduct) =>
+                      navigate({
+                        to: "/autmog/$penId",
+                        params: { penId: penParam(nextProduct) },
+                      })
+                    }
+                    product={product}
+                    rates={rates}
+                    units={units}
+                    weight={weight}
+                  />
+                ))
+              ) : (
+                <div className="col-span-full rounded-lg border border-dashed border-border p-16 text-center text-muted-foreground">
+                  {t("web.archive.noItems")}
+                </div>
+              )}
+            </section>
+          </PullToRefresh>
+        </div>
+      </div>
 
       <ProductLightbox
         currency={currency}
         imageIndex={imageIndex}
-        onClose={() => navigate({ to: "/" })}
+        onClose={() => navigate({ to: "/autmog" })}
         onImageChange={(nextIndex) => {
           if (!selectedProduct) return;
           navigate({
-            to: "/pens/$penId",
+            to: "/autmog/$penId",
             params: { penId: penParam(selectedProduct) },
             search: nextIndex > 0 ? { img: nextIndex + 1 } : {},
             replace: true,
@@ -306,6 +287,11 @@ export function ArchivePage() {
         units={units}
         weight={weight}
       />
+      <div
+        aria-hidden="true"
+        className="h-[calc(3.5rem+env(safe-area-inset-bottom))] min-[881px]:hidden"
+      />
+      {mobileToolbar}
     </AppShell>
   );
 }

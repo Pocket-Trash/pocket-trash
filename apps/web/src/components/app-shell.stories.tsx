@@ -1,14 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect } from "storybook/test";
-import {
-  mockStoryAuth,
-  StoryProviders,
-  storyActiveFilters,
-  storyMatchModes,
-  storyProducts,
-} from "../../.storybook/story-fixtures";
+import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { AppShell } from "./app-shell";
-import { FilterSidebar } from "./filter-sidebar";
+import { Button } from "./ui/button";
 
 const meta = {
   beforeEach: mockStoryAuth,
@@ -40,16 +34,6 @@ export const Default: Story = {
       </div>
     ),
     meta: "8 items",
-    sidebarContent: (
-      <FilterSidebar
-        active={storyActiveFilters}
-        matchModes={storyMatchModes}
-        onClear={() => undefined}
-        onMatchModeChange={() => undefined}
-        onToggleFilter={() => undefined}
-        products={storyProducts}
-      />
-    ),
     title: "Pocket Trash",
   },
   play: async ({ canvas }) => {
@@ -59,6 +43,12 @@ export const Default: Story = {
   },
 };
 
-export const SidebarCollapsed: Story = {
-  args: { ...Default.args, defaultSidebarOpen: false },
+export const RouteHeader: Story = {
+  args: {
+    breadcrumbItems: [{ label: "Products", to: "/products" }],
+    children: <div className="p-6">Product form</div>,
+    headerActions: <Button>Add product</Button>,
+    meta: "Draft",
+    title: "Add product",
+  },
 };

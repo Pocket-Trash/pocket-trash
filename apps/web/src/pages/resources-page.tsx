@@ -45,44 +45,46 @@ export function ResourcesPage({
           </Button>
         ) : null
       }
-      sidebarContent={
-        <ResourceFilters
-          categories={directory.categories}
-          onChange={setCategoryFilters}
-          selectedCategorySlugs={selectedCategorySlugs}
-          t={t}
-        />
-      }
       title={t("web.resources.directory.title")}
     >
-      <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 md:px-6">
-        <p className="m-0 max-w-2xl text-sm leading-6 text-muted-foreground">
-          {t("web.resources.directory.description")}
-        </p>
+      <div className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 md:grid-cols-[14rem_minmax(0,1fr)] md:px-6">
+        <aside className="self-start rounded-lg border border-sidebar-border bg-sidebar p-2 text-sidebar-foreground">
+          <ResourceFilters
+            categories={directory.categories}
+            onChange={setCategoryFilters}
+            selectedCategorySlugs={selectedCategorySlugs}
+            t={t}
+          />
+        </aside>
+        <main className="grid min-w-0 gap-6">
+          <p className="m-0 max-w-2xl text-sm leading-6 text-muted-foreground">
+            {t("web.resources.directory.description")}
+          </p>
 
-        {directory.invalidFilters.length > 0 ? (
-          <p
-            className="m-0 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-            role="alert"
-          >
-            {t("web.resources.directory.invalidFilter")}
-          </p>
-        ) : directory.resources.length === 0 ? (
-          <p className="m-0 rounded-lg border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
-            {t(
-              selectedCategorySlugs.length > 0
-                ? "web.resources.directory.emptyFiltered"
-                : "web.resources.directory.empty",
-            )}
-          </p>
-        ) : (
-          <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {directory.resources.map((resource) => (
-              <ResourceCard key={resource.id} resource={resource} />
-            ))}
-          </section>
-        )}
-      </main>
+          {directory.invalidFilters.length > 0 ? (
+            <p
+              className="m-0 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+              role="alert"
+            >
+              {t("web.resources.directory.invalidFilter")}
+            </p>
+          ) : directory.resources.length === 0 ? (
+            <p className="m-0 rounded-lg border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
+              {t(
+                selectedCategorySlugs.length > 0
+                  ? "web.resources.directory.emptyFiltered"
+                  : "web.resources.directory.empty",
+              )}
+            </p>
+          ) : (
+            <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {directory.resources.map((resource) => (
+                <ResourceCard key={resource.id} resource={resource} />
+              ))}
+            </section>
+          )}
+        </main>
+      </div>
     </AppShell>
   );
 }

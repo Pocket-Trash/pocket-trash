@@ -1,16 +1,15 @@
-import { useAuth, useClerk, useUser } from "@clerk/tanstack-react-start";
+import { useClerk, useUser } from "@clerk/tanstack-react-start";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
 import {
-  ChevronsUpDown,
   Files,
   FlaskConical,
   Folder,
-  Languages,
   LogOut,
+  Settings,
   User,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,55 +20,25 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { localeLabel, supportedLocales } from "@/lib/locale";
-import { updateLocaleSetting } from "@/lib/locale-api";
 import { useLocale } from "@/providers/locale-provider";
 
-export function UserMenu({ compact = false }: { compact?: boolean }) {
-  const { isSignedIn } = useAuth();
+export function UserMenu() {
   const clerk = useClerk();
-  const { locale, setLocale } = useLocale();
+  const { locale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const { isLoaded, user } = useUser();
 
   if (!isLoaded) {
-    return compact ? (
-      <Skeleton className="size-9 rounded-full" />
-    ) : (
-      <div className="flex h-12 items-center gap-3 rounded-md border border-sidebar-border bg-sidebar px-3">
-        <Skeleton className="size-8 rounded-full" />
-        <div className="flex flex-1 flex-col gap-1.5">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-3 w-32" />
-        </div>
-      </div>
-    );
+    return <Skeleton className="size-9 rounded-full" />;
   }
 
   if (!user) {
-    return compact ? (
+    return (
       <Button
-        aria-label={t("web.action.signIn")}
-        className="rounded-full"
-        nativeButton={false}
-        render={<Link params={{ _splat: "" }} to="/sign-in/$" />}
-        size="icon"
-        variant="outline"
-      >
-        <User />
-      </Button>
-    ) : (
-      <Button
-        className="w-full"
         nativeButton={false}
         render={<Link params={{ _splat: "" }} to="/sign-in/$" />}
         variant="outline"
@@ -85,46 +54,21 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          compact ? (
-            <Button
-              aria-label={t("web.navigation.accountMenu")}
-              className="rounded-full p-0"
-              size="icon"
-              type="button"
-              variant="outline"
-            />
-          ) : (
-            <Button
-              className="h-12 w-full justify-start gap-3 px-3"
-              type="button"
-              variant="outline"
-            />
-          )
+          <Button
+            aria-label={t("web.navigation.accountMenu")}
+            className="rounded-full p-0"
+            size="icon"
+            type="button"
+            variant="outline"
+          />
         }
       >
-        <Avatar size={compact ? "sm" : undefined}>
+        <Avatar size="sm">
           <AvatarImage alt={username} src={user.imageUrl} />
           <AvatarFallback>{initialsFor(username)}</AvatarFallback>
         </Avatar>
-        {compact ? null : (
-          <>
-            <span className="min-w-0 flex-1 text-left">
-              <span className="block truncate text-sm font-medium">
-                {username}
-              </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {t("web.navigation.account")}
-              </span>
-            </span>
-            <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
-          </>
-        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-64"
-        side={compact ? "bottom" : "top"}
-      >
+      <DropdownMenuContent align="end" className="w-64" side="bottom">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex items-center gap-3">
             <Avatar size="sm">
@@ -154,35 +98,14 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
           <Files />
           {t("web.resources.management.title")}
         </DropdownMenuItem>
+        <DropdownMenuItem render={<Link to="/user/settings" />}>
+          <Settings />
+          {t("web.settings.settings")}
+        </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/settings/beta-features" />}>
           <FlaskConical />
           {t("web.navigation.betaFeatures")}
         </DropdownMenuItem>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <Languages />
-            {t("web.navigation.language")}
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            <DropdownMenuRadioGroup
-              onValueChange={(value) => {
-                const nextLocale = value as typeof locale;
-                setLocale(nextLocale);
-
-                if (isSignedIn) {
-                  void updateLocaleSetting(nextLocale);
-                }
-              }}
-              value={locale}
-            >
-              {supportedLocales.map((code) => (
-                <DropdownMenuRadioItem key={code} value={code}>
-                  {localeLabel(code, t)}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {
