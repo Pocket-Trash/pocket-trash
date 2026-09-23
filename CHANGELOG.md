@@ -18,6 +18,14 @@
 
 
 
+
+## 0.3.1
+
+### Patch Changes
+
+* Validate deploy artifacts before release and publish releases after production succeeds. (@app/api, @app/scraper, @app/web)
+* Fix repo lint warnings. (@app/scraper, @app/web, @package/infisical-runner)
+
 ## 0.3.0
 
 ### Minor Changes

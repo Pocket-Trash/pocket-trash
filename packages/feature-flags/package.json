@@ -1,6 +1,6 @@
 {
   "name": "@package/feature-flags",
-  "version": "0.0.1",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
