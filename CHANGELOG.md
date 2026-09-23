@@ -21,6 +21,13 @@
 
 
 
+
+## 0.4.2
+
+### Patch Changes
+
+* Wait for production deployment and GitHub release before the release command completes. (@app/api, @app/scraper, @app/web)
+
 ## 0.4.1
 
 ### Patch Changes
