@@ -95,10 +95,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          changed_files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
           database=false
 
-          if grep -Eq '^(packages/database/src/schema/|packages/database/drizzle/|packages/database/drizzle\.config\.ts$|packages/database/package\.json$)' <<< "$changed_files"; then
+          if grep -Eq '^(packages/database/src/schema/|packages/database/drizzle/|packages/database/drizzle\.config\.ts$)' <<< "$changed_files"; then
             database=true
           fi
 
