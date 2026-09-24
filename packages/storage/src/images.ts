@@ -197,8 +197,7 @@ function createBunnyImageStorage(config: BunnyStorageConfig): ImageStorage {
       const image = await fetchRemoteImage(config, input.sourceUrl);
       const targetFilePath = buildImageFilePath({
         ...input,
-        fileName:
-          input.fileName.replace(/\.[^.]+$/u, "") + `.${image.extension}`,
+        fileName: `${input.fileName.replace(/\.[^.]+$/u, "")}.${image.extension}`,
       });
       await bunnyRequest(config, normalizeBunnyObjectPath(targetFilePath), {
         body: new Uint8Array(image.buffer),
