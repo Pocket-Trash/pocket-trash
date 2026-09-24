@@ -23,6 +23,16 @@
 
 
 
+
+## 0.5.1
+
+### Patch Changes
+
+* Serve responsive navigation covers and site favicons directly from Bunny CDN. (@app/web)
+* Load help documents from the shared localization package.
+  Only flag preview database changes introduced by the PR in schema, migration,
+  or Drizzle configuration files. (@app/web)
+
 ## 0.5.0
 
 ### Minor Changes
