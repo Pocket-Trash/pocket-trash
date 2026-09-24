@@ -5,7 +5,8 @@ import {
   maxCatalogImageSessionBytes,
   type ResourceStorage,
   type ResourceUploadMetadata,
-} from "@package/resources";
+  readResponseBodyWithLimit,
+} from "@package/storage";
 import { and, eq, isNull, lt, max, sql } from "drizzle-orm";
 
 export type CatalogImageTargetType =
@@ -333,16 +334,27 @@ export function createCatalogImageUploadSessionsService(input: {
       ) {
         throw new CatalogImageUploadError("content_length_mismatch", 400);
       }
-      const bytes = await request.arrayBuffer();
-      const digest = toHex(await crypto.subtle.digest("SHA-256", bytes));
+      let bytes: Uint8Array;
+      try {
+        bytes = await readResponseBodyWithLimit(
+          new Response(request.body),
+          contentLength,
+          AbortSignal.timeout(30_000),
+        );
+        if (bytes.byteLength !== contentLength)
+          throw new Error("Image content length mismatch.");
+      } catch {
+        throw new CatalogImageUploadError("content_length_mismatch", 400);
+      }
+      const digest = toHex(
+        await crypto.subtle.digest("SHA-256", new Uint8Array(bytes)),
+      );
       if (digest !== file.sha256) {
         throw new CatalogImageUploadError("hash_mismatch", 400);
       }
       try {
-        const body = new Response(bytes).body;
-        if (!body) throw new CatalogImageUploadError("upload_failed", 502);
         await input.storage.uploadStream({
-          body,
+          body: bytes,
           contentLength,
           contentType: file.contentType,
           objectPath: file.objectPath,

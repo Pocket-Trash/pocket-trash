@@ -1162,20 +1162,20 @@ async function signCollectionOwners<
 async function signCatalogImages<T extends CatalogImage>(
   images: T[],
 ): Promise<T[]> {
-  const [{ signResourceUrl }, { serverEnv }] = await Promise.all([
-    import("@package/resources"),
-    import("@/env/server"),
-  ]);
+  const [{ signResourceUrl, imageDeliveryUrl }, { serverEnv }] =
+    await Promise.all([import("@package/storage"), import("@/env/server")]);
   if (!serverEnv.BUNNY_CDN_BASE_URL || !serverEnv.BUNNY_CDN_TOKEN_KEY)
     return images;
   return await Promise.all(
     images.map(async (image) => ({
       ...image,
-      url: await signResourceUrl({
-        cdnBaseUrl: serverEnv.BUNNY_CDN_BASE_URL,
-        objectPath: image.objectPath,
-        tokenKey: serverEnv.BUNNY_CDN_TOKEN_KEY,
-      }),
+      url: imageDeliveryUrl(
+        await signResourceUrl({
+          cdnBaseUrl: serverEnv.BUNNY_CDN_BASE_URL,
+          objectPath: image.objectPath,
+          tokenKey: serverEnv.BUNNY_CDN_TOKEN_KEY,
+        }),
+      ),
     })),
   );
 }

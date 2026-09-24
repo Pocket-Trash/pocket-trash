@@ -25,9 +25,8 @@
   "dependencies": {
     "@package/database": "workspace:*",
     "@package/feature-flags": "workspace:*",
-    "@package/images": "workspace:*",
+    "@package/storage": "workspace:*",
     "@package/logger": "workspace:*",
-    "@package/resources": "workspace:*",
     "@pocket-trash/localizations": "^0.5.1",
     "drizzle-orm": "latest"
   },

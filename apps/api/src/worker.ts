@@ -10,8 +10,8 @@ import {
   normalizeConsoleTransportMode,
   normalizeLogLevel,
 } from "@package/logger";
-import { createResourceStorage } from "@package/resources";
 import { createServices } from "@package/services";
+import { createStorage } from "@package/storage";
 import { type ApiBindings, createApp } from "./app.js";
 import { createCatalogImageUploadSessionsService } from "./catalog-image-upload-sessions.js";
 import { createClerkWebhookHandler } from "./clerk-webhooks.js";
@@ -60,7 +60,7 @@ const app = createApp({
     validateResourceUploadBindings(bindings);
     const service = createResourceUploadSessionsService({
       db: createDb({ databaseUrl: bindings.DATABASE_URL as string }),
-      storage: createResourceStorage({
+      storage: createStorage({
         accessKey: bindings.BUNNY_STORAGE_ACCESS_KEY,
         cdnBaseUrl: bindings.BUNNY_CDN_BASE_URL,
         endpoint: bindings.BUNNY_STORAGE_ENDPOINT,
@@ -83,7 +83,7 @@ const app = createApp({
     validateResourceUploadBindings(bindings);
     const service = createCatalogImageUploadSessionsService({
       db: createDb({ databaseUrl: bindings.DATABASE_URL as string }),
-      storage: createResourceStorage({
+      storage: createStorage({
         accessKey: bindings.BUNNY_STORAGE_ACCESS_KEY,
         cdnBaseUrl: bindings.BUNNY_CDN_BASE_URL,
         endpoint: bindings.BUNNY_STORAGE_ENDPOINT,
@@ -186,7 +186,7 @@ export async function handleWorkerScheduled(
         validateResourceUploadBindings(env);
         await createResourceUploadSessionsService({
           db: createDb({ databaseUrl: env.DATABASE_URL as string }),
-          storage: createResourceStorage({
+          storage: createStorage({
             accessKey: env.BUNNY_STORAGE_ACCESS_KEY,
             cdnBaseUrl: env.BUNNY_CDN_BASE_URL,
             endpoint: env.BUNNY_STORAGE_ENDPOINT,
@@ -196,7 +196,7 @@ export async function handleWorkerScheduled(
         }).cleanupExpired();
         await createCatalogImageUploadSessionsService({
           db: createDb({ databaseUrl: env.DATABASE_URL as string }),
-          storage: createResourceStorage({
+          storage: createStorage({
             accessKey: env.BUNNY_STORAGE_ACCESS_KEY,
             cdnBaseUrl: env.BUNNY_CDN_BASE_URL,
             endpoint: env.BUNNY_STORAGE_ENDPOINT,

@@ -1,3 +1,4 @@
+import { type Logger, loggerMessages } from "@package/logger";
 import {
   createImageStorage,
   type ImageFileDeleteResult,
@@ -8,8 +9,7 @@ import {
   type ImageUploadInput,
   type ImageUploadResult,
   type RemoteImageUploadInput,
-} from "@package/images";
-import { type Logger, loggerMessages } from "@package/logger";
+} from "@package/storage";
 import { hashLogIdentifier } from "../logging.js";
 
 export type ImagesService = {
@@ -18,7 +18,6 @@ export type ImagesService = {
     fileId: string,
     input: ImageUpdateInput,
   ): Promise<ImageUpdateResult | null>;
-  uploadImage(input: ImageUploadInput): Promise<ImageUploadResult | null>;
   uploadRemoteImage(
     input: RemoteImageUploadInput,
   ): Promise<ImageUploadResult | null>;
@@ -56,15 +55,6 @@ function wrapImageStorage(
             fileIdHash: hashLogIdentifier(fileId),
             updateKeys: Object.keys(input),
           },
-        },
-      );
-    },
-    async uploadImage(input) {
-      return await logger.operation(
-        loggerMessages.images.upload,
-        () => imageStorage.uploadImage(input),
-        {
-          attributes: summarizeUploadInput(input),
         },
       );
     },

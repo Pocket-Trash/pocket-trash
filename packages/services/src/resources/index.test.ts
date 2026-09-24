@@ -6,7 +6,7 @@ import {
   type LogTransport,
   loggerMessages,
 } from "@package/logger";
-import type { ResourceStorage } from "@package/resources";
+import type { ResourceStorage } from "@package/storage";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 import { hashLogIdentifier } from "../logging.js";
@@ -408,7 +408,7 @@ describe("resources service", () => {
           id: image.id,
           position: image.position,
           size: image.size,
-          url: "https://cdn.example.test/resources/dev/preview.webp?token=signed",
+          url: "https://cdn.example.test/resources/dev/preview.webp?token=signed&format=webp&quality=85",
         },
       ],
       isAdminPrivate: false,
@@ -503,7 +503,7 @@ describe("resources service", () => {
           uploaderClerkId: "user_123",
           uploaderUsername: "roy",
           coverImageUrl:
-            "https://cdn.example.test/resources/dev/preview.webp?token=signed",
+            "https://cdn.example.test/resources/dev/preview.webp?token=signed&format=webp&quality=85",
         },
       ],
     });

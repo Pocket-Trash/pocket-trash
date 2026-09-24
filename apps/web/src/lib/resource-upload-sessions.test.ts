@@ -9,6 +9,7 @@ import {
   getResourceUploadErrorTranslation,
   ResourceUploadRequestError,
   uploadResourceSession,
+  validateResourceImages,
   validateResourceUpload,
 } from "./resource-upload-sessions";
 
@@ -17,6 +18,22 @@ beforeEach(() => {
 });
 
 describe("resource upload sessions", () => {
+  it("accepts images through 25 MiB while retaining the 20 MiB resource-file limit", () => {
+    expect(
+      validateResourceImages([
+        file("photo.png", 25 * 1024 * 1024, "image/png"),
+      ]),
+    ).toBeUndefined();
+    expect(
+      validateResourceImages([
+        file("photo.png", 25 * 1024 * 1024 + 1, "image/png"),
+      ]),
+    ).toEqual({
+      key: "web.resources.validation.imageTooLarge",
+      params: { maxSize: "25 MiB" },
+    });
+  });
+
   it("appends files selected in separate picker or drop actions", () => {
     const first = file("one.stl", 1);
     const second = file("two.stl", 1);

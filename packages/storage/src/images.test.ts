@@ -49,7 +49,7 @@ describe("createImageStorage", () => {
     ).toThrow("Unsupported image storage provider: imagekit.");
   });
 
-  it("overwrites an existing Bunny image with processed dimensions", async () => {
+  it("overwrites an existing Bunny image with original bytes and dimensions", async () => {
     const sourceImage = await sharp({
       create: {
         background: "red",
@@ -72,7 +72,7 @@ describe("createImageStorage", () => {
 
       if (
         url.pathname ===
-        "/pocket-trash-storage/images/products/pens/123/source-image.webp"
+        "/pocket-trash-storage/images/products/pens/123/source-image.jpg"
       ) {
         if (init?.body) {
           uploadedBodies.push(init.body);
@@ -90,25 +90,28 @@ describe("createImageStorage", () => {
 
     await expect(
       storage.uploadRemoteImage({
-        fileName: "source-image.webp",
+        fileName: "source-image.jpg",
         folder: "/images/products/pens/123",
         sourceUrl: "https://cdn.example.test/source-image.jpg",
       }),
     ).resolves.toEqual({
-      fileId: "/images/products/pens/123/source-image.webp",
-      filePath: "/images/products/pens/123/source-image.webp",
+      fileId: "/images/products/pens/123/source-image.jpg",
+      filePath: "/images/products/pens/123/source-image.jpg",
       height: 300,
       provider: "bunny",
       thumbnailUrl:
-        "https://cdn.pocket-trash.app/images/products/pens/123/source-image.webp?format=webp&quality=85&width=500",
-      url: "https://cdn.pocket-trash.app/images/products/pens/123/source-image.webp",
+        "https://cdn.pocket-trash.app/images/products/pens/123/source-image.jpg?format=webp&quality=85&width=500",
+      url: "https://cdn.pocket-trash.app/images/products/pens/123/source-image.jpg?format=webp&quality=85",
       width: 400,
     });
     expect(uploadedBodies).toHaveLength(1);
+    expect(
+      new Uint8Array(await new Response(uploadedBodies[0]).arrayBuffer()),
+    ).toEqual(new Uint8Array(sourceImage));
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("uploads an optimized remote image when Bunny does not have the target path", async () => {
+  it("uploads an original remote image when Bunny does not have the target path", async () => {
     const sourceImage = await sharp({
       create: {
         background: "red",
@@ -135,12 +138,12 @@ describe("createImageStorage", () => {
 
       if (
         url.pathname ===
-        "/pocket-trash-storage/images/products/pens/123/source-image.webp"
+        "/pocket-trash-storage/images/products/pens/123/source-image.jpg"
       ) {
         expect(init?.method).toBe("PUT");
         expect(init?.headers).toMatchObject({
           AccessKey: "storage-key",
-          "content-type": "image/webp",
+          "content-type": "image/jpeg",
         });
         if (init?.body) {
           uploadedBodies.push(init.body);
@@ -158,21 +161,24 @@ describe("createImageStorage", () => {
 
     await expect(
       storage.uploadRemoteImage({
-        fileName: "source-image.webp",
+        fileName: "source-image.jpg",
         folder: "/images/products/pens/123",
         sourceUrl: "https://cdn.example.test/source-image.jpg",
       }),
     ).resolves.toEqual({
-      fileId: "/images/products/pens/123/source-image.webp",
-      filePath: "/images/products/pens/123/source-image.webp",
-      height: 1500,
+      fileId: "/images/products/pens/123/source-image.jpg",
+      filePath: "/images/products/pens/123/source-image.jpg",
+      height: 3000,
       provider: "bunny",
       thumbnailUrl:
-        "https://cdn.pocket-trash.app/images/products/pens/123/source-image.webp?format=webp&quality=85&width=500",
-      url: "https://cdn.pocket-trash.app/images/products/pens/123/source-image.webp",
-      width: 2000,
+        "https://cdn.pocket-trash.app/images/products/pens/123/source-image.jpg?format=webp&quality=85&width=500",
+      url: "https://cdn.pocket-trash.app/images/products/pens/123/source-image.jpg?format=webp&quality=85",
+      width: 4000,
     });
     expect(uploadedBodies).toHaveLength(1);
+    expect(
+      new Uint8Array(await new Response(uploadedBodies[0]).arrayBuffer()),
+    ).toEqual(new Uint8Array(sourceImage));
   });
 
   it("preserves the Bunny zone when the CDN base URL includes it", async () => {
@@ -187,7 +193,7 @@ describe("createImageStorage", () => {
     ).resolves.toMatchObject({
       thumbnailUrl:
         "https://cdn.pocket-trash.app/dev/products/1000/42143344591035.webp?format=webp&quality=85&width=500",
-      url: "https://cdn.pocket-trash.app/dev/products/1000/42143344591035.webp",
+      url: "https://cdn.pocket-trash.app/dev/products/1000/42143344591035.webp?format=webp&quality=85",
     });
   });
 
@@ -341,7 +347,7 @@ describe("createImageStorage", () => {
 
     await expect(
       storage.uploadRemoteImage({
-        fileName: "source-image.webp",
+        fileName: "source-image.jpg",
         folder: "/images/products/pens/123",
         sourceUrl: "https://cdn.example.test/source-image.jpg",
       }),
@@ -369,7 +375,7 @@ describe("createImageStorage", () => {
 
     await expect(
       storage.uploadRemoteImage({
-        fileName: "source-image.webp",
+        fileName: "source-image.jpg",
         folder: "/images/products/pens/123",
         sourceUrl: "https://cdn.example.test/source-image.jpg",
       }),
@@ -400,7 +406,7 @@ describe("createImageStorage", () => {
 
     await expect(
       storage.uploadRemoteImage({
-        fileName: "source-image.webp",
+        fileName: "source-image.jpg",
         folder: "/images/products/pens/123",
         sourceUrl: "https://cdn.example.test/source-image.jpg",
       }),

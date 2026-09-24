@@ -1,5 +1,5 @@
 import type { Database } from "@package/database";
-import type { ResourceStorage } from "@package/resources";
+import type { ResourceStorage } from "@package/storage";
 import type { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";

@@ -1,4 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { readResponseBodyWithLimit } from "./body.js";
+import { bunnyRequest } from "./bunny.js";
+import {
+  imageDeliveryUrl,
+  inspectImage,
+  maxImageBytes,
+} from "./image-policy.js";
 
 type FetchLike = typeof fetch;
 
@@ -58,7 +65,7 @@ export type ResourceStorage = {
   ): ResourceUploadTarget;
   delete(objectPath: string): Promise<ResourceDeleteResult>;
   uploadStream(input: {
-    body: ReadableStream;
+    body: ReadableStream | Uint8Array;
     contentLength: number;
     contentType: string;
     objectPath: string;
@@ -90,7 +97,7 @@ type BunnyObject = {
 
 export const maxBufferedResourceBytes = 4 * 1024 * 1024;
 export const maxCatalogImageFiles = 20;
-export const maxCatalogImageFileBytes = 25 * 1024 * 1024;
+export const maxCatalogImageFileBytes = maxImageBytes;
 export const maxCatalogImageSessionBytes = 200 * 1024 * 1024;
 export const maxSessionFileBytes = 20 * 1024 * 1024;
 export const maxSessionBytes = 100 * 1024 * 1024;
@@ -137,9 +144,7 @@ export function buildResourceFolderPrefix(input: {
   return buildPreviewFolderPath(input.isolatedPreviewPrNumber);
 }
 
-export function createResourceStorage(
-  input: ResourceStorageConfig,
-): ResourceStorage {
+export function createStorage(input: ResourceStorageConfig): ResourceStorage {
   const config = readConfig(input);
 
   return {
@@ -155,7 +160,7 @@ export function createResourceStorage(
       return {
         ...metadata,
         objectPath,
-        url: buildUrl(config.cdnBaseUrl, objectPath),
+        url: imageDeliveryUrl(buildUrl(config.cdnBaseUrl, objectPath)),
       };
     },
     createUploadTarget(metadata, resourceId, kind = "resource") {
@@ -163,14 +168,17 @@ export function createResourceStorage(
       const extension = validateUploadMetadata(
         metadata,
         kind === "image" ? allowedImageMimeTypes : allowedMimeTypes,
-        maxSessionFileBytes,
+        kind === "image" ? maxImageBytes : maxSessionFileBytes,
       );
       const objectPath = `${config.folderPrefix}/${resourceId}/${config.randomUUID()}${extension}`;
 
       return {
         ...metadata,
         objectPath,
-        url: buildUrl(config.cdnBaseUrl, objectPath),
+        url:
+          kind === "image"
+            ? imageDeliveryUrl(buildUrl(config.cdnBaseUrl, objectPath))
+            : buildUrl(config.cdnBaseUrl, objectPath),
       };
     },
     async delete(objectPath) {
@@ -197,8 +205,36 @@ export function createResourceStorage(
         );
       }
 
+      if (contentType.startsWith("image/")) {
+        if (
+          !Object.values(allowedImageMimeTypes).some((types) =>
+            types.some((type) => type === contentType),
+          )
+        )
+          throw new Error("Invalid image upload target.");
+        if (
+          !Number.isSafeInteger(contentLength) ||
+          contentLength <= 0 ||
+          contentLength > maxImageBytes
+        )
+          throw new Error("Image exceeds the configured size limit.");
+        const bytes =
+          body instanceof Uint8Array
+            ? body
+            : await readResponseBodyWithLimit(
+                new Response(body),
+                contentLength,
+                AbortSignal.timeout(30_000),
+              );
+        if (bytes.byteLength !== contentLength)
+          throw new Error("Image content length mismatch.");
+        const image = inspectImage(bytes);
+        if (image.contentType !== contentType)
+          throw new Error("Image content type mismatch.");
+        body = bytes;
+      }
       await bunnyRequest(config, normalizedPath, {
-        body,
+        body: body instanceof Uint8Array ? new Uint8Array(body) : body,
         expectedStatuses: [200, 201],
         headers: {
           "content-length": String(contentLength),
@@ -211,7 +247,18 @@ export function createResourceStorage(
       return upload(config, input, allowedMimeTypes, resourceId);
     },
     async uploadImage(input, resourceId) {
-      return upload(config, input, allowedImageMimeTypes, resourceId);
+      const target = this.createUploadTarget(
+        { ...input, size: input.bytes.byteLength },
+        resourceId,
+        "image",
+      );
+      await this.uploadStream({
+        body: input.bytes,
+        contentLength: input.bytes.byteLength,
+        contentType: input.contentType,
+        objectPath: target.objectPath,
+      });
+      return target;
     },
   };
 }
@@ -384,32 +431,6 @@ async function deleteBunnyFolder(
   }
 
   return true;
-}
-
-async function bunnyRequest(
-  config: BunnyConfig,
-  objectPath: string,
-  input: {
-    body?: BodyInit;
-    expectedStatuses: number[];
-    headers?: HeadersInit;
-    method: "DELETE" | "GET" | "PUT";
-  },
-): Promise<Response> {
-  const response = await config.fetch(
-    buildUrl(`${config.endpoint}/${config.zoneName}`, objectPath),
-    {
-      body: input.body,
-      headers: { AccessKey: config.accessKey, ...input.headers },
-      method: input.method,
-    },
-  );
-
-  if (!input.expectedStatuses.includes(response.status)) {
-    throw new Error(`Bunny storage request failed: ${response.status}.`);
-  }
-
-  return response;
 }
 
 function readConfig(input: ResourceStorageConfig): BunnyConfig {

@@ -30,7 +30,7 @@
     "@package/feature-flags": "workspace:*",
     "@package/logger": "workspace:*",
     "@package/markdown": "workspace:*",
-    "@package/resources": "workspace:*",
+    "@package/storage": "workspace:*",
     "@package/services": "workspace:*",
     "@pocket-trash/localizations": "^0.7.0",
     "@t3-oss/env-core": "^0.13.11",

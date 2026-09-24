@@ -161,7 +161,12 @@ export function validateResourceImages(
   }
   const imageNames = new Set<string>();
   for (const image of images) {
-    const error = validateFile(image, imageMimeTypes);
+    const error = validateFile(
+      image,
+      imageMimeTypes,
+      image.type,
+      25 * 1024 * 1024,
+    );
     if (error?.key === "web.resources.validation.invalidFileType") {
       return {
         key: "web.resources.validation.imageInvalidType",
@@ -170,7 +175,7 @@ export function validateResourceImages(
     if (error?.key === "web.resources.validation.fileTooLarge") {
       return {
         key: "web.resources.validation.imageTooLarge",
-        params: { maxSize: "20 MiB" },
+        params: { maxSize: "25 MiB" },
       };
     }
     if (error) return error;
@@ -368,6 +373,7 @@ function validateFile(
   file: File,
   allowedTypes: Readonly<Record<string, readonly string[]>>,
   contentType = file.type,
+  maxBytes = maxFileBytes,
 ): ResourceUploadValidationError | undefined {
   if (
     !file.name ||
@@ -386,7 +392,7 @@ function validateFile(
       params: { filename: file.name },
     };
   }
-  if (file.size > maxFileBytes) {
+  if (file.size > maxBytes) {
     return {
       key: "web.resources.validation.fileTooLarge",
       params: { filename: file.name, maxSize: "20 MiB" },

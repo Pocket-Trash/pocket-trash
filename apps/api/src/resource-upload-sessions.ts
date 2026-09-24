@@ -3,7 +3,7 @@ import {
   maxSessionBytes,
   type ResourceStorage,
   type ResourceUploadMetadata,
-} from "@package/resources";
+} from "@package/storage";
 import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
 export const resourceUploadErrorCodes = [

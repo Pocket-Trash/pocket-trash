@@ -84,7 +84,7 @@ shared_packages [label: "Shared packages and detected runtime links", color: "gr
   app_web [icon: box, label: "@app/web\napps/web"]
   package_database [icon: package, label: "@package/database\npackages/database"]
   package_feature_flags [icon: package, label: "@package/feature-flags\npackages/feature-flags"]
-  package_images [icon: package, label: "@package/images\npackages/images"]
+  package_storage [icon: package, label: "@package/storage\npackages/storage"]
   package_json_data [icon: package, label: "@package/json-data\npackages/json-data"]
   package_logger [icon: package, label: "@package/logger\npackages/logger"]
   package_markdown [icon: package, label: "@package/markdown\npackages/markdown"]
@@ -110,7 +110,7 @@ app_web > package_services: workspace dependency
 package_database > package_feature_flags: workspace dependency
 package_services > package_database: workspace dependency
 package_services > package_feature_flags: workspace dependency
-package_services > package_images: workspace dependency
+package_services > package_storage: workspace dependency
 package_services > package_logger: workspace dependency
 
 legend [position: bottom-right] {

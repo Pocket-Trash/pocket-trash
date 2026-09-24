@@ -1,7 +1,8 @@
+import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildResourceFolderPrefix,
-  createResourceStorage,
+  createStorage,
   deletePreviewResourceFolder,
   signResourceUrl,
 } from "./index.js";
@@ -67,7 +68,7 @@ describe("resource storage", () => {
 
       return new Response(null, { status: 201 });
     });
-    const storage = createResourceStorage({ ...config, fetch: fetchMock });
+    const storage = createStorage({ ...config, fetch: fetchMock });
 
     await expect(
       storage.upload(
@@ -109,7 +110,7 @@ describe("resource storage", () => {
       });
       return new Response(null, { status: 201 });
     });
-    const storage = createResourceStorage({ ...config, fetch: fetchMock });
+    const storage = createStorage({ ...config, fetch: fetchMock });
     const target = storage.createUploadTarget(
       {
         contentType: "application/octet-stream",
@@ -142,7 +143,7 @@ describe("resource storage", () => {
     vi.stubGlobal("fetch", runtimeFetch);
 
     try {
-      const storage = createResourceStorage(config);
+      const storage = createStorage(config);
       await expect(
         storage.uploadStream({
           body: new ReadableStream(),
@@ -157,7 +158,7 @@ describe("resource storage", () => {
   });
 
   it("accepts octet-stream for every supported resource extension", () => {
-    const storage = createResourceStorage(config);
+    const storage = createStorage(config);
 
     for (const extension of [
       "3mf",
@@ -184,34 +185,50 @@ describe("resource storage", () => {
   it("uploads a resource image through a separate allowlist", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       expect(toUrl(input).pathname).toBe(
-        "/pocket-trash-storage/resources/dev/1005/00000000-0000-4000-8000-000000000001.webp",
+        "/pocket-trash-storage/resources/dev/1005/00000000-0000-4000-8000-000000000001.png",
       );
-      expect(init?.headers).toMatchObject({ "content-type": "image/webp" });
+      expect(init?.headers).toMatchObject({ "content-type": "image/png" });
+      const bytes = await new Response(init?.body).arrayBuffer();
+      expect(await sharp(bytes).metadata()).toMatchObject({
+        format: "png",
+        width: 3000,
+        height: 1500,
+        hasAlpha: true,
+      });
       return new Response(null, { status: 201 });
     });
-    const storage = createResourceStorage({ ...config, fetch: fetchMock });
+    const storage = createStorage({ ...config, fetch: fetchMock });
 
     await expect(
       storage.uploadImage(
         {
-          bytes: new Uint8Array([1, 2, 3]),
-          contentType: "image/webp",
-          fileName: "clip.webp",
+          bytes: await sharp({
+            create: {
+              width: 3000,
+              height: 1500,
+              channels: 4,
+              background: { r: 255, g: 0, b: 0, alpha: 0.5 },
+            },
+          })
+            .png()
+            .toBuffer(),
+          contentType: "image/png",
+          fileName: "clip.png",
         },
         1005,
       ),
     ).resolves.toMatchObject({
-      contentType: "image/webp",
-      objectPath:
-        "resources/dev/1005/00000000-0000-4000-8000-000000000001.webp",
+      contentType: "image/png",
+      fileName: "clip.png",
+      objectPath: "resources/dev/1005/00000000-0000-4000-8000-000000000001.png",
     });
 
     await expect(
       storage.upload(
         {
           bytes: new Uint8Array([1]),
-          contentType: "image/webp",
-          fileName: "clip.webp",
+          contentType: "image/png",
+          fileName: "clip.png",
         },
         1005,
       ),
@@ -220,7 +237,7 @@ describe("resource storage", () => {
 
   it("rejects oversized, mismatched, and unsafe uploads before Bunny", async () => {
     const fetchMock = vi.fn<typeof fetch>();
-    const storage = createResourceStorage({ ...config, fetch: fetchMock });
+    const storage = createStorage({ ...config, fetch: fetchMock });
 
     await expect(
       storage.upload(
@@ -263,7 +280,7 @@ describe("resource storage", () => {
       expect(init?.method).toBe("DELETE");
       return new Response(null, { status: 200 });
     });
-    const storage = createResourceStorage({ ...config, fetch: fetchMock });
+    const storage = createStorage({ ...config, fetch: fetchMock });
 
     await expect(storage.delete("resources/dev/resource.stl")).resolves.toBe(
       "deleted",

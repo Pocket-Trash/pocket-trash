@@ -1,3 +1,11 @@
+import { readResponseBodyWithLimit } from "./body.js";
+import { bunnyRequest } from "./bunny.js";
+import {
+  imageDeliveryUrl,
+  inspectImage,
+  maxImageBytes,
+} from "./image-policy.js";
+
 type FetchLike = typeof fetch;
 
 export type ImageStorageProvider = "bunny";
@@ -60,7 +68,6 @@ export type ImageStorage = {
     fileId: string,
     input: ImageUpdateInput,
   ) => Promise<ImageUpdateResult | null>;
-  uploadImage: (input: ImageUploadInput) => Promise<ImageUploadResult | null>;
   uploadRemoteImage: (
     input: RemoteImageUploadInput,
   ) => Promise<ImageUploadResult | null>;
@@ -89,6 +96,8 @@ type BunnyPrefixDeleteResult = {
 
 type ProcessedImage = {
   buffer: Buffer;
+  contentType: string;
+  extension: string;
   height: number;
   width: number;
 };
@@ -96,9 +105,7 @@ type ProcessedImage = {
 const defaultImageStorageProvider = "bunny";
 const defaultFetchTimeoutMs = 30_000;
 const defaultMaxInputPixels = 80_000_000;
-const defaultRemoteImageMaxBytes = 50 * 1024 * 1024;
-const uploadMaxDimension = 2_000;
-const uploadWebpQuality = 85;
+const defaultRemoteImageMaxBytes = maxImageBytes;
 const thumbnailWidth = 500;
 
 export function createImageStorage(config: ImageStorageConfig): ImageStorage {
@@ -179,25 +186,25 @@ function createBunnyImageStorage(config: BunnyStorageConfig): ImageStorage {
         fileId: filePath,
         filePath,
         provider: "bunny",
-        thumbnailUrl: buildImageUrl(config.cdnBaseUrl, filePath, {
-          format: "webp",
-          quality: String(uploadWebpQuality),
-          width: String(thumbnailWidth),
-        }),
-        url: buildImageUrl(config.cdnBaseUrl, filePath),
+        thumbnailUrl: imageDeliveryUrl(
+          buildImageUrl(config.cdnBaseUrl, filePath),
+          thumbnailWidth,
+        ),
+        url: imageDeliveryUrl(buildImageUrl(config.cdnBaseUrl, filePath)),
       };
     },
-    async uploadImage() {
-      throw new Error("Direct image uploads require a remote source URL.");
-    },
     async uploadRemoteImage(input) {
-      const targetFilePath = buildImageFilePath(input);
-      const image = await fetchAndProcessRemoteImage(config, input.sourceUrl);
+      const image = await fetchRemoteImage(config, input.sourceUrl);
+      const targetFilePath = buildImageFilePath({
+        ...input,
+        fileName:
+          input.fileName.replace(/\.[^.]+$/u, "") + `.${image.extension}`,
+      });
       await bunnyRequest(config, normalizeBunnyObjectPath(targetFilePath), {
         body: new Uint8Array(image.buffer),
         expectedStatuses: [200, 201],
         headers: {
-          "content-type": "image/webp",
+          "content-type": image.contentType,
         },
         method: "PUT",
       });
@@ -279,12 +286,10 @@ async function listBunnyFolder(
   return body as BunnyStorageObject[];
 }
 
-async function fetchAndProcessRemoteImage(
+async function fetchRemoteImage(
   config: BunnyStorageConfig,
   sourceUrl: string,
 ): Promise<ProcessedImage> {
-  const { default: sharp } = await import("sharp");
-
   const inputBuffer = await withFetchTimeout(config, async (signal) => {
     const response = await config.fetch(sourceUrl, { signal });
 
@@ -311,66 +316,10 @@ async function fetchAndProcessRemoteImage(
     throw new Error("Remote image is larger than the configured maximum size.");
   }
 
-  const { data, info } = await sharp(inputBuffer, {
-    limitInputPixels: config.maxInputPixels,
-  })
-    .rotate()
-    .resize({
-      fit: "inside",
-      height: uploadMaxDimension,
-      withoutEnlargement: true,
-      width: uploadMaxDimension,
-    })
-    .webp({ quality: uploadWebpQuality })
-    .toBuffer({ resolveWithObject: true });
-
   return {
-    buffer: data,
-    height: info.height,
-    width: info.width,
+    buffer: inputBuffer,
+    ...inspectImage(inputBuffer, config.maxInputPixels),
   };
-}
-
-async function bunnyRequest(
-  config: BunnyStorageConfig,
-  objectPath: string,
-  input: {
-    body?: BodyInit;
-    expectedStatuses: number[];
-    headers?: HeadersInit;
-    method: "DELETE" | "GET" | "PUT";
-  },
-): Promise<Response> {
-  const url = buildBunnyStorageUrl(config, objectPath);
-  const response = await fetchWithTimeout(config, url, {
-    body: input.body,
-    headers: {
-      AccessKey: config.accessKey,
-      ...input.headers,
-    },
-    method: input.method,
-  });
-
-  if (!input.expectedStatuses.includes(response.status)) {
-    throw new Error(`Bunny storage request failed: ${response.status}.`);
-  }
-
-  return response;
-}
-
-async function fetchWithTimeout(
-  config: BunnyStorageConfig,
-  input: Parameters<FetchLike>[0],
-  init?: Parameters<FetchLike>[1],
-): Promise<Response> {
-  return await withFetchTimeout(
-    config,
-    async (signal) =>
-      await config.fetch(input, {
-        ...init,
-        signal,
-      }),
-  );
 }
 
 async function withFetchTimeout<T>(
@@ -387,79 +336,6 @@ async function withFetchTimeout<T>(
   } finally {
     clearTimeout(timeout);
   }
-}
-
-async function readResponseBodyWithLimit(
-  response: Response,
-  maxBytes: number,
-  signal?: AbortSignal,
-): Promise<Buffer> {
-  if (!response.body) {
-    throw new Error("Remote image response did not include a readable body.");
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-
-  try {
-    while (true) {
-      const { done, value } = await readStreamChunk(reader, signal);
-
-      if (done) {
-        break;
-      }
-
-      totalBytes += value.byteLength;
-
-      if (totalBytes > maxBytes) {
-        await reader.cancel();
-        throw new Error(
-          "Remote image is larger than the configured maximum size.",
-        );
-      }
-
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  return Buffer.concat(chunks, totalBytes);
-}
-
-async function readStreamChunk(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  signal?: AbortSignal,
-): Promise<ReadableStreamReadResult<Uint8Array>> {
-  if (!signal) {
-    return await reader.read();
-  }
-
-  if (signal.aborted) {
-    throw createAbortError();
-  }
-
-  return await new Promise<ReadableStreamReadResult<Uint8Array>>(
-    (resolve, reject) => {
-      const onAbort = () => {
-        void reader.cancel().catch(() => undefined);
-        reject(createAbortError());
-      };
-
-      signal.addEventListener("abort", onAbort, { once: true });
-      reader
-        .read()
-        .then(resolve, reject)
-        .finally(() => {
-          signal.removeEventListener("abort", onAbort);
-        });
-    },
-  );
-}
-
-function createAbortError(): DOMException {
-  return new DOMException("The operation was aborted.", "AbortError");
 }
 
 function readBunnyConfig(config: ImageStorageConfig): BunnyStorageConfig {
@@ -577,16 +453,6 @@ function normalizeBunnyFolderPath(folderPath: string): string {
   return normalizedPath ? `${normalizedPath}/` : "";
 }
 
-function buildBunnyStorageUrl(
-  config: Pick<BunnyStorageConfig, "endpoint" | "zoneName">,
-  objectPath: string,
-): string {
-  return `${config.endpoint}/${config.zoneName}/${objectPath
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/")}`;
-}
-
 function buildImageUrl(
   cdnBaseUrl: string,
   filePath: string,
@@ -618,12 +484,11 @@ function mapBunnyImage(
     filePath,
     height: image.height,
     provider: "bunny",
-    thumbnailUrl: buildImageUrl(config.cdnBaseUrl, filePath, {
-      format: "webp",
-      quality: String(uploadWebpQuality),
-      width: String(thumbnailWidth),
-    }),
-    url: buildImageUrl(config.cdnBaseUrl, filePath),
+    thumbnailUrl: imageDeliveryUrl(
+      buildImageUrl(config.cdnBaseUrl, filePath),
+      thumbnailWidth,
+    ),
+    url: imageDeliveryUrl(buildImageUrl(config.cdnBaseUrl, filePath)),
     width: image.width,
   };
 }
@@ -641,9 +506,6 @@ function createDryRunImageStorage(): ImageStorage {
       return "skipped";
     },
     async updateFile() {
-      return null;
-    },
-    async uploadImage() {
       return null;
     },
     async uploadRemoteImage() {

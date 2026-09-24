@@ -33,14 +33,16 @@ prefix.
 
 The web app declares resource metadata, 1–10 files, and 1–10 images to
 the API Worker. Each declared object is then sent in a separate authenticated
-raw-body PUT. The Worker streams that body directly to Bunny with its declared
-content length; it does not buffer the object in Vercel or Worker memory.
+raw-body PUT. The Worker streams non-image files directly to Bunny. Images are read with a
+25 MiB limit, validated through `@package/storage`, and stored unchanged.
+Image delivery URLs use Bunny Dynamic Image API for WebP conversion and optimization;
+upload metadata continues to describe the original file.
 
 Sessions expire after one hour. The production Worker removes uploaded Bunny
 objects before deleting expired session rows. Completion is idempotent and only
 persists the resource/version records after every declared upload succeeds.
 
-Each file or image may be at most 20 MiB, and all files and images in a create
+Each non-image file may be at most 20 MiB and each image at most 25 MiB, and all files and images in a create
 session may total at most 100 MiB. Resource filenames must be unique within a
 version, case-insensitively. Allowed extension and MIME pairs are:
 

@@ -10,7 +10,7 @@ import {
   maxCatalogImageFileBytes,
   maxCatalogImageFiles,
   maxSessionFileBytes,
-} from "@package/resources";
+} from "@package/storage";
 import { Scalar } from "@scalar/hono-api-reference";
 import {
   type CatalogImageActor,
@@ -144,7 +144,14 @@ const ResourceUploadSessionSchema = z.discriminatedUnion("operation", [
     categories: z.array(z.string().min(1).max(60)).min(1).max(10),
     description: z.string().min(1).max(5000),
     files: z.array(ResourceUploadFileSchema).min(1).max(10),
-    images: z.array(ResourceUploadFileSchema).min(1).max(10),
+    images: z
+      .array(
+        ResourceUploadFileSchema.extend({
+          size: z.number().int().positive().max(maxCatalogImageFileBytes),
+        }),
+      )
+      .min(1)
+      .max(10),
     isPrivate: z.boolean().default(false),
     name: z.string().min(1).max(120),
     operation: z.literal("create"),

@@ -1,8 +1,10 @@
 import type { DatabaseConfig } from "@package/database";
 import { createDb } from "@package/database";
-import type { ImageStorageConfig } from "@package/images";
 import { createLogger, type Logger, type LoggerConfig } from "@package/logger";
-import type { ResourceStorageConfig } from "@package/resources";
+import type {
+  ImageStorageConfig,
+  ResourceStorageConfig,
+} from "@package/storage";
 import { createDbServices, type DbServices } from "./db/index.js";
 
 export type {
@@ -181,12 +183,10 @@ export type {
   ImageUploadInput,
   ImageUploadResult,
   RemoteImageUploadInput,
-} from "@package/images";
-export type {
   ResourceStorageConfig,
   ResourceUploadInput,
   ResourceUploadResult,
-} from "@package/resources";
+} from "@package/storage";
 export type {
   CreateResourceInput,
   ResourceDetail,

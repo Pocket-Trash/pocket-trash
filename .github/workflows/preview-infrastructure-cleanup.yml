@@ -100,13 +100,13 @@ jobs:
         id: image_cleanup
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: pnpm --filter @package/images run cleanup:preview-folder
+        run: pnpm --filter @package/storage run cleanup:preview-images
 
       - name: Delete resource PR preview folder
         id: resource_cleanup
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: pnpm --filter @package/resources run cleanup:preview-folder
+        run: pnpm --filter @package/storage run cleanup:preview-folder
 
       - name: Remove db-change label
         uses: actions/github-script@v8

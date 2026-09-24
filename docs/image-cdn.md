@@ -1,7 +1,7 @@
 # Image CDN
 
 Pocket Trash uses Bunny for product and collection image storage and delivery.
-Shared upload, update, and delete behavior lives in `@package/images` and is
+Shared upload, update, and delete behavior lives in `@package/storage` and is
 exposed to apps through `@package/services`.
 
 ## Bunny Services
@@ -41,9 +41,9 @@ Upload folders are built from:
 /<BUNNY_IMAGE_FOLDER_PREFIX>/products/<image-owner-key>
 ```
 
-Before upload, Pocket Trash fetches the remote source image, auto-rotates it,
-resizes it so the longest edge is at most 2,000 pixels without enlargement, and
-converts it to WebP quality 85. Bunny stores that optimized WebP object.
+Pocket Trash validates the source format, dimensions, and 25 MiB size limit,
+then uploads the original bytes to Bunny Storage with their original format.
+Bunny Optimizer performs conversion, resizing, and compression at delivery time.
 
 | Environment | Folder prefix | Lifetime |
 | --- | --- | --- |
@@ -97,3 +97,35 @@ detection that selects the database branch:
 The cleanup workflow removes branch-specific Vercel `BUNNY_IMAGE_FOLDER_PREFIX` when
 the PR closes. Isolated PR image folders under `/images/preview/pr-<number>` are
 deleted from Bunny Storage.
+
+## Central storage package
+
+`@package/storage` replaces `@package/images` and `@package/resources`. It owns
+Bunny transport, upload validation and targets, signed downloads, image delivery
+URLs, deletion, and preview cleanup. Images retain their original bytes, MIME
+type, extension, and dimensions in storage. JPEG, PNG, and WebP inputs are
+supported up to 25 MiB and 80 million pixels. The API handles user uploads; the
+scraper imports this package through services for its own uploads only. No
+service calls the scraper, and no always-on Node processor is needed.
+
+### Bunny Dynamic Image API
+
+Enable both Bunny Optimizer and **Dynamic Image API** on the Pull Zone.
+`imageDeliveryUrl` adds `format=webp&quality=85` to image URLs, including signed
+catalog and resource image URLs. Thumbnail URLs additionally request `width=500`.
+Original resource-file downloads retain their existing URLs without transforms.
+See [Dynamic Image API](https://bunny.net/docs/optimizer/dynamic-images/overview).
+
+Full-size image URLs omit an explicit width so Smart Image Optimization uses the
+configured dashboard limits: **2000 px desktop width**, **1000 px mobile width**,
+and **85 quality** for both. These are width limits, not longest-edge limits.
+Bunny preserves the stored original and caches transformed variants at the edge.
+Existing objects do not require a conversion or storage migration.
+
+Cloudflare Image Transformations, temporary source objects, and API signing keys
+for processing are unnecessary. Existing signed-download credentials remain in
+the web/services configuration. No scraper deployment or scheduler changes are
+required.
+
+Preview cleanup runs both `@package/storage cleanup:preview-images` and
+`@package/storage cleanup:preview-folder` to cover the existing namespaces.

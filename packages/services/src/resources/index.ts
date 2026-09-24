@@ -2,14 +2,15 @@ import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
 import {
-  createResourceStorage,
+  createStorage,
+  imageDeliveryUrl,
   maxSessionBytes,
   type ResourceStorage,
   type ResourceStorageConfig,
   type ResourceUploadInput,
   type ResourceUploadResult,
   signResourceUrl,
-} from "@package/resources";
+} from "@package/storage";
 import {
   and,
   count,
@@ -526,7 +527,7 @@ export function createResourcesService(
           const signedImages = await Promise.all(
             images.map(async ({ objectPath, ...image }) => ({
               ...image,
-              url: await signUrl(objectPath),
+              url: imageDeliveryUrl(await signUrl(objectPath)),
             })),
           );
 
@@ -672,7 +673,7 @@ export function createResourcesService(
                 async ({ coverImageObjectPath, ...resource }) => ({
                   ...resource,
                   coverImageUrl: coverImageObjectPath
-                    ? await signUrl(coverImageObjectPath)
+                    ? imageDeliveryUrl(await signUrl(coverImageObjectPath))
                     : null,
                 }),
               ),
@@ -1102,7 +1103,7 @@ export function createConfiguredResourcesService(
 ): ResourcesService {
   return createResourcesService(
     db,
-    createResourceStorage(config),
+    createStorage(config),
     logger,
     async (objectPath) => await signResourceUrl({ ...config, objectPath }),
   );

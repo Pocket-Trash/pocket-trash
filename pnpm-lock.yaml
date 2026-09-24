@@ -80,12 +80,12 @@ importers:
       '@package/logger':
         specifier: workspace:*
         version: link:../../packages/logger
-      '@package/resources':
-        specifier: workspace:*
-        version: link:../../packages/resources
       '@package/services':
         specifier: workspace:*
         version: link:../../packages/services
+      '@package/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@scalar/hono-api-reference':
         specifier: ^0.12.2
         version: 0.12.4(hono@4.13.8)
@@ -184,12 +184,12 @@ importers:
       '@package/markdown':
         specifier: workspace:*
         version: link:../../packages/markdown
-      '@package/resources':
-        specifier: workspace:*
-        version: link:../../packages/resources
       '@package/services':
         specifier: workspace:*
         version: link:../../packages/services
+      '@package/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@pocket-trash/localizations':
         specifier: ^0.7.0
         version: 0.7.0
@@ -365,19 +365,6 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/images:
-    dependencies:
-      sharp:
-        specifier: ^0.35.3
-        version: 0.35.3(@types/node@26.1.0)
-    devDependencies:
-      '@package/eslint':
-        specifier: workspace:*
-        version: link:../eslint
-      '@package/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
   packages/infisical-runner:
     devDependencies:
       '@package/eslint':
@@ -435,15 +422,6 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/resources:
-    devDependencies:
-      '@package/eslint':
-        specifier: workspace:*
-        version: link:../eslint
-      '@package/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
   packages/services:
     dependencies:
       '@package/database':
@@ -452,15 +430,12 @@ importers:
       '@package/feature-flags':
         specifier: workspace:*
         version: link:../feature-flags
-      '@package/images':
-        specifier: workspace:*
-        version: link:../images
       '@package/logger':
         specifier: workspace:*
         version: link:../logger
-      '@package/resources':
+      '@package/storage':
         specifier: workspace:*
-        version: link:../resources
+        version: link:../storage
       '@pocket-trash/localizations':
         specifier: ^0.5.1
         version: 0.5.1
@@ -474,6 +449,22 @@ importers:
       '@package/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+
+  packages/storage:
+    dependencies:
+      image-size:
+        specifier: 1.2.1
+        version: 1.2.1
+    devDependencies:
+      '@package/eslint':
+        specifier: workspace:*
+        version: link:../eslint
+      '@package/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      sharp:
+        specifier: ^0.35.3
+        version: 0.35.3(@types/node@26.1.0)
 
   packages/tsconfig: {}
 
