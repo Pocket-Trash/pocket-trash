@@ -97,7 +97,9 @@ export function HomePage() {
             <img
               alt=""
               className="aspect-4/3 w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-              src={image}
+              sizes="(min-width: 96rem) 480px, (min-width: 48rem) 33vw, 100vw"
+              src={`${image}?width=640`}
+              srcSet={`${image}?width=320 320w, ${image}?width=480 480w, ${image}?width=640 640w, ${image}?width=960 960w, ${image}?width=1440 1440w`}
             />
             <div className="p-5 text-xl font-semibold">{t(key)}</div>
           </Link>
