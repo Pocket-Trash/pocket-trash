@@ -6,7 +6,7 @@ import { ResourceCard, type ResourceCardItem } from "./resource-card";
 const resource = {
   canEdit: false,
   categories: [{ id: 1, name: "3D printing", slug: "3d-printing" }],
-  coverImageUrl: "/images/navigation/resources.webp",
+  coverImageUrl: "https://cdn.pocket-trash.app/assets/resosurces.webp",
   createdAt: new Date("2026-09-16T12:00:00Z"),
   currentVersion: { fileId: 10, fileName: "spinner.stl", id: 20 },
   downloadCount: 24,

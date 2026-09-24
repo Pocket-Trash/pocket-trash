@@ -69,17 +69,17 @@ export function HomePage() {
   const t = useCatalogCopy();
   const cards = [
     {
-      image: "/images/navigation/q3d-seigaiha.jpg",
+      image: "https://cdn.pocket-trash.app/assets/products.webp",
       key: "web.navigation.products" as const,
       to: "/products" as const,
     },
     {
-      image: "/images/navigation/collections.webp",
+      image: "https://cdn.pocket-trash.app/assets/collections.webp",
       key: "web.navigation.collections" as const,
       to: "/collections" as const,
     },
     {
-      image: "/images/navigation/resources.webp",
+      image: "https://cdn.pocket-trash.app/assets/resosurces.webp",
       key: "web.navigation.resources" as const,
       to: "/resources" as const,
     },
