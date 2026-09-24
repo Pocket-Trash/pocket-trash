@@ -32,3 +32,20 @@ export const resourceMimeTypesByExtension = {
     "application/zip",
   ],
 } as const;
+
+export const maxResourceFiles = 10;
+export const maxResourceImages = 10;
+export const uploadTargetTypes = [
+  "product",
+  "collection",
+  "collection_item",
+  "resource",
+] as const;
+export type UploadTargetType = (typeof uploadTargetTypes)[number];
+export const imageEntities = [
+  "products",
+  "collections",
+  "collection-items",
+  "resources",
+] as const;
+export type ImageEntity = (typeof imageEntities)[number];

@@ -38,7 +38,7 @@ uploads.
 Upload folders are built from:
 
 ```text
-/<BUNNY_IMAGE_FOLDER_PREFIX>/products/<image-owner-key>
+{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{id}/{sha256}.{ext}
 ```
 
 Pocket Trash validates the source format, dimensions, and 25 MiB size limit,
@@ -52,23 +52,13 @@ Bunny Optimizer performs conversion, resizing, and compression at delivery time.
 | Preview using shared staging DB | `images/preview` | Long term non-production. |
 | Local dev | `images/dev` | Shared local development namespace. |
 
-## Product Paths
+## Image Paths
 
-Products use:
+Display images use `{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{id}/{sha256}.{ext}`.
+The entity values are `products`, `collections`, `collection-items`, and `resources`.
+Uploaded filenames use the SHA-256 of the original bytes and the original extension.
 
-```text
-/<prefix>/products/<tmp-products-id>
-```
-
-Variation images use:
-
-```text
-/<prefix>/products/<tmp-products-id>-<tmp-product-variations-id>
-```
-
-Autmog pen images are product-level images and use `tmp_products.id` as the
-image folder key. Grimsmo images are variation-level images because each scraped
-listing handle is a product variation under a stable Grimsmo product.
+Scraper images use the same path builder, with a source image ID instead of the hash when available. Product owner IDs remain `tmp_products.id`; variation owner IDs remain `<tmp-products-id>-<tmp-product-variations-id>`. Autmog pen images are product-level, while Grimsmo images are variation-level. No existing scraper paths change.
 
 ## Delivery And Transforms
 

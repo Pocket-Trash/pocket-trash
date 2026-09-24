@@ -1003,7 +1003,6 @@ export function CollectionFormPage({
             onDelete={(image) =>
               updateCover(() =>
                 deleteCollectionCover({
-                  collectionId: current.id,
                   getToken,
                   imageId: image.id,
                 }),

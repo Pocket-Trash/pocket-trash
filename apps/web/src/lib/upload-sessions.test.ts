@@ -19,6 +19,27 @@ beforeEach(() => {
 });
 
 describe("resource upload sessions", () => {
+  it("limits resource sessions to ten files and ten images", () => {
+    expect(
+      validateResourceUpload(
+        Array.from({ length: 11 }, (_, i) =>
+          file(`${i}.pdf`, 1, "application/pdf"),
+        ),
+      ),
+    ).toEqual({
+      key: "web.resources.validation.tooManyFiles",
+      params: { maxFiles: 10 },
+    });
+    expect(
+      validateResourceImages(
+        Array.from({ length: 11 }, (_, i) => file(`${i}.png`, 1, "image/png")),
+      ),
+    ).toEqual({
+      key: "web.resources.validation.tooManyImages",
+      params: { maxImages: 10 },
+    });
+  });
+
   it("accepts images through 25 MiB while retaining the 20 MiB resource-file limit", () => {
     expect(
       validateResourceImages([

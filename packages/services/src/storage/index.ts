@@ -4,11 +4,14 @@ import {
   maxImageSessionBytes,
   maxImageSessionFiles,
   maxResourceFileBytes,
+  maxResourceFiles,
+  maxResourceImages,
   maxResourceSessionBytes,
   readBodyWithLimit,
   sha256,
   storageFetchTimeoutMs,
   type UploadStorage,
+  uploadTargetTypes,
 } from "@package/storage";
 import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -32,7 +35,7 @@ export type { UploadActor } from "./types.js";
 export { UploadSessionError } from "./types.js";
 export const uploadManifestSchema = z.object({
   target: z.object({
-    type: z.enum(["product", "collection", "collection_item", "resource"]),
+    type: z.enum(uploadTargetTypes),
     id: z.number().int().positive().optional(),
   }),
   payload: z.record(z.string(), z.unknown()).optional(),
@@ -456,9 +459,9 @@ export function validateManifest(
       ((operation === "create" && manifest.target.id !== undefined) ||
         (operation === "version" && (!manifest.target.id || images.length)) ||
         files.length < 1 ||
-        files.length > 10 ||
+        files.length > maxResourceFiles ||
         (operation === "create" && images.length < 1) ||
-        images.length > 10))
+        images.length > maxResourceImages))
   )
     throw new UploadSessionError("invalid_request", 400);
   if (

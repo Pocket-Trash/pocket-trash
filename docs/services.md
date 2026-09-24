@@ -207,3 +207,5 @@ Apps import storage capabilities only through `@package/services`; ESLint reject
 The shared storage implementation exposes `createUploadStorage`, `createImageTarget`, `createFileTarget`, `putImage`, and `putFile`. Bunny config fields are `accessKey`, `endpoint`, `zoneName`, and `cdnBaseUrl`; uploads also need `folderPrefix` and `imageFolderPrefix`. The `signImages` helper applies fresh signatures and Bunny delivery parameters for all uploaded display images. See [Resource Storage](resource-storage.md) for routes and limits.
 
 Run `pnpm --filter @package/services test:storage` with Docker available to test upload reservations, version allocation, completion, deletion guards and cleanup against a disposable PostgreSQL database. The command applies the migration history to its own container and removes the container afterward. It does not use configured application databases.
+
+The API uses `apps/api/src/lib/services.ts` as a per-request factory because Cloudflare Worker bindings arrive per request. Webhook requests configure database services; upload requests also configure storage.

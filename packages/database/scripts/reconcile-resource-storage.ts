@@ -52,7 +52,18 @@ export function destinationPath(
   const prefix = branchResourcePrefix(branchName);
   if (!prefix)
     throw new Error(`No Bunny resource prefix exists for ${branchName}.`);
-  return `${prefix}/${resourceId}/${baseName(objectPath)}`;
+  if (
+    /^images\/(?:dev\/|preview\/(?:pr-[1-9]\d*\/)?)?resources\//u.test(
+      objectPath,
+    )
+  ) {
+    return `${prefix.replace(/^resources/u, "images")}/resources/${resourceId}/${baseName(objectPath)}`;
+  }
+  const version =
+    /^resources\/(?:files|dev|preview(?:\/pr-[1-9]\d*)?)\/\d+\/(v[1-9]\d*)\/[^/]+$/u.exec(
+      objectPath,
+    )?.[1];
+  return `${prefix}/${resourceId}/${version ? `${version}/` : ""}${baseName(objectPath)}`;
 }
 
 async function main(): Promise<void> {
@@ -269,12 +280,20 @@ function storedObject(
   return { branchName, database, id, objectPath, resourceId, table };
 }
 
-async function getPendingUploadPaths(
+export async function getPendingUploadPaths(
   database: NeonQueryFunction<false, false>,
 ): Promise<string[]> {
-  if (!(await tableExists(database, "resource_upload_files"))) return [];
-  const rows = await database`select object_path from resource_upload_files`;
-  return rows.map((row) => String(row.object_path));
+  const paths: string[] = [];
+  if (await tableExists(database, "upload_file")) {
+    const rows = await database`select object_path from upload_file`;
+    paths.push(...rows.map((row) => String(row.object_path)));
+  }
+  // Older preview branches still reserve uploads in the previous table.
+  if (await tableExists(database, "resource_upload_files")) {
+    const rows = await database`select object_path from resource_upload_files`;
+    paths.push(...rows.map((row) => String(row.object_path)));
+  }
+  return paths;
 }
 
 export function buildMoves(records: StoredObject[]): ObjectMove[] {

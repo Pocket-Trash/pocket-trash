@@ -1,3 +1,5 @@
+import type { ImageEntity } from "../constants.js";
+
 type PutInput = {
   body: ReadableStream;
   contentLength: number;
@@ -72,7 +74,7 @@ export type UploadStorage = {
   createImageTarget(
     input: UploadMetadata,
     target: {
-      entity: "products" | "collections" | "collection-items" | "resources";
+      entity: ImageEntity;
       entityId: number;
     },
   ): UploadTarget;

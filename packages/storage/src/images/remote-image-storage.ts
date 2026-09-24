@@ -1,3 +1,4 @@
+import type { ImageEntity } from "../constants.js";
 import {
   imageThumbnailWidth,
   maxImageBytes,
@@ -11,11 +12,7 @@ import {
 } from "../lib/bunny-client.js";
 import { buildCdnUrl, normalizeObjectPath } from "../lib/paths.js";
 import { readBodyWithLimit } from "../lib/read-body-with-limit.js";
-import {
-  buildImageObjectPath,
-  type ImageEntity,
-  sha256,
-} from "../object-paths.js";
+import { buildImageObjectPath, sha256 } from "../object-paths.js";
 import { imageDeliveryUrl } from "./delivery-url.js";
 import { inspectImage } from "./validate-image.js";
 

@@ -1,9 +1,5 @@
+import { type ImageEntity, imageEntities } from "./constants.js";
 import { normalizeObjectPath } from "./lib/paths.js";
-export type ImageEntity =
-  | "products"
-  | "collections"
-  | "collection-items"
-  | "resources";
 export function imageFolderPrefix(value: string | undefined): string {
   const prefix = normalizeObjectPath(value ?? "");
   if (!/^images(?:\/dev|\/preview(?:\/pr-[1-9]\d*)?)?$/u.test(prefix))
@@ -34,11 +30,7 @@ export function buildImageObjectPath(input: {
   name: string;
   extension: string;
 }): string {
-  if (
-    !["products", "collections", "collection-items", "resources"].includes(
-      input.entity,
-    )
-  )
+  if (!imageEntities.includes(input.entity))
     throw new Error("Invalid image entity.");
   return `${imageFolderPrefix(input.prefix)}/${input.entity}/${segment(input.entityId)}/${segment(input.name)}.${extension(input.extension)}`;
 }

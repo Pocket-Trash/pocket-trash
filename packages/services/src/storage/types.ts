@@ -2,11 +2,10 @@ import type { Database } from "@package/database";
 import type { UploadMetadata } from "@package/storage";
 export type StorageDb = Pick<Database, "execute">;
 export type UploadActor = { clerkId: string; isAdmin: boolean };
-export type UploadTargetType =
-  | "product"
-  | "collection"
-  | "collection_item"
-  | "resource";
+
+import type { UploadTargetType } from "@package/storage/constants";
+
+export type { UploadTargetType } from "@package/storage/constants";
 export type UploadTarget = { type: UploadTargetType; id: number };
 export type UploadedFile = UploadMetadata & {
   kind: "image" | "file";

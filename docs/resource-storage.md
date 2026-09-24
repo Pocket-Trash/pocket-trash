@@ -14,7 +14,7 @@ serves protected files through its linked Pull Zone.
 | CDN hostname | `cdn.pocket-trash.app` |
 
 Use the Storage Zone password, not the Bunny account API key, as
-`BUNNY_STORAGE_ACCESS_KEY`. Keep every `RESOURCE_*` value server-only.
+`BUNNY_STORAGE_ACCESS_KEY`. Keep every `BUNNY_*` value server-only.
 
 ## Object namespaces
 
@@ -59,3 +59,5 @@ local-development branches use `resources/dev`, `preview` uses
 `resources/preview/pr-<number>`. Run
 `pnpm resources:reconcile-storage -- --apply` to apply that exact
 reconciliation. The production Neon branch is skipped.
+
+Reconciliation preserves resource version folders and the `images/` namespace for resource images. Reserved paths in `upload_file` are protected from orphan deletion; older preview branches retain protection through `resource_upload_files`.

@@ -1,20 +1,22 @@
 import {
-  maxImageSessionFiles as maxFiles,
-  maxImageBytes as maxImageFileBytes,
-  maxImageSessionBytes as maxTotalBytes,
-} from "@package/services/constants";
-
-const imageTypes = new Set<string>(Object.values(imageMimeTypes).flat());
-
-import {
-  resourceMimeTypesByExtension as fileMimeTypes,
-  imageMimeTypesByExtension as imageMimeTypes,
-  maxResourceFileBytes as maxFileBytes,
+  imageMimeTypesByExtension,
   maxImageBytes,
+  maxImageSessionBytes,
+  maxImageSessionFiles,
+  maxResourceFileBytes,
+  maxResourceFiles,
+  maxResourceImages,
   maxResourceSessionBytes,
+  resourceMimeTypesByExtension,
+  type UploadTargetType,
 } from "@package/services/constants";
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { clientEnv } from "@/env/client";
+
+const imageTypes = new Set<string>(
+  Object.values(imageMimeTypesByExtension).flat(),
+);
+const formatMiB = (bytes: number) => `${bytes / 1024 / 1024} MiB`;
 
 const resourceContentType = "application/octet-stream";
 type UploadMetadata = {
@@ -97,16 +99,20 @@ export function validateResourceUpload(
   if (files.length === 0) {
     return { key: "web.resources.validation.requiredFile" };
   }
-  if (files.length > 10) {
+  if (files.length > maxResourceFiles) {
     return {
       key: "web.resources.validation.tooManyFiles",
-      params: { maxFiles: 10 },
+      params: { maxFiles: maxResourceFiles },
     };
   }
 
   const names = new Set<string>();
   for (const file of files) {
-    const unsafe = validateFile(file, fileMimeTypes, resourceContentType);
+    const unsafe = validateFile(
+      file,
+      resourceMimeTypesByExtension,
+      resourceContentType,
+    );
     if (unsafe) return unsafe;
     const normalizedName = file.name.toLocaleLowerCase();
     if (names.has(normalizedName)) {
@@ -132,7 +138,7 @@ export function validateResourceUpload(
   if (totalSize > maxResourceSessionBytes) {
     return {
       key: "web.resources.validation.sessionTooLarge",
-      params: { maxSize: "100 MiB" },
+      params: { maxSize: formatMiB(maxResourceSessionBytes) },
     };
   }
 }
@@ -145,17 +151,17 @@ export function validateResourceImages(
   if (required && totalCount === 0) {
     return { key: "web.resources.validation.requiredImage" };
   }
-  if (totalCount > 10) {
+  if (totalCount > maxResourceImages) {
     return {
       key: "web.resources.validation.tooManyImages",
-      params: { maxImages: 10 },
+      params: { maxImages: maxResourceImages },
     };
   }
   const imageNames = new Set<string>();
   for (const image of images) {
     const error = validateFile(
       image,
-      imageMimeTypes,
+      imageMimeTypesByExtension,
       image.type,
       maxImageBytes,
     );
@@ -167,7 +173,7 @@ export function validateResourceImages(
     if (error?.key === "web.resources.validation.fileTooLarge") {
       return {
         key: "web.resources.validation.imageTooLarge",
-        params: { maxSize: "25 MiB" },
+        params: { maxSize: formatMiB(maxImageBytes) },
       };
     }
     if (error) return error;
@@ -185,7 +191,7 @@ export function validateResourceImages(
   if (totalSize > maxResourceSessionBytes) {
     return {
       key: "web.resources.validation.sessionTooLarge",
-      params: { maxSize: "100 MiB" },
+      params: { maxSize: formatMiB(maxResourceSessionBytes) },
     };
   }
 }
@@ -226,7 +232,7 @@ export async function uploadResourceSession(input: {
 
 async function uploadSession(input: {
   target: {
-    type: "resource" | "product" | "collection" | "collection_item";
+    type: UploadTargetType;
     id?: number;
   };
   payload?: Record<string, unknown>;
@@ -410,7 +416,7 @@ function validateFile(
   file: File,
   allowedTypes: Readonly<Record<string, readonly string[]>>,
   contentType = file.type,
-  maxBytes = maxFileBytes,
+  maxBytes = maxResourceFileBytes,
 ): ResourceUploadValidationError | undefined {
   if (
     !file.name ||
@@ -432,7 +438,7 @@ function validateFile(
   if (file.size > maxBytes) {
     return {
       key: "web.resources.validation.fileTooLarge",
-      params: { filename: file.name, maxSize: "20 MiB" },
+      params: { filename: file.name, maxSize: formatMiB(maxBytes) },
     };
   }
   const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
@@ -465,31 +471,30 @@ function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/u, "");
 }
 
-export type ImageUploadError = {
-  key: TranslationKey;
-  params?: Record<string, number | string>;
-};
+export type ImageUploadError = ResourceUploadValidationError;
 
 export function validateImages(files: File[]): ImageUploadError | undefined {
-  if (files.length > maxFiles) {
+  if (files.length > maxImageSessionFiles) {
     return {
       key: "web.resources.validation.tooManyImages",
-      params: { maxImages: maxFiles },
+      params: { maxImages: maxImageSessionFiles },
     };
   }
-  if (files.reduce((total, file) => total + file.size, 0) > maxTotalBytes) {
+  if (
+    files.reduce((total, file) => total + file.size, 0) > maxImageSessionBytes
+  ) {
     return {
       key: "web.resources.validation.sessionTooLarge",
-      params: { maxSize: "200 MiB" },
+      params: { maxSize: formatMiB(maxImageSessionBytes) },
     };
   }
   for (const file of files) {
     if (!imageTypes.has(file.type))
       return { key: "web.resources.validation.imageInvalidType" };
-    if (file.size > maxImageFileBytes) {
+    if (file.size > maxImageBytes) {
       return {
         key: "web.resources.validation.imageTooLarge",
-        params: { maxSize: "25 MiB" },
+        params: { maxSize: formatMiB(maxImageBytes) },
       };
     }
   }
@@ -500,7 +505,7 @@ export async function uploadImages(input: {
   getToken(): Promise<string | null>;
   onOwnerDeletedDuplicate?(imageId: number): Promise<boolean>;
   targetId: number;
-  targetType: "product" | "collection" | "collection_item";
+  targetType: Exclude<UploadTargetType, "resource">;
 }): Promise<{ uploaded: File[]; failed: File[] }> {
   if (!input.files.length) return { uploaded: [], failed: [] };
   const validation = validateImages(input.files);
@@ -536,7 +541,6 @@ export async function uploadImages(input: {
   }
 }
 export async function deleteCollectionCover(input: {
-  collectionId: number;
   imageId: number;
   getToken(): Promise<string | null>;
 }) {

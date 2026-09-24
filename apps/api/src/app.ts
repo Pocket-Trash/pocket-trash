@@ -16,6 +16,8 @@ import {
 import { Scalar } from "@scalar/hono-api-reference";
 import { clerkWebhookPath } from "./clerk-webhooks.js";
 
+const uploadErrorSchema = z.object({ error: z.string() });
+
 export const apiPrefix = "/api/v0";
 export const healthPath = `${apiPrefix}/health`;
 export const logsPath = `${apiPrefix}/logs`;
@@ -335,8 +337,14 @@ export function createApp(dependencies: AppDependencies = {}) {
     },
     responses: {
       201: { description: "The upload session was created." },
-      400: { description: "The upload declaration was invalid." },
-      401: { description: "Authentication is required." },
+      400: {
+        description: "The upload declaration was invalid.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      401: {
+        description: "Authentication is required.",
+        content: jsonContent(uploadErrorSchema),
+      },
     },
   });
 

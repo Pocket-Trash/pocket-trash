@@ -4,6 +4,7 @@ import {
   type LogEvent,
   loggerValues,
 } from "@package/logger";
+import { type StorageService, UploadSessionError } from "@package/services";
 import { describe, expect, it, vi } from "vitest";
 import {
   apiDocsPath,
@@ -14,10 +15,6 @@ import {
   openApiJsonPath,
   uploadSessionsPath,
 } from "./app.js";
-import {
-  UploadSessionError,
-  type UploadSessionsService,
-} from "./upload-sessions.js";
 
 describe("api", () => {
   it("serves only the restored API shell", async () => {
@@ -321,5 +318,5 @@ function createUploadServiceMock() {
       ],
     })),
     upload: vi.fn(async () => {}),
-  } satisfies UploadSessionsService;
+  } satisfies StorageService;
 }

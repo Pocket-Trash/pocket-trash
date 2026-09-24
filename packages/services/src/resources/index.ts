@@ -3,6 +3,7 @@ import { schema } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
 import {
   createUploadStorage,
+  maxResourceImages,
   maxResourceSessionBytes,
   sha256,
   signResourceUrl,
@@ -1013,7 +1014,8 @@ export function createResourcesService(
               ) ||
               normalized.retainedImageIds.length + normalized.images.length ===
                 0 ||
-              normalized.retainedImageIds.length + normalized.images.length > 10
+              normalized.retainedImageIds.length + normalized.images.length >
+                maxResourceImages
             ) {
               throw new Error("Resource images are invalid.");
             }
@@ -1268,9 +1270,9 @@ function normalizeResourceImages(
   if (
     !Array.isArray(images) ||
     (required && images.length === 0) ||
-    images.length > 10
+    images.length > maxResourceImages
   ) {
-    throw new Error("A resource requires 1–10 images.");
+    throw new Error(`A resource requires 1–${maxResourceImages} images.`);
   }
 
   const names = images.map(({ fileName }) => fileName.trim().toLowerCase());
