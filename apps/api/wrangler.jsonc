@@ -28,7 +28,8 @@
     "crons": ["15 * * * *"]
   },
   "vars": {
-    "APP_ENV": "production"
+    "APP_ENV": "production",
+    "BUNNY_IMAGE_FOLDER_PREFIX": "images"
   },
   "env": {
     "development": {
@@ -44,7 +45,8 @@
         "crons": []
       },
       "vars": {
-        "APP_ENV": "development"
+        "APP_ENV": "development",
+        "BUNNY_IMAGE_FOLDER_PREFIX": "images/dev"
       },
       "kv_namespaces": [
         {
@@ -61,7 +63,8 @@
       },
       "workers_dev": false,
       "vars": {
-        "APP_ENV": "preview"
+        "APP_ENV": "preview",
+        "BUNNY_IMAGE_FOLDER_PREFIX": "images/preview"
       }
     }
   }

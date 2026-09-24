@@ -75,7 +75,9 @@
     "typescript-eslint": "latest",
     "vitest": "latest",
     "wait-on": "^9.0.10",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "pg": "^8.23.0",
+    "@types/pg": "^8.23.1"
   },
   "pnpm": {
     "overrides": {

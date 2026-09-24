@@ -14,7 +14,6 @@ import {
   timestamp,
   unique,
   uniqueIndex,
-  uuid,
 } from "drizzle-orm/pg-core";
 import { maker, material, productType } from "./scraper.js";
 import { user } from "./users.js";
@@ -299,84 +298,6 @@ export const collectionItemImage = pgTable(
     check(
       "collection_item_image_deleted_by_role_valid",
       sql`${table.deletedByRole} is null or ${table.deletedByRole} in ('owner', 'admin')`,
-    ),
-  ],
-);
-
-export const catalogImageUploadSession = pgTable(
-  "catalog_image_upload_session",
-  {
-    id: uuid("id").primaryKey(),
-    uploaderClerkId: text("uploader_clerk_id").notNull(),
-    targetType: text("target_type", {
-      enum: catalogImageTargetTypes,
-    }).notNull(),
-    productId: bigint("product_id", { mode: "number" }).references(
-      () => product.id,
-      { onDelete: "cascade" },
-    ),
-    collectionItemId: bigint("collection_item_id", {
-      mode: "number",
-    }).references(() => collectionItem.id, { onDelete: "cascade" }),
-    collectionId: bigint("collection_id", { mode: "number" }).references(
-      () => userCollection.id,
-      { onDelete: "cascade" },
-    ),
-    expiresAt: timestamp("expires_at", {
-      mode: "date",
-      withTimezone: true,
-    }).notNull(),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("catalog_image_upload_session_expires_at_idx").on(table.expiresAt),
-    check(
-      "catalog_image_upload_session_target_consistent",
-      sql`(${table.targetType} = 'product' and ${table.productId} is not null and ${table.collectionId} is null and ${table.collectionItemId} is null) or (${table.targetType} = 'collection' and ${table.productId} is null and ${table.collectionId} is not null and ${table.collectionItemId} is null) or (${table.targetType} = 'collection_item' and ${table.productId} is null and ${table.collectionId} is null and ${table.collectionItemId} is not null)`,
-    ),
-  ],
-);
-
-export const catalogImageUploadFile = pgTable(
-  "catalog_image_upload_file",
-  {
-    id: uuid("id").primaryKey(),
-    sessionId: uuid("session_id")
-      .notNull()
-      .references(() => catalogImageUploadSession.id, { onDelete: "cascade" }),
-    position: integer("position").notNull(),
-    fileName: text("file_name").notNull(),
-    contentType: text("content_type").notNull(),
-    size: integer("size").notNull(),
-    sha256: text("sha256").notNull(),
-    objectPath: text("object_path").notNull(),
-    url: text("url").notNull(),
-    uploadedAt: timestamp("uploaded_at", { mode: "date", withTimezone: true }),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("catalog_image_upload_file_session_id_idx").on(table.sessionId),
-    unique("catalog_image_upload_file_object_path_unique").on(table.objectPath),
-    unique("catalog_image_upload_file_session_position_unique").on(
-      table.sessionId,
-      table.position,
-    ),
-    unique("catalog_image_upload_file_session_hash_unique").on(
-      table.sessionId,
-      table.sha256,
-    ),
-    check(
-      "catalog_image_upload_file_position_valid",
-      sql`${table.position} >= 0`,
-    ),
-    check("catalog_image_upload_file_size_positive", sql`${table.size} > 0`),
-    check(
-      "catalog_image_upload_file_sha256_valid",
-      sql`${table.sha256} ~ '^[0-9a-f]{64}$'`,
     ),
   ],
 );

@@ -127,5 +127,15 @@ for processing are unnecessary. Existing signed-download credentials remain in
 the web/services configuration. No scraper deployment or scheduler changes are
 required.
 
-Preview cleanup runs both `@package/storage cleanup:preview-images` and
-`@package/storage cleanup:preview-folder` to cover the existing namespaces.
+Preview cleanup runs `pnpm --filter @package/storage cleanup:preview` once to delete both isolated image and resource prefixes.
+
+## Shared paths and signing
+
+The scraper and upload service use the same validated image path builder:
+`{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{entityId}/{name}.{ext}`.
+Entities are `products`, `collections`, `collection-items`, and `resources`.
+Uploaded names are the SHA-256 of the original bytes. Scraper names use the source image ID when available, otherwise the same SHA-256 rule. Variation owner keys remain unchanged.
+
+`BUNNY_IMAGE_FOLDER_PREFIX` is required by the API Worker as well as the scraper and web storage configuration. The deploy workflow sets it alongside the resource prefix for each environment.
+
+The services `signImages` helper signs uploaded product, collection, collection-item and resource images at render, then applies Bunny Dynamic Image API parameters. Tokens last 120 seconds. Enforcing tokens on the `images/*` CDN namespace remains a separate Bunny dashboard change; scraper delivery is unchanged.

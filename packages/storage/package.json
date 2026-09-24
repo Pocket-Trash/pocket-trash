@@ -1,6 +1,6 @@
 {
   "name": "@package/storage",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -9,20 +9,23 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "default": "./dist/constants.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:ci": "tsc -p tsconfig.json",
     "check": "biome check .",
-    "cleanup:preview-folder": "tsx src/cleanup-preview-folder.ts",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests --exclude \"dist/**\"",
     "test:ci": "vitest run --passWithNoTests --exclude \"dist/**\"",
     "test:watch": "vitest --passWithNoTests --exclude \"dist/**\"",
     "test:watch:no-infisical": "vitest --passWithNoTests --exclude \"dist/**\"",
-    "cleanup:preview-images": "tsx src/cleanup-preview-images.ts"
+    "cleanup:preview": "tsx src/preview-cleanup/cli.ts"
   },
   "devDependencies": {
     "@package/eslint": "workspace:*",

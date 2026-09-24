@@ -197,3 +197,13 @@ Database service methods log stable operation names from `loggerMessages.databas
 Add future database services under `s.db.<service>.<method>`.
 
 For non-database domains, add a new top-level namespace under `s.<namespace>.<method>` only when that domain has its own cohesive service boundary.
+
+## Storage boundary
+
+Apps import storage capabilities only through `@package/services`; ESLint rejects direct `@package/storage` imports in all apps. Browser code imports limits and MIME maps from `@package/services/constants`, which has no Node dependencies.
+
+`services.storage` owns upload sessions, path/version reservations, completion, expiry cleanup and generic file deletion. `services.db.catalog.attachImages` and `selectCollectionCover` own image records, permissions, positions and cover selection. Resource create/version metadata is validated in services, never in the API transport.
+
+The shared storage implementation exposes `createUploadStorage`, `createImageTarget`, `createFileTarget`, `putImage`, and `putFile`. Bunny config fields are `accessKey`, `endpoint`, `zoneName`, and `cdnBaseUrl`; uploads also need `folderPrefix` and `imageFolderPrefix`. The `signImages` helper applies fresh signatures and Bunny delivery parameters for all uploaded display images. See [Resource Storage](resource-storage.md) for routes and limits.
+
+Run `pnpm --filter @package/services test:storage` with Docker available to test upload reservations, version allocation, completion, deletion guards and cleanup against a disposable PostgreSQL database. The command applies the migration history to its own container and removes the container afterward. It does not use configured application databases.

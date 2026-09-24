@@ -7,33 +7,24 @@ import {
   parseClientLogEvents,
 } from "@package/logger";
 import {
-  maxCatalogImageFileBytes,
-  maxCatalogImageFiles,
-  maxSessionFileBytes,
-} from "@package/storage";
+  fileTypes,
+  type StorageService,
+  type UploadActor,
+  UploadSessionError,
+  uploadManifestSchema,
+} from "@package/services";
 import { Scalar } from "@scalar/hono-api-reference";
-import {
-  type CatalogImageActor,
-  CatalogImageUploadError,
-  type CatalogImageUploadSessionsService,
-} from "./catalog-image-upload-sessions.js";
 import { clerkWebhookPath } from "./clerk-webhooks.js";
-import {
-  ResourceUploadSessionError,
-  type ResourceUploadSessionInput,
-  type ResourceUploadSessionsService,
-} from "./resource-upload-sessions.js";
 
 export const apiPrefix = "/api/v0";
 export const healthPath = `${apiPrefix}/health`;
 export const logsPath = `${apiPrefix}/logs`;
-export const resourceUploadSessionsPath = `${apiPrefix}/resource-upload-sessions`;
-export const catalogImageUploadSessionsPath = `${apiPrefix}/catalog-image-upload-sessions`;
+export const uploadSessionsPath = `${apiPrefix}/storage/upload-sessions`;
 export const openApiJsonPath = `${apiPrefix}/openapi.json`;
 export const apiDocsPath = `${apiPrefix}/docs`;
 export { clerkWebhookPath };
 
-export type ApiBindings = Omit<Env, "APP_ENV"> & {
+export type ApiBindings = Omit<Env, "APP_ENV" | "BUNNY_IMAGE_FOLDER_PREFIX"> & {
   APP_ENV?: string;
   AXIOM_DATASET?: string;
   AXIOM_EDGE_DOMAIN?: string;
@@ -50,6 +41,7 @@ export type ApiBindings = Omit<Env, "APP_ENV"> & {
   URL_INITIALS?: string;
   BUNNY_CDN_BASE_URL?: string;
   BUNNY_RESOURCE_FOLDER_PREFIX?: string;
+  BUNNY_IMAGE_FOLDER_PREFIX?: string;
   BUNNY_STORAGE_ACCESS_KEY?: string;
   BUNNY_STORAGE_ENDPOINT?: string;
   BUNNY_STORAGE_ZONE_NAME?: string;
@@ -65,14 +57,10 @@ type AppDependencies = {
     bindings: ApiBindings,
   ) => Promise<RuntimeConfig> | RuntimeConfig;
   runtimeConfig?: RuntimeConfig;
-  getResourceUploadRuntime?: (
+  getUploadRuntime?: (
     bindings: ApiBindings,
-  ) => Promise<ResourceUploadRuntime> | ResourceUploadRuntime;
-  resourceUploadRuntime?: ResourceUploadRuntime;
-  getCatalogImageUploadRuntime?: (
-    bindings: ApiBindings,
-  ) => Promise<CatalogImageUploadRuntime> | CatalogImageUploadRuntime;
-  catalogImageUploadRuntime?: CatalogImageUploadRuntime;
+  ) => Promise<UploadRuntime> | UploadRuntime;
+  uploadRuntime?: UploadRuntime;
   getClerkWebhookRuntime?: (
     bindings: ApiBindings,
   ) => Promise<ClerkWebhookRuntime> | ClerkWebhookRuntime;
@@ -84,16 +72,10 @@ export type ClerkWebhookRuntime = {
   handle(request: Request, targetKind: "local" | "primary"): Promise<Response>;
 };
 
-export type ResourceUploadRuntime = {
-  authenticate(request: Request): Promise<string | null>;
+export type UploadRuntime = {
+  authenticate(request: Request): Promise<UploadActor | null>;
   isAllowedOrigin(origin: string): boolean;
-  service: ResourceUploadSessionsService;
-};
-
-export type CatalogImageUploadRuntime = {
-  authenticate(request: Request): Promise<CatalogImageActor | null>;
-  isAllowedOrigin(origin: string): boolean;
-  service: CatalogImageUploadSessionsService;
+  service: StorageService;
 };
 
 const jsonContent = (schema: z.ZodType) => ({
@@ -112,56 +94,6 @@ const ErrorResponseSchema = z
     error: z.string().openapi({ example: "Expected a JSON request body." }),
   })
   .openapi("ErrorResponse");
-
-const ResourceUploadErrorSchema = z
-  .object({ error: z.string().openapi({ example: "invalid_request" }) })
-  .openapi("ResourceUploadError");
-
-const ResourceUploadFileSchema = z.object({
-  contentType: z.string().min(1).max(255),
-  fileName: z.string().min(1).max(255),
-  size: z.number().int().positive().max(maxSessionFileBytes),
-});
-
-const CatalogImageUploadSessionSchema = z.object({
-  files: z
-    .array(
-      z.object({
-        contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
-        fileName: z.string().min(1).max(255),
-        sha256: z.string().regex(/^[0-9a-f]{64}$/u),
-        size: z.number().int().positive().max(maxCatalogImageFileBytes),
-      }),
-    )
-    .min(1)
-    .max(maxCatalogImageFiles),
-  targetId: z.number().int().positive(),
-  targetType: z.enum(["product", "collection", "collection_item"]),
-});
-
-const ResourceUploadSessionSchema = z.discriminatedUnion("operation", [
-  z.object({
-    categories: z.array(z.string().min(1).max(60)).min(1).max(10),
-    description: z.string().min(1).max(5000),
-    files: z.array(ResourceUploadFileSchema).min(1).max(10),
-    images: z
-      .array(
-        ResourceUploadFileSchema.extend({
-          size: z.number().int().positive().max(maxCatalogImageFileBytes),
-        }),
-      )
-      .min(1)
-      .max(10),
-    isPrivate: z.boolean().default(false),
-    name: z.string().min(1).max(120),
-    operation: z.literal("create"),
-  }),
-  z.object({
-    files: z.array(ResourceUploadFileSchema).min(1).max(10),
-    operation: z.literal("version"),
-    resourceId: z.number().int().positive(),
-  }),
-]);
 
 const ClientLogEventSchema = z
   .object({
@@ -305,118 +237,31 @@ export function createApp(dependencies: AppDependencies = {}) {
     return context.json({ accepted: events.value.length });
   });
 
-  for (const path of [
-    "/resource-upload-sessions",
-    "/resource-upload-sessions/*",
-    "/catalog-image-upload-sessions",
-    "/catalog-image-upload-sessions/*",
-  ]) {
-    api.use(path, async (context, next) => {
-      const origin = context.req.header("origin");
-      const runtime = path.startsWith("/catalog-image")
-        ? await resolveCatalogImageUploadRuntime(dependencies, context.env)
-        : await resolveResourceUploadRuntime(dependencies, context.env);
-      if (origin && runtime?.isAllowedOrigin(origin)) {
-        context.header("access-control-allow-origin", origin);
-        context.header("vary", "Origin");
-      }
-      if (context.req.method === "OPTIONS") {
-        context.header(
-          "access-control-allow-headers",
-          "authorization, content-type",
-        );
-        context.header(
-          "access-control-allow-methods",
-          "DELETE, PATCH, POST, PUT, OPTIONS",
-        );
-        return context.body(null, 204);
-      }
-      await next();
-    });
-  }
-
-  api.post("/resource-upload-sessions", async (context) => {
-    const runtime = await requireResourceUploadRuntime(
-      dependencies,
-      context.env,
-    );
-    const userId = await runtime.authenticate(context.req.raw);
-    if (!userId) return context.json({ error: "unauthorized" }, 401);
-
-    let body: unknown;
-    try {
-      body = await context.req.json();
-    } catch {
-      return context.json({ error: "invalid_request" }, 400);
+  api.use("/storage/*", async (context, next) => {
+    const runtime = await resolveUploadRuntime(dependencies, context.env);
+    const origin = context.req.header("origin");
+    if (origin && runtime?.isAllowedOrigin(origin)) {
+      context.header("access-control-allow-origin", origin);
+      context.header("vary", "Origin");
     }
-    const parsed = ResourceUploadSessionSchema.safeParse(body);
-    if (!parsed.success) {
-      return context.json({ error: "invalid_request" }, 400);
-    }
-
-    try {
-      return context.json(
-        await runtime.service.create(
-          parsed.data as ResourceUploadSessionInput,
-          userId,
-        ),
-        201,
+    if (context.req.method === "OPTIONS") {
+      context.header(
+        "access-control-allow-headers",
+        "authorization, content-type",
       );
-    } catch (error) {
-      return resourceUploadErrorResponse(error);
+      context.header(
+        "access-control-allow-methods",
+        "DELETE, POST, PUT, OPTIONS",
+      );
+      return context.body(null, 204);
     }
+    await next();
   });
-
-  api.put(
-    "/resource-upload-sessions/:sessionId/files/:fileId",
-    async (context) => {
-      const runtime = await requireResourceUploadRuntime(
-        dependencies,
-        context.env,
-      );
-      const userId = await runtime.authenticate(context.req.raw);
-      if (!userId) return context.json({ error: "unauthorized" }, 401);
-
-      try {
-        await runtime.service.upload(
-          context.req.param("sessionId"),
-          context.req.param("fileId"),
-          userId,
-          context.req.raw,
-        );
-        return context.body(null, 204);
-      } catch (error) {
-        return resourceUploadErrorResponse(error);
-      }
-    },
-  );
-
-  api.post("/resource-upload-sessions/:sessionId/complete", async (context) => {
-    const runtime = await requireResourceUploadRuntime(
-      dependencies,
-      context.env,
-    );
-    const userId = await runtime.authenticate(context.req.raw);
-    if (!userId) return context.json({ error: "unauthorized" }, 401);
-
-    try {
-      return context.json(
-        await runtime.service.complete(context.req.param("sessionId"), userId),
-        200,
-      );
-    } catch (error) {
-      return resourceUploadErrorResponse(error);
-    }
-  });
-
-  api.post("/catalog-image-upload-sessions", async (context) => {
-    const runtime = await requireCatalogImageUploadRuntime(
-      dependencies,
-      context.env,
-    );
+  api.post("/storage/upload-sessions", async (context) => {
+    const runtime = await requireUploadRuntime(dependencies, context.env);
     const actor = await runtime.authenticate(context.req.raw);
     if (!actor) return context.json({ error: "unauthorized" }, 401);
-    const parsed = CatalogImageUploadSessionSchema.safeParse(
+    const parsed = uploadManifestSchema.safeParse(
       await context.req.json().catch(() => null),
     );
     if (!parsed.success) return context.json({ error: "invalid_request" }, 400);
@@ -426,138 +271,72 @@ export function createApp(dependencies: AppDependencies = {}) {
         201,
       );
     } catch (error) {
-      return catalogImageUploadErrorResponse(error);
+      return uploadErrorResponse(error);
     }
   });
-
-  api.patch(
-    "/catalog-image-upload-sessions/collections/:collectionId/cover",
-    async (context) => {
-      const runtime = await requireCatalogImageUploadRuntime(
-        dependencies,
-        context.env,
-      );
-      const actor = await runtime.authenticate(context.req.raw);
-      if (!actor) return context.json({ error: "unauthorized" }, 401);
-      const parsed = z
-        .object({ imageId: z.number().int().positive().nullable() })
-        .safeParse(await context.req.json().catch(() => null));
-      const collectionId = Number(context.req.param("collectionId"));
-      if (
-        !parsed.success ||
-        !Number.isSafeInteger(collectionId) ||
-        collectionId <= 0
-      ) {
-        return context.json({ error: "invalid_request" }, 400);
-      }
-      try {
-        await runtime.service.selectCollectionCover(
-          collectionId,
-          parsed.data.imageId,
-          actor,
-        );
-        return context.body(null, 204);
-      } catch (error) {
-        return catalogImageUploadErrorResponse(error);
-      }
-    },
-  );
-
-  api.delete(
-    "/catalog-image-upload-sessions/collections/:collectionId/covers/:imageId",
-    async (context) => {
-      const runtime = await requireCatalogImageUploadRuntime(
-        dependencies,
-        context.env,
-      );
-      const actor = await runtime.authenticate(context.req.raw);
-      if (!actor) return context.json({ error: "unauthorized" }, 401);
-      const collectionId = Number(context.req.param("collectionId"));
-      const imageId = Number(context.req.param("imageId"));
-      if (
-        !Number.isSafeInteger(collectionId) ||
-        collectionId <= 0 ||
-        !Number.isSafeInteger(imageId) ||
-        imageId <= 0
-      ) {
-        return context.json({ error: "invalid_request" }, 400);
-      }
-      try {
-        await runtime.service.deleteCollectionCover(
-          collectionId,
-          imageId,
-          actor,
-        );
-        return context.body(null, 204);
-      } catch (error) {
-        return catalogImageUploadErrorResponse(error);
-      }
-    },
-  );
-
   api.put(
-    "/catalog-image-upload-sessions/:sessionId/files/:fileId",
+    "/storage/upload-sessions/:sessionId/files/:fileId",
     async (context) => {
-      const runtime = await requireCatalogImageUploadRuntime(
-        dependencies,
-        context.env,
-      );
+      const runtime = await requireUploadRuntime(dependencies, context.env);
       const actor = await runtime.authenticate(context.req.raw);
       if (!actor) return context.json({ error: "unauthorized" }, 401);
+      const { sessionId, fileId } = context.req.param();
+      if (
+        !z.string().uuid().safeParse(sessionId).success ||
+        !z.string().uuid().safeParse(fileId).success
+      )
+        return context.json({ error: "invalid_request" }, 400);
       try {
-        await runtime.service.upload(
-          context.req.param("sessionId"),
-          context.req.param("fileId"),
-          actor,
-          context.req.raw,
-        );
+        await runtime.service.upload(sessionId, fileId, actor, context.req.raw);
         return context.body(null, 204);
       } catch (error) {
-        return catalogImageUploadErrorResponse(error);
+        return uploadErrorResponse(error);
       }
     },
   );
-
-  api.post(
-    "/catalog-image-upload-sessions/:sessionId/complete",
-    async (context) => {
-      const runtime = await requireCatalogImageUploadRuntime(
-        dependencies,
-        context.env,
+  api.post("/storage/upload-sessions/:sessionId/complete", async (context) => {
+    const runtime = await requireUploadRuntime(dependencies, context.env);
+    const actor = await runtime.authenticate(context.req.raw);
+    if (!actor) return context.json({ error: "unauthorized" }, 401);
+    const sessionId = context.req.param("sessionId");
+    if (!z.string().uuid().safeParse(sessionId).success)
+      return context.json({ error: "invalid_request" }, 400);
+    try {
+      return context.json(
+        await runtime.service.completeUpload(sessionId, actor),
       );
-      const actor = await runtime.authenticate(context.req.raw);
-      if (!actor) return context.json({ error: "unauthorized" }, 401);
-      try {
-        await runtime.service.complete(context.req.param("sessionId"), actor);
-        return context.json({ ok: true }, 200);
-      } catch (error) {
-        return catalogImageUploadErrorResponse(error);
-      }
-    },
-  );
-
+    } catch (error) {
+      return uploadErrorResponse(error);
+    }
+  });
+  api.delete("/storage/file/:fileType/:fileId", async (context) => {
+    const runtime = await requireUploadRuntime(dependencies, context.env);
+    const actor = await runtime.authenticate(context.req.raw);
+    if (!actor) return context.json({ error: "unauthorized" }, 401);
+    const type = z.enum(fileTypes).safeParse(context.req.param("fileType"));
+    const fileId = Number(context.req.param("fileId"));
+    if (!type.success || !Number.isSafeInteger(fileId) || fileId <= 0)
+      return context.json({ error: "invalid_request" }, 400);
+    try {
+      await runtime.service.deleteFile({ fileType: type.data, fileId, actor });
+      return context.body(null, 204);
+    } catch (error) {
+      return uploadErrorResponse(error);
+    }
+  });
   api.openAPIRegistry.registerPath({
     method: "post",
-    path: "/resource-upload-sessions",
-    operationId: "createResourceUploadSession",
-    summary: "Create a resource upload session",
-    tags: ["Resources"],
+    path: "/storage/upload-sessions",
+    operationId: "createUploadSession",
+    summary: "Create an upload session",
+    tags: ["Storage"],
     request: {
-      body: {
-        required: true,
-        content: jsonContent(ResourceUploadSessionSchema),
-      },
+      body: { required: true, content: jsonContent(uploadManifestSchema) },
     },
     responses: {
       201: { description: "The upload session was created." },
-      400: {
-        description: "The upload declaration was invalid.",
-        content: jsonContent(ResourceUploadErrorSchema),
-      },
-      401: {
-        description: "Authentication is required.",
-        content: jsonContent(ResourceUploadErrorSchema),
-      },
+      400: { description: "The upload declaration was invalid." },
+      401: { description: "Authentication is required." },
     },
   });
 
@@ -592,14 +371,22 @@ export function createApp(dependencies: AppDependencies = {}) {
   return app;
 }
 
-async function resolveResourceUploadRuntime(
+async function resolveUploadRuntime(
   dependencies: AppDependencies,
   bindings: ApiBindings,
-): Promise<ResourceUploadRuntime | undefined> {
+) {
   return (
-    (await dependencies.getResourceUploadRuntime?.(bindings)) ??
-    dependencies.resourceUploadRuntime
+    (await dependencies.getUploadRuntime?.(bindings)) ??
+    dependencies.uploadRuntime
   );
+}
+async function requireUploadRuntime(
+  dependencies: AppDependencies,
+  bindings: ApiBindings,
+) {
+  const runtime = await resolveUploadRuntime(dependencies, bindings);
+  if (!runtime) throw new Error("Storage uploads are not configured.");
+  return runtime;
 }
 
 async function requireClerkWebhookRuntime(
@@ -613,46 +400,8 @@ async function requireClerkWebhookRuntime(
   return runtime;
 }
 
-async function requireResourceUploadRuntime(
-  dependencies: AppDependencies,
-  bindings: ApiBindings,
-): Promise<ResourceUploadRuntime> {
-  const runtime = await resolveResourceUploadRuntime(dependencies, bindings);
-  if (!runtime) throw new Error("Resource uploads are not configured.");
-  return runtime;
-}
-
-async function resolveCatalogImageUploadRuntime(
-  dependencies: AppDependencies,
-  bindings: ApiBindings,
-) {
-  return (
-    (await dependencies.getCatalogImageUploadRuntime?.(bindings)) ??
-    dependencies.catalogImageUploadRuntime
-  );
-}
-
-async function requireCatalogImageUploadRuntime(
-  dependencies: AppDependencies,
-  bindings: ApiBindings,
-) {
-  const runtime = await resolveCatalogImageUploadRuntime(
-    dependencies,
-    bindings,
-  );
-  if (!runtime) throw new Error("Catalog image uploads are not configured.");
-  return runtime;
-}
-
-function resourceUploadErrorResponse(error: unknown): Response {
-  if (error instanceof ResourceUploadSessionError) {
-    return Response.json({ error: error.code }, { status: error.status });
-  }
-  throw error;
-}
-
-function catalogImageUploadErrorResponse(error: unknown): Response {
-  if (error instanceof CatalogImageUploadError) {
+function uploadErrorResponse(error: unknown): Response {
+  if (error instanceof UploadSessionError)
     return Response.json(
       {
         error: error.code,
@@ -661,6 +410,5 @@ function catalogImageUploadErrorResponse(error: unknown): Response {
       },
       { status: error.status },
     );
-  }
   throw error;
 }

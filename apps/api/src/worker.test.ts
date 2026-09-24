@@ -4,7 +4,7 @@ import worker, {
   handleWorkerScheduled,
   isAllowedWebOrigin,
   validateApiBindings,
-  validateResourceUploadBindings,
+  validateUploadBindings,
 } from "./worker.js";
 
 describe("api worker", () => {
@@ -39,14 +39,13 @@ describe("api worker", () => {
   });
 
   it("validates upload bindings and environment-specific web origins", () => {
-    expect(() =>
-      validateResourceUploadBindings({ APP_ENV: "production" }),
-    ).toThrow(
+    expect(() => validateUploadBindings({ APP_ENV: "production" })).toThrow(
       new ApiEnvValidationError([
         "CLERK_SECRET_KEY",
         "DATABASE_URL",
         "BUNNY_CDN_BASE_URL",
         "BUNNY_RESOURCE_FOLDER_PREFIX",
+        "BUNNY_IMAGE_FOLDER_PREFIX",
         "BUNNY_STORAGE_ACCESS_KEY",
         "BUNNY_STORAGE_ENDPOINT",
         "BUNNY_STORAGE_ZONE_NAME",

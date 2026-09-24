@@ -21,7 +21,7 @@ import {
   getResourceUploadErrorTranslation,
   uploadResourceSession,
   validateResourceUpload,
-} from "@/lib/resource-upload-sessions";
+} from "@/lib/upload-sessions";
 import { useLocale } from "@/providers/locale-provider";
 
 export function ResourceUploadPage() {

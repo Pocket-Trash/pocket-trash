@@ -13,6 +13,16 @@ import {
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { hashLogIdentifier } from "../../logging.js";
+import {
+  attachImages as attachStoredImages,
+  lockTarget,
+  selectCollectionCover as selectStoredCover,
+} from "../../storage/image-records.js";
+import type {
+  UploadActor,
+  UploadedFile,
+  UploadTarget,
+} from "../../storage/types.js";
 import type { UsersService } from "../users/index.js";
 
 export type CatalogProductType = "spinner" | "spinner-button";
@@ -116,6 +126,16 @@ export type ProductWriteInput = {
 };
 
 export type CatalogService = {
+  attachImages(input: {
+    target: UploadTarget;
+    files: UploadedFile[];
+    actor: UploadActor;
+  }): Promise<void>;
+  selectCollectionCover(input: {
+    collectionId: number;
+    imageId: number | null;
+    actor: UploadActor;
+  }): Promise<void>;
   createColor(input: {
     actorClerkId: string;
     hex: string;
@@ -366,6 +386,17 @@ export function createCatalogService(
   logger: Logger,
 ): CatalogService {
   return {
+    async attachImages(input) {
+      await db.transaction(async (tx) => {
+        await lockTarget(tx, input.target);
+        await attachStoredImages(tx, input);
+      });
+    },
+    async selectCollectionCover(input) {
+      await db.transaction(async (tx) => {
+        await selectStoredCover(tx, input);
+      });
+    },
     async createColor(input) {
       return await logger.operation(
         loggerMessages.database.catalog.createColor,

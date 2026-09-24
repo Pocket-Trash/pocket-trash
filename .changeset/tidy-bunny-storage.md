@@ -6,4 +6,4 @@
 "@package/storage": patch
 ---
 
-Centralize image uploads in shared storage and use Bunny Dynamic Images for optimized delivery while preserving originals up to 25 MiB.
+Unify uploads and safe cleanup through shared storage sessions, preserve originals up to 25 MiB, and optimize image delivery with Bunny Dynamic Images.

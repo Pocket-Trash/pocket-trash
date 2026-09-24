@@ -799,6 +799,18 @@ export const getPublicCollection = createServerFn({ method: "GET" })
     };
   });
 
+export const selectCollectionCover = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z
+      .object({ collectionId: idSchema, imageId: idSchema.nullable() })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    await s.db.catalog.selectCollectionCover({ ...data, actor });
+  });
+
 export const saveCollection = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     collectionWriteSchema
@@ -969,7 +981,7 @@ export const listCatalogImageTrash = createServerFn({ method: "GET" }).handler(
   async () => {
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
-    return await signCatalogImages(
+    return await signImages(
       await s.db.catalog.listImageTrash({
         actorClerkId: actor.clerkId,
         actorIsAdmin: actor.isAdmin,
@@ -1112,7 +1124,7 @@ async function signCatalogProducts(products: CatalogProduct[]) {
   return await Promise.all(
     products.map(async (product) => ({
       ...product,
-      images: await signCatalogImages(product.images),
+      images: await signImages(product.images),
     })),
   );
 }
@@ -1121,8 +1133,8 @@ async function signCollectionItem<
   T extends { images: CatalogImage[]; productImages: CatalogImage[] },
 >(item: T): Promise<T> {
   const [images, productImages] = await Promise.all([
-    signCatalogImages(item.images),
-    signCatalogImages(item.productImages),
+    signImages(item.images),
+    signImages(item.productImages),
   ]);
   return { ...item, images, productImages };
 }
@@ -1133,12 +1145,12 @@ async function signCollectionSummaries(
   return await Promise.all(
     collections.map(async (collection) => {
       const [coverImage] = collection.coverImage
-        ? await signCatalogImages([collection.coverImage])
+        ? await signImages([collection.coverImage])
         : [];
       return {
         ...collection,
         coverImage: coverImage ?? null,
-        coverImages: await signCatalogImages(collection.coverImages),
+        coverImages: await signImages(collection.coverImages),
       };
     }),
   );
@@ -1159,24 +1171,17 @@ async function signCollectionOwners<
   );
 }
 
-async function signCatalogImages<T extends CatalogImage>(
-  images: T[],
-): Promise<T[]> {
-  const [{ signResourceUrl, imageDeliveryUrl }, { serverEnv }] =
-    await Promise.all([import("@package/storage"), import("@/env/server")]);
+async function signImages<T extends CatalogImage>(images: T[]): Promise<T[]> {
+  const [{ signResourceUrl, signImages: sign }, { serverEnv }] =
+    await Promise.all([import("@package/services"), import("@/env/server")]);
   if (!serverEnv.BUNNY_CDN_BASE_URL || !serverEnv.BUNNY_CDN_TOKEN_KEY)
     return images;
-  return await Promise.all(
-    images.map(async (image) => ({
-      ...image,
-      url: imageDeliveryUrl(
-        await signResourceUrl({
-          cdnBaseUrl: serverEnv.BUNNY_CDN_BASE_URL,
-          objectPath: image.objectPath,
-          tokenKey: serverEnv.BUNNY_CDN_TOKEN_KEY,
-        }),
-      ),
-    })),
+  return sign(images, (objectPath) =>
+    signResourceUrl({
+      cdnBaseUrl: serverEnv.BUNNY_CDN_BASE_URL,
+      tokenKey: serverEnv.BUNNY_CDN_TOKEN_KEY,
+      objectPath,
+    }),
   );
 }
 

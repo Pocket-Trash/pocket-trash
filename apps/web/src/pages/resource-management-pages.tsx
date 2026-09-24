@@ -19,15 +19,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPageShell } from "@/components/user-page-shell";
+import type { getResourceDetail, listOwnedResources } from "@/lib/resources";
+import { updateResource } from "@/lib/resources";
 import {
   appendResourceUploadFiles,
   getResourceUploadErrorTranslation,
   uploadResourceSession,
   validateResourceImages,
   validateResourceUpload,
-} from "@/lib/resource-upload-sessions";
-import type { getResourceDetail, listOwnedResources } from "@/lib/resources";
-import { updateResource } from "@/lib/resources";
+} from "@/lib/upload-sessions";
 import { useLocale } from "@/providers/locale-provider";
 
 type OwnedResource = Awaited<ReturnType<typeof listOwnedResources>>[number];

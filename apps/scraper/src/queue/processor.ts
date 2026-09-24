@@ -698,17 +698,13 @@ async function processTmpImageJob({
       }
 
       const result = await imageStorage.uploadRemoteImage({
-        fileName: getTmpImageFileName({
-          sourceHash: row.image.sourceHash,
-          sourceImageId: row.image.sourceImageId,
+        prefix: imageFolderPrefix ?? "images",
+        entity: "products",
+        entityId: getTmpImageFolderKey({
+          productId: row.image.productId,
+          productVariationId: row.image.productVariationId,
         }),
-        folder: buildImageFolder({
-          entityId: getTmpImageFolderKey({
-            productId: row.image.productId,
-            productVariationId: row.image.productVariationId,
-          }),
-          prefix: imageFolderPrefix,
-        }),
+        sourceImageId: row.image.sourceImageId ?? undefined,
         overwriteFile: true,
         overwriteTags: true,
         sourceUrl: row.image.sourceUrl,
@@ -874,18 +870,6 @@ function logImageJobError({
   });
 }
 
-function getTmpImageFileName({
-  sourceHash,
-  sourceImageId,
-}: {
-  sourceHash: string;
-  sourceImageId: string | null;
-}): string {
-  const suffix = sourceImageId ?? sourceHash.replace("sha256:", "");
-
-  return `${suffix}.webp`;
-}
-
 export function getTmpImageFolderKey({
   productId,
   productVariationId,
@@ -974,23 +958,6 @@ function formatProcessorErrorForAttributes(error: unknown) {
     message: error.message,
     name: error.name,
   };
-}
-
-export function buildImageFolder({
-  entityId,
-  prefix,
-}: {
-  entityId: string;
-  prefix?: string;
-}) {
-  const normalizedPrefix = normalizeImageFolderPrefix(prefix);
-  const pathSegments = [normalizedPrefix, "products", entityId].filter(Boolean);
-
-  return `/${pathSegments.join("/")}`;
-}
-
-function normalizeImageFolderPrefix(prefix: string | undefined) {
-  return prefix?.replace(/^\/+|\/+$/g, "");
 }
 
 function logProcessorErrorSummary({

@@ -2,10 +2,12 @@ import type { DatabaseConfig } from "@package/database";
 import { createDb } from "@package/database";
 import { createLogger, type Logger, type LoggerConfig } from "@package/logger";
 import type {
-  ImageStorageConfig,
-  ResourceStorageConfig,
+  RemoteImageStorageConfig,
+  UploadStorageConfig,
 } from "@package/storage";
+import { createUploadStorage } from "@package/storage";
 import { createDbServices, type DbServices } from "./db/index.js";
+import { createStorageService, type StorageService } from "./storage/index.js";
 
 export type {
   CatalogColor,
@@ -51,9 +53,10 @@ export type ServicesLoggerConfig = LoggerConfig | Logger;
 
 export type ServicesConfig = {
   db?: DatabaseConfig;
-  images?: ImageStorageConfig;
+  images?: RemoteImageStorageConfig;
   logger?: ServicesLoggerConfig;
-  resources?: ResourceStorageConfig;
+  resources?: UploadStorageConfig;
+  storage?: UploadStorageConfig;
 };
 
 export class Services {
@@ -62,6 +65,7 @@ export class Services {
   #images?: ImagesService;
   #logger?: Logger;
   #resources?: ResourcesService;
+  #storage?: StorageService;
 
   configure(config: ServicesConfig): void {
     if (config.db && !config.logger && !this.#logger) {
@@ -90,6 +94,11 @@ export class Services {
       const db = createDb(config.db);
       this.#db = createDbServices(db, this.#logger);
       this.#flags = createFeatureFlagsService(db, this.#db.users, this.#logger);
+      if (config.storage)
+        this.#storage = createStorageService({
+          db,
+          storage: createUploadStorage(config.storage),
+        });
       if (config.resources) {
         this.#resources = createConfiguredResourcesService(
           db,
@@ -148,6 +157,12 @@ export class Services {
     return this.#images;
   }
 
+  get storage(): StorageService {
+    if (!this.#storage)
+      throw new Error("Storage services have not been configured.");
+    return this.#storage;
+  }
+
   get resources(): ResourcesService {
     if (!this.#resources) {
       throw new Error(
@@ -177,16 +192,24 @@ function isLogger(value: ServicesLoggerConfig): value is Logger {
 }
 
 export type {
-  ImageStorageConfig,
   ImageUpdateInput,
   ImageUpdateResult,
   ImageUploadInput,
   ImageUploadResult,
+  RemoteImageStorageConfig,
   RemoteImageUploadInput,
-  ResourceStorageConfig,
-  ResourceUploadInput,
-  ResourceUploadResult,
+  UploadInput,
+  UploadResult,
+  UploadStorageConfig,
 } from "@package/storage";
+export {
+  buildImageObjectPath,
+  buildResourceFileObjectPath,
+  createUploadStorage,
+  imageDeliveryUrl,
+  signResourceUrl,
+} from "@package/storage";
+export { signImages } from "./images/sign-images.js";
 export type {
   CreateResourceInput,
   ResourceDetail,
@@ -204,5 +227,7 @@ export {
   createConfiguredResourcesService,
   createResourcesService,
 } from "./resources/index.js";
+
+export * from "./storage/index.js";
 export type { ImagesService };
 export { createImagesService };

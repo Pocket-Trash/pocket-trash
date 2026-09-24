@@ -3,11 +3,11 @@ import {
   createImageStorage,
   type ImageFileDeleteResult,
   type ImageStorage,
-  type ImageStorageConfig,
   type ImageUpdateInput,
   type ImageUpdateResult,
   type ImageUploadInput,
   type ImageUploadResult,
+  type RemoteImageStorageConfig,
   type RemoteImageUploadInput,
 } from "@package/storage";
 import { hashLogIdentifier } from "../logging.js";
@@ -24,7 +24,7 @@ export type ImagesService = {
 };
 
 export function createImagesService(
-  config: ImageStorageConfig,
+  config: RemoteImageStorageConfig,
   logger: Logger,
 ): ImagesService {
   return wrapImageStorage(createImageStorage(config), logger);
@@ -77,7 +77,9 @@ function summarizeUploadInput(
   input: ImageUploadInput | RemoteImageUploadInput,
 ) {
   return {
-    fileNameHash: hashLogIdentifier(input.fileName),
+    fileNameHash: input.fileName
+      ? hashLogIdentifier(input.fileName)
+      : undefined,
     folderHash: input.folder ? hashLogIdentifier(input.folder) : undefined,
     hasFolder: Boolean(input.folder),
     overwriteFile: input.overwriteFile,

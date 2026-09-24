@@ -46,18 +46,18 @@ import {
   restoreCatalogImage,
   saveCatalogProduct,
   saveCollection,
+  selectCollectionCover,
   softDeleteCatalogImage,
   updateCollectionItem,
 } from "@/lib/catalog-api";
 import { useCatalogCopy } from "@/lib/catalog-copy";
-import {
-  type CatalogImageUploadError,
-  deleteCollectionCover,
-  selectCollectionCover,
-  uploadCatalogImages,
-  validateCatalogImages,
-} from "@/lib/catalog-image-uploads";
 import { getImageUploadGuidance } from "@/lib/help-content";
+import {
+  deleteCollectionCover,
+  type ImageUploadError,
+  uploadImages,
+  validateImages,
+} from "@/lib/upload-sessions";
 import { useLocale } from "@/providers/locale-provider";
 
 export function ProductFormPage({
@@ -184,7 +184,7 @@ function ProductEditor({
         setFormError("web.catalog.error.form");
         return;
       }
-      const imageError = validateCatalogImages(images);
+      const imageError = validateImages(images);
       if (imageError) {
         setFormError(imageError.key);
         return;
@@ -200,7 +200,7 @@ function ProductEditor({
       setSavedProductId(result.product.id);
       if (images.length) {
         try {
-          const uploads = await uploadCatalogImages({
+          const uploads = await uploadImages({
             files: images,
             getToken,
             onOwnerDeletedDuplicate: async (imageId) => {
@@ -226,9 +226,7 @@ function ProductEditor({
             return;
           }
         } catch (error) {
-          setFormError(
-            (error as CatalogImageUploadError).key ?? "error.generic",
-          );
+          setFormError((error as ImageUploadError).key ?? "error.generic");
           return;
         }
       }
@@ -919,7 +917,7 @@ export function CollectionFormPage({
     setCurrent(result.collection);
     if (cover) {
       try {
-        const upload = await uploadCatalogImages({
+        const upload = await uploadImages({
           files: [cover],
           getToken,
           targetId: result.collection.id,
@@ -998,9 +996,7 @@ export function CollectionFormPage({
             onClear={() =>
               updateCover(() =>
                 selectCollectionCover({
-                  collectionId: current.id,
-                  getToken,
-                  imageId: null,
+                  data: { collectionId: current.id, imageId: null },
                 }),
               )
             }
@@ -1016,9 +1012,7 @@ export function CollectionFormPage({
             onSelect={(image) =>
               updateCover(() =>
                 selectCollectionCover({
-                  collectionId: current.id,
-                  getToken,
-                  imageId: image.id,
+                  data: { collectionId: current.id, imageId: image.id },
                 }),
               )
             }
@@ -1163,7 +1157,7 @@ export function CollectionAddPage({
     ) {
       return;
     }
-    const imageError = validateCatalogImages(images);
+    const imageError = validateImages(images);
     if (imageError) {
       setFormError(imageError.key);
       return;
@@ -1171,7 +1165,7 @@ export function CollectionAddPage({
     if (savedItemId && savedCollectionId) {
       try {
         if (images.length) {
-          const uploads = await uploadCatalogImages({
+          const uploads = await uploadImages({
             files: images,
             getToken,
             targetId: savedItemId,
@@ -1184,7 +1178,7 @@ export function CollectionAddPage({
           }
         }
         if (collectionCover) {
-          const coverUpload = await uploadCatalogImages({
+          const coverUpload = await uploadImages({
             files: [collectionCover],
             getToken,
             targetId: savedCollectionId,
@@ -1201,7 +1195,7 @@ export function CollectionAddPage({
           to: "/user/collections/$collectionId",
         });
       } catch (error) {
-        setFormError((error as CatalogImageUploadError).key ?? "error.generic");
+        setFormError((error as ImageUploadError).key ?? "error.generic");
       }
       return;
     }
@@ -1247,7 +1241,7 @@ export function CollectionAddPage({
     setSavedCollectionId(result.collectionId);
     if (images.length) {
       try {
-        const uploads = await uploadCatalogImages({
+        const uploads = await uploadImages({
           files: images,
           getToken,
           onOwnerDeletedDuplicate: async (imageId) => {
@@ -1273,13 +1267,13 @@ export function CollectionAddPage({
           return;
         }
       } catch (error) {
-        setFormError((error as CatalogImageUploadError).key ?? "error.generic");
+        setFormError((error as ImageUploadError).key ?? "error.generic");
         return;
       }
     }
     if (collectionCover) {
       try {
-        const upload = await uploadCatalogImages({
+        const upload = await uploadImages({
           files: [collectionCover],
           getToken,
           targetId: result.collectionId,
@@ -1898,14 +1892,14 @@ export function CollectionEditPage({
               return;
             }
             setFormError(null);
-            const imageError = validateCatalogImages(images);
+            const imageError = validateImages(images);
             if (imageError) {
               setFormError(imageError.key);
               return;
             }
             if (images.length) {
               try {
-                const uploads = await uploadCatalogImages({
+                const uploads = await uploadImages({
                   files: images,
                   getToken,
                   onOwnerDeletedDuplicate: async (imageId) => {
@@ -1933,7 +1927,7 @@ export function CollectionEditPage({
                 }
               } catch (error) {
                 setFormError(
-                  (error as CatalogImageUploadError).key ?? "error.generic",
+                  (error as ImageUploadError).key ?? "error.generic",
                 );
                 return;
               }

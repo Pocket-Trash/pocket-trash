@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "default": "./dist/constants.js"
     }
   },
   "scripts": {
@@ -20,15 +24,17 @@
     "test": "vitest run --passWithNoTests --exclude \"dist/**\"",
     "test:ci": "vitest run --passWithNoTests --exclude \"dist/**\"",
     "test:watch": "vitest --passWithNoTests --exclude \"dist/**\"",
-    "test:watch:no-infisical": "vitest --passWithNoTests --exclude \"dist/**\""
+    "test:watch:no-infisical": "vitest --passWithNoTests --exclude \"dist/**\"",
+    "test:storage": "node scripts/test-storage.mjs"
   },
   "dependencies": {
     "@package/database": "workspace:*",
     "@package/feature-flags": "workspace:*",
-    "@package/storage": "workspace:*",
     "@package/logger": "workspace:*",
+    "@package/storage": "workspace:*",
     "@pocket-trash/localizations": "^0.5.1",
-    "drizzle-orm": "latest"
+    "drizzle-orm": "latest",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@package/eslint": "workspace:*",
