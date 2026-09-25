@@ -140,7 +140,7 @@ function createBunnyImageStorage(config: RemoteBunnyConfig): ImageStorage {
       const image = await fetchRemoteImage(config, input.sourceUrl);
       const targetFilePath =
         input.prefix && input.entity && input.entityId !== undefined
-          ? `/${buildImageObjectPath({ prefix: input.prefix, entity: input.entity, entityId: input.entityId, name: input.sourceImageId ?? (await sha256(image.buffer)), extension: image.extension })}`
+          ? `/${buildImageObjectPath({ prefix: input.prefix, entity: input.entity, entityId: input.entityId, name: input.sourceImageId && /^[a-zA-Z0-9_-]+$/u.test(input.sourceImageId) ? input.sourceImageId : await sha256(image.buffer), extension: image.extension })}`
           : buildImageFilePath({
               ...input,
               fileName: `${(input.fileName ?? (await sha256(image.buffer))).replace(/\.[^.]+$/u, "")}.${image.extension}`,

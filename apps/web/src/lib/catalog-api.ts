@@ -981,7 +981,7 @@ export const listCatalogImageTrash = createServerFn({ method: "GET" }).handler(
   async () => {
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
-    return await signImages(
+    return await signCatalogImageUrls(
       await s.db.catalog.listImageTrash({
         actorClerkId: actor.clerkId,
         actorIsAdmin: actor.isAdmin,
@@ -1124,7 +1124,7 @@ async function signCatalogProducts(products: CatalogProduct[]) {
   return await Promise.all(
     products.map(async (product) => ({
       ...product,
-      images: await signImages(product.images),
+      images: await signCatalogImageUrls(product.images),
     })),
   );
 }
@@ -1133,8 +1133,8 @@ async function signCollectionItem<
   T extends { images: CatalogImage[]; productImages: CatalogImage[] },
 >(item: T): Promise<T> {
   const [images, productImages] = await Promise.all([
-    signImages(item.images),
-    signImages(item.productImages),
+    signCatalogImageUrls(item.images),
+    signCatalogImageUrls(item.productImages),
   ]);
   return { ...item, images, productImages };
 }
@@ -1145,12 +1145,12 @@ async function signCollectionSummaries(
   return await Promise.all(
     collections.map(async (collection) => {
       const [coverImage] = collection.coverImage
-        ? await signImages([collection.coverImage])
+        ? await signCatalogImageUrls([collection.coverImage])
         : [];
       return {
         ...collection,
         coverImage: coverImage ?? null,
-        coverImages: await signImages(collection.coverImages),
+        coverImages: await signCatalogImageUrls(collection.coverImages),
       };
     }),
   );
@@ -1171,12 +1171,16 @@ async function signCollectionOwners<
   );
 }
 
-async function signImages<T extends CatalogImage>(images: T[]): Promise<T[]> {
-  const [{ signResourceUrl, signImages: sign }, { serverEnv }] =
-    await Promise.all([import("@package/services"), import("@/env/server")]);
+async function signCatalogImageUrls<T extends CatalogImage>(
+  images: T[],
+): Promise<T[]> {
+  const [{ signResourceUrl, signImages }, { serverEnv }] = await Promise.all([
+    import("@package/services"),
+    import("@/env/server"),
+  ]);
   if (!serverEnv.BUNNY_CDN_BASE_URL || !serverEnv.BUNNY_CDN_TOKEN_KEY)
     return images;
-  return sign(images, (objectPath) =>
+  return signImages(images, (objectPath) =>
     signResourceUrl({
       cdnBaseUrl: serverEnv.BUNNY_CDN_BASE_URL,
       tokenKey: serverEnv.BUNNY_CDN_TOKEN_KEY,

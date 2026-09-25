@@ -288,6 +288,11 @@ export async function getPendingUploadPaths(
     const rows = await database`select object_path from upload_file`;
     paths.push(...rows.map((row) => String(row.object_path)));
   }
+  if (await tableExists(database, "storage_object_deletion")) {
+    const rows =
+      await database`select object_path from storage_object_deletion`;
+    paths.push(...rows.map((row) => String(row.object_path)));
+  }
   // Older preview branches still reserve uploads in the previous table.
   if (await tableExists(database, "resource_upload_files")) {
     const rows = await database`select object_path from resource_upload_files`;

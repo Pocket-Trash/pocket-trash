@@ -38,6 +38,8 @@
   },
   "devDependencies": {
     "@package/eslint": "workspace:*",
-    "@package/tsconfig": "workspace:*"
+    "@package/tsconfig": "workspace:*",
+    "pg": "^8.23.0",
+    "@types/pg": "^8.23.1"
   }
 }

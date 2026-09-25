@@ -39,12 +39,14 @@ const app = createApp({
     };
   },
   getUploadRuntime(bindings) {
+    const { logger, services } = storageRuntime(bindings);
     return {
+      logger,
       authenticate: (request: Request) =>
         authenticateClerkRequest(request, bindings),
       isAllowedOrigin: (origin: string) =>
         isAllowedWebOrigin(origin, bindings.APP_ENV),
-      service: storageService(bindings),
+      service: services.storage,
     };
   },
 });
@@ -131,15 +133,19 @@ export async function handleWorkerScheduled(
 
   context.waitUntil(
     (async () => {
+      let runtime: ReturnType<typeof storageRuntime> | undefined;
       try {
-        await storageService(env).cleanupExpired();
-      } catch (error) {
+        runtime = storageRuntime(env);
+        await runtime.services.storage.cleanupExpired();
+      } catch {
         await logWorkerException(
-          error,
+          new Error("Storage cleanup failed."),
           env,
           new Request("https://api.pocket-trash.app/__scheduled"),
           "scheduled",
         );
+      } finally {
+        await runtime?.logger.flush();
       }
     })(),
   );
@@ -222,8 +228,7 @@ export default {
   scheduled: handleWorkerScheduled,
 } satisfies ExportedHandler<ApiBindings>;
 
-function storageService(bindings: ApiBindings) {
+function storageRuntime(bindings: ApiBindings) {
   validateUploadBindings(bindings);
-  const { services } = createApiServices(bindings, true);
-  return services.storage;
+  return createApiServices(bindings, { storage: true });
 }

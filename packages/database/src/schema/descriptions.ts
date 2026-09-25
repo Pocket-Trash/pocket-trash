@@ -23,6 +23,10 @@ export const schemaDescriptions = {
     description:
       "Admin review events created for new resources and categories.",
   },
+  storage_object_deletion: {
+    description:
+      "Durable post-commit object deletion queue. Paths remain reserved until cleanup finishes.",
+  },
   upload_file: {
     description:
       "Declared files, reserved object paths and verified upload state for all upload sessions.",

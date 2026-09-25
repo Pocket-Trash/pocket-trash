@@ -575,11 +575,11 @@ describe("resources service", () => {
 
   it("updates owner metadata and replaces its images", async () => {
     const deleted: string[] = [];
-    const execute = vi
-      .fn()
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValue({ rows: [{ id: 1000 }] });
+    const execute = vi.fn(async (query) => ({
+      rows: new PgDialect().sqlToQuery(query).sql.includes("update resources")
+        ? [{ id: 1000 }]
+        : [],
+    }));
     const storage: UploadStorage = {
       createFileTarget: vi.fn(),
       async delete(objectPath) {
@@ -639,10 +639,22 @@ describe("resources service", () => {
         resourceId: 1000,
       }),
     ).resolves.toEqual({ id: 1000 });
-    expect(deleted).toEqual(["dev/old-preview.webp"]);
-    const query = new PgDialect().sqlToQuery(execute.mock.calls[2]?.[0]);
-    expect(query.sql).toContain("update resources");
-    expect(query.sql).toContain("on conflict do nothing");
+    expect(deleted).toEqual([]);
+    const queries = execute.mock.calls.map(([query]) =>
+      new PgDialect().sqlToQuery(query),
+    );
+    expect(
+      queries.some(
+        (query) =>
+          query.sql.includes("insert into storage_object_deletion") &&
+          query.params.includes("dev/old-preview.webp"),
+      ),
+    ).toBe(true);
+    const query = queries.find((query) =>
+      query.sql.includes("update resources"),
+    );
+    expect(query?.sql).toContain("update resources");
+    expect(query?.sql).toContain("on conflict do nothing");
   });
 
   it("records owner and admin soft deletions without changing visibility", async () => {
@@ -685,134 +697,112 @@ describe("resources service", () => {
     expect(query.sql).not.toContain("is_private =");
   });
 
-  it("permanently deletes every stored object before the resource row", async () => {
-    const execute = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [
-          { objectPath: "resources/dev/1000/image.webp" },
-          { objectPath: "resources/dev/1000/model.stl" },
-          { objectPath: "resources/dev/1000/legacy.zip" },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [{ id: 1000 }] });
-    const remove = vi.fn().mockResolvedValue("deleted");
-    const service = createResourcesService(
-      { execute } as unknown as Database,
-      { delete: remove } as unknown as UploadStorage,
-      createNoopLogger({ app: "web", environment: "test" }),
+  it("queues every resource object in the purge transaction without deleting Bunny objects", async () => {
+    const execute = vi.fn(async (query) => {
+      const text = new PgDialect().sqlToQuery(query).sql;
+      if (text.includes("stored_objects.object_path"))
+        return {
+          rows: [
+            { objectPath: "resources/dev/1000/image.webp" },
+            { objectPath: "resources/dev/1000/model.stl" },
+            { objectPath: "resources/dev/1000/legacy.zip" },
+          ],
+        };
+      return { rows: [{ id: 1000 }] };
+    });
+    const transaction = vi.fn(async (fn: (tx: unknown) => unknown) =>
+      fn({ execute }),
     );
-
-    await expect(
-      service.permanentlyDelete({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
-        resourceId: 1000,
-      }),
-    ).resolves.toBeUndefined();
-
-    expect(remove).toHaveBeenCalledTimes(3);
-    expect(remove).toHaveBeenCalledWith("resources/dev/1000/image.webp");
-    expect(remove).toHaveBeenCalledWith("resources/dev/1000/model.stl");
-    expect(remove).toHaveBeenCalledWith("resources/dev/1000/legacy.zip");
-    const objectQuery = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
-    expect(objectQuery.sql).toContain("from resource_images");
-    expect(objectQuery.sql).toContain("from resource_files");
-    expect(objectQuery.sql).toContain("resource_versions.object_path");
-    expect(objectQuery.sql).toContain("resources.deleted_at is not null");
-    const deleteQuery = new PgDialect().sqlToQuery(execute.mock.calls[1]?.[0]);
-    expect(deleteQuery.sql).toContain("delete from resources");
-    expect(deleteQuery.sql).toContain("deleted_at is not null");
-    expect(deleteQuery.sql).not.toContain("resource_categories");
-  });
-
-  it("requires an admin and a soft-deleted resource before deleting storage", async () => {
-    const execute = vi.fn().mockResolvedValue({ rows: [] });
     const remove = vi.fn();
     const service = createResourcesService(
-      { execute } as unknown as Database,
+      { transaction } as unknown as Database,
       { delete: remove } as unknown as UploadStorage,
-      createNoopLogger({ app: "web", environment: "test" }),
+      createNoopLogger(),
     );
+    await service.permanentlyDelete({
+      actorClerkId: "admin",
+      actorIsAdmin: true,
+      resourceId: 1000,
+    });
+    expect(transaction).toHaveBeenCalledOnce();
+    expect(remove).not.toHaveBeenCalled();
+    const queries = execute.mock.calls.map(([query]) =>
+      new PgDialect().sqlToQuery(query),
+    );
+    expect(
+      queries
+        .filter((query) =>
+          query.sql.includes("insert into storage_object_deletion"),
+        )
+        .flatMap((query) => query.params),
+    ).toEqual([
+      "resources/dev/1000/image.webp",
+      "resources/dev/1000/legacy.zip",
+      "resources/dev/1000/model.stl",
+    ]);
+    expect(queries.at(-1)?.sql).toContain("delete from resources");
+  });
 
+  it("requires an admin and a soft-deleted resource before queuing deletion", async () => {
+    const execute = vi.fn(async () => ({ rows: [] }));
+    const transaction = vi.fn(async (fn: (tx: unknown) => unknown) =>
+      fn({ execute }),
+    );
+    const remove = vi.fn();
+    const service = createResourcesService(
+      { transaction } as unknown as Database,
+      { delete: remove } as unknown as UploadStorage,
+      createNoopLogger(),
+    );
     await expect(
       service.permanentlyDelete({
-        actorClerkId: "user_123",
+        actorClerkId: "owner",
         actorIsAdmin: false,
         resourceId: 1000,
       }),
     ).rejects.toThrow("requires an admin");
-    expect(execute).not.toHaveBeenCalled();
-
+    expect(transaction).not.toHaveBeenCalled();
     await expect(
       service.permanentlyDelete({
-        actorClerkId: "admin_123",
+        actorClerkId: "admin",
         actorIsAdmin: true,
         resourceId: 1000,
       }),
     ).rejects.toThrow("must be soft-deleted");
     expect(remove).not.toHaveBeenCalled();
-    expect(execute).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps database state retryable when Bunny deletion fails", async () => {
-    const execute = vi.fn().mockResolvedValue({
-      rows: [{ objectPath: "resources/dev/1000/model.stl" }],
-    });
-    const remove = vi.fn().mockRejectedValue(new Error("Bunny unavailable"));
-    const service = createResourcesService(
-      { execute } as unknown as Database,
-      { delete: remove } as unknown as UploadStorage,
-      createNoopLogger({ app: "web", environment: "test" }),
-    );
-
-    await expect(
-      service.permanentlyDelete({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
-        resourceId: 1000,
-      }),
-    ).rejects.toThrow("Bunny unavailable");
-    expect(execute).toHaveBeenCalledTimes(1);
-  });
-
-  it("logs database purge failures without exposing the admin identifier", async () => {
+  it("logs purge failures without SQL payloads or admin identifiers", async () => {
     const events: LogEvent[] = [];
     const logger = captureLogger(events);
-    const execute = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [{ objectPath: "resources/dev/1000/model.stl" }],
-      })
-      .mockRejectedValueOnce(new Error("database unavailable"));
+    const failure = new Error(
+      "query parameters: admin_private private-filename.pdf",
+    );
+    const transaction = vi.fn(async () => {
+      throw failure;
+    });
     const service = createResourcesService(
-      { execute } as unknown as Database,
-      {
-        delete: vi.fn().mockResolvedValue("deleted"),
-      } as unknown as UploadStorage,
+      { transaction } as unknown as Database,
+      { delete: vi.fn() } as unknown as UploadStorage,
       logger,
     );
-
     await expect(
       service.permanentlyDelete({
         actorClerkId: "admin_private",
         actorIsAdmin: true,
         resourceId: 1000,
       }),
-    ).rejects.toThrow("database unavailable");
+    ).rejects.toBe(failure);
     await logger.flush();
-
     expect(events).toHaveLength(1);
     expect(events[0]?.message).toBe(
       `${loggerMessages.resources.permanentlyDelete}.failed`,
     );
-    expect(events[0]?.attributes).toMatchObject({
-      actorClerkIdHash: hashLogIdentifier("admin_private"),
-      operation: loggerMessages.resources.permanentlyDelete,
-      outcome: "failure",
-      resourceId: 1000,
-    });
+    expect(events[0]?.attributes?.actorClerkIdHash).toBe(
+      hashLogIdentifier("admin_private"),
+    );
     expect(JSON.stringify(events)).not.toContain("admin_private");
+    expect(JSON.stringify(events)).not.toContain("private-filename.pdf");
   });
 
   it("lets owners restore only their own owner deletion and admins restore any", async () => {

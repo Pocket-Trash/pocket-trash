@@ -74,6 +74,7 @@ describe("resource storage reconciliation", () => {
   });
   it.each([
     "upload_file",
+    "storage_object_deletion",
     "resource_upload_files",
     undefined,
   ])("protects pending paths from %s", async (table) => {

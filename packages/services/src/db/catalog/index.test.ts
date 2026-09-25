@@ -1,6 +1,6 @@
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
-import { createLogger } from "@package/logger";
+import { createLogger, type LogEvent, loggerMessages } from "@package/logger";
 import { describe, expect, it, vi } from "vitest";
 import {
   assertValidFinishOptions,
@@ -808,5 +808,55 @@ describe("catalog finish validation", () => {
     expect(() => assertValidFinishOptions([option, option], effects)).toThrow(
       /duplicate/i,
     );
+  });
+});
+
+describe("catalog image operation logging", () => {
+  it("logs attachment and cover operations and redacts failures", async () => {
+    const events: LogEvent[] = [];
+    const logger = createLogger({
+      app: "api",
+      environment: "test",
+      transports: [
+        {
+          log(event) {
+            events.push(event);
+          },
+        },
+      ],
+    });
+    const transaction = vi.fn(async () => undefined);
+    const service = createCatalogService(
+      { transaction } as unknown as Database,
+      logger,
+    );
+    const actor = { clerkId: "private-owner", isAdmin: false };
+    await service.attachImages({
+      actor,
+      target: { type: "product", id: 1 },
+      files: [],
+    });
+    await service.selectCollectionCover({
+      actor,
+      collectionId: 1,
+      imageId: null,
+    });
+    const failure = new Error(
+      "SQL parameters: private-owner private-filename.jpg",
+    );
+    transaction.mockRejectedValueOnce(failure);
+    await expect(
+      service.selectCollectionCover({ actor, collectionId: 1, imageId: null }),
+    ).rejects.toBe(failure);
+    await logger.flush();
+    expect(events.map((event) => event.message)).toEqual([
+      `${loggerMessages.database.catalog.attachImages}.succeeded`,
+      `${loggerMessages.database.catalog.selectCollectionCover}.succeeded`,
+      `${loggerMessages.database.catalog.selectCollectionCover}.failed`,
+    ]);
+    for (const event of events)
+      expect(event.attributes?.clerkIdHash).toMatch(/^sha256:/u);
+    expect(JSON.stringify(events)).not.toContain("private-owner");
+    expect(JSON.stringify(events)).not.toContain("private-filename.jpg");
   });
 });

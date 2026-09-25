@@ -6,8 +6,8 @@ vi.mock("@/env/client", () => ({
 
 import {
   appendResourceUploadFiles,
-  getResourceUploadErrorTranslation,
-  ResourceUploadRequestError,
+  getUploadErrorTranslation,
+  UploadRequestError,
   uploadResourceSession,
   validateImages,
   validateResourceImages,
@@ -283,13 +283,13 @@ describe("resource upload sessions", () => {
 
   it("maps stable API codes to localized upload messages", () => {
     expect(
-      getResourceUploadErrorTranslation(
-        new ResourceUploadRequestError("complete", "session_expired"),
+      getUploadErrorTranslation(
+        new UploadRequestError("complete", "session_expired"),
       ),
     ).toEqual({ key: "web.resources.upload.expired" });
     expect(
-      getResourceUploadErrorTranslation(
-        new ResourceUploadRequestError("file", "upload_failed", "tool.stl"),
+      getUploadErrorTranslation(
+        new UploadRequestError("file", "upload_failed", "tool.stl"),
       ),
     ).toEqual({
       key: "web.resources.upload.fileFailure",

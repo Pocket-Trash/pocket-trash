@@ -75,6 +75,7 @@ export type ClerkWebhookRuntime = {
 };
 
 export type UploadRuntime = {
+  logger?: Logger;
   authenticate(request: Request): Promise<UploadActor | null>;
   isAllowedOrigin(origin: string): boolean;
   service: StorageService;
@@ -145,7 +146,10 @@ const HealthRoute = createRoute({
 
 export function createApp(dependencies: AppDependencies = {}) {
   const app = new OpenAPIHono<{ Bindings: ApiBindings }>();
-  const api = new OpenAPIHono<{ Bindings: ApiBindings }>();
+  const api = new OpenAPIHono<{
+    Bindings: ApiBindings;
+    Variables: { uploadRuntime: UploadRuntime };
+  }>();
 
   api.openapi(HealthRoute, (context) =>
     context.json({ ok: true, service: "api" }, 200),
@@ -241,6 +245,7 @@ export function createApp(dependencies: AppDependencies = {}) {
 
   api.use("/storage/*", async (context, next) => {
     const runtime = await resolveUploadRuntime(dependencies, context.env);
+    if (runtime) context.set("uploadRuntime", runtime);
     const origin = context.req.header("origin");
     if (origin && runtime?.isAllowedOrigin(origin)) {
       context.header("access-control-allow-origin", origin);
@@ -257,10 +262,14 @@ export function createApp(dependencies: AppDependencies = {}) {
       );
       return context.body(null, 204);
     }
-    await next();
+    try {
+      await next();
+    } finally {
+      await runtime?.logger?.flush();
+    }
   });
   api.post("/storage/upload-sessions", async (context) => {
-    const runtime = await requireUploadRuntime(dependencies, context.env);
+    const runtime = requireUploadRuntime(context.get("uploadRuntime"));
     const actor = await runtime.authenticate(context.req.raw);
     if (!actor) return context.json({ error: "unauthorized" }, 401);
     const parsed = uploadManifestSchema.safeParse(
@@ -279,7 +288,7 @@ export function createApp(dependencies: AppDependencies = {}) {
   api.put(
     "/storage/upload-sessions/:sessionId/files/:fileId",
     async (context) => {
-      const runtime = await requireUploadRuntime(dependencies, context.env);
+      const runtime = requireUploadRuntime(context.get("uploadRuntime"));
       const actor = await runtime.authenticate(context.req.raw);
       if (!actor) return context.json({ error: "unauthorized" }, 401);
       const { sessionId, fileId } = context.req.param();
@@ -297,7 +306,7 @@ export function createApp(dependencies: AppDependencies = {}) {
     },
   );
   api.post("/storage/upload-sessions/:sessionId/complete", async (context) => {
-    const runtime = await requireUploadRuntime(dependencies, context.env);
+    const runtime = requireUploadRuntime(context.get("uploadRuntime"));
     const actor = await runtime.authenticate(context.req.raw);
     if (!actor) return context.json({ error: "unauthorized" }, 401);
     const sessionId = context.req.param("sessionId");
@@ -312,7 +321,7 @@ export function createApp(dependencies: AppDependencies = {}) {
     }
   });
   api.delete("/storage/file/:fileType/:fileId", async (context) => {
-    const runtime = await requireUploadRuntime(dependencies, context.env);
+    const runtime = requireUploadRuntime(context.get("uploadRuntime"));
     const actor = await runtime.authenticate(context.req.raw);
     if (!actor) return context.json({ error: "unauthorized" }, 401);
     const type = z.enum(fileTypes).safeParse(context.req.param("fileType"));
@@ -388,11 +397,7 @@ async function resolveUploadRuntime(
     dependencies.uploadRuntime
   );
 }
-async function requireUploadRuntime(
-  dependencies: AppDependencies,
-  bindings: ApiBindings,
-) {
-  const runtime = await resolveUploadRuntime(dependencies, bindings);
+function requireUploadRuntime(runtime: UploadRuntime | undefined) {
   if (!runtime) throw new Error("Storage uploads are not configured.");
   return runtime;
 }
@@ -418,5 +423,5 @@ function uploadErrorResponse(error: unknown): Response {
       },
       { status: error.status },
     );
-  throw error;
+  throw new Error("Storage operation failed.");
 }

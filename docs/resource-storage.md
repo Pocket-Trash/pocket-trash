@@ -60,4 +60,6 @@ local-development branches use `resources/dev`, `preview` uses
 `pnpm resources:reconcile-storage -- --apply` to apply that exact
 reconciliation. The production Neon branch is skipped.
 
-Reconciliation preserves resource version folders and the `images/` namespace for resource images. Reserved paths in `upload_file` are protected from orphan deletion; older preview branches retain protection through `resource_upload_files`.
+Reconciliation preserves resource version folders and the `images/` namespace for resource images. On databases that have applied migration 0030, reconciliation protects reserved paths from `upload_file`. Older preview databases that have not applied that migration use `resource_upload_files`. Each query checks that its table exists. Migration 0031 adds `storage_object_deletion`; reconciliation also protects those queued paths when the table exists.
+
+Deleting an attachment commits its database removal and a durable object-deletion entry together. The service attempts physical deletion after commit. Failures remain queued for API cleanup retries; the existing production schedule runs hourly. Development/preview do not run that schedule, so failed deletions remain queued until cleanup is run for that environment. Queued paths remain reserved against new uploads until cleanup finishes; cleanup never deletes an attached object.

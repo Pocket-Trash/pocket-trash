@@ -42,14 +42,14 @@ export function createApiLogger(env: ApiBindings) {
 
 export function createApiServices(
   bindings: ApiBindings,
-  includeStorage = false,
+  options: { storage?: boolean } = {},
 ) {
   const logger = createApiLogger(bindings);
   const services = createServices();
   services.configure({
     db: { databaseUrl: bindings.DATABASE_URL as string },
     logger,
-    ...(includeStorage
+    ...(options.storage
       ? {
           storage: {
             accessKey: bindings.BUNNY_STORAGE_ACCESS_KEY,

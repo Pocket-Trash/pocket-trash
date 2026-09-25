@@ -24,9 +24,14 @@ import {
   sql,
 } from "drizzle-orm";
 import { signImages } from "../images/sign-images.js";
-import { hashLogIdentifier } from "../logging.js";
+import { hashLogIdentifier, loggedMutation } from "../logging.js";
 import { lockTarget } from "../storage/image-records.js";
 import { createStorageService } from "../storage/index.js";
+import {
+  assertNotPendingDeletion,
+  cleanupObjectDeletions,
+  queueObjectDeletions,
+} from "../storage/object-lifecycle.js";
 
 export type CreateResourceInput = {
   categories: string[];
@@ -227,12 +232,14 @@ export function createResourcesService(
 ): ResourcesService {
   return {
     async addVersion(input) {
-      return await logger.operation(
+      return await loggedMutation(
+        logger,
         loggerMessages.resources.addVersion,
         async () => {
           const result = await uploadBufferedSession(
             db,
             storage,
+            logger,
             input,
             { type: "resource", id: input.resourceId },
             { operation: "version" },
@@ -263,12 +270,14 @@ export function createResourcesService(
       );
     },
     async create(input) {
-      return await logger.operation(
+      return await loggedMutation(
+        logger,
         loggerMessages.resources.create,
         async () => {
           const result = await uploadBufferedSession(
             db,
             storage,
+            logger,
             input,
             { type: "resource" },
             {
@@ -817,7 +826,8 @@ export function createResourcesService(
       );
     },
     async permanentlyDelete(input) {
-      await logger.operation(
+      await loggedMutation(
+        logger,
         loggerMessages.resources.permanentlyDelete,
         async () => {
           assertPositiveInteger(input.resourceId, "resourceId");
@@ -826,7 +836,9 @@ export function createResourcesService(
             throw new Error("Resource permanent deletion requires an admin.");
           }
 
-          const objects = await db.execute<{ objectPath: string | null }>(sql`
+          const paths = await db.transaction(async (tx) => {
+            await lockTarget(tx, { type: "resource", id: input.resourceId });
+            const objects = await tx.execute<{ objectPath: string | null }>(sql`
             select stored_objects.object_path as "objectPath"
             from resources
             left join lateral (
@@ -848,28 +860,34 @@ export function createResourcesService(
             where resources.id = ${input.resourceId}
               and resources.deleted_at is not null
           `);
-          if (objects.rows.length === 0) {
-            throw new Error(
-              "Resource must be soft-deleted before permanent deletion.",
+            if (objects.rows.length === 0) {
+              throw new Error(
+                "Resource must be soft-deleted before permanent deletion.",
+              );
+            }
+
+            await queueObjectDeletions(
+              tx,
+              objects.rows.flatMap(({ objectPath }) =>
+                objectPath ? [objectPath] : [],
+              ),
             );
-          }
 
-          await Promise.all(
-            objects.rows.flatMap(({ objectPath }) =>
-              objectPath ? [storage.delete(objectPath)] : [],
-            ),
-          );
-
-          const deleted = await db.execute<{ id: number }>(sql`
+            const deleted = await tx.execute<{ id: number }>(sql`
             delete from resources
             where id = ${input.resourceId} and deleted_at is not null
             returning id
           `);
-          if (!deleted.rows[0]) {
-            throw new Error(
-              "Resource permanent deletion could not be completed.",
+            if (!deleted.rows[0]) {
+              throw new Error(
+                "Resource permanent deletion could not be completed.",
+              );
+            }
+            return objects.rows.flatMap(({ objectPath }) =>
+              objectPath ? [objectPath] : [],
             );
-          }
+          });
+          await cleanupObjectDeletions(db, storage, logger, paths);
         },
         {
           attributes: {
@@ -978,11 +996,13 @@ export function createResourcesService(
       );
     },
     async update(input) {
-      return await logger.operation(
+      return await loggedMutation(
+        logger,
         loggerMessages.resources.update,
         async () => {
           const normalized = normalizeUpdateInput(input);
-          return db.transaction(async (tx) => {
+          const removedPaths: string[] = [];
+          const result = await db.transaction(async (tx) => {
             await lockTarget(tx, {
               type: "resource",
               id: normalized.resourceId,
@@ -1033,17 +1053,20 @@ export function createResourcesService(
                 images,
               );
               const retained = new Set(normalized.retainedImageIds);
-              await Promise.allSettled(
-                currentImages
+              removedPaths.push(
+                ...currentImages
                   .filter(({ id }) => !retained.has(id))
-                  .map(({ objectPath }) => storage.delete(objectPath)),
+                  .map(({ objectPath }) => objectPath),
               );
+              await queueObjectDeletions(tx, removedPaths);
               return updated;
             } catch (error) {
               await deleteUploadedFiles(storage, images);
               throw error;
             }
           });
+          await cleanupObjectDeletions(db, storage, logger, removedPaths);
+          return result;
         },
         {
           attributes: {
@@ -1306,6 +1329,7 @@ async function uploadResourceImages(
         },
         { entity: "resources", entityId: resourceId },
       );
+      await assertNotPendingDeletion(db, target.objectPath);
       const existing = await db.execute(
         sql`select 1 from resource_images where object_path=${target.objectPath} union all select 1 from upload_file where object_path=${target.objectPath} limit 1`,
       );
@@ -1351,11 +1375,12 @@ export function canViewResource(
 async function uploadBufferedSession(
   db: Database,
   storage: UploadStorage,
+  logger: Logger,
   input: CreateResourceInput | UploadResourceVersionInput,
   target: { type: "resource"; id?: number },
   payload: Record<string, unknown>,
 ) {
-  const service = createStorageService({ db, storage });
+  const service = createStorageService({ db, storage, logger });
   const actor = { clerkId: input.uploaderClerkId, isAdmin: false };
   const inputs = [
     ...input.files.map((file) => ({ ...file, kind: "file" as const })),

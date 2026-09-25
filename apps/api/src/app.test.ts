@@ -301,7 +301,6 @@ describe("api", () => {
 function createUploadServiceMock() {
   return {
     cleanupExpired: vi.fn(async () => 0),
-    complete: vi.fn(async () => ({ resourceId: 1000, version: 1 })),
     completeUpload: vi.fn(async () => ({ resourceId: 1000, version: 1 })),
     deleteFile: vi.fn(async () => {}),
     create: vi.fn(async () => ({
@@ -320,3 +319,32 @@ function createUploadServiceMock() {
     upload: vi.fn(async () => {}),
   } satisfies StorageService;
 }
+
+describe("upload runtime lifecycle", () => {
+  it.each([
+    false,
+    true,
+  ])("resolves one runtime per request and flushes its logger (failure=%s)", async (fails) => {
+    const service = createUploadServiceMock();
+    if (fails)
+      service.deleteFile.mockRejectedValueOnce(
+        new Error("private SQL payload"),
+      );
+    const flush = vi.fn(async () => {});
+    const logger = { ...createNoopLogger(), flush };
+    const getUploadRuntime = vi.fn(() => ({
+      logger,
+      service,
+      authenticate: async () => ({ clerkId: "owner", isAdmin: false }),
+      isAllowedOrigin: () => true,
+    }));
+    const app = createApp({ getUploadRuntime });
+    const response = await app.request(
+      "/api/v0/storage/file/product_image/42",
+      { method: "DELETE" },
+    );
+    expect(response.status).toBe(fails ? 500 : 204);
+    expect(getUploadRuntime).toHaveBeenCalledOnce();
+    expect(flush).toHaveBeenCalledOnce();
+  });
+});

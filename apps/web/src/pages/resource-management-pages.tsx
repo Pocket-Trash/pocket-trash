@@ -23,7 +23,7 @@ import type { getResourceDetail, listOwnedResources } from "@/lib/resources";
 import { updateResource } from "@/lib/resources";
 import {
   appendResourceUploadFiles,
-  getResourceUploadErrorTranslation,
+  getUploadErrorTranslation,
   uploadResourceSession,
   validateResourceImages,
   validateResourceUpload,
@@ -358,7 +358,7 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
             to: "/resources/$resourceId",
           });
         } catch (error) {
-          const message = getResourceUploadErrorTranslation(error);
+          const message = getUploadErrorTranslation(error);
           toast.error(t(message.key, message.params));
           setSubmitting(false);
           setUploadStatus("");

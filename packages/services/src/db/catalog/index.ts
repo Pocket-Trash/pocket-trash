@@ -12,7 +12,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { hashLogIdentifier } from "../../logging.js";
+import { hashLogIdentifier, loggedMutation } from "../../logging.js";
 import {
   attachImages as attachStoredImages,
   lockTarget,
@@ -387,15 +387,27 @@ export function createCatalogService(
 ): CatalogService {
   return {
     async attachImages(input) {
-      await db.transaction(async (tx) => {
-        await lockTarget(tx, input.target);
-        await attachStoredImages(tx, input);
-      });
+      await loggedMutation(
+        logger,
+        loggerMessages.database.catalog.attachImages,
+        () =>
+          db.transaction(async (tx) => {
+            await lockTarget(tx, input.target);
+            await attachStoredImages(tx, input);
+          }),
+        actorAttributes(input.actor.clerkId),
+      );
     },
     async selectCollectionCover(input) {
-      await db.transaction(async (tx) => {
-        await selectStoredCover(tx, input);
-      });
+      await loggedMutation(
+        logger,
+        loggerMessages.database.catalog.selectCollectionCover,
+        () =>
+          db.transaction(async (tx) => {
+            await selectStoredCover(tx, input);
+          }),
+        actorAttributes(input.actor.clerkId),
+      );
     },
     async createColor(input) {
       return await logger.operation(

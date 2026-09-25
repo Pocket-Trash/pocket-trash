@@ -5,7 +5,7 @@ import type {
   RemoteImageStorageConfig,
   UploadStorageConfig,
 } from "@package/storage";
-import { createUploadStorage } from "@package/storage";
+import { createUploadStorage, signResourceUrl } from "@package/storage";
 import { createDbServices, type DbServices } from "./db/index.js";
 import { createStorageService, type StorageService } from "./storage/index.js";
 
@@ -38,7 +38,7 @@ import {
 } from "./flags/index.js";
 import { createImagesService, type ImagesService } from "./images/index.js";
 import {
-  createConfiguredResourcesService,
+  createResourcesService,
   type ResourcesService,
 } from "./resources/index.js";
 
@@ -55,7 +55,6 @@ export type ServicesConfig = {
   db?: DatabaseConfig;
   images?: RemoteImageStorageConfig;
   logger?: ServicesLoggerConfig;
-  resources?: UploadStorageConfig;
   storage?: UploadStorageConfig;
 };
 
@@ -76,8 +75,8 @@ export class Services {
       throw new Error("Image services require logger configuration.");
     }
 
-    if (config.resources && !config.db) {
-      throw new Error("Resource services require database configuration.");
+    if (config.storage && !config.db) {
+      throw new Error("Storage services require database configuration.");
     }
 
     if (config.logger) {
@@ -94,16 +93,19 @@ export class Services {
       const db = createDb(config.db);
       this.#db = createDbServices(db, this.#logger);
       this.#flags = createFeatureFlagsService(db, this.#db.users, this.#logger);
-      if (config.storage)
+      if (config.storage) {
+        const configStorage = config.storage;
+        const storage = createUploadStorage(configStorage);
         this.#storage = createStorageService({
           db,
-          storage: createUploadStorage(config.storage),
+          storage,
+          logger: this.#logger,
         });
-      if (config.resources) {
-        this.#resources = createConfiguredResourcesService(
+        this.#resources = createResourcesService(
           db,
-          config.resources,
+          storage,
           this.#logger,
+          (objectPath) => signResourceUrl({ ...configStorage, objectPath }),
         );
       }
     }
@@ -202,13 +204,7 @@ export type {
   UploadResult,
   UploadStorageConfig,
 } from "@package/storage";
-export {
-  buildImageObjectPath,
-  buildResourceFileObjectPath,
-  createUploadStorage,
-  imageDeliveryUrl,
-  signResourceUrl,
-} from "@package/storage";
+export { signResourceUrl } from "@package/storage";
 export { signImages } from "./images/sign-images.js";
 export type {
   CreateResourceInput,

@@ -228,7 +228,7 @@ function createContext(
   return {
     close: vi.fn(),
     db: {} as ScraperJobContext["db"],
-    imageFolderPrefix: undefined,
+    imageFolderPrefix: "images/dev",
     imageStorage: {} as ScraperJobContext["imageStorage"],
     queues: {
       close: vi.fn(),

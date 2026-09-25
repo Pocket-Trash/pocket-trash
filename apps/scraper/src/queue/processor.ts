@@ -41,7 +41,7 @@ export type RunQueueProcessorOptions = {
   concurrency: number;
   connection: Redis;
   db: Database;
-  imageFolderPrefix?: string;
+  imageFolderPrefix: string;
   imageStorage: ImagesService;
   logger: Logger;
   queues: ScraperQueues;
@@ -575,7 +575,7 @@ async function processImageJob({
 }: {
   db: Database;
   errorCounter: ProcessorErrorCounter;
-  imageFolderPrefix?: string;
+  imageFolderPrefix: string;
   imageStorage: ImagesService;
   job: Job<ScraperImageJob>;
   logger: Logger;
@@ -671,7 +671,7 @@ async function processTmpImageJob({
 }: {
   db: Database;
   errorCounter: ProcessorErrorCounter;
-  imageFolderPrefix?: string;
+  imageFolderPrefix: string;
   imageStorage: ImagesService;
   job: Job<ScraperImageJob>;
   logger: Logger;
@@ -698,7 +698,7 @@ async function processTmpImageJob({
       }
 
       const result = await imageStorage.uploadRemoteImage({
-        prefix: imageFolderPrefix ?? "images",
+        prefix: imageFolderPrefix,
         entity: "products",
         entityId: getTmpImageFolderKey({
           productId: row.image.productId,

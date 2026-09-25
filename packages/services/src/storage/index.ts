@@ -1,4 +1,5 @@
 import { type Database, schema } from "@package/database";
+import { type Logger, loggerMessages } from "@package/logger";
 import {
   maxImageBytes,
   maxImageSessionBytes,
@@ -15,6 +16,7 @@ import {
 } from "@package/storage";
 import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
+import { hashLogIdentifier, loggedMutation } from "../logging.js";
 import { completeResource, completeVersion } from "./complete-resource.js";
 import {
   assertCanEditTarget,
@@ -23,9 +25,16 @@ import {
   imageTargets,
   lockTarget,
 } from "./image-records.js";
+import {
+  assertNotPendingDeletion,
+  cleanupObjectDeletions,
+  fileRecords,
+  lockObjectPath,
+  objectIsAttached,
+  queueObjectDeletions,
+} from "./object-lifecycle.js";
 import { resourcePayload } from "./resource-payload.js";
 import {
-  type StorageDb,
   type UploadActor,
   UploadSessionError,
   type UploadTarget,
@@ -61,45 +70,19 @@ export const fileTypes = [
   "resource_file",
 ] as const;
 export type FileType = (typeof fileTypes)[number];
-const fileRecords = {
-  product_image: {
-    table: "product_image",
-    column: "product_id",
-    targetType: "product",
-  },
-  collection_image: {
-    table: "collection_image",
-    column: "collection_id",
-    targetType: "collection",
-  },
-  collection_item_image: {
-    table: "collection_item_image",
-    column: "collection_item_id",
-    targetType: "collection_item",
-  },
-  resource_image: {
-    table: "resource_images",
-    column: "resource_id",
-    targetType: "resource",
-  },
-  resource_file: {
-    table: "resource_files",
-    column: "version_id",
-    targetType: "resource",
-  },
-} as const;
 type Session = typeof schema.uploadSession.$inferSelect;
 
 export function createStorageService(input: {
   db: Database;
   storage: UploadStorage;
+  logger: Logger;
   now?: () => Date;
   randomUUID?: () => string;
 }) {
-  const { db, storage } = input;
+  const { db, storage, logger } = input;
   const now = input.now ?? (() => new Date());
   const uuid = input.randomUUID ?? (() => crypto.randomUUID());
-  return {
+  const service = {
     async create(value: unknown, actor: UploadActor) {
       const parsed = uploadManifestSchema.safeParse(value);
       if (!parsed.success) throw new UploadSessionError("invalid_request", 400);
@@ -174,7 +157,10 @@ export function createStorageService(input: {
             throw new UploadSessionError("invalid_request", 400);
           }
         });
-        for (const file of files) {
+        for (const file of [...files].sort((a, b) =>
+          a.objectPath.localeCompare(b.objectPath),
+        )) {
+          await assertNotPendingDeletion(tx, file.objectPath);
           const reserved = await tx
             .select({ id: schema.uploadFile.id })
             .from(schema.uploadFile)
@@ -213,6 +199,8 @@ export function createStorageService(input: {
       actor: UploadActor,
       request: Request,
     ) {
+      // ponytail: hold the per-session lock through bounded I/O; use durable
+      // in-flight claims if transaction duration becomes a bottleneck.
       return db.transaction(async (tx) => {
         const session = await loadSession(tx, sessionId, actor.clerkId);
         if (session.completedAt) return;
@@ -279,9 +267,6 @@ export function createStorageService(input: {
           .set({ uploadedAt: now() })
           .where(eq(schema.uploadFile.id, fileId));
       });
-    },
-    async complete(sessionId: string, actor: UploadActor) {
-      return this.completeUpload(sessionId, actor);
     },
     async completeUpload(sessionId: string, actor: UploadActor) {
       return db.transaction(async (tx) => {
@@ -350,18 +335,25 @@ export function createStorageService(input: {
               .from(schema.uploadFile)
               .where(eq(schema.uploadFile.sessionId, id));
             if (!session.completedAt)
-              for (const file of files)
+              for (const file of [...files].sort((a, b) =>
+                a.objectPath.localeCompare(b.objectPath),
+              )) {
+                await lockObjectPath(tx, file.objectPath);
                 if (!(await objectIsAttached(tx, file.objectPath)))
                   await storage.delete(file.objectPath);
+              }
             await tx
               .delete(schema.uploadSession)
               .where(eq(schema.uploadSession.id, id));
             removed++;
           });
         } catch {
-          /* Keep the session and reservations for a later cleanup retry. */
+          logger.warn(loggerMessages.database.storage.cleanupRetry, {
+            attributes: { sessionIdHash: hashLogIdentifier(id) },
+          });
         }
       }
+      await cleanupObjectDeletions(db, storage, logger);
       return removed;
     },
     async deleteFile({
@@ -380,7 +372,7 @@ export function createStorageService(input: {
       )
         throw new UploadSessionError("invalid_request", 400);
       const mapping = fileRecords[fileType];
-      return db.transaction(async (tx) => {
+      const objectPath = await db.transaction(async (tx) => {
         const result = await tx.execute<{
           targetId: number;
           objectPath: string;
@@ -414,11 +406,62 @@ export function createStorageService(input: {
           if ((count.rows[0]?.count ?? 0) <= 1)
             throw new UploadSessionError("invalid_request", 400);
         }
-        await storage.delete(file.objectPath);
+        await queueObjectDeletions(tx, [file.objectPath]);
         await tx.execute(
           sql`delete from ${sql.identifier(mapping.table)} where id = ${fileId}`,
         );
+        return file.objectPath;
       });
+      await cleanupObjectDeletions(db, storage, logger, [objectPath]);
+    },
+  };
+  return {
+    create: (value: unknown, actor: UploadActor) =>
+      loggedMutation(
+        logger,
+        loggerMessages.database.storage.create,
+        () => service.create(value, actor),
+        actorData(actor),
+      ),
+    upload: (
+      sessionId: string,
+      fileId: string,
+      actor: UploadActor,
+      request: Request,
+    ) =>
+      loggedMutation(
+        logger,
+        loggerMessages.database.storage.upload,
+        () => service.upload(sessionId, fileId, actor, request),
+        actorData(actor, sessionId),
+      ),
+    completeUpload: (sessionId: string, actor: UploadActor) =>
+      loggedMutation(
+        logger,
+        loggerMessages.database.storage.completeUpload,
+        () => service.completeUpload(sessionId, actor),
+        actorData(actor, sessionId),
+      ),
+    deleteFile: (input: Parameters<typeof service.deleteFile>[0]) =>
+      loggedMutation(
+        logger,
+        loggerMessages.database.storage.deleteFile,
+        () => service.deleteFile(input),
+        actorData(input.actor),
+      ),
+    cleanupExpired: () =>
+      loggedMutation(
+        logger,
+        loggerMessages.database.storage.cleanupExpired,
+        () => service.cleanupExpired(),
+      ),
+  };
+}
+function actorData(actor: UploadActor, sessionId?: string) {
+  return {
+    attributes: {
+      actorClerkIdHash: hashLogIdentifier(actor.clerkId),
+      ...(sessionId ? { sessionIdHash: hashLogIdentifier(sessionId) } : {}),
     },
   };
 }
@@ -477,15 +520,4 @@ export function validateManifest(
         group.length
     )
       throw new UploadSessionError("invalid_request", 400);
-}
-async function objectIsAttached(db: StorageDb, path: string) {
-  const result = await db.execute(
-    sql`select 1 from (${sql.join(
-      Object.values(fileRecords).map(
-        ({ table }) => sql`select object_path from ${sql.identifier(table)}`,
-      ),
-      sql` union all `,
-    )}) objects where object_path = ${path} limit 1`,
-  );
-  return result.rows.length > 0;
 }

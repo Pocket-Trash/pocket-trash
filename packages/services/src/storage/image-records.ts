@@ -32,6 +32,11 @@ export const imageTargets = {
     parent: "collection_item",
   },
 } as const;
+export async function lockObjectPath(db: StorageDb, path: string) {
+  await db.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`object:${path}`}, 0))`,
+  );
+}
 export async function lockTarget(db: StorageDb, target: UploadTarget) {
   await db.execute(
     sql`select pg_advisory_xact_lock(hashtextextended(${`upload:${target.type}:${target.id}`}, 0))`,
@@ -88,6 +93,16 @@ export async function attachImages(
   input: { target: UploadTarget; files: UploadedFile[]; actor: UploadActor },
 ) {
   const { target, files, actor } = input;
+  for (const file of [...files].sort((a, b) =>
+    a.objectPath.localeCompare(b.objectPath),
+  )) {
+    await lockObjectPath(db, file.objectPath);
+    const pending = await db.execute(
+      sql`select 1 from storage_object_deletion where object_path = ${file.objectPath}`,
+    );
+    if (pending.rows.length)
+      throw new UploadSessionError("upload_in_progress", 409);
+  }
   if (target.type === "resource")
     throw new UploadSessionError("invalid_request", 400);
   await assertCanEditTarget(db, target, actor);

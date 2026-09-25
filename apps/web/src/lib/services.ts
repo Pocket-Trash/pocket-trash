@@ -44,7 +44,7 @@ services.configure({
     databaseUrl: serverEnv.DATABASE_URL,
   },
   logger,
-  resources:
+  storage:
     serverEnv.BUNNY_STORAGE_ACCESS_KEY &&
     serverEnv.BUNNY_CDN_BASE_URL &&
     serverEnv.BUNNY_CDN_TOKEN_KEY &&

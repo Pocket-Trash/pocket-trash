@@ -35,6 +35,7 @@ Generated schema documentation for committed Drizzle tables.
 - [`resources`](./resources.md)
 - [`resources_to_categories`](./resources-to-categories.md)
 - [`scraper_runs`](./scraper-runs.md)
+- [`storage_object_deletion`](./storage-object-deletion.md)
 - [`tmp_autmog_pen_materials`](./tmp-autmog-pen-materials.md)
 - [`tmp_autmog_pen_versions`](./tmp-autmog-pen-versions.md)
 - [`tmp_autmog_pens`](./tmp-autmog-pens.md)

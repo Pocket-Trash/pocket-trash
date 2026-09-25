@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import { createImageStorage } from "../index.js";
+import { sha256 } from "../object-paths.js";
 
 const bunnyConfig = {
   accessKey: "storage-key",
@@ -10,6 +11,51 @@ const bunnyConfig = {
 };
 
 describe("createImageStorage", () => {
+  it.each([
+    undefined,
+    "",
+    "image..id",
+    "gid://shopify/ProductImage/1",
+    "123",
+    "safe_ID-1",
+  ])("uses safe IDs or byte hashes for upstream ID %s", async (sourceImageId) => {
+    const bytes = await sharp({
+      create: { width: 1, height: 1, channels: 3, background: "red" },
+    })
+      .png()
+      .toBuffer();
+    const puts: string[] = [];
+    const storage = createImageStorage({
+      ...bunnyConfig,
+      fetch: async (input, init) => {
+        if (init?.method === "PUT") {
+          puts.push(toUrl(input).pathname);
+          return new Response(null, { status: 201 });
+        }
+        return new Response(bytes, {
+          headers: {
+            "content-length": String(bytes.length),
+            "content-type": "image/png",
+          },
+        });
+      },
+    });
+    await storage.uploadRemoteImage({
+      prefix: "images/dev",
+      entity: "products",
+      entityId: 1000,
+      sourceImageId,
+      sourceUrl: "https://source.test/image.png",
+    });
+    const expected =
+      sourceImageId === "123" || sourceImageId === "safe_ID-1"
+        ? sourceImageId
+        : await sha256(bytes);
+    expect(puts).toEqual([
+      `/pocket-trash-storage/images/dev/products/1000/${expected}.png`,
+    ]);
+  });
+
   it("skips image mutations in dry-run mode", async () => {
     const storage = createImageStorage({ dryRun: true });
 

@@ -1,6 +1,11 @@
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
-import { createNoopLogger } from "@package/logger";
+import {
+  createLogger,
+  createNoopLogger,
+  type LogEvent,
+  loggerMessages,
+} from "@package/logger";
 import { createUploadStorage, sha256 } from "@package/storage";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
@@ -39,7 +44,19 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       return new Response(null, { status: 201 });
     },
   });
-  const service = createStorageService({ db, storage });
+  const events: LogEvent[] = [];
+  const logger = createLogger({
+    app: "api",
+    environment: "test",
+    transports: [
+      {
+        log(event) {
+          events.push(event);
+        },
+      },
+    ],
+  });
+  const service = createStorageService({ db, storage, logger });
   const actor = { clerkId: "storage-test-owner", isAdmin: false };
   const image = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB9sAAAAASUVORK5CYII=",
@@ -393,5 +410,228 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       ),
     ).toBe(false);
     await expect(service.create(value, actor)).resolves.toHaveProperty("id");
+  });
+  it("rolls back logical deletion without losing the object, reserves queued paths, and retries Bunny failures", async () => {
+    const bytes = new Uint8Array([...image, 21]);
+    const file = await manifest(
+      bytes,
+      "image",
+      "private-file.png",
+      "image/png",
+    );
+    const value = { target: { type: "product", id: productId }, files: [file] };
+    const session = await service.create(value, actor);
+    await put(session, { "private-file.png": bytes });
+    await service.completeUpload(session.id, actor);
+    const row = (
+      await pool.query(
+        "select id,object_path from product_image where product_id=$1 and sha256=$2",
+        [productId, file.sha256],
+      )
+    ).rows[0];
+    await pool.query(
+      `create function reject_test_delete() returns trigger language plpgsql as $$ begin raise exception 'secret SQL payload private-file.png'; end $$`,
+    );
+    await pool.query(
+      `create constraint trigger reject_test_delete after delete on product_image deferrable initially deferred for each row execute function reject_test_delete()`,
+    );
+    try {
+      await expect(
+        service.deleteFile({
+          fileType: "product_image",
+          fileId: Number(row.id),
+          actor,
+        }),
+      ).rejects.toThrow();
+      expect(
+        (await pool.query("select id from product_image where id=$1", [row.id]))
+          .rowCount,
+      ).toBe(1);
+      expect(
+        (
+          await pool.query(
+            "select 1 from storage_object_deletion where object_path=$1",
+            [row.object_path],
+          )
+        ).rowCount,
+      ).toBe(0);
+      expect(objects.has(row.object_path)).toBe(true);
+    } finally {
+      await pool.query("drop trigger reject_test_delete on product_image");
+      await pool.query("drop function reject_test_delete()");
+    }
+    failDelete = true;
+    try {
+      await service.deleteFile({
+        fileType: "product_image",
+        fileId: Number(row.id),
+        actor,
+      });
+    } finally {
+      failDelete = false;
+    }
+    expect(
+      (await pool.query("select id from product_image where id=$1", [row.id]))
+        .rowCount,
+    ).toBe(0);
+    expect(objects.has(row.object_path)).toBe(true);
+    await expect(service.create(value, actor)).rejects.toMatchObject({
+      code: "upload_in_progress",
+    });
+    failDelete = true;
+    try {
+      await service.cleanupExpired();
+    } finally {
+      failDelete = false;
+    }
+    expect(objects.has(row.object_path)).toBe(true);
+    expect(
+      (
+        await pool.query(
+          "select 1 from storage_object_deletion where object_path=$1",
+          [row.object_path],
+        )
+      ).rowCount,
+    ).toBe(1);
+    await Promise.all([service.cleanupExpired(), service.cleanupExpired()]);
+    expect(objects.has(row.object_path)).toBe(false);
+    const retry = await service.create(value, actor);
+    await put(retry, { "private-file.png": bytes });
+    await service.completeUpload(retry.id, actor);
+    await service.cleanupExpired();
+    expect(objects.has(row.object_path)).toBe(true);
+
+    await logger.flush();
+    expect(
+      events.some(
+        (event) =>
+          event.message === loggerMessages.database.storage.deletionRetry,
+      ),
+    ).toBe(true);
+    expect(
+      events.some(
+        (event) =>
+          event.message === loggerMessages.database.storage.cleanupRetry,
+      ),
+    ).toBe(true);
+    expect(
+      events.some(
+        (event) =>
+          event.message === `${loggerMessages.database.storage.upload}.failed`,
+      ),
+    ).toBe(true);
+    const completionEvents = events.filter(
+      (event) =>
+        event.message ===
+        `${loggerMessages.database.storage.completeUpload}.succeeded`,
+    );
+    expect(completionEvents.length).toBeGreaterThan(0);
+    const serialized = JSON.stringify(events);
+    for (const secret of [
+      actor.clerkId,
+      session.id,
+      "secret SQL payload",
+      "private-file.png",
+      "Bunny unavailable",
+      "https://cdn.test",
+    ])
+      expect(serialized).not.toContain(secret);
+  });
+
+  it("queues resource replacements and purges while protecting attached paths", async () => {
+    const resources = createResourcesService(db, storage, logger);
+    const created = await resources.create({
+      name: "Deletion test",
+      description: "Test",
+      categories: ["Tools"],
+      uploaderClerkId: actor.clerkId,
+      files: [
+        { bytes: pdf, fileName: "model.pdf", contentType: "application/pdf" },
+      ],
+      images: [
+        { bytes: image, fileName: "cover.png", contentType: "image/png" },
+      ],
+    });
+    const old = (
+      await pool.query(
+        "select object_path from resource_images where resource_id=$1",
+        [created.id],
+      )
+    ).rows[0].object_path;
+    const replacement = new Uint8Array([...image, 22]);
+    const update = {
+      resourceId: created.id,
+      actorClerkId: actor.clerkId,
+      actorIsAdmin: false,
+      name: "Updated",
+      description: "Updated",
+      categories: ["Tools"],
+      retainedImageIds: [],
+      images: [
+        {
+          bytes: replacement,
+          fileName: "replacement.png",
+          contentType: "image/png",
+        },
+      ],
+    };
+    failDelete = true;
+    try {
+      await resources.update(update);
+    } finally {
+      failDelete = false;
+    }
+    expect(objects.has(old)).toBe(true);
+    await expect(
+      resources.update({
+        ...update,
+        images: [
+          { bytes: image, fileName: "old.png", contentType: "image/png" },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "upload_in_progress" });
+    await service.cleanupExpired();
+    expect(objects.has(old)).toBe(false);
+    const attached = (
+      await pool.query(
+        "select object_path from resource_images where resource_id=$1",
+        [created.id],
+      )
+    ).rows[0].object_path;
+    await pool.query(
+      "insert into storage_object_deletion(object_path) values($1)",
+      [attached],
+    );
+    await service.cleanupExpired();
+    expect(objects.has(attached)).toBe(true);
+    await resources.softDelete({
+      resourceId: created.id,
+      actorClerkId: actor.clerkId,
+      actorIsAdmin: false,
+    });
+    failDelete = true;
+    try {
+      await resources.permanentlyDelete({
+        resourceId: created.id,
+        actorClerkId: "admin",
+        actorIsAdmin: true,
+      });
+    } finally {
+      failDelete = false;
+    }
+    expect(
+      (await pool.query("select id from resources where id=$1", [created.id]))
+        .rowCount,
+    ).toBe(0);
+    expect(objects.has(attached)).toBe(true);
+    failDelete = true;
+    try {
+      await service.cleanupExpired();
+    } finally {
+      failDelete = false;
+    }
+    expect(objects.has(attached)).toBe(true);
+    await service.cleanupExpired();
+    expect(objects.has(attached)).toBe(false);
   });
 });

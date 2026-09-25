@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   appendResourceUploadFiles,
-  getResourceUploadErrorTranslation,
+  getUploadErrorTranslation,
   uploadResourceSession,
   validateResourceUpload,
 } from "@/lib/upload-sessions";
@@ -88,7 +88,7 @@ export function ResourceUploadPage() {
                 to: "/resources/$resourceId",
               });
             } catch (error) {
-              const message = getResourceUploadErrorTranslation(error);
+              const message = getUploadErrorTranslation(error);
               toast.error(t(message.key, message.params));
             } finally {
               setSubmitting(false);

@@ -90,3 +90,14 @@ export const uploadFile = pgTable(
     check("upload_file_hash_valid", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
   ],
 );
+
+export const storageObjectDeletion = pgTable(
+  "storage_object_deletion",
+  {
+    objectPath: text("object_path").primaryKey(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("storage_object_deletion_created_idx").on(t.createdAt)],
+);

@@ -23,8 +23,9 @@ describe("API services factory", () => {
         BUNNY_RESOURCE_FOLDER_PREFIX: "resources/dev",
         BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
       },
-      true,
+      { storage: true },
     );
     expect(uploads.services.storage).toBeDefined();
+    expect(uploads.services.resources).toBeDefined();
   });
 });

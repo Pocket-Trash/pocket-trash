@@ -32,9 +32,6 @@ importers:
       '@types/node':
         specifier: latest
         version: 26.1.0
-      '@types/pg':
-        specifier: ^8.23.1
-        version: 8.23.1
       concurrently:
         specifier: ^10.0.3
         version: 10.0.3
@@ -47,9 +44,6 @@ importers:
       eslint:
         specifier: latest
         version: 10.6.0(jiti@2.7.0)
-      pg:
-        specifier: ^8.23.0
-        version: 8.23.0
       tsx:
         specifier: latest
         version: 4.22.5
@@ -452,6 +446,12 @@ importers:
       '@package/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
 
   packages/storage:
     dependencies:

@@ -93,7 +93,7 @@ receive development events only while labeled `preview:webhooks`.
 | `DATABASE_URL` | Postgres connection string. |
 | `REDIS_URL` | Queue backend. |
 | `SCRAPER_CRON_ENABLED` | Enables scheduled scraping on Railway. |
-| `BUNNY_IMAGE_FOLDER_PREFIX` | Complete image namespace such as `images`, `images/dev`, or `images/preview`. |
+| `BUNNY_IMAGE_FOLDER_PREFIX` | Required at scraper startup, including dry runs. Complete image namespace: `images`, `images/dev`, `images/preview`, or `images/preview/pr-<number>`. Missing or invalid values fail startup; there is no default. |
 | `AXIOM_TOKEN`, `AXIOM_DATASET`, `AXIOM_EDGE_DOMAIN`, `LOG_LEVEL`, `LOGGER` | Shared logger configuration. |
 
 ## Hosting

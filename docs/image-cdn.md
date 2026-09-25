@@ -58,7 +58,7 @@ Display images use `{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{id}/{sha256}.{ext}`.
 The entity values are `products`, `collections`, `collection-items`, and `resources`.
 Uploaded filenames use the SHA-256 of the original bytes and the original extension.
 
-Scraper images use the same path builder, with a source image ID instead of the hash when available. Product owner IDs remain `tmp_products.id`; variation owner IDs remain `<tmp-products-id>-<tmp-product-variations-id>`. Autmog pen images are product-level, while Grimsmo images are variation-level. No existing scraper paths change.
+Scraper images use the same path builder, with a source image ID instead of the hash when it contains only letters, digits, underscores and hyphens; otherwise the original image bytes supply the SHA-256 hash. Product owner IDs remain `tmp_products.id`; variation owner IDs remain `<tmp-products-id>-<tmp-product-variations-id>`. Autmog pen images are product-level, while Grimsmo images are variation-level. Previously persisted URLs are not automatically rewritten. New or retried uploads use the original file extension and byte-hash fallback instead of the previous `.webp` extension and metadata `sourceHash` fallback.
 
 ## Delivery And Transforms
 

@@ -34,7 +34,7 @@ export const scraperSourceKeys = Object.values(scraperSources);
 export type ScraperJobContext = {
   close: () => Promise<void>;
   db: Database;
-  imageFolderPrefix?: string;
+  imageFolderPrefix: string;
   imageStorage: ImagesService;
   redis: ReturnType<typeof createRedisConnection>;
   queues: ScraperQueues;

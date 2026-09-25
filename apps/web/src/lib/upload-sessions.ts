@@ -50,7 +50,7 @@ export type ResourceUploadValidationError = {
   params?: Record<string, number | string>;
 };
 
-export class ResourceUploadRequestError extends Error {
+export class UploadRequestError extends Error {
   constructor(
     readonly stage: "complete" | "file" | "session",
     readonly code?: string,
@@ -59,7 +59,7 @@ export class ResourceUploadRequestError extends Error {
     readonly sha256?: string,
   ) {
     super(code ?? stage);
-    this.name = "ResourceUploadRequestError";
+    this.name = "UploadRequestError";
   }
 }
 
@@ -70,10 +70,10 @@ export function appendResourceUploadFiles(
   return [...current, ...additions];
 }
 
-export function getResourceUploadErrorTranslation(
+export function getUploadErrorTranslation(
   error: unknown,
 ): ResourceUploadValidationError {
-  if (!(error instanceof ResourceUploadRequestError)) {
+  if (!(error instanceof UploadRequestError)) {
     return { key: "web.resources.error.saveFailed" };
   }
   if (error.code === "session_expired") {
@@ -251,7 +251,7 @@ async function uploadSession(input: {
       ? (request: FileUploadRequest) => uploadFileWithFetch(fetcher, request)
       : uploadFileWithProgress);
   const token = await input.getToken();
-  if (!token) throw new ResourceUploadRequestError("session", "unauthorized");
+  if (!token) throw new UploadRequestError("session", "unauthorized");
 
   const response = await fetcher(
     `${trimTrailingSlash(clientEnv.VITE_API_URL)}/api/v0/storage/upload-sessions`,
@@ -286,7 +286,7 @@ async function uploadSession(input: {
       imageId?: number;
       sha256?: string;
     };
-    throw new ResourceUploadRequestError(
+    throw new UploadRequestError(
       "session",
       error.error,
       undefined,
@@ -302,11 +302,7 @@ async function uploadSession(input: {
       ({ name }) => name === upload.fileName,
     );
     if (!file) {
-      throw new ResourceUploadRequestError(
-        "file",
-        "invalid_request",
-        upload.fileName,
-      );
+      throw new UploadRequestError("file", "invalid_request", upload.fileName);
     }
 
     const uploadResponse = await uploadFile({
@@ -319,7 +315,7 @@ async function uploadSession(input: {
       url: `${trimTrailingSlash(clientEnv.VITE_API_URL)}/api/v0/storage/upload-sessions/${encodeURIComponent(session.id)}/files/${encodeURIComponent(upload.id)}`,
     });
     if (!uploadResponse.ok) {
-      throw new ResourceUploadRequestError(
+      throw new UploadRequestError(
         "file",
         await readErrorCode(uploadResponse),
         file.name,
@@ -341,7 +337,7 @@ async function uploadSession(input: {
     completeResponse = await complete();
   }
   if (!completeResponse.ok) {
-    throw new ResourceUploadRequestError(
+    throw new UploadRequestError(
       "complete",
       await readErrorCode(completeResponse),
     );
@@ -398,13 +394,7 @@ function uploadFileWithProgress(input: FileUploadRequest): Promise<Response> {
       );
     });
     const rejectUpload = () =>
-      reject(
-        new ResourceUploadRequestError(
-          "file",
-          "upload_failed",
-          input.file.name,
-        ),
-      );
+      reject(new UploadRequestError("file", "upload_failed", input.file.name));
     request.addEventListener("abort", rejectUpload);
     request.addEventListener("error", rejectUpload);
     report(0);
@@ -520,7 +510,7 @@ export async function uploadImages(input: {
     return { uploaded: input.files, failed: [] };
   } catch (error) {
     if (
-      error instanceof ResourceUploadRequestError &&
+      error instanceof UploadRequestError &&
       error.code === "duplicate_owner_deleted" &&
       error.imageId &&
       error.sha256 &&
@@ -537,7 +527,7 @@ export async function uploadImages(input: {
       const result = await uploadImages({ ...input, files: remaining });
       return { ...result, uploaded: [...restored, ...result.uploaded] };
     }
-    throw getResourceUploadErrorTranslation(error);
+    throw getUploadErrorTranslation(error);
   }
 }
 export async function deleteCollectionCover(input: {
