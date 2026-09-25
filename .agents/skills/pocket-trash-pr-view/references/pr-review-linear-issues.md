@@ -1,7 +1,7 @@
 # PR Review Linear Issues
 
-Use this only when `pr-review.md` finds real out-of-diff issues and the user
-wants Linear tickets created for them.
+Use this only when `$pocket-trash-pr-view` finds real out-of-diff issues and the
+user wants Linear tickets created for them.
 
 ## Confirm ticket options
 

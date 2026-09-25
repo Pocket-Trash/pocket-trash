@@ -1,3 +1,8 @@
+---
+name: pocket-trash-pr-update
+description: Update the current branch's Pocket Trash GitHub pull request.
+---
+
 # PR Update
 
 Update the title and body of an existing GitHub pull request for the current
@@ -86,7 +91,7 @@ suggest a branch, create a branch, push, fetch, or update a PR from `main`.
 ## Title
 
 Write the PR title using the same conventional commit subject format as
-`$pocket-trash commit` and `$pocket-trash pr-create`:
+`$pocket-trash-commit` and `$pocket-trash-pr-create`:
 
 ```text
 <type>(<scope>): <short summary>

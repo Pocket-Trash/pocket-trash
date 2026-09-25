@@ -1,9 +1,20 @@
+---
+name: pocket-trash-localization-audit
+description: Audit Pocket Trash code for user-visible hard-coded strings.
+---
+
 # Localization Audit
 
 Audit Pocket Trash code for user-visible strings that are not localized.
 
 This workflow is only intended for the `Pocket-Trash/pocket-trash` repo. Before
-using it, confirm the current repo with the router repo-scope check.
+using it, confirm the current repo with `git remote get-url origin`. If that
+does not identify `Pocket-Trash/pocket-trash`, inspect the root `package.json`;
+treat it as Pocket Trash only when the package name is `pocket-trash.app`.
+
+If the current repo is not Pocket Trash, stop before running commands or making
+changes. Name the repo you detected when possible and ask whether the user wants
+to continue even though the workflow might not work.
 
 ## Workflow
 
@@ -28,7 +39,7 @@ using it, confirm the current repo with the router repo-scope check.
    - why it appears user-visible,
    - the recommended localization key.
 6. Do not edit files unless the user explicitly asks for fixes. If fixes are
-   requested, use `$pocket-trash localize` for every new key.
+   requested, use `$pocket-trash-localize` for every new key.
 
 ## Error Handling
 

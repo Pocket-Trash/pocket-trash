@@ -1,88 +1,24 @@
 ---
 name: pocket-trash
-description:
-  Pocket Trash router for listing or running repo workflow subcommands.
+description: List the available Pocket Trash workflow skills.
 ---
 
-# Pocket Trash
+# Pocket Trash Skills
 
-Route Pocket Trash repo workflow requests to the matching subcommand.
+Return this list to the user:
 
-If the user invokes `$pocket-trash` or `/pocket-trash` without a subcommand,
-list the available subcommands with one-line descriptions and tell them to use
-`$pocket-trash <subcommand>`.
-
-## Subcommands
-
-- `commit`: create a Pocket Trash conventional git commit. Read
-  [references/commit.md](references/commit.md).
-- `pr-create`: create a Pocket Trash GitHub PR. Read
-  [references/pr-create.md](references/pr-create.md).
-- `pr-update`: update the current branch's Pocket Trash GitHub PR. Read
-  [references/pr-update.md](references/pr-update.md).
-- `pr-review`: review a Pocket Trash PR and run repo checks. Read
-  [references/pr-review.md](references/pr-review.md).
-- `implement-linear-ticket`: read and implement a Pocket Trash Linear ticket.
-  Read
-  [references/implement-linear-ticket.md](references/implement-linear-ticket.md).
-- `update-scopes`: suggest Pocket Trash commitlint scope updates. Read
-  [references/update-scopes.md](references/update-scopes.md).
-- `grill-me`: stress-test a Pocket Trash plan with focused questions. Read
-  [references/grill-me.md](references/grill-me.md).
-- `logger`: audit Pocket Trash logger and `console.*` usage. Read
-  [references/logger.md](references/logger.md).
-- `db-migration-conflicts`: resolve Pocket Trash Drizzle migration history
-  conflicts. Read
-  [references/db-migration-conflicts.md](references/db-migration-conflicts.md).
-- `figjam`: read Pocket Trash FigJam/Figma context or prepare bridge payloads.
-  Read [references/figjam.md](references/figjam.md).
-- `bunny-audit`: audit Pocket Trash Bunny account services, billing, and usage.
-  Read [references/bunny-audit.md](references/bunny-audit.md).
-- `localize`: add or track Pocket Trash user-visible text through
-  `@pocket-trash/localizations`. Read
-  [references/localize.md](references/localize.md).
-- `localizations-merge`: merge planned localization files into the localizations
-  repo. Read
-  [references/localizations-merge.md](references/localizations-merge.md).
-- `localization-audit`: audit Pocket Trash code for user-visible hard-coded
-  strings. Read
-  [references/localization-audit.md](references/localization-audit.md).
-- `storybook`: add or update Pocket Trash Storybook stories. Read
-  [references/storybook.md](references/storybook.md).
-
-Match obvious aliases to the same subcommands, for example `pr`, `pull request`,
-`review`, `linear`, `ticket`, `database conflicts`, `migrations`, `figma`,
-`figjam`, `bunny`, `logging`, `localization`, `localize`, `translations`,
-`i18n`, `copy audit`, and `stories`.
-
-## Repo Scope
-
-The `logger`, `db-migration-conflicts`, `figjam`, `bunny-audit`, `localize`,
-`localization-audit`, and `storybook` subcommands are only intended for the
-`Pocket-Trash/pocket-trash` repo.
-
-Before using one of those subcommands, check the current repo:
-
-1. Run `git remote get-url origin`.
-2. If that does not identify `Pocket-Trash/pocket-trash`, run
-   `git rev-parse --show-toplevel` and inspect the root `package.json` if it
-   exists.
-3. Treat the repo as Pocket Trash only when the origin is
-   `Pocket-Trash/pocket-trash` or the root package name is `pocket-trash.app`.
-
-If the current repo is not Pocket Trash, stop before running commands or making
-changes. Tell the user the selected subcommand is only supposed to be used in
-the Pocket Trash repo, name the repo you detected when possible, and ask whether
-they truly want to continue even though it might not work.
-
-The `localizations-merge` subcommand is only intended for the
-`Pocket-Trash/localizations` repo. Before using it, check the current repo with
-the same remote/package-name method. Treat the repo as localizations only when
-the origin is `Pocket-Trash/localizations` or the root package name is
-`@pocket-trash/localizations`. If the current repo is not localizations, stop
-before running commands or making changes and ask whether the user wants to
-continue.
-
-If the request does not map to a listed subcommand, explain that `$pocket-trash`
-only covers the listed Pocket Trash workflows and ask for the intended
-subcommand.
+- `$pocket-trash-bunny-audit`: audit Bunny services, billing, and usage.
+- `$pocket-trash-commit`: create a conventional git commit.
+- `$pocket-trash-db-diagnostics`: inspect production SQL and database health.
+- `$pocket-trash-db-migration-conflicts`: resolve Drizzle migration conflicts.
+- `$pocket-trash-grill-me`: stress-test a plan with focused questions.
+- `$pocket-trash-implement-linear-ticket`: implement a Linear ticket.
+- `$pocket-trash-localization-audit`: find user-visible hard-coded strings.
+- `$pocket-trash-localizations-merge`: merge planned localization files.
+- `$pocket-trash-localize`: add or track user-visible localized text.
+- `$pocket-trash-logger`: audit logger and `console.*` usage.
+- `$pocket-trash-pr-create`: create a GitHub pull request.
+- `$pocket-trash-pr-update`: update the current branch's pull request.
+- `$pocket-trash-pr-view`: review a pull request and run repo checks.
+- `$pocket-trash-storybook`: add or update Storybook stories.
+- `$pocket-trash-update-scopes`: suggest commitlint scope updates.

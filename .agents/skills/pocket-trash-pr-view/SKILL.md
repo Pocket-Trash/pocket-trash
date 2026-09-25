@@ -1,4 +1,9 @@
-# PR Review
+---
+name: pocket-trash-pr-view
+description: Review a Pocket Trash pull request and run repository checks.
+---
+
+# PR View
 
 Review a pull request end to end: run this repo's mandated checks, read the diff
 for real defects, and report findings scoped to the PR under review. Base every
@@ -61,7 +66,7 @@ results:
 
 ```bash
 pnpm typecheck
-pnpm lint          # Biome carries the $pocket-trash logger console.* audit
+pnpm lint          # Biome carries the $pocket-trash-logger console.* audit
 pnpm test          # needs `infisical login`; use `pnpm test:ci` for the no-Infisical run
 pnpm exec biome check --linter-enabled=false .   # format check without rewriting the PR
 ```
@@ -108,7 +113,7 @@ pnpm exec biome check --linter-enabled=false .   # format check without rewritin
 8. If an issue is in a touched file but outside the PR diff, do not add a PR
    comment, suggestion, or draft review note for it. List it separately as an
    out-of-diff issue. If the user wants Linear tickets for those issues, read
-   [pr-review-linear-issues.md](pr-review-linear-issues.md).
+   [pr-review-linear-issues.md](references/pr-review-linear-issues.md).
 
 ## Draft PR comments
 

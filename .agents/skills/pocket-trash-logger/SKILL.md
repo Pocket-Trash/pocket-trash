@@ -1,3 +1,8 @@
+---
+name: pocket-trash-logger
+description: Audit Pocket Trash logger and console usage.
+---
+
 # Logger
 
 This workflow is only intended for the `Pocket-Trash/pocket-trash` repo. Before

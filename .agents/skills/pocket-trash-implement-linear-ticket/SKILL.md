@@ -1,3 +1,8 @@
+---
+name: pocket-trash-implement-linear-ticket
+description: Read and implement a Pocket Trash Linear ticket.
+---
+
 # Implement Linear Ticket
 
 Use the Linear MCP server as the source of truth for ticket content and branch
