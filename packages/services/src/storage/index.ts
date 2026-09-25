@@ -1,5 +1,5 @@
 import { type Database, schema } from "@package/database";
-import { type Logger, loggerMessages } from "@package/logger";
+import { type LogContext, type Logger, loggerMessages } from "@package/logger";
 import {
   maxImageBytes,
   maxImageSessionBytes,
@@ -83,10 +83,12 @@ export function createStorageService(input: {
   const now = input.now ?? (() => new Date());
   const uuid = input.randomUUID ?? (() => crypto.randomUUID());
   const service = {
-    async create(value: unknown, actor: UploadActor) {
+    async create(value: unknown, actor: UploadActor, attributes: LogContext) {
       const parsed = uploadManifestSchema.safeParse(value);
       if (!parsed.success) throw new UploadSessionError("invalid_request", 400);
       const manifest = parsed.data;
+      attributes.targetType = manifest.target.type;
+      Object.assign(attributes, fileCounts(manifest.files));
       const payload =
         manifest.target.type === "resource"
           ? resourcePayload(manifest.payload)
@@ -132,6 +134,7 @@ export function createStorageService(input: {
         }
         const id = uuid(),
           expiresAt = new Date(now().getTime() + 60 * 60 * 1000);
+        attributes.sessionIdHash = hashLogIdentifier(id);
         const positions = { image: 0, file: 0 };
         const files = manifest.files.map((file) => {
           try {
@@ -198,11 +201,13 @@ export function createStorageService(input: {
       fileId: string,
       actor: UploadActor,
       request: Request,
+      attributes: LogContext,
     ) {
       // ponytail: hold the per-session lock through bounded I/O; use durable
       // in-flight claims if transaction duration becomes a bottleneck.
       return db.transaction(async (tx) => {
         const session = await loadSession(tx, sessionId, actor.clerkId);
+        attributes.targetType = session.targetType;
         if (session.completedAt) return;
         if (session.expiresAt <= now())
           throw new UploadSessionError("session_expired", 409);
@@ -222,6 +227,11 @@ export function createStorageService(input: {
             ),
           );
         if (!file) throw new UploadSessionError("session_not_found", 404);
+        attributes.fileType =
+          file.kind === "file"
+            ? "resource_file"
+            : `${session.targetType}_image`;
+        attributes.fileCount = 1;
         if (file.uploadedAt) return;
         const header = request.headers.get("content-length"),
           length = header === null ? NaN : Number(header);
@@ -268,10 +278,18 @@ export function createStorageService(input: {
           .where(eq(schema.uploadFile.id, fileId));
       });
     },
-    async completeUpload(sessionId: string, actor: UploadActor) {
+    async completeUpload(
+      sessionId: string,
+      actor: UploadActor,
+      attributes: LogContext,
+    ) {
       return db.transaction(async (tx) => {
         const session = await loadSession(tx, sessionId, actor.clerkId);
-        if (session.completedAt) return completion(session);
+        attributes.targetType = session.targetType;
+        if (session.completedAt) {
+          attributes.alreadyCompleted = true;
+          return completion(session);
+        }
         if (session.expiresAt <= now())
           throw new UploadSessionError("session_expired", 409);
         const target: UploadTarget = {
@@ -284,6 +302,7 @@ export function createStorageService(input: {
           .from(schema.uploadFile)
           .where(eq(schema.uploadFile.sessionId, sessionId))
           .orderBy(schema.uploadFile.position);
+        Object.assign(attributes, fileCounts(files));
         if (!files.length || files.some((file) => !file.uploadedAt))
           throw new UploadSessionError("uploads_incomplete", 409);
         if (target.type === "resource") {
@@ -310,15 +329,22 @@ export function createStorageService(input: {
         return completion(session);
       });
     },
-    async cleanupExpired() {
+    async cleanupExpired(attributes: LogContext) {
       const sessions = await db
         .select({ id: schema.uploadSession.id })
         .from(schema.uploadSession)
         .where(lt(schema.uploadSession.expiresAt, now()));
-      let removed = 0;
+      attributes.sessionCount = sessions.length;
+      attributes.removedSessionCount = 0;
+      attributes.failedSessionCount = 0;
+      let removed = 0,
+        failed = 0;
       for (const { id } of sessions) {
+        const sessionAttributes: LogContext = {
+          sessionIdHash: hashLogIdentifier(id),
+        };
         try {
-          await db.transaction(async (tx) => {
+          const didRemove = await db.transaction(async (tx) => {
             const [session] = await tx
               .select()
               .from(schema.uploadSession)
@@ -330,10 +356,12 @@ export function createStorageService(input: {
               )
               .for("update");
             if (!session) return;
+            sessionAttributes.targetType = session.targetType;
             const files = await tx
               .select()
               .from(schema.uploadFile)
               .where(eq(schema.uploadFile.sessionId, id));
+            Object.assign(sessionAttributes, fileCounts(files));
             if (!session.completedAt)
               for (const file of [...files].sort((a, b) =>
                 a.objectPath.localeCompare(b.objectPath),
@@ -345,26 +373,31 @@ export function createStorageService(input: {
             await tx
               .delete(schema.uploadSession)
               .where(eq(schema.uploadSession.id, id));
-            removed++;
+            return true;
           });
+          if (didRemove) attributes.removedSessionCount = ++removed;
         } catch {
+          attributes.failedSessionCount = ++failed;
           logger.warn(loggerMessages.database.storage.cleanupRetry, {
-            attributes: { sessionIdHash: hashLogIdentifier(id) },
+            attributes: sessionAttributes,
           });
         }
       }
       await cleanupObjectDeletions(db, storage, logger);
       return removed;
     },
-    async deleteFile({
-      fileType,
-      fileId,
-      actor,
-    }: {
-      fileType: FileType;
-      fileId: number;
-      actor: UploadActor;
-    }) {
+    async deleteFile(
+      {
+        fileType,
+        fileId,
+        actor,
+      }: {
+        fileType: FileType;
+        fileId: number;
+        actor: UploadActor;
+      },
+      attributes: LogContext,
+    ) {
       if (
         !fileTypes.includes(fileType) ||
         !Number.isSafeInteger(fileId) ||
@@ -372,6 +405,10 @@ export function createStorageService(input: {
       )
         throw new UploadSessionError("invalid_request", 400);
       const mapping = fileRecords[fileType];
+      attributes.fileType = fileType;
+      attributes.targetType = mapping.targetType;
+      attributes.fileIdHash = hashLogIdentifier(String(fileId));
+      attributes.fileCount = 1;
       const objectPath = await db.transaction(async (tx) => {
         const result = await tx.execute<{
           targetId: number;
@@ -416,53 +453,71 @@ export function createStorageService(input: {
     },
   };
   return {
-    create: (value: unknown, actor: UploadActor) =>
-      loggedMutation(
+    create: (value: unknown, actor: UploadActor) => {
+      const attributes = actorAttributes(actor);
+      return loggedMutation(
         logger,
         loggerMessages.database.storage.create,
-        () => service.create(value, actor),
-        actorData(actor),
-      ),
+        () => service.create(value, actor, attributes),
+        { attributes },
+      );
+    },
     upload: (
       sessionId: string,
       fileId: string,
       actor: UploadActor,
       request: Request,
-    ) =>
-      loggedMutation(
+    ) => {
+      const attributes = actorAttributes(actor, sessionId);
+      attributes.fileIdHash = hashLogIdentifier(fileId);
+      return loggedMutation(
         logger,
         loggerMessages.database.storage.upload,
-        () => service.upload(sessionId, fileId, actor, request),
-        actorData(actor, sessionId),
-      ),
-    completeUpload: (sessionId: string, actor: UploadActor) =>
-      loggedMutation(
+        () => service.upload(sessionId, fileId, actor, request, attributes),
+        { attributes },
+      );
+    },
+    completeUpload: (sessionId: string, actor: UploadActor) => {
+      const attributes = actorAttributes(actor, sessionId);
+      return loggedMutation(
         logger,
         loggerMessages.database.storage.completeUpload,
-        () => service.completeUpload(sessionId, actor),
-        actorData(actor, sessionId),
-      ),
-    deleteFile: (input: Parameters<typeof service.deleteFile>[0]) =>
-      loggedMutation(
+        () => service.completeUpload(sessionId, actor, attributes),
+        { attributes },
+      );
+    },
+    deleteFile: (input: Parameters<typeof service.deleteFile>[0]) => {
+      const attributes = actorAttributes(input.actor);
+      return loggedMutation(
         logger,
         loggerMessages.database.storage.deleteFile,
-        () => service.deleteFile(input),
-        actorData(input.actor),
-      ),
-    cleanupExpired: () =>
-      loggedMutation(
+        () => service.deleteFile(input, attributes),
+        { attributes },
+      );
+    },
+    cleanupExpired: () => {
+      const attributes: LogContext = {};
+      return loggedMutation(
         logger,
         loggerMessages.database.storage.cleanupExpired,
-        () => service.cleanupExpired(),
-      ),
+        () => service.cleanupExpired(attributes),
+        { attributes },
+      );
+    },
   };
 }
-function actorData(actor: UploadActor, sessionId?: string) {
+function actorAttributes(actor: UploadActor, sessionId?: string): LogContext {
   return {
-    attributes: {
-      actorClerkIdHash: hashLogIdentifier(actor.clerkId),
-      ...(sessionId ? { sessionIdHash: hashLogIdentifier(sessionId) } : {}),
-    },
+    actorClerkIdHash: hashLogIdentifier(actor.clerkId),
+    ...(sessionId ? { sessionIdHash: hashLogIdentifier(sessionId) } : {}),
+  };
+}
+function fileCounts(files: ReadonlyArray<{ kind: "image" | "file" }>) {
+  const imageCount = files.filter((file) => file.kind === "image").length;
+  return {
+    fileCount: files.length,
+    imageCount,
+    resourceFileCount: files.length - imageCount,
   };
 }
 export type StorageService = ReturnType<typeof createStorageService>;

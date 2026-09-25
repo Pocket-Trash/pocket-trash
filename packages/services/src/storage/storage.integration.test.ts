@@ -10,6 +10,7 @@ import { createUploadStorage, sha256 } from "@package/storage";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { hashLogIdentifier } from "../logging.js";
 import { createResourcesService } from "../resources/index.js";
 import { selectCollectionCover } from "./image-records.js";
 import { createStorageService } from "./index.js";
@@ -165,6 +166,65 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     await expect(service.completeUpload(session.id, actor)).resolves.toEqual(
       result,
     );
+    await logger.flush();
+    const sessionEvents = events.filter(
+      (event) =>
+        event.attributes?.sessionIdHash === hashLogIdentifier(session.id),
+    );
+    expect(
+      sessionEvents.find(
+        (event) =>
+          event.message ===
+          `${loggerMessages.database.storage.create}.succeeded`,
+      )?.attributes,
+    ).toMatchObject({
+      targetType: "resource",
+      fileCount: 2,
+      imageCount: 1,
+      resourceFileCount: 1,
+      actorClerkIdHash: hashLogIdentifier(actor.clerkId),
+    });
+    for (const file of session.uploads) {
+      expect(
+        sessionEvents.find(
+          (event) =>
+            event.message ===
+              `${loggerMessages.database.storage.upload}.succeeded` &&
+            event.attributes?.fileIdHash === hashLogIdentifier(file.id),
+        )?.attributes,
+      ).toMatchObject({
+        targetType: "resource",
+        fileType: file.kind === "image" ? "resource_image" : "resource_file",
+        fileCount: 1,
+      });
+      expect(JSON.stringify(sessionEvents)).not.toContain(file.id);
+    }
+    expect(
+      sessionEvents.find(
+        (event) =>
+          event.message ===
+          `${loggerMessages.database.storage.completeUpload}.failed`,
+      )?.attributes,
+    ).toMatchObject({
+      targetType: "resource",
+      fileCount: 2,
+      imageCount: 1,
+      resourceFileCount: 1,
+    });
+    const completions = sessionEvents.filter(
+      (event) =>
+        event.message ===
+        `${loggerMessages.database.storage.completeUpload}.succeeded`,
+    );
+    expect(completions[0]?.attributes).toMatchObject({
+      targetType: "resource",
+      fileCount: 2,
+    });
+    expect(completions[1]?.attributes).toMatchObject({
+      targetType: "resource",
+      alreadyCompleted: true,
+    });
+    expect(completions[1]?.attributes).not.toHaveProperty("fileCount");
     if (!("resourceId" in result)) throw new Error("Expected resource");
     const rows = await pool.query(
       "select f.object_path from resource_files f join resource_versions v on v.id=f.version_id where v.resource_id=$1",
@@ -322,6 +382,33 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     );
     await expect(service.cleanupExpired()).resolves.toBe(1);
     expect(objects.has(existing)).toBe(true);
+    await logger.flush();
+    expect(
+      events.find(
+        (event) =>
+          event.message ===
+            `${loggerMessages.database.storage.upload}.failed` &&
+          event.attributes?.sessionIdHash === hashLogIdentifier(session.id),
+      )?.attributes,
+    ).toMatchObject({
+      targetType: "product",
+      fileType: "product_image",
+      fileCount: 1,
+      fileIdHash: hashLogIdentifier(session.uploads[0]!.id),
+    });
+    expect(
+      events
+        .filter(
+          (event) =>
+            event.message ===
+            `${loggerMessages.database.storage.cleanupExpired}.succeeded`,
+        )
+        .at(-1)?.attributes,
+    ).toMatchObject({
+      sessionCount: 1,
+      removedSessionCount: 1,
+      failedSessionCount: 0,
+    });
   });
   it("routes buffered callers through reserved sessions and protects existing images during edits", async () => {
     const resources = createResourcesService(
@@ -397,6 +484,32 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     failDelete = true;
     try {
       expect(await service.cleanupExpired()).toBe(0);
+      await logger.flush();
+      expect(
+        events
+          .filter(
+            (event) =>
+              event.message ===
+              `${loggerMessages.database.storage.cleanupExpired}.succeeded`,
+          )
+          .at(-1)?.attributes,
+      ).toMatchObject({
+        sessionCount: 1,
+        removedSessionCount: 0,
+        failedSessionCount: 1,
+      });
+      expect(
+        events.find(
+          (event) =>
+            event.message === loggerMessages.database.storage.cleanupRetry &&
+            event.attributes?.sessionIdHash === hashLogIdentifier(session.id),
+        )?.attributes,
+      ).toMatchObject({
+        targetType: "product",
+        fileCount: 1,
+        imageCount: 1,
+        resourceFileCount: 0,
+      });
     } finally {
       failDelete = false;
     }
@@ -526,6 +639,20 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
         `${loggerMessages.database.storage.completeUpload}.succeeded`,
     );
     expect(completionEvents.length).toBeGreaterThan(0);
+    for (const outcome of ["succeeded", "failed"]) {
+      expect(
+        events.find(
+          (event) =>
+            event.message ===
+              `${loggerMessages.database.storage.deleteFile}.${outcome}` &&
+            event.attributes?.fileIdHash === hashLogIdentifier(String(row.id)),
+        )?.attributes,
+      ).toMatchObject({
+        targetType: "product",
+        fileType: "product_image",
+        fileCount: 1,
+      });
+    }
     const serialized = JSON.stringify(events);
     for (const secret of [
       actor.clerkId,
