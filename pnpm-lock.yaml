@@ -191,8 +191,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/services
       '@pocket-trash/localizations':
-        specifier: ^0.8.0
-        version: 0.8.0
+        specifier: ^0.10.0
+        version: 0.10.0
       '@t3-oss/env-core':
         specifier: ^0.13.11
         version: 0.13.11(typescript@6.0.3)(zod@4.4.3)
@@ -2379,12 +2379,12 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@pocket-trash/localizations@0.5.1':
-    resolution: {integrity: sha512-cd1ZtYbKABKdaqu0T4hxXCz2FpqUihU1o4cHBIZIfpZAsfJNP85hFI2unuokU/ufB/beuHF4kQ7/V1f4hE6dHQ==}
+  '@pocket-trash/localizations@0.10.0':
+    resolution: {integrity: sha512-hu4uLZVxRUxPJ6RnByQxo1aWtxOoGUyWBQVdPNPAdlvWnd9QskNsVx3+ZhICLiklp/64F2HMBYNy2fxFQZesJw==}
     engines: {node: '>=20'}
 
-  '@pocket-trash/localizations@0.8.0':
-    resolution: {integrity: sha512-UqKqq3IwISQ4cIz6+M9L6T2CrBYiKmBbtZMy4ctaNPmZ7wCiz8brhczwxtQz6NDPkN8ctKj+5hACcbY4MID7Zw==}
+  '@pocket-trash/localizations@0.5.1':
+    resolution: {integrity: sha512-cd1ZtYbKABKdaqu0T4hxXCz2FpqUihU1o4cHBIZIfpZAsfJNP85hFI2unuokU/ufB/beuHF4kQ7/V1f4hE6dHQ==}
     engines: {node: '>=20'}
 
   '@polka/url@1.0.0-next.29':
@@ -9924,13 +9924,13 @@ snapshots:
   '@oxc-resolver/binding-win32-x64-msvc@11.21.2':
     optional: true
 
-  '@pocket-trash/localizations@0.5.1':
+  '@pocket-trash/localizations@0.10.0':
     dependencies:
       lts: 2.0.0
     transitivePeerDependencies:
       - supports-color
 
-  '@pocket-trash/localizations@0.8.0':
+  '@pocket-trash/localizations@0.5.1':
     dependencies:
       lts: 2.0.0
     transitivePeerDependencies:

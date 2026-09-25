@@ -91,6 +91,8 @@ const owners = [
     itemCount: 1,
     items: [
       {
+        bearing: null,
+        bearingOverride: null,
         canAdminister: false,
         canEdit: false,
         collectionId: 1000,
@@ -98,6 +100,8 @@ const owners = [
         collectionItemId: 2000,
         collectionName: "Daily Carry",
         displayName: "My Catla",
+        description: null,
+        descriptionOverride: null,
         finishOption: null,
         imageCount: 0,
         images: [],
@@ -126,12 +130,14 @@ const owners = [
 ] satisfies PublicCollectionOwner[];
 
 const product: CatalogProduct = {
+  bearing: null,
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: false,
   compatibleButtonId: null,
   compatibleButtonName: null,
   createdAt: new Date(0),
+  description: null,
   diameterMm: null,
   finishOptions: [],
   id: 1,
@@ -142,6 +148,8 @@ const product: CatalogProduct = {
   lengthMm: null,
   makerId: 1,
   makerName: "KAP EDC",
+  makerProductUrl: null,
+  makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
   materials: [],
   name: "Catla",
@@ -150,6 +158,7 @@ const product: CatalogProduct = {
   productTypeName: "Spinner",
   productTypeSlug: "spinner",
   slug: "catla",
+  spinDiameterMm: null,
   thicknessMm: null,
   thicknessWithButtonMm: null,
   updatedAt: new Date(0),
@@ -216,6 +225,35 @@ describe("ProductDetailPage", () => {
     expect(html).toContain('href="/collections/1002/1000/2000"');
     expect(html).toContain('href="https://www.kapedc.com"');
   });
+
+  it("renders sanitized markdown and only valid maker product links", () => {
+    const sourcedProduct = {
+      ...product,
+      bearing: "R188",
+      description: "**Fast** <script>alert('no')</script>",
+      makerProductUrl: "https://www.kapedc.com/products/catla",
+      spinDiameterMm: "52",
+    };
+
+    const html = renderToStaticMarkup(
+      <ProductDetailPage collectionItems={[]} product={sourcedProduct} />,
+    );
+    const invalidHtml = renderToStaticMarkup(
+      <ProductDetailPage
+        collectionItems={[]}
+        product={{ ...sourcedProduct, makerProductUrlValid: false }}
+      />,
+    );
+
+    expect(html).toContain("<strong>Fast</strong>");
+    expect(html).not.toContain("<script");
+    expect(html).toContain("R188");
+    expect(html).toContain("52 mm");
+    expect(html).toContain('href="https://www.kapedc.com/products/catla"');
+    expect(invalidHtml).not.toContain(
+      'href="https://www.kapedc.com/products/catla"',
+    );
+  });
 });
 
 describe("CollectionItemDetailPage", () => {
@@ -228,5 +266,23 @@ describe("CollectionItemDetailPage", () => {
     expect(html).toContain("My Catla");
     expect(html).toContain("Catla");
     expect(html).toContain('href="/products/spinner/catla"');
+  });
+
+  it("renders effective collection item details", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        item={{
+          ...item,
+          bearing: "One Drop",
+          description: "Collection **override**",
+        }}
+      />,
+    );
+
+    expect(html).toContain("One Drop");
+    expect(html).toContain("Collection <strong>override</strong>");
   });
 });

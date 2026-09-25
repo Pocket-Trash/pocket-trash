@@ -19,6 +19,9 @@ describe("catalog schema", () => {
       "owner_clerk_id",
       "name",
       "slug",
+      "description",
+      "maker_product_url",
+      "maker_product_url_valid",
       "is_private",
       "private_reason",
       "privated_at",
@@ -51,10 +54,25 @@ describe("catalog schema", () => {
       ({ name }) => name,
     );
     expect(spinnerColumns).toEqual(
-      expect.arrayContaining(["compatible_button_id"]),
+      expect.arrayContaining([
+        "bearing",
+        "compatible_button_id",
+        "spin_diameter_mm",
+      ]),
     );
     expect(spinnerColumns).not.toEqual(
       expect.arrayContaining(["name", "slug", "maker_id"]),
     );
+    expect(
+      collectionItem.columns.find(({ name }) => name === "description")
+        ?.notNull,
+    ).toBe(false);
+    expect(
+      product.columns.find(({ name }) => name === "maker_product_url_valid")
+        ?.hasDefault,
+    ).toBe(true);
+    expect(
+      getTableConfig(schema.collectionSpinner).columns.map(({ name }) => name),
+    ).toEqual(expect.arrayContaining(["bearing"]));
   });
 });

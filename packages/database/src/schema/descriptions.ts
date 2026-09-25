@@ -164,6 +164,10 @@ export const schemaDescriptions = {
           "Optional owner-defined name shown instead of the product name.",
         example: "Blue Katla",
       },
+      description: {
+        description: "Optional Markdown description overriding the product.",
+        example: "My daily-carry spinner.",
+      },
       material_id: {
         description: "Exact material of the owned physical item.",
         example: 1000,
@@ -281,6 +285,18 @@ export const schemaDescriptions = {
       slug: {
         description: "Stable product slug within its type.",
         example: "standard-katla",
+      },
+      description: {
+        description: "Optional product description stored as Markdown.",
+        example: "A compact tri spinner.",
+      },
+      maker_product_url: {
+        description: "Direct URL to the maker's product page.",
+        example: "https://example.com/products/standard-katla",
+      },
+      maker_product_url_valid: {
+        description: "Whether the maker product URL may be shown publicly.",
+        example: true,
       },
     },
   },
@@ -403,6 +419,14 @@ export const schemaDescriptions = {
         description: "Compatible button diameter in millimeters.",
         example: "24.5",
       },
+      spin_diameter_mm: {
+        description: "Swept spinner diameter in millimeters.",
+        example: "55.0",
+      },
+      bearing: {
+        description: "Bearing specification supplied by the maker.",
+        example: "R188 hybrid ceramic",
+      },
       compatible_button_id: {
         description: "Catalog spinner button selected for this spinner.",
         example: 1001,
@@ -461,6 +485,10 @@ export const schemaDescriptions = {
         description:
           "Owned spinner button currently installed on this spinner.",
         example: 1001,
+      },
+      bearing: {
+        description: "Optional bearing override for this owned spinner.",
+        example: "R188 full ceramic",
       },
     },
   },

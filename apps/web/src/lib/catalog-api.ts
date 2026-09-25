@@ -36,6 +36,24 @@ const slugNameSchema = z
   .min(1, requiredMessage)
   .refine((value) => slugify(value).length > 0, requiredMessage);
 const displayNameSchema = z.string().trim().min(1, requiredMessage);
+const optionalDescriptionSchema = z
+  .string()
+  .max(5000, "web.catalog.error.descriptionLength")
+  .transform((value) => (value.trim() ? value : null));
+const optionalBearingSchema = z
+  .string()
+  .trim()
+  .max(200, "web.catalog.error.bearingLength")
+  .transform((value) => value || null);
+const optionalUrlSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) =>
+      value === "" || z.url().safeParse(normalizeOptionalUrl(value)).success,
+    urlMessage,
+  )
+  .transform((value) => normalizeOptionalUrl(value) || null);
 
 export const finishOptionSchema = z
   .object({
@@ -97,36 +115,52 @@ export const finishOptionSchema = z
 
 export const productFormSchema = z
   .object({
+    bearing: optionalBearingSchema,
     buttonDiameterMm: numericSpecSchema,
     compatibleButtonId: idSchema.nullable(),
+    description: optionalDescriptionSchema,
     diameterMm: numericSpecSchema,
     finishOptions: z
       .array(finishOptionSchema)
       .min(1, "web.catalog.error.finishOptionRequired"),
     lengthMm: numericSpecSchema,
     makerId: idSchema,
+    makerProductUrl: optionalUrlSchema,
     materialIds: z.array(idSchema).min(1, requiredMessage),
     name: slugNameSchema,
     productId: idSchema.nullable(),
     productTypeSlug: productTypeSchema,
+    spinDiameterMm: numericSpecSchema,
     thicknessMm: numericSpecSchema,
     thicknessWithButtonMm: numericSpecSchema,
     weightG: numericSpecSchema,
     widthMm: numericSpecSchema,
   })
-  .superRefine(({ finishOptions }, context) => {
-    const signatures = finishOptions.map(
-      ({ colorEffectId, colorIds, finishIds }) =>
-        `${finishIds.join(",")}|${colorEffectId ?? ""}|${colorIds.join(",")}`,
-    );
-    if (new Set(signatures).size !== signatures.length) {
-      context.addIssue({
-        code: "custom",
-        message: "web.catalog.error.duplicateFinishOption",
-        path: ["finishOptions"],
-      });
-    }
-  });
+  .superRefine(
+    ({ bearing, finishOptions, productTypeSlug, spinDiameterMm }, context) => {
+      if (
+        productTypeSlug !== "spinner" &&
+        (bearing !== null || spinDiameterMm !== null)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: [bearing !== null ? "bearing" : "spinDiameterMm"],
+        });
+      }
+      const signatures = finishOptions.map(
+        ({ colorEffectId, colorIds, finishIds }) =>
+          `${finishIds.join(",")}|${colorEffectId ?? ""}|${colorIds.join(",")}`,
+      );
+      if (new Set(signatures).size !== signatures.length) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.duplicateFinishOption",
+          path: ["finishOptions"],
+        });
+      }
+    },
+  );
 
 const productLookupSchema = z.object({
   productSlug: z.string().regex(slugPattern),
@@ -185,6 +219,7 @@ type CatalogLookupMutationResult<
 
 const collectionAddSchema = z
   .object({
+    bearing: optionalBearingSchema,
     buttonCustomFinish: finishOptionSchema.nullable(),
     buttonFinishOptionId: idSchema.nullable(),
     buttonMaterialId: idSchema.nullable(),
@@ -193,6 +228,7 @@ const collectionAddSchema = z
     confirmed: z.boolean(),
     customFinish: finishOptionSchema.nullable(),
     displayName: displayNameSchema,
+    description: optionalDescriptionSchema,
     finishOptionId: idSchema.nullable(),
     materialId: idSchema,
     newCollection: collectionWriteSchema.nullable().optional().default(null),
@@ -231,14 +267,23 @@ const collectionAddSchema = z
         path: ["buttonProductId"],
       });
     }
+    if (input.productTypeSlug !== "spinner" && input.bearing !== null) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["bearing"],
+      });
+    }
   });
 
 const collectionEditSchema = z
   .object({
+    bearing: optionalBearingSchema,
     collectionId: idSchema.optional(),
     collectionItemId: idSchema,
     customFinish: finishOptionSchema.nullable(),
     displayName: displayNameSchema,
+    description: optionalDescriptionSchema,
     finishOptionId: idSchema.nullable(),
     installedButton: z
       .object({
@@ -520,6 +565,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     const input: ProductWriteInput = {
       actorClerkId: actor.clerkId,
       actorIsAdmin: actor.isAdmin,
+      description: parsed.data.description,
       finishOptions: parsed.data.finishOptions.map(
         ({ colorEffectId, colorIds, finishIds }) => ({
           colorEffectId,
@@ -528,15 +574,18 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
         }),
       ),
       makerId: parsed.data.makerId,
+      makerProductUrl: parsed.data.makerProductUrl,
       materialIds: parsed.data.materialIds,
       name: parsed.data.name,
       productTypeSlug: parsed.data.productTypeSlug,
       slug,
       specs: {
+        bearing: parsed.data.bearing,
         buttonDiameterMm: parsed.data.buttonDiameterMm,
         compatibleButtonId: parsed.data.compatibleButtonId,
         diameterMm: parsed.data.diameterMm,
         lengthMm: parsed.data.lengthMm,
+        spinDiameterMm: parsed.data.spinDiameterMm,
         thicknessMm: parsed.data.thicknessMm,
         thicknessWithButtonMm: parsed.data.thicknessWithButtonMm,
         weightG: parsed.data.weightG,
@@ -587,6 +636,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
           ? (
               await s.db.collections.addSpinner({
                 actorClerkId: actor.clerkId,
+                bearing: parsed.data.bearing,
                 buttonCustomFinish: parsed.data.buttonCustomFinish
                   ? toFinishWriteOption(parsed.data.buttonCustomFinish)
                   : null,
@@ -601,6 +651,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
                 spinnerProductId: parsed.data.productId,
                 collectionId: parsed.data.collectionId,
                 displayName: parsed.data.displayName,
+                description: parsed.data.description,
                 newCollection: parsed.data.newCollection,
               })
             ).spinnerItemId
@@ -613,6 +664,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
               materialId: parsed.data.materialId,
               collectionId: parsed.data.collectionId,
               displayName: parsed.data.displayName,
+              description: parsed.data.description,
               newCollection: parsed.data.newCollection,
               productId: parsed.data.productId,
             });

@@ -1,3 +1,4 @@
+import { markdownToHtml } from "@package/markdown";
 import type {
   CatalogFinishOption,
   CatalogProduct,
@@ -202,6 +203,7 @@ export function ProductDetailPage({
             "mm",
           ],
           ["web.catalog.field.buttonDiameter", product.buttonDiameterMm, "mm"],
+          ["web.catalog.field.spinDiameter", product.spinDiameterMm, "mm"],
         ]
       : [
           ["web.archive.spec.weight", product.weightG, "g"],
@@ -276,6 +278,9 @@ export function ProductDetailPage({
           nextLabel={t("web.resources.action.nextImage")}
           previousLabel={t("web.resources.action.previousImage")}
         />
+        {product.description ? (
+          <MarkdownDescription markdown={product.description} />
+        ) : null}
         <dl className="grid gap-4 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
           <Detail label={t("web.catalog.field.productType")}>
             {product.productTypeName}
@@ -283,6 +288,18 @@ export function ProductDetailPage({
           <Detail label={t("web.catalog.field.maker")}>
             <MakerLink name={product.makerName} url={product.makerUrl} />
           </Detail>
+          {product.makerProductUrl && product.makerProductUrlValid ? (
+            <Detail label={t("web.catalog.field.makerProductUrl")}>
+              <a
+                className="text-primary underline underline-offset-2"
+                href={product.makerProductUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {t("web.action.visitProductPage")}
+              </a>
+            </Detail>
+          ) : null}
           <Detail label={t("web.catalog.field.materials")}>
             {product.materials.map(({ name }) => name).join(", ")}
           </Detail>
@@ -298,6 +315,11 @@ export function ProductDetailPage({
           {product.productTypeSlug === "spinner" ? (
             <Detail label={t("web.catalog.field.button")}>
               {product.compatibleButtonName ?? t("web.catalog.defaultButton")}
+            </Detail>
+          ) : null}
+          {product.productTypeSlug === "spinner" && product.bearing ? (
+            <Detail label={t("web.catalog.field.bearing")}>
+              {product.bearing}
             </Detail>
           ) : null}
           {specs.map(([key, value, unit]) =>
@@ -884,7 +906,15 @@ export function CollectionItemDetailPage({
               )}
             </Detail>
           ) : null}
+          {item.productTypeSlug === "spinner" && item.bearing ? (
+            <Detail label={t("web.catalog.field.bearing")}>
+              {item.bearing}
+            </Detail>
+          ) : null}
         </dl>
+        {item.description ? (
+          <MarkdownDescription markdown={item.description} />
+        ) : null}
         <Link
           className={buttonVariants({ variant: "outline" })}
           params={{
@@ -910,6 +940,15 @@ export function CollectionItemDetailPage({
         />
       </main>
     </AppShell>
+  );
+}
+
+function MarkdownDescription({ markdown }: { markdown: string }) {
+  return (
+    <div
+      className="grid gap-4 rounded-xl border border-border bg-card p-6 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:bg-accent/30 [&_blockquote]:p-4 [&_h2]:mt-3 [&_h2]:text-xl [&_h2]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ul]:grid [&_ul]:gap-2"
+      dangerouslySetInnerHTML={{ __html: markdownToHtml(markdown) ?? "" }}
+    />
   );
 }
 

@@ -92,12 +92,14 @@ describe("finish option editor", () => {
 
   it("renders the owned material and product finish choices", () => {
     const product: CatalogProduct = {
+      bearing: null,
       buttonDiameterMm: null,
       canAdminister: false,
       canEdit: true,
       compatibleButtonId: null,
       compatibleButtonName: null,
       createdAt: new Date(0),
+      description: null,
       diameterMm: null,
       finishOptions: [
         {
@@ -113,6 +115,8 @@ describe("finish option editor", () => {
       lengthMm: null,
       makerId: 1000,
       makerName: "Maker",
+      makerProductUrl: null,
+      makerProductUrlValid: true,
       makerUrl: null,
       materials: [{ id: 1000, name: "Bronze", slug: "bronze" }],
       name: "Spinner",
@@ -123,6 +127,7 @@ describe("finish option editor", () => {
       productTypeName: "Spinner",
       productTypeSlug: "spinner",
       slug: "spinner",
+      spinDiameterMm: null,
       thicknessMm: null,
       thicknessWithButtonMm: null,
       updatedAt: new Date(0),
@@ -273,6 +278,29 @@ describe("collection add form", () => {
     expect(html).toContain(">Add new collection<");
     expect(html).toContain(">Add to collection<");
     expect(html).toContain("disabled");
+    expect(html).toContain('aria-label="Description"');
+    expect(html).toContain('aria-label="Bearing"');
+  });
+
+  it("does not offer a bearing override for a button", () => {
+    const product = productFixture(1004, "Button", "spinner-button");
+    const html = renderToStaticMarkup(
+      createElement(CollectionAddPage, {
+        collections: [],
+        defaultCollectionName: "Tester's Collection",
+        initialProductId: product.id,
+        options: {
+          ...emptyCatalogOptions,
+          productTypes: [
+            { id: 2, name: "Spinner button", slug: "spinner-button" },
+          ],
+        },
+        products: [product],
+      }),
+    );
+
+    expect(html).toContain('aria-label="Description"');
+    expect(html).not.toContain('aria-label="Bearing"');
   });
 });
 
@@ -282,12 +310,14 @@ function productFixture(
   productTypeSlug: "spinner" | "spinner-button",
 ): CatalogProduct {
   return {
+    bearing: null,
     buttonDiameterMm: null,
     canAdminister: false,
     canEdit: true,
     compatibleButtonId: null,
     compatibleButtonName: null,
     createdAt: new Date(0),
+    description: null,
     diameterMm: null,
     finishOptions: [
       {
@@ -303,6 +333,8 @@ function productFixture(
     lengthMm: null,
     makerId: 1,
     makerName: "Maker",
+    makerProductUrl: null,
+    makerProductUrlValid: true,
     makerUrl: null,
     materials: [{ id: id + 1, name: "Bronze", slug: "bronze" }],
     name,
@@ -313,6 +345,7 @@ function productFixture(
     productTypeName: productTypeSlug === "spinner" ? "Spinner" : "Button",
     productTypeSlug,
     slug: name.toLowerCase(),
+    spinDiameterMm: null,
     thicknessMm: null,
     thicknessWithButtonMm: null,
     updatedAt: new Date(0),
@@ -327,6 +360,8 @@ function collectionFixture(
   sourceProductFinishOptionId: number,
 ): UserCollectionItem {
   return {
+    bearing: null,
+    bearingOverride: null,
     canAdminister: false,
     canEdit: true,
     collectionId: 1000,
@@ -334,6 +369,8 @@ function collectionFixture(
     collectionIsPrivate: false,
     collectionName: "Test collection",
     displayName: product.name,
+    description: null,
+    descriptionOverride: null,
     finishOption: product.finishOptions[0] ?? null,
     imageCount: 0,
     images: [],

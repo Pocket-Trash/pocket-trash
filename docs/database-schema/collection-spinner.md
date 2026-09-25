@@ -11,3 +11,4 @@ User collection row for a spinner.
 | `id` | `bigint` | yes | PK, FK |  | `collection_item.id` (on delete cascade) | Collection item row identifier for this spinner. | `1000` |
 | `product_spinner_id` | `bigint` | yes | FK |  | `product_spinner.id` (on delete restrict) | Catalog spinner this collection item represents. | `1000` |
 | `installed_button_id` | `bigint` | no | FK |  | `collection_spinner_button.id` (on delete set null) | Owned spinner button currently installed on this spinner. | `1001` |
+| `bearing` | `text` | no |  |  |  | Optional bearing override for this owned spinner. | `R188 full ceramic` |
