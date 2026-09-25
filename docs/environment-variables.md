@@ -74,6 +74,7 @@ runner exposes the normalized `URL_INITIALS` to child processes.
 | `CLERK_WEBHOOK_SIGNING_SECRET` | Secret | Verifies Clerk `user.created` and `user.updated` webhooks. |
 | `URL_INITIALS` | Local server | Normalized developer selector exposed by the Infisical runner. |
 | `BUNNY_CDN_BASE_URL` | Worker | Public Bunny delivery origin. |
+| `BUNNY_IMAGE_FOLDER_PREFIX` | Worker | Required for upload storage. Complete image namespace: `images`, `images/dev`, `images/preview`, or `images/preview/pr-<number>`. |
 | `BUNNY_RESOURCE_FOLDER_PREFIX` | Worker | Resource namespace selected for the deployment. |
 | `BUNNY_STORAGE_ACCESS_KEY` | Secret | Bunny Storage Zone password. |
 | `BUNNY_STORAGE_ENDPOINT` | Worker | Regional Bunny Storage API origin. |
