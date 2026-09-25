@@ -1,3 +1,8 @@
+---
+name: pocket-trash-update-scopes
+description: Suggest Pocket Trash conventional commit scope updates.
+---
+
 # Update Scopes
 
 Keep conventional commit scopes aligned with the repository without duplicating

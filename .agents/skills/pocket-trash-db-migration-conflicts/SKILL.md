@@ -1,3 +1,8 @@
+---
+name: pocket-trash-db-migration-conflicts
+description: Resolve Pocket Trash Drizzle migration history conflicts.
+---
+
 # DB Migration Conflicts
 
 This workflow is only intended for the `Pocket-Trash/pocket-trash` repo. Before

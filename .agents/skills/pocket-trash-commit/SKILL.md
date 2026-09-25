@@ -1,3 +1,8 @@
+---
+name: pocket-trash-commit
+description: Create conventional git commits for Pocket Trash repositories.
+---
+
 # Git Commit
 
 Write conventional commits for this repository. Never include AI co-authorship
@@ -38,5 +43,6 @@ If `./docs/commit-lint.md` does not exist, read `./commitlint.config.cjs`:
 - **No `Co-Authored-By` lines** — commits are from the user only
 - **Summary line**: imperative mood, lowercase, no period, max 72 chars
 - **Body**: point-form list of changes, keep each point succinct
-- **One commit per logical change** — don't bundle unrelated work
+- Perform one or more commits based on the logical separation of the changes. Do
+  not bundle unrelated changes in one commit.
 - Stage specific files by name — avoid `git add -A` or `git add .`

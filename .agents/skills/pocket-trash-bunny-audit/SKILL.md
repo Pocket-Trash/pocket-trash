@@ -1,3 +1,8 @@
+---
+name: pocket-trash-bunny-audit
+description: Audit Pocket Trash Bunny services, billing, and usage.
+---
+
 # Bunny Audit
 
 This workflow is only intended for the `Pocket-Trash/pocket-trash` repo. Before

@@ -1,3 +1,8 @@
+---
+name: pocket-trash-grill-me
+description: Stress-test a Pocket Trash plan with focused questions.
+---
+
 # Grill Me
 
 Interview the user about a plan until the important in-scope decisions, risks,

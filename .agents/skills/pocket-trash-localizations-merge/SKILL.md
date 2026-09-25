@@ -1,9 +1,22 @@
+---
+name: pocket-trash-localizations-merge
+description:
+  Merge planned localization files into the Pocket Trash localizations repo.
+---
+
 # Localizations Merge
 
 Merge planned localization files into the `Pocket-Trash/localizations` repo.
 
 This workflow is only intended for the `Pocket-Trash/localizations` repo. Before
-using it, confirm the current repo with the router repo-scope check.
+using it, confirm the current repo with `git remote get-url origin`. If that
+does not identify `Pocket-Trash/localizations`, inspect the root `package.json`;
+treat it as the localizations repo only when the package name is
+`@pocket-trash/localizations`.
+
+If the current repo is not the Pocket Trash localizations repo, stop before
+running commands or making changes. Name the repo you detected when possible and
+ask whether the user wants to continue even though the workflow might not work.
 
 ## Workflow
 
@@ -65,8 +78,8 @@ using it, confirm the current repo with the router repo-scope check.
     Update all callers that were changed to use the incoming keys so they use the existing keys instead.
     ```
 
-15. At the end, tell the user to use `$pocket-trash commit`, then
-    `$pocket-trash pr-create` or `$pocket-trash pr-update`.
+15. At the end, tell the user to use `$pocket-trash-commit`, then
+    `$pocket-trash-pr-create` or `$pocket-trash-pr-update`.
 
 ## Error Handling
 

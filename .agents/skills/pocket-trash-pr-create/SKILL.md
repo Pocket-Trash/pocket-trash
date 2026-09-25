@@ -1,3 +1,8 @@
+---
+name: pocket-trash-pr-create
+description: Create a Pocket Trash GitHub pull request.
+---
+
 # PR Create
 
 Create a GitHub pull request for the current branch using `gh`. Base the title
@@ -70,7 +75,7 @@ suggest a branch, create a branch, push, fetch, or create a PR from `main`.
 ## Title And Body
 
 Write the PR title from the commit subjects and changed files using the same
-conventional commit subject format as `$pocket-trash commit`:
+conventional commit subject format as `$pocket-trash-commit`:
 
 ```text
 <type>(<scope>): <short summary>
@@ -92,7 +97,7 @@ conventional commit subject format as `$pocket-trash commit`:
 - Do not include AI co-authorship or generated-by lines.
 
 If the user asks this skill to create, amend, or suggest commits while preparing
-the PR, use the same `$pocket-trash commit` body format:
+the PR, use the same `$pocket-trash-commit` body format:
 
 ```text
 <type>(<scope>): <short summary>
