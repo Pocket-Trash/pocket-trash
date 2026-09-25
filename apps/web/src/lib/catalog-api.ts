@@ -48,12 +48,17 @@ const optionalBearingSchema = z
 const optionalUrlSchema = z
   .string()
   .trim()
-  .refine(
-    (value) =>
-      value === "" || z.url().safeParse(normalizeOptionalUrl(value)).success,
-    urlMessage,
-  )
+  .refine((value) => isWebUrl(normalizeOptionalUrl(value)), urlMessage)
   .transform((value) => normalizeOptionalUrl(value) || null);
+
+function isWebUrl(value: string | null) {
+  if (value === null) return true;
+  try {
+    return ["http:", "https:"].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
 
 export const finishOptionSchema = z
   .object({
@@ -172,11 +177,7 @@ const makerSchema = z.object({
   rootUrl: z
     .string()
     .trim()
-    .refine(
-      (value) =>
-        value === "" || z.url().safeParse(normalizeOptionalUrl(value)).success,
-      urlMessage,
-    ),
+    .refine((value) => isWebUrl(normalizeOptionalUrl(value)), urlMessage),
 });
 
 const materialSchema = z.object({

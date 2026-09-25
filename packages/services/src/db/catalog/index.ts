@@ -193,6 +193,10 @@ export type CatalogService = {
     productId: number;
     reason?: string;
   }): Promise<void>;
+  setMakerProductUrlValidity(input: {
+    makerProductUrlValid: boolean;
+    productId: number;
+  }): Promise<void>;
   updateProduct(
     input: ProductWriteInput & { productId: number },
   ): Promise<CatalogProduct>;
@@ -519,9 +523,10 @@ export function createCatalogService(
                 makerId: input.makerId,
                 ...(input.makerProductUrl !== undefined
                   ? {
-                      makerProductUrl: normalizeOptionalText(
+                      makerProductUrl: normalizeOptionalUrl(
                         input.makerProductUrl,
                       ),
+                      makerProductUrlValid: true,
                     }
                   : {}),
                 name: input.name,
@@ -709,6 +714,12 @@ export function createCatalogService(
         .set(privacyUpdate({ ...input, actorIsAdmin: actorIsModerating }))
         .where(eq(schema.product.id, input.productId));
     },
+    async setMakerProductUrlValidity(input) {
+      await db
+        .update(schema.product)
+        .set({ makerProductUrlValid: input.makerProductUrlValid })
+        .where(eq(schema.product.id, input.productId));
+    },
     async softDeleteImage(input) {
       await softDeleteCatalogImage(db, input);
     },
@@ -744,6 +755,10 @@ export function createCatalogService(
             ) {
               throw new Error("Product does not exist.");
             }
+            const makerProductUrl =
+              input.makerProductUrl === undefined
+                ? undefined
+                : normalizeOptionalUrl(input.makerProductUrl);
 
             await tx
               .update(schema.product)
@@ -756,14 +771,12 @@ export function createCatalogService(
                     }
                   : {}),
                 makerId: input.makerId,
-                ...(input.makerProductUrl !== undefined
+                ...(makerProductUrl !== undefined
                   ? {
-                      makerProductUrl: normalizeOptionalText(
-                        input.makerProductUrl,
-                      ),
+                      makerProductUrl,
                       makerProductUrlValid:
-                        normalizeOptionalText(input.makerProductUrl) !==
-                        existing.makerProductUrl
+                        makerProductUrl !==
+                        normalizeOptionalUrl(existing.makerProductUrl)
                           ? true
                           : existing.makerProductUrlValid,
                     }
@@ -2924,6 +2937,10 @@ function spinnerSpecs(specs: ProductWriteInput["specs"]) {
 
 function normalizeOptionalText(value: string | null | undefined) {
   return value?.trim() || null;
+}
+
+function normalizeOptionalUrl(value: string | null | undefined) {
+  return value?.trim().replace(/\/+$/, "") || null;
 }
 
 function normalizeOptionalDescription(value: string | null | undefined) {

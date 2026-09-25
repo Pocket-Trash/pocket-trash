@@ -283,25 +283,17 @@ function ProductEditor({
       </form.Subscribe>
       <form.Field name="description">
         {(field) => (
-          <Field label={t("web.catalog.field.description")}>
-            <textarea
-              aria-label={t("web.catalog.field.description")}
-              aria-describedby="product-description-help"
-              className="min-h-28 rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              maxLength={5000}
-              name={field.name}
-              onBlur={field.handleBlur}
-              onChange={(event) => field.handleChange(event.target.value)}
-              value={field.state.value}
-            />
-            <p
-              className="text-xs text-muted-foreground"
-              id="product-description-help"
-            >
-              {t("web.catalog.help.markdownDescription")}
-            </p>
-            <FieldError error={serverErrors.description?.[0]} t={t} />
-          </Field>
+          <MarkdownTextarea
+            error={serverErrors.description?.[0]}
+            help={t("web.catalog.help.markdownDescription")}
+            id="product-description"
+            label={t("web.catalog.field.description")}
+            name={field.name}
+            onBlur={field.handleBlur}
+            onChange={field.handleChange}
+            t={t}
+            value={field.state.value}
+          />
         )}
       </form.Field>
       <form.Field name="makerId">
@@ -1388,23 +1380,15 @@ export function CollectionAddPage({
             value={displayName}
           />
         </Field>
-        <Field label={t("web.catalog.field.description")}>
-          <textarea
-            aria-describedby="collection-item-description-help"
-            aria-label={t("web.catalog.field.description")}
-            className="min-h-28 rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
-            disabled={!product}
-            maxLength={5000}
-            onChange={(event) => setDescription(event.target.value)}
-            value={description}
-          />
-          <p
-            className="text-xs text-muted-foreground"
-            id="collection-item-description-help"
-          >
-            {t("web.catalog.help.markdownDescription")}
-          </p>
-        </Field>
+        <MarkdownTextarea
+          disabled={!product}
+          help={t("web.catalog.help.markdownDescription")}
+          id="collection-item-description"
+          label={t("web.catalog.field.description")}
+          onChange={setDescription}
+          t={t}
+          value={description}
+        />
         {product?.productTypeSlug === "spinner" ? (
           <Field label={t("web.catalog.field.bearing")}>
             <Input
@@ -1887,22 +1871,14 @@ export function CollectionEditPage({
             value={displayName}
           />
         </Field>
-        <Field label={t("web.catalog.field.description")}>
-          <textarea
-            aria-describedby="collection-item-override-help"
-            aria-label={t("web.catalog.field.description")}
-            className="min-h-28 rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            maxLength={5000}
-            onChange={(event) => setDescription(event.target.value)}
-            value={description}
-          />
-          <p
-            className="text-xs text-muted-foreground"
-            id="collection-item-override-help"
-          >
-            {t("web.catalog.help.collectionDescriptionOverride")}
-          </p>
-        </Field>
+        <MarkdownTextarea
+          help={t("web.catalog.help.collectionDescriptionOverride")}
+          id="collection-item-override"
+          label={t("web.catalog.field.description")}
+          onChange={setDescription}
+          t={t}
+          value={description}
+        />
         {item.productTypeSlug === "spinner" ? (
           <Field label={t("web.catalog.field.bearing")}>
             <Input
@@ -2170,6 +2146,53 @@ function Field({
       <span>{label}</span>
       {children}
     </div>
+  );
+}
+
+function MarkdownTextarea({
+  disabled = false,
+  error,
+  help,
+  id,
+  label,
+  name,
+  onBlur,
+  onChange,
+  t,
+  value,
+}: {
+  disabled?: boolean;
+  error?: string;
+  help: string;
+  id: string;
+  label: string;
+  name?: string;
+  onBlur?: React.FocusEventHandler<HTMLTextAreaElement>;
+  onChange(value: string): void;
+  t: ReturnType<typeof useCatalogCopy>;
+  value: string;
+}) {
+  const helpId = `${id}-help`;
+
+  return (
+    <Field label={label}>
+      <textarea
+        aria-describedby={helpId}
+        aria-label={label}
+        className="min-h-28 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={disabled}
+        id={id}
+        maxLength={5000}
+        name={name}
+        onBlur={onBlur}
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      />
+      <p className="text-xs text-muted-foreground" id={helpId}>
+        {help}
+      </p>
+      <FieldError error={error} t={t} />
+    </Field>
   );
 }
 

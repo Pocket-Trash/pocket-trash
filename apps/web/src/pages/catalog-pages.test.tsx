@@ -1,6 +1,7 @@
 import type { CatalogProduct, PublicCollectionOwner } from "@package/services";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { ProductCard } from "@/components/product-card";
 import {
   CollectionItemDetailPage,
   CollectionPage,
@@ -209,6 +210,46 @@ describe("CollectionPage", () => {
     expect(html).toContain("Add to collection");
     expect(html.indexOf("Edit")).toBeLessThan(html.indexOf("Public"));
   });
+
+  it("keeps descriptions and bearings off collection lists", () => {
+    const collection = owners[0]?.collections[0];
+    const item = owners[0]?.items[0];
+    if (!collection || !item) throw new Error("Collection fixtures required.");
+
+    const html = renderToStaticMarkup(
+      <CollectionPage
+        collection={collection}
+        items={[
+          {
+            ...item,
+            bearing: "LIST_ONLY_BEARING",
+            description: "LIST_ONLY_DESCRIPTION",
+          },
+        ]}
+        ownerUsername="royanger"
+      />,
+    );
+
+    expect(html).not.toContain("LIST_ONLY_BEARING");
+    expect(html).not.toContain("LIST_ONLY_DESCRIPTION");
+  });
+});
+
+describe("ProductCard", () => {
+  it("keeps descriptions off cards", () => {
+    const html = renderToStaticMarkup(
+      <ProductCard
+        finishOptionCountLabel="No finishes"
+        imageAlt="Catla"
+        imageCountLabel="No images"
+        materialCountLabel="No materials"
+        privateLabel="Private"
+        product={{ ...product, description: "CARD_ONLY_DESCRIPTION" }}
+      />,
+    );
+
+    expect(html).not.toContain("CARD_ONLY_DESCRIPTION");
+  });
 });
 
 describe("ProductDetailPage", () => {
@@ -250,6 +291,9 @@ describe("ProductDetailPage", () => {
     expect(html).toContain("R188");
     expect(html).toContain("52 mm");
     expect(html).toContain('href="https://www.kapedc.com/products/catla"');
+    expect(html).toContain("hover:text-primary");
+    expect(html).toContain("focus-visible:ring-ring");
+    expect(html).toContain("text-card-foreground");
     expect(invalidHtml).not.toContain(
       'href="https://www.kapedc.com/products/catla"',
     );

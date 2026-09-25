@@ -290,14 +290,10 @@ export function ProductDetailPage({
           </Detail>
           {product.makerProductUrl && product.makerProductUrlValid ? (
             <Detail label={t("web.catalog.field.makerProductUrl")}>
-              <a
-                className="text-primary underline underline-offset-2"
-                href={product.makerProductUrl}
-                rel="noreferrer"
-                target="_blank"
-              >
-                {t("web.action.visitProductPage")}
-              </a>
+              <MakerLink
+                name={t("web.action.visitProductPage")}
+                url={product.makerProductUrl}
+              />
             </Detail>
           ) : null}
           <Detail label={t("web.catalog.field.materials")}>
@@ -946,7 +942,7 @@ export function CollectionItemDetailPage({
 function MarkdownDescription({ markdown }: { markdown: string }) {
   return (
     <div
-      className="grid gap-4 rounded-xl border border-border bg-card p-6 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:bg-accent/30 [&_blockquote]:p-4 [&_h2]:mt-3 [&_h2]:text-xl [&_h2]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ul]:grid [&_ul]:gap-2"
+      className="grid gap-4 rounded-xl border border-border bg-card p-6 text-card-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:bg-accent/30 [&_blockquote]:p-4 [&_h2]:mt-3 [&_h2]:text-xl [&_h2]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ul]:grid [&_ul]:gap-2"
       dangerouslySetInnerHTML={{ __html: markdownToHtml(markdown) ?? "" }}
     />
   );

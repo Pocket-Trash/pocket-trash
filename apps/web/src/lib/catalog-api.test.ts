@@ -166,6 +166,19 @@ describe("product source details", () => {
     ).toBe(false);
   });
 
+  it.each([
+    "javascript:alert(1)",
+    "ftp://maker.example/spinner",
+  ])("rejects the non-web maker URL %s", (makerProductUrl) => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        finishOptions: validFinishOptions,
+        makerProductUrl,
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects spinner-only details for buttons", () => {
     expect(
       productFormSchema.safeParse({

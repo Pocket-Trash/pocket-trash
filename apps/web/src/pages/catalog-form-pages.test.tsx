@@ -280,6 +280,8 @@ describe("collection add form", () => {
     expect(html).toContain("disabled");
     expect(html).toContain('aria-label="Description"');
     expect(html).toContain('aria-label="Bearing"');
+    expect(html).toContain("border-input bg-background");
+    expect(html).toContain("focus-visible:ring-ring");
   });
 
   it("does not offer a bearing override for a button", () => {
