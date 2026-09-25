@@ -10,13 +10,29 @@ import {
   resourceMimeTypesByExtension,
   type UploadTargetType,
 } from "@package/services/constants";
-import type { TranslationKey } from "@pocket-trash/localizations";
+import {
+  DEFAULT_LOCALE,
+  formatTranslation,
+  type SupportedLocale,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
 import { clientEnv } from "@/env/client";
 
 const imageTypes = new Set<string>(
   Object.values(imageMimeTypesByExtension).flat(),
 );
-const formatMiB = (bytes: number) => `${bytes / 1024 / 1024} MiB`;
+export function formatMiB(
+  bytes: number,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): string {
+  return formatTranslation(
+    "web.storage.sizeMiB",
+    {
+      value: new Intl.NumberFormat(locale).format(bytes / 1024 / 1024),
+    },
+    locale,
+  );
+}
 
 const resourceContentType = "application/octet-stream";
 type UploadMetadata = {
@@ -74,7 +90,7 @@ export function getUploadErrorTranslation(
   error: unknown,
 ): ResourceUploadValidationError {
   if (!(error instanceof UploadRequestError)) {
-    return { key: "web.resources.error.saveFailed" };
+    return { key: "web.upload.saveFailed" };
   }
   if (error.code === "session_expired") {
     return { key: "web.resources.upload.expired" };
@@ -86,7 +102,7 @@ export function getUploadErrorTranslation(
     };
   }
   if (error.stage === "complete") {
-    return { key: "web.resources.upload.finalizationFailure" };
+    return { key: "web.upload.finalizationFailure" };
   }
   return { key: "web.resources.upload.sessionFailure" };
 }
@@ -95,6 +111,7 @@ export function validateResourceUpload(
   files: File[],
   images: File[] = [],
   requireImages = false,
+  locale: SupportedLocale = DEFAULT_LOCALE,
 ): ResourceUploadValidationError | undefined {
   if (files.length === 0) {
     return { key: "web.resources.validation.requiredFile" };
@@ -112,6 +129,8 @@ export function validateResourceUpload(
       file,
       resourceMimeTypesByExtension,
       resourceContentType,
+      maxResourceFileBytes,
+      locale,
     );
     if (unsafe) return unsafe;
     const normalizedName = file.name.toLocaleLowerCase();
@@ -128,6 +147,7 @@ export function validateResourceUpload(
     images,
     images.length,
     requireImages,
+    locale,
   );
   if (imageError) return imageError;
 
@@ -138,7 +158,7 @@ export function validateResourceUpload(
   if (totalSize > maxResourceSessionBytes) {
     return {
       key: "web.resources.validation.sessionTooLarge",
-      params: { maxSize: formatMiB(maxResourceSessionBytes) },
+      params: { maxSize: formatMiB(maxResourceSessionBytes, locale) },
     };
   }
 }
@@ -147,6 +167,7 @@ export function validateResourceImages(
   images: File[],
   totalCount = images.length,
   required = true,
+  locale: SupportedLocale = DEFAULT_LOCALE,
 ): ResourceUploadValidationError | undefined {
   if (required && totalCount === 0) {
     return { key: "web.resources.validation.requiredImage" };
@@ -164,6 +185,7 @@ export function validateResourceImages(
       imageMimeTypesByExtension,
       image.type,
       maxImageBytes,
+      locale,
     );
     if (error?.key === "web.resources.validation.invalidFileType") {
       return {
@@ -173,7 +195,7 @@ export function validateResourceImages(
     if (error?.key === "web.resources.validation.fileTooLarge") {
       return {
         key: "web.resources.validation.imageTooLarge",
-        params: { maxSize: formatMiB(maxImageBytes) },
+        params: { maxSize: formatMiB(maxImageBytes, locale) },
       };
     }
     if (error) return error;
@@ -191,7 +213,7 @@ export function validateResourceImages(
   if (totalSize > maxResourceSessionBytes) {
     return {
       key: "web.resources.validation.sessionTooLarge",
-      params: { maxSize: formatMiB(maxResourceSessionBytes) },
+      params: { maxSize: formatMiB(maxResourceSessionBytes, locale) },
     };
   }
 }
@@ -407,6 +429,7 @@ function validateFile(
   allowedTypes: Readonly<Record<string, readonly string[]>>,
   contentType = file.type,
   maxBytes = maxResourceFileBytes,
+  locale: SupportedLocale = DEFAULT_LOCALE,
 ): ResourceUploadValidationError | undefined {
   if (
     !file.name ||
@@ -428,7 +451,7 @@ function validateFile(
   if (file.size > maxBytes) {
     return {
       key: "web.resources.validation.fileTooLarge",
-      params: { filename: file.name, maxSize: formatMiB(maxBytes) },
+      params: { filename: file.name, maxSize: formatMiB(maxBytes, locale) },
     };
   }
   const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
@@ -463,7 +486,10 @@ function trimTrailingSlash(value: string): string {
 
 export type ImageUploadError = ResourceUploadValidationError;
 
-export function validateImages(files: File[]): ImageUploadError | undefined {
+export function validateImages(
+  files: File[],
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): ImageUploadError | undefined {
   if (files.length > maxImageSessionFiles) {
     return {
       key: "web.resources.validation.tooManyImages",
@@ -475,7 +501,7 @@ export function validateImages(files: File[]): ImageUploadError | undefined {
   ) {
     return {
       key: "web.resources.validation.sessionTooLarge",
-      params: { maxSize: formatMiB(maxImageSessionBytes) },
+      params: { maxSize: formatMiB(maxImageSessionBytes, locale) },
     };
   }
   for (const file of files) {
@@ -484,13 +510,14 @@ export function validateImages(files: File[]): ImageUploadError | undefined {
     if (file.size > maxImageBytes) {
       return {
         key: "web.resources.validation.imageTooLarge",
-        params: { maxSize: formatMiB(maxImageBytes) },
+        params: { maxSize: formatMiB(maxImageBytes, locale) },
       };
     }
   }
 }
 
 export async function uploadImages(input: {
+  locale: SupportedLocale;
   files: File[];
   getToken(): Promise<string | null>;
   onOwnerDeletedDuplicate?(imageId: number): Promise<boolean>;
@@ -498,7 +525,7 @@ export async function uploadImages(input: {
   targetType: Exclude<UploadTargetType, "resource">;
 }): Promise<{ uploaded: File[]; failed: File[] }> {
   if (!input.files.length) return { uploaded: [], failed: [] };
-  const validation = validateImages(input.files);
+  const validation = validateImages(input.files, input.locale);
   if (validation) throw validation;
   try {
     await uploadSession({

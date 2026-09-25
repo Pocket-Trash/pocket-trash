@@ -1,5 +1,12 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import {
+  maxImageBytes,
+  maxResourceFileBytes,
+  maxResourceFiles,
+  maxResourceImages,
+  maxResourceSessionBytes,
+} from "@package/services/constants";
+import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
@@ -18,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   appendResourceUploadFiles,
+  formatMiB,
   getUploadErrorTranslation,
   uploadResourceSession,
   validateResourceUpload,
@@ -54,7 +62,12 @@ export function ResourceUploadPage() {
             }
 
             const formData = new FormData(event.currentTarget);
-            const validation = validateResourceUpload(files, imageFiles, true);
+            const validation = validateResourceUpload(
+              files,
+              imageFiles,
+              true,
+              locale,
+            );
             if (validation) {
               toast.error(t(validation.key, validation.params));
               return;
@@ -117,9 +130,9 @@ export function ResourceUploadPage() {
             accept="image/jpeg,image/png,image/webp"
             browseLabel={t("web.resources.upload.browseFiles")}
             description={t("web.resources.upload.imagesHelp", {
-              maxFileSize: "20 MiB",
-              maxImages: 10,
-              maxSessionSize: "100 MiB",
+              maxFileSize: formatMiB(maxImageBytes, locale),
+              maxImages: maxResourceImages,
+              maxSessionSize: formatMiB(maxResourceSessionBytes, locale),
             })}
             disabled={submitting}
             files={imageFiles}
@@ -155,9 +168,9 @@ export function ResourceUploadPage() {
           <ResourceFileInput
             browseLabel={t("web.resources.upload.browseFiles")}
             description={t("web.resources.upload.fileHelp", {
-              maxFileSize: "20 MiB",
-              maxFiles: 10,
-              maxSessionSize: "100 MiB",
+              maxFileSize: formatMiB(maxResourceFileBytes, locale),
+              maxFiles: maxResourceFiles,
+              maxSessionSize: formatMiB(maxResourceSessionBytes, locale),
             })}
             disabled={submitting}
             files={files}

@@ -1,3 +1,4 @@
+import { formatTranslation } from "@pocket-trash/localizations";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/env/client", () => ({
@@ -6,6 +7,7 @@ vi.mock("@/env/client", () => ({
 
 import {
   appendResourceUploadFiles,
+  formatMiB,
   getUploadErrorTranslation,
   UploadRequestError,
   uploadResourceSession,
@@ -339,5 +341,53 @@ describe("image uploads", () => {
         ),
       )?.key,
     ).toBe("web.resources.validation.sessionTooLarge");
+  });
+});
+
+describe("localized upload copy", () => {
+  it.each([
+    "en-US",
+    "es-MX",
+  ] as const)("formats binary sizes and preserves validation parameters in %s", (locale) => {
+    expect(formatMiB(25 * 1024 * 1024, locale)).toBe("25 MiB");
+    expect(formatMiB(1.5 * 1024 * 1024, locale)).toBe("1.5 MiB");
+    expect(
+      validateResourceUpload(
+        [file("large.pdf", 20 * 1024 * 1024 + 1)],
+        [],
+        false,
+        locale,
+      ),
+    ).toEqual({
+      key: "web.resources.validation.fileTooLarge",
+      params: { filename: "large.pdf", maxSize: "20 MiB" },
+    });
+    const copy = formatTranslation(
+      "web.resources.upload.fileTypes",
+      {},
+      locale,
+    );
+    for (const type of ["JPEG", "PNG", "WebP"]) expect(copy).toContain(type);
+  });
+
+  it("uses the released generic upload failures in both locales", () => {
+    const save = getUploadErrorTranslation(new Error("unexpected"));
+    const complete = getUploadErrorTranslation(
+      new UploadRequestError("complete", "upload_failed"),
+    );
+    expect(save.key).toBe("web.upload.saveFailed");
+    expect(complete.key).toBe("web.upload.finalizationFailure");
+    expect(formatTranslation(save.key, {}, "en-US")).toBe(
+      "We couldn't save your upload. Try again.",
+    );
+    expect(formatTranslation(save.key, {}, "es-MX")).toBe(
+      "No pudimos guardar tu carga. Inténtalo de nuevo.",
+    );
+    expect(formatTranslation(complete.key, {}, "en-US")).not.toContain(
+      "resource",
+    );
+    expect(formatTranslation(complete.key, {}, "es-MX")).not.toContain(
+      "recurso",
+    );
   });
 });
