@@ -14,6 +14,9 @@ Shared catalog product identity for supported product types.
 | `owner_clerk_id` | `text` | yes |  |  |  |  |  |
 | `name` | `text` | yes |  |  |  | Human-readable product name. | `Standard Katla` |
 | `slug` | `text` | yes |  |  |  | Stable product slug within its type. | `standard-katla` |
+| `description` | `text` | no |  |  |  | Optional product description stored as Markdown. | `A compact tri spinner.` |
+| `maker_product_url` | `text` | no |  |  |  | Direct URL to the maker's product page. | `https://example.com/products/standard-katla` |
+| `maker_product_url_valid` | `boolean` | yes |  | `true` |  | Whether the maker product URL may be shown publicly. | `true` |
 | `is_private` | `boolean` | yes |  |  |  |  |  |
 | `private_reason` | `text` | no |  |  |  |  |  |
 | `privated_at` | `timestamp with time zone` | no |  |  |  |  |  |

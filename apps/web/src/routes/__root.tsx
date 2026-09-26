@@ -27,6 +27,41 @@ export const Route = createRootRoute({
     };
   },
   head: () => ({
+    links: [
+      {
+        rel: "icon",
+        href: "https://pocket-trash.b-cdn.net/assets/favicon/favicon.ico",
+        sizes: "any",
+      },
+      {
+        rel: "icon",
+        type: "image/png",
+        sizes: "16x16",
+        href: "https://pocket-trash.b-cdn.net/assets/favicon/favicon-16x16.png",
+      },
+      {
+        rel: "icon",
+        type: "image/png",
+        sizes: "32x32",
+        href: "https://pocket-trash.b-cdn.net/assets/favicon/favicon-32x32.png",
+      },
+      {
+        rel: "icon",
+        type: "image/png",
+        sizes: "192x192",
+        href: "https://pocket-trash.b-cdn.net/assets/favicon/android-chrome-192x192.png",
+      },
+      {
+        rel: "icon",
+        type: "image/png",
+        sizes: "512x512",
+        href: "https://pocket-trash.b-cdn.net/assets/favicon/android-chrome-512x512.png",
+      },
+      {
+        rel: "apple-touch-icon",
+        href: "https://pocket-trash.b-cdn.net/assets/favicon/apple-touch-icon.png",
+      },
+    ],
     meta: [
       {
         charSet: "utf-8",

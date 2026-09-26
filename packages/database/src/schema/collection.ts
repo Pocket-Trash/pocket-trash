@@ -81,6 +81,7 @@ export const collectionItem = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     collectionId: bigint("collection_id", { mode: "number" }).notNull(),
     displayName: text("display_name"),
+    description: text("description"),
     materialId: bigint("material_id", { mode: "number" }).references(
       () => material.id,
       { onDelete: "restrict" },
@@ -122,6 +123,10 @@ export const collectionItem = pgTable(
     check(
       "collection_item_private_metadata_consistent",
       sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
+    ),
+    check(
+      "collection_item_description_length_valid",
+      sql`${table.description} is null or char_length(${table.description}) <= 5000`,
     ),
   ],
 );
@@ -183,6 +188,11 @@ export const product = pgTable(
     ownerClerkId: text("owner_clerk_id").notNull(),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    description: text("description"),
+    makerProductUrl: text("maker_product_url"),
+    makerProductUrlValid: boolean("maker_product_url_valid")
+      .default(true)
+      .notNull(),
     isPrivate: boolean("is_private").default(false).notNull(),
     privateReason: text("private_reason"),
     privatedAt: timestamp("privated_at", { mode: "date", withTimezone: true }),
@@ -201,6 +211,10 @@ export const product = pgTable(
     check(
       "product_private_metadata_consistent",
       sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
+    ),
+    check(
+      "product_description_length_valid",
+      sql`${table.description} is null or char_length(${table.description}) <= 5000`,
     ),
   ],
 );
@@ -508,28 +522,39 @@ export const finishOptionColor = pgTable(
   ],
 );
 
-export const productSpinner = pgTable("product_spinner", {
-  id: bigint("id", { mode: "number" })
-    .primaryKey()
-    .references(() => product.id, { onDelete: "cascade" }),
-  weightG: decimal("weight_g"),
-  lengthMm: decimal("length_mm"),
-  widthMm: decimal("width_mm"),
-  thicknessMm: decimal("thickness_mm"),
-  thicknessWithButtonMm: decimal("thickness_with_button_mm"),
-  buttonDiameterMm: decimal("button_diameter_mm"),
-  compatibleButtonId: bigint("compatible_button_id", {
-    mode: "number",
-  }).references((): AnyPgColumn => productSpinnerButton.id, {
-    onDelete: "set null",
-  }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const productSpinner = pgTable(
+  "product_spinner",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .references(() => product.id, { onDelete: "cascade" }),
+    weightG: decimal("weight_g"),
+    lengthMm: decimal("length_mm"),
+    widthMm: decimal("width_mm"),
+    thicknessMm: decimal("thickness_mm"),
+    thicknessWithButtonMm: decimal("thickness_with_button_mm"),
+    buttonDiameterMm: decimal("button_diameter_mm"),
+    spinDiameterMm: decimal("spin_diameter_mm"),
+    bearing: text("bearing"),
+    compatibleButtonId: bigint("compatible_button_id", {
+      mode: "number",
+    }).references((): AnyPgColumn => productSpinnerButton.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      "product_spinner_bearing_length_valid",
+      sql`${table.bearing} is null or char_length(${table.bearing}) <= 200`,
+    ),
+  ],
+);
 
 export const productSpinnerButton = pgTable("product_spinner_button", {
   id: bigint("id", { mode: "number" })
@@ -557,17 +582,27 @@ export const collectionSpinnerButton = pgTable("collection_spinner_button", {
     .references(() => productSpinnerButton.id, { onDelete: "restrict" }),
 });
 
-export const collectionSpinner = pgTable("collection_spinner", {
-  id: bigint("id", { mode: "number" })
-    .primaryKey()
-    .references(() => collectionItem.id, { onDelete: "cascade" }),
-  productSpinnerId: bigint("product_spinner_id", { mode: "number" })
-    .notNull()
-    .references(() => productSpinner.id, { onDelete: "restrict" }),
-  installedButtonId: bigint("installed_button_id", {
-    mode: "number",
-  }).references(() => collectionSpinnerButton.id, { onDelete: "set null" }),
-});
+export const collectionSpinner = pgTable(
+  "collection_spinner",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .references(() => collectionItem.id, { onDelete: "cascade" }),
+    productSpinnerId: bigint("product_spinner_id", { mode: "number" })
+      .notNull()
+      .references(() => productSpinner.id, { onDelete: "restrict" }),
+    installedButtonId: bigint("installed_button_id", {
+      mode: "number",
+    }).references(() => collectionSpinnerButton.id, { onDelete: "set null" }),
+    bearing: text("bearing"),
+  },
+  (table) => [
+    check(
+      "collection_spinner_bearing_length_valid",
+      sql`${table.bearing} is null or char_length(${table.bearing}) <= 200`,
+    ),
+  ],
+);
 
 export type CollectionItem = typeof collectionItem.$inferSelect;
 export type NewCollectionItem = typeof collectionItem.$inferInsert;

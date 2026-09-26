@@ -16,6 +16,7 @@ import {
 import { CollectionCard } from "@/components/collection-card";
 import { ImageGallery } from "@/components/image-gallery";
 import { MakerLink } from "@/components/maker-link";
+import { MarkdownContent } from "@/components/markdown-content";
 import { ProductCard } from "@/components/product-card";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -69,17 +70,17 @@ export function HomePage() {
   const t = useCatalogCopy();
   const cards = [
     {
-      image: "/images/navigation/q3d-seigaiha.jpg",
+      image: "https://cdn.pocket-trash.app/assets/products.webp",
       key: "web.navigation.products" as const,
       to: "/products" as const,
     },
     {
-      image: "/images/navigation/collections.webp",
+      image: "https://cdn.pocket-trash.app/assets/collections.webp",
       key: "web.navigation.collections" as const,
       to: "/collections" as const,
     },
     {
-      image: "/images/navigation/resources.webp",
+      image: "https://cdn.pocket-trash.app/assets/resosurces.webp",
       key: "web.navigation.resources" as const,
       to: "/resources" as const,
     },
@@ -97,7 +98,9 @@ export function HomePage() {
             <img
               alt=""
               className="aspect-4/3 w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-              src={image}
+              sizes="(min-width: 96rem) 480px, (min-width: 48rem) 33vw, 100vw"
+              src={`${image}?width=640`}
+              srcSet={`${image}?width=320 320w, ${image}?width=480 480w, ${image}?width=640 640w, ${image}?width=960 960w, ${image}?width=1440 1440w`}
             />
             <div className="p-5 text-xl font-semibold">{t(key)}</div>
           </Link>
@@ -200,6 +203,7 @@ export function ProductDetailPage({
             "mm",
           ],
           ["web.catalog.field.buttonDiameter", product.buttonDiameterMm, "mm"],
+          ["web.catalog.field.spinDiameter", product.spinDiameterMm, "mm"],
         ]
       : [
           ["web.archive.spec.weight", product.weightG, "g"],
@@ -274,6 +278,12 @@ export function ProductDetailPage({
           nextLabel={t("web.resources.action.nextImage")}
           previousLabel={t("web.resources.action.previousImage")}
         />
+        {product.description ? (
+          <MarkdownContent
+            className="rounded-xl border border-border bg-card p-6 text-card-foreground"
+            markdown={product.description}
+          />
+        ) : null}
         <dl className="grid gap-4 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
           <Detail label={t("web.catalog.field.productType")}>
             {product.productTypeName}
@@ -281,6 +291,14 @@ export function ProductDetailPage({
           <Detail label={t("web.catalog.field.maker")}>
             <MakerLink name={product.makerName} url={product.makerUrl} />
           </Detail>
+          {product.makerProductUrl && product.makerProductUrlValid ? (
+            <Detail label={t("web.catalog.field.makerProductUrl")}>
+              <MakerLink
+                name={t("web.action.visitProductPage")}
+                url={product.makerProductUrl}
+              />
+            </Detail>
+          ) : null}
           <Detail label={t("web.catalog.field.materials")}>
             {product.materials.map(({ name }) => name).join(", ")}
           </Detail>
@@ -296,6 +314,11 @@ export function ProductDetailPage({
           {product.productTypeSlug === "spinner" ? (
             <Detail label={t("web.catalog.field.button")}>
               {product.compatibleButtonName ?? t("web.catalog.defaultButton")}
+            </Detail>
+          ) : null}
+          {product.productTypeSlug === "spinner" && product.bearing ? (
+            <Detail label={t("web.catalog.field.bearing")}>
+              {product.bearing}
             </Detail>
           ) : null}
           {specs.map(([key, value, unit]) =>
@@ -882,7 +905,18 @@ export function CollectionItemDetailPage({
               )}
             </Detail>
           ) : null}
+          {item.productTypeSlug === "spinner" && item.bearing ? (
+            <Detail label={t("web.catalog.field.bearing")}>
+              {item.bearing}
+            </Detail>
+          ) : null}
         </dl>
+        {item.description ? (
+          <MarkdownContent
+            className="rounded-xl border border-border bg-card p-6 text-card-foreground"
+            markdown={item.description}
+          />
+        ) : null}
         <Link
           className={buttonVariants({ variant: "outline" })}
           params={{

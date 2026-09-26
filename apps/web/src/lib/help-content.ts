@@ -2,6 +2,8 @@ import {
   formatTranslation,
   type SupportedLocale,
 } from "@pocket-trash/localizations";
+import englishGuide from "@pocket-trash/localizations/help/en-US/image-size-and-resolution-guide.mdx?raw";
+import spanishGuide from "@pocket-trash/localizations/help/es-MX/image-size-and-resolution-guide.mdx?raw";
 
 type HelpMetadata = Record<string, string> & {
   title: string;
@@ -13,11 +15,10 @@ export type HelpDocument = {
   slug: string;
 };
 
-const rawDocuments = import.meta.glob<string>("../../content/help/*/*.mdx", {
-  eager: true,
-  import: "default",
-  query: "?raw",
-});
+const rawDocuments = {
+  "/help/en-US/image-size-and-resolution-guide.mdx": englishGuide,
+  "/help/es-MX/image-size-and-resolution-guide.mdx": spanishGuide,
+};
 
 const documents = new Map<string, HelpDocument>();
 

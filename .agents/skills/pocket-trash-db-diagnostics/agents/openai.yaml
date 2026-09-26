@@ -1,0 +1,6 @@
+interface:
+  display_name: "Pocket Trash DB Diagnostics"
+  short_description: "Inspect cumulative SQL and database health"
+  default_prompt:
+    "Use $pocket-trash-db-diagnostics to show the top cumulative SQL on Pocket
+    Trash production."

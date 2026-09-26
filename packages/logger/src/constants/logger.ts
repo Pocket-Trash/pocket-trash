@@ -55,6 +55,7 @@ export const loggerMessages = {
       listColorEffects: "database.catalog.listColorEffects",
       listColors: "database.catalog.listColors",
       listFinishes: "database.catalog.listFinishes",
+      setMakerProductUrlValidity: "database.catalog.setMakerProductUrlValidity",
       updateProduct: "database.catalog.updateProduct",
     },
     collections: {

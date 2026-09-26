@@ -33,6 +33,11 @@ describe("help content", () => {
     expect(guide?.body).toContain("1200 × 900");
   });
 
+  it("returns no document for unknown topics", () => {
+    expect(getHelpDocument("en-US", "missing-guide")).toBeUndefined();
+    expect(getHelpDocument("es-MX", "missing-guide")).toBeUndefined();
+  });
+
   it("parses optional modified dates", () => {
     const document = parseHelpDocument(
       "---\ntitle: Test\ndatePublished: 2026-09-01\ndateModified: 2026-09-23\ncategory: Test\n---\nBody",

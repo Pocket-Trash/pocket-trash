@@ -143,8 +143,10 @@ function ProductEditor({
   const [formError, setFormError] = React.useState<string | null>(null);
   const form = useForm({
     defaultValues: {
+      bearing: initialProduct?.bearing ?? "",
       buttonDiameterMm: initialProduct?.buttonDiameterMm ?? null,
       compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
+      description: initialProduct?.description ?? "",
       diameterMm: initialProduct?.diameterMm ?? null,
       finishOptions: initialProduct?.finishOptions.length
         ? initialProduct.finishOptions.map((option) => ({
@@ -168,10 +170,12 @@ function ProductEditor({
           ],
       lengthMm: initialProduct?.lengthMm ?? null,
       makerId: initialProduct?.makerId ?? 0,
+      makerProductUrl: initialProduct?.makerProductUrl ?? "",
       materialIds: initialProduct?.materials.map(({ id }) => id) ?? [],
       name: initialProduct?.name ?? "",
       productId: initialProduct?.id ?? null,
       productTypeSlug,
+      spinDiameterMm: initialProduct?.spinDiameterMm ?? null,
       thicknessMm: initialProduct?.thicknessMm ?? null,
       thicknessWithButtonMm: initialProduct?.thicknessWithButtonMm ?? null,
       weightG: initialProduct?.weightG ?? null,
@@ -277,6 +281,21 @@ function ProductEditor({
           </Field>
         )}
       </form.Subscribe>
+      <form.Field name="description">
+        {(field) => (
+          <MarkdownTextarea
+            error={serverErrors.description?.[0]}
+            help={t("web.catalog.help.markdownDescription")}
+            id="product-description"
+            label={t("web.catalog.field.description")}
+            name={field.name}
+            onBlur={field.handleBlur}
+            onChange={field.handleChange}
+            t={t}
+            value={field.state.value}
+          />
+        )}
+      </form.Field>
       <form.Field name="makerId">
         {(field) => {
           const selected =
@@ -309,6 +328,28 @@ function ProductEditor({
             </Field>
           );
         }}
+      </form.Field>
+      <form.Field name="makerProductUrl">
+        {(field) => (
+          <Field label={t("web.catalog.field.makerProductUrl")}>
+            <Input
+              aria-label={t("web.catalog.field.makerProductUrl")}
+              aria-describedby="maker-product-url-help"
+              name={field.name}
+              onBlur={field.handleBlur}
+              onChange={(event) => field.handleChange(event.target.value)}
+              type="url"
+              value={field.state.value}
+            />
+            <p
+              className="text-xs text-muted-foreground"
+              id="maker-product-url-help"
+            >
+              {t("web.catalog.help.makerProductUrl")}
+            </p>
+            <FieldError error={serverErrors.makerProductUrl?.[0]} t={t} />
+          </Field>
+        )}
       </form.Field>
       <form.Field name="materialIds">
         {(field) => {
@@ -367,6 +408,7 @@ function ProductEditor({
             "thicknessMm",
             "thicknessWithButtonMm",
             "buttonDiameterMm",
+            "spinDiameterMm",
           ] as const)
         : (["weightG", "diameterMm", "thicknessMm"] as const)
       ).map((name) => {
@@ -374,6 +416,7 @@ function ProductEditor({
           buttonDiameterMm: "web.catalog.field.buttonDiameter",
           diameterMm: "web.archive.spec.diameter",
           lengthMm: "web.archive.spec.length",
+          spinDiameterMm: "web.catalog.field.spinDiameter",
           thicknessMm: "web.catalog.field.thickness",
           thicknessWithButtonMm: "web.catalog.field.thicknessWithButton",
           weightG: "web.archive.spec.weight",
@@ -403,6 +446,23 @@ function ProductEditor({
           </form.Field>
         );
       })}
+      {productTypeSlug === "spinner" ? (
+        <form.Field name="bearing">
+          {(field) => (
+            <Field label={t("web.catalog.field.bearing")}>
+              <Input
+                aria-label={t("web.catalog.field.bearing")}
+                maxLength={200}
+                name={field.name}
+                onBlur={field.handleBlur}
+                onChange={(event) => field.handleChange(event.target.value)}
+                value={field.state.value}
+              />
+              <FieldError error={serverErrors.bearing?.[0]} t={t} />
+            </Field>
+          )}
+        </form.Field>
+      ) : null}
       {productTypeSlug === "spinner" ? (
         <form.Subscribe selector={(state) => state.values.buttonDiameterMm}>
           {(diameter) => (
@@ -1093,6 +1153,8 @@ export function CollectionAddPage({
   const [displayName, setDisplayName] = React.useState(
     initialProduct?.name ?? "",
   );
+  const [description, setDescription] = React.useState("");
+  const [bearing, setBearing] = React.useState("");
   const [material, setMaterial] = React.useState<CatalogLookup | null>(null);
   const [finish, setFinish] = React.useState<ComboboxOption | null>(null);
   const [customFinish, setCustomFinish] = React.useState(emptyFinishOption);
@@ -1207,6 +1269,7 @@ export function CollectionAddPage({
     }
     const result = await addCollectionProduct({
       data: {
+        bearing,
         buttonCustomFinish:
           selectedButton && buttonFinish?.id === "custom"
             ? buttonCustomFinish
@@ -1221,6 +1284,7 @@ export function CollectionAddPage({
         confirmed,
         customFinish: finish.id === "custom" ? customFinish : null,
         displayName,
+        description,
         finishOptionId: finish.id === "custom" ? null : Number(finish.id),
         materialId: material.id,
         newCollection:
@@ -1316,6 +1380,25 @@ export function CollectionAddPage({
             value={displayName}
           />
         </Field>
+        <MarkdownTextarea
+          disabled={!product}
+          help={t("web.catalog.help.markdownDescription")}
+          id="collection-item-description"
+          label={t("web.catalog.field.description")}
+          onChange={setDescription}
+          t={t}
+          value={description}
+        />
+        {product?.productTypeSlug === "spinner" ? (
+          <Field label={t("web.catalog.field.bearing")}>
+            <Input
+              aria-label={t("web.catalog.field.bearing")}
+              maxLength={200}
+              onChange={(event) => setBearing(event.target.value)}
+              value={bearing}
+            />
+          </Field>
+        ) : null}
         {syncIncomplete ? (
           <Notice>{t("web.collections.error.syncIncomplete")}</Notice>
         ) : null}
@@ -1384,6 +1467,8 @@ export function CollectionAddPage({
               setType(value);
               setProduct(null);
               setDisplayName("");
+              setDescription("");
+              setBearing("");
               setMaterial(null);
               setFinish(null);
               setCustomFinish(emptyFinishOption());
@@ -1409,6 +1494,8 @@ export function CollectionAddPage({
               onClick={() => {
                 setProduct(candidate);
                 setDisplayName(candidate.name);
+                setDescription("");
+                setBearing("");
                 setMaterial(null);
                 setFinish(null);
                 setCustomFinish(emptyFinishOption());
@@ -1700,6 +1787,10 @@ export function CollectionEditPage({
   const [existingImages, setExistingImages] = React.useState(item.images);
   const [collectionId, setCollectionId] = React.useState(item.collectionId);
   const [displayName, setDisplayName] = React.useState(item.displayName);
+  const [description, setDescription] = React.useState(
+    item.descriptionOverride ?? "",
+  );
+  const [bearing, setBearing] = React.useState(item.bearingOverride ?? "");
   const [options, setOptions] = React.useState(initialOptions);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [material, setMaterial] = React.useState<CatalogLookup | null>(
@@ -1780,6 +1871,24 @@ export function CollectionEditPage({
             value={displayName}
           />
         </Field>
+        <MarkdownTextarea
+          help={t("web.catalog.help.collectionDescriptionOverride")}
+          id="collection-item-override"
+          label={t("web.catalog.field.description")}
+          onChange={setDescription}
+          t={t}
+          value={description}
+        />
+        {item.productTypeSlug === "spinner" ? (
+          <Field label={t("web.catalog.field.bearing")}>
+            <Input
+              aria-label={t("web.catalog.field.bearing")}
+              maxLength={200}
+              onChange={(event) => setBearing(event.target.value)}
+              value={bearing}
+            />
+          </Field>
+        ) : null}
         <CollectionSelector
           addLabel={t("web.collections.select.addNew")}
           collections={collections}
@@ -1982,10 +2091,12 @@ export function CollectionEditPage({
             }
             const result = await updateCollectionItem({
               data: {
+                bearing,
                 collectionId,
                 collectionItemId: item.collectionItemId,
                 customFinish: finish.id === "custom" ? customFinish : null,
                 displayName,
+                description,
                 finishOptionId:
                   finish.id === "current" || finish.id === "custom"
                     ? null
@@ -2035,6 +2146,53 @@ function Field({
       <span>{label}</span>
       {children}
     </div>
+  );
+}
+
+function MarkdownTextarea({
+  disabled = false,
+  error,
+  help,
+  id,
+  label,
+  name,
+  onBlur,
+  onChange,
+  t,
+  value,
+}: {
+  disabled?: boolean;
+  error?: string;
+  help: string;
+  id: string;
+  label: string;
+  name?: string;
+  onBlur?: React.FocusEventHandler<HTMLTextAreaElement>;
+  onChange(value: string): void;
+  t: ReturnType<typeof useCatalogCopy>;
+  value: string;
+}) {
+  const helpId = `${id}-help`;
+
+  return (
+    <Field label={label}>
+      <textarea
+        aria-describedby={helpId}
+        aria-label={label}
+        className="min-h-28 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={disabled}
+        id={id}
+        maxLength={5000}
+        name={name}
+        onBlur={onBlur}
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      />
+      <p className="text-xs text-muted-foreground" id={helpId}>
+        {help}
+      </p>
+      <FieldError error={error} t={t} />
+    </Field>
   );
 }
 
