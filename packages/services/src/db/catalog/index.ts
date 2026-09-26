@@ -715,10 +715,21 @@ export function createCatalogService(
         .where(eq(schema.product.id, input.productId));
     },
     async setMakerProductUrlValidity(input) {
-      await db
-        .update(schema.product)
-        .set({ makerProductUrlValid: input.makerProductUrlValid })
-        .where(eq(schema.product.id, input.productId));
+      await logger.operation(
+        loggerMessages.database.catalog.setMakerProductUrlValidity,
+        async () => {
+          await db
+            .update(schema.product)
+            .set({ makerProductUrlValid: input.makerProductUrlValid })
+            .where(eq(schema.product.id, input.productId));
+        },
+        {
+          attributes: {
+            makerProductUrlValid: input.makerProductUrlValid,
+            productId: input.productId,
+          },
+        },
+      );
     },
     async softDeleteImage(input) {
       await softDeleteCatalogImage(db, input);

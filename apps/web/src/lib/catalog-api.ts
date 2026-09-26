@@ -177,7 +177,11 @@ const makerSchema = z.object({
   rootUrl: z
     .string()
     .trim()
-    .refine((value) => isWebUrl(normalizeOptionalUrl(value)), urlMessage),
+    .refine(
+      (value) =>
+        value === "" || z.url().safeParse(normalizeOptionalUrl(value)).success,
+      urlMessage,
+    ),
 });
 
 const materialSchema = z.object({

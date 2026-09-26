@@ -1,6 +1,7 @@
 ---
 "@app/web": minor
 "@package/database": minor
+"@package/logger": minor
 "@package/services": minor
 ---
 
