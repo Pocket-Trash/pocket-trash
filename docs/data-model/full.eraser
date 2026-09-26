@@ -1,0 +1,376 @@
+// ════════════════════════════════════════════════════════════════
+// machinedpens — refill compatibility model  ·  PASTABLE ERD
+// BUYER-FACING LABELS · the whole model on one canvas
+//
+// This file IS the paste. Copy with:
+//   pbcopy < docs/data-model/full.eraser
+//
+// 20 entities · 37 relationship lines — structurally IDENTICAL to
+// docs/data-model/schema.eraser, word for word different.
+// It is still a hairball. That is the point of the four scoped views:
+//   docs/data-model/fit.eraser         5 entities /  8 edges  <- review first
+//   docs/data-model/remedies.eraser   10 entities / 10 edges
+//   docs/data-model/collection.eraser 10 entities / 12 edges
+//   docs/data-model/catalog.eraser     9 entities / 11 edges
+// Splitting is what reduces crossings; entity ORDER only biases layout,
+// because Eraser also reorders columns WITHIN an entity on render.
+//
+// ⚠️ LABELS, NOT SCHEMA. The source of truth is docs/data-model/MODEL.md;
+//    its structural expression is docs/data-model/schema.eraser, unchanged.
+//    Every name below maps back through MODEL.md section 7b. Do NOT
+//    implement from this file — it exists to be read, not built.
+//
+// ⚠️ NO SCHEMA RENAMES. Every name below is a display label only.
+//    A rename tip_option > nose_option was researched and REJECTED
+//    (BVG, 2026-08-12): "tip" is the clearer word. The residual ambiguity
+//    is ACCEPTED and handled with qualifiers instead —
+//      `tip`      = the PEN'S front assembly   (this entity)
+//      `tip_size` = the REFILL'S writing point (on refill_option, 5.2)
+//    Never write a bare "tip" in UI copy; always "pen tip" or "tip size".
+//
+// Eraser ERD entities have NO [label:] property — verified against
+//   docs.eraser.io/docs/erd-syntax (icon, color, colorMode, styleMode,
+//   typeface only). Hence a separate file rather than an annotation.
+//
+// Reflects decisions through SITTING 3 (complete 2026-08-12), plus 4.1-4.4b
+// (`report` + `evidence`, which replaced `verified bool`; the 4.3 `source`
+// split; 4.4's derived verdict; 4.4b's `claimed_by` on refill_measurement).
+// The open_* shells are GONE: 4.5 and 5.5 answered the last of them.
+// Naming settles NONE of it.
+//
+// ERASER DOC URL: ____________________________________________
+// ════════════════════════════════════════════════════════════════
+
+title machinedpens — buyer view — will this refill fit
+notation crows-feet
+typeface clean
+styleMode plain
+
+// ── CATALOG ─────────────────────────────────────────
+
+maker [icon: factory] {
+  id bigint pk
+  slug text unique
+  name text
+  root_url text unique   // inherited from the committed makers table
+}
+
+pen_size [icon: layers] {
+  id bigint pk           // was product_family — a maker's SIZE class
+  maker_id bigint fk     //   "Standard" | "Short" | "Mini" | "Slim"
+  slug text unique       // ⚠️ SCOPES PARTS ONLY, never a fit claim.
+  name text              //   Two pens in one family can take different
+                         //   refill styles.
+}
+
+pen [icon: pen-tool, color: blue] {
+  id bigint pk
+  maker_id bigint fk
+  pen_size_id bigint fk null
+  slug text unique
+  name text
+  advance_mechanism enum // none(capped)|ratchet|bolt|screw|cam.
+                         //   JetPens' own facet reads "LEAD ADVANCE
+                         //   MECHANISM" — borrowed verbatim.
+  control enum           // top_button|side_button|bolt_knob|clip|toggle|
+                         //   body_rotation|n_a. WHAT YOU OPERATE, split
+                         //   from HOW THE TIP MOVES on purpose. No
+                         //   market word for the axis — we teach it.
+  tip_opening_class enum // precision|standard|wide — the hole up front
+  tip_opening_mm decimal null
+  adjustable_length enum // none|adjustable
+  fits_refill_length_min_mm decimal null // Modern Fuel publishes 89-116
+  fits_refill_length_max_mm decimal null
+  refill_grip enum       // fixed|collet — "collet" is genuine market
+                         //   vocabulary, not ours
+  handedness enum        // right|left|either — browse facet, not an axis
+}
+
+tip [icon: git-merge, color: blue] {
+  id bigint pk           // shortened from tip_option; schema name UNCHANGED
+  pen_id bigint fk
+  refill_style_id bigint fk
+  name text              // "G2 Spring & Pen Tip" | "Parker nose"
+  tuned_for_refill_id bigint fk null // was toleranced_for_refill_id
+  adjustable_length enum null        // null = inherit from the pen
+  fits_refill_length_min_mm decimal null
+  fits_refill_length_max_mm decimal null
+  ships_with_refill_id bigint fk null // C4b — MOVED from the pen. What is in
+                         //   the box belongs to the CONFIGURATION you bought.
+}
+
+pen_finish [icon: droplet, color: blue] {
+  id bigint pk           // was product_variant — SURFACE ONLY. The body
+  pen_id bigint fk       //   is unchanged, so this is not a new pen.
+  finisher_maker_id bigint fk null // null = the base maker's own work.
+                         //   Set for KVR and Dark Pines, who finish
+                         //   ANOTHER maker's stock body.
+  material_id bigint fk null // C2 — was free text, which made Titanium,
+                         //   titanium and Ti three separate things.
+  finish text null       // Machined | Stonewashed | DLC. Stays free text —
+                         //   half vocabulary, half prose.
+  name text null         // "Golden Dragon"
+  one_of_a_kind bool     // "no two will be exactly alike"
+}
+
+material [icon: box] {
+  id bigint pk           // C2 — a SHARED list, not a fixed one: makers keep
+  slug text unique       //   shipping alloys nobody wrote down. The site's
+  name text              //   existing materials list, not a new invention.
+}
+
+// ── REFILL STYLES ───────────────────────────────────
+
+refill_style [icon: crosshair, color: purple] {
+  id bigint pk           // promoted INTO the schema 2026-08-12
+  slug text unique       // model-level ONLY, never brand-level:
+  name text              //   dsm-2006, not schmidt. EVERY market word
+                         //   here is a brand name (Parker-style, G2,
+                         //   Euro-style) — which is exactly why the
+                         //   schema keeps its own.
+  iso_spec text null     // "ISO 12757-1:G2" | null when de facto
+  interchangeability enum // well|partial|poor. Shown as "reliable" /
+                         //   "varies by brand" / "check per pen".
+  variance_note text null
+}
+
+also_known_as {
+  id bigint pk
+  refill_style_id bigint fk
+  alias text             // "Standard Rollerball" | "RB" | "Pilot
+                         //   G2-style" — all three name ONE style
+}
+
+// ── REFILLS ─────────────────────────────────────────
+
+refill [icon: edit-3, color: green] {
+  id bigint pk
+  slug text unique
+  brand text
+  model text
+  refill_style_id bigint fk
+  ink_or_lead enum       // ballpoint|gel|hybrid|rollerball|pressurized|
+                         //   graphite|permanent_marker|highlighter.
+                         //   NOT "refill type" (that phrase means the
+                         //   shape half the time) and NOT "ink type"
+                         //   (pencil and marker are in scope).
+                         // NO tip_size, NO ink_colour — 5.2, they moved to
+                         //   refill_option below. THIS ROW IS THE MODEL: a
+                         //   Sarasa, not a blue 0.5 Sarasa.
+  back_end_shape enum    // open|plugged|finned|flanged. The ONLY axis no
+                         //   measurement can express. Described
+                         //   everywhere, named nowhere.
+  availability enum      // sold_separately | harvested
+}
+
+refill_option [icon: layers, color: green] {
+  id bigint pk           // was refill_variant — 5.2, 2026-08-14. WHICH ONE
+  refill_id bigint fk    //   YOU BUY. Same job as pen_finish on the pen side:
+                         //   differences that change NOTHING about fit, kept
+                         //   out of the fit corpus so they cannot multiply it.
+  tip_size decimal null  // the WRITING POINT width; lead diameter for graphite
+  ink_colour text null   // the maker's OWN word — "Vintage Vermillion". Free
+                         //   text, the full long tail. Same call as `finish`.
+  ink_colour_family enum null // black|blue|blue_black|red|green|other — the
+                         //   FILTER. Two columns because no code turns "Vintage
+                         //   Vermillion" into red. Starts coarse, grows.
+                         //   blue_black added 2026-08-14 (R-A), sourced at all
+                         //   three makers.
+}
+// Colour never affects fit, which is why it lives here and not on `refill`.
+// A blue 0.5 EnerGel inherits every EnerGel fit claim for free.
+
+also_sold_as [icon: copy, color: green] {
+  id bigint pk           // was `rebrand` — C1, 2026-08-13. Closes lexicon §2.7
+  refill_id bigint fk    // the branded one you are holding (Retro 51 REF5P)
+  oem_refill_id bigint fk // what it actually is (Schmidt P8126)
+  claimed_by enum        // maker|retailer|community|owner|staff
+  citation_url text null // REQUIRED for maker/community — the mapping is
+  citation_note text null //  CONTESTED in the wild (P8126 vs P8127).
+}
+// Schmidt and Premec make refills for other brands to relabel; Retro 51,
+// Baron Fig and Diplomat all sell the same Schmidt part. Fit claims
+// propagate ONE HOP through this and render LABELLED — "via Schmidt P8126".
+// ⚠️ SAME PART, NEVER SAME STYLE — style-mates belong to refill_style.
+
+refill_measurement [icon: maximize-2] {
+  id bigint pk
+  refill_id bigint fk
+  feature text           // "body_od"|"rear_cap_od"|"step_1_od". A bare
+  value decimal          //   number is MEANINGLESS without this.
+  unit text              //   Explains, never matches.
+  claimed_by enum        // 4.4b — maker|retailer|community|owner|staff, the 4.3 enum
+                         //   reused. `staff` = our own calipers, and the only
+                         //   value that can fire a geometry negative alone.
+  citation_url text null // 4.3 — was `source`. ONE citation shape.
+  citation_note text null
+}
+// NO disputed_note here (4.4b) — a wrong NUMBER is noise, not content; it
+// gets deleted. And sources disagreeing on one `feature` SUPPRESSES the
+// geometry negative: never hide a pen on a number you are not sure of.
+
+// ── FIT CLAIMS — the moat ───────────────────────────
+
+fit_check [icon: link, color: orange] {
+  id bigint pk           // promoted INTO the schema 2026-08-12
+  refill_id bigint fk
+  tip_id bigint fk null      // most specific wins:
+  refill_style_id bigint fk null //   tip > style > style inheritance
+  polarity enum          // positive | negative. NOT renamed — the market
+                         //   has no noun, only footnotes.
+  reason text null       // REQUIRED when negative
+  fit_quality enum null  // toleranced|snug|loose. Shown as "precision" /
+                         //   "snug" / "loose". NULL on a `declared` row —
+                         //   nobody seated it, so there is nothing to say.
+  trim_mm decimal null   // Tactile Turn publishes a heading reading
+  trim_reference text null //   "Requires Trimming - Required amount in
+  trim_necessity enum    //   Millimeters". required|recommended|optional
+  works_but_not_advised bool // "fits but you shouldn't" — Ti2 magnet x
+                         //   hybrid ink. Retail omits these instead.
+  claimed_by enum        // 4.3 — maker | retailer | community | owner | staff.
+                         //   `staff` = "Tested by machinedpens".
+  citation_url text null // 4.3 — "Source: Unsharpen ↗". The buyer's own
+  citation_note text null //  word IS "source", which is exactly why the
+                         //   schema cannot spend it on the category.
+  evidence enum          // 4.1 — declared | tested. Buyer sees "Tested"
+                         //   or "Says it fits". Was `verified bool`.
+  disputed_note text null // 4.4 — the STAFF OVERRIDE. Maker copy is not
+                         //   always truth; it can be a typo or copied
+                         //   from another product. Non-null = we do not
+                         //   trust this row. A claim about the CITATION,
+                         //   not about the pen. Dropped from the VERDICT
+                         //   but still shown: "Karas lists this — we
+                         //   don't think it's right." Buyer sees
+                         //   "Disputed by machinedpens".
+}
+
+report [icon: message-square, color: orange] {
+  id bigint pk           // 4.1 — what a USER submits. Not a claim.
+  refill_id bigint fk
+  tip_id bigint fk       // always concrete — you own one pen
+  fits bool              // "Does it fit?" — the one thing a submitter
+                         //   can reliably state.
+  note text null         // free text. Reports arrive as prose.
+  review_state enum      // pending|approved|rejected. NEVER SHOWN.
+  fit_id bigint fk null  // set once folded into a claim. N reports > 1
+                         //   fit_check, which is what keeps the COUNT.
+}
+
+part [icon: tool] {
+  id bigint pk
+  maker_id bigint fk null       // null = generic / third-party
+  pen_size_id bigint fk null // null = maker-wide
+  slug text unique
+  kind enum       // clip|bolt|bolt_handle|top_cap|spring|o_ring|spacer|
+                  //   adapter. Brand words are an ALIAS MAP, not new
+                  //   kinds — Ti2's "stabilizer" is a spacer.
+  name text
+  made_by enum    // oem | aftermarket | community
+}
+
+part_needed {
+  fit_id bigint fk
+  part_id bigint fk
+  how_to_get enum // included_with_pen | included_with_refill |
+                  //   purchase_separately
+  necessity enum  // required | recommended | optional — SHARED with
+                  //   trim_necessity. On the LINK, because the same
+                  //   spring is required for one refill and merely
+                  //   recommended for another.
+}
+
+style_adapter [icon: shuffle, color: red] {
+  id bigint pk                 // was socket_bridge
+  part_id bigint fk            // ⚠️ "adapter", NEVER "converter" — a
+  from_style_id bigint fk      //   converter is a fountain-pen FILLING
+  to_style_id bigint fk        //   DEVICE. DIRECTED: the reverse is a
+  result_fit_quality enum null //   separate row.
+  only_on_tip_id bigint fk null // null = style-wide
+}
+
+// ── COLLECTION ──────────────────────────────────────
+
+owner [icon: user] {
+  id bigint pk           // the committed users table — Clerk-backed and
+  clerk_id text unique   //   deliberately minimal (PR #63)
+}
+
+my_pen [icon: package, color: gray] {
+  id bigint pk                   // was collection_item
+  owner_id bigint fk         // 5.3a — a pen YOU OWN has to name you
+  pen_finish_id bigint fk    // the FINISH, not the pen
+  tip_id bigint fk
+  installed_refill_id bigint fk null // 5.3b(i) — WHICH REFILL. Always
+                             //   recordable; every read path uses this one.
+  installed_refill_option_id bigint fk null // 5.3b(i) — EXACTLY WHICH ONE,
+                             //   optional: the size and colour. The picker
+                             //   asks ONCE and fills the line above.
+                             // 5.5 — A FIELD, not a log.
+                             // 5.4 — MULTIPLES ARE SEPARATE ROWS, always.
+}
+
+part_fitted {
+  my_pen_id bigint fk        // 5.4 — WHICH PARTS ARE ON YOUR PEN: the bronze
+  part_id bigint fk          //   clip, the copper back piece. TT sells those
+                             //   alone in four alloys and says to mix and
+                             //   match, only matching the pen size.
+                             // LOOKS, NOT FITS: a spring or spacer is not a
+                             //   choice you made — the refill dictated it,
+                             //   and part_needed already holds it.
+}
+
+// ── RATIFICATION SWEEP — DONE 2026-08-13, shell removed ─────────
+//   S1 slot_option -> part merge · S2 3.2b tip override ·
+//   S3 4.3 source split. All RATIFIED as applied; no columns changed.
+
+
+// ── RELATIONSHIPS ───────────────────────────────────
+
+pen.maker_id > maker.id
+pen.pen_size_id > pen_size.id
+tip.ships_with_refill_id > refill.id
+pen_size.maker_id > maker.id
+
+tip.pen_id > pen.id
+tip.refill_style_id > refill_style.id
+tip.tuned_for_refill_id > refill.id
+
+pen_finish.pen_id > pen.id
+pen_finish.finisher_maker_id > maker.id
+pen_finish.material_id > material.id
+
+also_known_as.refill_style_id > refill_style.id
+
+refill.refill_style_id > refill_style.id
+refill_option.refill_id > refill.id
+refill_measurement.refill_id > refill.id
+also_sold_as.refill_id > refill.id
+also_sold_as.oem_refill_id > refill.id
+
+fit_check.refill_id > refill.id
+fit_check.tip_id > tip.id
+fit_check.refill_style_id > refill_style.id
+
+report.refill_id > refill.id
+report.tip_id > tip.id
+report.fit_id > fit_check.id
+
+part_needed.fit_id > fit_check.id
+part_needed.part_id > part.id
+
+part.maker_id > maker.id
+part.pen_size_id > pen_size.id
+
+style_adapter.part_id > part.id
+style_adapter.from_style_id > refill_style.id
+style_adapter.to_style_id > refill_style.id
+style_adapter.only_on_tip_id > tip.id
+
+my_pen.owner_id > owner.id
+my_pen.pen_finish_id > pen_finish.id
+my_pen.tip_id > tip.id
+my_pen.installed_refill_id > refill.id
+my_pen.installed_refill_option_id > refill_option.id
+
+part_fitted.my_pen_id > my_pen.id
+part_fitted.part_id > part.id

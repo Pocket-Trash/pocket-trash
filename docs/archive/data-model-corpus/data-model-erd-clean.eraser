@@ -1,0 +1,486 @@
+// ════════════════════════════════════════════════════════════════
+// machinedpens — refill compatibility model  ·  PASTABLE ERD
+//
+// This file IS the paste. Copy with:
+//   pbcopy < .notes/data-model-erd-clean.eraser
+//
+// Rendered OK in app.eraser.io on 2026-08-12 — every construct here is
+// verified legal (see .notes/eraser-integration-findings.md, Q4).
+//
+// VISUAL ENCODING, ported from data-model-erd.md 2026-08-15. This file had
+//   drifted PLAIN while the annotated copy carried icons and colours — which
+//   made the file that calls itself "the paste" the least readable of the six.
+//   Colour marks the section: blue = the pen side · green = refills ·
+//   purple = refill styles · orange = the assertion corpus (the moat) ·
+//   red = style_adapter · gray = the collection.
+//   THREE ENTITIES ARE DELIBERATELY LEFT PLAIN — also_known_as, part_needed
+//   and part_fitted — and they are exactly the LINK/ALIAS tables. Unadorned
+//   reads as "this is a join, not a thing". Keep it that way.
+// ⚠️ THIS IS STILL THE IMPLEMENTATION REFERENCE, NOT A REVIEW ARTIFACT: it
+//   carries internal names and all 42 house-style timestamp rows. For a team
+//   review use the buyer-facing views — and prefer the three SCOPED ones,
+//   because 20 entities on one canvas is the hairball lexicon §4 names, and
+//   the recorded fix is SPLITTING, not ordering.
+//
+// Reflects decisions through SITTING 3 (complete 2026-08-12), plus 4.1-4.4b.
+//   4.1  `fit_report` + `fit_check.evidence` (replaced `verified bool`)
+//   4.1b nothing renders until approved — fit_report has NO buyer read path
+//   4.3  `source` split three ways: claimed_by / made_by / citation_*
+//   4.4  the verdict is DERIVED (demotion #9); `fit_check.disputed_note` is
+//        the staff override for maker copy that is a typo or a copy-paste
+//   4.4b NO disputed_note on refill_dimension — a bad number is DELETED.
+//        `claimed_by` added there instead, and a geometry negative fires only
+//        on an unconflicted `feature` or a `staff` row. Displayed measurement
+//        is DERIVED (demotion #10).
+//   4.5  TWO CORPORA — catalog broad (scraper stages, human promotes) vs
+//        fit_check narrow and deep, seeded NEGATIVES-FIRST. Zero fit rows is
+//        not empty: it renders the PRIOR (refill_style + observance), a 4th
+//        display state. Coverage is DERIVED (demotion #11). No new columns.
+// SITTING 4 IS COMPLETE. RATIFICATION SWEEP COMPLETE 2026-08-13:
+//   S1 the slot_option -> part merge · S2 3.2b's tip_option override ·
+//   S3 4.3's source split. All three were already applied; the sweep bought
+//   certainty, not columns. ZERO soft decisions remain in the model.
+//   C1  `rebrand` — the branded SKU points at the OEM part it actually is
+//       (Retro 51 REF5P -> Schmidt P8126). Closes lexicon §2.7. Carries the
+//       4.3 attribution shape because the mapping is CONTESTED in the wild.
+//       The verdict rule gains a step -1: expand the fit_check set to
+//       R + R's rebrand partners, ONE HOP, labelled "via Schmidt P8126".
+//       ⚠️ SAME PART, NEVER SAME STYLE — style-mates belong to refill_style.
+//   C2  VOCABULARY STORAGE — a table when members arrive at RUNTIME or carry
+//       data; a TS `as const` when the set is closed at compile time and a
+//       member is nothing but its own name. All ~20 curated vocabularies here
+//       are the second kind. `material` is the only one of the first, and it
+//       is INHERITED — the committed `materials` table (scraper.ts:191),
+//       declared here only so product_variant's FK resolves. `mechanisms` and
+//       `product_types` are scraper staging, NOT ours to model.
+//       product_variant.material string null -> material_id (was free text:
+//       no fixed list AND no shared list). `finish` stays free text, flagged.
+//   C3  the committed `mechanisms` / `product_types` tables are NOT corrected
+//       and NOT used. Both are interned from scraped strings — "click" is a
+//       QUOTE from Autmog's page, not a modelling claim. Promoting it is a
+//       SPLIT (-> ratchet + top_button) and it is UNDERDETERMINED, so a human
+//       does it. Confirms 4.5's "cheap per row, still a human".
+//   C4a `claimed_by` gains a FIFTH value: maker|retailer|community|owner|staff.
+//       On refill_dimension claimed_by is the ONLY trust signal (4.4b kept
+//       `evidence` off), so merging "measured it" with "retyped it" would
+//       destroy it. Fisher PR: Unsharpen 90x4.8 vs Penstore 89x5.8.
+//   5.3a DIRECTION CHANGE — field-log dropped, web-only, no app integration.
+//       A saved config is A PEN YOU OWN (finish + pen tip + what's loaded),
+//       not a wishlist and not an inventory. collection_item gains user_id;
+//       `user` is INHERITED (the committed users table, PR #63).
+//       It is also the fit_report entry point: 4.1 wants a report to name a
+//       tip_option, and a saved config already does.
+//   5.2 THE REFILL GRAIN — `refill` IS A MODEL. tip_size and colour were
+//       single-valued columns on a row a Sarasa fills with 3 sizes x 20
+//       colours: a column whose CARDINALITY CONTRADICTS ITS ROW'S GRAIN.
+//       Both moved to a new `refill_variant`, the refill-side twin of
+//       product_variant (same job: surface differences that must never
+//       duplicate the assertion corpus). Five of the six FKs into `refill`
+//       already wanted the model; only collection_item.installed_refill_id
+//       leaned SKU-ward — ANSWERED by 5.3b(i) below, (c) BOTH.
+//       COLOUR SPLIT IN TWO — colour_name free text (the long tail, the
+//       maker's own word) + colour_family enum (black|blue|blue_black|red|
+//       green|other, the browse facet). The bucket cannot be derived from the
+//       name, so it is curated. NINTH axis-mix. Starts coarse and grows.
+//       CLOSES C1's OPEN 5.2: a rebrand is MODEL -> MODEL.
+//   5.3b(i) INSTALLED REFILL — (c) BOTH. collection_item keeps
+//       installed_refill_id (the MODEL, what every read path uses) and gains
+//       installed_refill_variant_id (THE EXACT ONE, optional). Coarse +
+//       precise, the shape already run four times. R-A killed the cold-start
+//       case for model-only: Pentel, uni and Pilot each publish a COMPLETE
+//       size x colour matrix, and the code printed on the refill in your pen
+//       (LR7, UMR-85N, LP3RF-12S4) already names the size. Exact-only was
+//       refused because NOTHING forces refill_variant to be populated while
+//       fit_check forces `refill` to exist.
+//       THE TWO CANNOT DISAGREE — refill_variant needs UNIQUE (id, refill_id);
+//       collection_item takes a two-column FK (installed_refill_variant_id,
+//       installed_refill_id) -> refill_variant (id, refill_id), plus
+//       CHECK (installed_refill_variant_id IS NULL OR installed_refill_id IS
+//       NOT NULL). NOT match full — that would forbid the model-only case.
+//       KNOCK-ON RENAME: variant_id -> product_variant_id. Two "variants" on
+//       one row (pen finish vs refill option) is naming-law trap 3.
+//       blue_black added to colour_family — R-A found it first-class at all
+//       three makers, which pays off the flagged R-D claim.
+//   5.3b(ii) COLLECTION RESIDUE — (a) NOTHING MORE, AND LESS ENTRY. No
+//       nickname, no note, NO COLUMNS. The row already stores zero specs, so
+//       they read through to the catalog; what is new is that the four FKs
+//       arrive PRE-FILLED from the stock config. RULE: fill what the catalog
+//       makes unambiguous, ASK ONLY WHERE IT BRANCHES (one tip_option, fill
+//       it; more than one, ask once). WRITTEN AT SAVE TIME, not resolved on
+//       read — otherwise a curator's catalog edit would silently change what
+//       is loaded in every saved pen (4.4's mutable-vs-owned line), a report
+//       would carry a value the owner never saw (4.1), and null would mean
+//       both "empty" and "stock". NO note column: pairing prose belongs in
+//       fit_report.note where a curator can promote it.
+//   5.4 MULTIPLES — SEPARATE ROWS, ALWAYS. Never a quantity: it cannot say
+//       which refill is in the second one, cannot be the subject of a report
+//       (4.1), and counting what you own is the inventory shape 5.3a left.
+//       BVG corrected the REASON — what separates two copies is usually a
+//       FINISH or a SMALL PART, not the refill. Finish was already covered;
+//       parts were not, so + `part_fitted` (collection_item x part), the
+//       20th entity. R-F confirmed the case and the catalog needed NOTHING:
+//       TT sells the Bolt Action Back Piece alone in Ti/Cu/Bronze/Zirc,
+//       "mixed and matched between pens" but "select the correct diameter
+//       (Standard, Slim, or Thick)" — which IS part.family_id, 3.2 (a').
+//       CURATION RULE: parts that change how it LOOKS are the owner's choice
+//       and go here; parts that change how it FITS are dictated by the refill
+//       and part_needed already holds them. part.kind is the test.
+//       NO tip_variant — R-F found NO maker selling a tip alone in an alloy
+//       (TT machines tip and body together; Fellhoelter's spare kit is an
+//       o-ring, a spring and a refill). Logged as the TENTH axis-mix,
+//       AVOIDED. Revisit if a maker ever sells tips by alloy.
+//       NO nickname — the parts list closed the gap that argued for it.
+//   5.5 WHAT'S LOADED IS A FIELD, NOT A LOG. "Log from day one" was
+//       field-log's OWN premise and field-log is dropped. The log's one
+//       durable use — what was loaded WHEN SOMEONE SAID IT FITS — is
+//       fit_report, append-only already (4.1). A pen you own is MUTABLE
+//       state (4.4's line), which is what updated_at is for. A log later is
+//       an append-only child + a twelfth demotion, no backfill.
+//       RE-CENTRED: this layer is PEN + PARTS first, refill second.
+//   5.6a THE COMPLETENESS GATE — you cannot own what the catalog does not
+//       fully have. NEEDS NO COLUMN: collection_item's required FKs already
+//       say it (maker + product + finish + tip, and the tip declares a
+//       refill_style). Same bar 4.5 set from the other end. No `published`
+//       flag: staging is tmp_*, so being in a curated table IS promotion.
+//       A pen we lack routes to a SUBMISSION — fit_report's pattern one
+//       corpus over. Out of scope, not modelled, shape recorded.
+// Entity count: 20 entities / 37 edges. The open_5_carry_log SHELL IS GONE
+//   — 5.5 answered it (a field, not a log), so there is nothing left to
+//   scaffold. Zero shells remain in the model.
+//   VALIDATED 2026-08-14: every relationship endpoint in all five .eraser
+//   files resolves to a declared entity and an existing column.
+//
+// HOUSE STYLE applied 2026-08-12 (naming thread, ratified by BVG):
+//   inherited from the COMMITTED schema — packages/database/src/schema/
+//   and docs/database-schema/{makers,mechanisms,materials,product-types}.md
+//     · id bigint pk          (was `string`; FKs follow to stay coherent)
+//     · created_at / updated_at timestamptz on every entity
+//     · slug text unique      on canonical entities only
+//     · maker.root_url text unique
+//   Non-id `string` columns are deliberately UNTOUCHED — converting them
+//   to `text` was not part of the ratified patch.
+//   Rationale + the collisions we did NOT inherit: .notes/vocabulary-lexicon.md §5
+//
+// NAMING: `tip_option` > `nose_option` was proposed and REJECTED (BVG,
+//   2026-08-12) — "tip is still better". Closed, not parked. Five OTHER
+//   renames landed under the naming law; see .notes/vocabulary-lexicon.md §0.1.
+//   Buyer-facing labels live in .notes/data-model-erd-public*.eraser, which
+//   are views, never the schema of record.
+//
+// Field-level provenance lives elsewhere, deliberately:
+//   .notes/data-model-answers.md   — SOURCE OF TRUTH, has a RESUME HERE block
+//   .notes/data-model-erd.md       — the annotated ERD, comments carry decision numbers
+//
+// ERASER DOC URL: ____________________________________________
+//   ^ paste it here once the canonical diagram exists, so future
+//     sittings update that diagram in place instead of minting a new one.
+// ════════════════════════════════════════════════════════════════
+
+title machinedpens — refill compatibility model
+notation crows-feet
+typeface clean
+styleMode plain
+
+// ── CATALOG ─────────────────────────────────────────
+
+maker [icon: factory] {
+  id bigint pk
+  slug text unique
+  name string
+  root_url text unique
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+product_family [icon: layers] {
+  id bigint pk
+  maker_id bigint
+  slug text unique
+  name string
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+product [icon: pen-tool, color: blue] {
+  id bigint pk
+  maker_id bigint
+  family_id bigint null
+  slug text unique
+  name string
+  advance_mechanism enum
+  actuator enum
+  bore_class enum
+  bore_mm decimal null
+  axial_adjust enum
+  accepts_length_min_mm decimal null
+  accepts_length_max_mm decimal null
+  radial_retention enum
+  handedness enum
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+tip_option [icon: git-merge, color: blue] {
+  id bigint pk
+  product_id bigint
+  refill_style_id bigint
+  name string
+  toleranced_for_refill_id bigint null
+  axial_adjust enum null
+  accepts_length_min_mm decimal null
+  accepts_length_max_mm decimal null
+  ships_with_refill_id bigint null
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+material [icon: box] {
+  id bigint pk
+  slug text unique
+  name string
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+product_variant [icon: droplet, color: blue] {
+  id bigint pk
+  product_id bigint
+  finisher_maker_id bigint null
+  material_id bigint null
+  finish string null
+  name string null
+  one_off bool
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+// ── REFILL STYLES ─────────────────────────────────────────
+
+refill_style [icon: crosshair, color: purple] {
+  id bigint pk
+  slug text unique
+  name string
+  standard string null
+  observance enum
+  variance_note text null
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+also_known_as {
+  id bigint pk
+  refill_style_id bigint
+  alias string
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+// ── REFILLS ─────────────────────────────────────────
+
+refill [icon: edit-3, color: green] {
+  id bigint pk
+  slug text unique
+  brand string
+  model string
+  refill_style_id bigint
+  medium enum
+  rear_topology enum
+  form enum
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+refill_variant [icon: layers, color: green] {
+  id bigint pk
+  refill_id bigint
+  tip_size decimal null
+  colour_name text null
+  colour_family enum null
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+rebrand [icon: copy, color: green] {
+  id bigint pk
+  refill_id bigint
+  oem_refill_id bigint
+  claimed_by enum
+  citation_url text null
+  citation_note text null
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+refill_dimension [icon: maximize-2] {
+  id bigint pk
+  refill_id bigint
+  feature string
+  value decimal
+  unit string
+  claimed_by enum
+  citation_url text null
+  citation_note text null
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+// ── ASSERTIONS ──────────────────────────────────────
+
+fit_check [icon: link, color: orange] {
+  id bigint pk
+  refill_id bigint
+  tip_option_id bigint null
+  refill_style_id bigint null
+  polarity enum
+  reason text null
+  fit_quality enum null
+  trim_mm decimal null
+  trim_reference string null
+  trim_necessity enum
+  functional_warning bool
+  claimed_by enum
+  evidence enum
+  citation_url text null
+  citation_note text null
+  disputed_note text null
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+fit_report [icon: message-square, color: orange] {
+  id bigint pk
+  refill_id bigint
+  tip_option_id bigint
+  fits bool
+  note text null
+  review_state enum
+  fit_id bigint null
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+part [icon: tool] {
+  id bigint pk
+  maker_id bigint null
+  family_id bigint null
+  slug text unique
+  kind enum
+  name string
+  made_by enum
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+part_needed {
+  fit_id bigint
+  part_id bigint
+  sourcing enum
+  necessity enum
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+style_adapter [icon: shuffle, color: red] {
+  id bigint pk
+  part_id bigint
+  from_style_id bigint
+  to_style_id bigint
+  result_quality enum null
+  scope_tip_option_id bigint null
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+// ── COLLECTION ──────────────────────────────────────
+
+user [icon: user] {
+  id bigint pk
+  clerk_id text unique
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+collection_item [icon: package, color: gray] {
+  id bigint pk
+  user_id bigint
+  product_variant_id bigint
+  tip_option_id bigint
+  installed_refill_id bigint null
+  installed_refill_variant_id bigint null
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+part_fitted {
+  collection_item_id bigint
+  part_id bigint
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+// ── SITTING 4 COMPLETE — 4.1 / 4.1b / 4.3 / 4.4 / 4.4b / 4.5 ────
+//   NO residual OPENs. The one that stood here — no `claimed_by` value fit
+//     a RETAIL listing reprinting a spec (Penstore) — was CLOSED by C4a on
+//     2026-08-13 with a fifth value, `retailer`. Marker was stale; cleared
+//     2026-08-14.
+//   CLOSED by C4b — ships_with_refill_id MOVED from product to tip_option.
+//     The refill in the box belongs to the CONFIGURATION you bought, and a
+//     fit is tip-scoped. Third application of F3'.
+//
+// ── RATIFICATION SWEEP — DONE 2026-08-13, shell removed ─────────
+//   S1 slot_option -> part merge      RATIFIED
+//   S2 3.2b tip_option override       RATIFIED
+//   S3 4.3 source split               RATIFIED
+//   No columns added or removed. The `// SOFT` markers are gone.
+
+
+// ── RELATIONSHIPS ───────────────────────────────────
+
+product.maker_id > maker.id
+product.family_id > product_family.id
+tip_option.ships_with_refill_id > refill.id
+product_family.maker_id > maker.id
+
+tip_option.product_id > product.id
+tip_option.refill_style_id > refill_style.id
+tip_option.toleranced_for_refill_id > refill.id
+
+product_variant.product_id > product.id
+product_variant.finisher_maker_id > maker.id
+product_variant.material_id > material.id
+
+also_known_as.refill_style_id > refill_style.id
+
+refill.refill_style_id > refill_style.id
+refill_variant.refill_id > refill.id
+refill_dimension.refill_id > refill.id
+rebrand.refill_id > refill.id
+rebrand.oem_refill_id > refill.id
+
+fit_check.refill_id > refill.id
+fit_check.tip_option_id > tip_option.id
+fit_check.refill_style_id > refill_style.id
+
+fit_report.refill_id > refill.id
+fit_report.tip_option_id > tip_option.id
+fit_report.fit_id > fit_check.id
+
+part_needed.fit_id > fit_check.id
+part_needed.part_id > part.id
+
+part.maker_id > maker.id
+part.family_id > product_family.id
+
+style_adapter.part_id > part.id
+style_adapter.from_style_id > refill_style.id
+style_adapter.to_style_id > refill_style.id
+style_adapter.scope_tip_option_id > tip_option.id
+
+collection_item.user_id > user.id
+collection_item.product_variant_id > product_variant.id
+collection_item.tip_option_id > tip_option.id
+collection_item.installed_refill_id > refill.id
+collection_item.installed_refill_variant_id > refill_variant.id
+
+part_fitted.collection_item_id > collection_item.id
+part_fitted.part_id > part.id

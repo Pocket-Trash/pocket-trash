@@ -1,0 +1,55 @@
+title machinedpens — refill compatibility model (Sittings 0–3 COMPLETE; 4–5 open)
+notation crows-feet
+typeface clean
+styleMode plain
+
+// P0 — top-level comment (expected to pass; Eraser's own examples use these)
+
+p1_baseline {
+  id string pk
+  slug text unique
+}
+
+p2_fk_modifier {
+  id string pk
+  maker_id string fk
+}
+
+p3_null_modifier {
+  id string pk
+  bore_mm decimal null
+}
+
+p4_fk_and_null {
+  id string pk
+  family_id string fk null
+}
+
+p5_icons [icon: factory, color: blue] {
+  id string pk
+}
+
+p6_icons_two [icon: pen-tool, color: purple] {
+  id string pk
+}
+
+p7_inline_comment {
+  id string pk
+  name string // trailing comment inside an entity block
+}
+
+p8_comment_run {
+  id string pk
+  actuator enum // first line of a run
+                //   indented continuation
+                //   second continuation
+  bore_class enum
+}
+
+p9_comment_punctuation {
+  id string pk
+  medium enum // 5.1 — em-dash, en–dash, pipes a|b|c, braces {}, angles > <, "quotes", maker's, ⚠️ × ′
+}
+
+p1_baseline.id > p2_fk_modifier.id
+p3_null_modifier.id - p4_fk_and_null.id

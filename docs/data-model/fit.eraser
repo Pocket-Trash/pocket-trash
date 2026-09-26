@@ -1,0 +1,210 @@
+// ════════════════════════════════════════════════════════════════
+// machinedpens — THE FIT ANSWER  ·  PASTABLE ERD  ·  BUYER-FACING
+//
+// This file IS the paste. Copy with:
+//   pbcopy < docs/data-model/fit.eraser
+//
+// 5 entities · 8 relationship lines. The full model is 20 / 37.
+//
+// ⚠️ THE ONE TO REVIEW FIRST. Split out of the compatibility view on
+//    2026-08-15 because that canvas was doing two jobs — "does it fit?" and
+//    "what do I do about it?" This is the first job, and it is the moat (F5).
+//    The remedies — parts, trims, adapters, rebrands, measurements — are a
+//    separate paste, deliberately.
+//
+// ⚠️ LABELS, NOT SCHEMA. Buyer-facing names from docs/data-model/MODEL.md
+//    section 7b. The source of truth is docs/data-model/MODEL.md; its
+//    structural expression is docs/data-model/schema.eraser, unchanged.
+//    Same structure, same cardinality, different words.
+//
+// Rename map applied here (internal > buyer-facing):
+//   fit_report > report · tip_option > tip (shortened, NOT renamed)
+//   medium > ink_or_lead · rear_topology > back_end_shape · form > availability
+//   observance > interchangeability · functional_warning > works_but_not_advised
+//   fit_check.source > claimed_by
+//   PROMOTED to schema 2026-08-12: refill_style · fit_check
+//
+// `polarity` is DELIBERATELY not renamed: the market has no noun for it, only
+//   asterisked footnotes ("items with ** will not work"). The buyer sees two
+//   words, Fits / Doesn't fit, and never the column name.
+//
+// ERASER DOC URL: ____________________________________________
+// ════════════════════════════════════════════════════════════════
+
+title machinedpens — the fit answer
+
+notation crows-feet
+typeface clean
+styleMode plain
+
+// ── THE PRIOR — what we can say before anyone tests anything ──
+
+refill_style [icon: crosshair, color: purple] {
+  id bigint pk
+  slug text unique        // model-level ONLY, never brand-level: dsm-2006,
+  name text               //   not schmidt. EVERY market word for this concept
+                          //   is a brand name (Parker-style, G2, Euro-style)
+                          //   and "G2" means two different shapes in the wild.
+  iso_spec text null      // "ISO 12757-1:G2" | null when de facto
+  interchangeability enum // well | partial | poor -> "reliable" /
+                          //   "varies by brand" / "check per pen".
+                          // 🔑 THIS IS THE COLD-START ANSWER. A pen with ZERO
+                          //   fit checks is NOT empty: it renders the PRIOR —
+                          //   "takes Parker-style, usually reliable" — which is
+                          //   the FOURTH display state, and at launch it is the
+                          //   MOST COMMON one. It must never read as a negative.
+  variance_note text null // "D1 has two legal widths"; "Parker-style front
+                          //   contour changed after 2015"
+}
+
+// ── THE TWO THINGS BEING MATCHED ─────────────────────
+
+refill [icon: edit-3, color: green] {
+  id bigint pk
+  slug text unique
+  brand text
+  model text              // ⚠️ THIS ROW IS THE MODEL, not the SKU. "A Sarasa",
+                          //   never "a blue 0.5 Sarasa". Tip size and colour
+                          //   live on refill_option, which is CATALOG data and
+                          //   which NOTHING on this canvas points at. That is
+                          //   the property being protected: colour never
+                          //   affects fit, so it must never multiply these rows.
+  refill_style_id bigint fk
+  ink_or_lead enum        // ballpoint|gel|hybrid|rollerball|pressurized|
+                          //   graphite|permanent_marker|highlighter.
+                          //   Functional, not cosmetic — hybrid ink is what
+                          //   broke the Ti2 magnet case.
+  back_end_shape enum     // open|plugged|finned|flanged. THE ONLY AXIS in the
+                          //   whole model, because it is the only fit fact NO
+                          //   MEASUREMENT CAN EXPRESS. Everything else that
+                          //   looked like an axis reduced to a diameter at a
+                          //   named location. ⚠️ values are still a DRAFT.
+  availability enum       // sold_separately | harvested (gut a pen for it)
+}
+
+tip [icon: git-merge, color: blue] {
+  id bigint pk            // shortened from tip_option; schema name UNCHANGED.
+  pen_id bigint fk        //   THE PEN'S front assembly — not the writing point.
+                          //   The pen itself is in the catalog view; it is off
+                          //   this canvas on purpose.
+  refill_style_id bigint fk // 🔑 THE STYLE LIVES HERE, NOT ON THE PEN. Karas
+                          //   sells the Render K in Parker AND G2 tips; Tactile
+                          //   Turn's Switch Standard takes a Pilot G2 while the
+                          //   Short takes a Schmidt EasyFlow 9000. Same maker,
+                          //   same family, different answers.
+  name text               // "G2 Spring & Pen Tip" | "Parker nose"
+}
+
+// ── THE CLAIM — one refill, one pen tip. This is the moat ──
+
+fit_check [icon: link, color: orange] {
+  id bigint pk
+  refill_id bigint fk
+  tip_id bigint fk null          // SCOPED, and most specific wins:
+  refill_style_id bigint fk null //   tip > refill_style. One row can say "this
+                                 //   refill doesn't drop into ANY G2 pen"
+                                 //   (a fact about the refill) or "EnerGel works
+                                 //   across the style EXCEPT the Ti2 TechLiner".
+                                 //   Neither is expressible at the other grain.
+  polarity enum                  // positive | negative.
+                                 // 🔑 NEGATIVES ARE FIRST-CLASS AND ARE SEEDED
+                                 //   FIRST. Retail has no vocabulary for
+                                 //   "doesn't fit" because retail's incentive is
+                                 //   to sell the pen. That gap IS the product.
+  reason text null               // REQUIRED when polarity = negative
+  fit_quality enum null          // toleranced | snug | loose -> "precision" /
+                                 //   "snug" / "loose". NULL on a declared row:
+                                 //   nobody seated anything, so any value would
+                                 //   be invented.
+  trim_mm decimal null           // captured always; the remedies view is where
+  trim_reference text null       //   these are read. "Trim to Parker ballpoint
+  trim_necessity enum            //   length" beats "trim 2 mm" — it survives a
+                                 //   change of pen. required|recommended|optional
+  works_but_not_advised bool     // fits, and you shouldn't: Ti2's magnet vs
+                                 //   hybrid ink. NO market word — we teach it.
+  claimed_by enum                // maker|retailer|community|owner|staff.
+                                 //   ⚠️ IT LABELS, IT NEVER RANKS — see the
+                                 //   verdict rule below. Ranking by authority
+                                 //   puts the maker above the owner and gets
+                                 //   Bastion exactly backwards.
+  evidence enum                  // declared | tested. DID ANYONE PHYSICALLY SEAT
+                                 //   THIS? Magnus's blanket "if it's in the style
+                                 //   below, it will fit!" and Tactile Turn's list
+                                 //   with per-refill trim amounts in mm look
+                                 //   identical on the page and are NOT the same
+                                 //   claim. This is the only trust signal a buyer
+                                 //   sees, and NOTHING clears it — evidence does
+                                 //   not un-happen. A contradiction is a NEW ROW.
+  citation_url text null         // CURATION RULE: claimed_by = maker or
+  citation_note text null        //   community REQUIRES a citation. A claim you
+                                 //   cannot trace is one you cannot defend.
+  disputed_note text null        // THE STAFF OVERRIDE. Non-null = we think the
+                                 //   source is wrong here, and the text says why.
+                                 //   A claim about the CITATION, not about the
+                                 //   pen. Dropped from the verdict, STILL SHOWN —
+                                 //   hiding it would delete the product.
+                                 //   Retail never contradicts a maker; we do.
+}
+
+// ── THE LOOP — how a real owner corrects us ──────────
+
+report [icon: message-square, color: orange] {
+  id bigint pk            // "I put this in my pen and here's what happened."
+  refill_id bigint fk     //   NOT a claim — an observation awaiting review.
+  tip_id bigint fk        // ALWAYS CONCRETE: a person owns one pen, so a report
+                          //   names a TIP. A fit_check may be style-scoped; a
+                          //   report never is. That asymmetry is real.
+  fits bool               // the one thing a submitter can reliably state.
+                          //   NOT "works" (collides with works_but_not_advised)
+                          //   and NOT "polarity" (jargon has no place on a form).
+  note text null          // free text, because reports arrive as PROSE: "the tip
+                          //   of the Space Pen insert wiggles around when I
+                          //   write." Fit quality, trims and parts are the
+                          //   EDITOR'S job at promotion, never the user's.
+  review_state enum       // pending | approved | rejected. THE APPROVAL GATE.
+                          // 🔑 NOTHING RENDERS UNTIL APPROVED — a report has NO
+                          //   buyer read path at all. "Accuracy, not widespread
+                          //   adoption." Rejected rows are KEPT: so they are not
+                          //   re-reviewed, and because a pattern of rejections is
+                          //   itself a signal.
+  fit_id bigint fk null   // set when folded into a curated claim. N reports to
+                          //   ONE fit_check, which is what preserves the COUNT —
+                          //   you cannot tell a false positive from a true one by
+                          //   looking at a single report.
+                          // 🔑 ENTRY POINT: a saved pen already names a tip, so
+                          //   submission is "pick your setup, tell us if it fits".
+}
+
+// ── RELATIONSHIPS ───────────────────────────────────
+
+refill.refill_style_id > refill_style.id
+tip.refill_style_id > refill_style.id
+
+fit_check.refill_id > refill.id
+fit_check.tip_id > tip.id
+fit_check.refill_style_id > refill_style.id
+
+report.refill_id > refill.id
+report.tip_id > tip.id
+report.fit_id > fit_check.id
+
+// ── ⚠️ THE VERDICT IS NOT ON THIS CANVAS, AND THAT IS THE POINT ──
+//
+// What a buyer is told about one refill x one pen is DERIVED from the
+// fit_check set, never stored. Nothing to curate, nothing to drift:
+//
+//   -1  expand the set to the refill PLUS its rebrand partners — ONE HOP,
+//       no chains. Propagated rows render LABELLED: "via Schmidt P8126".
+//    0  drop every row with a disputed_note
+//    1  scope: most specific wins — tip > refill_style
+//    2  evidence: tested > declared. claimed_by LABELS, it never RANKS
+//    3  still tied and opposite -> NO VERDICT. "Sources disagree",
+//       both shown, both cited
+//
+// Four display states fall out: AGREE · SPLIT BY EVIDENCE (the tested row
+// wins; the declared row renders as a named, cited COUNTERCLAIM, not a
+// footnote) · UNRESOLVED · and PRIOR ONLY, which is the cold start and the
+// most common state at launch.
+//
+// Step 0 is what keeps "no verdict" from being a sticky shrug: with the
+// override available, showing no verdict is a CHOICE.

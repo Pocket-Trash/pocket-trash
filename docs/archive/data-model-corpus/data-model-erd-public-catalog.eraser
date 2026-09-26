@@ -1,0 +1,192 @@
+// ════════════════════════════════════════════════════════════════
+// machinedpens — CATALOG view  ·  PASTABLE ERD  ·  BUYER-FACING LABELS
+//
+// This file IS the paste. Copy with:
+//   pbcopy < .notes/data-model-erd-public-catalog.eraser
+//
+// Answers: "What is this pen, and what does it come as?"
+// 9 entities · 11 relationship lines. The full model is 20 / 37.
+//   C2 (2026-08-13) added `material` — the shared alloy list.
+//   5.2 (2026-08-14) added `refill_option` — which tip size and colour you
+//     actually buy. `refill` is the MODEL; the facets read the option row.
+//
+// ⚠️ LABELS, NOT SCHEMA. Identifiers here are the buyer-facing names from
+//    .notes/vocabulary-lexicon.md. The schema of record is unchanged and
+//    lives in .notes/data-model-erd-clean.eraser. Same structure, same
+//    cardinality, different words. Do not implement from this file.
+//
+// Eraser ERD entities have NO [label:] property (verified against
+//   docs.eraser.io/docs/erd-syntax — only icon, color, colorMode,
+//   styleMode, typeface). A friendly view therefore has to be a separate
+//   file with renamed identifiers. That is why this file exists.
+//
+// Rename map applied here (internal > buyer-facing):
+//   product > pen · product_family > pen_size · tip_option > tip (shortened, NOT renamed)
+//   product_variant > pen_finish · socket > refill_style
+//   actuator > control · bore_* > tip_opening_* · axial_adjust >
+//   adjustable_length · radial_retention > refill_grip · one_off >
+//   one_of_a_kind · toleranced_for_refill_id > tuned_for_refill_id
+//
+// House-style columns (created_at / updated_at timestamptz) are inherited
+//   from the committed schema but OMITTED here as diagram noise. See
+//   vocabulary-lexicon.md section 5.1 for the proposed patch.
+//
+// Reflects decisions through SITTING 3. Sittings 4-5 are open.
+// ════════════════════════════════════════════════════════════════
+
+title machinedpens — buyer view — catalog
+notation crows-feet
+typeface clean
+styleMode plain
+
+// ── WHO MAKES IT ────────────────────────────────────
+
+maker [icon: factory] {
+  id bigint pk
+  slug text unique
+  name text
+  root_url text unique  // inherited from the committed makers table
+}
+
+pen_size [icon: layers] {
+  id bigint pk
+  maker_id bigint fk
+  slug text unique
+  name text              // "Standard" | "Short" | "Mini" | "Slim"
+                         // ⚠️ SCOPES PARTS ONLY — never a fit claim.
+                         //   Two pens in one family can take different
+                         //   refill styles.
+}
+
+// ── THE PEN ─────────────────────────────────────────
+
+pen [icon: pen-tool, color: blue] {
+  id bigint pk
+  maker_id bigint fk
+  pen_size_id bigint fk null
+  slug text unique
+  name text
+  advance_mechanism enum // none(capped)|ratchet|bolt|screw|cam
+                         //   JetPens' own facet name is
+                         //   "LEAD ADVANCE MECHANISM" — borrowed verbatim.
+  control enum           // top_button|side_button|bolt_knob|clip|toggle|
+                         //   body_rotation|n_a. WHAT YOU OPERATE, kept
+                         //   separate from HOW THE TIP MOVES above.
+                         //   No market word for this axis — we teach it.
+  tip_opening_class enum // precision|standard|wide — the hole at the front
+  tip_opening_mm decimal null
+  adjustable_length enum // none|adjustable
+  fits_refill_length_min_mm decimal null // Modern Fuel publishes 89-116
+  fits_refill_length_max_mm decimal null
+  refill_grip enum       // fixed|collet — "collet" is real market
+                         //   vocabulary (BigIDesign's collet grip)
+  handedness enum        // right|left|either — a browse facet, never a
+                         //   fit axis
+}
+
+tip [icon: git-merge, color: blue] {
+  id bigint pk           // shortened from tip_option; schema name UNCHANGED.
+  pen_id bigint fk       //   The PEN'S front assembly — not the writing
+  refill_style_id bigint fk //   point, which is refill.tip_size.
+  name text              // "G2 Spring & Pen Tip" | "Parker nose"
+  tuned_for_refill_id bigint fk null // Autmog's per-refill tolerancing
+  adjustable_length enum null        // null = inherit from the pen
+  fits_refill_length_min_mm decimal null
+  fits_refill_length_max_mm decimal null
+  ships_with_refill_id bigint fk null // C4b, 2026-08-13 — MOVED from the pen.
+                         //   What is in the box belongs to the CONFIGURATION
+                         //   you bought: Karas sells the Render K in a Parker
+                         //   tip AND a G2 tip, and they ship different
+                         //   refills. NOT a design-intent claim.
+}
+
+material [icon: box] {
+  id bigint pk           // C2, 2026-08-13 — Titanium | Zirc | Mokume |
+  slug text unique       //   Timascus | ... A SHARED LIST, not a fixed one:
+  name text              //   makers keep shipping alloys nobody wrote down,
+}                        //   so the word has to be addable without a code
+                         //   change. This is the site's existing materials
+                         //   list, not a new invention.
+
+pen_finish [icon: droplet, color: blue] {
+  id bigint pk
+  pen_id bigint fk
+  finisher_maker_id bigint fk null // null = the base maker's own work.
+                                   //   Set for KVR and Dark Pines, who
+                                   //   finish ANOTHER maker's stock body.
+  material_id bigint fk null // C2 — was free text, which made Titanium,
+                             //   titanium and Ti three different things and
+                             //   split the browse-by-material page apart.
+  finish text null       // Machined | Stonewashed | DLC
+                         //   STAYS free text — half vocabulary, half prose
+                         //   ("a deep blackened finish", Dark Pines).
+  name text null         // "Golden Dragon"
+  one_of_a_kind bool     // "no two will be exactly alike"
+}
+
+// ── WHAT IT TAKES (detail lives in the compatibility view) ──
+
+refill_style [icon: crosshair, color: purple] {
+  id bigint pk
+  slug text unique       // model-level ONLY, never brand-level:
+  name text              //   dsm-2006, not schmidt
+  iso_spec text null     // "ISO 12757-1:G2" | null when de facto
+  interchangeability enum // well|partial|poor
+  variance_note text null
+}
+
+refill [icon: edit-3, color: green] {
+  id bigint pk
+  slug text unique
+  brand text
+  model text
+  refill_style_id bigint fk
+  ink_or_lead enum       // ballpoint|gel|hybrid|rollerball|pressurized|
+                         //   graphite|permanent_marker|highlighter.
+                         //   NOT "refill type" — that phrase means the
+                         //   physical shape half the time.
+                         //   STAYS HERE: an EnerGel is gel in every colour.
+                         // NO tip_size, NO ink_colour — 5.2, they moved to
+                         //   refill_option. This row is the MODEL.
+}
+
+refill_option [icon: layers, color: green] {
+  id bigint pk           // was refill_variant — 5.2, 2026-08-14. WHICH ONE YOU
+  refill_id bigint fk    //   BUY, and the row the browse facets actually read.
+                         //   Exactly the job pen_finish does on the pen side:
+                         //   differences that change NOTHING about fit, held
+                         //   apart so they cannot multiply the fit corpus.
+  tip_size decimal null  // the WRITING POINT width; lead diameter for graphite.
+                         //   JetPens facet, exact match (0.38/0.5/0.7/1.0).
+  ink_colour text null   // the maker's OWN word — "Vintage Vermillion".
+                         //   FREE TEXT, the full long tail. Same call as
+                         //   `finish` above, and for the same reason.
+  ink_colour_family enum null // black|blue|blue_black|red|green|other — what
+                         //   the FILTER uses. TWO COLUMNS because no code turns
+                         //   "Vintage Vermillion" into red: the bucket has to
+                         //   be curated. Starts coarse and grows.
+                         //   blue_black added 2026-08-14 (R-A): uni ships it
+                         //   across six refill codes, Pilot as -BB, Pentel at
+                         //   0.3/0.4. Sourced, not guessed.
+                         //   null = not applicable (a pencil mechanism).
+}
+// This is where BigIDesign's ~800-row refill sheet lands — brand + model +
+// tip size + colour per row is EXACTLY this grain.
+
+// ── RELATIONSHIPS ───────────────────────────────────
+
+pen_size.maker_id > maker.id
+
+pen.maker_id > maker.id
+pen.pen_size_id > pen_size.id
+tip.ships_with_refill_id > refill.id
+
+tip.pen_id > pen.id
+tip.refill_style_id > refill_style.id
+tip.tuned_for_refill_id > refill.id
+
+pen_finish.pen_id > pen.id
+pen_finish.finisher_maker_id > maker.id
+pen_finish.material_id > material.id
+
+refill_option.refill_id > refill.id

@@ -1,0 +1,251 @@
+// ════════════════════════════════════════════════════════════════
+// machinedpens — THE REMEDIES  ·  PASTABLE ERD  ·  BUYER-FACING
+//
+// This file IS the paste. Copy with:
+//   pbcopy < docs/data-model/remedies.eraser
+//
+// 10 entities · 10 relationship lines. The full model is 20 / 37.
+//   Six are the subject; FOUR ARE STUBS — fit_check, refill, refill_style and
+//   tip appear in short form so the links resolve. Their full form is in
+//   docs/data-model/fit.eraser. Same pattern the collection view
+//   uses. A view earns an entity by answering ITS question.
+//
+// ⚠️ THE SECOND HALF OF THE PAIR. Split out of the compatibility view on
+//    2026-08-15, which was doing two jobs at once:
+//      #1 does it fit?           -> docs/data-model/fit.eraser  (5 / 8)
+//      #2 what do I do about it? -> THIS FILE                   (10 / 10)
+//    Ten edges against the combined view's eighteen.
+//
+// Answers: "It doesn't drop straight in. Now what?"
+//   ...trim it · ...you need a part · ...an adapter changes what it takes ·
+//   ...it is the same part under another brand · ...here is why it fails
+//
+// 🔑 THE RULE THAT SHAPES THIS WHOLE CANVAS — a remedy modifies the REFILL or
+//    ADDS A PART. NOTHING modifies the pen. Drilling a tip hole is out of
+//    scope and is not "it fits": at that point it is a different pen tip, and
+//    nobody sells it. That is why there is no `modification` entity here, and
+//    why the vocabulary that started at five values landed at ZERO — every
+//    candidate decomposed into a trim spec or a part.
+//
+// ⚠️ LABELS, NOT SCHEMA. Buyer-facing names from docs/data-model/MODEL.md
+//    section 7b. The source of truth is docs/data-model/MODEL.md; its
+//    structural expression is docs/data-model/schema.eraser, unchanged.
+//
+// Rename map applied here (internal > buyer-facing):
+//   rebrand > also_sold_as · refill_dimension > refill_measurement
+//   tip_option > tip (shortened, NOT renamed) · part.source > made_by
+//   part_needed.sourcing > how_to_get · style_adapter.scope_tip_option_id >
+//   only_on_tip_id · style_adapter.result_quality > result_fit_quality
+//   PROMOTED to schema 2026-08-12: part_needed · style_adapter · also_known_as
+//
+// ERASER DOC URL: ____________________________________________
+// ════════════════════════════════════════════════════════════════
+
+title machinedpens — making it fit
+
+notation crows-feet
+typeface clean
+styleMode plain
+
+// ── THE CLAIM THESE HANG OFF (stub — full form in the fit view) ──
+
+fit_check [icon: link, color: orange] {
+  id bigint pk
+  trim_mm decimal null     // ⚠️ ONLY THE REMEDY COLUMNS ARE SHOWN. The other
+  trim_reference text null  //   twelve are in the fit view; showing them here
+  trim_necessity enum       //   would put the moat on a canvas about spacers.
+                            // REFERENCE BEATS AMOUNT: "trim to Parker ballpoint
+                            //   length" survives a change of pen; "trim 2 mm"
+                            //   does not. Both are kept because the real range
+                            //   is 1-13 mm — an EnerGel cut to a Schmidt P8126
+                            //   loses 13.4 mm — so "needs trimming" alone is
+                            //   useless to the person holding the knife.
+                            // required | recommended | optional. The FIRST
+                            //   disjunction in the corpus: the Modern Fuel aBAP
+                            //   x EnerGel can be trimmed to the default OR
+                            //   adjusted with the bundled wrench. CURATED, never
+                            //   derived — inferring it from a length window
+                            //   would be geometry producing a POSITIVE.
+                            // "DROPS IN UNMODIFIED" IS A QUERY, not a flag:
+                            //   (no trim OR trim not required) AND no required
+                            //   part you don't already own.
+}
+
+// ── REMEDY 1 — a part is required ───────────────────
+
+part_needed {
+  fit_id bigint fk
+  part_id bigint fk
+  how_to_get enum // included_with_pen | included_with_refill | purchase_separately.
+                  //   Fisher's adapter ships WITH THE REFILL; Karas' spacer ships
+                  //   WITH THE PEN. Same part kind, opposite answer, and it is the
+                  //   difference between "drops in" and "buy something".
+  necessity enum  // required | recommended | optional — the SAME vocabulary as
+                  //   trimming. ⚠️ IT LIVES ON THE LINK, NOT ON THE PART: the
+                  //   same spring is REQUIRED for one refill and merely "not
+                  //   optimal" for another. Necessity is a fact about the
+                  //   PAIRING, never about the object.
+}
+
+part [icon: tool] {
+  id bigint pk
+  slug text unique
+  kind enum       // clip|bolt|bolt_handle|top_cap|spring|o_ring|spacer|adapter.
+                  //   GLOBAL and coarse. Fellhoelter's bolt handle and NTI's are
+                  //   the same KIND and different ROWS. Brand words are an ALIAS
+                  //   MAP, not new kinds — Ti2's "stabilizer" is a spacer.
+                  //   NOT here: `tip` (that is a pen tip) and `grip` (that is
+                  //   milling, i.e. a finish).
+  name text
+  made_by enum    // oem | aftermarket | community. The 3D-printed D1 sleeve for a
+                  //   Tactile Turn Mini is community-made and real; Fellhoelter's
+                  //   kit is OEM. Same shelf, different trust.
+                  // ⚠️ NO maker_id / pen_size_id ON THIS CANVAS. Parts ARE scoped
+                  //   by maker and pen size — Tactile Turn's spares are
+                  //   "universally interchangeable across their pen lines" but you
+                  //   must "select the correct diameter (Standard, Slim, Thick)" —
+                  //   and that scoping is a CATALOG fact. Full form in the catalog
+                  //   view. Carrying it here dragged two stub boxes to opposite
+                  //   corners for nothing.
+                  // 🔑 BEING A PURCHASE OPTION VS A FIT-REQUIRED PART IS NOT A
+                  //   COLUMN — it is WHICH JOIN POINTS HERE. The Short spring is
+                  //   both, from one row. Two tables would have meant two rows for
+                  //   one SKU that could silently drift.
+}
+
+// ── REMEDY 2 — an adapter changes WHAT THE PEN TAKES ──
+
+style_adapter [icon: shuffle, color: red] {
+  id bigint pk
+  part_id bigint fk
+  from_style_id bigint fk      // DIRECTED — the reverse is a separate row, and it
+  to_style_id bigint fk        //   is not automatic. Fisher's converter makes a PR
+                               //   refill fit a Parker pen; nothing makes the
+                               //   journey back.
+  result_fit_quality enum null // null when the adapter is adjustable
+  only_on_tip_id bigint fk null // null = works across the whole style. Tactile
+                               //   Turn's Parker adapter is STANDARD-ONLY, which
+                               //   is the general-claim-plus-scoped-exception
+                               //   shape this schema runs at five different grains.
+                               // ⚠️ DECLARED, NEVER COMPUTED. Fisher: 89 mm + a
+                               //   10 mm adapter = 99 mm, which arithmetic reads
+                               //   as "in band for Parker" — and the real refill
+                               //   wiggles at the tip. Geometry may produce a
+                               //   NEGATIVE, never a positive.
+}
+
+// ── REMEDY 3 — it is the same part under another brand ──
+
+also_sold_as [icon: copy, color: green] {
+  id bigint pk            // the branded SKU -> what it actually is. Retro 51's
+  refill_id bigint fk     //   REF5P is a Schmidt P8126; Schmidt also supplies
+  oem_refill_id bigint fk //   Baron Fig and Diplomat, and Premec advertises
+                          //   white-label manufacture. An INDUSTRY STRUCTURE,
+                          //   not a Retro 51 oddity.
+  claimed_by enum         // ⚠️ ATTRIBUTED, because the mapping is CONTESTED in
+  citation_url text null  //   the wild — one source calls the REF5P a P8127, two
+  citation_note text null //   call it a P8126. A bare FK would have hidden that.
+                          // 🔑 SAME PART OFF THE SAME LINE — NEVER MERELY THE
+                          //   SAME STYLE. Monteverde's "compatible with Parker,
+                          //   Cross, Montblanc" refills are style-mates and
+                          //   refill_style already holds them; admitting them
+                          //   here would propagate fit claims across genuinely
+                          //   different parts.
+                          // A fit claim travels ONE HOP along this link and
+                          //   renders LABELLED — "via Schmidt P8126" — never
+                          //   silently.
+}
+
+// ── REMEDY 4 — the naming trap, and why a fit failed ──
+
+also_known_as {
+  id bigint pk
+  refill_style_id bigint fk
+  alias text              // "Standard Rollerball" | "RB" | "Euro" | "DIN" |
+                          //   "Pilot G2-style" — all naming ONE shape.
+                          // ⚠️ MODEL-LEVEL, NEVER BRAND-LEVEL. "Signo UMR-85",
+                          //   never a bare "Signo": that brand spans two
+                          //   different shapes, "Schmidt" spans five, and "G2"
+                          //   means the ISO Parker standard AND the Pilot gel
+                          //   refill — twelve millimetres apart in length and
+                          //   near-identical in cross-section. That collision is
+                          //   the single most documented confusion in the domain.
+}
+
+refill_measurement [icon: maximize-2] {
+  id bigint pk
+  refill_id bigint fk
+  feature text            // ⚠️ A BARE NUMBER IS MEANINGLESS. "body_od" |
+  value decimal           //   "rear_cap_od" | "step_1_od" — a Sarasa's 6.09 may
+  unit text               //   be a different FEATURE than a Pilot's 5.94 rather
+                          //   than a different number.
+                          // EXPLAINS, NEVER MATCHES. These numbers tell a buyer
+                          //   WHY something failed; they never decide whether it
+                          //   fits. Inferring fit from dimensions is what the
+                          //   one existing competitor does, and it cannot know
+                          //   about back-end shape or magnets.
+  claimed_by enum         // maker|retailer|community|owner|staff. THE ONLY TRUST
+                          //   SIGNAL A NUMBER HAS. Fisher PR: a guide with
+                          //   calipers says 90 x 4.8, a shop reprinting a spec
+                          //   says 89 x 5.8. Merging "measured it" with "retyped
+                          //   it" would destroy the distinction.
+  citation_url text null  // Two rows disagreeing on one feature render BOTH, with
+  citation_note text null //   citations, and fire no geometry screen. A bad
+                          //   number is DELETED, never annotated — there is no
+                          //   disputed flag here, because a disputed NUMBER is
+                          //   noise, not content.
+}
+
+// ── STUBS — full form in data-model-erd-public-fit.eraser ──
+
+refill [icon: edit-3, color: green] {
+  id bigint pk
+  brand text        // THE MODEL, not the SKU — "a Sarasa", never "a blue 0.5
+  model text        //   Sarasa". Tip size and colour are catalog data and
+}                   //   nothing on this canvas points at them.
+
+refill_style [icon: crosshair, color: purple] {
+  id bigint pk
+  name text
+}
+
+tip [icon: git-merge, color: blue] {
+  id bigint pk      // the PEN'S front assembly
+  name text
+}
+
+// ── RELATIONSHIPS ───────────────────────────────────
+
+part_needed.fit_id > fit_check.id
+part_needed.part_id > part.id
+
+style_adapter.part_id > part.id
+style_adapter.from_style_id > refill_style.id
+style_adapter.to_style_id > refill_style.id
+style_adapter.only_on_tip_id > tip.id
+
+also_sold_as.refill_id > refill.id
+also_sold_as.oem_refill_id > refill.id
+
+refill_measurement.refill_id > refill.id
+also_known_as.refill_style_id > refill_style.id
+
+// ── ⚠️ WHAT IS DELIBERATELY ABSENT ──────────────────
+//
+// There is no `needs` vocabulary, and that is a decision, not an omission.
+// It started at five values and landed at ZERO, because every candidate
+// decomposed into something already here:
+//
+//   adapter        -> a PART (and a style_adapter row when it changes the style)
+//   spacer         -> a PART
+//   spring swap    -> ships as ONE SKU with the tip -> a different PEN TIP
+//   tip kit        -> a different PEN TIP, which the pen already models
+//   socket change  -> the Fisher Universal SNAPS at 67 mm: that is a TRIM, and
+//                     the style change is a consequence of it
+//   radial slop    -> not a need at all. A machined pen that needs tape to stop
+//                     rattling is a LOOSE FIT, which is fit_quality
+//   drilling       -> OUT OF SCOPE. It modifies the PEN, so it is a different
+//                     pen tip — and nobody sells it, so it has no rows
+//
+// The vocabulary closes on a PRINCIPLE, which is why the next candidate is
+// testable rather than debatable.

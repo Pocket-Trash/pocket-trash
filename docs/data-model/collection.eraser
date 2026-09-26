@@ -1,0 +1,242 @@
+// ════════════════════════════════════════════════════════════════
+// machinedpens — COLLECTION view  ·  PASTABLE ERD  ·  BUYER-FACING
+//
+// This file IS the paste. Copy with:
+//   pbcopy < docs/data-model/collection.eraser
+//
+// Answers: "What do I own, and what's loaded in it right now?"
+// 10 entities · 12 relationship lines. The full model is 20 / 37.
+//   The open_5_carry_log shell is GONE — 5.5 answered it.
+//
+// ⚠️ LABELS, NOT SCHEMA. Identifiers here are the buyer-facing names from
+//    docs/data-model/MODEL.md section 7b. The source of truth is
+//    docs/data-model/MODEL.md; its structural expression is unchanged and
+//    lives in docs/data-model/schema.eraser.
+//
+// ⚠️ DIRECTION CHANGE 2026-08-13 — field-log is DROPPED (already gone from
+//    apps/ on origin/main) and there is NO app integration. This is no
+//    longer "Brownie's layer": it is a LIMITED, web-only save.
+//    5.3a ANSWERED — a saved config is A PEN YOU OWN: a finish, a pen tip,
+//    and what is loaded. NOT a wishlist, and NOT an inventory: no price,
+//    no serial, no condition. Those belonged to the app being dropped.
+//    5.3b(i) ANSWERED (c), 2026-08-14 — a saved pen names the refill MODEL
+//    (always) and the EXACT ONE (optional). R-A found all three makers
+//    publish a complete size x colour matrix, so the exact one is usually
+//    knowable; but nothing forces that catalogue to be filled, and the code
+//    on the refill in your pen names the SIZE, so neither grain alone works.
+//    5.3b(ii) ANSWERED (a), 2026-08-14 — NOTHING MORE, AND LESS ENTRY. No
+//    nickname, no note, no new columns. This row stores ZERO specs already,
+//    so they read through to the catalog; what changed is that the four
+//    links arrive PRE-FILLED from the stock config. You type "copper
+//    TiBolt" and correct whatever is wrong. Fill what the catalog makes
+//    unambiguous, ask only where it branches — and the values are SAVED to
+//    your row, so a later catalog edit never rewrites the pen you own.
+//    5.4 ANSWERED, 2026-08-14 — own two of the same pen and they are TWO
+//    ROWS, never a count. What tells them apart is usually the finish or a
+//    small part, not the refill, so + `part_fitted`. No nickname.
+//    5.5 ANSWERED, 2026-08-14 — A FIELD, NOT A LOG. "Log from day one" was
+//    field-log's OWN premise and field-log is dropped. BVG: "we are just
+//    recording things owned — the actual refill is trivial at this point,
+//    it's more about the actual PEN AND PARTS." Knowing what was loaded
+//    when someone said it fits is what a REPORT is for, and that is
+//    append-only already. THE COLLECTION LAYER IS NOW COMPLETE.
+//
+// Rename map applied here (internal > buyer-facing):
+//   collection_item > my_pen · product_variant > pen_finish
+//   refill_variant > refill_option
+//   product > pen · tip_option > tip (shortened, NOT renamed) · one_off > one_of_a_kind
+// ════════════════════════════════════════════════════════════════
+
+title machinedpens — buyer view — my collection
+notation crows-feet
+typeface clean
+styleMode plain
+
+// ── WHAT I OWN ──────────────────────────────────────
+
+my_pen [icon: package, color: gray] {
+  id bigint pk
+  owner_id bigint fk         // 5.3a — a pen YOU OWN has to name you.
+                                 //   The committed users table (Clerk).
+  pen_finish_id bigint fk    // points at the FINISH, not the pen —
+                                 //   what you own is a specific object
+  tip_id bigint fk              // which front end is fitted
+  installed_refill_id bigint fk null // 5.3b(i) — WHICH REFILL. "An EnerGel
+                                 //   LR7." Always recordable, even for a
+                                 //   colour nobody has catalogued yet, and
+                                 //   it is what every read path uses.
+  installed_refill_option_id bigint fk null // 5.3b(i) — EXACTLY WHICH ONE.
+                                 //   Optional: the size and colour you
+                                 //   actually loaded. Fill it when you know
+                                 //   it, skip it when you don't — the two
+                                 //   can never contradict each other.
+                                 //   ONE PICKER, not two: choosing the exact
+                                 //   one fills the line above for you.
+                                 // 5.5 — A FIELD, not a log. Swap the
+                                 //   refill and this row updates.
+                                 // 🔑 THIS IS THE REPORT ENTRY POINT.
+                                 //   A report must name a specific pen
+                                 //   tip (4.1) — a saved setup already
+                                 //   does. "Pick your setup, tell us if
+                                 //   it fits."
+                                 // 5.4 — two of the same pen are TWO ROWS.
+                                 // OPEN 5.x — owner-commissioned
+                                 //   finishing: you send YOUR pen to
+                                 //   KVR. Same fact, different side.
+}
+
+// ── WHAT IT IS (full form in the catalog view) ──────
+
+pen_finish [icon: droplet, color: blue] {
+  id bigint pk
+  pen_id bigint fk
+  material_id bigint fk null // C2 — points at the shared alloy
+                          //   list, declared in the catalog view
+  finish text null        // Machined | Stonewashed | DLC
+  name text null          // "Golden Dragon"
+  one_of_a_kind bool      // "no two will be exactly alike"
+}
+
+pen [icon: pen-tool, color: blue] {
+  id bigint pk
+  maker_id bigint fk
+  slug text unique
+  name text
+  advance_mechanism enum  // JetPens' own facet: "LEAD ADVANCE MECHANISM"
+  control enum            // what you operate — kept separate on purpose
+}
+
+tip [icon: git-merge, color: blue] {
+  id bigint pk            // shortened from tip_option; schema name UNCHANGED
+  pen_id bigint fk
+  name text
+}
+
+refill [icon: edit-3, color: green] {
+  id bigint pk
+  brand text
+  model text
+  ink_or_lead enum        // ballpoint|gel|hybrid|rollerball|pressurized|
+                          //   graphite|permanent_marker|highlighter
+                          // NO tip_size, NO ink_colour — 5.2, 2026-08-14.
+                          //   They moved to refill_option, because `refill`
+                          //   is now the MODEL.
+                          // ✅ 5.3b(i) ANSWERED (c) — my_pen points at BOTH:
+                          //   HERE for "an EnerGel LR7", and at refill_option
+                          //   for "the 0.7, Navy Blue" when you know it.
+}
+
+refill_option [icon: layers, color: green] {
+  id bigint pk            // was refill_variant — 5.2. WHICH ONE YOU BUY.
+  refill_id bigint fk     //   Shown here because 5.3b(i) lets a saved pen
+  tip_size decimal null   //   name the exact one. Full form is in the
+  ink_colour text null    //   catalog view.
+}
+
+part_fitted {
+  my_pen_id bigint fk     // 5.4 — WHICH PARTS ARE ON YOUR PEN. The bronze
+  part_id bigint fk       //   clip, the copper back piece. Tactile Turn
+                          //   sells those alone in Titanium, Copper, Bronze
+                          //   and Zirconium and says to MIX AND MATCH — you
+                          //   only have to match the pen size.
+                          // LOOKS, NOT FITS. A spring or a spacer is not a
+                          //   choice you made: the refill dictated it, and
+                          //   it already lives with the fit check. If you
+                          //   fitted one nobody has recorded, that is a
+                          //   REPORT, not a checkbox.
+}
+
+part [icon: tool] {
+  id bigint pk            // full form in the compatibility view
+  maker_id bigint fk null // null = generic / third-party
+  kind enum               // clip|bolt|bolt_handle|top_cap|spring|o_ring|
+                          //   spacer|adapter — the first four are yours to
+                          //   choose, the rest come from the fit
+  name text
+}
+
+maker [icon: factory] {
+  id bigint pk
+  name text
+}
+
+owner [icon: user] {
+  id bigint pk            // the committed users table — Clerk-backed and
+  clerk_id text unique    //   deliberately minimal. Never shown to anyone
+}                         //   but you.
+
+
+// ── RELATIONSHIPS ───────────────────────────────────
+
+my_pen.owner_id > owner.id
+my_pen.pen_finish_id > pen_finish.id
+my_pen.tip_id > tip.id
+my_pen.installed_refill_id > refill.id
+my_pen.installed_refill_option_id > refill_option.id
+
+refill_option.refill_id > refill.id
+
+part_fitted.my_pen_id > my_pen.id
+part_fitted.part_id > part.id
+part.maker_id > maker.id
+
+pen_finish.pen_id > pen.id
+tip.pen_id > pen.id
+pen.maker_id > maker.id
+
+// ── ⚠️ TWO RULES THAT GOVERN THIS LAYER AND ARE INVISIBLE IN BOXES ──
+//
+// 1. THE COMPLETENESS GATE. You cannot own what the catalog does not fully
+//    have. It needs no column — the required links above already say it:
+//    a pen is ownable only when it has a MAKER, a PEN, a FINISH, a PEN TIP,
+//    and that pen tip declares a REFILL STYLE. A pen we lack routes to a
+//    SUBMISSION (you send us the details, we approve or amend, it goes
+//    public, and then anyone can customize from it). That path is real and
+//    is deliberately NOT modelled here yet — when it is built it should
+//    reuse the report's shape: pending / approved / rejected, rejected rows
+//    kept.
+//
+// 2. THE CATALOG FILLS THE ROW; YOU CORRECT IT. Type "copper TiBolt" and
+//    every link above arrives PRE-FILLED from the stock configuration. Fill
+//    what the catalog makes unambiguous, ASK ONLY WHERE IT BRANCHES — one
+//    pen tip, fill it; more than one, ask once. "Copper TiBolt" branches:
+//    the Full Size TiBolt takes a Schmidt, the G2 TiBolt takes a G2 Mini.
+//    ⚠️ THE VALUES ARE WRITTEN TO YOUR ROW, not resolved on read — otherwise
+//    the day a curator corrects what a pen ships with, every saved pen
+//    silently changes what is loaded in it. A pen you own is not curated
+//    state.
+//
+// ── ⚠️ WHAT IS DELIBERATELY ABSENT ──────────────────
+//
+// This layer was settled in five questions and gained TWO things. Everything
+// else was answered by DELETING a question, so the absences are decisions:
+//
+//   drop number · serial · acquisition date · price paid · current value ·
+//   condition · photos
+//                  -> COLLECTOR INVENTORY. A saved pen is a pen you own, not
+//                     a valuation. That shape belonged to an app that was
+//                     dropped.
+//   a nickname     -> the row already renders a name it does not store
+//                     (maker + pen + finish + pen tip + what's loaded), and
+//                     part_fitted now tells two copies apart. One nullable
+//                     column away if the UI ever wants it.
+//   a note         -> "this one rattles" / "I trimmed it 2 mm" are facts
+//                     about a PAIRING, and the report already has a home for
+//                     them where a curator can promote them into a fit check.
+//                     A note here is where that knowledge goes to die.
+//   a quantity     -> own two and they are TWO ROWS. A count cannot say which
+//                     refill is in the second one, and cannot be the subject
+//                     of a report.
+//   a carry log    -> "log from day one" was the dropped app's own premise.
+//                     What was loaded WHEN SOMEONE SAID IT FITS is the
+//                     report, which is append-only already. A pen you own is
+//                     state you EDIT.
+//   functional parts in part_fitted
+//                  -> a spring or a spacer is not a choice you made: the
+//                     refill dictated it, and it already lives with the fit
+//                     check. Only parts that change how the pen LOOKS belong
+//                     here.
+//
+// 🔑 AND THIS IS THE REPORT ENTRY POINT. A report must name a specific pen
+//    tip; a saved pen already does. "Pick your setup, tell us if it fits."
+//    The moat gets what it asked for from the feature being kept.
