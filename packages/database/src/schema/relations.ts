@@ -1,7 +1,5 @@
 import { relations } from "drizzle-orm";
 import {
-  catalogImageUploadFile,
-  catalogImageUploadSession,
   collectionImage,
   collectionItem,
   collectionItemImage,
@@ -29,8 +27,6 @@ import {
   resourceNotifications,
   resources,
   resourcesToCategories,
-  resourceUploadFiles,
-  resourceUploadSessions,
   resourceVersions,
 } from "./resources.js";
 import {
@@ -55,6 +51,7 @@ import {
   tmpProducts,
   tmpProductVariations,
 } from "./scraper.js";
+import { uploadFile, uploadSession } from "./uploads.js";
 import { userSettings } from "./user-settings.js";
 import { user } from "./users.js";
 
@@ -88,12 +85,6 @@ export const resourcesRelations = relations(resources, ({ many }) => ({
   images: many(resourceImages),
   notifications: many(resourceNotifications),
   versions: many(resourceVersions),
-  completedUploadSessions: many(resourceUploadSessions, {
-    relationName: "resourceUploadSessionCompletedResource",
-  }),
-  uploadSessions: many(resourceUploadSessions, {
-    relationName: "resourceUploadSessionTarget",
-  }),
 }));
 
 export const resourceImagesRelations = relations(resourceImages, ({ one }) => ({
@@ -132,33 +123,6 @@ export const resourceFilesRelations = relations(
     version: one(resourceVersions, {
       fields: [resourceFiles.versionId],
       references: [resourceVersions.id],
-    }),
-  }),
-);
-
-export const resourceUploadSessionsRelations = relations(
-  resourceUploadSessions,
-  ({ many, one }) => ({
-    files: many(resourceUploadFiles),
-    resource: one(resources, {
-      fields: [resourceUploadSessions.resourceId],
-      references: [resources.id],
-      relationName: "resourceUploadSessionTarget",
-    }),
-    completedResource: one(resources, {
-      fields: [resourceUploadSessions.completedResourceId],
-      references: [resources.id],
-      relationName: "resourceUploadSessionCompletedResource",
-    }),
-  }),
-);
-
-export const resourceUploadFilesRelations = relations(
-  resourceUploadFiles,
-  ({ one }) => ({
-    session: one(resourceUploadSessions, {
-      fields: [resourceUploadFiles.sessionId],
-      references: [resourceUploadSessions.id],
     }),
   }),
 );
@@ -329,35 +293,6 @@ export const productImageRelations = relations(productImage, ({ one }) => ({
     references: [product.id],
   }),
 }));
-
-export const catalogImageUploadSessionRelations = relations(
-  catalogImageUploadSession,
-  ({ many, one }) => ({
-    collection: one(userCollection, {
-      fields: [catalogImageUploadSession.collectionId],
-      references: [userCollection.id],
-    }),
-    collectionItem: one(collectionItem, {
-      fields: [catalogImageUploadSession.collectionItemId],
-      references: [collectionItem.id],
-    }),
-    files: many(catalogImageUploadFile),
-    product: one(product, {
-      fields: [catalogImageUploadSession.productId],
-      references: [product.id],
-    }),
-  }),
-);
-
-export const catalogImageUploadFileRelations = relations(
-  catalogImageUploadFile,
-  ({ one }) => ({
-    session: one(catalogImageUploadSession, {
-      fields: [catalogImageUploadFile.sessionId],
-      references: [catalogImageUploadSession.id],
-    }),
-  }),
-);
 
 export const productMaterialRelations = relations(
   productMaterial,
@@ -697,3 +632,13 @@ export const tmpGrimsmoKnifeVariationVersionsRelations = relations(
     }),
   }),
 );
+
+export const uploadSessionRelations = relations(uploadSession, ({ many }) => ({
+  files: many(uploadFile),
+}));
+export const uploadFileRelations = relations(uploadFile, ({ one }) => ({
+  session: one(uploadSession, {
+    fields: [uploadFile.sessionId],
+    references: [uploadSession.id],
+  }),
+}));

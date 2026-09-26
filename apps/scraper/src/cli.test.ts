@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { formatRedisEnvDebugValue, parseCommand } from "./cli.js";
+
+vi.hoisted(() => {
+  vi.stubEnv("BUNNY_IMAGE_FOLDER_PREFIX", "images/dev");
+});
+
+afterAll(() => vi.unstubAllEnvs());
 
 describe("scraper CLI", () => {
   it("parses Railway cron commands", () => {

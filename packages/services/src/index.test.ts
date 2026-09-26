@@ -41,9 +41,9 @@ describe("services", () => {
           environment: "test",
           transports: [],
         },
-        resources: {},
+        storage: {},
       }),
-    ).toThrow("Resource services require database configuration");
+    ).toThrow("Storage services require database configuration");
   });
 
   it("configures logger independently", () => {

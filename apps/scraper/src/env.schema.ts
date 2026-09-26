@@ -65,6 +65,9 @@ export class ScraperEnvValidationError extends Error {
 }
 
 const scraperServerSchema = {
+  BUNNY_IMAGE_FOLDER_PREFIX: z
+    .string()
+    .regex(/^images(?:\/(?:dev|preview(?:\/pr-[1-9]\d*)?))?$/u),
   APP_ENV: z.string().min(1).optional(),
   AXIOM_DATASET: z.string().min(1).optional(),
   AXIOM_EDGE_DOMAIN: z.string().min(1).optional(),
@@ -116,10 +119,6 @@ export function createScraperJobEnv(runtimeEnv: ScraperRuntimeEnv) {
       BUNNY_STORAGE_ZONE_NAME: z.string().min(1).optional(),
       DATABASE_URL: z.string().min(1).url(),
       BUNNY_CDN_BASE_URL: z.string().min(1).url().optional(),
-      BUNNY_IMAGE_FOLDER_PREFIX: z
-        .string()
-        .regex(/^images(?:\/(?:dev|preview(?:\/pr-[1-9]\d*)?))?$/u)
-        .optional(),
       IMAGE_STORAGE_PROVIDER: z.string().min(1).default("bunny"),
       REDIS_URL: redisUrlSchema,
       GRIMSMO_PROXY_URL: z.string().min(1).url().optional(),

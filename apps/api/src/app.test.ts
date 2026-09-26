@@ -4,6 +4,7 @@ import {
   type LogEvent,
   loggerValues,
 } from "@package/logger";
+import { type StorageService, UploadSessionError } from "@package/services";
 import { describe, expect, it, vi } from "vitest";
 import {
   apiDocsPath,
@@ -12,12 +13,8 @@ import {
   healthPath,
   logsPath,
   openApiJsonPath,
-  resourceUploadSessionsPath,
+  uploadSessionsPath,
 } from "./app.js";
-import {
-  ResourceUploadSessionError,
-  type ResourceUploadSessionsService,
-} from "./resource-upload-sessions.js";
 
 describe("api", () => {
   it("serves only the restored API shell", async () => {
@@ -38,7 +35,7 @@ describe("api", () => {
     };
     expect(document.paths).toHaveProperty(healthPath);
     expect(document.paths).toHaveProperty(logsPath);
-    expect(document.paths).toHaveProperty(resourceUploadSessionsPath);
+    expect(document.paths).toHaveProperty(uploadSessionsPath);
 
     for (const path of [
       "/",
@@ -139,35 +136,40 @@ describe("api", () => {
   });
 
   it("authenticates session creation and streams each declared file", async () => {
-    const service = createResourceUploadServiceMock();
+    const service = createUploadServiceMock();
     const app = createApp({
-      resourceUploadRuntime: {
-        authenticate: async () => "user_123",
+      uploadRuntime: {
+        authenticate: async () => ({ clerkId: "user_123", isAdmin: false }),
         isAllowedOrigin: (origin) => origin === "https://preview.vercel.app",
         service,
       },
     });
-    const sessionResponse = await app.request(resourceUploadSessionsPath, {
+    const sessionResponse = await app.request(uploadSessionsPath, {
       body: JSON.stringify({
-        categories: ["Tools"],
-        description: "Description",
+        target: { type: "resource" },
+        payload: {
+          categories: ["Tools"],
+          description: "Description",
+          name: "Tool",
+          operation: "create",
+          isPrivate: true,
+        },
         files: [
           {
+            kind: "file",
             contentType: "application/octet-stream",
             fileName: "tool.stl",
             size: 3,
+            sha256: "a".repeat(64),
           },
-        ],
-        images: [
           {
+            kind: "image",
             contentType: "image/webp",
             fileName: "tool.webp",
             size: 3,
+            sha256: "b".repeat(64),
           },
         ],
-        isPrivate: true,
-        name: "Tool",
-        operation: "create",
       }),
       headers: {
         "content-type": "application/json",
@@ -182,15 +184,17 @@ describe("api", () => {
     );
     expect(service.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        isPrivate: true,
-        name: "Tool",
-        operation: "create",
+        payload: expect.objectContaining({
+          isPrivate: true,
+          name: "Tool",
+          operation: "create",
+        }),
       }),
-      "user_123",
+      { clerkId: "user_123", isAdmin: false },
     );
 
     const uploadRequest = new Request(
-      `https://api.example.test${resourceUploadSessionsPath}/00000000-0000-4000-8000-000000000001/files/00000000-0000-4000-8000-000000000002`,
+      `https://api.example.test${uploadSessionsPath}/00000000-0000-4000-8000-000000000001/files/00000000-0000-4000-8000-000000000002`,
       {
         body: new Uint8Array([1, 2, 3]),
         headers: {
@@ -206,21 +210,21 @@ describe("api", () => {
     expect(service.upload).toHaveBeenCalledWith(
       "00000000-0000-4000-8000-000000000001",
       "00000000-0000-4000-8000-000000000002",
-      "user_123",
+      { clerkId: "user_123", isAdmin: false },
       uploadRequest,
     );
   });
 
   it("rejects unauthenticated resource upload sessions", async () => {
     const app = createApp({
-      resourceUploadRuntime: {
+      uploadRuntime: {
         authenticate: async () => null,
         isAllowedOrigin: () => true,
-        service: createResourceUploadServiceMock(),
+        service: createUploadServiceMock(),
       },
     });
 
-    const response = await app.request(resourceUploadSessionsPath, {
+    const response = await app.request(uploadSessionsPath, {
       body: "{}",
       method: "POST",
     });
@@ -230,35 +234,75 @@ describe("api", () => {
   });
 
   it("uses the authenticated owner and returns stable completion errors", async () => {
-    const service = createResourceUploadServiceMock();
-    service.complete.mockRejectedValue(
-      new ResourceUploadSessionError("uploads_incomplete", 409),
+    const service = createUploadServiceMock();
+    service.completeUpload.mockRejectedValue(
+      new UploadSessionError("uploads_incomplete", 409),
     );
     const app = createApp({
-      resourceUploadRuntime: {
-        authenticate: async () => "user_123",
+      uploadRuntime: {
+        authenticate: async () => ({ clerkId: "user_123", isAdmin: false }),
         isAllowedOrigin: () => true,
         service,
       },
     });
 
     const response = await app.request(
-      `${resourceUploadSessionsPath}/session-id/complete`,
+      `${uploadSessionsPath}/00000000-0000-4000-8000-000000000001/complete`,
       { method: "POST" },
     );
 
-    expect(service.complete).toHaveBeenCalledWith("session-id", "user_123");
+    expect(service.completeUpload).toHaveBeenCalledWith(
+      "00000000-0000-4000-8000-000000000001",
+      { clerkId: "user_123", isAdmin: false },
+    );
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
       error: "uploads_incomplete",
     });
   });
+  it("validates generic deletion targets before calling services", async () => {
+    const service = createUploadServiceMock();
+    const app = createApp({
+      uploadRuntime: {
+        authenticate: async () => ({ clerkId: "user_123", isAdmin: false }),
+        isAllowedOrigin: () => true,
+        service,
+      },
+    });
+    for (const path of [
+      "unknown/1",
+      "resource_image/0",
+      "product_image/not-a-number",
+    ]) {
+      expect(
+        (
+          await app.request(`/api/v0/storage/file/${path}`, {
+            method: "DELETE",
+          })
+        ).status,
+      ).toBe(400);
+    }
+    expect(service.deleteFile).not.toHaveBeenCalled();
+    expect(
+      (
+        await app.request("/api/v0/storage/file/resource_image/42", {
+          method: "DELETE",
+        })
+      ).status,
+    ).toBe(204);
+    expect(service.deleteFile).toHaveBeenCalledWith({
+      fileType: "resource_image",
+      fileId: 42,
+      actor: { clerkId: "user_123", isAdmin: false },
+    });
+  });
 });
 
-function createResourceUploadServiceMock() {
+function createUploadServiceMock() {
   return {
     cleanupExpired: vi.fn(async () => 0),
-    complete: vi.fn(async () => ({ resourceId: 1000, version: 1 })),
+    completeUpload: vi.fn(async () => ({ resourceId: 1000, version: 1 })),
+    deleteFile: vi.fn(async () => {}),
     create: vi.fn(async () => ({
       expiresAt: "2026-09-17T01:00:00.000Z",
       id: "00000000-0000-4000-8000-000000000001",
@@ -267,11 +311,40 @@ function createResourceUploadServiceMock() {
           contentType: "application/octet-stream",
           fileName: "tool.stl",
           id: "00000000-0000-4000-8000-000000000002",
-          kind: "resource" as const,
+          kind: "file" as const,
           size: 3,
         },
       ],
     })),
     upload: vi.fn(async () => {}),
-  } satisfies ResourceUploadSessionsService;
+  } satisfies StorageService;
 }
+
+describe("upload runtime lifecycle", () => {
+  it.each([
+    false,
+    true,
+  ])("resolves one runtime per request and flushes its logger (failure=%s)", async (fails) => {
+    const service = createUploadServiceMock();
+    if (fails)
+      service.deleteFile.mockRejectedValueOnce(
+        new Error("private SQL payload"),
+      );
+    const flush = vi.fn(async () => {});
+    const logger = { ...createNoopLogger(), flush };
+    const getUploadRuntime = vi.fn(() => ({
+      logger,
+      service,
+      authenticate: async () => ({ clerkId: "owner", isAdmin: false }),
+      isAllowedOrigin: () => true,
+    }));
+    const app = createApp({ getUploadRuntime });
+    const response = await app.request(
+      "/api/v0/storage/file/product_image/42",
+      { method: "DELETE" },
+    );
+    expect(response.status).toBe(fails ? 500 : 204);
+    expect(getUploadRuntime).toHaveBeenCalledOnce();
+    expect(flush).toHaveBeenCalledOnce();
+  });
+});

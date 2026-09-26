@@ -1,0 +1,38 @@
+{
+  "name": "@package/storage",
+  "version": "0.5.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "default": "./dist/constants.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:ci": "tsc -p tsconfig.json",
+    "check": "biome check .",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests --exclude \"dist/**\"",
+    "test:ci": "vitest run --passWithNoTests --exclude \"dist/**\"",
+    "test:watch": "vitest --passWithNoTests --exclude \"dist/**\"",
+    "test:watch:no-infisical": "vitest --passWithNoTests --exclude \"dist/**\"",
+    "cleanup:preview": "tsx src/preview-cleanup/cli.ts"
+  },
+  "devDependencies": {
+    "@package/eslint": "workspace:*",
+    "@package/tsconfig": "workspace:*",
+    "sharp": "^0.35.3"
+  },
+  "dependencies": {
+    "image-size": "1.2.1"
+  }
+}

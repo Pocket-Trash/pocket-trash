@@ -1,15 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import * as serviceFactories from "./lib/services.js";
 import worker, {
   ApiEnvValidationError,
   handleWorkerScheduled,
   isAllowedWebOrigin,
   validateApiBindings,
-  validateResourceUploadBindings,
+  validateUploadBindings,
 } from "./worker.js";
 
 describe("api worker", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("serves health without database or Clerk bindings", async () => {
@@ -39,14 +41,13 @@ describe("api worker", () => {
   });
 
   it("validates upload bindings and environment-specific web origins", () => {
-    expect(() =>
-      validateResourceUploadBindings({ APP_ENV: "production" }),
-    ).toThrow(
+    expect(() => validateUploadBindings({ APP_ENV: "production" })).toThrow(
       new ApiEnvValidationError([
         "CLERK_SECRET_KEY",
         "DATABASE_URL",
         "BUNNY_CDN_BASE_URL",
         "BUNNY_RESOURCE_FOLDER_PREFIX",
+        "BUNNY_IMAGE_FOLDER_PREFIX",
         "BUNNY_STORAGE_ACCESS_KEY",
         "BUNNY_STORAGE_ENDPOINT",
         "BUNNY_STORAGE_ZONE_NAME",
@@ -67,6 +68,46 @@ describe("api worker", () => {
     expect(isAllowedWebOrigin("https://attacker.example", "production")).toBe(
       false,
     );
+  });
+
+  it.each([
+    false,
+    true,
+  ])("flushes the scheduled cleanup logger even on failure (%s)", async (fails) => {
+    const bindings = {
+      APP_ENV: "production",
+      CLERK_SECRET_KEY: "test-secret",
+      DATABASE_URL: "postgresql://user:password@localhost/test",
+      BUNNY_STORAGE_ACCESS_KEY: "test",
+      BUNNY_CDN_BASE_URL: "https://cdn.test",
+      BUNNY_STORAGE_ENDPOINT: "https://storage.test",
+      BUNNY_STORAGE_ZONE_NAME: "test",
+      BUNNY_RESOURCE_FOLDER_PREFIX: "resources/files",
+      BUNNY_IMAGE_FOLDER_PREFIX: "images",
+    };
+    const runtime = serviceFactories.createApiServices(bindings, {
+      storage: true,
+    });
+    const cleanup = vi.spyOn(runtime.services.storage, "cleanupExpired");
+    if (fails) cleanup.mockRejectedValueOnce(new Error("private SQL payload"));
+    else cleanup.mockResolvedValueOnce(0);
+    const flush = vi.spyOn(runtime.logger, "flush");
+    vi.spyOn(serviceFactories, "createApiServices").mockReturnValueOnce(
+      runtime,
+    );
+    const tasks: Promise<unknown>[] = [];
+    await handleWorkerScheduled(
+      { cron: "15 * * * *", scheduledTime: 0 } as ScheduledController,
+      bindings,
+      {
+        waitUntil(task: Promise<unknown>) {
+          tasks.push(task);
+        },
+      } as ExecutionContext,
+    );
+    await Promise.all(tasks);
+    expect(cleanup).toHaveBeenCalledOnce();
+    expect(flush).toHaveBeenCalledOnce();
   });
 
   it("does not schedule expired-session cleanup outside production", async () => {

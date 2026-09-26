@@ -6,8 +6,47 @@ import {
 } from "./env.schema.js";
 
 describe("scraper env", () => {
+  it.each([
+    undefined,
+    "",
+    " ",
+    "images/preview/../",
+    "other",
+  ])("rejects missing or invalid image prefixes (%s) in both startup modes", (prefix) => {
+    const runtimeEnv = {
+      BUNNY_IMAGE_FOLDER_PREFIX: prefix,
+      DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
+      REDIS_URL: "redis://localhost:4008",
+      SCRAPER_DRY_RUN: "true",
+    };
+    expect(() => createScraperEnv(runtimeEnv)).toThrow(
+      "Invalid environment variables: BUNNY_IMAGE_FOLDER_PREFIX",
+    );
+    expect(() => createScraperJobEnv(runtimeEnv)).toThrow(
+      "Invalid environment variables: BUNNY_IMAGE_FOLDER_PREFIX",
+    );
+  });
+
+  it.each([
+    "images",
+    "images/dev",
+    "images/preview",
+    "images/preview/pr-119",
+  ])("accepts explicitly configured image prefix %s", (prefix) => {
+    const runtimeEnv = {
+      BUNNY_IMAGE_FOLDER_PREFIX: prefix,
+      DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
+      REDIS_URL: "redis://localhost:4008",
+    };
+    expect(createScraperEnv(runtimeEnv).BUNNY_IMAGE_FOLDER_PREFIX).toBe(prefix);
+    expect(createScraperJobEnv(runtimeEnv).BUNNY_IMAGE_FOLDER_PREFIX).toBe(
+      prefix,
+    );
+  });
+
   it("validates scraper environment variables", () => {
     const env = createScraperEnv({
+      BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
       APP_ENV: "preview",
       LOG_DEPLOYMENT_ID: "pocket-trash-pr-27",
       LOG_DEPLOYMENT_TARGET: "railway",
@@ -24,7 +63,7 @@ describe("scraper env", () => {
   });
 
   it("defaults PORT to 4007", () => {
-    const env = createScraperEnv({});
+    const env = createScraperEnv({ BUNNY_IMAGE_FOLDER_PREFIX: "images/dev" });
 
     expect(env.PORT).toBe(4007);
   });
@@ -32,6 +71,7 @@ describe("scraper env", () => {
   it("rejects invalid PORT values", () => {
     expect(() =>
       createScraperEnv({
+        BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
         PORT: "70000",
       }),
     ).toThrow("Invalid environment variables: PORT");
@@ -39,6 +79,7 @@ describe("scraper env", () => {
 
   it("enables the scheduler when requested", () => {
     const env = createScraperEnv({
+      BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
       SCRAPER_SCHEDULER_ENABLED: "true",
     });
 
@@ -48,12 +89,14 @@ describe("scraper env", () => {
   it("exposes sanitized validation issue details", () => {
     expect(() =>
       createScraperEnv({
+        BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
         PORT: "70000",
       }),
     ).toThrow(ScraperEnvValidationError);
 
     try {
       createScraperEnv({
+        BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
         PORT: "70000",
       });
     } catch (error) {
@@ -122,13 +165,14 @@ describe("scraper env", () => {
   });
 
   it("requires Redis and database URLs for scraper jobs", () => {
-    expect(() => createScraperJobEnv({})).toThrow(
-      "Invalid environment variables: DATABASE_URL, REDIS_URL",
-    );
+    expect(() =>
+      createScraperJobEnv({ BUNNY_IMAGE_FOLDER_PREFIX: "images/dev" }),
+    ).toThrow("Invalid environment variables: DATABASE_URL, REDIS_URL");
   });
 
   it("uses REDIS when REDIS_URL is missing", () => {
     const env = createScraperJobEnv({
+      BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
       DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
       REDIS: "redis://localhost:4008",
     });
@@ -138,6 +182,7 @@ describe("scraper env", () => {
 
   it("allows overriding the image storage provider", () => {
     const env = createScraperJobEnv({
+      BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
       DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
       IMAGE_STORAGE_PROVIDER: "test-provider",
       REDIS_URL: "redis://localhost:4008",
@@ -148,6 +193,7 @@ describe("scraper env", () => {
 
   it("uses REDIS when REDIS_URL is not a resolved Redis URL", () => {
     const env = createScraperJobEnv({
+      BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
       DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
       REDIS: "redis://localhost:4008",
       REDIS_URL: "$" + "{{scraper-queue.REDIS_PUBLIC_URL}}",
@@ -159,6 +205,7 @@ describe("scraper env", () => {
   it("rejects Redis references that do not resolve to Redis URLs", () => {
     expect(() =>
       createScraperJobEnv({
+        BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
         DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
         REDIS: "$" + "{{shared.REDIS}}",
         REDIS_URL: "$" + "{{scraper-queue.REDIS_PUBLIC_URL}}",
@@ -168,6 +215,7 @@ describe("scraper env", () => {
 
   it("defaults scheduler settings for scraper jobs", () => {
     const env = createScraperJobEnv({
+      BUNNY_IMAGE_FOLDER_PREFIX: "images/dev",
       DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
       REDIS_URL: "redis://localhost:4008",
     });

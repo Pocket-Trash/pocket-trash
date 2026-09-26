@@ -5,5 +5,6 @@ export * from "./feature-flags.js";
 export * from "./relations.js";
 export * from "./resources.js";
 export * from "./scraper.js";
+export * from "./uploads.js";
 export * from "./user-settings.js";
 export * from "./users.js";

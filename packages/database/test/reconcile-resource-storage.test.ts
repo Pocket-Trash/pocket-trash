@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import type { NeonQueryFunction } from "@neondatabase/serverless";
+import { describe, expect, it, vi } from "vitest";
 import {
   branchResourcePrefix,
   buildMoves,
   destinationPath,
+  getPendingUploadPaths,
   type StoredObject,
 } from "../scripts/reconcile-resource-storage.js";
 
@@ -45,5 +47,50 @@ describe("resource storage reconciliation", () => {
       "resources/dev/1000/shared.stl",
       "resources/preview/1000/shared.stl",
     ]);
+  });
+  it.each([
+    [
+      "preview",
+      "resources/files/1000/v2/hash.pdf",
+      "resources/preview/1000/v2/hash.pdf",
+    ],
+    [
+      "dev_branch_roy",
+      "resources/dev/1000/v1/hash.pdf",
+      "resources/dev/1000/v1/hash.pdf",
+    ],
+    [
+      "preview-pr-147",
+      "images/resources/1000/hash.png",
+      "images/preview/pr-147/resources/1000/hash.png",
+    ],
+    [
+      "preview",
+      "images/preview/pr-147/resources/1000/hash.png",
+      "images/preview/resources/1000/hash.png",
+    ],
+  ])("preserves the storage layout for %s", (branch, path, expected) => {
+    expect(destinationPath(branch, 1000, path)).toBe(expected);
+  });
+  it.each([
+    "upload_file",
+    "storage_object_deletion",
+    "resource_upload_files",
+    undefined,
+  ])("protects pending paths from %s", async (table) => {
+    const database = vi.fn(
+      async (strings: TemplateStringsArray, ...values: unknown[]) => {
+        const query = strings.join("?");
+        if (query.includes("to_regclass"))
+          return [{ exists: values[0] === `public.${table}` }];
+        expect(query).toBe(`select object_path from ${table}`);
+        return [{ object_path: "resources/dev/1000/v2/pending.pdf" }];
+      },
+    );
+    expect(
+      await getPendingUploadPaths(
+        database as unknown as NeonQueryFunction<false, false>,
+      ),
+    ).toEqual(table ? ["resources/dev/1000/v2/pending.pdf"] : []);
   });
 });

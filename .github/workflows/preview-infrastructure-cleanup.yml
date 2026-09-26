@@ -96,17 +96,11 @@ jobs:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
         run: bash .github/scripts/vercel-branch-database-url.sh remove-resource-api-base-url
 
-      - name: Delete image PR preview folder
-        id: image_cleanup
+      - name: Delete storage PR preview folders
+        id: storage_cleanup
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: pnpm --filter @package/images run cleanup:preview-folder
-
-      - name: Delete resource PR preview folder
-        id: resource_cleanup
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: pnpm --filter @package/resources run cleanup:preview-folder
+        run: pnpm --filter @package/storage run cleanup:preview
 
       - name: Remove db-change label
         uses: actions/github-script@v8
@@ -186,10 +180,10 @@ jobs:
         uses: actions/github-script@v8
         env:
           CLEANUP_PERFORMED: ${{ steps.neon_cleanup.outputs.cleanup_performed }}
-          IMAGE_CLEANUP_STATUS: ${{ steps.image_cleanup.outputs.status }}
-          IMAGE_FOLDER_PATH: ${{ steps.image_cleanup.outputs.folder_path }}
-          RESOURCE_CLEANUP_STATUS: ${{ steps.resource_cleanup.outputs.status }}
-          RESOURCE_FOLDER_PATH: ${{ steps.resource_cleanup.outputs.folder_path }}
+          IMAGE_CLEANUP_STATUS: ${{ steps.storage_cleanup.outputs.image_status }}
+          IMAGE_FOLDER_PATH: ${{ steps.storage_cleanup.outputs.image_folder_path }}
+          RESOURCE_CLEANUP_STATUS: ${{ steps.storage_cleanup.outputs.resource_status }}
+          RESOURCE_FOLDER_PATH: ${{ steps.storage_cleanup.outputs.resource_folder_path }}
           TARGET_BRANCH: ${{ steps.neon_cleanup.outputs.target_branch }}
         with:
           github-token: ${{ steps.db-preview-comment-token.outputs.token }}

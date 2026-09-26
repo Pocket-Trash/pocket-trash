@@ -4,8 +4,6 @@
 
 Generated schema documentation for committed Drizzle tables.
 
-- [`catalog_image_upload_file`](./catalog-image-upload-file.md)
-- [`catalog_image_upload_session`](./catalog-image-upload-session.md)
 - [`collection_image`](./collection-image.md)
 - [`collection_item`](./collection-item.md)
 - [`collection_item_image`](./collection-item-image.md)
@@ -33,12 +31,11 @@ Generated schema documentation for committed Drizzle tables.
 - [`resource_files`](./resource-files.md)
 - [`resource_images`](./resource-images.md)
 - [`resource_notifications`](./resource-notifications.md)
-- [`resource_upload_files`](./resource-upload-files.md)
-- [`resource_upload_sessions`](./resource-upload-sessions.md)
 - [`resource_versions`](./resource-versions.md)
 - [`resources`](./resources.md)
 - [`resources_to_categories`](./resources-to-categories.md)
 - [`scraper_runs`](./scraper-runs.md)
+- [`storage_object_deletion`](./storage-object-deletion.md)
 - [`tmp_autmog_pen_materials`](./tmp-autmog-pen-materials.md)
 - [`tmp_autmog_pen_versions`](./tmp-autmog-pen-versions.md)
 - [`tmp_autmog_pens`](./tmp-autmog-pens.md)
@@ -54,6 +51,8 @@ Generated schema documentation for committed Drizzle tables.
 - [`tmp_product_product_types`](./tmp-product-product-types.md)
 - [`tmp_product_variations`](./tmp-product-variations.md)
 - [`tmp_products`](./tmp-products.md)
+- [`upload_file`](./upload-file.md)
+- [`upload_session`](./upload-session.md)
 - [`user_collection`](./user-collection.md)
 - [`user_settings`](./user-settings.md)
 - [`users`](./users.md)

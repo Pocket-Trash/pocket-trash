@@ -23,12 +23,17 @@ export const schemaDescriptions = {
     description:
       "Admin review events created for new resources and categories.",
   },
-  resource_upload_files: {
+  storage_object_deletion: {
     description:
-      "Declared files and upload state for resumable resource upload sessions.",
+      "Durable post-commit object deletion queue. Paths remain reserved until cleanup finishes.",
   },
-  resource_upload_sessions: {
-    description: "Authenticated resource creation and version upload sessions.",
+  upload_file: {
+    description:
+      "Declared files, reserved object paths and verified upload state for all upload sessions.",
+  },
+  upload_session: {
+    description:
+      "Authenticated upload sessions with opaque resource metadata, reserved versions and expiry.",
   },
   resource_versions: {
     description: "Immutable uploaded file versions for resources.",

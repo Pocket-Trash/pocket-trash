@@ -25,7 +25,6 @@
     "@hono/zod-openapi": "^1.6.3",
     "@package/database": "workspace:*",
     "@package/logger": "workspace:*",
-    "@package/resources": "workspace:*",
     "@package/services": "workspace:*",
     "@scalar/hono-api-reference": "^0.12.2",
     "drizzle-orm": "latest",
