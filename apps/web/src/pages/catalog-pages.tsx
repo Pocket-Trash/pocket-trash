@@ -1,4 +1,3 @@
-import { markdownToHtml } from "@package/markdown";
 import type {
   CatalogFinishOption,
   CatalogProduct,
@@ -17,6 +16,7 @@ import {
 import { CollectionCard } from "@/components/collection-card";
 import { ImageGallery } from "@/components/image-gallery";
 import { MakerLink } from "@/components/maker-link";
+import { MarkdownContent } from "@/components/markdown-content";
 import { ProductCard } from "@/components/product-card";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -279,7 +279,10 @@ export function ProductDetailPage({
           previousLabel={t("web.resources.action.previousImage")}
         />
         {product.description ? (
-          <MarkdownDescription markdown={product.description} />
+          <MarkdownContent
+            className="rounded-xl border border-border bg-card p-6 text-card-foreground"
+            markdown={product.description}
+          />
         ) : null}
         <dl className="grid gap-4 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
           <Detail label={t("web.catalog.field.productType")}>
@@ -909,7 +912,10 @@ export function CollectionItemDetailPage({
           ) : null}
         </dl>
         {item.description ? (
-          <MarkdownDescription markdown={item.description} />
+          <MarkdownContent
+            className="rounded-xl border border-border bg-card p-6 text-card-foreground"
+            markdown={item.description}
+          />
         ) : null}
         <Link
           className={buttonVariants({ variant: "outline" })}
@@ -936,15 +942,6 @@ export function CollectionItemDetailPage({
         />
       </main>
     </AppShell>
-  );
-}
-
-function MarkdownDescription({ markdown }: { markdown: string }) {
-  return (
-    <div
-      className="grid gap-4 rounded-xl border border-border bg-card p-6 text-card-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:bg-accent/30 [&_blockquote]:p-4 [&_h2]:mt-3 [&_h2]:text-xl [&_h2]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ul]:grid [&_ul]:gap-2"
-      dangerouslySetInnerHTML={{ __html: markdownToHtml(markdown) ?? "" }}
-    />
   );
 }
 
