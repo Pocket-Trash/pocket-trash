@@ -70,6 +70,25 @@ export const Route = createRootRoute({
         name: "viewport",
         content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
+      // Launch chromeless (no Safari toolbars) when added to the iOS home
+      // screen, so the fixed bottom toolbar is never overlapped by browser
+      // chrome. `mobile-web-app-capable` is the standard alias.
+      {
+        name: "apple-mobile-web-app-capable",
+        content: "yes",
+      },
+      {
+        name: "mobile-web-app-capable",
+        content: "yes",
+      },
+      {
+        name: "apple-mobile-web-app-status-bar-style",
+        content: "default",
+      },
+      {
+        name: "apple-mobile-web-app-title",
+        content: SITE_NAME,
+      },
       {
         title: formatTranslation("web.site.name"),
       },
