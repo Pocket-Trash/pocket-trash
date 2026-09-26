@@ -31,12 +31,14 @@ const collectionImage = image(
 );
 
 const product: CatalogProduct = {
+  bearing: "R188 hybrid ceramic",
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: false,
   compatibleButtonId: null,
   compatibleButtonName: null,
   createdAt: new Date("2026-01-01"),
+  description: "A **compact** spinner.",
   diameterMm: "50.8",
   finishOptions: [
     {
@@ -54,6 +56,8 @@ const product: CatalogProduct = {
   lengthMm: null,
   makerId: 1000,
   makerName: "KAP EDC",
+  makerProductUrl: "https://www.kapedc.com/products/katla",
+  makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
   materials: [{ id: 1000, name: "Titanium", slug: "titanium" }],
   name: "Katla",
@@ -62,6 +66,7 @@ const product: CatalogProduct = {
   productTypeName: "Spinner",
   productTypeSlug: "spinner",
   slug: "katla",
+  spinDiameterMm: "55",
   thicknessMm: "12.7",
   thicknessWithButtonMm: null,
   updatedAt: new Date("2026-01-02"),
@@ -84,6 +89,8 @@ const collection: UserCollectionSummary = {
 };
 
 const item: UserCollectionItem = {
+  bearing: "R188 full ceramic",
+  bearingOverride: "R188 full ceramic",
   canAdminister: false,
   canEdit: false,
   collectionId: collection.id,
@@ -91,6 +98,8 @@ const item: UserCollectionItem = {
   collectionItemId: 1000,
   collectionName: collection.name,
   displayName: "My Katla",
+  description: "My **daily carry** spinner.",
+  descriptionOverride: "My **daily carry** spinner.",
   finishOption: product.finishOptions[0] ?? null,
   imageCount: 1,
   images: [collectionImage],

@@ -3,12 +3,14 @@ import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { ProductCard } from "./product-card";
 
 const product: CatalogProduct = {
+  bearing: null,
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: true,
   compatibleButtonId: null,
   compatibleButtonName: null,
   createdAt: new Date("2026-01-01"),
+  description: null,
   diameterMm: "50.8",
   finishOptions: [
     {
@@ -28,6 +30,8 @@ const product: CatalogProduct = {
   lengthMm: null,
   makerId: 1000,
   makerName: "KAP EDC",
+  makerProductUrl: null,
+  makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
   materials: [
     { id: 1000, name: "Bronze", slug: "bronze" },
@@ -39,6 +43,7 @@ const product: CatalogProduct = {
   productTypeName: "Spinner",
   productTypeSlug: "spinner",
   slug: "katla",
+  spinDiameterMm: null,
   thicknessMm: "12.7",
   thicknessWithButtonMm: null,
   updatedAt: new Date("2026-01-02"),

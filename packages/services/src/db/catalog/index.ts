@@ -62,12 +62,14 @@ export type ProductWriteFinishOption = {
 };
 
 export type CatalogProduct = {
+  bearing: string | null;
   buttonDiameterMm: string | null;
   compatibleButtonId: number | null;
   compatibleButtonName: string | null;
   canAdminister: boolean;
   canEdit: boolean;
   createdAt: Date;
+  description: string | null;
   diameterMm: string | null;
   finishOptions: CatalogFinishOption[];
   imageCount: number;
@@ -76,6 +78,8 @@ export type CatalogProduct = {
   lengthMm: string | null;
   makerId: number;
   makerName: string;
+  makerProductUrl: string | null;
+  makerProductUrlValid: boolean;
   makerUrl: string | null;
   materials: Array<{ id: number; name: string; slug: string }>;
   name: string;
@@ -87,6 +91,7 @@ export type CatalogProduct = {
   productTypeName: string;
   productTypeSlug: string;
   slug: string;
+  spinDiameterMm: string | null;
   thicknessMm: string | null;
   thicknessWithButtonMm: string | null;
   updatedAt: Date;
@@ -97,17 +102,21 @@ export type CatalogProduct = {
 export type ProductWriteInput = {
   actorClerkId: string;
   actorIsAdmin?: boolean;
+  description?: string | null;
   makerId: number;
+  makerProductUrl?: string | null;
   finishOptions: ProductWriteFinishOption[];
   materialIds: number[];
   name: string;
   productTypeSlug: CatalogProductType;
   slug: string;
   specs: {
+    bearing?: string | null;
     buttonDiameterMm?: string | null;
     compatibleButtonId?: number | null;
     diameterMm?: string | null;
     lengthMm?: string | null;
+    spinDiameterMm?: string | null;
     thicknessMm?: string | null;
     thicknessWithButtonMm?: string | null;
     weightG?: string | null;
@@ -184,12 +193,18 @@ export type CatalogService = {
     productId: number;
     reason?: string;
   }): Promise<void>;
+  setMakerProductUrlValidity(input: {
+    makerProductUrlValid: boolean;
+    productId: number;
+  }): Promise<void>;
   updateProduct(
     input: ProductWriteInput & { productId: number },
   ): Promise<CatalogProduct>;
 };
 
 export type UserCollectionItem = {
+  bearing: string | null;
+  bearingOverride: string | null;
   canAdminister: boolean;
   canEdit: boolean;
   collectionIsPrivate: boolean;
@@ -197,6 +212,8 @@ export type UserCollectionItem = {
   collectionName: string;
   collectionItemId: number;
   displayName: string;
+  description: string | null;
+  descriptionOverride: string | null;
   finishOption: CatalogFinishOption | null;
   imageCount: number;
   images: CatalogImage[];
@@ -255,6 +272,7 @@ export type CollectionWriteInput = {
 export type CollectionsService = {
   addSpinner(input: {
     actorClerkId: string;
+    bearing?: string | null;
     buttonCustomFinish: ProductWriteFinishOption | null;
     buttonFinishOptionId: number | null;
     buttonMaterialId: number | null;
@@ -265,6 +283,7 @@ export type CollectionsService = {
     spinnerProductId: number;
     collectionId?: number | null;
     displayName: string;
+    description?: string | null;
     newCollection?: CollectionWriteInput | null;
   }): Promise<{ buttonItemId: number | null; spinnerItemId: number }>;
   addSpinnerButton(input: {
@@ -275,6 +294,7 @@ export type CollectionsService = {
     productId: number;
     collectionId?: number | null;
     displayName: string;
+    description?: string | null;
     newCollection?: CollectionWriteInput | null;
   }): Promise<number>;
   createCollection(
@@ -339,11 +359,13 @@ export type CollectionsService = {
   updateItem(input: {
     actorClerkId: string;
     actorIsAdmin?: boolean;
+    bearing?: string | null;
     collectionId?: number;
     collectionItemId: number;
     customFinish: ProductWriteFinishOption | null;
     finishOptionId: number | null;
     displayName: string;
+    description?: string | null;
     installedButton?: {
       collectionItemId: number;
       customFinish: ProductWriteFinishOption | null;
@@ -491,7 +513,22 @@ export function createCatalogService(
             const [row] = await tx
               .insert(schema.product)
               .values({
+                ...(input.description !== undefined
+                  ? {
+                      description: normalizeOptionalDescription(
+                        input.description,
+                      ),
+                    }
+                  : {}),
                 makerId: input.makerId,
+                ...(input.makerProductUrl !== undefined
+                  ? {
+                      makerProductUrl: normalizeOptionalUrl(
+                        input.makerProductUrl,
+                      ),
+                      makerProductUrlValid: true,
+                    }
+                  : {}),
                 name: input.name,
                 ownerClerkId: input.actorClerkId,
                 productTypeId: type.id,
@@ -677,6 +714,23 @@ export function createCatalogService(
         .set(privacyUpdate({ ...input, actorIsAdmin: actorIsModerating }))
         .where(eq(schema.product.id, input.productId));
     },
+    async setMakerProductUrlValidity(input) {
+      await logger.operation(
+        loggerMessages.database.catalog.setMakerProductUrlValidity,
+        async () => {
+          await db
+            .update(schema.product)
+            .set({ makerProductUrlValid: input.makerProductUrlValid })
+            .where(eq(schema.product.id, input.productId));
+        },
+        {
+          attributes: {
+            makerProductUrlValid: input.makerProductUrlValid,
+            productId: input.productId,
+          },
+        },
+      );
+    },
     async softDeleteImage(input) {
       await softDeleteCatalogImage(db, input);
     },
@@ -689,6 +743,8 @@ export function createCatalogService(
             const [existing] = await tx
               .select({
                 id: schema.product.id,
+                makerProductUrl: schema.product.makerProductUrl,
+                makerProductUrlValid: schema.product.makerProductUrlValid,
                 ownerClerkId: schema.product.ownerClerkId,
               })
               .from(schema.product)
@@ -710,11 +766,32 @@ export function createCatalogService(
             ) {
               throw new Error("Product does not exist.");
             }
+            const makerProductUrl =
+              input.makerProductUrl === undefined
+                ? undefined
+                : normalizeOptionalUrl(input.makerProductUrl);
 
             await tx
               .update(schema.product)
               .set({
+                ...(input.description !== undefined
+                  ? {
+                      description: normalizeOptionalDescription(
+                        input.description,
+                      ),
+                    }
+                  : {}),
                 makerId: input.makerId,
+                ...(makerProductUrl !== undefined
+                  ? {
+                      makerProductUrl,
+                      makerProductUrlValid:
+                        makerProductUrl !==
+                        normalizeOptionalUrl(existing.makerProductUrl)
+                          ? true
+                          : existing.makerProductUrlValid,
+                    }
+                  : {}),
                 name: input.name,
                 slug: input.slug,
               })
@@ -854,6 +931,13 @@ export function createCollectionsService(
               .insert(schema.collectionItem)
               .values({
                 collectionId,
+                ...(input.description !== undefined
+                  ? {
+                      description: normalizeOptionalDescription(
+                        input.description,
+                      ),
+                    }
+                  : {}),
                 displayName: input.displayName,
                 materialId: input.spinnerMaterialId,
                 ownerId: owner.id,
@@ -861,6 +945,9 @@ export function createCollectionsService(
               .returning({ id: schema.collectionItem.id });
             if (!spinnerItem) throw new Error("Failed to create spinner item.");
             await tx.insert(schema.collectionSpinner).values({
+              ...(input.bearing !== undefined
+                ? { bearing: normalizeOptionalText(input.bearing) }
+                : {}),
               id: spinnerItem.id,
               installedButtonId: buttonItemId,
               productSpinnerId: input.spinnerProductId,
@@ -897,6 +984,13 @@ export function createCollectionsService(
               .insert(schema.collectionItem)
               .values({
                 collectionId,
+                ...(input.description !== undefined
+                  ? {
+                      description: normalizeOptionalDescription(
+                        input.description,
+                      ),
+                    }
+                  : {}),
                 displayName: input.displayName,
                 materialId: input.materialId,
                 ownerId: owner.id,
@@ -1328,8 +1422,24 @@ export function createCollectionsService(
             });
             await tx
               .update(schema.collectionItem)
-              .set({ displayName: input.displayName.trim() })
+              .set({
+                ...(input.description !== undefined
+                  ? {
+                      description: normalizeOptionalDescription(
+                        input.description,
+                      ),
+                    }
+                  : {}),
+                displayName: input.displayName.trim(),
+              })
               .where(eq(schema.collectionItem.id, input.collectionItemId));
+
+            if (item.spinnerProductId !== null && input.bearing !== undefined) {
+              await tx
+                .update(schema.collectionSpinner)
+                .set({ bearing: normalizeOptionalText(input.bearing) })
+                .where(eq(schema.collectionSpinner.id, input.collectionItemId));
+            }
 
             if (input.installedButton !== undefined) {
               if (item.spinnerProductId === null) {
@@ -1701,10 +1811,12 @@ async function queryProducts(
 
   const rows = await db
     .select({
+      bearing: schema.productSpinner.bearing,
       buttonDiameterMm: schema.productSpinner.buttonDiameterMm,
       compatibleButtonId: schema.productSpinner.compatibleButtonId,
       compatibleButtonName: compatibleButtonProduct.name,
       createdAt: sql<Date>`coalesce(${schema.productSpinner.createdAt}, ${schema.productSpinnerButton.createdAt})`,
+      description: schema.product.description,
       diameterMm: schema.productSpinnerButton.diameterMm,
       id: schema.product.id,
       isPrivate: schema.product.isPrivate,
@@ -1712,6 +1824,8 @@ async function queryProducts(
       lengthMm: schema.productSpinner.lengthMm,
       makerId: schema.maker.id,
       makerName: schema.maker.name,
+      makerProductUrl: schema.product.makerProductUrl,
+      makerProductUrlValid: schema.product.makerProductUrlValid,
       makerUrl: schema.maker.rootUrl,
       materialId: schema.material.id,
       materialName: schema.material.name,
@@ -1722,6 +1836,7 @@ async function queryProducts(
       productTypeName: schema.productType.name,
       productTypeSlug: schema.productType.slug,
       slug: schema.product.slug,
+      spinDiameterMm: schema.productSpinner.spinDiameterMm,
       thicknessMm: sql<
         string | null
       >`coalesce(${schema.productSpinner.thicknessMm}, ${schema.productSpinnerButton.thicknessMm})`,
@@ -1775,12 +1890,14 @@ async function queryProducts(
       continue;
     }
     products.set(row.id, {
+      bearing: row.bearing,
       buttonDiameterMm: row.buttonDiameterMm,
       compatibleButtonId: row.compatibleButtonId,
       compatibleButtonName: row.compatibleButtonName,
       canAdminister: Boolean(viewer?.isAdmin),
       canEdit: Boolean(viewer?.isAdmin || viewer?.clerkId === row.ownerClerkId),
       createdAt: row.createdAt,
+      description: row.description,
       diameterMm: row.diameterMm,
       finishOptions: [],
       imageCount: 0,
@@ -1789,6 +1906,8 @@ async function queryProducts(
       lengthMm: row.lengthMm,
       makerId: row.makerId,
       makerName: row.makerName,
+      makerProductUrl: row.makerProductUrl,
+      makerProductUrlValid: row.makerProductUrlValid,
       makerUrl: row.makerUrl,
       materials:
         row.materialId && row.materialName && row.materialSlug
@@ -1812,6 +1931,7 @@ async function queryProducts(
       productTypeName: row.productTypeName,
       productTypeSlug: row.productTypeSlug,
       slug: row.slug,
+      spinDiameterMm: row.spinDiameterMm,
       thicknessMm: row.thicknessMm,
       thicknessWithButtonMm: row.thicknessWithButtonMm,
       updatedAt: row.updatedAt,
@@ -2026,11 +2146,15 @@ async function queryOwnedItems(
   }
   const rows = await db
     .select({
+      bearingOverride: schema.collectionSpinner.bearing,
+      productBearing: schema.productSpinner.bearing,
       collectionId: schema.userCollection.id,
       collectionItemId: schema.collectionItem.id,
       collectionIsPrivate: schema.userCollection.isPrivate,
       collectionName: schema.userCollection.name,
       displayName: sql<string>`coalesce(${schema.collectionItem.displayName}, ${schema.product.name})`,
+      descriptionOverride: schema.collectionItem.description,
+      productDescription: schema.product.description,
       colorEffectId: schema.colorEffect.id,
       colorEffectName: schema.colorEffect.name,
       colorEffectSlug: schema.colorEffect.slug,
@@ -2091,6 +2215,10 @@ async function queryOwnedItems(
       ),
     )
     .innerJoin(schema.maker, eq(schema.product.makerId, schema.maker.id))
+    .leftJoin(
+      schema.productSpinner,
+      eq(schema.product.id, schema.productSpinner.id),
+    )
     .innerJoin(
       schema.productType,
       eq(schema.product.productTypeId, schema.productType.id),
@@ -2120,6 +2248,8 @@ async function queryOwnedItems(
     ),
   );
   const items: UserCollectionItem[] = visibleRows.map((row) => ({
+    bearing: row.bearingOverride ?? row.productBearing,
+    bearingOverride: row.bearingOverride,
     canAdminister: Boolean(options.viewerIsAdmin),
     canEdit: Boolean(
       options.viewerIsAdmin || options.viewerClerkId === row.ownerClerkId,
@@ -2129,6 +2259,8 @@ async function queryOwnedItems(
     collectionItemId: row.collectionItemId,
     collectionName: row.collectionName,
     displayName: row.displayName,
+    description: row.descriptionOverride ?? row.productDescription,
+    descriptionOverride: row.descriptionOverride,
     finishOption: row.finishOptionId
       ? (finishOptions.get(row.finishOptionId) ?? null)
       : null,
@@ -2798,14 +2930,32 @@ export function assertValidFinishOptions(
 
 function spinnerSpecs(specs: ProductWriteInput["specs"]) {
   return {
+    ...(specs.bearing !== undefined
+      ? { bearing: normalizeOptionalText(specs.bearing) }
+      : {}),
     buttonDiameterMm: specs.buttonDiameterMm ?? null,
     compatibleButtonId: specs.compatibleButtonId ?? null,
     lengthMm: specs.lengthMm ?? null,
+    ...(specs.spinDiameterMm !== undefined
+      ? { spinDiameterMm: specs.spinDiameterMm }
+      : {}),
     thicknessMm: specs.thicknessMm ?? null,
     thicknessWithButtonMm: specs.thicknessWithButtonMm ?? null,
     weightG: specs.weightG ?? null,
     widthMm: specs.widthMm ?? null,
   };
+}
+
+function normalizeOptionalText(value: string | null | undefined) {
+  return value?.trim() || null;
+}
+
+function normalizeOptionalUrl(value: string | null | undefined) {
+  return value?.trim().replace(/\/+$/, "") || null;
+}
+
+function normalizeOptionalDescription(value: string | null | undefined) {
+  return value?.trim() ? value : null;
 }
 
 function buttonSpecs(specs: ProductWriteInput["specs"]) {

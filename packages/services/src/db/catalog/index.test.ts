@@ -141,6 +141,75 @@ describe("collection catalog writes", () => {
     ).resolves.toEqual([]);
   });
 
+  it("uses collection overrides and falls back to product details", async () => {
+    const baseRow = {
+      bearingOverride: null,
+      buttonId: null,
+      collectionId: 900,
+      collectionIsPrivate: false,
+      collectionItemId: 2001,
+      collectionName: "Daily Carry",
+      colorEffectId: null,
+      colorEffectName: null,
+      colorEffectSlug: null,
+      descriptionOverride: null,
+      displayName: "My spinner",
+      finishOptionId: null,
+      installedButtonId: null,
+      isPrivate: false,
+      makerId: 100,
+      makerName: "KAP EDC",
+      makerUrl: null,
+      materialId: null,
+      materialName: null,
+      materialSlug: null,
+      name: "Catla",
+      ownerClerkId: "user-secret",
+      ownerUserId: 1000,
+      ownerUsername: "ranger",
+      privatedByClerkId: null,
+      productBearing: "R188",
+      productDescription: "**Fast** spinner",
+      productId: 1100,
+      productSlug: "catla",
+      productTypeName: "Spinner",
+      sourceProductFinishOptionId: null,
+      spinnerId: 2001,
+      updatedAt: new Date("2026-09-23"),
+    };
+    const { service } = setup(
+      [],
+      [
+        [
+          baseRow,
+          {
+            ...baseRow,
+            bearingOverride: "One Drop",
+            collectionItemId: 2002,
+            descriptionOverride: "Collection **override**",
+          },
+        ],
+        [],
+        [],
+      ],
+    );
+
+    await expect(service.listProductItems(1100)).resolves.toEqual([
+      expect.objectContaining({
+        bearing: "R188",
+        bearingOverride: null,
+        description: "**Fast** spinner",
+        descriptionOverride: null,
+      }),
+      expect.objectContaining({
+        bearing: "One Drop",
+        bearingOverride: "One Drop",
+        description: "Collection **override**",
+        descriptionOverride: "Collection **override**",
+      }),
+    ]);
+  });
+
   it("lists public collections that have no public items", async () => {
     const createdAt = new Date("2026-09-23T22:59:55.454Z");
     const updatedAt = new Date("2026-09-23T23:02:19.572Z");
@@ -609,6 +678,219 @@ describe("collection catalog writes", () => {
 });
 
 describe("catalog lookup writes", () => {
+  it("creates product source details as valid", async () => {
+    const { db, writes } = setup(
+      [[{ id: 900 }], [{ id: 5000 }]],
+      [[{ id: 1000 }]],
+    );
+    const service = createCatalogService(
+      db,
+      createLogger({ app: "api", environment: "test" }),
+    );
+    service.getProduct = vi.fn().mockResolvedValue({
+      bearing: "R188",
+      description: "**Fast** spinner",
+      id: 900,
+      makerProductUrl: "https://maker.example/spinner",
+      makerProductUrlValid: true,
+      spinDiameterMm: "52",
+    } as never);
+
+    await expect(
+      service.createProduct({
+        actorClerkId: "user-secret",
+        description: "**Fast** spinner",
+        finishOptions: [
+          {
+            colorEffectId: null,
+            colorIds: [],
+            finishIds: [1000],
+          },
+        ],
+        makerId: 100,
+        makerProductUrl: " https://maker.example/spinner/ ",
+        materialIds: [1000],
+        name: "Catla",
+        productTypeSlug: "spinner",
+        slug: "catla",
+        specs: { bearing: " R188 ", spinDiameterMm: "52" },
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        bearing: "R188",
+        description: "**Fast** spinner",
+        makerProductUrl: "https://maker.example/spinner",
+        makerProductUrlValid: true,
+        spinDiameterMm: "52",
+      }),
+    );
+    expect(writes).toEqual(
+      expect.arrayContaining([
+        {
+          table: schema.product,
+          value: expect.objectContaining({
+            description: "**Fast** spinner",
+            makerProductUrl: "https://maker.example/spinner",
+            makerProductUrlValid: true,
+          }),
+        },
+        {
+          table: schema.productSpinner,
+          value: expect.objectContaining({
+            bearing: "R188",
+            spinDiameterMm: "52",
+          }),
+        },
+      ]),
+    );
+  });
+
+  it("reads product source details", async () => {
+    const { db } = setup(
+      [],
+      [
+        [
+          {
+            bearing: "R188",
+            createdAt: new Date(0),
+            description: "**Fast** spinner",
+            id: 900,
+            isPrivate: false,
+            makerId: 100,
+            makerName: "Maker",
+            makerProductUrl: "https://maker.example/spinner",
+            makerProductUrlValid: false,
+            name: "Catla",
+            ownerClerkId: "user-secret",
+            privatedByClerkId: null,
+            productTypeId: 1000,
+            productTypeName: "Spinner",
+            productTypeSlug: "spinner",
+            slug: "catla",
+            spinDiameterMm: "52",
+            updatedAt: new Date(0),
+          },
+        ],
+        [],
+        [],
+      ],
+    );
+    const service = createCatalogService(
+      db,
+      createLogger({ app: "api", environment: "test" }),
+    );
+
+    await expect(service.getProduct("spinner", "catla")).resolves.toEqual(
+      expect.objectContaining({
+        bearing: "R188",
+        description: "**Fast** spinner",
+        makerProductUrl: "https://maker.example/spinner",
+        makerProductUrlValid: false,
+        spinDiameterMm: "52",
+      }),
+    );
+  });
+
+  it.each([
+    {
+      existingMakerProductUrl: "https://maker.example/original/",
+      expectedValidity: false,
+      makerProductUrl: "https://maker.example/original",
+      name: "preserves invalidity when the URL is unchanged",
+    },
+    {
+      existingMakerProductUrl: "https://maker.example/original",
+      expectedValidity: true,
+      makerProductUrl: "https://maker.example/replacement",
+      name: "resets validity when the URL changes",
+    },
+    {
+      existingMakerProductUrl: "https://maker.example/original",
+      expectedValidity: undefined,
+      makerProductUrl: undefined,
+      name: "leaves validity untouched for unrelated edits",
+    },
+  ])("$name", async ({
+    existingMakerProductUrl,
+    expectedValidity,
+    makerProductUrl,
+  }) => {
+    const { db, updates } = setup(
+      [[{ id: 5000 }]],
+      [
+        [
+          {
+            id: 900,
+            makerProductUrl: existingMakerProductUrl,
+            makerProductUrlValid: false,
+            ownerClerkId: "user-secret",
+          },
+        ],
+      ],
+    );
+    const service = createCatalogService(
+      db,
+      createLogger({ app: "api", environment: "test" }),
+    );
+    service.getProduct = vi.fn().mockResolvedValue({ id: 900 } as never);
+
+    await service.updateProduct({
+      actorClerkId: "user-secret",
+      description: "Updated **description**",
+      finishOptions: [
+        {
+          colorEffectId: null,
+          colorIds: [],
+          finishIds: [1000],
+        },
+      ],
+      makerId: 100,
+      makerProductUrl,
+      materialIds: [1000],
+      name: "Catla edited",
+      productId: 900,
+      productTypeSlug: "spinner",
+      slug: "catla-edited",
+      specs: { bearing: " One Drop ", spinDiameterMm: "54" },
+    });
+
+    const value = updates.find(({ table }) => table === schema.product)
+      ?.value as Record<string, unknown>;
+    expect(value).toEqual(
+      expect.objectContaining({ description: "Updated **description**" }),
+    );
+    expect(
+      updates.find(({ table }) => table === schema.productSpinner)?.value,
+    ).toEqual(
+      expect.objectContaining({ bearing: "One Drop", spinDiameterMm: "54" }),
+    );
+    if (expectedValidity === undefined) {
+      expect(value).not.toHaveProperty("makerProductUrlValid");
+    } else {
+      expect(value).toEqual(
+        expect.objectContaining({ makerProductUrlValid: expectedValidity }),
+      );
+    }
+  });
+
+  it("updates maker product URL validity without rewriting the product", async () => {
+    const { db, updates } = setup([], []);
+    const service = createCatalogService(
+      db,
+      createLogger({ app: "api", environment: "test" }),
+    );
+
+    await service.setMakerProductUrlValidity({
+      makerProductUrlValid: false,
+      productId: 900,
+    });
+
+    expect(updates).toContainEqual({
+      table: schema.product,
+      value: { makerProductUrlValid: false },
+    });
+  });
+
   it("treats an admin changing their own product as an owner action", async () => {
     const { db, updates } = setup(
       [],
