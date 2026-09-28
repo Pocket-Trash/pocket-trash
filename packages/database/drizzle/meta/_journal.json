@@ -218,6 +218,13 @@
       "when": 1790364997717,
       "tag": "0030_nifty_madelyne_pryor",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790636095052,
+      "tag": "0031_harsh_sauron",
+      "breakpoints": true
     }
   ]
 }

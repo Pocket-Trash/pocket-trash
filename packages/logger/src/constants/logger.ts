@@ -77,6 +77,14 @@ export const loggerMessages = {
       setUserPreference: "database.featureFlags.setUserPreference",
       update: "database.featureFlags.update",
     },
+    feedback: {
+      approve: "database.feedback.approve",
+      deny: "database.feedback.deny",
+      listMine: "database.feedback.listMine",
+      listPending: "database.feedback.listPending",
+      submit: "database.feedback.submit",
+      updatePending: "database.feedback.updatePending",
+    },
     userSettings: {
       getByClerkId: "database.userSettings.getByClerkId",
       patchForClerkId: "database.userSettings.patchForClerkId",

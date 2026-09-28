@@ -7,6 +7,10 @@ import {
   createCollectionsService,
 } from "./catalog/index.js";
 import {
+  createFeedbackService,
+  type FeedbackService,
+} from "./feedback/index.js";
+import {
   createUserSettingsService,
   defaultUserSettings,
   type UserSettingsService,
@@ -16,6 +20,7 @@ import { createUsersService, type UsersService } from "./users/index.js";
 export type DbServices = {
   catalog: CatalogService;
   collections: CollectionsService;
+  feedback: FeedbackService;
   userSettings: UserSettingsService;
   users: UsersService;
 };
@@ -26,6 +31,7 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
   return {
     catalog: createCatalogService(db, logger),
     collections: createCollectionsService(db, users, logger),
+    feedback: createFeedbackService(db, logger),
     userSettings: createUserSettingsService(db, users, logger),
     users,
   };
@@ -48,6 +54,15 @@ export type {
   UserCollectionItem,
   UserCollectionSummary,
 } from "./catalog/index.js";
+export type {
+  FeedbackService,
+  SubmitFeedbackInput,
+  UpdatePendingFeedbackInput,
+} from "./feedback/index.js";
+export {
+  FeedbackStateError,
+  FeedbackSubmissionLimitError,
+} from "./feedback/index.js";
 export type {
   UpsertUserSettingsInput,
   UserSettingsService,

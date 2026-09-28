@@ -6,6 +6,8 @@ export type {
   DimensionUnit,
   FeatureFlag,
   FeatureFlagUserOverride,
+  FeedbackCategory,
+  FeedbackStatus,
   GrimsmoKnifeVariationNormalizedData,
   GrimsmoPenVariationNormalizedData,
   GrimsmoProductNormalizedData,

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UserRouteImport } from './routes/user'
 import { Route as ResourcesRouteImport } from './routes/resources'
+import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as AutmogRouteImport } from './routes/autmog'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UserIndexRouteImport } from './routes/user.index'
@@ -29,6 +30,8 @@ import { Route as ResourcesResourceIdRouteImport } from './routes/resources.$res
 import { Route as ProductsAddRouteImport } from './routes/products.add'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as HelpSlugRouteImport } from './routes/help.$slug'
+import { Route as FeedbackNewRouteImport } from './routes/feedback.new'
+import { Route as FeedbackMyRequestsRouteImport } from './routes/feedback.my-requests'
 import { Route as CollectionsAddRouteImport } from './routes/collections.add'
 import { Route as CollectionsUserIdRouteImport } from './routes/collections.$userId'
 import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
@@ -43,6 +46,7 @@ import { Route as CollectionsEditCollectionItemIdRouteImport } from './routes/co
 import { Route as AdminSettingsFeatureFlagsRouteImport } from './routes/admin.settings.feature-flags'
 import { Route as AdminResourcesTrashRouteImport } from './routes/admin.resources.trash'
 import { Route as AdminResourcesNotificationsRouteImport } from './routes/admin.resources.notifications'
+import { Route as AdminFeedbackRequestsRouteImport } from './routes/admin.feedback.requests'
 import { Route as AdminCatalogImagesTrashRouteImport } from './routes/admin.catalog-images.trash'
 import { Route as UserCollectionsCollectionIdEditRouteImport } from './routes/user.collections_.$collectionId_.edit'
 import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId_.versions.new'
@@ -57,6 +61,11 @@ const UserRoute = UserRouteImport.update({
 const ResourcesRoute = ResourcesRouteImport.update({
   id: '/resources',
   path: '/resources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackRoute = FeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AutmogRoute = AutmogRouteImport.update({
@@ -149,6 +158,16 @@ const HelpSlugRoute = HelpSlugRouteImport.update({
   path: '/help/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeedbackNewRoute = FeedbackNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => FeedbackRoute,
+} as any)
+const FeedbackMyRequestsRoute = FeedbackMyRequestsRouteImport.update({
+  id: '/my-requests',
+  path: '/my-requests',
+  getParentRoute: () => FeedbackRoute,
+} as any)
 const CollectionsAddRoute = CollectionsAddRouteImport.update({
   id: '/collections/add',
   path: '/collections/add',
@@ -226,6 +245,11 @@ const AdminResourcesNotificationsRoute =
     path: '/admin/resources/notifications',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AdminFeedbackRequestsRoute = AdminFeedbackRequestsRouteImport.update({
+  id: '/admin/feedback/requests',
+  path: '/admin/feedback/requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminCatalogImagesTrashRoute = AdminCatalogImagesTrashRouteImport.update({
   id: '/admin/catalog-images/trash',
   path: '/admin/catalog-images/trash',
@@ -259,11 +283,14 @@ const CollectionsUserIdCollectionIdCollectionItemIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/autmog': typeof AutmogRouteWithChildren
+  '/feedback': typeof FeedbackRouteWithChildren
   '/resources': typeof ResourcesRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/feedback/my-requests': typeof FeedbackMyRequestsRoute
+  '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
@@ -281,6 +308,7 @@ export interface FileRoutesByFullPath {
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
   '/admin/catalog-images/trash': typeof AdminCatalogImagesTrashRoute
+  '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/resources/trash': typeof AdminResourcesTrashRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
@@ -300,9 +328,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/autmog': typeof AutmogRouteWithChildren
+  '/feedback': typeof FeedbackRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/feedback/my-requests': typeof FeedbackMyRequestsRoute
+  '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
@@ -320,6 +351,7 @@ export interface FileRoutesByTo {
   '/resources': typeof ResourcesIndexRoute
   '/user': typeof UserIndexRoute
   '/admin/catalog-images/trash': typeof AdminCatalogImagesTrashRoute
+  '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/resources/trash': typeof AdminResourcesTrashRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
@@ -340,11 +372,14 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/autmog': typeof AutmogRouteWithChildren
+  '/feedback': typeof FeedbackRouteWithChildren
   '/resources': typeof ResourcesRouteWithChildren
   '/user': typeof UserRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/feedback/my-requests': typeof FeedbackMyRequestsRoute
+  '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
@@ -362,6 +397,7 @@ export interface FileRoutesById {
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
   '/admin/catalog-images/trash': typeof AdminCatalogImagesTrashRoute
+  '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/resources/trash': typeof AdminResourcesTrashRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
@@ -383,11 +419,14 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/autmog'
+    | '/feedback'
     | '/resources'
     | '/user'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/feedback/my-requests'
+    | '/feedback/new'
     | '/help/$slug'
     | '/pens/$penId'
     | '/products/add'
@@ -405,6 +444,7 @@ export interface FileRouteTypes {
     | '/resources/'
     | '/user/'
     | '/admin/catalog-images/trash'
+    | '/admin/feedback/requests'
     | '/admin/resources/notifications'
     | '/admin/resources/trash'
     | '/admin/settings/feature-flags'
@@ -424,9 +464,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/autmog'
+    | '/feedback'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/feedback/my-requests'
+    | '/feedback/new'
     | '/help/$slug'
     | '/pens/$penId'
     | '/products/add'
@@ -444,6 +487,7 @@ export interface FileRouteTypes {
     | '/resources'
     | '/user'
     | '/admin/catalog-images/trash'
+    | '/admin/feedback/requests'
     | '/admin/resources/notifications'
     | '/admin/resources/trash'
     | '/admin/settings/feature-flags'
@@ -463,11 +507,14 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/autmog'
+    | '/feedback'
     | '/resources'
     | '/user'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/feedback/my-requests'
+    | '/feedback/new'
     | '/help/$slug'
     | '/pens/$penId'
     | '/products/add'
@@ -485,6 +532,7 @@ export interface FileRouteTypes {
     | '/resources/'
     | '/user/'
     | '/admin/catalog-images/trash'
+    | '/admin/feedback/requests'
     | '/admin/resources/notifications'
     | '/admin/resources/trash'
     | '/admin/settings/feature-flags'
@@ -505,6 +553,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AutmogRoute: typeof AutmogRouteWithChildren
+  FeedbackRoute: typeof FeedbackRouteWithChildren
   ResourcesRoute: typeof ResourcesRouteWithChildren
   UserRoute: typeof UserRouteWithChildren
   CollectionsUserIdRoute: typeof CollectionsUserIdRoute
@@ -518,6 +567,7 @@ export interface RootRouteChildren {
   HelpIndexRoute: typeof HelpIndexRoute
   ProductsIndexRoute: typeof ProductsIndexRoute
   AdminCatalogImagesTrashRoute: typeof AdminCatalogImagesTrashRoute
+  AdminFeedbackRequestsRoute: typeof AdminFeedbackRequestsRoute
   AdminResourcesNotificationsRoute: typeof AdminResourcesNotificationsRoute
   AdminResourcesTrashRoute: typeof AdminResourcesTrashRoute
   AdminSettingsFeatureFlagsRoute: typeof AdminSettingsFeatureFlagsRoute
@@ -542,6 +592,13 @@ declare module '@tanstack/react-router' {
       path: '/resources'
       fullPath: '/resources'
       preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feedback': {
+      id: '/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof FeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/autmog': {
@@ -670,6 +727,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HelpSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/feedback/new': {
+      id: '/feedback/new'
+      path: '/new'
+      fullPath: '/feedback/new'
+      preLoaderRoute: typeof FeedbackNewRouteImport
+      parentRoute: typeof FeedbackRoute
+    }
+    '/feedback/my-requests': {
+      id: '/feedback/my-requests'
+      path: '/my-requests'
+      fullPath: '/feedback/my-requests'
+      preLoaderRoute: typeof FeedbackMyRequestsRouteImport
+      parentRoute: typeof FeedbackRoute
+    }
     '/collections/add': {
       id: '/collections/add'
       path: '/collections/add'
@@ -768,6 +839,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminResourcesNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/feedback/requests': {
+      id: '/admin/feedback/requests'
+      path: '/admin/feedback/requests'
+      fullPath: '/admin/feedback/requests'
+      preLoaderRoute: typeof AdminFeedbackRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/catalog-images/trash': {
       id: '/admin/catalog-images/trash'
       path: '/admin/catalog-images/trash'
@@ -816,6 +894,20 @@ const AutmogRouteChildren: AutmogRouteChildren = {
 
 const AutmogRouteWithChildren =
   AutmogRoute._addFileChildren(AutmogRouteChildren)
+
+interface FeedbackRouteChildren {
+  FeedbackMyRequestsRoute: typeof FeedbackMyRequestsRoute
+  FeedbackNewRoute: typeof FeedbackNewRoute
+}
+
+const FeedbackRouteChildren: FeedbackRouteChildren = {
+  FeedbackMyRequestsRoute: FeedbackMyRequestsRoute,
+  FeedbackNewRoute: FeedbackNewRoute,
+}
+
+const FeedbackRouteWithChildren = FeedbackRoute._addFileChildren(
+  FeedbackRouteChildren,
+)
 
 interface ResourcesRouteChildren {
   ResourcesResourceIdRoute: typeof ResourcesResourceIdRoute
@@ -868,6 +960,7 @@ const UserRouteWithChildren = UserRoute._addFileChildren(UserRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AutmogRoute: AutmogRouteWithChildren,
+  FeedbackRoute: FeedbackRouteWithChildren,
   ResourcesRoute: ResourcesRouteWithChildren,
   UserRoute: UserRouteWithChildren,
   CollectionsUserIdRoute: CollectionsUserIdRoute,
@@ -881,6 +974,7 @@ const rootRouteChildren: RootRouteChildren = {
   HelpIndexRoute: HelpIndexRoute,
   ProductsIndexRoute: ProductsIndexRoute,
   AdminCatalogImagesTrashRoute: AdminCatalogImagesTrashRoute,
+  AdminFeedbackRequestsRoute: AdminFeedbackRequestsRoute,
   AdminResourcesNotificationsRoute: AdminResourcesNotificationsRoute,
   AdminResourcesTrashRoute: AdminResourcesTrashRoute,
   AdminSettingsFeatureFlagsRoute: AdminSettingsFeatureFlagsRoute,
