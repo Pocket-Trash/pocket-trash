@@ -3,7 +3,15 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { Files, FlaskConical, Folder, Settings, User } from "lucide-react";
+import {
+  Files,
+  FlaskConical,
+  Folder,
+  ListTodo,
+  MessageSquarePlus,
+  Settings,
+  User,
+} from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -35,6 +43,16 @@ export function UserIndexPage() {
       icon: FlaskConical,
       label: t("web.navigation.betaFeatures"),
       to: "/user/settings/beta-features" as const,
+    },
+    {
+      icon: MessageSquarePlus,
+      label: t("web.feedback.new.title"),
+      to: "/feedback/new" as const,
+    },
+    {
+      icon: ListTodo,
+      label: t("web.feedback.myRequests.title"),
+      to: "/feedback/my-requests" as const,
     },
   ];
 
