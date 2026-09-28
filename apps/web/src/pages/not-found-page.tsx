@@ -2,7 +2,6 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -22,8 +21,8 @@ export function NotFoundPage() {
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           {t("web.page.notFound.description")}
         </p>
-        <Button className="mt-6" nativeButton={false} render={<Link to="/" />}>
-          {t("web.page.notFound.returnToArchive")}
+        <Button className="mt-6" nativeButton={false} render={<a href="/" />}>
+          {t("web.page.notFound.returnHome")}
         </Button>
       </section>
     </main>

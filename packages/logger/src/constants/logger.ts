@@ -192,6 +192,7 @@ export const loggerMessages = {
     fxRatesFetchFailed: "web.fxRates.fetch.failed",
     localizationKeyMissing: "web.localization.key.missing",
     localeSyncFailed: "web.locale.sync.failed",
+    routeError: "web.route.error",
     userSettingsFetchFailed: "web.userSettings.fetch.failed",
     userSettingsSaveFailed: "web.userSettings.save.failed",
   },

@@ -1,3 +1,4 @@
+import { loggerMessages } from "@package/logger";
 import { formatTranslation } from "@pocket-trash/localizations";
 import {
   createRootRoute,
@@ -6,6 +7,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import type * as React from "react";
+import { logger } from "@/lib/logger";
 import { themeStorageKey } from "@/lib/theme";
 import type { ThemeBootstrapState } from "@/lib/theme-bootstrap";
 import { resolveServerThemeBootstrap } from "@/lib/theme-bootstrap";
@@ -17,9 +19,20 @@ import { AppProviders } from "@/providers/app-providers";
 import "../styles.css";
 
 export const Route = createRootRoute({
-  component: RootDocument,
+  component: RootContent,
   loader: async () => {
-    const settingsState = await getCurrentUserSettingsState();
+    const settingsState = await getCurrentUserSettingsState().catch(
+      async (error) => {
+        if (import.meta.env.SSR) {
+          const { s } = await import("@/lib/services");
+          s.logger.warn(loggerMessages.web.userSettingsFetchFailed, { error });
+        } else {
+          logger.warn(loggerMessages.web.userSettingsFetchFailed, { error });
+        }
+
+        return null;
+      },
+    );
 
     return {
       settingsState,
@@ -75,9 +88,24 @@ export const Route = createRootRoute({
       },
     ],
   }),
+  shellComponent: RootDocument,
 });
 
 function RootDocument({ children }: { children?: React.ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <div className="root">{children}</div>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+function RootContent() {
   const loaderData = Route.useLoaderData();
   const themeBootstrap = loaderData?.themeBootstrap ?? {
     serverTheme: null,
@@ -85,29 +113,19 @@ function RootDocument({ children }: { children?: React.ReactNode }) {
   };
 
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <HeadContent />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: bootstrapScript(
-              themeBootstrap,
-              loaderData?.settingsState ?? null,
-            ),
-          }}
-        />
-      </head>
-      <body>
-        <div className="root">
-          <AppProviders
-            initialSettingsState={loaderData?.settingsState ?? null}
-          >
-            {children ?? <Outlet />}
-          </AppProviders>
-        </div>
-        <Scripts />
-      </body>
-    </html>
+    <>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: bootstrapScript(
+            themeBootstrap,
+            loaderData?.settingsState ?? null,
+          ),
+        }}
+      />
+      <AppProviders initialSettingsState={loaderData?.settingsState ?? null}>
+        <Outlet />
+      </AppProviders>
+    </>
   );
 }
 
