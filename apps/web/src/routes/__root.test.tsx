@@ -1,5 +1,5 @@
 import { loggerMessages } from "@package/logger";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getSettings: vi.fn(),
@@ -30,6 +30,10 @@ vi.mock("@/lib/logger", () => ({
 import { Route } from "./__root";
 
 describe("root route loader", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("fails open when optional user settings cannot load", async () => {
     const error = new Error("settings unavailable");
     mocks.getSettings.mockRejectedValue(error);
@@ -50,5 +54,21 @@ describe("root route loader", () => {
       loggerMessages.web.userSettingsFetchFailed,
       { error },
     );
+  });
+
+  it("still fails open when reporting the settings failure also fails", async () => {
+    mocks.getSettings.mockRejectedValue(new Error("settings unavailable"));
+    mocks.warn.mockImplementation(() => {
+      throw new Error("logger unavailable");
+    });
+    const loader = Route.options.loader;
+
+    expect(typeof loader).toBe("function");
+    if (typeof loader !== "function")
+      throw new Error("Root loader is missing.");
+
+    await expect(loader({} as never)).resolves.toMatchObject({
+      settingsState: null,
+    });
   });
 });

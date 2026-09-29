@@ -23,11 +23,17 @@ export const Route = createRootRoute({
   loader: async () => {
     const settingsState = await getCurrentUserSettingsState().catch(
       async (error) => {
-        if (import.meta.env.SSR) {
-          const { s } = await import("@/lib/services");
-          s.logger.warn(loggerMessages.web.userSettingsFetchFailed, { error });
-        } else {
-          logger.warn(loggerMessages.web.userSettingsFetchFailed, { error });
+        try {
+          if (import.meta.env.SSR) {
+            const { s } = await import("@/lib/services");
+            s.logger.warn(loggerMessages.web.userSettingsFetchFailed, {
+              error,
+            });
+          } else {
+            logger.warn(loggerMessages.web.userSettingsFetchFailed, { error });
+          }
+        } catch {
+          // Optional settings and logging must never prevent first paint.
         }
 
         return null;
@@ -96,6 +102,14 @@ function RootDocument({ children }: { children?: React.ReactNode }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: bootstrapScript(
+              { serverTheme: null, shouldUseServerTheme: false },
+              null,
+            ),
+          }}
+        />
       </head>
       <body>
         <div className="root">{children}</div>
