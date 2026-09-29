@@ -144,7 +144,12 @@ export function AppShell({
           </div>
         ) : null}
       </header>
-      <div className={cn("flex-1", contained && "[&>*]:mx-auto [&>*]:w-full")}>
+      <div
+        className={cn(
+          "flex flex-1 flex-col",
+          contained && "[&>*]:mx-auto [&>*]:w-full",
+        )}
+      >
         {children}
       </div>
       <PageFooter />

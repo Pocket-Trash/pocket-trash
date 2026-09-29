@@ -69,14 +69,8 @@ export const Hub: Story = {
       canvas.getByRole("navigation", { name: "Admin Panel" }),
     );
     for (const [name, href] of [
-      ["All active", "/admin/feedback"],
-      ["Requests", "/admin/feedback/requests"],
-      ["Planned", "/admin/feedback/planned"],
-      ["Archive", "/admin/feedback/archive"],
-      ["Feedback notifications", "/admin/notifications/feedback"],
-      ["Resource notifications", "/admin/notifications/resources"],
-      ["Resource trash", "/admin/trash/resources"],
-      ["Catalog image trash", "/admin/trash/catalog-images"],
+      ["Feedback", "/admin/feedback"],
+      ["Notifications", "/notifications"],
       ["Feature flags", "/admin/settings/feature-flags"],
       ["Trash", "/admin/trash"],
     ] as const) {
@@ -84,6 +78,11 @@ export const Hub: Story = {
         "href",
         href,
       );
+    }
+    for (const name of ["All active", "Requests", "Planned", "Archive"]) {
+      await expect(
+        sidebar.queryByRole("link", { name }),
+      ).not.toBeInTheDocument();
     }
   },
 };
