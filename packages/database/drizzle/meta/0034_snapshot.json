@@ -1,6 +1,6 @@
 {
-  "id": "4d4280ac-0680-495a-9110-768ac4f0b108",
-  "prevId": "1ec266af-a778-4fa9-b3e7-8fa3b37ba738",
+  "id": "742697e1-30a3-44ce-8fd9-49943464ea94",
+  "prevId": "05df7dc8-c751-4b4b-8a12-61e118567511",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2197,6 +2197,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "linear_client_uuid": {
+          "name": "linear_client_uuid",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -2265,7 +2271,13 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "feedback_linear_client_uuid_unique": {
+          "name": "feedback_linear_client_uuid_unique",
+          "nullsNotDistinct": false,
+          "columns": ["linear_client_uuid"]
+        }
+      },
       "policies": {},
       "checkConstraints": {
         "feedback_title_length_valid": {
@@ -2278,7 +2290,7 @@
         },
         "feedback_approved_category_required": {
           "name": "feedback_approved_category_required",
-          "value": "\"feedback\".\"status\" in ('pending', 'denied') or \"feedback\".\"category\" is not null"
+          "value": "\"feedback\".\"status\" in ('pending', 'merged', 'denied') or \"feedback\".\"category\" is not null"
         }
       },
       "isRLSEnabled": false
@@ -2531,13 +2543,13 @@
           "name": "version_id",
           "type": "bigint",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "file_id": {
-          "name": "file_id",
-          "type": "bigint",
+        "user_clerk_id": {
+          "name": "user_clerk_id",
+          "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",
@@ -2562,21 +2574,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "resource_downloads_file_id_idx": {
-          "name": "resource_downloads_file_id_idx",
-          "columns": [
-            {
-              "expression": "file_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -2588,19 +2585,16 @@
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        },
-        "resource_downloads_file_id_resource_files_id_fk": {
-          "name": "resource_downloads_file_id_resource_files_id_fk",
-          "tableFrom": "resource_downloads",
-          "tableTo": "resource_files",
-          "columnsFrom": ["file_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "resource_downloads_version_user_unique": {
+          "name": "resource_downloads_version_user_unique",
+          "nullsNotDistinct": false,
+          "columns": ["version_id", "user_clerk_id"]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -3066,6 +3060,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "archive_object_path": {
+          "name": "archive_object_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "anonymous_download_count": {
+          "name": "anonymous_download_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3113,6 +3120,11 @@
           "name": "resource_versions_object_path_unique",
           "nullsNotDistinct": false,
           "columns": ["object_path"]
+        },
+        "resource_versions_archive_object_path_unique": {
+          "name": "resource_versions_archive_object_path_unique",
+          "nullsNotDistinct": false,
+          "columns": ["archive_object_path"]
         }
       },
       "policies": {},
@@ -3124,6 +3136,10 @@
         "resource_versions_size_positive": {
           "name": "resource_versions_size_positive",
           "value": "\"resource_versions\".\"size\" > 0"
+        },
+        "resource_versions_anonymous_download_count_nonnegative": {
+          "name": "resource_versions_anonymous_download_count_nonnegative",
+          "value": "\"resource_versions\".\"anonymous_download_count\" >= 0"
         }
       },
       "isRLSEnabled": false

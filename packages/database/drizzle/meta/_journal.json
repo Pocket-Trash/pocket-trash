@@ -239,6 +239,13 @@
       "when": 1790644314527,
       "tag": "0033_careful_ma_gnuci",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1790660970834,
+      "tag": "0034_next_lady_mastermind",
+      "breakpoints": true
     }
   ]
 }

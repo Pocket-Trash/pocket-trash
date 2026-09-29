@@ -14,7 +14,7 @@ import {
 import { uploadFile, uploadSession } from "../src/schema/uploads.js";
 
 describe("resource schema", () => {
-  it("stores numeric resources with immutable versions and event-based downloads", () => {
+  it("stores version-level archives and authenticated downloads", () => {
     expect(getTableName(resources)).toBe("resources");
     expect(resources.id.dataType).toBe("number");
     expect(resources.uploaderClerkId.notNull).toBe(true);
@@ -39,6 +39,9 @@ describe("resource schema", () => {
       "resource_versions_resource_version_unique",
     );
     expect(resourceVersions.resourceId.notNull).toBe(true);
+    expect(resourceVersions.archiveObjectPath.notNull).toBe(false);
+    expect(resourceVersions.anonymousDownloadCount.notNull).toBe(true);
+    expect(resourceVersions.anonymousDownloadCount.default).toBe(0);
     expect(getTableName(resourceFiles)).toBe("resource_files");
     expect(resourceFiles.versionId.notNull).toBe(true);
     expect(resourceFiles.objectPath.notNull).toBe(true);
@@ -49,13 +52,19 @@ describe("resource schema", () => {
     expect(resourceImages.objectPath.notNull).toBe(true);
 
     expect(getTableName(resourceDownloads)).toBe("resource_downloads");
-    expect(resourceDownloads.fileId.notNull).toBe(false);
-    expect("resourceId" in resourceDownloads).toBe(false);
+    expect(resourceDownloads.versionId.notNull).toBe(true);
+    expect(resourceDownloads.userClerkId.notNull).toBe(true);
+    expect("fileId" in resourceDownloads).toBe(false);
     expect(
       getTableConfig(resourceDownloads).foreignKeys.map(
         ({ onDelete }) => onDelete,
       ),
-    ).toEqual(["cascade", "cascade"]);
+    ).toEqual(["cascade"]);
+    expect(
+      getTableConfig(resourceDownloads).uniqueConstraints.map(
+        ({ name }) => name,
+      ),
+    ).toContain("resource_downloads_version_user_unique");
   });
 
   it("normalizes categories through a unique assignment table", () => {
