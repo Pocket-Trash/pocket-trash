@@ -1,4 +1,7 @@
-import type { AdminFeedbackSort } from "@package/services";
+import type {
+  AdminFeedbackSort,
+  ListAdminFeedbackOptions,
+} from "@package/services";
 import {
   formatTranslation,
   type TranslationKey,
@@ -20,7 +23,8 @@ import {
   denyFeedback,
   listAdminActiveFeedback,
   listArchivedFeedback,
-  type listFeedbackMergeTargets,
+  type listFeedbackArchiveStatuses,
+  listFeedbackMergeTargets,
   listPendingFeedback,
   mergePendingFeedback,
   updateAdminFeedback,
@@ -37,8 +41,8 @@ type SortField = Sort["field"];
 
 const features = tableFeatures({});
 const columnHelper = createColumnHelper<typeof features, Item>();
-const archiveStatuses = ["completed", "merged", "denied", "canceled"] as const;
-type ArchiveStatus = (typeof archiveStatuses)[number];
+type ArchiveStatus = NonNullable<ListAdminFeedbackOptions["statuses"]>[number];
+type ArchiveStatuses = Awaited<ReturnType<typeof listFeedbackArchiveStatuses>>;
 
 export function AdminFeedbackRequestsPage({
   initialPage,
@@ -65,24 +69,35 @@ export function AdminActiveFeedbackPage({
 }
 
 export function AdminFeedbackArchivePage({
+  archiveStatuses,
   initialPage,
 }: {
+  archiveStatuses: ArchiveStatuses;
   initialPage: Page;
 }) {
-  return <AdminFeedbackPage initialPage={initialPage} scope="archive" />;
+  return (
+    <AdminFeedbackPage
+      archiveStatuses={archiveStatuses}
+      initialPage={initialPage}
+      scope="archive"
+    />
+  );
 }
 
 function AdminFeedbackPage({
+  archiveStatuses = [],
   initialPage,
   mergeTargets = [],
   scope,
 }: {
+  archiveStatuses?: ArchiveStatuses;
   initialPage: Page;
   mergeTargets?: MergeTarget[];
   scope: Scope;
 }) {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [targets, setTargets] = useState(mergeTargets);
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(initialPage);
   const [search, setSearch] = useState("");
@@ -190,7 +205,7 @@ function AdminFeedbackPage({
       ),
     });
     const submitter = columnHelper.accessor("submitterUsername", {
-      cell: ({ row }) => row.original.submitterUsername ?? "—",
+      cell: ({ row }) => row.original.submitterUsername ?? "",
       header: () => (
         <SortButton field="submitter" onChange={changeSort} sort={sort}>
           {t("web.feedback.admin.table.submitter")}
@@ -292,7 +307,7 @@ function AdminFeedbackPage({
               {scope === "archive" ? (
                 <select
                   aria-label={t("web.feedback.admin.archive.statusLabel")}
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   onChange={(event) => {
                     const nextStatus = archiveStatuses.find(
                       (value) => value === event.target.value,
@@ -338,7 +353,7 @@ function AdminFeedbackPage({
           </p>
         ) : null}
         {page.items.length > 0 ? (
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <div className="overflow-x-auto rounded-lg border border-border bg-card text-card-foreground">
             <table className="w-full border-collapse text-sm">
               <thead className="bg-muted/50">
                 {table.getHeaderGroups().map((group) => (
@@ -377,7 +392,9 @@ function AdminFeedbackPage({
         ) : null}
         {offset > 0 || page.hasNext ? (
           <nav
-            aria-label={t(`web.feedback.admin.${copyScope}.title`)}
+            aria-label={`${t(`web.feedback.admin.${copyScope}.title`)}: ${t(
+              `web.feedback.admin.${copyScope}.nextPage`,
+            )}`}
             className="flex justify-between gap-3"
           >
             <Button
@@ -402,10 +419,16 @@ function AdminFeedbackPage({
       <AdminFeedbackDialog
         dialogRef={dialogRef}
         item={selected}
-        mergeTargets={mergeTargets}
+        mergeTargets={targets}
         onChanged={async () => {
           dialogRef.current?.close();
-          await load(offset);
+          const [, nextTargets] = await Promise.all([
+            load(offset),
+            scope === "pending"
+              ? listFeedbackMergeTargets()
+              : Promise.resolve(targets),
+          ]);
+          setTargets(nextTargets);
         }}
         onClosed={() => {
           setSelected(undefined);
@@ -533,7 +556,7 @@ function AdminFeedbackDialog({
             >
               {t("web.catalog.field.description")}
               <textarea
-                className="min-h-32 resize-y rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="min-h-32 resize-y rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 defaultValue={item.description}
                 id="admin-feedback-description"
                 maxLength={5000}
@@ -547,7 +570,7 @@ function AdminFeedbackDialog({
             >
               {t("web.feedback.new.categoryLabel")}
               <select
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 defaultValue={item.category ?? ""}
                 id="admin-feedback-category"
                 name="category"
@@ -632,7 +655,7 @@ function AdminFeedbackDialog({
                   {t("web.feedback.admin.requests.mergeTargetLabel")}
                 </label>
                 <select
-                  className="h-9 min-w-56 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-9 min-w-56 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   defaultValue=""
                   id="feedback-merge-target"
                   name="targetId"

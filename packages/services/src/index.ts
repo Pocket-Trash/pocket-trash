@@ -9,6 +9,7 @@ import { createUploadStorage, signResourceUrl } from "@package/storage";
 import { createDbServices, type DbServices } from "./db/index.js";
 import { createStorageService, type StorageService } from "./storage/index.js";
 
+export { adminFeedbackArchiveStatuses } from "./db/feedback/index.js";
 export type {
   AdminFeedbackItem,
   AdminFeedbackPage,

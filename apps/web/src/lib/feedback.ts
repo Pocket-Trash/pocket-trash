@@ -1,4 +1,7 @@
-import type { AdminFeedbackSortField } from "@package/services";
+import type {
+  AdminFeedbackSortField,
+  ListAdminFeedbackOptions,
+} from "@package/services";
 import { createServerFn } from "@tanstack/react-start";
 import {
   type FeedbackCategory,
@@ -93,6 +96,14 @@ export const listArchivedFeedback = createServerFn({ method: "GET" })
     const { s } = await import("@/lib/services");
     return await s.db.feedback.listArchive(data);
   });
+
+export const listFeedbackArchiveStatuses = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  await requireResourceAdmin();
+  const { adminFeedbackArchiveStatuses } = await import("@package/services");
+  return adminFeedbackArchiveStatuses;
+});
 
 export const listFeedbackMergeTargets = createServerFn({
   method: "GET",
@@ -214,10 +225,10 @@ export function parseAdminFeedbackListInput(
   const statusInput = value.statuses ?? [];
   if (!Array.isArray(statusInput)) throw invalidFeedbackRequest();
   const statuses = statusInput.map((status) => {
-    if (!archiveStatuses.includes(status as (typeof archiveStatuses)[number])) {
+    if (typeof status !== "string" || activeFeedbackStatuses.includes(status)) {
       throw invalidFeedbackRequest();
     }
-    return status as (typeof archiveStatuses)[number];
+    return status as NonNullable<ListAdminFeedbackOptions["statuses"]>[number];
   });
   return { ...base, sort, statuses };
 }
@@ -228,7 +239,12 @@ const adminSortFields = {
   pending: ["title", "category", "submitter", "submitted"],
 } as const satisfies Record<string, readonly AdminFeedbackSortField[]>;
 
-const archiveStatuses = ["completed", "merged", "denied", "canceled"] as const;
+const activeFeedbackStatuses: readonly string[] = [
+  "pending",
+  "requested",
+  "planned",
+  "in_progress",
+];
 
 function parseMergeFeedbackInput(input: unknown) {
   const value = parseRecord(input);

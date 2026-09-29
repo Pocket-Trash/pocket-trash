@@ -40,7 +40,7 @@ const publicStatuses: (typeof schema.feedbackStatuses)[number][] = [
   "planned",
   "in_progress",
 ];
-const archiveStatuses = schema.feedbackStatuses.filter(
+export const adminFeedbackArchiveStatuses = schema.feedbackStatuses.filter(
   (status) => !activeStatuses.includes(status),
 );
 
@@ -62,7 +62,6 @@ export type AdminFeedbackItem = {
   category: FeedbackCategory | null;
   createdAt: Date;
   description: string;
-  hasReservedPlan: boolean;
   id: number;
   status: FeedbackStatus;
   submitterUsername: string | null;
@@ -661,7 +660,6 @@ function adminFeedbackColumns() {
     category: schema.feedback.category,
     createdAt: schema.feedback.createdAt,
     description: schema.feedback.description,
-    hasReservedPlan: sql<boolean>`${schema.feedback.linearClientUuid} is not null`,
     id: schema.feedback.id,
     status: schema.feedback.status,
     submitterUsername: schema.user.username,
@@ -696,7 +694,7 @@ function normalizedArchiveStatuses(value: FeedbackStatus[] | undefined) {
   const statuses = value ?? [];
   if (
     new Set(statuses).size !== statuses.length ||
-    statuses.some((status) => !archiveStatuses.includes(status))
+    statuses.some((status) => !adminFeedbackArchiveStatuses.includes(status))
   ) {
     throw new Error("Invalid feedback archive status.");
   }

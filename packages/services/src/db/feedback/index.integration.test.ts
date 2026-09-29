@@ -626,6 +626,29 @@ describe("feedback lifecycle", () => {
         submitterClerkId: "duplicate-owner",
         title: "Second duplicate",
       });
+      const [completedTarget] = await db
+        .insert(schema.feedback)
+        .values({
+          category: "feature",
+          description: "Completed target",
+          status: "completed",
+          submitterClerkId: "completed-owner",
+          title: "Completed target",
+        })
+        .returning();
+      if (!completedTarget) throw new Error("Failed to seed completed target.");
+
+      await expect(service.mergePending(target.id, first.id)).rejects.toThrow();
+      await expect(service.mergePending(first.id, second.id)).rejects.toThrow();
+      await expect(
+        service.mergePending(first.id, completedTarget.id),
+      ).rejects.toThrow();
+      expect(
+        await db
+          .select({ status: schema.feedback.status })
+          .from(schema.feedback)
+          .where(eq(schema.feedback.id, first.id)),
+      ).toEqual([{ status: "pending" }]);
 
       await service.mergePending(first.id, target.id);
       await service.mergePending(second.id, target.id);
