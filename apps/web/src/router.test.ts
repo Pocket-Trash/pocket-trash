@@ -54,4 +54,16 @@ describe("resource management routes", () => {
       ),
     ).toBe(true);
   });
+
+  it.each([
+    "/contact",
+    "/privacy",
+    "/terms-of-service",
+  ])("registers the public %s route", (fullPath) => {
+    expect(
+      Object.values(getRouter().routesById).some(
+        (candidate) => candidate.fullPath === fullPath,
+      ),
+    ).toBe(true);
+  });
 });
