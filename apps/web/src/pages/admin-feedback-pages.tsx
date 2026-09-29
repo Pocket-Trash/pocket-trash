@@ -761,7 +761,7 @@ function AdminFeedbackNav() {
       </Button>
       <Button
         nativeButton={false}
-        render={<Link to="/admin/feedback/active" />}
+        render={<Link to="/admin/feedback/planned" />}
         variant="outline"
       >
         {t("web.feedback.admin.navigation.active")}

@@ -140,6 +140,9 @@ export const Active: Story = {
     await expect(breadcrumbs.getByText("Admin")).toBeVisible();
     await expect(breadcrumbs.getByText("Feedback")).toBeVisible();
     await expect(breadcrumbs.getByText("Planned")).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "Planned" }),
+    ).toHaveAttribute("href", "/admin/feedback/planned");
     const opener = canvas.getByRole("button", {
       name: "Manage Saved searches",
     });

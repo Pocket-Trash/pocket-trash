@@ -48,8 +48,8 @@ import { Route as AdminSettingsFeatureFlagsRouteImport } from './routes/admin.se
 import { Route as AdminResourcesTrashRouteImport } from './routes/admin.resources.trash'
 import { Route as AdminResourcesNotificationsRouteImport } from './routes/admin.resources.notifications'
 import { Route as AdminFeedbackRequestsRouteImport } from './routes/admin.feedback.requests'
+import { Route as AdminFeedbackPlannedRouteImport } from './routes/admin.feedback.planned'
 import { Route as AdminFeedbackArchiveRouteImport } from './routes/admin.feedback.archive'
-import { Route as AdminFeedbackActiveRouteImport } from './routes/admin.feedback.active'
 import { Route as AdminCatalogImagesTrashRouteImport } from './routes/admin.catalog-images.trash'
 import { Route as UserCollectionsCollectionIdEditRouteImport } from './routes/user.collections_.$collectionId_.edit'
 import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId_.versions.new'
@@ -258,14 +258,14 @@ const AdminFeedbackRequestsRoute = AdminFeedbackRequestsRouteImport.update({
   path: '/admin/feedback/requests',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminFeedbackPlannedRoute = AdminFeedbackPlannedRouteImport.update({
+  id: '/admin/feedback/planned',
+  path: '/admin/feedback/planned',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminFeedbackArchiveRoute = AdminFeedbackArchiveRouteImport.update({
   id: '/admin/feedback/archive',
   path: '/admin/feedback/archive',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminFeedbackActiveRoute = AdminFeedbackActiveRouteImport.update({
-  id: '/admin/feedback/active',
-  path: '/admin/feedback/active',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminCatalogImagesTrashRoute = AdminCatalogImagesTrashRouteImport.update({
@@ -327,8 +327,8 @@ export interface FileRoutesByFullPath {
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
   '/admin/catalog-images/trash': typeof AdminCatalogImagesTrashRoute
-  '/admin/feedback/active': typeof AdminFeedbackActiveRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
+  '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/resources/trash': typeof AdminResourcesTrashRoute
@@ -372,8 +372,8 @@ export interface FileRoutesByTo {
   '/resources': typeof ResourcesIndexRoute
   '/user': typeof UserIndexRoute
   '/admin/catalog-images/trash': typeof AdminCatalogImagesTrashRoute
-  '/admin/feedback/active': typeof AdminFeedbackActiveRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
+  '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/resources/trash': typeof AdminResourcesTrashRoute
@@ -421,8 +421,8 @@ export interface FileRoutesById {
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
   '/admin/catalog-images/trash': typeof AdminCatalogImagesTrashRoute
-  '/admin/feedback/active': typeof AdminFeedbackActiveRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
+  '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
   '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
   '/admin/resources/trash': typeof AdminResourcesTrashRoute
@@ -471,8 +471,8 @@ export interface FileRouteTypes {
     | '/resources/'
     | '/user/'
     | '/admin/catalog-images/trash'
-    | '/admin/feedback/active'
     | '/admin/feedback/archive'
+    | '/admin/feedback/planned'
     | '/admin/feedback/requests'
     | '/admin/resources/notifications'
     | '/admin/resources/trash'
@@ -516,8 +516,8 @@ export interface FileRouteTypes {
     | '/resources'
     | '/user'
     | '/admin/catalog-images/trash'
-    | '/admin/feedback/active'
     | '/admin/feedback/archive'
+    | '/admin/feedback/planned'
     | '/admin/feedback/requests'
     | '/admin/resources/notifications'
     | '/admin/resources/trash'
@@ -564,8 +564,8 @@ export interface FileRouteTypes {
     | '/resources/'
     | '/user/'
     | '/admin/catalog-images/trash'
-    | '/admin/feedback/active'
     | '/admin/feedback/archive'
+    | '/admin/feedback/planned'
     | '/admin/feedback/requests'
     | '/admin/resources/notifications'
     | '/admin/resources/trash'
@@ -601,8 +601,8 @@ export interface RootRouteChildren {
   HelpIndexRoute: typeof HelpIndexRoute
   ProductsIndexRoute: typeof ProductsIndexRoute
   AdminCatalogImagesTrashRoute: typeof AdminCatalogImagesTrashRoute
-  AdminFeedbackActiveRoute: typeof AdminFeedbackActiveRoute
   AdminFeedbackArchiveRoute: typeof AdminFeedbackArchiveRoute
+  AdminFeedbackPlannedRoute: typeof AdminFeedbackPlannedRoute
   AdminFeedbackRequestsRoute: typeof AdminFeedbackRequestsRoute
   AdminResourcesNotificationsRoute: typeof AdminResourcesNotificationsRoute
   AdminResourcesTrashRoute: typeof AdminResourcesTrashRoute
@@ -889,18 +889,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFeedbackRequestsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/feedback/planned': {
+      id: '/admin/feedback/planned'
+      path: '/admin/feedback/planned'
+      fullPath: '/admin/feedback/planned'
+      preLoaderRoute: typeof AdminFeedbackPlannedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/feedback/archive': {
       id: '/admin/feedback/archive'
       path: '/admin/feedback/archive'
       fullPath: '/admin/feedback/archive'
       preLoaderRoute: typeof AdminFeedbackArchiveRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/feedback/active': {
-      id: '/admin/feedback/active'
-      path: '/admin/feedback/active'
-      fullPath: '/admin/feedback/active'
-      preLoaderRoute: typeof AdminFeedbackActiveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/catalog-images/trash': {
@@ -1033,8 +1033,8 @@ const rootRouteChildren: RootRouteChildren = {
   HelpIndexRoute: HelpIndexRoute,
   ProductsIndexRoute: ProductsIndexRoute,
   AdminCatalogImagesTrashRoute: AdminCatalogImagesTrashRoute,
-  AdminFeedbackActiveRoute: AdminFeedbackActiveRoute,
   AdminFeedbackArchiveRoute: AdminFeedbackArchiveRoute,
+  AdminFeedbackPlannedRoute: AdminFeedbackPlannedRoute,
   AdminFeedbackRequestsRoute: AdminFeedbackRequestsRoute,
   AdminResourcesNotificationsRoute: AdminResourcesNotificationsRoute,
   AdminResourcesTrashRoute: AdminResourcesTrashRoute,
