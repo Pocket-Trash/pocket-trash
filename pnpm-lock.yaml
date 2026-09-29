@@ -191,8 +191,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/services
       '@pocket-trash/localizations':
-        specifier: ^0.10.0
-        version: 0.10.0
+        specifier: ^0.11.0
+        version: 0.11.0
       '@t3-oss/env-core':
         specifier: ^0.13.11
         version: 0.13.11(typescript@6.0.3)(zod@4.4.3)
@@ -2388,8 +2388,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@pocket-trash/localizations@0.10.0':
-    resolution: {integrity: sha512-hu4uLZVxRUxPJ6RnByQxo1aWtxOoGUyWBQVdPNPAdlvWnd9QskNsVx3+ZhICLiklp/64F2HMBYNy2fxFQZesJw==}
+  '@pocket-trash/localizations@0.11.0':
+    resolution: {integrity: sha512-GBDKn5GsDSrtH7TFrTbHWHiaC3aH5KXobQvDkGAu54oJLAIBDrI1/NjzIb5H6nNBOxqDK1bRTRK6K2WYG/SF2w==}
     engines: {node: '>=20'}
 
   '@pocket-trash/localizations@0.5.1':
@@ -9935,7 +9935,7 @@ snapshots:
   '@oxc-resolver/binding-win32-x64-msvc@11.21.2':
     optional: true
 
-  '@pocket-trash/localizations@0.10.0':
+  '@pocket-trash/localizations@0.11.0':
     dependencies:
       lts: 2.0.0
     transitivePeerDependencies:
