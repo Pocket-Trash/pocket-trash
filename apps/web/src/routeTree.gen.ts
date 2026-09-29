@@ -392,11 +392,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account-erased': typeof AccountErasedRoute
   '/account-erasure': typeof AccountErasureRoute
-  '/admin/account-erasure': typeof AdminAccountErasureRoute
   '/autmog': typeof AutmogRouteWithChildren
   '/contact': typeof ContactRoute
   '/privacy': typeof PrivacyRoute
   '/terms-of-service': typeof TermsOfServiceRoute
+  '/admin/account-erasure': typeof AdminAccountErasureRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -554,11 +554,11 @@ export interface FileRouteTypes {
     | '/'
     | '/account-erased'
     | '/account-erasure'
-    | '/admin/account-erasure'
     | '/autmog'
     | '/contact'
     | '/privacy'
     | '/terms-of-service'
+    | '/admin/account-erasure'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
