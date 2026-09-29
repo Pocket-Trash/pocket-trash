@@ -1,3 +1,4 @@
+import appStorageBoundary from "@package/eslint/apps";
 import baseConfig from "@package/eslint/base";
 
 export default [
@@ -13,4 +14,5 @@ export default [
       },
     },
   },
+  appStorageBoundary,
 ];

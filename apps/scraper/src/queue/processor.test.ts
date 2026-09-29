@@ -1,7 +1,6 @@
 import { loggerMessages } from "@package/logger";
 import { describe, expect, it } from "vitest";
 import {
-  buildImageFolder,
   createProcessorErrorCounter,
   getTmpImageFolderKey,
 } from "./processor.js";
@@ -58,35 +57,6 @@ describe("createProcessorErrorCounter", () => {
       ],
       totalErrors: 1,
     });
-  });
-});
-
-describe("buildImageFolder", () => {
-  it("builds production product folders in the images namespace", () => {
-    expect(
-      buildImageFolder({
-        entityId: "1000",
-        prefix: "images",
-      }),
-    ).toBe("/images/products/1000");
-  });
-
-  it("builds isolated preview product folders with the PR prefix", () => {
-    expect(
-      buildImageFolder({
-        entityId: "1000-1001",
-        prefix: "images/preview/pr-52",
-      }),
-    ).toBe("/images/preview/pr-52/products/1000-1001");
-  });
-
-  it("normalizes surrounding slashes in the folder prefix", () => {
-    expect(
-      buildImageFolder({
-        entityId: "1000",
-        prefix: "/images/preview/",
-      }),
-    ).toBe("/images/preview/products/1000");
   });
 });
 

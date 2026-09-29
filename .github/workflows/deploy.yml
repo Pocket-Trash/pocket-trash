@@ -224,8 +224,10 @@ jobs:
 
           if [[ "$DB_CHANGING" == "true" ]]; then
             resource_folder_prefix="resources/preview/pr-${PR_NUMBER}"
+            image_folder_prefix="images/preview/pr-${PR_NUMBER}"
           else
             resource_folder_prefix="resources/preview"
+            image_folder_prefix="images/preview"
           fi
 
           api_vars=(
@@ -234,6 +236,7 @@ jobs:
             --var "LOG_DEPLOYMENT_ID:${LOG_DEPLOYMENT_ID}"
             --var "LOG_DEPLOYMENT_TARGET:cloudflare-worker"
             --var "BUNNY_CDN_BASE_URL:${BUNNY_CDN_BASE_URL}"
+            --var "BUNNY_IMAGE_FOLDER_PREFIX:${image_folder_prefix}"
             --var "BUNNY_RESOURCE_FOLDER_PREFIX:${resource_folder_prefix}"
             --var "BUNNY_STORAGE_ENDPOINT:${BUNNY_STORAGE_ENDPOINT}"
             --var "BUNNY_STORAGE_ZONE_NAME:${BUNNY_STORAGE_ZONE_NAME}"
@@ -475,8 +478,10 @@ jobs:
 
           if [[ "$DB_CHANGING" == "true" ]]; then
             resource_folder_prefix="resources/preview/pr-${PR_NUMBER}"
+            image_folder_prefix="images/preview/pr-${PR_NUMBER}"
           else
             resource_folder_prefix="resources/preview"
+            image_folder_prefix="images/preview"
           fi
 
           jq -cn \
@@ -496,6 +501,7 @@ jobs:
             --var "LOG_DEPLOYMENT_ID:${LOG_DEPLOYMENT_ID}" \
             --var "LOG_DEPLOYMENT_TARGET:cloudflare-worker" \
             --var "BUNNY_CDN_BASE_URL:${BUNNY_CDN_BASE_URL}" \
+            --var "BUNNY_IMAGE_FOLDER_PREFIX:${image_folder_prefix}" \
             --var "BUNNY_RESOURCE_FOLDER_PREFIX:${resource_folder_prefix}" \
             --var "BUNNY_STORAGE_ENDPOINT:${BUNNY_STORAGE_ENDPOINT}" \
             --var "BUNNY_STORAGE_ZONE_NAME:${BUNNY_STORAGE_ZONE_NAME}"
@@ -939,6 +945,7 @@ jobs:
             --var "LOG_DEPLOYMENT_ID:development" \
             --var "LOG_DEPLOYMENT_TARGET:cloudflare-worker" \
             --var "BUNNY_CDN_BASE_URL:${BUNNY_CDN_BASE_URL}" \
+            --var "BUNNY_IMAGE_FOLDER_PREFIX:images/dev" \
             --var "BUNNY_RESOURCE_FOLDER_PREFIX:resources/dev" \
             --var "BUNNY_STORAGE_ENDPOINT:${BUNNY_STORAGE_ENDPOINT}" \
             --var "BUNNY_STORAGE_ZONE_NAME:${BUNNY_STORAGE_ZONE_NAME}"
@@ -1126,6 +1133,7 @@ jobs:
             --var "LOG_DEPLOYMENT_ID:production" \
             --var "LOG_DEPLOYMENT_TARGET:cloudflare-worker" \
             --var "BUNNY_CDN_BASE_URL:${BUNNY_CDN_BASE_URL}" \
+            --var "BUNNY_IMAGE_FOLDER_PREFIX:images" \
             --var "BUNNY_RESOURCE_FOLDER_PREFIX:resources/files" \
             --var "BUNNY_STORAGE_ENDPOINT:${BUNNY_STORAGE_ENDPOINT}" \
             --var "BUNNY_STORAGE_ZONE_NAME:${BUNNY_STORAGE_ZONE_NAME}"

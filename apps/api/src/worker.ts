@@ -1,31 +1,13 @@
 import { verifyToken } from "@clerk/backend";
-import { createDb } from "@package/database";
-import {
-  createAxiomTransport,
-  createConsoleTransport,
-  createLogger,
-  isLogLevel,
-  loggerMessages,
-  loggerValues,
-  normalizeConsoleTransportMode,
-  normalizeLogLevel,
-} from "@package/logger";
-import { createResourceStorage } from "@package/resources";
-import { createServices } from "@package/services";
+import { isLogLevel, loggerMessages } from "@package/logger";
 import { type ApiBindings, createApp } from "./app.js";
-import { createCatalogImageUploadSessionsService } from "./catalog-image-upload-sessions.js";
 import { createClerkWebhookHandler } from "./clerk-webhooks.js";
-import { createResourceUploadSessionsService } from "./resource-upload-sessions.js";
+import { createApiLogger, createApiServices } from "./lib/services.js";
 
 const app = createApp({
   getClerkWebhookRuntime(bindings) {
     validateClerkWebhookBindings(bindings);
-    const logger = createApiLogger(bindings);
-    const services = createServices();
-    services.configure({
-      db: { databaseUrl: bindings.DATABASE_URL as string },
-      logger,
-    });
+    const { logger, services } = createApiServices(bindings);
     const handle = createClerkWebhookHandler({
       logger,
       signingSecret: bindings.CLERK_WEBHOOK_SIGNING_SECRET as string,
@@ -56,47 +38,15 @@ const app = createApp({
       logger: createApiLogger(bindings),
     };
   },
-  getResourceUploadRuntime(bindings) {
-    validateResourceUploadBindings(bindings);
-    const service = createResourceUploadSessionsService({
-      db: createDb({ databaseUrl: bindings.DATABASE_URL as string }),
-      storage: createResourceStorage({
-        accessKey: bindings.BUNNY_STORAGE_ACCESS_KEY,
-        cdnBaseUrl: bindings.BUNNY_CDN_BASE_URL,
-        endpoint: bindings.BUNNY_STORAGE_ENDPOINT,
-        folderPrefix: bindings.BUNNY_RESOURCE_FOLDER_PREFIX,
-        zoneName: bindings.BUNNY_STORAGE_ZONE_NAME,
-      }),
-    });
-
+  getUploadRuntime(bindings) {
+    const { logger, services } = storageRuntime(bindings);
     return {
-      authenticate: (request: Request) =>
-        authenticateClerkRequest(request, bindings).then(
-          (actor) => actor?.clerkId ?? null,
-        ),
-      isAllowedOrigin: (origin: string) =>
-        isAllowedWebOrigin(origin, bindings.APP_ENV),
-      service,
-    };
-  },
-  getCatalogImageUploadRuntime(bindings) {
-    validateResourceUploadBindings(bindings);
-    const service = createCatalogImageUploadSessionsService({
-      db: createDb({ databaseUrl: bindings.DATABASE_URL as string }),
-      storage: createResourceStorage({
-        accessKey: bindings.BUNNY_STORAGE_ACCESS_KEY,
-        cdnBaseUrl: bindings.BUNNY_CDN_BASE_URL,
-        endpoint: bindings.BUNNY_STORAGE_ENDPOINT,
-        folderPrefix: bindings.BUNNY_RESOURCE_FOLDER_PREFIX,
-        zoneName: bindings.BUNNY_STORAGE_ZONE_NAME,
-      }),
-    });
-    return {
+      logger,
       authenticate: (request: Request) =>
         authenticateClerkRequest(request, bindings),
       isAllowedOrigin: (origin: string) =>
         isAllowedWebOrigin(origin, bindings.APP_ENV),
-      service,
+      service: services.storage,
     };
   },
 });
@@ -130,12 +80,13 @@ export function validateApiBindings(env: ApiBindings) {
   }
 }
 
-export function validateResourceUploadBindings(env: ApiBindings) {
+export function validateUploadBindings(env: ApiBindings) {
   const required = [
     "CLERK_SECRET_KEY",
     "DATABASE_URL",
     "BUNNY_CDN_BASE_URL",
     "BUNNY_RESOURCE_FOLDER_PREFIX",
+    "BUNNY_IMAGE_FOLDER_PREFIX",
     "BUNNY_STORAGE_ACCESS_KEY",
     "BUNNY_STORAGE_ENDPOINT",
     "BUNNY_STORAGE_ZONE_NAME",
@@ -182,35 +133,19 @@ export async function handleWorkerScheduled(
 
   context.waitUntil(
     (async () => {
+      let runtime: ReturnType<typeof storageRuntime> | undefined;
       try {
-        validateResourceUploadBindings(env);
-        await createResourceUploadSessionsService({
-          db: createDb({ databaseUrl: env.DATABASE_URL as string }),
-          storage: createResourceStorage({
-            accessKey: env.BUNNY_STORAGE_ACCESS_KEY,
-            cdnBaseUrl: env.BUNNY_CDN_BASE_URL,
-            endpoint: env.BUNNY_STORAGE_ENDPOINT,
-            folderPrefix: env.BUNNY_RESOURCE_FOLDER_PREFIX,
-            zoneName: env.BUNNY_STORAGE_ZONE_NAME,
-          }),
-        }).cleanupExpired();
-        await createCatalogImageUploadSessionsService({
-          db: createDb({ databaseUrl: env.DATABASE_URL as string }),
-          storage: createResourceStorage({
-            accessKey: env.BUNNY_STORAGE_ACCESS_KEY,
-            cdnBaseUrl: env.BUNNY_CDN_BASE_URL,
-            endpoint: env.BUNNY_STORAGE_ENDPOINT,
-            folderPrefix: env.BUNNY_RESOURCE_FOLDER_PREFIX,
-            zoneName: env.BUNNY_STORAGE_ZONE_NAME,
-          }),
-        }).cleanupExpired();
-      } catch (error) {
+        runtime = storageRuntime(env);
+        await runtime.services.storage.cleanupExpired();
+      } catch {
         await logWorkerException(
-          error,
+          new Error("Storage cleanup failed."),
           env,
           new Request("https://api.pocket-trash.app/__scheduled"),
           "scheduled",
         );
+      } finally {
+        await runtime?.logger.flush();
       }
     })(),
   );
@@ -269,38 +204,6 @@ async function authenticateClerkRequest(
   }
 }
 
-function createApiLogger(env: ApiBindings) {
-  const environment = env.APP_ENV ?? "unknown";
-  const hasAxiom = Boolean(env.AXIOM_TOKEN && env.AXIOM_DATASET);
-  const transports = [
-    ...(hasAxiom
-      ? [
-          createAxiomTransport({
-            dataset: env.AXIOM_DATASET as string,
-            edgeDomain: env.AXIOM_EDGE_DOMAIN,
-            token: env.AXIOM_TOKEN as string,
-          }),
-        ]
-      : []),
-    ...(environment === "development" || !hasAxiom
-      ? [
-          createConsoleTransport({
-            mode: normalizeConsoleTransportMode(env.LOGGER),
-          }),
-        ]
-      : []),
-  ];
-
-  return createLogger({
-    app: loggerValues.apps.api,
-    deploymentId: env.LOG_DEPLOYMENT_ID ?? environment,
-    deploymentTarget: env.LOG_DEPLOYMENT_TARGET ?? "cloudflare-worker",
-    environment,
-    level: normalizeLogLevel(env.LOG_LEVEL),
-    transports,
-  });
-}
-
 async function logWorkerException(
   error: unknown,
   env: ApiBindings,
@@ -324,3 +227,8 @@ export default {
   fetch: handleWorkerFetch,
   scheduled: handleWorkerScheduled,
 } satisfies ExportedHandler<ApiBindings>;
+
+function storageRuntime(bindings: ApiBindings) {
+  validateUploadBindings(bindings);
+  return createApiServices(bindings, { storage: true });
+}

@@ -34,7 +34,7 @@ export const scraperSourceKeys = Object.values(scraperSources);
 export type ScraperJobContext = {
   close: () => Promise<void>;
   db: Database;
-  imageFolderPrefix?: string;
+  imageFolderPrefix: string;
   imageStorage: ImagesService;
   redis: ReturnType<typeof createRedisConnection>;
   queues: ScraperQueues;
@@ -57,9 +57,9 @@ export async function createScraperJobContext(
   const services = createServices();
   services.configure({
     images: {
-      bunnyStorageAccessKey: env.BUNNY_STORAGE_ACCESS_KEY,
-      bunnyStorageEndpoint: env.BUNNY_STORAGE_ENDPOINT,
-      bunnyStorageZoneName: env.BUNNY_STORAGE_ZONE_NAME,
+      accessKey: env.BUNNY_STORAGE_ACCESS_KEY,
+      endpoint: env.BUNNY_STORAGE_ENDPOINT,
+      zoneName: env.BUNNY_STORAGE_ZONE_NAME,
       cdnBaseUrl: env.BUNNY_CDN_BASE_URL,
       dryRun: env.SCRAPER_DRY_RUN,
       provider: env.IMAGE_STORAGE_PROVIDER,

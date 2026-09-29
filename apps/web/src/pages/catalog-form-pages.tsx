@@ -9,6 +9,11 @@ import type {
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
+import {
+  maxImageBytes,
+  maxImageSessionBytes,
+  maxImageSessionFiles,
+} from "@package/services/constants";
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
@@ -46,18 +51,19 @@ import {
   restoreCatalogImage,
   saveCatalogProduct,
   saveCollection,
+  selectCollectionCover,
   softDeleteCatalogImage,
   updateCollectionItem,
 } from "@/lib/catalog-api";
 import { useCatalogCopy } from "@/lib/catalog-copy";
-import {
-  type CatalogImageUploadError,
-  deleteCollectionCover,
-  selectCollectionCover,
-  uploadCatalogImages,
-  validateCatalogImages,
-} from "@/lib/catalog-image-uploads";
 import { getImageUploadGuidance } from "@/lib/help-content";
+import {
+  deleteCollectionCover,
+  formatMiB,
+  type ImageUploadError,
+  uploadImages,
+  validateImages,
+} from "@/lib/upload-sessions";
 import { useLocale } from "@/providers/locale-provider";
 
 export function ProductFormPage({
@@ -188,7 +194,7 @@ function ProductEditor({
         setFormError("web.catalog.error.form");
         return;
       }
-      const imageError = validateCatalogImages(images);
+      const imageError = validateImages(images, locale);
       if (imageError) {
         setFormError(imageError.key);
         return;
@@ -204,7 +210,8 @@ function ProductEditor({
       setSavedProductId(result.product.id);
       if (images.length) {
         try {
-          const uploads = await uploadCatalogImages({
+          const uploads = await uploadImages({
+            locale,
             files: images,
             getToken,
             onOwnerDeletedDuplicate: async (imageId) => {
@@ -230,9 +237,7 @@ function ProductEditor({
             return;
           }
         } catch (error) {
-          setFormError(
-            (error as CatalogImageUploadError).key ?? "error.generic",
-          );
+          setFormError((error as ImageUploadError).key ?? "error.generic");
           return;
         }
       }
@@ -520,9 +525,9 @@ function ProductEditor({
         aspectRatioWarning={imageGuidance.warning}
         browseLabel={t("web.resources.upload.browseFiles")}
         description={t("web.resources.upload.imagesHelp", {
-          maxFileSize: "25 MiB",
-          maxImages: 20,
-          maxSessionSize: "200 MiB",
+          maxFileSize: formatMiB(maxImageBytes, locale),
+          maxImages: maxImageSessionFiles,
+          maxSessionSize: formatMiB(maxImageSessionBytes, locale),
         })}
         fileTypes={t("web.resources.upload.imageTypes")}
         files={images}
@@ -936,6 +941,7 @@ export function CollectionFormPage({
 }: {
   collection?: UserCollectionSummary;
 }) {
+  const { locale } = useLocale();
   const t = useCatalogCopy();
   const navigate = useNavigate();
   const { getToken } = useAuth();
@@ -948,9 +954,9 @@ export function CollectionFormPage({
     description: t("web.collections.field.description"),
     descriptionPlaceholder: t("web.collections.placeholder.description"),
     imageHelp: t("web.resources.upload.imagesHelp", {
-      maxFileSize: "25 MiB",
+      maxFileSize: formatMiB(maxImageBytes, locale),
       maxImages: 1,
-      maxSessionSize: "25 MiB",
+      maxSessionSize: formatMiB(maxImageBytes, locale),
     }),
     imageTypes: t("web.resources.upload.imageTypes"),
     name: t("web.collections.field.name"),
@@ -979,7 +985,8 @@ export function CollectionFormPage({
     setCurrent(result.collection);
     if (cover) {
       try {
-        const upload = await uploadCatalogImages({
+        const upload = await uploadImages({
+          locale,
           files: [cover],
           getToken,
           targetId: result.collection.id,
@@ -1058,16 +1065,13 @@ export function CollectionFormPage({
             onClear={() =>
               updateCover(() =>
                 selectCollectionCover({
-                  collectionId: current.id,
-                  getToken,
-                  imageId: null,
+                  data: { collectionId: current.id, imageId: null },
                 }),
               )
             }
             onDelete={(image) =>
               updateCover(() =>
                 deleteCollectionCover({
-                  collectionId: current.id,
                   getToken,
                   imageId: image.id,
                 }),
@@ -1076,9 +1080,7 @@ export function CollectionFormPage({
             onSelect={(image) =>
               updateCover(() =>
                 selectCollectionCover({
-                  collectionId: current.id,
-                  getToken,
-                  imageId: image.id,
+                  data: { collectionId: current.id, imageId: image.id },
                 }),
               )
             }
@@ -1225,7 +1227,7 @@ export function CollectionAddPage({
     ) {
       return;
     }
-    const imageError = validateCatalogImages(images);
+    const imageError = validateImages(images, locale);
     if (imageError) {
       setFormError(imageError.key);
       return;
@@ -1233,7 +1235,8 @@ export function CollectionAddPage({
     if (savedItemId && savedCollectionId) {
       try {
         if (images.length) {
-          const uploads = await uploadCatalogImages({
+          const uploads = await uploadImages({
+            locale,
             files: images,
             getToken,
             targetId: savedItemId,
@@ -1246,7 +1249,8 @@ export function CollectionAddPage({
           }
         }
         if (collectionCover) {
-          const coverUpload = await uploadCatalogImages({
+          const coverUpload = await uploadImages({
+            locale,
             files: [collectionCover],
             getToken,
             targetId: savedCollectionId,
@@ -1263,7 +1267,7 @@ export function CollectionAddPage({
           to: "/user/collections/$collectionId",
         });
       } catch (error) {
-        setFormError((error as CatalogImageUploadError).key ?? "error.generic");
+        setFormError((error as ImageUploadError).key ?? "error.generic");
       }
       return;
     }
@@ -1311,7 +1315,8 @@ export function CollectionAddPage({
     setSavedCollectionId(result.collectionId);
     if (images.length) {
       try {
-        const uploads = await uploadCatalogImages({
+        const uploads = await uploadImages({
+          locale,
           files: images,
           getToken,
           onOwnerDeletedDuplicate: async (imageId) => {
@@ -1337,13 +1342,14 @@ export function CollectionAddPage({
           return;
         }
       } catch (error) {
-        setFormError((error as CatalogImageUploadError).key ?? "error.generic");
+        setFormError((error as ImageUploadError).key ?? "error.generic");
         return;
       }
     }
     if (collectionCover) {
       try {
-        const upload = await uploadCatalogImages({
+        const upload = await uploadImages({
+          locale,
           files: [collectionCover],
           getToken,
           targetId: result.collectionId,
@@ -1431,9 +1437,9 @@ export function CollectionAddPage({
                   "web.collections.placeholder.description",
                 ),
                 imageHelp: t("web.resources.upload.imagesHelp", {
-                  maxFileSize: "25 MiB",
+                  maxFileSize: formatMiB(maxImageBytes, locale),
                   maxImages: 1,
-                  maxSessionSize: "25 MiB",
+                  maxSessionSize: formatMiB(maxImageBytes, locale),
                 }),
                 imageTypes: t("web.resources.upload.imageTypes"),
                 name: t("web.collections.field.name"),
@@ -1613,9 +1619,9 @@ export function CollectionAddPage({
             aspectRatioWarning={imageGuidance.warning}
             browseLabel={t("web.resources.upload.browseFiles")}
             description={t("web.resources.upload.imagesHelp", {
-              maxFileSize: "25 MiB",
-              maxImages: 20,
-              maxSessionSize: "200 MiB",
+              maxFileSize: formatMiB(maxImageBytes, locale),
+              maxImages: maxImageSessionFiles,
+              maxSessionSize: formatMiB(maxImageSessionBytes, locale),
             })}
             fileTypes={t("web.resources.upload.imageTypes")}
             files={images}
@@ -1975,9 +1981,9 @@ export function CollectionEditPage({
           aspectRatioWarning={imageGuidance.warning}
           browseLabel={t("web.resources.upload.browseFiles")}
           description={t("web.resources.upload.imagesHelp", {
-            maxFileSize: "25 MiB",
-            maxImages: 20,
-            maxSessionSize: "200 MiB",
+            maxFileSize: formatMiB(maxImageBytes, locale),
+            maxImages: maxImageSessionFiles,
+            maxSessionSize: formatMiB(maxImageSessionBytes, locale),
           })}
           fileTypes={t("web.resources.upload.imageTypes")}
           files={images}
@@ -2007,14 +2013,15 @@ export function CollectionEditPage({
               return;
             }
             setFormError(null);
-            const imageError = validateCatalogImages(images);
+            const imageError = validateImages(images, locale);
             if (imageError) {
               setFormError(imageError.key);
               return;
             }
             if (images.length) {
               try {
-                const uploads = await uploadCatalogImages({
+                const uploads = await uploadImages({
+                  locale,
                   files: images,
                   getToken,
                   onOwnerDeletedDuplicate: async (imageId) => {
@@ -2042,7 +2049,7 @@ export function CollectionEditPage({
                 }
               } catch (error) {
                 setFormError(
-                  (error as CatalogImageUploadError).key ?? "error.generic",
+                  (error as ImageUploadError).key ?? "error.generic",
                 );
                 return;
               }

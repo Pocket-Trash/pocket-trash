@@ -9,10 +9,9 @@ import {
   resourceNotifications,
   resources,
   resourcesToCategories,
-  resourceUploadFiles,
-  resourceUploadSessions,
   resourceVersions,
 } from "../src/schema/resources.js";
+import { uploadFile, uploadSession } from "../src/schema/uploads.js";
 
 describe("resource schema", () => {
   it("stores numeric resources with immutable versions and event-based downloads", () => {
@@ -83,19 +82,17 @@ describe("resource schema", () => {
   });
 
   it("tracks expiring upload sessions and their declared files", () => {
-    expect(getTableName(resourceUploadSessions)).toBe(
-      "resource_upload_sessions",
-    );
-    expect(resourceUploadSessions.uploaderClerkId.notNull).toBe(true);
-    expect(resourceUploadSessions.isPrivate.default).toBe(false);
-    expect(resourceUploadSessions.isPrivate.notNull).toBe(true);
-    expect(resourceUploadSessions.expiresAt.notNull).toBe(true);
-    expect(resourceUploadSessions.completedAt.notNull).toBe(false);
-    expect(resourceUploadSessions.reservedResourceId.notNull).toBe(false);
+    expect(getTableName(uploadSession)).toBe("upload_session");
+    expect(uploadSession.uploaderClerkId.notNull).toBe(true);
+    expect(uploadSession.targetType.notNull).toBe(true);
+    expect(uploadSession.payload.notNull).toBe(false);
+    expect(uploadSession.expiresAt.notNull).toBe(true);
+    expect(uploadSession.completedAt.notNull).toBe(false);
+    expect(uploadSession.reservedResourceId.notNull).toBe(false);
 
-    expect(getTableName(resourceUploadFiles)).toBe("resource_upload_files");
-    expect(resourceUploadFiles.sessionId.notNull).toBe(true);
-    expect(resourceUploadFiles.position.notNull).toBe(true);
-    expect(resourceUploadFiles.uploadedAt.notNull).toBe(false);
+    expect(getTableName(uploadFile)).toBe("upload_file");
+    expect(uploadFile.sessionId.notNull).toBe(true);
+    expect(uploadFile.position.notNull).toBe(true);
+    expect(uploadFile.uploadedAt.notNull).toBe(false);
   });
 });

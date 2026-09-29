@@ -74,6 +74,7 @@ runner exposes the normalized `URL_INITIALS` to child processes.
 | `CLERK_WEBHOOK_SIGNING_SECRET` | Secret | Verifies Clerk `user.created` and `user.updated` webhooks. |
 | `URL_INITIALS` | Local server | Normalized developer selector exposed by the Infisical runner. |
 | `BUNNY_CDN_BASE_URL` | Worker | Public Bunny delivery origin. |
+| `BUNNY_IMAGE_FOLDER_PREFIX` | Worker | Required for upload storage. Complete image namespace: `images`, `images/dev`, `images/preview`, or `images/preview/pr-<number>`. |
 | `BUNNY_RESOURCE_FOLDER_PREFIX` | Worker | Resource namespace selected for the deployment. |
 | `BUNNY_STORAGE_ACCESS_KEY` | Secret | Bunny Storage Zone password. |
 | `BUNNY_STORAGE_ENDPOINT` | Worker | Regional Bunny Storage API origin. |
@@ -93,7 +94,7 @@ receive development events only while labeled `preview:webhooks`.
 | `DATABASE_URL` | Postgres connection string. |
 | `REDIS_URL` | Queue backend. |
 | `SCRAPER_CRON_ENABLED` | Enables scheduled scraping on Railway. |
-| `BUNNY_IMAGE_FOLDER_PREFIX` | Complete image namespace such as `images`, `images/dev`, or `images/preview`. |
+| `BUNNY_IMAGE_FOLDER_PREFIX` | Required at scraper startup, including dry runs. Complete image namespace: `images`, `images/dev`, `images/preview`, or `images/preview/pr-<number>`. Missing or invalid values fail startup; there is no default. |
 | `AXIOM_TOKEN`, `AXIOM_DATASET`, `AXIOM_EDGE_DOMAIN`, `LOG_LEVEL`, `LOGGER` | Shared logger configuration. |
 
 ## Hosting

@@ -1,11 +1,14 @@
+import { resourceMimeTypesByExtension } from "@package/services/constants";
 import { ExternalLink, TriangleAlert, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { appendResourceUploadFiles } from "@/lib/resource-upload-sessions";
+import { appendResourceUploadFiles } from "@/lib/upload-sessions";
 import { cn } from "@/lib/utils";
 
-const acceptedResourceFiles = ".stl,.3mf,.step,.stp,.pdf,.txt,.zip";
+const acceptedResourceFiles = Object.keys(resourceMimeTypesByExtension).join(
+  ",",
+);
 
 export function ResourceFileInput({
   browseLabel,

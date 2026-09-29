@@ -9,7 +9,7 @@ scope:
   packages:
     - "@package/database"
     - "@package/feature-flags"
-    - "@package/images"
+    - "@package/storage"
     - "@package/json-data"
     - "@package/logger"
     - "@package/markdown"

@@ -14,7 +14,7 @@ serves protected files through its linked Pull Zone.
 | CDN hostname | `cdn.pocket-trash.app` |
 
 Use the Storage Zone password, not the Bunny account API key, as
-`BUNNY_STORAGE_ACCESS_KEY`. Keep every `RESOURCE_*` value server-only.
+`BUNNY_STORAGE_ACCESS_KEY`. Keep every `BUNNY_*` value server-only.
 
 ## Object namespaces
 
@@ -31,30 +31,24 @@ prefix.
 
 ## Upload sessions
 
-The web app declares resource metadata, 1–10 files, and 1–10 images to
-the API Worker. Each declared object is then sent in a separate authenticated
-raw-body PUT. The Worker streams that body directly to Bunny with its declared
-content length; it does not buffer the object in Vercel or Worker memory.
+All apps access storage through `@package/services`. The API exposes one authenticated route family:
 
-Sessions expire after one hour. The production Worker removes uploaded Bunny
-objects before deleting expired session rows. Completion is idempotent and only
-persists the resource/version records after every declared upload succeeds.
+- `POST /api/v0/storage/upload-sessions` accepts a target (`product`, `collection`, `collection_item`, or `resource`), optional opaque resource metadata, and files with `kind`, original name, MIME type, byte length, and SHA-256.
+- `PUT /api/v0/storage/upload-sessions/:sessionId/files/:fileId` accepts the original bytes. Services verify length and hash before sending them to Bunny.
+- `POST /api/v0/storage/upload-sessions/:sessionId/complete` attaches all uploads in one database transaction.
+- `DELETE /api/v0/storage/file/:fileType/:fileId` checks ownership and deletion rules before removing the object and row. File types are `product_image`, `collection_image`, `collection_item_image`, `resource_image`, and `resource_file`.
 
-Each file or image may be at most 20 MiB, and all files and images in a create
-session may total at most 100 MiB. Resource filenames must be unique within a
-version, case-insensitively. Allowed extension and MIME pairs are:
+Resource payloads are validated in services. Create stores metadata on the session and reserves an ID without creating a draft resource. Completion creates the resource, categories, first version, files and images together. Version uploads reserve their version number before writing files. Buffered resource create/version callers use the same session service.
 
-- `.stl`: `model/stl`, `application/sla`, `application/octet-stream`
-- `.3mf`: `application/vnd.ms-package.3dmanufacturing-3dmodel+xml`
-- `.step` and `.stp`: `model/step`, `application/step`
-- `.pdf`: `application/pdf`
-- `.txt`: `text/plain`
-- `.zip`: `application/zip`, `application/x-zip-compressed`
+Sessions expire after one hour. Active sessions reserve their object paths, and overlapping uploads are rejected. Cleanup preserves objects attached to records and retains failed deletions for retry. Completion is idempotent. Expired reservations remain until cleanup succeeds.
 
-The server generates object names. Upload callers provide file bytes, the
-original filename, and the MIME type but cannot provide an object path.
-Every object is stored at `<prefix>/<resource-id>/<generated-name>`. The first
-image by upload order is the resource cover image.
+Display images allow JPEG, PNG and WebP up to 25 MiB and 80 million pixels. Product, collection and collection-item sessions allow 20 images and 200 MiB total. Resource creation requires 1–10 files and 1–10 images, with 100 MiB total. Each downloadable resource file is limited to 20 MiB, including downloadable images. Filenames within each kind are unique case-insensitively. Resource file extensions are `.3mf`, `.pdf`, `.step`, `.stl`, `.stp`, `.txt`, `.zip`, `.jpg`, `.jpeg`, `.png`, and `.webp` with matching MIME types.
+
+Display images use `{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{id}/{sha256}.{ext}`. Downloads use `{BUNNY_RESOURCE_FOLDER_PREFIX}/{resourceId}/v{version}/{sha256}.{ext}`. Original names stay in the database for downloads. The first resource image is its cover. Originals are stored unchanged; Bunny Dynamic Image API optimizes display images on delivery. Images and downloads receive fresh signed URLs on render.
+
+Deletion keeps at least one image per resource and one file per resource version. A current collection cover must be cleared or replaced before deletion.
+
+`@package/storage` owns `createUploadStorage`, `createImageTarget`, `createFileTarget`, `putImage`, and `putFile`; services own permissions and records. Shared Bunny configuration uses `accessKey`, `endpoint`, `zoneName`, and `cdnBaseUrl`, with separate `folderPrefix` and `imageFolderPrefix`. Browser code reads shared limits through `@package/services/constants`.
 
 Run `pnpm resources:reconcile-storage` to review moves and orphan deletions
 across every non-production Neon branch and every folder under `resources/`.
@@ -65,3 +59,7 @@ local-development branches use `resources/dev`, `preview` uses
 `resources/preview/pr-<number>`. Run
 `pnpm resources:reconcile-storage -- --apply` to apply that exact
 reconciliation. The production Neon branch is skipped.
+
+Reconciliation preserves resource version folders and the `images/` namespace for resource images. On databases that have applied migration 0030, reconciliation protects reserved paths from `upload_file`. Older preview databases that have not applied that migration use `resource_upload_files`. Each query checks that its table exists. Migration 0031 adds `storage_object_deletion`; reconciliation also protects those queued paths when the table exists.
+
+Deleting an attachment commits its database removal and a durable object-deletion entry together. The service attempts physical deletion after commit. Failures remain queued for API cleanup retries; the existing production schedule runs hourly. Development/preview do not run that schedule, so failed deletions remain queued until cleanup is run for that environment. Queued paths remain reserved against new uploads until cleanup finishes; cleanup never deletes an attached object.

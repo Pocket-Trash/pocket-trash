@@ -1,7 +1,7 @@
 # Image CDN
 
 Pocket Trash uses Bunny for product and collection image storage and delivery.
-Shared upload, update, and delete behavior lives in `@package/images` and is
+Shared upload, update, and delete behavior lives in `@package/storage` and is
 exposed to apps through `@package/services`.
 
 ## Bunny Services
@@ -38,12 +38,12 @@ uploads.
 Upload folders are built from:
 
 ```text
-/<BUNNY_IMAGE_FOLDER_PREFIX>/products/<image-owner-key>
+{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{id}/{sha256}.{ext}
 ```
 
-Before upload, Pocket Trash fetches the remote source image, auto-rotates it,
-resizes it so the longest edge is at most 2,000 pixels without enlargement, and
-converts it to WebP quality 85. Bunny stores that optimized WebP object.
+Pocket Trash validates the source format, dimensions, and 25 MiB size limit,
+then uploads the original bytes to Bunny Storage with their original format.
+Bunny Optimizer performs conversion, resizing, and compression at delivery time.
 
 | Environment | Folder prefix | Lifetime |
 | --- | --- | --- |
@@ -52,23 +52,13 @@ converts it to WebP quality 85. Bunny stores that optimized WebP object.
 | Preview using shared staging DB | `images/preview` | Long term non-production. |
 | Local dev | `images/dev` | Shared local development namespace. |
 
-## Product Paths
+## Image Paths
 
-Products use:
+Display images use `{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{id}/{sha256}.{ext}`.
+The entity values are `products`, `collections`, `collection-items`, and `resources`.
+Uploaded filenames use the SHA-256 of the original bytes and the original extension.
 
-```text
-/<prefix>/products/<tmp-products-id>
-```
-
-Variation images use:
-
-```text
-/<prefix>/products/<tmp-products-id>-<tmp-product-variations-id>
-```
-
-Autmog pen images are product-level images and use `tmp_products.id` as the
-image folder key. Grimsmo images are variation-level images because each scraped
-listing handle is a product variation under a stable Grimsmo product.
+Scraper images use the same path builder, with a source image ID instead of the hash when it contains only letters, digits, underscores and hyphens; otherwise the original image bytes supply the SHA-256 hash. Product owner IDs remain `tmp_products.id`; variation owner IDs remain `<tmp-products-id>-<tmp-product-variations-id>`. Autmog pen images are product-level, while Grimsmo images are variation-level. Previously persisted URLs are not automatically rewritten. New or retried uploads use the original file extension and byte-hash fallback instead of the previous `.webp` extension and metadata `sourceHash` fallback.
 
 ## Delivery And Transforms
 
@@ -97,3 +87,45 @@ detection that selects the database branch:
 The cleanup workflow removes branch-specific Vercel `BUNNY_IMAGE_FOLDER_PREFIX` when
 the PR closes. Isolated PR image folders under `/images/preview/pr-<number>` are
 deleted from Bunny Storage.
+
+## Central storage package
+
+`@package/storage` replaces `@package/images` and `@package/resources`. It owns
+Bunny transport, upload validation and targets, signed downloads, image delivery
+URLs, deletion, and preview cleanup. Images retain their original bytes, MIME
+type, extension, and dimensions in storage. JPEG, PNG, and WebP inputs are
+supported up to 25 MiB and 80 million pixels. The API handles user uploads; the
+scraper imports this package through services for its own uploads only. No
+service calls the scraper, and no always-on Node processor is needed.
+
+### Bunny Dynamic Image API
+
+Enable both Bunny Optimizer and **Dynamic Image API** on the Pull Zone.
+`imageDeliveryUrl` adds `format=webp&quality=85` to image URLs, including signed
+catalog and resource image URLs. Thumbnail URLs additionally request `width=500`.
+Original resource-file downloads retain their existing URLs without transforms.
+See [Dynamic Image API](https://bunny.net/docs/optimizer/dynamic-images/overview).
+
+Full-size image URLs omit an explicit width so Smart Image Optimization uses the
+configured dashboard limits: **2000 px desktop width**, **1000 px mobile width**,
+and **85 quality** for both. These are width limits, not longest-edge limits.
+Bunny preserves the stored original and caches transformed variants at the edge.
+Existing objects do not require a conversion or storage migration.
+
+Cloudflare Image Transformations, temporary source objects, and API signing keys
+for processing are unnecessary. Existing signed-download credentials remain in
+the web/services configuration. No scraper deployment or scheduler changes are
+required.
+
+Preview cleanup runs `pnpm --filter @package/storage cleanup:preview` once to delete both isolated image and resource prefixes.
+
+## Shared paths and signing
+
+The scraper and upload service use the same validated image path builder:
+`{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{entityId}/{name}.{ext}`.
+Entities are `products`, `collections`, `collection-items`, and `resources`.
+Uploaded names are the SHA-256 of the original bytes. Scraper names use the source image ID when available, otherwise the same SHA-256 rule. Variation owner keys remain unchanged.
+
+`BUNNY_IMAGE_FOLDER_PREFIX` is required by the API Worker as well as the scraper and web storage configuration. The deploy workflow sets it alongside the resource prefix for each environment.
+
+The services `signImages` helper signs uploaded product, collection, collection-item and resource images at render, then applies Bunny Dynamic Image API parameters. Tokens last 120 seconds. Enforcing tokens on the `images/*` CDN namespace remains a separate Bunny dashboard change; scraper delivery is unchanged.

@@ -225,6 +225,13 @@
       "when": 1790636095052,
       "tag": "0031_harsh_sauron",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790640338015,
+      "tag": "0032_loose_captain_britain",
+      "breakpoints": true
     }
   ]
 }

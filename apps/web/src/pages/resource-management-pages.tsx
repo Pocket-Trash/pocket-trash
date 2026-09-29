@@ -1,5 +1,12 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import {
+  maxImageBytes,
+  maxResourceFileBytes,
+  maxResourceFiles,
+  maxResourceImages,
+  maxResourceSessionBytes,
+} from "@package/services/constants";
+import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
@@ -19,15 +26,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPageShell } from "@/components/user-page-shell";
+import type { getResourceDetail, listOwnedResources } from "@/lib/resources";
+import { updateResource } from "@/lib/resources";
 import {
   appendResourceUploadFiles,
-  getResourceUploadErrorTranslation,
+  formatMiB,
+  getUploadErrorTranslation,
   uploadResourceSession,
   validateResourceImages,
   validateResourceUpload,
-} from "@/lib/resource-upload-sessions";
-import type { getResourceDetail, listOwnedResources } from "@/lib/resources";
-import { updateResource } from "@/lib/resources";
+} from "@/lib/upload-sessions";
 import { useLocale } from "@/providers/locale-provider";
 
 type OwnedResource = Awaited<ReturnType<typeof listOwnedResources>>[number];
@@ -146,6 +154,8 @@ function ResourceEditForm({ detail }: { detail: ResourceDetail }) {
         const imageValidation = validateResourceImages(
           imageFiles,
           retainedImageIds.length + imageFiles.length,
+          true,
+          locale,
         );
         if (imageValidation) {
           toast.error(t(imageValidation.key, imageValidation.params));
@@ -231,9 +241,9 @@ function ResourceEditForm({ detail }: { detail: ResourceDetail }) {
         accept="image/jpeg,image/png,image/webp"
         browseLabel={t("web.resources.upload.browseFiles")}
         description={t("web.resources.upload.imagesHelp", {
-          maxFileSize: "20 MiB",
-          maxImages: 10,
-          maxSessionSize: "100 MiB",
+          maxFileSize: formatMiB(maxImageBytes, locale),
+          maxImages: maxResourceImages,
+          maxSessionSize: formatMiB(maxResourceSessionBytes, locale),
         })}
         disabled={submitting}
         files={imageFiles}
@@ -324,7 +334,7 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
       className="grid gap-6 rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
       onSubmit={async (event) => {
         event.preventDefault();
-        const validation = validateResourceUpload(files);
+        const validation = validateResourceUpload(files, [], false, locale);
         if (validation) {
           toast.error(t(validation.key, validation.params));
           return;
@@ -358,7 +368,7 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
             to: "/resources/$resourceId",
           });
         } catch (error) {
-          const message = getResourceUploadErrorTranslation(error);
+          const message = getUploadErrorTranslation(error);
           toast.error(t(message.key, message.params));
           setSubmitting(false);
           setUploadStatus("");
@@ -368,9 +378,9 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
       <ResourceFileInput
         browseLabel={t("web.resources.upload.browseFiles")}
         description={t("web.resources.upload.fileHelp", {
-          maxFiles: 10,
-          maxFileSize: "20 MiB",
-          maxSessionSize: "100 MiB",
+          maxFiles: maxResourceFiles,
+          maxFileSize: formatMiB(maxResourceFileBytes, locale),
+          maxSessionSize: formatMiB(maxResourceSessionBytes, locale),
         })}
         disabled={submitting}
         files={files}

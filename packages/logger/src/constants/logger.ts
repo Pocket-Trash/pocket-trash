@@ -46,7 +46,18 @@ export const loggerMessages = {
   },
   common: {},
   database: {
+    storage: {
+      create: "database.storage.create",
+      upload: "database.storage.upload",
+      completeUpload: "database.storage.completeUpload",
+      deleteFile: "database.storage.deleteFile",
+      cleanupExpired: "database.storage.cleanupExpired",
+      cleanupRetry: "database.storage.cleanupRetry",
+      deletionRetry: "database.storage.deletionRetry",
+    },
     catalog: {
+      attachImages: "database.catalog.attachImages",
+      selectCollectionCover: "database.catalog.selectCollectionCover",
       createColor: "database.catalog.createColor",
       createFinish: "database.catalog.createFinish",
       createMaker: "database.catalog.createMaker",
