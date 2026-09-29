@@ -10,6 +10,10 @@ import { createDbServices, type DbServices } from "./db/index.js";
 import { createStorageService, type StorageService } from "./storage/index.js";
 
 export type {
+  AdminFeedbackItem,
+  AdminFeedbackPage,
+  AdminFeedbackSort,
+  AdminFeedbackSortField,
   CatalogColor,
   CatalogFinishOption,
   CatalogImage,
@@ -22,12 +26,15 @@ export type {
   CatalogViewer,
   CollectionsService,
   FeedbackListItem,
+  FeedbackMergeTarget,
   FeedbackPage,
   FeedbackService,
+  ListAdminFeedbackOptions,
   ListMyFeedbackOptions,
   ProductWriteInput,
   PublicCollectionOwner,
   SubmitFeedbackInput,
+  UpdateAdminFeedbackInput,
   UpdatePendingFeedbackInput,
   UpsertUserSettingsInput,
   UserCollectionItem,
@@ -38,6 +45,7 @@ export type {
 } from "./db/index.js";
 export {
   defaultUserSettings,
+  FeedbackPlanRecoveryRequiredError,
   FeedbackStateError,
   FeedbackSubmissionLimitError,
 } from "./db/index.js";

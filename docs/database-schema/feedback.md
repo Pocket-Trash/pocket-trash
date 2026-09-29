@@ -13,6 +13,7 @@ No table description has been added yet.
 | `title` | `text` | yes |  |  |  |  |  |
 | `description` | `text` | yes |  |  |  |  |  |
 | `category` | `text` | no |  |  |  |  |  |
+| `linear_client_uuid` | `uuid` | no | unique |  |  |  |  |
 | `status` | `text` | yes |  | `'pending'` |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 | `updated_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |

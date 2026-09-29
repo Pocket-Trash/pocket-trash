@@ -8,6 +8,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uuid,
 } from "drizzle-orm/pg-core";
 
 export const feedbackCategories = [
@@ -43,6 +44,7 @@ export const feedback = pgTable(
     title: text("title").notNull(),
     description: text("description").notNull(),
     category: text("category", { enum: feedbackCategories }),
+    linearClientUuid: uuid("linear_client_uuid").unique(),
     status: text("status", { enum: feedbackStatuses })
       .default("pending")
       .notNull(),
@@ -69,7 +71,7 @@ export const feedback = pgTable(
     ),
     check(
       "feedback_approved_category_required",
-      sql`${table.status} in ('pending', 'denied') or ${table.category} is not null`,
+      sql`${table.status} in ('pending', 'merged', 'denied') or ${table.category} is not null`,
     ),
   ],
 );
