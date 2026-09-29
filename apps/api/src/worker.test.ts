@@ -89,6 +89,9 @@ describe("api worker", () => {
       storage: true,
     });
     const cleanup = vi.spyOn(runtime.services.storage, "cleanupExpired");
+    const purge = vi
+      .spyOn(runtime.services.db.erasure, "purgeExpiredReceipts")
+      .mockResolvedValueOnce(0);
     if (fails) cleanup.mockRejectedValueOnce(new Error("private SQL payload"));
     else cleanup.mockResolvedValueOnce(0);
     const flush = vi.spyOn(runtime.logger, "flush");
@@ -107,6 +110,7 @@ describe("api worker", () => {
     );
     await Promise.all(tasks);
     expect(cleanup).toHaveBeenCalledOnce();
+    expect(purge).toHaveBeenCalledOnce();
     expect(flush).toHaveBeenCalledOnce();
   });
 

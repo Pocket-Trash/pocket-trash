@@ -10,6 +10,10 @@ export type SchemaDescription = {
 };
 
 export const schemaDescriptions = {
+  erasure_request: {
+    description:
+      "Durable, idempotent complete-erasure requests and their minimal temporary receipts.",
+  },
   resource_categories: {
     description: "Reusable categories assigned to resources.",
   },

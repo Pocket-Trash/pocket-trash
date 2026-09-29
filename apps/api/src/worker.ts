@@ -9,6 +9,8 @@ const app = createApp({
     validateClerkWebhookBindings(bindings);
     const { logger, services } = createApiServices(bindings);
     const handle = createClerkWebhookHandler({
+      erasure: services.db.erasure,
+      erasureHmacSecret: bindings.ERASURE_HMAC_SECRET,
       logger,
       signingSecret: bindings.CLERK_WEBHOOK_SIGNING_SECRET as string,
       targets: bindings.CLERK_WEBHOOK_TARGETS,
@@ -43,7 +45,11 @@ const app = createApp({
     return {
       logger,
       authenticate: (request: Request) =>
-        authenticateClerkRequest(request, bindings),
+        authenticateClerkRequest(
+          request,
+          bindings,
+          services.db.erasure.assertAccountActive,
+        ),
       isAllowedOrigin: (origin: string) =>
         isAllowedWebOrigin(origin, bindings.APP_ENV),
       service: services.storage,
@@ -99,7 +105,11 @@ export function validateUploadBindings(env: ApiBindings) {
 }
 
 export function validateClerkWebhookBindings(env: ApiBindings) {
-  const required = ["CLERK_WEBHOOK_SIGNING_SECRET", "DATABASE_URL"] as const;
+  const required = [
+    "CLERK_WEBHOOK_SIGNING_SECRET",
+    "DATABASE_URL",
+    "ERASURE_HMAC_SECRET",
+  ] as const;
   const invalidVariables = required.filter((name) => !env[name]?.trim());
   if (invalidVariables.length > 0) {
     throw new ApiEnvValidationError(invalidVariables);
@@ -136,7 +146,10 @@ export async function handleWorkerScheduled(
       let runtime: ReturnType<typeof storageRuntime> | undefined;
       try {
         runtime = storageRuntime(env);
-        await runtime.services.storage.cleanupExpired();
+        await Promise.all([
+          runtime.services.storage.cleanupExpired(),
+          runtime.services.db.erasure.purgeExpiredReceipts(),
+        ]);
       } catch {
         await logWorkerException(
           new Error("Storage cleanup failed."),
@@ -177,6 +190,7 @@ export function isAllowedWebOrigin(
 async function authenticateClerkRequest(
   request: Request,
   env: ApiBindings,
+  assertAccountActive: (clerkId: string) => Promise<void>,
 ): Promise<{ clerkId: string; isAdmin: boolean } | null> {
   const authorization = request.headers.get("authorization");
   const origin = request.headers.get("origin");
@@ -195,6 +209,7 @@ async function authenticateClerkRequest(
       authorizedParties: [origin],
       secretKey: env.CLERK_SECRET_KEY,
     });
+    await assertAccountActive(payload.sub);
     return {
       clerkId: payload.sub,
       isAdmin: (payload as { role?: unknown }).role === "admin",

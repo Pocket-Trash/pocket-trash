@@ -35,6 +35,7 @@ export type ApiBindings = Omit<Env, "APP_ENV" | "BUNNY_IMAGE_FOLDER_PREFIX"> & {
   CLERK_WEBHOOK_SIGNING_SECRET?: string;
   CLERK_WEBHOOK_TARGETS?: KVNamespace;
   DATABASE_URL?: string;
+  ERASURE_HMAC_SECRET?: string;
   LOGGER?: string;
   LOG_DEPLOYMENT_ID?: string;
   LOG_DEPLOYMENT_TARGET?: string;

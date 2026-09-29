@@ -9,10 +9,13 @@ and Clerk's update timestamp in `users` for joins and display.
 - Development: `https://dev-api.pocket-trash.app/api/v0/webhooks/clerk`
 - Local: `http://localhost:4006/api/v0/webhooks/clerk/<initials>`
 
-Both Clerk endpoints subscribe to `user.created` and `user.updated`. Every
+Both Clerk endpoints subscribe to `user.created`, `user.updated`, and
+`user.deleted`. Every
 handler verifies `CLERK_WEBHOOK_SIGNING_SECRET`; duplicate and stale events are
-safe. Development forwards the exact signed payload to targets stored in the
-`CLERK_WEBHOOK_TARGETS` KV namespace.
+safe. Expected deletions resume an approved erasure request. Unexpected
+deletions hide user content and create a `needs_attention` request without
+erasing local data. Development forwards the exact signed payload to targets
+stored in the `CLERK_WEBHOOK_TARGETS` KV namespace.
 
 ## Local development
 

@@ -2,6 +2,10 @@ import { verifyWebhook } from "@clerk/backend/webhooks";
 import type { Logger } from "@package/logger";
 import { loggerMessages } from "@package/logger";
 import type { UsersService } from "@package/services";
+import {
+  createErasureSubjectHmac,
+  type ErasureService,
+} from "@package/services";
 
 export const clerkWebhookPath = "/api/v0/webhooks/clerk";
 
@@ -27,6 +31,8 @@ export type ClerkWebhookTargetMetadata = {
 };
 
 export type ClerkWebhookHandlerOptions = {
+  erasure?: Pick<ErasureService, "handleClerkDeletion">;
+  erasureHmacSecret?: string;
   fetch?: typeof fetch;
   logger: Logger;
   signingSecret: string;
@@ -69,6 +75,17 @@ export function createClerkWebhookHandler(options: ClerkWebhookHandlerOptions) {
           clerkId: event.data.id,
           clerkUpdatedAt: new Date(event.data.updated_at),
           username: event.data.username ?? "",
+        });
+      } else if (event.type === "user.deleted") {
+        if (!options.erasure || !options.erasureHmacSecret || !event.data.id) {
+          throw new Error("Erasure webhook handling is not configured.");
+        }
+        await options.erasure.handleClerkDeletion({
+          subjectHmac: await createErasureSubjectHmac(
+            event.data.id,
+            options.erasureHmacSecret,
+          ),
+          targetClerkId: event.data.id,
         });
       }
     } catch {
