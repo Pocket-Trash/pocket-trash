@@ -45,6 +45,9 @@ describe("resource management routes", () => {
   });
 
   it.each([
+    "/admin",
+    "/admin/notifications/feedback",
+    "/admin/notifications/resources",
     "/admin/resources/trash",
     "/user/resources/trash",
   ])("registers %s", (fullPath) => {
@@ -53,5 +56,13 @@ describe("resource management routes", () => {
         (candidate) => candidate.fullPath === fullPath,
       ),
     ).toBe(true);
+  });
+
+  it("does not register the old resource notification route", () => {
+    expect(
+      Object.values(getRouter().routesById).some(
+        (candidate) => candidate.fullPath === "/admin/resources/notifications",
+      ),
+    ).toBe(false);
   });
 });

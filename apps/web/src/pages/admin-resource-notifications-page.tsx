@@ -53,7 +53,13 @@ export function AdminResourceNotificationsPage({
   }
 
   return (
-    <AppShell title={t("web.resources.notification.title")}>
+    <AppShell
+      breadcrumbItems={[
+        { label: t("web.navigation.admin"), to: "/admin" },
+        { label: t("web.admin.notifications.title") },
+      ]}
+      title={t("web.resources.notification.title")}
+    >
       <main className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-6 md:px-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="m-0 text-sm text-muted-foreground">

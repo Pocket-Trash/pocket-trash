@@ -113,6 +113,22 @@ export const listFeedbackMergeTargets = createServerFn({
   return await s.db.feedback.listMergeTargets();
 });
 
+export const listFeedbackNotifications = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  await requireResourceAdmin();
+  const { s } = await import("@/lib/services");
+  return await s.db.feedback.listNotifications();
+});
+
+export const markFeedbackNotificationRead = createServerFn({ method: "POST" })
+  .validator(parseNotificationId)
+  .handler(async ({ data }) => {
+    const actorClerkId = await requireResourceAdmin();
+    const { s } = await import("@/lib/services");
+    await s.db.feedback.markNotificationRead(data.notificationId, actorClerkId);
+  });
+
 export const updateAdminFeedback = createServerFn({ method: "POST" })
   .validator(parseAdminFeedbackInput)
   .handler(async ({ data }) => {
@@ -261,6 +277,14 @@ function parseFeedbackId(input: unknown) {
     throw invalidFeedbackRequest();
   }
   return { feedbackId: Number(feedbackId) };
+}
+
+function parseNotificationId(input: unknown) {
+  const notificationId = parseRecord(input).notificationId;
+  if (!Number.isSafeInteger(notificationId) || Number(notificationId) <= 0) {
+    throw invalidFeedbackRequest();
+  }
+  return { notificationId: Number(notificationId) };
 }
 
 function parseRecord(input: unknown): Record<string, unknown> {

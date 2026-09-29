@@ -20,6 +20,7 @@ type AppShellProps = {
     | {
         label: string;
         to?:
+          | "/admin"
           | "/collections"
           | "/help"
           | "/products"
