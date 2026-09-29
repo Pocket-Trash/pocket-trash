@@ -91,6 +91,7 @@ function AdminFeedbackPage({
   const [status, setStatus] = useState<ArchiveStatus | "">("");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const { locale } = useLocale();
   const t = useCopy();
 
@@ -98,15 +99,19 @@ function AdminFeedbackPage({
     if (selected && !dialogRef.current?.open) dialogRef.current?.showModal();
   }, [selected]);
 
+  useEffect(() => () => clearTimeout(searchTimerRef.current), []);
+
   async function load(
     nextOffset: number,
     nextSort = sort,
     nextStatus = status,
+    nextSearch = search,
   ) {
+    clearTimeout(searchTimerRef.current);
     setError(false);
     setLoading(true);
     try {
-      const data = { offset: nextOffset, search, sort: nextSort };
+      const data = { offset: nextOffset, search: nextSearch, sort: nextSort };
       setPage(
         scope === "pending"
           ? await listPendingFeedback({ data })
@@ -272,7 +277,14 @@ function AdminFeedbackPage({
                 className="min-w-56 flex-1"
                 id={`${scope}-feedback-search`}
                 maxLength={120}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  const nextSearch = event.target.value;
+                  setSearch(nextSearch);
+                  searchTimerRef.current = scheduleAdminSearch(
+                    searchTimerRef.current,
+                    () => void load(0, sort, status, nextSearch),
+                  );
+                }}
                 placeholder={t(`web.feedback.admin.${scope}.searchPlaceholder`)}
                 type="search"
                 value={search}
@@ -734,6 +746,14 @@ function formatDate(value: Date, locale: string) {
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
     new Date(value),
   );
+}
+
+export function scheduleAdminSearch(
+  current: ReturnType<typeof setTimeout> | undefined,
+  search: () => void,
+) {
+  clearTimeout(current);
+  return setTimeout(search, 150);
 }
 
 function statusKey(status: Item["status"]): TranslationKey {
