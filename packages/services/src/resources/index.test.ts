@@ -95,45 +95,26 @@ describe("resources service", () => {
     expect(upload).not.toHaveBeenCalled();
   });
 
-  it("records a download before returning the file URL", async () => {
+  it("signs before recording one authenticated file download per version", async () => {
     const calls: string[] = [];
     const db = {
-      insert() {
-        return {
-          async values() {
-            calls.push("recorded");
-          },
-        };
-      },
-      select() {
-        return {
-          from() {
-            return {
-              innerJoin() {
-                return {
-                  innerJoin() {
-                    return {
-                      where() {
-                        return {
-                          async limit() {
-                            calls.push("selected");
-                            return [
-                              {
-                                id: 1001,
-                                objectPath: "resources/dev/file.stl",
-                              },
-                            ];
-                          },
-                        };
-                      },
-                    };
-                  },
-                };
+      execute: vi
+        .fn()
+        .mockImplementationOnce(async () => {
+          calls.push("selected");
+          return {
+            rows: [
+              {
+                objectPath: "resources/dev/file.stl",
+                versionId: 1001,
               },
-            };
-          },
-        };
-      },
+            ],
+          };
+        })
+        .mockImplementationOnce(async () => {
+          calls.push("recorded");
+          return { rows: [] };
+        }),
     } as unknown as Database;
     const service = createResourcesService(
       db,
@@ -146,10 +127,127 @@ describe("resources service", () => {
       },
     );
 
-    await expect(service.download(1000, 1001)).resolves.toBe(
+    await expect(
+      service.downloadFile(1000, 1002, { clerkId: "user_123" }),
+    ).resolves.toBe(
       "https://cdn.example.test/resources/dev/file.stl?token=signed",
     );
-    expect(calls).toEqual(["selected", "recorded", "signed"]);
+    expect(calls).toEqual(["selected", "signed", "recorded"]);
+    const recordQuery = new PgDialect().sqlToQuery(
+      (db.execute as ReturnType<typeof vi.fn>).mock.calls[1]?.[0],
+    );
+    expect(recordQuery.sql).toContain(
+      "on conflict (version_id, user_clerk_id) do nothing",
+    );
+    expect(recordQuery.params).toEqual([1001, "user_123"]);
+  });
+
+  it("counts every anonymous file download only after signing succeeds", async () => {
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [{ objectPath: "resources/dev/file.stl", versionId: 1001 }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ objectPath: "resources/dev/file.stl", versionId: 1001 }],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+    const sign = vi.fn().mockRejectedValueOnce(new Error("signing failed"));
+    const service = createResourcesService(
+      { execute } as unknown as Database,
+      {} as UploadStorage,
+      createNoopLogger({ app: "web", environment: "test" }),
+      sign,
+    );
+
+    await expect(service.downloadFile(1000, 1002)).rejects.toThrow(
+      "signing failed",
+    );
+    expect(execute).toHaveBeenCalledTimes(1);
+
+    sign.mockResolvedValueOnce("https://cdn.example.test/signed");
+    await expect(service.downloadFile(1000, 1002)).resolves.toBe(
+      "https://cdn.example.test/signed",
+    );
+    const countQuery = new PgDialect().sqlToQuery(execute.mock.calls[2]?.[0]);
+    expect(countQuery.sql).toContain("anonymous_download_count + 1");
+    expect(countQuery.params).toEqual([1001]);
+  });
+
+  it("streams one ZIP candidate and deletes it when compare-and-set selects a winner", async () => {
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            archiveObjectPath: null,
+            fileName: "first.stl",
+            objectPath: "resources/dev/1000/first.stl",
+            size: 3,
+            version: 2,
+            versionId: 1001,
+          },
+          {
+            archiveObjectPath: null,
+            fileName: "notes.txt",
+            objectPath: "resources/dev/1000/notes.txt",
+            size: 5,
+            version: 2,
+            versionId: 1001,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            objectPath:
+              "resources/dev/1000/archives/winner/resource-1000-v2.zip",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+    const remove = vi.fn().mockResolvedValue("deleted");
+    const putFile = vi.fn(async ({ body }: { body: ReadableStream }) => {
+      await new Response(body).arrayBuffer();
+    });
+    const storage = {
+      createArchiveTarget: vi.fn(() => ({
+        contentType: "application/zip",
+        fileName: "resource-1000-v2.zip",
+        objectPath:
+          "resources/dev/1000/archives/candidate/resource-1000-v2.zip",
+        size: 0,
+        url: "https://cdn.example.test/candidate",
+      })),
+      delete: remove,
+      readFile: vi.fn(async (objectPath: string) =>
+        new Blob([
+          objectPath.endsWith("notes.txt")
+            ? "notes"
+            : new Uint8Array([1, 2, 3]),
+        ]).stream(),
+      ),
+      putFile,
+    } as unknown as UploadStorage;
+    const service = createResourcesService(
+      { execute } as unknown as Database,
+      storage,
+      createNoopLogger({ app: "web", environment: "test" }),
+      async (objectPath) => `https://cdn.example.test/${objectPath}`,
+    );
+
+    await expect(service.downloadVersion(1000, 1001)).resolves.toBe(
+      "https://cdn.example.test/resources/dev/1000/archives/winner/resource-1000-v2.zip",
+    );
+    expect(putFile).toHaveBeenCalledOnce();
+    expect(storage.readFile).toHaveBeenCalledTimes(2);
+    expect(remove).toHaveBeenCalledWith(
+      "resources/dev/1000/archives/candidate/resource-1000-v2.zip",
+    );
+    const candidateQuery = new PgDialect().sqlToQuery(
+      execute.mock.calls[1]?.[0],
+    );
+    expect(candidateQuery.sql).toContain("archive_object_path is null");
   });
 
   it("returns resource detail with event-derived download counts", async () => {
@@ -157,12 +255,12 @@ describe("resources service", () => {
     const categories = [{ id: 1002, name: "3D printing", slug: "3d-printing" }];
     const version = {
       createdAt,
+      downloadCount: 2,
       id: 1001,
       version: 1,
     };
     const file = {
       contentType: "model/stl",
-      downloadCount: 2,
       fileName: "clip.stl",
       id: 1003,
       size: 42,
@@ -182,7 +280,6 @@ describe("resources service", () => {
       files: [
         {
           contentType: file.contentType,
-          downloadCount: file.downloadCount,
           fileName: file.fileName,
           id: file.id,
           size: file.size,
@@ -221,18 +318,18 @@ describe("resources service", () => {
       })
       .mockReturnValueOnce({
         from: () => ({
-          where: () => ({
-            orderBy: async () => [version],
+          leftJoin: () => ({
+            where: () => ({
+              groupBy: () => ({ orderBy: async () => [version] }),
+            }),
           }),
         }),
       })
       .mockReturnValueOnce({
         from: () => ({
-          leftJoin: () => ({
-            innerJoin: () => ({
-              where: () => ({
-                groupBy: () => ({ orderBy: async () => [file] }),
-              }),
+          innerJoin: () => ({
+            where: () => ({
+              orderBy: async () => [file],
             }),
           }),
         }),
@@ -246,10 +343,8 @@ describe("resources service", () => {
       })
       .mockReturnValueOnce({
         from: () => ({
-          innerJoin: () => ({
-            leftJoin: () => ({
-              where: async () => [{ downloadCount: 3 }],
-            }),
+          leftJoin: () => ({
+            where: async () => [{ downloadCount: 3 }],
           }),
         }),
       });
@@ -327,9 +422,11 @@ describe("resources service", () => {
         categories,
         createdAt: new Date("2026-09-16T12:00:00Z"),
         currentVersion: {
+          fileCount: 1,
           fileId: 1003,
           fileName: "clip.stl",
           id: 1001,
+          version: 1,
         },
         downloadCount: 3,
         id: 1000,
@@ -360,9 +457,11 @@ describe("resources service", () => {
           categories,
           createdAt: new Date("2026-09-16T12:00:00Z"),
           currentVersion: {
+            fileCount: 1,
             fileId: 1003,
             fileName: "clip.stl",
             id: 1001,
+            version: 1,
           },
           downloadCount: 3,
           id: 1000,
@@ -581,6 +680,7 @@ describe("resources service", () => {
         : [],
     }));
     const storage: UploadStorage = {
+      createArchiveTarget: vi.fn(),
       createFileTarget: vi.fn(),
       async delete(objectPath) {
         deleted.push(objectPath);
@@ -596,6 +696,7 @@ describe("resources service", () => {
       },
       putFile: vi.fn(),
       putImage: vi.fn(),
+      readFile: vi.fn(),
     };
     const select = vi
       .fn()
@@ -706,6 +807,10 @@ describe("resources service", () => {
             { objectPath: "resources/dev/1000/image.webp" },
             { objectPath: "resources/dev/1000/model.stl" },
             { objectPath: "resources/dev/1000/legacy.zip" },
+            {
+              objectPath:
+                "resources/dev/1000/archives/candidate/resource-1000-v1.zip",
+            },
           ],
         };
       return { rows: [{ id: 1000 }] };
@@ -736,6 +841,7 @@ describe("resources service", () => {
         )
         .flatMap((query) => query.params),
     ).toEqual([
+      "resources/dev/1000/archives/candidate/resource-1000-v1.zip",
       "resources/dev/1000/image.webp",
       "resources/dev/1000/legacy.zip",
       "resources/dev/1000/model.stl",
@@ -876,3 +982,4 @@ describe("resources service", () => {
     expect(adminQuery.params).toEqual([]);
   });
 });
+

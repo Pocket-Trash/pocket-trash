@@ -51,6 +51,21 @@ export function buildResourceFileObjectPath(input: {
     throw new Error("Invalid resource file path.");
   return `${resourceFolderPrefix(input.prefix)}/${input.resourceId}/v${input.version}/${input.sha256}.${extension(input.extension)}`;
 }
+export function buildResourceArchiveObjectPath(input: {
+  candidateId: string;
+  prefix: string;
+  resourceId: number;
+  version: number;
+}): string {
+  if (
+    !Number.isSafeInteger(input.resourceId) ||
+    input.resourceId <= 0 ||
+    !Number.isSafeInteger(input.version) ||
+    input.version <= 0
+  )
+    throw new Error("Invalid resource archive path.");
+  return `${resourceFolderPrefix(input.prefix)}/${input.resourceId}/archives/${segment(input.candidateId)}/resource-${input.resourceId}-v${input.version}.zip`;
+}
 export async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(bytes));
   return [...new Uint8Array(digest)]

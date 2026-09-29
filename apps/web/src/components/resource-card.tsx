@@ -16,7 +16,11 @@ import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { downloadResource, type listResourceDirectory } from "@/lib/resources";
+import {
+  downloadResource,
+  downloadResourceVersion,
+  type listResourceDirectory,
+} from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
 export type ResourceCardItem = Awaited<
@@ -35,6 +39,8 @@ export function ResourceCard({
 }) {
   const { locale } = useLocale();
   const [downloading, setDownloading] = useState(false);
+  const [archiveFailed, setArchiveFailed] = useState(false);
+  const downloadsArchive = resource.currentVersion.fileCount >= 2;
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -46,24 +52,47 @@ export function ResourceCard({
           <div className="flex flex-wrap gap-2">
             <Button
               className="flex-1"
-              disabled={downloading}
+              disabled={downloading || archiveFailed}
               onClick={async () => {
                 setDownloading(true);
                 try {
-                  const url = await downloadResource({
-                    data: {
-                      fileId: resource.currentVersion.fileId,
-                      resourceId: resource.id,
-                    },
-                  });
+                  const url = downloadsArchive
+                    ? await downloadResourceVersion({
+                        data: {
+                          resourceId: resource.id,
+                          versionId: resource.currentVersion.id,
+                        },
+                      })
+                    : await downloadResource({
+                        data: {
+                          fileId: resource.currentVersion.fileId,
+                          resourceId: resource.id,
+                        },
+                      });
                   if (!url) throw new Error("missing download");
                   window.location.assign(url);
                 } catch {
                   toast.error(
                     t("web.resources.error.downloadUnavailable", {
-                      filename: resource.currentVersion.fileName,
+                      filename: downloadsArchive
+                        ? `resource-${resource.id}-v${resource.currentVersion.version}.zip`
+                        : resource.currentVersion.fileName,
                     }),
+                    downloadsArchive
+                      ? {
+                          description: (
+                            <Link
+                              className="underline"
+                              params={{ resourceId: String(resource.id) }}
+                              to="/resources/$resourceId"
+                            >
+                              {t("web.resources.action.details")}
+                            </Link>
+                          ),
+                        }
+                      : undefined,
                   );
+                  if (downloadsArchive) setArchiveFailed(true);
                   setDownloading(false);
                 }
               }}
@@ -71,6 +100,7 @@ export function ResourceCard({
             >
               <FileDown />
               {t("web.resources.action.download")}
+              {downloadsArchive ? " ZIP" : null}
             </Button>
             <Button
               className="flex-1"
@@ -202,7 +232,7 @@ function ResourceCardContent({
             </span>
           ) : null}
           <span>
-            {t("web.resources.detail.totalDownloadCount", {
+            {t("web.resources.detail.downloadCount", {
               count: resource.downloadCount,
             })}
           </span>

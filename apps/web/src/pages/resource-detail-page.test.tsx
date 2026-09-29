@@ -37,10 +37,15 @@ describe("resource detail", () => {
       files: [
         {
           contentType: "model/stl",
-          downloadCount: 0,
           fileName: "clip.stl",
           id: 1002,
           size: 42,
+        },
+        {
+          contentType: "text/plain",
+          fileName: "notes.txt",
+          id: 1003,
+          size: 12,
         },
       ],
       id: 1001,
@@ -79,6 +84,9 @@ describe("resource detail", () => {
     expect(html).not.toContain("Upload new version");
     expect(html).not.toContain('href="/resources/1000/versions/new"');
     expect(html).toContain("clip.stl");
+    expect(html).toContain("Download ZIP");
+    expect(html).toContain("Downloads: 0");
+    expect(html).not.toContain("Total downloads");
     expect(html).not.toContain("File: clip.stl");
   });
 });

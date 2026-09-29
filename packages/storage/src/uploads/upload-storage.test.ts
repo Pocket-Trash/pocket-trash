@@ -2,6 +2,7 @@ import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildResourceFolderPrefix,
+  createUncompressedZip,
   createUploadStorage,
   sha256,
   signResourceUrl,
@@ -20,6 +21,54 @@ const config = {
 };
 
 describe("resource storage", () => {
+  it("streams an uncompressed ZIP with root files in stored order", async () => {
+    const firstBytes = new Uint8Array([1, 2, 3]);
+    const secondBytes = new TextEncoder().encode("notes");
+    const files = [
+      { bytes: firstBytes, fileName: "first.stl" },
+      { bytes: secondBytes, fileName: "notes.txt" },
+    ];
+    const archive = createUncompressedZip(
+      files.map(({ bytes, fileName }) => ({
+        fileName,
+        open: async () => new Blob([bytes]).stream(),
+        size: bytes.byteLength,
+      })),
+    );
+    const bytes = new Uint8Array(
+      await new Response(archive.body).arrayBuffer(),
+    );
+    const view = new DataView(bytes.buffer);
+    const firstNameLength = view.getUint16(26, true);
+    const firstDataOffset = 30 + firstNameLength;
+    const secondHeaderOffset = firstDataOffset + firstBytes.length + 16;
+    const secondNameLength = view.getUint16(secondHeaderOffset + 26, true);
+    const secondDataOffset = secondHeaderOffset + 30 + secondNameLength;
+
+    expect(bytes.byteLength).toBe(archive.contentLength);
+    expect(view.getUint32(0, true)).toBe(0x04034b50);
+    expect(new TextDecoder().decode(bytes.slice(30, firstDataOffset))).toBe(
+      "first.stl",
+    );
+    expect(bytes.slice(firstDataOffset, firstDataOffset + 3)).toEqual(
+      firstBytes,
+    );
+    expect(view.getUint32(firstDataOffset + 3, true)).toBe(0x08074b50);
+    expect(view.getUint32(firstDataOffset + 7, true)).toBe(0x55bc801d);
+    expect(view.getUint32(secondHeaderOffset, true)).toBe(0x04034b50);
+    expect(
+      new TextDecoder().decode(
+        bytes.slice(secondHeaderOffset + 30, secondDataOffset),
+      ),
+    ).toBe("notes.txt");
+    expect(
+      new TextDecoder().decode(
+        bytes.slice(secondDataOffset, secondDataOffset + secondBytes.length),
+      ),
+    ).toBe("notes");
+    expect(view.getUint32(bytes.byteLength - 22, true)).toBe(0x06054b50);
+  });
+
   it("signs one exact URL for 120 seconds, including decoded spaces", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-17T00:00:00Z"));
@@ -134,6 +183,34 @@ describe("resource storage", () => {
         objectPath: target.objectPath,
       }),
     ).resolves.toBeUndefined();
+  });
+
+  it("creates uniquely named archive candidates and reads stored objects", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      expect(toUrl(input).pathname).toBe(
+        "/pocket-trash-storage/resources/dev/1005/source.stl",
+      );
+      expect(init?.method).toBe("GET");
+      return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+    });
+    const storage = createUploadStorage({ ...config, fetch: fetchMock });
+
+    expect(storage.createArchiveTarget(1005, 3, 123)).toEqual({
+      contentType: "application/zip",
+      fileName: "resource-1005-v3.zip",
+      objectPath: expect.stringMatching(
+        /^resources\/dev\/1005\/archives\/[a-f0-9-]+\/resource-1005-v3\.zip$/u,
+      ),
+      size: 123,
+      url: expect.stringMatching(
+        /^https:\/\/cdn\.pocket-trash\.app\/resources\/dev\/1005\/archives\/[a-f0-9-]+\/resource-1005-v3\.zip$/u,
+      ),
+    });
+    await expect(
+      new Response(await storage.readFile("resources/dev/1005/source.stl"))
+        .arrayBuffer()
+        .then((bytes) => [...new Uint8Array(bytes)]),
+    ).resolves.toEqual([1, 2, 3]);
   });
 
   it("calls the Workers runtime fetch without rebinding it", async () => {

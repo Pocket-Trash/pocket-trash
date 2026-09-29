@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   File,
+  FileArchive,
   FileDown,
   Pencil,
   Trash2,
@@ -21,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   downloadResource,
+  downloadResourceVersion,
   type getResourceDetail,
   softDeleteResource,
 } from "@/lib/resources";
@@ -34,6 +36,10 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
   const { locale } = useLocale();
   const navigate = useNavigate();
   const [downloadingFileId, setDownloadingFileId] = useState<number>();
+  const [downloadingVersionId, setDownloadingVersionId] = useState<number>();
+  const [failedVersionIds, setFailedVersionIds] = useState<Set<number>>(
+    () => new Set(),
+  );
   const [deleting, setDeleting] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
@@ -59,6 +65,27 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
         }),
       );
       setDownloadingFileId(undefined);
+    }
+  }
+
+  async function startVersionDownload(
+    version: ResourceDetail["versions"][number],
+  ) {
+    setDownloadingVersionId(version.id);
+    try {
+      const url = await downloadResourceVersion({
+        data: { resourceId: detail.id, versionId: version.id },
+      });
+      if (!url) throw new Error("missing download");
+      window.location.assign(url);
+    } catch {
+      toast.error(
+        t("web.resources.error.downloadUnavailable", {
+          filename: `resource-${detail.id}-v${version.version}.zip`,
+        }),
+      );
+      setFailedVersionIds((failed) => new Set(failed).add(version.id));
+      setDownloadingVersionId(undefined);
     }
   }
 
@@ -131,7 +158,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
                 </dd>
               </div>
               <DetailRow
-                label={t("web.resources.detail.totalDownloadCount", {
+                label={t("web.resources.detail.downloadCount", {
                   count: detail.downloadCount,
                 })}
               />
@@ -174,9 +201,12 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
 
         <VersionCard
           canEdit={detail.canEdit}
+          archiveDownloading={downloadingVersionId === detail.currentVersion.id}
+          archiveFailed={failedVersionIds.has(detail.currentVersion.id)}
           downloadingFileId={downloadingFileId}
           locale={locale}
           onDownload={startDownload}
+          onDownloadVersion={startVersionDownload}
           resourceId={detail.id}
           t={t}
           title={t("web.resources.detail.currentVersion")}
@@ -207,12 +237,15 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
             <div className="mt-4 grid gap-3">
               {detail.versions.map((version) => (
                 <VersionCard
+                  archiveDownloading={downloadingVersionId === version.id}
+                  archiveFailed={failedVersionIds.has(version.id)}
                   canEdit={detail.canEdit}
                   collapsible
                   downloadingFileId={downloadingFileId}
                   key={version.id}
                   locale={locale}
                   onDownload={startDownload}
+                  onDownloadVersion={startVersionDownload}
                   resourceId={detail.id}
                   t={t}
                   version={version}
@@ -291,21 +324,27 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
 }
 
 function VersionCard({
+  archiveDownloading,
+  archiveFailed,
   canEdit,
   collapsible = false,
   downloadingFileId,
   locale,
   onDownload,
+  onDownloadVersion,
   resourceId,
   t,
   title,
   version,
 }: {
+  archiveDownloading: boolean;
+  archiveFailed: boolean;
   canEdit: boolean;
   collapsible?: boolean;
   downloadingFileId?: number;
   locale: SupportedLocale;
   onDownload: (file: ResourceDetail["currentVersion"]["files"][number]) => void;
+  onDownloadVersion: (version: ResourceDetail["versions"][number]) => void;
   resourceId: number;
   t: (key: TranslationKey, params?: Record<string, number | string>) => string;
   title?: string;
@@ -323,7 +362,7 @@ function VersionCard({
         <h2 className="m-0 text-base font-semibold">
           {t("web.resources.detail.version", { version: version.version })}
           {", "}
-          {t("web.resources.detail.totalDownloadCount", {
+          {t("web.resources.detail.downloadCount", {
             count: version.downloadCount,
           })}
           {", "}
@@ -331,23 +370,36 @@ function VersionCard({
             date: formatDate(version.createdAt, locale),
           })}
         </h2>
-        {collapsible ? (
-          <Button
-            aria-expanded={expanded}
-            aria-label={t(
-              expanded
-                ? "web.resources.action.collapseVersion"
-                : "web.resources.action.expandVersion",
-              { version: version.version },
-            )}
-            onClick={() => setExpanded((value) => !value)}
-            size="icon"
-            type="button"
-            variant="ghost"
-          >
-            {expanded ? <ChevronUp /> : <ChevronDown />}
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {version.files.length >= 2 ? (
+            <Button
+              disabled={archiveDownloading || archiveFailed}
+              onClick={() => onDownloadVersion(version)}
+              type="button"
+              variant="outline"
+            >
+              <FileArchive />
+              {t("web.resources.action.download")} ZIP
+            </Button>
+          ) : null}
+          {collapsible ? (
+            <Button
+              aria-expanded={expanded}
+              aria-label={t(
+                expanded
+                  ? "web.resources.action.collapseVersion"
+                  : "web.resources.action.expandVersion",
+                { version: version.version },
+              )}
+              onClick={() => setExpanded((value) => !value)}
+              size="icon"
+              type="button"
+              variant="ghost"
+            >
+              {expanded ? <ChevronUp /> : <ChevronDown />}
+            </Button>
+          ) : null}
+        </div>
       </div>
       {expanded ? (
         <div className="mt-4 grid gap-2">
@@ -393,10 +445,6 @@ function ResourceFileDownload({
         <p className="m-0 text-muted-foreground">
           {t("web.resources.detail.fileSize", {
             size: formatFileSize(file.size, locale),
-          })}
-          {", "}
-          {t("web.resources.detail.downloadCount", {
-            count: file.downloadCount,
           })}
         </p>
       </div>

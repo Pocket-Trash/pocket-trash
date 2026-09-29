@@ -9,7 +9,13 @@ const resource = {
   coverImageUrl:
     "https://cdn.pocket-trash.app/assets/resosurces.webp?width=640",
   createdAt: new Date("2026-09-16T12:00:00Z"),
-  currentVersion: { fileId: 10, fileName: "spinner.stl", id: 20 },
+  currentVersion: {
+    fileCount: 1,
+    fileId: 10,
+    fileName: "spinner.stl",
+    id: 20,
+    version: 1,
+  },
   downloadCount: 24,
   id: 1000,
   isPrivate: false,
@@ -49,6 +55,20 @@ export const Directory: Story = {
 
 export const Editable: Story = {
   args: { resource: { ...resource, canEdit: true } },
+};
+
+export const MultiFile: Story = {
+  args: {
+    resource: {
+      ...resource,
+      currentVersion: { ...resource.currentVersion, fileCount: 2 },
+    },
+  },
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("button", { name: "Download ZIP" }),
+    ).toBeVisible();
+  },
 };
 
 export const PrivateWithoutCover: Story = {

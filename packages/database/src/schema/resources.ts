@@ -111,6 +111,10 @@ export const resourceVersions = pgTable(
     legacyStorageProvider: text("storage_provider").default("bunny"),
     legacyObjectPath: text("object_path"),
     legacyUrl: text("url"),
+    archiveObjectPath: text("archive_object_path"),
+    anonymousDownloadCount: integer("anonymous_download_count")
+      .default(0)
+      .notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -122,8 +126,15 @@ export const resourceVersions = pgTable(
       table.version,
     ),
     unique("resource_versions_object_path_unique").on(table.legacyObjectPath),
+    unique("resource_versions_archive_object_path_unique").on(
+      table.archiveObjectPath,
+    ),
     check("resource_versions_version_positive", sql`${table.version} > 0`),
     check("resource_versions_size_positive", sql`${table.legacySize} > 0`),
+    check(
+      "resource_versions_anonymous_download_count_nonnegative",
+      sql`${table.anonymousDownloadCount} >= 0`,
+    ),
   ],
 );
 
@@ -194,21 +205,20 @@ export const resourceDownloads = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    versionId: bigint("version_id", { mode: "number" }).references(
-      () => resourceVersions.id,
-      { onDelete: "cascade" },
-    ),
-    fileId: bigint("file_id", { mode: "number" }).references(
-      () => resourceFiles.id,
-      { onDelete: "cascade" },
-    ),
+    versionId: bigint("version_id", { mode: "number" })
+      .notNull()
+      .references(() => resourceVersions.id, { onDelete: "cascade" }),
+    userClerkId: text("user_clerk_id").notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (table) => [
     index("resource_downloads_version_id_idx").on(table.versionId),
-    index("resource_downloads_file_id_idx").on(table.fileId),
+    unique("resource_downloads_version_user_unique").on(
+      table.versionId,
+      table.userClerkId,
+    ),
   ],
 );
 

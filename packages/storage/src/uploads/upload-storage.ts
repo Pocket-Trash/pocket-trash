@@ -25,6 +25,7 @@ import {
 import { buildCdnUrl, normalizeObjectPath } from "../lib/paths.js";
 import { readBodyWithLimit } from "../lib/read-body-with-limit.js";
 import {
+  buildResourceArchiveObjectPath,
   buildImageObjectPath,
   buildResourceFileObjectPath,
   imageFolderPrefix,
@@ -70,7 +71,20 @@ export type UploadTarget = UploadMetadata & {
 
 export type UploadDeleteResult = "deleted" | "missing";
 
+export type ArchiveTarget = {
+  contentType: "application/zip";
+  fileName: string;
+  objectPath: string;
+  size: number;
+  url: string;
+};
+
 export type UploadStorage = {
+  createArchiveTarget(
+    resourceId: number,
+    version: number,
+    size: number,
+  ): ArchiveTarget;
   createImageTarget(
     input: UploadMetadata,
     target: {
@@ -83,6 +97,7 @@ export type UploadStorage = {
     target: { resourceId: number; version: number },
   ): UploadTarget;
   delete(objectPath: string): Promise<UploadDeleteResult>;
+  readFile(objectPath: string): Promise<ReadableStream<Uint8Array>>;
   putFile(input: PutInput): Promise<void>;
   putImage(
     input: Omit<PutInput, "body"> & { body: ReadableStream | Uint8Array },
@@ -117,6 +132,24 @@ export function createUploadStorage(input: UploadStorageConfig): UploadStorage {
   const config = readConfig(input);
 
   return {
+    createArchiveTarget(resourceId, version, size) {
+      if (!Number.isSafeInteger(size) || size <= 0 || size > 0xffffffff)
+        throw new Error("Resource archive metadata is invalid.");
+      const fileName = `resource-${resourceId}-v${version}.zip`;
+      const objectPath = buildResourceArchiveObjectPath({
+        candidateId: crypto.randomUUID(),
+        prefix: config.folderPrefix,
+        resourceId,
+        version,
+      });
+      return {
+        contentType: "application/zip",
+        fileName,
+        objectPath,
+        size,
+        url: buildCdnUrl(config.cdnBaseUrl, objectPath),
+      };
+    },
     createImageTarget(metadata, { entity, entityId }) {
       assertEntityId(entityId);
       const extension = validateUploadMetadata(
@@ -177,6 +210,19 @@ export function createUploadStorage(input: UploadStorageConfig): UploadStorage {
       });
 
       return response.status === 404 ? "missing" : "deleted";
+    },
+    async readFile(objectPath) {
+      const normalizedPath = normalizeObjectPath(objectPath);
+      if (!normalizedPath.startsWith(`${config.folderPrefix}/`))
+        throw new Error(
+          "Upload object path is outside the configured namespace.",
+        );
+      const response = await bunnyRequest(config, normalizedPath, {
+        expectedStatuses: [200],
+        method: "GET",
+      });
+      if (!response.body) throw new Error("Upload object body is unavailable.");
+      return response.body;
     },
     async putFile({ body, contentLength, contentType, objectPath }) {
       const normalizedPath = normalizeObjectPath(objectPath);

@@ -1,4 +1,5 @@
 export * from "./constants.js";
+export * from "./archives/uncompressed-zip.js";
 export * from "./images/delivery-url.js";
 export * from "./images/remote-image-storage.js";
 export * from "./images/validate-image.js";
