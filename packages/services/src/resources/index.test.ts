@@ -982,4 +982,3 @@ describe("resources service", () => {
     expect(adminQuery.params).toEqual([]);
   });
 });
-

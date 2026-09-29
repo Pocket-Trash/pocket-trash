@@ -25,8 +25,8 @@ import {
 import { buildCdnUrl, normalizeObjectPath } from "../lib/paths.js";
 import { readBodyWithLimit } from "../lib/read-body-with-limit.js";
 import {
-  buildResourceArchiveObjectPath,
   buildImageObjectPath,
+  buildResourceArchiveObjectPath,
   buildResourceFileObjectPath,
   imageFolderPrefix,
   resourceFolderPrefix,
