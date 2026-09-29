@@ -108,6 +108,9 @@ export async function eraseAccountDatabaseData(
       where read_by_clerk_id = ${targetClerkId}
     `);
     await tx.execute(sql`
+      delete from resource_downloads where user_clerk_id = ${targetClerkId}
+    `);
+    await tx.execute(sql`
       delete from resources where uploader_clerk_id = ${targetClerkId}
     `);
     await tx.execute(sql`
@@ -183,6 +186,7 @@ export async function eraseAccountDatabaseData(
       union all select 'resource_categories.created_by_clerk_id', count(*) from resource_categories where created_by_clerk_id = ${targetClerkId}
       union all select 'resource_notifications.uploader_clerk_id', count(*) from resource_notifications where uploader_clerk_id = ${targetClerkId}
       union all select 'resource_notifications.read_by_clerk_id', count(*) from resource_notifications where read_by_clerk_id = ${targetClerkId}
+      union all select 'resource_downloads.user_clerk_id', count(*) from resource_downloads where user_clerk_id = ${targetClerkId}
       union all select 'upload_session.uploader_clerk_id', count(*) from upload_session where uploader_clerk_id = ${targetClerkId}
       union all select 'feedback.submitter_clerk_id', count(*) from feedback where submitter_clerk_id = ${targetClerkId}
       union all select 'feedback_votes.voter_clerk_id', count(*) from feedback_votes where voter_clerk_id = ${targetClerkId}

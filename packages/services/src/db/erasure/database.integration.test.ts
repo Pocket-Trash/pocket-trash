@@ -163,7 +163,7 @@ describe("account database erasure", () => {
           `
           select
             (select count(*)::int from product_material) as product_materials,
-            (select count(*)::int from resource_downloads) as anonymous_downloads,
+            (select count(*)::int from resource_downloads) as surviving_downloads,
             (select count(*)::int from resource_categories where created_by_clerk_id is null) as categories,
             (select count(*) > 0 from resource_notifications rn join resources r on r.id = rn.resource_id where r.name = 'Preserved resource' and rn.read_at is null and rn.read_by_clerk_id is null) as resource_notifications,
             (select count(*)::int from feedback_notifications where read_at is null and read_by_clerk_id is null) as feedback_notifications,
@@ -172,13 +172,13 @@ describe("account database erasure", () => {
         `,
         ),
       ).toEqual({
-        anonymous_downloads: 1,
         categories: 1,
         feedback_notifications: 1,
         flags: 1,
         overrides: 1,
         product_materials: 1,
         resource_notifications: true,
+        surviving_downloads: 1,
       });
 
       await client.exec(`
@@ -352,10 +352,10 @@ async function seedInventory(client: PGlite) {
        'erased.pdf', 'application/pdf', 10, 'resources/files/erased.pdf', 'https://cdn.test/files/erased.pdf'),
       ((select id from resource_versions where resource_id = (select id from resources where name = 'Preserved resource')),
        'preserved.pdf', 'application/pdf', 10, 'resources/files/preserved.pdf', 'https://cdn.test/files/preserved.pdf');
-    insert into resource_downloads (version_id, file_id)
-      select rv.id, rf.id from resource_versions rv
-      join resource_files rf on rf.version_id = rv.id
+    insert into resource_downloads (version_id, user_clerk_id)
+      select rv.id, downloader.clerk_id from resource_versions rv
       join resources r on r.id = rv.resource_id
+      cross join (values ('user_to_erase'), ('other_user')) downloader(clerk_id)
       where r.name = 'Preserved resource';
     insert into resources_to_categories (resource_id, category_id) values (
       (select id from resources where name = 'Preserved resource'),

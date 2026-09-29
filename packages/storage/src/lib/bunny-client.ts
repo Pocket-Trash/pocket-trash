@@ -10,16 +10,18 @@ export async function bunnyRequest(
     method: "DELETE" | "GET" | "PUT";
   },
 ): Promise<Response> {
+  const requestInit = {
+    body: input.body,
+    ...(input.body instanceof ReadableStream
+      ? { duplex: "half" as const }
+      : {}),
+    signal: AbortSignal.timeout(config.fetchTimeoutMs ?? storageFetchTimeoutMs),
+    headers: { AccessKey: config.accessKey, ...input.headers },
+    method: input.method,
+  };
   const response = await config.fetch(
     `${config.endpoint}/${config.zoneName}/${objectPath.replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/")}`,
-    {
-      body: input.body,
-      signal: AbortSignal.timeout(
-        config.fetchTimeoutMs ?? storageFetchTimeoutMs,
-      ),
-      headers: { AccessKey: config.accessKey, ...input.headers },
-      method: input.method,
-    },
+    requestInit,
   );
 
   if (!input.expectedStatuses.includes(response.status)) {

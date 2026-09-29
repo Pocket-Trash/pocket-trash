@@ -1,6 +1,6 @@
 {
-  "id": "e45236db-61af-4d98-921e-ddbd45b79f74",
-  "prevId": "a3596f58-4538-4e00-9348-e161705fdca3",
+  "id": "64b6626d-529a-41a4-826e-3276befd6212",
+  "prevId": "742697e1-30a3-44ce-8fd9-49943464ea94",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1995,12 +1995,36 @@
           "primaryKey": false,
           "notNull": false
         },
+        "verification_method": {
+          "name": "verification_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verified_by_clerk_id": {
+          "name": "verified_by_clerk_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "default": "'pending'"
+        },
+        "storage_targets": {
+          "name": "storage_targets",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
         },
         "step_results": {
           "name": "step_results",
@@ -2132,6 +2156,10 @@
         "erasure_request_status_valid": {
           "name": "erasure_request_status_valid",
           "value": "\"erasure_request\".\"status\" in ('pending', 'running', 'completed', 'needs_attention')"
+        },
+        "erasure_request_verification_method_valid": {
+          "name": "erasure_request_verification_method_valid",
+          "value": "\"erasure_request\".\"verification_method\" is null or \"erasure_request\".\"verification_method\" in ('clerk_reverification', 'authenticated_request', 'verified_email', 'clerk_webhook')"
         },
         "erasure_request_attempts_valid": {
           "name": "erasure_request_attempts_valid",
@@ -2727,13 +2755,13 @@
           "name": "version_id",
           "type": "bigint",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "file_id": {
-          "name": "file_id",
-          "type": "bigint",
+        "user_clerk_id": {
+          "name": "user_clerk_id",
+          "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",
@@ -2758,21 +2786,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "resource_downloads_file_id_idx": {
-          "name": "resource_downloads_file_id_idx",
-          "columns": [
-            {
-              "expression": "file_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -2784,19 +2797,16 @@
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        },
-        "resource_downloads_file_id_resource_files_id_fk": {
-          "name": "resource_downloads_file_id_resource_files_id_fk",
-          "tableFrom": "resource_downloads",
-          "tableTo": "resource_files",
-          "columnsFrom": ["file_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "resource_downloads_version_user_unique": {
+          "name": "resource_downloads_version_user_unique",
+          "nullsNotDistinct": false,
+          "columns": ["version_id", "user_clerk_id"]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -3262,6 +3272,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "archive_object_path": {
+          "name": "archive_object_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "anonymous_download_count": {
+          "name": "anonymous_download_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3309,6 +3332,11 @@
           "name": "resource_versions_object_path_unique",
           "nullsNotDistinct": false,
           "columns": ["object_path"]
+        },
+        "resource_versions_archive_object_path_unique": {
+          "name": "resource_versions_archive_object_path_unique",
+          "nullsNotDistinct": false,
+          "columns": ["archive_object_path"]
         }
       },
       "policies": {},
@@ -3320,6 +3348,10 @@
         "resource_versions_size_positive": {
           "name": "resource_versions_size_positive",
           "value": "\"resource_versions\".\"size\" > 0"
+        },
+        "resource_versions_anonymous_download_count_nonnegative": {
+          "name": "resource_versions_anonymous_download_count_nonnegative",
+          "value": "\"resource_versions\".\"anonymous_download_count\" >= 0"
         }
       },
       "isRLSEnabled": false
@@ -6540,6 +6572,12 @@
           "primaryKey": true,
           "notNull": true
         },
+        "owner_clerk_id": {
+          "name": "owner_clerk_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -6554,6 +6592,21 @@
           "columns": [
             {
               "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "storage_object_deletion_owner_idx": {
+          "name": "storage_object_deletion_owner_idx",
+          "columns": [
+            {
+              "expression": "owner_clerk_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

@@ -427,6 +427,12 @@ export function createStorageService(input: {
             where resources.uploader_clerk_id = ${targetClerkId}
               and resource_versions.object_path is not null
             union all
+            select resource_versions.archive_object_path
+            from resource_versions
+            join resources on resources.id = resource_versions.resource_id
+            where resources.uploader_clerk_id = ${targetClerkId}
+              and resource_versions.archive_object_path is not null
+            union all
             select upload_file.object_path
             from upload_file
             join upload_session on upload_session.id = upload_file.session_id
@@ -650,6 +656,10 @@ async function hasSurvivingReference(
       select resource_versions.object_path, resources.uploader_clerk_id, false
       from resource_versions join resources on resources.id = resource_versions.resource_id
       where resource_versions.object_path is not null
+      union all
+      select resource_versions.archive_object_path, resources.uploader_clerk_id, false
+      from resource_versions join resources on resources.id = resource_versions.resource_id
+      where resource_versions.archive_object_path is not null
       union all
       select upload_file.object_path, upload_session.uploader_clerk_id, false
       from upload_file join upload_session on upload_session.id = upload_file.session_id

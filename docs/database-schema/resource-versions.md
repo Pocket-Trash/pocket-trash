@@ -17,6 +17,8 @@ Immutable uploaded file versions for resources.
 | `storage_provider` | `text` | no |  | `'bunny'` |  |  |  |
 | `object_path` | `text` | no | unique |  |  |  |  |
 | `url` | `text` | no |  |  |  |  |  |
+| `archive_object_path` | `text` | no | unique |  |  |  |  |
+| `anonymous_download_count` | `integer` | yes |  |  |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 
 ## Indexes

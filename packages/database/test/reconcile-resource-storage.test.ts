@@ -29,6 +29,16 @@ describe("resource storage reconciliation", () => {
     ).toBe("resources/preview/1000/GUIDE TRIM TOOL_No-Text.stl");
   });
 
+  it("moves an archive candidate to its resource namespace", () => {
+    expect(
+      destinationPath(
+        "preview",
+        1000,
+        "resources/files/1000/archives/candidate/resource-1000-v2.zip",
+      ),
+    ).toBe("resources/preview/1000/resource-1000-v2.zip");
+  });
+
   it("copies a shared legacy object into each branch namespace", () => {
     const shared = {
       database: undefined as never,

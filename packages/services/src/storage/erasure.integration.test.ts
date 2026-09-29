@@ -54,6 +54,7 @@ describe("account storage erasure", () => {
       expect(captured?.targets).toEqual(
         expect.arrayContaining([
           paths.collection,
+          paths.archive,
           paths.item,
           paths.legacy,
           paths.queue,
@@ -87,6 +88,7 @@ describe("account storage erasure", () => {
       expect(new Set(erase.mock.calls.flat())).toEqual(
         new Set([
           paths.collection,
+          paths.archive,
           paths.item,
           paths.legacy,
           paths.queue,
@@ -111,6 +113,7 @@ describe("account storage erasure", () => {
 
 async function fixtures(client: PGlite, target: string, survivor: string) {
   const paths = {
+    archive: "resources/dev/1000/v1/archive.zip",
     collection: "images/dev/collections/1000/collection.png",
     item: "images/dev/collection-items/1000/item.png",
     legacy: "resources/dev/1000/v1/legacy.zip",
@@ -168,9 +171,9 @@ async function fixtures(client: PGlite, target: string, survivor: string) {
     [targetResourceId, paths.resourceImage, survivorResourceId, paths.shared],
   );
   const version = await client.query<{ id: number }>(
-    `insert into resource_versions(resource_id,version,file_name,content_type,size,object_path,url)
-      values($1,1,'legacy.zip','application/zip',1,$2,$2) returning id`,
-    [targetResourceId, paths.legacy],
+    `insert into resource_versions(resource_id,version,file_name,content_type,size,object_path,url,archive_object_path)
+      values($1,1,'legacy.zip','application/zip',1,$2,$2,$3) returning id`,
+    [targetResourceId, paths.legacy, paths.archive],
   );
   await client.query(
     `insert into resource_files(version_id,file_name,content_type,size,object_path,url)

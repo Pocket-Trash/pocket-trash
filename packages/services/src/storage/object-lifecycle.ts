@@ -35,6 +35,7 @@ export async function objectIsAttached(db: StorageDb, path: string) {
           ({ table }) => sql`select object_path from ${sql.identifier(table)}`,
         ),
         sql`select object_path from resource_versions`,
+        sql`select archive_object_path as object_path from resource_versions`,
       ],
       sql` union all `,
     )}) objects where object_path = ${path} limit 1`,
@@ -92,6 +93,11 @@ async function erasableObjectOwner(db: StorageDb, path: string) {
       from resource_versions
       join resources on resources.id = resource_versions.resource_id
       where resource_versions.object_path is not null
+      union all
+      select resources.uploader_clerk_id, resource_versions.archive_object_path
+      from resource_versions
+      join resources on resources.id = resource_versions.resource_id
+      where resource_versions.archive_object_path is not null
     ) owned where owned.object_path = ${path}`);
   return result.rows.length === 1 ? result.rows[0]?.clerkId : null;
 }

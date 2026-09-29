@@ -18,7 +18,7 @@ export const schemaDescriptions = {
     description: "Reusable categories assigned to resources.",
   },
   resource_downloads: {
-    description: "Append-only download events for resource versions.",
+    description: "Unique authenticated user downloads per resource version.",
   },
   resource_images: {
     description: "Ordered resource images; position zero is the cover image.",

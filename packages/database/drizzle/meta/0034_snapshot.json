@@ -1,5 +1,5 @@
 {
-  "id": "a3596f58-4538-4e00-9348-e161705fdca3",
+  "id": "742697e1-30a3-44ce-8fd9-49943464ea94",
   "prevId": "05df7dc8-c751-4b4b-8a12-61e118567511",
   "version": "7",
   "dialect": "postgresql",
@@ -1960,190 +1960,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.erasure_request": {
-      "name": "erasure_request",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "subject_hmac": {
-          "name": "subject_hmac",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "target_clerk_id": {
-          "name": "target_clerk_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "initiator": {
-          "name": "initiator",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "verification_reference": {
-          "name": "verification_reference",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "step_results": {
-          "name": "step_results",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "next_attempt_at": {
-          "name": "next_attempt_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "error_code": {
-          "name": "error_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "erasure_request_target_clerk_id_unique": {
-          "name": "erasure_request_target_clerk_id_unique",
-          "columns": [
-            {
-              "expression": "target_clerk_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"erasure_request\".\"target_clerk_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "erasure_request_due_idx": {
-          "name": "erasure_request_due_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "next_attempt_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "erasure_request_expiry_idx": {
-          "name": "erasure_request_expiry_idx",
-          "columns": [
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "erasure_request_subject_hmac_unique": {
-          "name": "erasure_request_subject_hmac_unique",
-          "nullsNotDistinct": false,
-          "columns": ["subject_hmac"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "erasure_request_initiator_valid": {
-          "name": "erasure_request_initiator_valid",
-          "value": "\"erasure_request\".\"initiator\" in ('self', 'admin')"
-        },
-        "erasure_request_status_valid": {
-          "name": "erasure_request_status_valid",
-          "value": "\"erasure_request\".\"status\" in ('pending', 'running', 'completed', 'needs_attention')"
-        },
-        "erasure_request_attempts_valid": {
-          "name": "erasure_request_attempts_valid",
-          "value": "\"erasure_request\".\"attempts\" >= 0"
-        },
-        "erasure_request_completion_valid": {
-          "name": "erasure_request_completion_valid",
-          "value": "(\"erasure_request\".\"status\" = 'completed') = (\"erasure_request\".\"completed_at\" is not null and \"erasure_request\".\"expires_at\" is not null and \"erasure_request\".\"target_clerk_id\" is null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.feature_flag_user_overrides": {
       "name": "feature_flag_user_overrides",
       "schema": "",
@@ -2727,13 +2543,13 @@
           "name": "version_id",
           "type": "bigint",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "file_id": {
-          "name": "file_id",
-          "type": "bigint",
+        "user_clerk_id": {
+          "name": "user_clerk_id",
+          "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",
@@ -2758,21 +2574,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "resource_downloads_file_id_idx": {
-          "name": "resource_downloads_file_id_idx",
-          "columns": [
-            {
-              "expression": "file_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -2784,19 +2585,16 @@
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        },
-        "resource_downloads_file_id_resource_files_id_fk": {
-          "name": "resource_downloads_file_id_resource_files_id_fk",
-          "tableFrom": "resource_downloads",
-          "tableTo": "resource_files",
-          "columnsFrom": ["file_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "resource_downloads_version_user_unique": {
+          "name": "resource_downloads_version_user_unique",
+          "nullsNotDistinct": false,
+          "columns": ["version_id", "user_clerk_id"]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -3262,6 +3060,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "archive_object_path": {
+          "name": "archive_object_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "anonymous_download_count": {
+          "name": "anonymous_download_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3309,6 +3120,11 @@
           "name": "resource_versions_object_path_unique",
           "nullsNotDistinct": false,
           "columns": ["object_path"]
+        },
+        "resource_versions_archive_object_path_unique": {
+          "name": "resource_versions_archive_object_path_unique",
+          "nullsNotDistinct": false,
+          "columns": ["archive_object_path"]
         }
       },
       "policies": {},
@@ -3320,6 +3136,10 @@
         "resource_versions_size_positive": {
           "name": "resource_versions_size_positive",
           "value": "\"resource_versions\".\"size\" > 0"
+        },
+        "resource_versions_anonymous_download_count_nonnegative": {
+          "name": "resource_versions_anonymous_download_count_nonnegative",
+          "value": "\"resource_versions\".\"anonymous_download_count\" >= 0"
         }
       },
       "isRLSEnabled": false

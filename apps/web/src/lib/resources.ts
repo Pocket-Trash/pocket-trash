@@ -5,6 +5,7 @@ import { activeAuth as auth } from "@/lib/auth";
 
 type ResourceIdInput = { resourceId: number };
 type ResourceDownloadInput = ResourceIdInput & { fileId: number };
+type ResourceVersionDownloadInput = ResourceIdInput & { versionId: number };
 
 type SessionClaimsWithRole = {
   role?: unknown;
@@ -259,13 +260,24 @@ export function parseResourceDirectoryInput(input: unknown) {
   return { categorySlugs: categorySlugs as string[] };
 }
 
-export const downloadResource = createServerFn({ method: "POST" })
+export const downloadResourceFile = createServerFn({ method: "POST" })
   .validator(parseResourceDownload)
   .handler(async ({ data }) => {
     const { s } = await import("@/lib/services");
-    return await s.resources.download(
+    return await s.resources.downloadFile(
       data.resourceId,
       data.fileId,
+      await getResourceViewer(),
+    );
+  });
+
+export const downloadResourceVersion = createServerFn({ method: "POST" })
+  .validator(parseResourceVersionDownload)
+  .handler(async ({ data }) => {
+    const { s } = await import("@/lib/services");
+    return await s.resources.downloadVersion(
+      data.resourceId,
+      data.versionId,
       await getResourceViewer(),
     );
   });
@@ -398,6 +410,17 @@ function parseResourceDownload(input: unknown): ResourceDownloadInput {
     throw invalidResourceRequest();
   }
   return { fileId, resourceId };
+}
+
+function parseResourceVersionDownload(
+  input: unknown,
+): ResourceVersionDownloadInput {
+  const { resourceId } = parseResourceId(input);
+  const versionId = Number((input as { versionId?: unknown }).versionId);
+  if (!Number.isSafeInteger(versionId) || versionId <= 0) {
+    throw invalidResourceRequest();
+  }
+  return { resourceId, versionId };
 }
 
 function parseNotificationId(input: unknown) {

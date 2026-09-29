@@ -63,7 +63,8 @@ at the start of a request. Only the subject HMAC may remain on the receipt.
 | `feedback` submitted by the subject, its notifications, and votes on it | Private pending or public accepted user-authored request text and activity | Delete | Delete submissions by `submitter_clerk_id`; cascade dependent rows; verify submission IDs absent | None |
 | `feedback_votes` by the subject; surviving notification `read_by_clerk_id` | Restricted user-linked activity on another user's feedback | Delete vote; clear read attribution and `read_at` | Direct delete/update and identifier scan | None |
 | `feature_flags` and surviving overrides created, updated, or archived by the subject | Restricted shared operational configuration | Preserve configuration; anonymize attribution | Make non-null actor columns nullable, set matching fields to `NULL`, and verify no identifier match | None |
-| `resource_downloads` for surviving resources and other aggregate metrics | Anonymous event with no account identifier in the current schema | Preserve only as an aggregate | Confirm schema/event has no user, Clerk, session, IP, or stable pseudonym field | None; adding such a field changes this matrix first |
+| `resource_downloads.user_clerk_id` for surviving resources | Restricted account-linked activity | Delete the subject's rows | Delete by `user_clerk_id`; verify no matching identifier remains | None |
+| `resource_versions.anonymous_download_count` and other aggregate metrics | Anonymous aggregate with no account identifier | Preserve | Confirm the aggregate cannot identify or single out an account | None; adding an identifier changes this matrix first |
 | `scraper_runs`, scraper queue jobs, temporary scraper tables, makers, materials, mechanisms, and product types | Shared catalog/operations data; no account link in current schema | Preserve | Schema and queued-payload scan must find no subject field | None |
 | Clerk user, email/phone, external accounts, sessions, MFA, metadata, and profile image | Private identity-provider account data | Delete | Revoke sessions, delete the Clerk user last, and verify the Backend API returns not found/already absent | Clerk log bound below |
 | Erasure request/receipt | Restricted privacy operations record | Preserve the minimum receipt temporarily | Store request ID, verification result, decision, timestamps, step results/error categories, subject HMAC, and exception expiries; never store raw ID, email, name, content, or object path after active deletion | Privacy-ops access only; delete 30 days after active-system completion and after every exception expires |
@@ -225,6 +226,7 @@ union all select 'resources.deleted_by_clerk_id', count(*) from resources where 
 union all select 'resource_categories.created_by_clerk_id', count(*) from resource_categories where created_by_clerk_id = :clerk_id
 union all select 'resource_notifications.uploader_clerk_id', count(*) from resource_notifications where uploader_clerk_id = :clerk_id
 union all select 'resource_notifications.read_by_clerk_id', count(*) from resource_notifications where read_by_clerk_id = :clerk_id
+union all select 'resource_downloads.user_clerk_id', count(*) from resource_downloads where user_clerk_id = :clerk_id
 union all select 'upload_session.uploader_clerk_id', count(*) from upload_session where uploader_clerk_id = :clerk_id
 union all select 'feedback.submitter_clerk_id', count(*) from feedback where submitter_clerk_id = :clerk_id
 union all select 'feedback_votes.voter_clerk_id', count(*) from feedback_votes where voter_clerk_id = :clerk_id
