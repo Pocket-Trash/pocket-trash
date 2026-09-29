@@ -5,9 +5,8 @@ import { AccountErasureStatusPage } from "@/pages/account-erasure-pages";
 
 export const Route = createFileRoute("/account-erasure")({
   loader: async () => {
-    const status = await getSelfErasureStatus().catch(() => {
-      throw redirect({ to: "/account-erased" });
-    });
+    const status = await getSelfErasureStatus();
+    if (status === "signed_out") throw redirect({ to: "/account-erased" });
     if (!status) throw redirect({ to: "/user/account" });
     return status;
   },

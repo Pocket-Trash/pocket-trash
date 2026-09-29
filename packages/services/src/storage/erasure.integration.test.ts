@@ -41,6 +41,9 @@ describe("account storage erasure", () => {
         initiator: "self",
         subjectHmac: "a".repeat(64),
         targetClerkId: target,
+        verificationMethod: "clerk_reverification",
+        verifiedAt: new Date(),
+        verifiedByClerkId: target,
       });
 
       await service.snapshotErasureTargets(request.id, target);

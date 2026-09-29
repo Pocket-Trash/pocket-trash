@@ -34,6 +34,9 @@ describe("account database erasure", () => {
         initiator: "self",
         subjectHmac,
         targetClerkId,
+        verificationMethod: "clerk_reverification",
+        verifiedAt: new Date(),
+        verifiedByClerkId: targetClerkId,
       });
       await client.exec(`
         create rule erasure_test_block as on update to product

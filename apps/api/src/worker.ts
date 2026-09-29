@@ -1,7 +1,9 @@
-import { verifyToken } from "@clerk/backend";
+import { createClerkClient, verifyToken } from "@clerk/backend";
 import { isLogLevel, loggerMessages } from "@package/logger";
 import { type ApiBindings, createApp } from "./app.js";
+import { findClerkOrphans } from "./clerk-orphans.js";
 import { createClerkWebhookHandler } from "./clerk-webhooks.js";
+import { createErasureOperations, drainErasureQueue } from "./erasure.js";
 import { createApiLogger, createApiServices } from "./lib/services.js";
 
 const app = createApp({
@@ -146,13 +148,42 @@ export async function handleWorkerScheduled(
       let runtime: ReturnType<typeof storageRuntime> | undefined;
       try {
         runtime = storageRuntime(env);
+        const clerk = createClerkClient({
+          secretKey: env.CLERK_SECRET_KEY as string,
+        });
+        await drainErasureQueue(
+          runtime.services.db.erasure,
+          createErasureOperations({
+            clerk: clerk.users,
+            erasure: runtime.services.db.erasure,
+            storage: runtime.services.storage,
+          }),
+        );
+        if (new Date(_controller.scheduledTime).getUTCHours() === 0) {
+          const candidates = await findClerkOrphans(
+            clerk.users,
+            runtime.services.db.users,
+          );
+          if (candidates.length > 0) {
+            runtime.logger.error(
+              loggerMessages.database.erasure.orphanCandidates,
+              {
+                attributes: {
+                  adminLink: "https://pocket-trash.app/admin/account-erasure",
+                  candidateCount: candidates.length,
+                  state: "needs_attention",
+                },
+              },
+            );
+          }
+        }
         await Promise.all([
           runtime.services.storage.cleanupExpired(),
           runtime.services.db.erasure.purgeExpiredReceipts(),
         ]);
       } catch {
         await logWorkerException(
-          new Error("Storage cleanup failed."),
+          new Error("Scheduled maintenance failed."),
           env,
           new Request("https://api.pocket-trash.app/__scheduled"),
           "scheduled",

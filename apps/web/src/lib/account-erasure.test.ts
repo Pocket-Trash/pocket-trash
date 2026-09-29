@@ -10,6 +10,7 @@ vi.mock("@/env/server", () => ({
 import {
   parseAdminErasureInput,
   parseSelfErasureInput,
+  selfErasureClerkId,
 } from "./account-erasure";
 
 describe("account erasure input", () => {
@@ -18,6 +19,15 @@ describe("account erasure input", () => {
       confirmed: true,
     });
     expect(() => parseSelfErasureInput({ confirmed: false })).toThrow();
+  });
+
+  it("distinguishes Clerk deletion from a status lookup failure", () => {
+    expect(
+      selfErasureClerkId({ isAuthenticated: false, userId: null }),
+    ).toBeNull();
+    expect(
+      selfErasureClerkId({ isAuthenticated: true, userId: "user_123" }),
+    ).toBe("user_123");
   });
 
   it("accepts only bounded, opaque admin verification evidence", () => {

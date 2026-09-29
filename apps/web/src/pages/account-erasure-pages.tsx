@@ -27,9 +27,13 @@ export function AccountErasureStatusPage({
     const interval = window.setInterval(() => {
       void getSelfErasureStatus()
         .then((next) => {
+          if (next === "signed_out") {
+            void clerk.signOut({ redirectUrl: "/account-erased" });
+            return;
+          }
           if (next) setStatus(next);
         })
-        .catch(() => clerk.signOut({ redirectUrl: "/account-erased" }));
+        .catch(() => undefined);
     }, 3000);
     return () => window.clearInterval(interval);
   }, [clerk, status.status]);

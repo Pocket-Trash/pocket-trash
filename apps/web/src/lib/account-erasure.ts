@@ -45,13 +45,21 @@ export const requestSelfErasure = createServerFn({ method: "POST" })
   });
 
 export const getSelfErasureStatus = createServerFn().handler(async () => {
-  const clerkId = requireSignedInUser(await clerkAuth());
+  const clerkId = selfErasureClerkId(await clerkAuth());
+  if (!clerkId) return "signed_out" as const;
   const { s } = await import("@/lib/services");
   const request = await s.db.erasure.getReceiptBySubject(
     await subjectHmac(clerkId),
   );
   return request ? statusView(request) : null;
 });
+
+export function selfErasureClerkId(state: {
+  isAuthenticated: boolean;
+  userId: string | null;
+}): string | null {
+  return state.isAuthenticated ? state.userId : null;
+}
 
 export const isErasureAdmin = createServerFn().handler(async () => {
   const state = await activeAuth();

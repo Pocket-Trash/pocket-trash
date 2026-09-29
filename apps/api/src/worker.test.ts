@@ -92,6 +92,9 @@ describe("api worker", () => {
     const purge = vi
       .spyOn(runtime.services.db.erasure, "purgeExpiredReceipts")
       .mockResolvedValueOnce(0);
+    const processDue = vi
+      .spyOn(runtime.services.db.erasure, "processDue")
+      .mockResolvedValueOnce(false);
     if (fails) cleanup.mockRejectedValueOnce(new Error("private SQL payload"));
     else cleanup.mockResolvedValueOnce(0);
     const flush = vi.spyOn(runtime.logger, "flush");
@@ -100,7 +103,7 @@ describe("api worker", () => {
     );
     const tasks: Promise<unknown>[] = [];
     await handleWorkerScheduled(
-      { cron: "15 * * * *", scheduledTime: 0 } as ScheduledController,
+      { cron: "15 * * * *", scheduledTime: 3_600_000 } as ScheduledController,
       bindings,
       {
         waitUntil(task: Promise<unknown>) {
@@ -110,6 +113,7 @@ describe("api worker", () => {
     );
     await Promise.all(tasks);
     expect(cleanup).toHaveBeenCalledOnce();
+    expect(processDue).toHaveBeenCalledOnce();
     expect(purge).toHaveBeenCalledOnce();
     expect(flush).toHaveBeenCalledOnce();
   });

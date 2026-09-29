@@ -18,6 +18,7 @@ import {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LEASE_MS = 30 * 60 * 1000;
 const RECEIPT_MS = 30 * DAY_MS;
+const ADMIN_ERASURE_URL = "https://pocket-trash.app/admin/account-erasure";
 const errorCodePattern = /^[a-z0-9_]{1,64}$/u;
 const subjectHmacPattern = /^[0-9a-f]{64}$/u;
 const verificationReferencePattern = /^[A-Za-z0-9:_-]{1,120}$/u;
@@ -45,7 +46,7 @@ export type ApprovedErasureExceptionCode = keyof typeof exceptionMaximumMs;
 
 export type ErasureReceipt = Omit<
   ErasureRequest,
-  "storageTargets" | "targetClerkId"
+  "storageTargets" | "targetClerkId" | "verifiedByClerkId"
 >;
 
 export type ErasureOperationRequest = Pick<
@@ -160,6 +161,12 @@ export function createErasureService(
         .where(eq(schema.erasureRequest.id, requiredValue(id, "Request")))
         .limit(1);
       return request ?? null;
+    },
+
+    async makeAccountInaccessible(targetClerkId: string): Promise<void> {
+      await db.transaction(async (tx) => {
+        await hideAccountContent(tx, requiredValue(targetClerkId, "Subject"));
+      });
     },
 
     async create(input: {
@@ -285,25 +292,7 @@ export function createErasureService(
           };
         }
 
-        const [account] = await tx
-          .select({ id: schema.user.id })
-          .from(schema.user)
-          .where(eq(schema.user.clerkId, targetClerkId))
-          .limit(1);
-        if (account) {
-          await tx
-            .update(schema.userCollection)
-            .set({ isPrivate: true })
-            .where(eq(schema.userCollection.ownerId, account.id));
-          await tx
-            .update(schema.collectionItem)
-            .set({ isPrivate: true })
-            .where(eq(schema.collectionItem.ownerId, account.id));
-          await tx
-            .update(schema.resources)
-            .set({ isPrivate: true })
-            .where(eq(schema.resources.uploaderClerkId, targetClerkId));
-        }
+        await hideAccountContent(tx, targetClerkId);
 
         const stepResults = initialStepResults(handledAt);
         stepResults.inaccessible = completedStep(handledAt);
@@ -341,8 +330,10 @@ export function createErasureService(
       if (result.unexpected) {
         logger.error(loggerMessages.database.erasure.unexpectedClerkDeletion, {
           attributes: {
-            errorCode: "unexpected_clerk_deletion",
+            adminLink: ADMIN_ERASURE_URL,
+            failureCategory: "unexpected_clerk_deletion",
             requestId: result.requestId,
+            state: "needs_attention",
           },
         });
       }
@@ -374,11 +365,6 @@ export function createErasureService(
             ...completedStep(completedAt),
             ...(exceptions.length > 0 ? { exceptions } : {}),
           };
-          if (step === "providers") {
-            request.targetClerkId = null;
-            operationRequest.targetClerkId = null;
-          }
-
           if (step === "verify") {
             await completeRequest(db, request, completedAt);
             logger.info(loggerMessages.database.erasure.completed, {
@@ -398,14 +384,18 @@ export function createErasureService(
             })
             .where(eq(schema.erasureRequest.id, request.id));
         } catch (error) {
-          await recordFailure(db, request, error, now());
-          logger.error(loggerMessages.database.erasure.stepFailed, {
-            attributes: {
-              errorCode: operationErrorCode(error),
-              requestId: request.id,
-              step,
+          const state = await recordFailure(db, request, error, now());
+          logger[state === "needs_attention" ? "error" : "warn"](
+            loggerMessages.database.erasure.stepFailed,
+            {
+              attributes: {
+                adminLink: ADMIN_ERASURE_URL,
+                failureCategory: operationErrorCode(error),
+                requestId: request.id,
+                state,
+              },
             },
-          });
+          );
           return true;
         }
       }
@@ -560,7 +550,7 @@ async function recordFailure(
   request: ErasureRequest,
   error: unknown,
   failedAt: Date,
-) {
+): Promise<"needs_attention" | "running"> {
   const startedAt = request.startedAt ?? failedAt;
   const needsAttention =
     (error instanceof ErasureOperationError && !error.retryable) ||
@@ -581,6 +571,7 @@ async function recordFailure(
       updatedAt: failedAt,
     })
     .where(eq(schema.erasureRequest.id, request.id));
+  return needsAttention ? "needs_attention" : "running";
 }
 
 function normalizeCreateInput(input: {
@@ -698,9 +689,36 @@ function requiredValue(value: string, name: string): string {
 }
 
 function receipt(request: ErasureRequest): ErasureReceipt {
-  const { storageTargets, targetClerkId, ...safe } = request;
+  const { storageTargets, targetClerkId, verifiedByClerkId, ...safe } = request;
   void storageTargets;
   void targetClerkId;
   void verifiedByClerkId;
   return safe;
+}
+
+type ErasureTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+async function hideAccountContent(
+  tx: ErasureTransaction,
+  targetClerkId: string,
+) {
+  const [account] = await tx
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(eq(schema.user.clerkId, targetClerkId))
+    .limit(1);
+  if (account) {
+    await tx
+      .update(schema.userCollection)
+      .set({ isPrivate: true })
+      .where(eq(schema.userCollection.ownerId, account.id));
+    await tx
+      .update(schema.collectionItem)
+      .set({ isPrivate: true })
+      .where(eq(schema.collectionItem.ownerId, account.id));
+  }
+  await tx
+    .update(schema.resources)
+    .set({ isPrivate: true })
+    .where(eq(schema.resources.uploaderClerkId, targetClerkId));
 }

@@ -8,6 +8,7 @@ import {
   createLogger,
   type LogEvent,
   type LogTransport,
+  loggerMessages,
 } from "@package/logger";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
@@ -132,7 +133,7 @@ describe("complete erasure service", () => {
         `storage:${clerkId}`,
         `database:${clerkId}`,
         `providers:${clerkId}`,
-        "verify:removed",
+        `verify:${clerkId}`,
       ]);
       await expect(
         service.assertAccountActive(clerkId),
@@ -227,6 +228,86 @@ describe("complete erasure service", () => {
           .where(eq(schema.resources.id, resource.id)),
       ).toEqual([{ isPrivate: true }]);
       expect(JSON.stringify(events)).not.toContain(clerkId);
+      expect(
+        events.find(
+          ({ message }) =>
+            message === loggerMessages.database.erasure.unexpectedClerkDeletion,
+        ),
+      ).toMatchObject({
+        attributes: {
+          adminLink: "https://pocket-trash.app/admin/account-erasure",
+          failureCategory: "unexpected_clerk_deletion",
+          requestId: handled.requestId,
+          state: "needs_attention",
+        },
+        level: "error",
+      });
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("retries provider failures for 24 hours before alerting", async () => {
+    const client = new PGlite();
+    await migrate(client);
+    const db = drizzle(client, { schema }) as unknown as Database;
+    const events: LogEvent[] = [];
+    let currentTime = new Date("2026-09-29T12:00:00.000Z");
+    const service = createErasureService(
+      db,
+      captureLogger(events),
+      () => currentTime,
+    );
+    const subjectHmac = "b".repeat(64);
+    const operations = Object.fromEntries(
+      [
+        "snapshot",
+        "inaccessible",
+        "storage",
+        "database",
+        "providers",
+        "verify",
+      ].map((step) => [
+        step,
+        vi.fn(async () => {
+          if (step === "providers") {
+            throw new ErasureOperationError("clerk_delete_failed");
+          }
+        }),
+      ]),
+    ) as unknown as ErasureOperations;
+
+    try {
+      const request = await service.create({
+        initiator: "self",
+        subjectHmac,
+        targetClerkId: "provider_failure_user",
+        verificationMethod: "clerk_reverification",
+        verifiedAt: currentTime,
+        verifiedByClerkId: "provider_failure_user",
+      });
+      await service.processDue(operations);
+      expect(events.at(-1)).toMatchObject({
+        attributes: {
+          adminLink: "https://pocket-trash.app/admin/account-erasure",
+          failureCategory: "clerk_delete_failed",
+          requestId: request.id,
+          state: "running",
+        },
+        level: "warn",
+      });
+
+      currentTime = new Date(currentTime.getTime() + 24 * 60 * 60 * 1000);
+      await service.processDue(operations);
+      expect(events.at(-1)).toMatchObject({
+        attributes: {
+          adminLink: "https://pocket-trash.app/admin/account-erasure",
+          failureCategory: "clerk_delete_failed",
+          requestId: request.id,
+          state: "needs_attention",
+        },
+        level: "error",
+      });
     } finally {
       await client.close();
     }

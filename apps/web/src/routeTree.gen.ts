@@ -392,6 +392,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account-erased': typeof AccountErasedRoute
   '/account-erasure': typeof AccountErasureRoute
+  '/admin/account-erasure': typeof AdminAccountErasureRoute
   '/autmog': typeof AutmogRouteWithChildren
   '/contact': typeof ContactRoute
   '/privacy': typeof PrivacyRoute
@@ -553,6 +554,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account-erased'
     | '/account-erasure'
+    | '/admin/account-erasure'
     | '/autmog'
     | '/contact'
     | '/privacy'
