@@ -86,7 +86,7 @@ export function ResourceCard({
                               params={{ resourceId: String(resource.id) }}
                               to="/resources/$resourceId"
                             >
-                              {t("web.resources.action.details")}
+                              {t("web.resources.error.archiveDownloadFallback")}
                             </Link>
                           ),
                         }
