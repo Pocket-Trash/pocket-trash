@@ -18,6 +18,7 @@ import { Route as UserIndexRouteImport } from './routes/user.index'
 import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
 import { Route as ProductsIndexRouteImport } from './routes/products.index'
 import { Route as HelpIndexRouteImport } from './routes/help.index'
+import { Route as FeedbackIndexRouteImport } from './routes/feedback.index'
 import { Route as CollectionsIndexRouteImport } from './routes/collections.index'
 import { Route as UserSettingsRouteImport } from './routes/user.settings_'
 import { Route as UserResourcesRouteImport } from './routes/user.resources'
@@ -97,6 +98,11 @@ const HelpIndexRoute = HelpIndexRouteImport.update({
   id: '/help/',
   path: '/help/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackIndexRoute = FeedbackIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => FeedbackRoute,
 } as any)
 const CollectionsIndexRoute = CollectionsIndexRouteImport.update({
   id: '/collections/',
@@ -303,6 +309,7 @@ export interface FileRoutesByFullPath {
   '/user/resources': typeof UserResourcesRoute
   '/user/settings': typeof UserSettingsRoute
   '/collections/': typeof CollectionsIndexRoute
+  '/feedback/': typeof FeedbackIndexRoute
   '/help/': typeof HelpIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
@@ -328,7 +335,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/autmog': typeof AutmogRouteWithChildren
-  '/feedback': typeof FeedbackRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -346,6 +352,7 @@ export interface FileRoutesByTo {
   '/user/resources': typeof UserResourcesRoute
   '/user/settings': typeof UserSettingsRoute
   '/collections': typeof CollectionsIndexRoute
+  '/feedback': typeof FeedbackIndexRoute
   '/help': typeof HelpIndexRoute
   '/products': typeof ProductsIndexRoute
   '/resources': typeof ResourcesIndexRoute
@@ -392,6 +399,7 @@ export interface FileRoutesById {
   '/user/resources': typeof UserResourcesRoute
   '/user/settings_': typeof UserSettingsRoute
   '/collections/': typeof CollectionsIndexRoute
+  '/feedback/': typeof FeedbackIndexRoute
   '/help/': typeof HelpIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
@@ -439,6 +447,7 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/user/settings'
     | '/collections/'
+    | '/feedback/'
     | '/help/'
     | '/products/'
     | '/resources/'
@@ -464,7 +473,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/autmog'
-    | '/feedback'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
@@ -482,6 +490,7 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/user/settings'
     | '/collections'
+    | '/feedback'
     | '/help'
     | '/products'
     | '/resources'
@@ -527,6 +536,7 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/user/settings_'
     | '/collections/'
+    | '/feedback/'
     | '/help/'
     | '/products/'
     | '/resources/'
@@ -642,6 +652,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/help/'
       preLoaderRoute: typeof HelpIndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/feedback/': {
+      id: '/feedback/'
+      path: '/'
+      fullPath: '/feedback/'
+      preLoaderRoute: typeof FeedbackIndexRouteImport
+      parentRoute: typeof FeedbackRoute
     }
     '/collections/': {
       id: '/collections/'
@@ -898,11 +915,13 @@ const AutmogRouteWithChildren =
 interface FeedbackRouteChildren {
   FeedbackMyRequestsRoute: typeof FeedbackMyRequestsRoute
   FeedbackNewRoute: typeof FeedbackNewRoute
+  FeedbackIndexRoute: typeof FeedbackIndexRoute
 }
 
 const FeedbackRouteChildren: FeedbackRouteChildren = {
   FeedbackMyRequestsRoute: FeedbackMyRequestsRoute,
   FeedbackNewRoute: FeedbackNewRoute,
+  FeedbackIndexRoute: FeedbackIndexRoute,
 }
 
 const FeedbackRouteWithChildren = FeedbackRoute._addFileChildren(

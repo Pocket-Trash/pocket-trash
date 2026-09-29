@@ -91,9 +91,13 @@ export const loggerMessages = {
     feedback: {
       approve: "database.feedback.approve",
       deny: "database.feedback.deny",
+      findDuplicates: "database.feedback.findDuplicates",
+      hasMine: "database.feedback.hasMine",
+      listActive: "database.feedback.listActive",
       listMine: "database.feedback.listMine",
       listPending: "database.feedback.listPending",
       submit: "database.feedback.submit",
+      toggleVote: "database.feedback.toggleVote",
       updatePending: "database.feedback.updatePending",
     },
     userSettings: {

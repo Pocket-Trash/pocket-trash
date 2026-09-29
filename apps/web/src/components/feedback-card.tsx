@@ -8,15 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import {
   type FeedbackCategory,
   feedbackCategoryKey,
+  feedbackStatus,
+  type VisibleFeedbackStatus,
 } from "@/lib/feedback-shared";
 import { useLocale } from "@/providers/locale-provider";
 
-type FeedbackCardProps = {
+export type FeedbackCardProps = {
   category: FeedbackCategory | null;
   children?: React.ReactNode;
   createdAt: Date | string;
   description: string;
-  status: "pending" | "requested";
+  status: VisibleFeedbackStatus;
   submitter?: string | null;
   title: string;
   voteCount: number;
@@ -37,6 +39,7 @@ export function FeedbackCard({
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
+  const statusDetails = feedbackStatus(status);
 
   return (
     <article className="grid gap-4 rounded-xl border border-border bg-card p-5 text-card-foreground shadow-sm">
@@ -49,9 +52,9 @@ export function FeedbackCard({
                 alt=""
                 aria-hidden="true"
                 className="size-4"
-                src={`https://cdn.pocket-trash.app/assets/static/icons/status-${status === "pending" ? "backlog" : "todo"}.svg`}
+                src={`https://cdn.pocket-trash.app/assets/static/icons/${statusDetails.icon}`}
               />
-              {t(`web.feedback.status.${status}`)}
+              {t(statusDetails.key)}
             </Badge>
             <Badge variant="secondary">
               {t(

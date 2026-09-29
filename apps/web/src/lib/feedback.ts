@@ -37,13 +37,37 @@ export const submitFeedback = createServerFn({ method: "POST" })
     }
   });
 
-export const listMyFeedback = createServerFn({ method: "GET" }).handler(
+export const findDuplicateFeedback = createServerFn({ method: "POST" })
+  .validator(parseFeedbackTitleInput)
+  .handler(async ({ data }) => {
+    const viewerClerkId = await requireResourceUploader();
+    const { s } = await import("@/lib/services");
+    return await s.db.feedback.findDuplicates(viewerClerkId, data.title);
+  });
+
+export const hasMyFeedback = createServerFn({ method: "GET" }).handler(
   async () => {
     const submitterClerkId = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    return await s.db.feedback.listMine(submitterClerkId);
+    return await s.db.feedback.hasMine(submitterClerkId);
   },
 );
+
+export const listActiveFeedback = createServerFn({ method: "GET" })
+  .validator(parseFeedbackListInput)
+  .handler(async ({ data }) => {
+    const viewerClerkId = await requireResourceUploader();
+    const { s } = await import("@/lib/services");
+    return await s.db.feedback.listActive(viewerClerkId, data.search);
+  });
+
+export const listMyFeedback = createServerFn({ method: "GET" })
+  .validator(parseFeedbackListInput)
+  .handler(async ({ data }) => {
+    const submitterClerkId = await requireResourceUploader();
+    const { s } = await import("@/lib/services");
+    return await s.db.feedback.listMine(submitterClerkId, data);
+  });
 
 export const listPendingFeedback = createServerFn({ method: "GET" })
   .validator(parseOffset)
@@ -77,12 +101,33 @@ export const denyFeedback = createServerFn({ method: "POST" })
     await s.db.feedback.deny(data.feedbackId);
   });
 
+export const toggleFeedbackVote = createServerFn({ method: "POST" })
+  .validator(parseFeedbackId)
+  .handler(async ({ data }) => {
+    const voterClerkId = await requireResourceUploader();
+    const { s } = await import("@/lib/services");
+    return await s.db.feedback.toggleVote(data.feedbackId, voterClerkId);
+  });
+
 export function parseFeedbackInput(input: unknown) {
   const value = parseRecord(input);
   const title = parseString(value.title, 120);
   const description = parseString(value.description, 5000);
   const category = parseCategory(value.category);
   return { category, description, title };
+}
+
+export function parseFeedbackListInput(input: unknown) {
+  if (input === undefined) return { offset: 0, search: "" };
+  const value = parseRecord(input);
+  const search = value.search === undefined ? "" : parseSearch(value.search);
+  const offset =
+    value.offset === undefined ? 0 : parseOffsetValue(value.offset);
+  return { offset, search };
+}
+
+export function parseFeedbackTitleInput(input: unknown) {
+  return { title: parseString(parseRecord(input).title, 120) };
 }
 
 function parsePendingFeedbackInput(input: unknown) {
@@ -99,11 +144,7 @@ function parseFeedbackId(input: unknown) {
 
 function parseOffset(input: unknown) {
   if (input === undefined) return { offset: 0 };
-  const offset = parseRecord(input).offset;
-  if (!Number.isSafeInteger(offset) || Number(offset) < 0) {
-    throw invalidFeedbackRequest();
-  }
-  return { offset: Number(offset) };
+  return { offset: parseOffsetValue(parseRecord(input).offset) };
 }
 
 function parseRecord(input: unknown): Record<string, unknown> {
@@ -120,6 +161,20 @@ function parseString(value: unknown, maxLength: number) {
     throw invalidFeedbackRequest();
   }
   return normalized;
+}
+
+function parseOffsetValue(value: unknown) {
+  if (!Number.isSafeInteger(value) || Number(value) < 0) {
+    throw invalidFeedbackRequest();
+  }
+  return Number(value);
+}
+
+function parseSearch(value: unknown) {
+  if (typeof value !== "string") throw invalidFeedbackRequest();
+  const search = value.trim();
+  if (search.length > 120) throw invalidFeedbackRequest();
+  return search;
 }
 
 function parseCategory(value: unknown): FeedbackCategory | undefined {
