@@ -1,9 +1,255 @@
 {
-  "id": "a6ad7be5-5dec-44ee-aab8-3ba524732da0",
+  "id": "709ab02d-59a6-4695-ac1d-62702127340a",
   "prevId": "dbc85469-cf0a-45ef-9966-c7ddf8063548",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.catalog_image_upload_file": {
+      "name": "catalog_image_upload_file",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_name": {
+          "name": "file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size": {
+          "name": "size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "object_path": {
+          "name": "object_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uploaded_at": {
+          "name": "uploaded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "catalog_image_upload_file_session_id_idx": {
+          "name": "catalog_image_upload_file_session_id_idx",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "catalog_image_upload_file_session_id_catalog_image_upload_session_id_fk": {
+          "name": "catalog_image_upload_file_session_id_catalog_image_upload_session_id_fk",
+          "tableFrom": "catalog_image_upload_file",
+          "tableTo": "catalog_image_upload_session",
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "catalog_image_upload_file_object_path_unique": {
+          "name": "catalog_image_upload_file_object_path_unique",
+          "nullsNotDistinct": false,
+          "columns": ["object_path"]
+        },
+        "catalog_image_upload_file_session_position_unique": {
+          "name": "catalog_image_upload_file_session_position_unique",
+          "nullsNotDistinct": false,
+          "columns": ["session_id", "position"]
+        },
+        "catalog_image_upload_file_session_hash_unique": {
+          "name": "catalog_image_upload_file_session_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": ["session_id", "sha256"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "catalog_image_upload_file_position_valid": {
+          "name": "catalog_image_upload_file_position_valid",
+          "value": "\"catalog_image_upload_file\".\"position\" >= 0"
+        },
+        "catalog_image_upload_file_size_positive": {
+          "name": "catalog_image_upload_file_size_positive",
+          "value": "\"catalog_image_upload_file\".\"size\" > 0"
+        },
+        "catalog_image_upload_file_sha256_valid": {
+          "name": "catalog_image_upload_file_sha256_valid",
+          "value": "\"catalog_image_upload_file\".\"sha256\" ~ '^[0-9a-f]{64}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.catalog_image_upload_session": {
+      "name": "catalog_image_upload_session",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "uploader_clerk_id": {
+          "name": "uploader_clerk_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_type": {
+          "name": "target_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "collection_item_id": {
+          "name": "collection_item_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "collection_id": {
+          "name": "collection_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "catalog_image_upload_session_expires_at_idx": {
+          "name": "catalog_image_upload_session_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "catalog_image_upload_session_product_id_product_id_fk": {
+          "name": "catalog_image_upload_session_product_id_product_id_fk",
+          "tableFrom": "catalog_image_upload_session",
+          "tableTo": "product",
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "catalog_image_upload_session_collection_item_id_collection_item_id_fk": {
+          "name": "catalog_image_upload_session_collection_item_id_collection_item_id_fk",
+          "tableFrom": "catalog_image_upload_session",
+          "tableTo": "collection_item",
+          "columnsFrom": ["collection_item_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "catalog_image_upload_session_collection_id_user_collection_id_fk": {
+          "name": "catalog_image_upload_session_collection_id_user_collection_id_fk",
+          "tableFrom": "catalog_image_upload_session",
+          "tableTo": "user_collection",
+          "columnsFrom": ["collection_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "catalog_image_upload_session_target_consistent": {
+          "name": "catalog_image_upload_session_target_consistent",
+          "value": "(\"catalog_image_upload_session\".\"target_type\" = 'product' and \"catalog_image_upload_session\".\"product_id\" is not null and \"catalog_image_upload_session\".\"collection_id\" is null and \"catalog_image_upload_session\".\"collection_item_id\" is null) or (\"catalog_image_upload_session\".\"target_type\" = 'collection' and \"catalog_image_upload_session\".\"product_id\" is null and \"catalog_image_upload_session\".\"collection_id\" is not null and \"catalog_image_upload_session\".\"collection_item_id\" is null) or (\"catalog_image_upload_session\".\"target_type\" = 'collection_item' and \"catalog_image_upload_session\".\"product_id\" is null and \"catalog_image_upload_session\".\"collection_id\" is null and \"catalog_image_upload_session\".\"collection_item_id\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.collection_image": {
       "name": "collection_image",
       "schema": "",
@@ -214,6 +460,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "material_id": {
           "name": "material_id",
           "type": "bigint",
@@ -386,6 +638,10 @@
         "collection_item_private_metadata_consistent": {
           "name": "collection_item_private_metadata_consistent",
           "value": "(\"collection_item\".\"is_private\" and num_nonnulls(\"collection_item\".\"private_reason\", \"collection_item\".\"privated_at\", \"collection_item\".\"privated_by_clerk_id\") in (0, 3)) or (not \"collection_item\".\"is_private\" and num_nonnulls(\"collection_item\".\"private_reason\", \"collection_item\".\"privated_at\", \"collection_item\".\"privated_by_clerk_id\") = 0)"
+        },
+        "collection_item_description_length_valid": {
+          "name": "collection_item_description_length_valid",
+          "value": "\"collection_item\".\"description\" is null or char_length(\"collection_item\".\"description\") <= 5000"
         }
       },
       "isRLSEnabled": false
@@ -585,6 +841,12 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": false
+        },
+        "bearing": {
+          "name": "bearing",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -620,7 +882,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "collection_spinner_bearing_length_valid": {
+          "name": "collection_spinner_bearing_length_valid",
+          "value": "\"collection_spinner\".\"bearing\" is null or char_length(\"collection_spinner\".\"bearing\") <= 200"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.collection_spinner_button": {
@@ -1252,6 +1519,25 @@
           "primaryKey": false,
           "notNull": true
         },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "maker_product_url": {
+          "name": "maker_product_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "maker_product_url_valid": {
+          "name": "maker_product_url_valid",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
         "is_private": {
           "name": "is_private",
           "type": "boolean",
@@ -1372,6 +1658,10 @@
         "product_private_metadata_consistent": {
           "name": "product_private_metadata_consistent",
           "value": "(\"product\".\"is_private\" and num_nonnulls(\"product\".\"private_reason\", \"product\".\"privated_at\", \"product\".\"privated_by_clerk_id\") in (0, 3)) or (not \"product\".\"is_private\" and num_nonnulls(\"product\".\"private_reason\", \"product\".\"privated_at\", \"product\".\"privated_by_clerk_id\") = 0)"
+        },
+        "product_description_length_valid": {
+          "name": "product_description_length_valid",
+          "value": "\"product\".\"description\" is null or char_length(\"product\".\"description\") <= 5000"
         }
       },
       "isRLSEnabled": false
@@ -1645,6 +1935,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "spin_diameter_mm": {
+          "name": "spin_diameter_mm",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bearing": {
+          "name": "bearing",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "compatible_button_id": {
           "name": "compatible_button_id",
           "type": "bigint",
@@ -1690,7 +1992,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "product_spinner_bearing_length_valid": {
+          "name": "product_spinner_bearing_length_valid",
+          "value": "\"product_spinner\".\"bearing\" is null or char_length(\"product_spinner\".\"bearing\") <= 200"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.product_spinner_button": {
@@ -2638,6 +2945,321 @@
         "resource_notifications_read_metadata_consistent": {
           "name": "resource_notifications_read_metadata_consistent",
           "value": "num_nonnulls(\"resource_notifications\".\"read_at\", \"resource_notifications\".\"read_by_clerk_id\") in (0, 2)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.resource_upload_files": {
+      "name": "resource_upload_files",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_name": {
+          "name": "file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size": {
+          "name": "size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "object_path": {
+          "name": "object_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uploaded_at": {
+          "name": "uploaded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "resource_upload_files_session_id_idx": {
+          "name": "resource_upload_files_session_id_idx",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "resource_upload_files_session_file_name_unique": {
+          "name": "resource_upload_files_session_file_name_unique",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"file_name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"resource_upload_files\".\"kind\" = 'resource'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "resource_upload_files_session_id_resource_upload_sessions_id_fk": {
+          "name": "resource_upload_files_session_id_resource_upload_sessions_id_fk",
+          "tableFrom": "resource_upload_files",
+          "tableTo": "resource_upload_sessions",
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "resource_upload_files_object_path_unique": {
+          "name": "resource_upload_files_object_path_unique",
+          "nullsNotDistinct": false,
+          "columns": ["object_path"]
+        },
+        "resource_upload_files_session_kind_position_unique": {
+          "name": "resource_upload_files_session_kind_position_unique",
+          "nullsNotDistinct": false,
+          "columns": ["session_id", "kind", "position"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "resource_upload_files_kind_valid": {
+          "name": "resource_upload_files_kind_valid",
+          "value": "\"resource_upload_files\".\"kind\" in ('resource', 'image')"
+        },
+        "resource_upload_files_position_valid": {
+          "name": "resource_upload_files_position_valid",
+          "value": "\"resource_upload_files\".\"position\" >= 0"
+        },
+        "resource_upload_files_size_positive": {
+          "name": "resource_upload_files_size_positive",
+          "value": "\"resource_upload_files\".\"size\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.resource_upload_sessions": {
+      "name": "resource_upload_sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "uploader_clerk_id": {
+          "name": "uploader_clerk_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operation": {
+          "name": "operation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resource_id": {
+          "name": "resource_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reserved_resource_id": {
+          "name": "reserved_resource_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "categories": {
+          "name": "categories",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "is_private": {
+          "name": "is_private",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "completed_resource_id": {
+          "name": "completed_resource_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_version": {
+          "name": "completed_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "resource_upload_sessions_expires_at_idx": {
+          "name": "resource_upload_sessions_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "resource_upload_sessions_uploader_clerk_id_idx": {
+          "name": "resource_upload_sessions_uploader_clerk_id_idx",
+          "columns": [
+            {
+              "expression": "uploader_clerk_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "resource_upload_sessions_resource_id_resources_id_fk": {
+          "name": "resource_upload_sessions_resource_id_resources_id_fk",
+          "tableFrom": "resource_upload_sessions",
+          "tableTo": "resources",
+          "columnsFrom": ["resource_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "resource_upload_sessions_completed_resource_id_resources_id_fk": {
+          "name": "resource_upload_sessions_completed_resource_id_resources_id_fk",
+          "tableFrom": "resource_upload_sessions",
+          "tableTo": "resources",
+          "columnsFrom": ["completed_resource_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "resource_upload_sessions_operation_valid": {
+          "name": "resource_upload_sessions_operation_valid",
+          "value": "\"resource_upload_sessions\".\"operation\" in ('create', 'version')"
+        },
+        "resource_upload_sessions_metadata_consistent": {
+          "name": "resource_upload_sessions_metadata_consistent",
+          "value": "(\"resource_upload_sessions\".\"operation\" = 'create' and \"resource_upload_sessions\".\"resource_id\" is null and \"resource_upload_sessions\".\"reserved_resource_id\" is not null and num_nonnulls(\"resource_upload_sessions\".\"name\", \"resource_upload_sessions\".\"description\") = 2 and jsonb_array_length(\"resource_upload_sessions\".\"categories\") between 1 and 10) or (\"resource_upload_sessions\".\"operation\" = 'version' and \"resource_upload_sessions\".\"resource_id\" is not null and \"resource_upload_sessions\".\"reserved_resource_id\" is null and num_nonnulls(\"resource_upload_sessions\".\"name\", \"resource_upload_sessions\".\"description\") = 0 and \"resource_upload_sessions\".\"categories\" = '[]'::jsonb and not \"resource_upload_sessions\".\"is_private\")"
+        },
+        "resource_upload_sessions_completion_consistent": {
+          "name": "resource_upload_sessions_completion_consistent",
+          "value": "num_nonnulls(\"resource_upload_sessions\".\"completed_resource_id\", \"resource_upload_sessions\".\"completed_version\", \"resource_upload_sessions\".\"completed_at\") in (0, 3)"
         }
       },
       "isRLSEnabled": false
@@ -6099,306 +6721,6 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.upload_file": {
-      "name": "upload_file",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "session_id": {
-          "name": "session_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "file_name": {
-          "name": "file_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "content_type": {
-          "name": "content_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "size": {
-          "name": "size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sha256": {
-          "name": "sha256",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "object_path": {
-          "name": "object_path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "url": {
-          "name": "url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "uploaded_at": {
-          "name": "uploaded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "upload_file_session_idx": {
-          "name": "upload_file_session_idx",
-          "columns": [
-            {
-              "expression": "session_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "upload_file_name_unique": {
-          "name": "upload_file_name_unique",
-          "columns": [
-            {
-              "expression": "session_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "lower(\"file_name\")",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "upload_file_session_id_upload_session_id_fk": {
-          "name": "upload_file_session_id_upload_session_id_fk",
-          "tableFrom": "upload_file",
-          "tableTo": "upload_session",
-          "columnsFrom": ["session_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "upload_file_path_reserved": {
-          "name": "upload_file_path_reserved",
-          "nullsNotDistinct": false,
-          "columns": ["object_path"]
-        },
-        "upload_file_kind_hash_unique": {
-          "name": "upload_file_kind_hash_unique",
-          "nullsNotDistinct": false,
-          "columns": ["session_id", "kind", "sha256"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "upload_file_kind_valid": {
-          "name": "upload_file_kind_valid",
-          "value": "\"upload_file\".\"kind\" in ('image','file')"
-        },
-        "upload_file_size_valid": {
-          "name": "upload_file_size_valid",
-          "value": "\"upload_file\".\"size\" > 0"
-        },
-        "upload_file_position_valid": {
-          "name": "upload_file_position_valid",
-          "value": "\"upload_file\".\"position\" >= 0"
-        },
-        "upload_file_hash_valid": {
-          "name": "upload_file_hash_valid",
-          "value": "\"upload_file\".\"sha256\" ~ '^[0-9a-f]{64}$'"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.upload_session": {
-      "name": "upload_session",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "uploader_clerk_id": {
-          "name": "uploader_clerk_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "target_type": {
-          "name": "target_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "target_id": {
-          "name": "target_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reserved_resource_id": {
-          "name": "reserved_resource_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reserved_version": {
-          "name": "reserved_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "payload": {
-          "name": "payload",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "upload_session_expiry_idx": {
-          "name": "upload_session_expiry_idx",
-          "columns": [
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "upload_session_owner_idx": {
-          "name": "upload_session_owner_idx",
-          "columns": [
-            {
-              "expression": "uploader_clerk_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "upload_session_resource_version_reserved": {
-          "name": "upload_session_resource_version_reserved",
-          "columns": [
-            {
-              "expression": "target_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "reserved_version",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"upload_session\".\"target_type\" = 'resource' and \"upload_session\".\"completed_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "upload_session_target_type_valid": {
-          "name": "upload_session_target_type_valid",
-          "value": "\"upload_session\".\"target_type\" in ('product', 'collection', 'collection_item', 'resource')"
-        },
-        "upload_session_target_id_valid": {
-          "name": "upload_session_target_id_valid",
-          "value": "\"upload_session\".\"target_id\" > 0"
-        },
-        "upload_session_version_valid": {
-          "name": "upload_session_version_valid",
-          "value": "\"upload_session\".\"reserved_version\" is null or \"upload_session\".\"reserved_version\" > 0"
-        }
-      },
       "isRLSEnabled": false
     }
   },

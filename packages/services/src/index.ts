@@ -21,8 +21,11 @@ export type {
   CatalogService,
   CatalogViewer,
   CollectionsService,
+  FeedbackService,
   ProductWriteInput,
   PublicCollectionOwner,
+  SubmitFeedbackInput,
+  UpdatePendingFeedbackInput,
   UpsertUserSettingsInput,
   UserCollectionItem,
   UserCollectionSummary,
@@ -30,7 +33,11 @@ export type {
   UserSyncResult,
   UsersService,
 } from "./db/index.js";
-export { defaultUserSettings } from "./db/index.js";
+export {
+  defaultUserSettings,
+  FeedbackStateError,
+  FeedbackSubmissionLimitError,
+} from "./db/index.js";
 
 import {
   createFeatureFlagsService,

@@ -66,6 +66,7 @@ export const loggerMessages = {
       listColorEffects: "database.catalog.listColorEffects",
       listColors: "database.catalog.listColors",
       listFinishes: "database.catalog.listFinishes",
+      setMakerProductUrlValidity: "database.catalog.setMakerProductUrlValidity",
       updateProduct: "database.catalog.updateProduct",
     },
     collections: {
@@ -86,6 +87,14 @@ export const loggerMessages = {
       setAdminOverride: "database.featureFlags.setAdminOverride",
       setUserPreference: "database.featureFlags.setUserPreference",
       update: "database.featureFlags.update",
+    },
+    feedback: {
+      approve: "database.feedback.approve",
+      deny: "database.feedback.deny",
+      listMine: "database.feedback.listMine",
+      listPending: "database.feedback.listPending",
+      submit: "database.feedback.submit",
+      updatePending: "database.feedback.updatePending",
     },
     userSettings: {
       getByClerkId: "database.userSettings.getByClerkId",

@@ -9,10 +9,115 @@
     },
     "pocket-trash": {
       "source": "pocket-trash/skills",
-      "ref": "v0.3.1",
+      "ref": "v0.4.0",
       "sourceType": "github",
       "skillPath": "skills/pocket-trash/SKILL.md",
-      "computedHash": "a4582fd81d869f51cf246ff1439305252c2af7d22c7cefccafb37532b2c16891"
+      "computedHash": "07b7c38aa8a0f7a2ff75b380c1870ea69d355e13e27912157a5bf3ce42201af0"
+    },
+    "pocket-trash-bunny-audit": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-bunny-audit/SKILL.md",
+      "computedHash": "35a94b14e356365b70a1c02aa45b921cb7ab665e4cf414c7e7582d1a15e8fb8d"
+    },
+    "pocket-trash-commit": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-commit/SKILL.md",
+      "computedHash": "3536e9c57d5c62049d3c4b79b4f4cae3a09cbe5eb373f739a9ce613cfc909e4d"
+    },
+    "pocket-trash-db-diagnostics": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-db-diagnostics/SKILL.md",
+      "computedHash": "6dd841444a1f67f5143b7d0a4ce53ae300e9b9173dc2573c3bd4804a393e6752"
+    },
+    "pocket-trash-db-migration-conflicts": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-db-migration-conflicts/SKILL.md",
+      "computedHash": "6ca56719be0cfb66bd9ee72c660779254f35654e984ea20ae16c66d5db74ff1c"
+    },
+    "pocket-trash-grill-me": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-grill-me/SKILL.md",
+      "computedHash": "8011c9925b1b7bbeb9768a853476c006649b583826b476d22a2e5c4e4505ee6a"
+    },
+    "pocket-trash-implement-linear-ticket": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-implement-linear-ticket/SKILL.md",
+      "computedHash": "33b2ab14cf1a2a6012da5f09c7aa79408b3f6836705017fe1c7b776d00cd24b7"
+    },
+    "pocket-trash-localization-audit": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-localization-audit/SKILL.md",
+      "computedHash": "2b79b072b0ad4d629f10a7b09a891e484923f75c0909083a1ae675bb32e0da9c"
+    },
+    "pocket-trash-localizations-merge": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-localizations-merge/SKILL.md",
+      "computedHash": "74b53668df53caabac20bfc2dd78e5b3cb47064a83325df0cd9466bc5d3d1e6b"
+    },
+    "pocket-trash-localize": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-localize/SKILL.md",
+      "computedHash": "e767f126d99a72f76fb8d89c4ddb07b41d0939b6ab3c17346ffb58f9331075b8"
+    },
+    "pocket-trash-logger": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-logger/SKILL.md",
+      "computedHash": "2468b514f21c4b4ffdfaf79f76190bf41a6a474c47f9d02564cff2b714faf206"
+    },
+    "pocket-trash-pr-create": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-pr-create/SKILL.md",
+      "computedHash": "752c8291c7c9978a64114a32afb039f54fc031114734b4e40ea07fbf252bdd14"
+    },
+    "pocket-trash-pr-update": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-pr-update/SKILL.md",
+      "computedHash": "0d91104e2fcd3b6a68838707211a8323621597bd434f4d7e5cca26d2bba9fbc9"
+    },
+    "pocket-trash-pr-view": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-pr-view/SKILL.md",
+      "computedHash": "87882061dd222c60d9a5890586c5ed3a4d1687d57ab6c6ba9f397accd09589c0"
+    },
+    "pocket-trash-storybook": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-storybook/SKILL.md",
+      "computedHash": "7e9e81c01e5e573cb1278c65bcfd789edd1f44a155e2ce99fbef33cec0cbc284"
+    },
+    "pocket-trash-update-scopes": {
+      "source": "pocket-trash/skills",
+      "ref": "v0.4.0",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-update-scopes/SKILL.md",
+      "computedHash": "1c5e606c78980bdce38f82881ebadda9c3dd9cb30e32469158db153208097d70"
     },
     "ponytail": {
       "source": "dietrichgebert/ponytail",

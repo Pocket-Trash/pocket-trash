@@ -1,9 +1,9 @@
-import { markdownToHtml } from "@package/markdown";
 import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { AppShell } from "@/components/app-shell";
+import { MarkdownContent } from "@/components/markdown-content";
 import type { HelpDocument } from "@/lib/help-content";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -77,12 +77,7 @@ function HelpArticle({
   document: HelpDocument;
   includeMain?: boolean;
 }) {
-  const content = (
-    <article
-      className="grid gap-4 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:bg-accent/30 [&_blockquote]:p-4 [&_h2]:mt-3 [&_h2]:text-xl [&_h2]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ul]:grid [&_ul]:gap-2"
-      dangerouslySetInnerHTML={{ __html: markdownToHtml(document.body) ?? "" }}
-    />
-  );
+  const content = <MarkdownContent markdown={document.body} />;
 
   return includeMain ? (
     <main className="mx-auto w-full max-w-3xl p-6">{content}</main>

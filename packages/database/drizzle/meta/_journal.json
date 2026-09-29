@@ -215,15 +215,22 @@
     {
       "idx": 30,
       "version": "7",
-      "when": 1790278417733,
-      "tag": "0030_silly_kree",
+      "when": 1790364997717,
+      "tag": "0030_nifty_madelyne_pryor",
       "breakpoints": true
     },
     {
       "idx": 31,
       "version": "7",
-      "when": 1790359293757,
-      "tag": "0031_complete_wasp",
+      "when": 1790636095052,
+      "tag": "0031_harsh_sauron",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790640338015,
+      "tag": "0032_loose_captain_britain",
       "breakpoints": true
     }
   ]
