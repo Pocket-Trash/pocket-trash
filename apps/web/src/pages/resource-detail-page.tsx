@@ -265,7 +265,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
                     await navigate({
                       to: detail.isOwner
                         ? "/user/resources/trash"
-                        : "/admin/resources/trash",
+                        : "/admin/trash/resources",
                     });
                   } catch {
                     toast.error(

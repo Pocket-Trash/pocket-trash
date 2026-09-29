@@ -21,9 +21,12 @@ type AppShellProps = {
         label: string;
         to?:
           | "/admin"
+          | "/admin/feedback"
+          | "/admin/trash"
           | "/collections"
           | "/help"
           | "/products"
+          | "/notifications"
           | "/user"
           | "/user/account"
           | "/user/collections";

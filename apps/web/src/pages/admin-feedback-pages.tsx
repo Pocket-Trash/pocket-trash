@@ -22,6 +22,7 @@ import {
   approveFeedback,
   denyFeedback,
   listAdminActiveFeedback,
+  listAdminAllActiveFeedback,
   listArchivedFeedback,
   type listFeedbackArchiveStatuses,
   listFeedbackMergeTargets,
@@ -32,7 +33,7 @@ import {
 import { feedbackCategories, feedbackCategoryKey } from "@/lib/feedback-shared";
 import { useLocale } from "@/providers/locale-provider";
 
-type Scope = "active" | "archive" | "pending";
+type Scope = "allActive" | "archive" | "pending" | "planned";
 type Page = Awaited<ReturnType<typeof listPendingFeedback>>;
 type Item = Page["items"][number];
 type MergeTarget = Awaited<ReturnType<typeof listFeedbackMergeTargets>>[number];
@@ -65,7 +66,15 @@ export function AdminActiveFeedbackPage({
 }: {
   initialPage: Page;
 }) {
-  return <AdminFeedbackPage initialPage={initialPage} scope="active" />;
+  return <AdminFeedbackPage initialPage={initialPage} scope="planned" />;
+}
+
+export function AdminAllActiveFeedbackPage({
+  initialPage,
+}: {
+  initialPage: Page;
+}) {
+  return <AdminFeedbackPage initialPage={initialPage} scope="allActive" />;
 }
 
 export function AdminFeedbackArchivePage({
@@ -132,14 +141,16 @@ function AdminFeedbackPage({
       const nextPage =
         scope === "pending"
           ? await listPendingFeedback({ data })
-          : scope === "active"
+          : scope === "planned"
             ? await listAdminActiveFeedback({ data })
-            : await listArchivedFeedback({
-                data: {
-                  ...data,
-                  statuses: nextStatus ? [nextStatus] : [],
-                },
-              });
+            : scope === "allActive"
+              ? await listAdminAllActiveFeedback({ data })
+              : await listArchivedFeedback({
+                  data: {
+                    ...data,
+                    statuses: nextStatus ? [nextStatus] : [],
+                  },
+                });
       if (requestId !== loadRequestRef.current) return;
       setPage(nextPage);
       setOffset(nextOffset);
@@ -270,14 +281,24 @@ function AdminFeedbackPage({
     ]);
   }, [locale, scope, search, sort, status, t]);
   const table = useTable({ columns, data: page.items, features });
-  const copyScope = scope === "pending" ? "requests" : scope;
-  const pageTitle = t(`web.feedback.admin.navigation.${copyScope}`);
+  const copyScope =
+    scope === "pending"
+      ? "requests"
+      : scope === "archive"
+        ? "archive"
+        : "active";
+  const pageTitle = t(
+    scope === "allActive"
+      ? "web.feedback.admin.navigation.allActive"
+      : `web.feedback.admin.navigation.${copyScope}`,
+  );
+  const searchCopyScope = scope === "archive" ? "archive" : "active";
 
   return (
     <AppShell
       breadcrumbItems={[
-        { label: t("web.navigation.admin") },
-        { label: t("web.feedback.title") },
+        { label: t("web.navigation.admin"), to: "/admin" },
+        { label: t("web.feedback.title"), to: "/admin/feedback" },
       ]}
       title={pageTitle}
     >
@@ -296,7 +317,11 @@ function AdminFeedbackPage({
               }}
             >
               <label className="sr-only" htmlFor={`${scope}-feedback-search`}>
-                {t(`web.feedback.admin.${scope}.searchLabel`)}
+                {t(
+                  scope === "allActive"
+                    ? "web.feedback.board.searchLabel"
+                    : `web.feedback.admin.${searchCopyScope}.searchLabel`,
+                )}
               </label>
               <div className="relative min-w-56 flex-1">
                 <Input
@@ -312,7 +337,9 @@ function AdminFeedbackPage({
                     );
                   }}
                   placeholder={t(
-                    `web.feedback.admin.${scope}.searchPlaceholder`,
+                    scope === "allActive"
+                      ? "web.feedback.board.searchPlaceholder"
+                      : `web.feedback.admin.${searchCopyScope}.searchPlaceholder`,
                   )}
                   type="search"
                   value={search}
@@ -364,12 +391,20 @@ function AdminFeedbackPage({
         ) : null}
         {loading ? (
           <p aria-live="polite" className="m-0 text-sm text-muted-foreground">
-            {t(`web.feedback.admin.${copyScope}.loading`)}
+            {t(
+              scope === "allActive"
+                ? "web.feedback.board.loading"
+                : `web.feedback.admin.${copyScope}.loading`,
+            )}
           </p>
         ) : null}
         {error ? (
           <p className="m-0 text-sm text-destructive" role="alert">
-            {t(`web.feedback.admin.${copyScope}.error`)}
+            {t(
+              scope === "allActive"
+                ? "web.feedback.board.error"
+                : `web.feedback.admin.${copyScope}.error`,
+            )}
           </p>
         ) : null}
         {!loading && !error && page.items.length === 0 ? (
@@ -377,7 +412,9 @@ function AdminFeedbackPage({
             {t(
               scope === "archive" && (search || status)
                 ? "web.feedback.admin.archive.noResults"
-                : `web.feedback.admin.${copyScope}.empty`,
+                : scope === "allActive"
+                  ? "web.feedback.board.empty"
+                  : `web.feedback.admin.${copyScope}.empty`,
             )}
           </p>
         ) : null}
@@ -421,7 +458,7 @@ function AdminFeedbackPage({
         ) : null}
         {offset > 0 || page.hasNext ? (
           <nav
-            aria-label={`${t(`web.feedback.admin.${copyScope}.title`)}: ${t(
+            aria-label={`${pageTitle}: ${t(
               `web.feedback.admin.${copyScope}.nextPage`,
             )}`}
             className="flex justify-between gap-3"
@@ -750,8 +787,15 @@ function AdminFeedbackNav() {
   return (
     <nav
       aria-label={t("web.feedback.admin.requests.title")}
-      className="flex gap-2"
+      className="flex flex-wrap gap-2"
     >
+      <Button
+        nativeButton={false}
+        render={<Link to="/admin/feedback" />}
+        variant="outline"
+      >
+        {t("web.feedback.admin.navigation.allActive")}
+      </Button>
       <Button
         nativeButton={false}
         render={<Link to="/admin/feedback/requests" />}

@@ -3,7 +3,7 @@ import { listCatalogImageTrash } from "@/lib/catalog-api";
 import { isResourceAdmin } from "@/lib/resources";
 import { CatalogImageTrashPage } from "@/pages/catalog-image-trash-page";
 
-export const Route = createFileRoute("/admin/catalog-images/trash")({
+export const Route = createFileRoute("/admin/trash/catalog-images")({
   beforeLoad: async () => {
     if (!(await isResourceAdmin())) throw redirect({ to: "/" });
   },

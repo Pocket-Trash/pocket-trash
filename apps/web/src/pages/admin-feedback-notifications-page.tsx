@@ -50,7 +50,7 @@ export function AdminFeedbackNotificationsPage({
     <AppShell
       breadcrumbItems={[
         { label: t("web.navigation.admin"), to: "/admin" },
-        { label: t("web.admin.notifications.title") },
+        { label: t("web.admin.notifications.title"), to: "/notifications" },
       ]}
       title={t("web.feedback.notification.title")}
     >

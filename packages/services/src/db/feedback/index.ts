@@ -682,12 +682,16 @@ async function listAdminFeedback(
     allowedSorts,
   );
   const statuses =
-    scope === "archive" ? normalizedArchiveStatuses(options.statuses) : [];
+    scope === "archive"
+      ? normalizedArchiveStatuses(options.statuses)
+      : scope === "active"
+        ? normalizedActiveStatuses(options.statuses)
+        : [];
   const statusCondition =
     scope === "pending"
       ? eq(schema.feedback.status, "pending")
       : scope === "active"
-        ? inArray(schema.feedback.status, publicStatuses)
+        ? inArray(schema.feedback.status, statuses)
         : statuses.length > 0
           ? inArray(schema.feedback.status, statuses)
           : notInArray(schema.feedback.status, activeStatuses);
@@ -764,6 +768,17 @@ function normalizedArchiveStatuses(value: FeedbackStatus[] | undefined) {
     statuses.some((status) => !adminFeedbackArchiveStatuses.includes(status))
   ) {
     throw new Error("Invalid feedback archive status.");
+  }
+  return statuses;
+}
+
+function normalizedActiveStatuses(value: FeedbackStatus[] | undefined) {
+  const statuses = value?.length ? value : activeStatuses;
+  if (
+    new Set(statuses).size !== statuses.length ||
+    statuses.some((status) => !activeStatuses.includes(status))
+  ) {
+    throw new Error("Invalid active feedback status.");
   }
   return statuses;
 }

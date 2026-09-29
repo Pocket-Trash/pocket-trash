@@ -4,4 +4,4 @@
 "@package/services": minor
 ---
 
-Add the admin hub and feedback notification center.
+Add grouped admin navigation, notification hubs, and feedback administration.

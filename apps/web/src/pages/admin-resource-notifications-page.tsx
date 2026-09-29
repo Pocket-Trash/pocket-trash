@@ -56,7 +56,7 @@ export function AdminResourceNotificationsPage({
     <AppShell
       breadcrumbItems={[
         { label: t("web.navigation.admin"), to: "/admin" },
-        { label: t("web.admin.notifications.title") },
+        { label: t("web.admin.notifications.title"), to: "/notifications" },
       ]}
       title={t("web.resources.notification.title")}
     >
@@ -68,7 +68,7 @@ export function AdminResourceNotificationsPage({
           <div className="flex flex-wrap gap-2">
             <Button
               nativeButton={false}
-              render={<Link to="/admin/catalog-images/trash" />}
+              render={<Link to="/admin/trash/catalog-images" />}
               variant="outline"
             >
               <Trash2 />
@@ -76,7 +76,7 @@ export function AdminResourceNotificationsPage({
             </Button>
             <Button
               nativeButton={false}
-              render={<Link to="/admin/resources/trash" />}
+              render={<Link to="/admin/trash/resources" />}
               variant="outline"
             >
               <Trash2 />

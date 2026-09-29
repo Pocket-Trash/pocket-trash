@@ -46,9 +46,13 @@ describe("resource management routes", () => {
 
   it.each([
     "/admin",
+    "/admin/feedback/",
     "/admin/notifications/feedback",
     "/admin/notifications/resources",
-    "/admin/resources/trash",
+    "/admin/trash/",
+    "/admin/trash/catalog-images",
+    "/admin/trash/resources",
+    "/notifications",
     "/user/resources/trash",
   ])("registers %s", (fullPath) => {
     expect(
@@ -62,6 +66,17 @@ describe("resource management routes", () => {
     expect(
       Object.values(getRouter().routesById).some(
         (candidate) => candidate.fullPath === "/admin/resources/notifications",
+      ),
+    ).toBe(false);
+  });
+
+  it.each([
+    "/admin/resources/trash",
+    "/admin/catalog-images/trash",
+  ])("does not register the moved route %s", (fullPath) => {
+    expect(
+      Object.values(getRouter().routesById).some(
+        (candidate) => candidate.fullPath === fullPath,
       ),
     ).toBe(false);
   });

@@ -7,6 +7,8 @@ import {
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { AdminFeedbackNotificationsPage } from "./admin-feedback-notifications-page";
 import { AdminIndexPage } from "./admin-index-page";
+import { AdminNotificationsIndexPage } from "./admin-notifications-index-page";
+import { AdminTrashIndexPage } from "./admin-trash-index-page";
 
 const unread = {
   createdAt: new Date("2026-09-29T12:00:00Z"),
@@ -51,21 +53,62 @@ type Story = StoryObj<typeof meta>;
 
 export const Hub: Story = {
   play: async ({ canvas }) => {
+    const main = within(
+      canvas.getByRole("region", {
+        name: "Manage Pocket Trash administration.",
+      }),
+    );
+    await expect(main.getByRole("link", { name: "Feedback" })).toHaveAttribute(
+      "href",
+      "/admin/feedback",
+    );
+    await expect(
+      main.getByRole("link", { name: "Notifications" }),
+    ).toHaveAttribute("href", "/notifications");
+    const sidebar = within(
+      canvas.getByRole("navigation", { name: "Admin Panel" }),
+    );
     for (const [name, href] of [
+      ["All active", "/admin/feedback"],
       ["Requests", "/admin/feedback/requests"],
       ["Planned", "/admin/feedback/planned"],
       ["Archive", "/admin/feedback/archive"],
       ["Feedback notifications", "/admin/notifications/feedback"],
       ["Resource notifications", "/admin/notifications/resources"],
-      ["Resource trash", "/admin/resources/trash"],
-      ["Catalog image trash", "/admin/catalog-images/trash"],
+      ["Resource trash", "/admin/trash/resources"],
+      ["Catalog image trash", "/admin/trash/catalog-images"],
       ["Feature flags", "/admin/settings/feature-flags"],
+      ["Trash", "/admin/trash"],
     ] as const) {
-      await expect(canvas.getByRole("link", { name })).toHaveAttribute(
+      await expect(sidebar.getByRole("link", { name })).toHaveAttribute(
         "href",
         href,
       );
     }
+  },
+};
+
+export const NotificationsHub: Story = {
+  render: () => <AdminNotificationsIndexPage />,
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("link", { name: "Feedback notifications" }),
+    ).toHaveAttribute("href", "/admin/notifications/feedback");
+    await expect(
+      canvas.getByRole("link", { name: "Resource notifications" }),
+    ).toHaveAttribute("href", "/admin/notifications/resources");
+  },
+};
+
+export const TrashHub: Story = {
+  render: () => <AdminTrashIndexPage />,
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("link", { name: "Resource trash" }),
+    ).toHaveAttribute("href", "/admin/trash/resources");
+    await expect(
+      canvas.getByRole("link", { name: "Catalog image trash" }),
+    ).toHaveAttribute("href", "/admin/trash/catalog-images");
   },
 };
 

@@ -45,6 +45,16 @@ export function AdminResourceTrashPage({
   const { locale } = useLocale();
   return (
     <AppShell
+      breadcrumbItems={[
+        {
+          label: formatTranslation("web.navigation.admin", {}, locale),
+          to: "/admin",
+        },
+        {
+          label: formatTranslation("web.admin.trash.title", {}, locale),
+          to: "/admin/trash",
+        },
+      ]}
       title={formatTranslation("web.resources.trash.adminTitle", {}, locale)}
     >
       <main className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6">

@@ -19,7 +19,13 @@ export function CatalogImageTrashPage({
     values: Record<string, unknown> = {},
   ) => formatTranslation(key, values, locale);
   return (
-    <AppShell title={t("web.admin.hub.catalogImageTrash")}>
+    <AppShell
+      breadcrumbItems={[
+        { label: t("web.navigation.admin"), to: "/admin" },
+        { label: t("web.admin.trash.title"), to: "/admin/trash" },
+      ]}
+      title={t("web.admin.hub.catalogImageTrash")}
+    >
       <main className="grid max-w-4xl gap-3 p-6">
         {images.map((image) => (
           <article

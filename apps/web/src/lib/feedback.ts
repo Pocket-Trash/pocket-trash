@@ -86,6 +86,17 @@ export const listAdminActiveFeedback = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     await requireResourceAdmin();
     const { s } = await import("@/lib/services");
+    return await s.db.feedback.listAdminActive({
+      ...data,
+      statuses: ["requested", "planned", "in_progress"],
+    });
+  });
+
+export const listAdminAllActiveFeedback = createServerFn({ method: "GET" })
+  .validator((input) => parseAdminFeedbackListInput(input, "active"))
+  .handler(async ({ data }) => {
+    await requireResourceAdmin();
+    const { s } = await import("@/lib/services");
     return await s.db.feedback.listAdminActive(data);
   });
 
