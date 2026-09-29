@@ -10,6 +10,7 @@ import {
 } from "@pocket-trash/localizations";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserPageShell } from "@/components/user-page-shell";
+import { DeleteAccountSection } from "@/pages/delete-account-section";
 import { useLocale } from "@/providers/locale-provider";
 
 export function UserAccountPage() {
@@ -26,6 +27,7 @@ export function UserAccountPage() {
           <UserProfileAccountPanel />
           <UserProfileSecurityPanel />
         </UserProfileProvider>
+        <DeleteAccountSection />
       </ClerkLoaded>
     </UserPageShell>
   );

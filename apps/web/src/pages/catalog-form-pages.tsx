@@ -552,6 +552,11 @@ function ProductEditor({
           targetType="product"
         />
       ) : null}
+      {!initialProduct ? (
+        <p className="m-0 text-sm text-muted-foreground">
+          {t("web.erasure.productNotice")}
+        </p>
+      ) : null}
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(isSubmitting) => (
           <Button disabled={isSubmitting} type="submit">

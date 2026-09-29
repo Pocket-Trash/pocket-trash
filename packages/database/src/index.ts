@@ -11,6 +11,7 @@ export type {
   ErasureStepName,
   ErasureStepResult,
   ErasureStepResults,
+  ErasureVerificationMethod,
   FeatureFlag,
   FeatureFlagUserOverride,
   FeedbackCategory,

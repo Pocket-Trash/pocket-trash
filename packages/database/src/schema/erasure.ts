@@ -18,6 +18,12 @@ export const erasureStatuses = [
   "completed",
   "needs_attention",
 ] as const;
+export const erasureVerificationMethods = [
+  "clerk_reverification",
+  "authenticated_request",
+  "verified_email",
+  "clerk_webhook",
+] as const;
 export const erasureStepNames = [
   "quiesce",
   "snapshot",
@@ -30,6 +36,8 @@ export const erasureStepNames = [
 
 export type ErasureInitiator = (typeof erasureInitiators)[number];
 export type ErasureStatus = (typeof erasureStatuses)[number];
+export type ErasureVerificationMethod =
+  (typeof erasureVerificationMethods)[number];
 export type ErasureStepName = (typeof erasureStepNames)[number];
 export type ErasureRetentionException = {
   code: string;
@@ -50,6 +58,11 @@ export const erasureRequest = pgTable(
     targetClerkId: text("target_clerk_id"),
     initiator: text("initiator", { enum: erasureInitiators }).notNull(),
     verificationReference: text("verification_reference"),
+    verificationMethod: text("verification_method", {
+      enum: erasureVerificationMethods,
+    }),
+    verifiedByClerkId: text("verified_by_clerk_id"),
+    verifiedAt: timestamp("verified_at", { mode: "date", withTimezone: true }),
     status: text("status", { enum: erasureStatuses })
       .default("pending")
       .notNull(),
@@ -87,6 +100,10 @@ export const erasureRequest = pgTable(
     check(
       "erasure_request_status_valid",
       sql`${table.status} in ('pending', 'running', 'completed', 'needs_attention')`,
+    ),
+    check(
+      "erasure_request_verification_method_valid",
+      sql`${table.verificationMethod} is null or ${table.verificationMethod} in ('clerk_reverification', 'authenticated_request', 'verified_email', 'clerk_webhook')`,
     ),
     check("erasure_request_attempts_valid", sql`${table.attempts} >= 0`),
     check(

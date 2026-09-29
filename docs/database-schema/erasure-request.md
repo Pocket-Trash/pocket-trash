@@ -13,6 +13,9 @@ Durable, idempotent complete-erasure requests and their minimal temporary receip
 | `target_clerk_id` | `text` | no | unique |  |  |  |  |
 | `initiator` | `text` | yes |  |  |  |  |  |
 | `verification_reference` | `text` | no |  |  |  |  |  |
+| `verification_method` | `text` | no |  |  |  |  |  |
+| `verified_by_clerk_id` | `text` | no |  |  |  |  |  |
+| `verified_at` | `timestamp with time zone` | no |  |  |  |  |  |
 | `status` | `text` | yes |  | `'pending'` |  |  |  |
 | `storage_targets` | `text[]` | no |  |  |  |  |  |
 | `step_results` | `jsonb` | yes |  |  |  |  |  |

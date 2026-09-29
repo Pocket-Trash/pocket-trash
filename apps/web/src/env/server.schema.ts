@@ -8,6 +8,7 @@ export type WebServerRuntimeEnv = {
   AXIOM_TOKEN?: string;
   CLERK_SECRET_KEY?: string;
   DATABASE_URL?: string;
+  ERASURE_HMAC_SECRET?: string;
   BUNNY_IMAGE_FOLDER_PREFIX?: string;
   LOGGER?: string;
   LOG_DEPLOYMENT_ID?: string;
@@ -33,6 +34,7 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
       AXIOM_TOKEN: runtimeEnv.AXIOM_TOKEN,
       CLERK_SECRET_KEY: runtimeEnv.CLERK_SECRET_KEY,
       DATABASE_URL: runtimeEnv.DATABASE_URL,
+      ERASURE_HMAC_SECRET: runtimeEnv.ERASURE_HMAC_SECRET,
       BUNNY_IMAGE_FOLDER_PREFIX: runtimeEnv.BUNNY_IMAGE_FOLDER_PREFIX,
       LOGGER: runtimeEnv.LOGGER,
       LOG_DEPLOYMENT_ID: runtimeEnv.LOG_DEPLOYMENT_ID,
@@ -53,6 +55,7 @@ export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
       AXIOM_TOKEN: z.string().min(1).optional(),
       CLERK_SECRET_KEY: z.string().min(1),
       DATABASE_URL: z.string().min(1).url(),
+      ERASURE_HMAC_SECRET: z.string().min(32),
       BUNNY_IMAGE_FOLDER_PREFIX: z
         .string()
         .regex(/^images(?:\/(?:dev|preview(?:\/pr-[1-9]\d*)?))?$/u)

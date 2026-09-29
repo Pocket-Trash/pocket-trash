@@ -8,6 +8,7 @@ export const serverEnv = createWebServerEnv({
   AXIOM_TOKEN: process.env.AXIOM_TOKEN,
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
   DATABASE_URL: process.env.DATABASE_URL,
+  ERASURE_HMAC_SECRET: process.env.ERASURE_HMAC_SECRET,
   BUNNY_IMAGE_FOLDER_PREFIX: process.env.BUNNY_IMAGE_FOLDER_PREFIX,
   LOGGER: process.env.LOGGER,
   LOG_DEPLOYMENT_ID: process.env.LOG_DEPLOYMENT_ID,

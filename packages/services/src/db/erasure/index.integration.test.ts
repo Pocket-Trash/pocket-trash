@@ -43,11 +43,17 @@ describe("complete erasure service", () => {
         initiator: "self",
         subjectHmac,
         targetClerkId: clerkId,
+        verificationMethod: "clerk_reverification",
+        verifiedAt: currentTime,
+        verifiedByClerkId: clerkId,
       });
       const duplicate = await service.create({
         initiator: "self",
         subjectHmac,
         targetClerkId: clerkId,
+        verificationMethod: "clerk_reverification",
+        verifiedAt: currentTime,
+        verifiedByClerkId: clerkId,
       });
       expect(duplicate.id).toBe(first.id);
       expect(JSON.stringify(first)).not.toContain(clerkId);
@@ -116,6 +122,9 @@ describe("complete erasure service", () => {
       expect(receipt?.expiresAt).toEqual(
         new Date(currentTime.getTime() + 30 * 24 * 60 * 60 * 1000),
       );
+      await expect(service.getReceiptBySubject(subjectHmac)).resolves.toEqual(
+        receipt,
+      );
       expect(order).toEqual([
         `snapshot:${clerkId}`,
         `snapshot:${clerkId}`,
@@ -128,6 +137,10 @@ describe("complete erasure service", () => {
       await expect(
         service.assertAccountActive(clerkId),
       ).resolves.toBeUndefined();
+      await expect(service.getForAdmin(first.id)).resolves.toMatchObject({
+        targetClerkId: null,
+        verifiedByClerkId: null,
+      });
       expect(JSON.stringify(events)).not.toContain(clerkId);
       expect(await service.processDue(operations)).toBe(false);
 
@@ -258,7 +271,16 @@ describe("complete erasure service", () => {
         initiator: "admin",
         subjectHmac,
         targetClerkId: "admin_target",
+        verificationMethod: "verified_email",
         verificationReference: "privacy_ticket_123",
+        verifiedAt: currentTime,
+        verifiedByClerkId: "admin_123",
+      });
+      await expect(service.getForAdmin(created.id)).resolves.toMatchObject({
+        verificationMethod: "verified_email",
+        verificationReference: "privacy_ticket_123",
+        verifiedAt: currentTime,
+        verifiedByClerkId: "admin_123",
       });
       await service.processDue(operations);
       expect(

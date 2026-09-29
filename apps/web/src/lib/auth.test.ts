@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  assertAccountActive: vi.fn(),
-  clerkAuth: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  class AccountErasureInProgressError extends Error {}
+  return {
+    AccountErasureInProgressError,
+    assertAccountActive: vi.fn(),
+    clerkAuth: vi.fn(),
+  };
+});
 
 vi.mock("@clerk/tanstack-react-start/server", () => ({
   auth: mocks.clerkAuth,
@@ -15,7 +19,11 @@ vi.mock("@/lib/services", () => ({
   },
 }));
 
-import { activeAuth } from "./auth";
+vi.mock("@package/services", () => ({
+  AccountErasureInProgressError: mocks.AccountErasureInProgressError,
+}));
+
+import { activeAuth, resolveAuthState } from "./auth";
 
 describe("activeAuth", () => {
   beforeEach(() => {
@@ -40,5 +48,18 @@ describe("activeAuth", () => {
 
     await activeAuth();
     expect(mocks.assertAccountActive).not.toHaveBeenCalled();
+  });
+
+  it("redirects an erasing account to its status page", async () => {
+    mocks.clerkAuth.mockResolvedValue({
+      isAuthenticated: true,
+      userId: "user_123",
+    });
+    mocks.assertAccountActive.mockRejectedValue(
+      new mocks.AccountErasureInProgressError(),
+    );
+
+    const error = await resolveAuthState().catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ options: { to: "/account-erasure" } });
   });
 });

@@ -4,6 +4,7 @@ import type {
   ErasureRequest,
   ErasureRetentionException,
   ErasureStepResults,
+  ErasureVerificationMethod,
 } from "@package/database";
 import { schema } from "@package/database";
 import type { Logger } from "@package/logger";
@@ -136,11 +137,39 @@ export function createErasureService(
       if (request) throw new AccountErasureInProgressError();
     },
 
+    async getReceiptBySubject(
+      subjectHmac: string,
+    ): Promise<ErasureReceipt | null> {
+      const [request] = await db
+        .select()
+        .from(schema.erasureRequest)
+        .where(
+          eq(
+            schema.erasureRequest.subjectHmac,
+            normalizeSubjectHmac(subjectHmac),
+          ),
+        )
+        .limit(1);
+      return request ? receipt(request) : null;
+    },
+
+    async getForAdmin(id: string): Promise<ErasureRequest | null> {
+      const [request] = await db
+        .select()
+        .from(schema.erasureRequest)
+        .where(eq(schema.erasureRequest.id, requiredValue(id, "Request")))
+        .limit(1);
+      return request ?? null;
+    },
+
     async create(input: {
       initiator: ErasureInitiator;
       subjectHmac: string;
       targetClerkId: string;
+      verificationMethod: ErasureVerificationMethod;
       verificationReference?: string;
+      verifiedAt: Date;
+      verifiedByClerkId: string;
     }): Promise<ErasureReceipt> {
       const values = normalizeCreateInput(input);
       const createdAt = now();
@@ -292,6 +321,9 @@ export function createErasureService(
             targetClerkId,
             updatedAt: handledAt,
             verificationReference: "clerk_webhook",
+            verificationMethod: "clerk_webhook",
+            verifiedAt: handledAt,
+            verifiedByClerkId: "clerk_webhook",
           })
           .onConflictDoNothing({ target: schema.erasureRequest.subjectHmac })
           .returning({ id: schema.erasureRequest.id });
@@ -517,6 +549,8 @@ async function completeRequest(
       stepResults: request.stepResults,
       targetClerkId: null,
       updatedAt: completedAt,
+      verifiedByClerkId:
+        request.initiator === "self" ? null : request.verifiedByClerkId,
     })
     .where(eq(schema.erasureRequest.id, request.id));
 }
@@ -553,29 +587,44 @@ function normalizeCreateInput(input: {
   initiator: ErasureInitiator;
   subjectHmac: string;
   targetClerkId: string;
+  verificationMethod: ErasureVerificationMethod;
   verificationReference?: string;
+  verifiedAt: Date;
+  verifiedByClerkId: string;
 }) {
   const verificationReference = input.verificationReference?.trim();
   if (!(["self", "admin"] as const).includes(input.initiator)) {
     throw new Error("Invalid erasure initiator.");
   }
+  const verifiedByClerkId = requiredValue(input.verifiedByClerkId, "Verifier");
+  if (Number.isNaN(input.verifiedAt.getTime())) {
+    throw new Error("Verification timestamp is invalid.");
+  }
   if (input.initiator === "admin") {
     if (
       !verificationReference ||
-      !verificationReferencePattern.test(verificationReference)
+      !verificationReferencePattern.test(verificationReference) ||
+      !(["authenticated_request", "verified_email"] as const).includes(
+        input.verificationMethod as "authenticated_request" | "verified_email",
+      )
     ) {
-      throw new Error("Admin verification reference is required.");
+      throw new Error("Admin verification evidence is required.");
     }
-  } else if (verificationReference) {
-    throw new Error(
-      "Self-service requests cannot set a verification reference.",
-    );
+  } else if (
+    verificationReference ||
+    input.verificationMethod !== "clerk_reverification" ||
+    verifiedByClerkId !== input.targetClerkId.trim()
+  ) {
+    throw new Error("Self-service verification evidence is invalid.");
   }
   return {
     initiator: input.initiator,
     subjectHmac: normalizeSubjectHmac(input.subjectHmac),
     targetClerkId: requiredValue(input.targetClerkId, "Subject"),
+    verificationMethod: input.verificationMethod,
     verificationReference,
+    verifiedAt: input.verifiedAt,
+    verifiedByClerkId,
   };
 }
 
@@ -652,5 +701,6 @@ function receipt(request: ErasureRequest): ErasureReceipt {
   const { storageTargets, targetClerkId, ...safe } = request;
   void storageTargets;
   void targetClerkId;
+  void verifiedByClerkId;
   return safe;
 }

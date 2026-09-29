@@ -4,7 +4,7 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { Check, ShieldMinus, Trash2 } from "lucide-react";
+import { Check, ShieldMinus, Trash2, UserRoundX } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
@@ -60,6 +60,14 @@ export function AdminResourceNotificationsPage({
             {t("web.resources.notification.description")}
           </p>
           <div className="flex flex-wrap gap-2">
+            <Button
+              nativeButton={false}
+              render={<Link to="/admin/account-erasure" />}
+              variant="outline"
+            >
+              <UserRoundX />
+              {t("web.erasure.admin.navigation")}
+            </Button>
             <Button
               nativeButton={false}
               render={<Link to="/admin/catalog-images/trash" />}
