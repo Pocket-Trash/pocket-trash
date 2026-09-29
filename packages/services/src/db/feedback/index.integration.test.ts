@@ -5,9 +5,13 @@ import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
-import { createFeedbackService } from "./index.js";
+import {
+  createFeedbackService,
+  FeedbackPlanRecoveryRequiredError,
+} from "./index.js";
 
 describe("feedback lifecycle", () => {
   it("creates a pending request, permanent vote, and submitted notification atomically", async () => {
@@ -137,7 +141,7 @@ describe("feedback lifecycle", () => {
         feedbackId: approved.id,
         title: "Edited title",
       });
-      await service.updatePending({
+      await service.updateAdmin({
         description: "Edited description",
         feedbackId: approved.id,
         title: "Edited title",
@@ -148,7 +152,7 @@ describe("feedback lifecycle", () => {
         ),
       ).toEqual(expect.objectContaining({ category: null, id: approved.id }));
       await expect(service.approve(approved.id)).rejects.toThrow();
-      await service.updatePending({
+      await service.updateAdmin({
         category: "feature",
         description: "Edited description",
         feedbackId: approved.id,
@@ -190,7 +194,7 @@ describe("feedback lifecycle", () => {
       );
 
       const firstPage = await service.listPending();
-      const secondPage = await service.listPending(30);
+      const secondPage = await service.listPending({ offset: 30 });
 
       expect(firstPage.items).toHaveLength(30);
       expect(firstPage.hasNext).toBe(true);
@@ -427,6 +431,259 @@ describe("feedback lifecycle", () => {
         items: [
           expect.objectContaining({ id: needle.id, status: "completed" }),
         ],
+      });
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("lists searchable admin active and archived feedback with bounded sorting", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      await migrate(client);
+      const [lessPopular, morePopular, archived] = await db
+        .insert(schema.feedback)
+        .values([
+          {
+            category: "feature",
+            description: "Used often by collectors",
+            status: "requested",
+            submitterClerkId: "active-less",
+            title: "Saved searches",
+          },
+          {
+            category: "feature",
+            description: "Used often by makers",
+            status: "requested",
+            submitterClerkId: "active-more",
+            title: "Saved searches",
+          },
+          {
+            category: "bug",
+            description: "Archived search result",
+            status: "denied",
+            submitterClerkId: "archived",
+            title: "Archived request",
+          },
+        ])
+        .returning();
+      if (!lessPopular || !morePopular || !archived) {
+        throw new Error("Failed to seed admin feedback.");
+      }
+      await db.insert(schema.feedbackVotes).values([
+        { feedbackId: lessPopular.id, voterClerkId: "voter-1" },
+        { feedbackId: morePopular.id, voterClerkId: "voter-1" },
+        { feedbackId: morePopular.id, voterClerkId: "voter-2" },
+      ]);
+      const service = createFeedbackService(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      );
+
+      const active = await service.listAdminActive({
+        search: "saved often",
+        sort: [{ direction: "asc", field: "title" }],
+      });
+      const votesAscending = await service.listAdminActive({
+        sort: [{ direction: "asc", field: "votes" }],
+      });
+      const archive = await service.listArchive({ statuses: ["denied"] });
+
+      expect(active.items.map(({ id }) => id)).toEqual([
+        morePopular.id,
+        lessPopular.id,
+      ]);
+      expect(votesAscending.items.map(({ id }) => id)).toEqual([
+        lessPopular.id,
+        morePopular.id,
+      ]);
+      expect(active.items[0]).not.toHaveProperty("submitterClerkId");
+      expect(archive.items).toEqual([
+        expect.objectContaining({ id: archived.id, status: "denied" }),
+      ]);
+      await expect(
+        service.listAdminActive({
+          sort: [
+            { direction: "asc", field: "title" },
+            { direction: "asc", field: "status" },
+            { direction: "desc", field: "votes" },
+          ],
+        }),
+      ).rejects.toThrow("At most 2 sorts");
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("edits through Completed and protects immutable or reserved feedback", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      await migrate(client);
+      const [completed, merged, reserved, requested] = await db
+        .insert(schema.feedback)
+        .values([
+          {
+            category: "feature",
+            description: "Completed description",
+            status: "completed",
+            submitterClerkId: "completed",
+            title: "Completed title",
+          },
+          {
+            category: "feature",
+            description: "Merged description",
+            status: "merged",
+            submitterClerkId: "merged",
+            title: "Merged title",
+          },
+          {
+            category: "feature",
+            description: "Reserved description",
+            linearClientUuid: "11111111-1111-4111-8111-111111111111",
+            status: "requested",
+            submitterClerkId: "reserved",
+            title: "Reserved title",
+          },
+          {
+            category: "feature",
+            description: "Requested description",
+            status: "requested",
+            submitterClerkId: "requested",
+            title: "Requested title",
+          },
+        ])
+        .returning();
+      if (!completed || !merged || !reserved || !requested) {
+        throw new Error("Failed to seed editable feedback.");
+      }
+      const service = createFeedbackService(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      );
+
+      await service.updateAdmin({
+        category: "improvement",
+        description: "Updated description",
+        feedbackId: completed.id,
+        title: "Updated title",
+      });
+      await expect(
+        service.updateAdmin({
+          category: "improvement",
+          description: "Cannot update",
+          feedbackId: merged.id,
+          title: "Cannot update",
+        }),
+      ).rejects.toThrow();
+      await expect(service.deny(reserved.id)).rejects.toBeInstanceOf(
+        FeedbackPlanRecoveryRequiredError,
+      );
+      await expect(service.deny(requested.id)).resolves.toBeUndefined();
+
+      expect(await service.listArchive({ statuses: ["completed"] })).toEqual({
+        hasNext: false,
+        items: [
+          expect.objectContaining({
+            category: "improvement",
+            id: completed.id,
+            title: "Updated title",
+          }),
+        ],
+      });
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("merges only pending feedback and transfers one removable vote", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      await migrate(client);
+      const service = createFeedbackService(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      );
+      const target = await service.submit({
+        category: "feature",
+        description: "Approved target",
+        submitterClerkId: "target-owner",
+        title: "Approved target",
+      });
+      await service.approve(target.id);
+      const first = await service.submit({
+        description: "First duplicate",
+        submitterClerkId: "duplicate-owner",
+        title: "First duplicate",
+      });
+      const second = await service.submit({
+        description: "Second duplicate",
+        submitterClerkId: "duplicate-owner",
+        title: "Second duplicate",
+      });
+      const [completedTarget] = await db
+        .insert(schema.feedback)
+        .values({
+          category: "feature",
+          description: "Completed target",
+          status: "completed",
+          submitterClerkId: "completed-owner",
+          title: "Completed target",
+        })
+        .returning();
+      if (!completedTarget) throw new Error("Failed to seed completed target.");
+
+      await expect(service.mergePending(target.id, first.id)).rejects.toThrow();
+      await expect(service.mergePending(first.id, second.id)).rejects.toThrow();
+      await expect(
+        service.mergePending(first.id, completedTarget.id),
+      ).rejects.toThrow();
+      expect(
+        await db
+          .select({ status: schema.feedback.status })
+          .from(schema.feedback)
+          .where(eq(schema.feedback.id, first.id)),
+      ).toEqual([{ status: "pending" }]);
+
+      await service.mergePending(first.id, target.id);
+      await service.mergePending(second.id, target.id);
+
+      expect(
+        await db
+          .select()
+          .from(schema.feedbackVotes)
+          .where(eq(schema.feedbackVotes.feedbackId, target.id)),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            isPermanent: true,
+            voterClerkId: "target-owner",
+          }),
+          expect.objectContaining({
+            isPermanent: false,
+            voterClerkId: "duplicate-owner",
+          }),
+        ]),
+      );
+      expect(
+        (
+          await db
+            .select()
+            .from(schema.feedbackVotes)
+            .where(eq(schema.feedbackVotes.feedbackId, target.id))
+        ).filter(({ voterClerkId }) => voterClerkId === "duplicate-owner"),
+      ).toHaveLength(1);
+      expect(await service.listArchive({ statuses: ["merged"] })).toEqual({
+        hasNext: false,
+        items: expect.arrayContaining([
+          expect.objectContaining({ id: first.id }),
+          expect.objectContaining({ id: second.id }),
+        ]),
       });
     } finally {
       await client.close();

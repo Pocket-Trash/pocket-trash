@@ -1,13 +1,23 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { isFeedbackAdmin, listPendingFeedback } from "@/lib/feedback";
-import { AdminFeedbackRequestsPage } from "@/pages/feedback-pages";
+import {
+  isFeedbackAdmin,
+  listFeedbackMergeTargets,
+  listPendingFeedback,
+} from "@/lib/feedback";
+import { AdminFeedbackRequestsPage } from "@/pages/admin-feedback-pages";
 
 export const Route = createFileRoute("/admin/feedback/requests")({
   beforeLoad: async () => {
     if (!(await isFeedbackAdmin())) throw notFound();
   },
-  loader: async () => await listPendingFeedback({ data: { offset: 0 } }),
+  loader: async () => {
+    const [initialPage, mergeTargets] = await Promise.all([
+      listPendingFeedback({ data: { offset: 0 } }),
+      listFeedbackMergeTargets(),
+    ]);
+    return { initialPage, mergeTargets };
+  },
   component: AdminFeedbackRequestsRoute,
   head: () => ({
     meta: [{ title: formatTranslation("web.feedback.admin.requests.title") }],
@@ -15,5 +25,5 @@ export const Route = createFileRoute("/admin/feedback/requests")({
 });
 
 function AdminFeedbackRequestsRoute() {
-  return <AdminFeedbackRequestsPage initialPage={Route.useLoaderData()} />;
+  return <AdminFeedbackRequestsPage {...Route.useLoaderData()} />;
 }

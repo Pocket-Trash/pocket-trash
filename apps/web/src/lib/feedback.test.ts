@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  parseAdminFeedbackListInput,
   parseFeedbackInput,
   parseFeedbackListInput,
   parseFeedbackTitleInput,
@@ -36,6 +37,57 @@ describe("feedback input", () => {
         description: "x".repeat(5001),
         title: "Too much detail",
       }),
+    ).toThrow();
+  });
+});
+
+describe("admin feedback input", () => {
+  it("accepts each view's supported filters and sort limits", () => {
+    expect(
+      parseAdminFeedbackListInput(
+        {
+          offset: 30,
+          search: "  mobile app  ",
+          sort: [
+            { direction: "desc", field: "status" },
+            { direction: "asc", field: "title" },
+          ],
+        },
+        "active",
+      ),
+    ).toEqual({
+      offset: 30,
+      search: "mobile app",
+      sort: [
+        { direction: "desc", field: "status" },
+        { direction: "asc", field: "title" },
+      ],
+    });
+    expect(
+      parseAdminFeedbackListInput({ statuses: ["completed"] }, "archive"),
+    ).toEqual({ offset: 0, search: "", sort: [], statuses: ["completed"] });
+  });
+
+  it("rejects unsupported, duplicate, or excessive sorts", () => {
+    expect(() =>
+      parseAdminFeedbackListInput(
+        { sort: [{ direction: "asc", field: "votes" }] },
+        "pending",
+      ),
+    ).toThrow();
+    expect(() =>
+      parseAdminFeedbackListInput(
+        {
+          sort: [
+            { direction: "asc", field: "title" },
+            { direction: "desc", field: "title" },
+          ],
+        },
+        "active",
+      ),
+    ).toThrow();
+    expect(() =>
+      parseAdminFeedbackListInput({ statuses: ["requested"] }, "archive"),
     ).toThrow();
   });
 });

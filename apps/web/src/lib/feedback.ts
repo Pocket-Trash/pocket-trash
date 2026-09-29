@@ -1,4 +1,7 @@
-import { FeedbackSubmissionLimitError } from "@package/services";
+import type {
+  AdminFeedbackSortField,
+  ListAdminFeedbackOptions,
+} from "@package/services";
 import { createServerFn } from "@tanstack/react-start";
 import {
   type FeedbackCategory,
@@ -20,6 +23,7 @@ export const submitFeedback = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const submitterClerkId = await requireResourceUploader();
     const { s } = await import("@/lib/services");
+    const { FeedbackSubmissionLimitError } = await import("@package/services");
     try {
       const feedback = await s.db.feedback.submit({
         ...data,
@@ -70,19 +74,59 @@ export const listMyFeedback = createServerFn({ method: "GET" })
   });
 
 export const listPendingFeedback = createServerFn({ method: "GET" })
-  .validator(parseOffset)
+  .validator((input) => parseAdminFeedbackListInput(input, "pending"))
   .handler(async ({ data }) => {
     await requireResourceAdmin();
     const { s } = await import("@/lib/services");
-    return await s.db.feedback.listPending(data.offset);
+    return await s.db.feedback.listPending(data);
   });
 
-export const updatePendingFeedback = createServerFn({ method: "POST" })
-  .validator(parsePendingFeedbackInput)
+export const listAdminActiveFeedback = createServerFn({ method: "GET" })
+  .validator((input) => parseAdminFeedbackListInput(input, "active"))
   .handler(async ({ data }) => {
     await requireResourceAdmin();
     const { s } = await import("@/lib/services");
-    await s.db.feedback.updatePending(data);
+    return await s.db.feedback.listAdminActive(data);
+  });
+
+export const listArchivedFeedback = createServerFn({ method: "GET" })
+  .validator((input) => parseAdminFeedbackListInput(input, "archive"))
+  .handler(async ({ data }) => {
+    await requireResourceAdmin();
+    const { s } = await import("@/lib/services");
+    return await s.db.feedback.listArchive(data);
+  });
+
+export const listFeedbackArchiveStatuses = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  await requireResourceAdmin();
+  const { adminFeedbackArchiveStatuses } = await import("@package/services");
+  return adminFeedbackArchiveStatuses;
+});
+
+export const listFeedbackMergeTargets = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  await requireResourceAdmin();
+  const { s } = await import("@/lib/services");
+  return await s.db.feedback.listMergeTargets();
+});
+
+export const updateAdminFeedback = createServerFn({ method: "POST" })
+  .validator(parseAdminFeedbackInput)
+  .handler(async ({ data }) => {
+    await requireResourceAdmin();
+    const { s } = await import("@/lib/services");
+    await s.db.feedback.updateAdmin(data);
+  });
+
+export const mergePendingFeedback = createServerFn({ method: "POST" })
+  .validator(parseMergeFeedbackInput)
+  .handler(async ({ data }) => {
+    await requireResourceAdmin();
+    const { s } = await import("@/lib/services");
+    await s.db.feedback.mergePending(data.feedbackId, data.targetId);
   });
 
 export const approveFeedback = createServerFn({ method: "POST" })
@@ -98,7 +142,21 @@ export const denyFeedback = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await requireResourceAdmin();
     const { s } = await import("@/lib/services");
-    await s.db.feedback.deny(data.feedbackId);
+    const { FeedbackPlanRecoveryRequiredError } = await import(
+      "@package/services"
+    );
+    try {
+      await s.db.feedback.deny(data.feedbackId);
+      return { ok: true as const };
+    } catch (error) {
+      if (error instanceof FeedbackPlanRecoveryRequiredError) {
+        return {
+          error: "web.feedback.admin.requests.planRecoveryRequired" as const,
+          ok: false as const,
+        };
+      }
+      throw error;
+    }
   });
 
 export const toggleFeedbackVote = createServerFn({ method: "POST" })
@@ -130,8 +188,71 @@ export function parseFeedbackTitleInput(input: unknown) {
   return { title: parseString(parseRecord(input).title, 120) };
 }
 
-function parsePendingFeedbackInput(input: unknown) {
+function parseAdminFeedbackInput(input: unknown) {
   return { ...parseFeedbackInput(input), ...parseFeedbackId(input) };
+}
+
+export function parseAdminFeedbackListInput(
+  input: unknown,
+  scope: "active" | "archive" | "pending",
+) {
+  if (input === undefined) return { offset: 0, search: "", sort: [] };
+  const value = parseRecord(input);
+  const base = parseFeedbackListInput(input);
+  const allowed = adminSortFields[scope];
+  const maxSorts = scope === "pending" ? 1 : 2;
+  const sortInput = value.sort ?? [];
+  if (!Array.isArray(sortInput) || sortInput.length > maxSorts) {
+    throw invalidFeedbackRequest();
+  }
+  const sort = sortInput.map((item) => {
+    const entry = parseRecord(item);
+    if (
+      !allowed.some((field) => field === entry.field) ||
+      (entry.direction !== "asc" && entry.direction !== "desc")
+    ) {
+      throw invalidFeedbackRequest();
+    }
+    return {
+      direction: entry.direction as "asc" | "desc",
+      field: entry.field as AdminFeedbackSortField,
+    };
+  });
+  if (new Set(sort.map(({ field }) => field)).size !== sort.length) {
+    throw invalidFeedbackRequest();
+  }
+  if (scope !== "archive") return { ...base, sort };
+  const statusInput = value.statuses ?? [];
+  if (!Array.isArray(statusInput)) throw invalidFeedbackRequest();
+  const statuses = statusInput.map((status) => {
+    if (typeof status !== "string" || activeFeedbackStatuses.includes(status)) {
+      throw invalidFeedbackRequest();
+    }
+    return status as NonNullable<ListAdminFeedbackOptions["statuses"]>[number];
+  });
+  return { ...base, sort, statuses };
+}
+
+const adminSortFields = {
+  active: ["title", "status", "category", "votes", "submitter", "updated"],
+  archive: ["title", "status", "category", "submitter"],
+  pending: ["title", "category", "submitter", "submitted"],
+} as const satisfies Record<string, readonly AdminFeedbackSortField[]>;
+
+const activeFeedbackStatuses: readonly string[] = [
+  "pending",
+  "requested",
+  "planned",
+  "in_progress",
+];
+
+function parseMergeFeedbackInput(input: unknown) {
+  const value = parseRecord(input);
+  const targetId = value.targetId;
+  if (!Number.isSafeInteger(targetId) || Number(targetId) <= 0) {
+    throw invalidFeedbackRequest();
+  }
+  return { ...parseFeedbackId(input), targetId: Number(targetId) };
 }
 
 function parseFeedbackId(input: unknown) {
@@ -140,11 +261,6 @@ function parseFeedbackId(input: unknown) {
     throw invalidFeedbackRequest();
   }
   return { feedbackId: Number(feedbackId) };
-}
-
-function parseOffset(input: unknown) {
-  if (input === undefined) return { offset: 0 };
-  return { offset: parseOffsetValue(parseRecord(input).offset) };
 }
 
 function parseRecord(input: unknown): Record<string, unknown> {

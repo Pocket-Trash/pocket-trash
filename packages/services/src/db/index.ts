@@ -55,14 +55,22 @@ export type {
   UserCollectionSummary,
 } from "./catalog/index.js";
 export type {
+  AdminFeedbackItem,
+  AdminFeedbackPage,
+  AdminFeedbackSort,
+  AdminFeedbackSortField,
   FeedbackListItem,
+  FeedbackMergeTarget,
   FeedbackPage,
   FeedbackService,
+  ListAdminFeedbackOptions,
   ListMyFeedbackOptions,
   SubmitFeedbackInput,
+  UpdateAdminFeedbackInput,
   UpdatePendingFeedbackInput,
 } from "./feedback/index.js";
 export {
+  FeedbackPlanRecoveryRequiredError,
   FeedbackStateError,
   FeedbackSubmissionLimitError,
 } from "./feedback/index.js";

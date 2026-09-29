@@ -1,14 +1,21 @@
-import type { Database, FeedbackCategory } from "@package/database";
+import type {
+  Database,
+  FeedbackCategory,
+  FeedbackStatus,
+} from "@package/database";
 import { schema } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
 import {
   and,
+  asc,
   count,
   desc,
   eq,
   inArray,
+  isNull,
   notInArray,
   or,
+  type SQL,
   sql,
 } from "drizzle-orm";
 import { hashLogIdentifier } from "../../logging.js";
@@ -21,15 +28,25 @@ const activeStatuses: (typeof schema.feedbackStatuses)[number][] = [
 ];
 const hiddenFromSubmitterStatuses: (typeof schema.feedbackStatuses)[number][] =
   ["merged", "denied", "canceled"];
+const editableStatuses: (typeof schema.feedbackStatuses)[number][] = [
+  "pending",
+  "requested",
+  "planned",
+  "in_progress",
+  "completed",
+];
 const publicStatuses: (typeof schema.feedbackStatuses)[number][] = [
   "requested",
   "planned",
   "in_progress",
 ];
+export const adminFeedbackArchiveStatuses = schema.feedbackStatuses.filter(
+  (status) => !activeStatuses.includes(status),
+);
 
 export type FeedbackListItem = Omit<
   typeof schema.feedback.$inferSelect,
-  "submitterClerkId"
+  "linearClientUuid" | "submitterClerkId"
 > & {
   hasPermanentVote: boolean;
   hasVoted: boolean;
@@ -40,6 +57,49 @@ export type FeedbackPage = {
   hasNext: boolean;
   items: FeedbackListItem[];
 };
+
+export type AdminFeedbackItem = {
+  category: FeedbackCategory | null;
+  createdAt: Date;
+  description: string;
+  id: number;
+  status: FeedbackStatus;
+  submitterUsername: string | null;
+  title: string;
+  updatedAt: Date;
+  voteCount: number;
+};
+
+export type AdminFeedbackPage = {
+  hasNext: boolean;
+  items: AdminFeedbackItem[];
+};
+
+export type AdminFeedbackSortField =
+  | "category"
+  | "status"
+  | "submitted"
+  | "submitter"
+  | "title"
+  | "updated"
+  | "votes";
+
+export type AdminFeedbackSort = {
+  direction: "asc" | "desc";
+  field: AdminFeedbackSortField;
+};
+
+export type ListAdminFeedbackOptions = {
+  offset?: number;
+  search?: string;
+  sort?: AdminFeedbackSort[];
+  statuses?: FeedbackStatus[];
+};
+
+export type FeedbackMergeTarget = Pick<
+  AdminFeedbackItem,
+  "id" | "status" | "title"
+>;
 
 export type ListMyFeedbackOptions = {
   offset?: number;
@@ -53,12 +113,14 @@ export type SubmitFeedbackInput = {
   title: string;
 };
 
-export type UpdatePendingFeedbackInput = {
+export type UpdateAdminFeedbackInput = {
   category?: FeedbackCategory;
   description: string;
   feedbackId: number;
   title: string;
 };
+
+export type UpdatePendingFeedbackInput = UpdateAdminFeedbackInput;
 
 export type FeedbackService = {
   approve(feedbackId: number): Promise<void>;
@@ -72,26 +134,30 @@ export type FeedbackService = {
     viewerClerkId: string,
     search?: string,
   ): Promise<FeedbackListItem[]>;
+  listAdminActive(
+    options?: ListAdminFeedbackOptions,
+  ): Promise<AdminFeedbackPage>;
+  listArchive(options?: ListAdminFeedbackOptions): Promise<AdminFeedbackPage>;
+  listMergeTargets(): Promise<FeedbackMergeTarget[]>;
   listMine(
     submitterClerkId: string,
     options?: ListMyFeedbackOptions,
   ): Promise<FeedbackPage>;
-  listPending(offset?: number): Promise<{
-    hasNext: boolean;
-    items: (typeof schema.feedback.$inferSelect & {
-      submitterUsername: string | null;
-      voteCount: number;
-    })[];
-  }>;
+  listPending(
+    options?: ListAdminFeedbackOptions | number,
+  ): Promise<AdminFeedbackPage>;
+  mergePending(feedbackId: number, targetId: number): Promise<void>;
   submit(
     input: SubmitFeedbackInput,
   ): Promise<typeof schema.feedback.$inferSelect>;
   toggleVote(feedbackId: number, voterClerkId: string): Promise<boolean>;
+  updateAdmin(input: UpdateAdminFeedbackInput): Promise<void>;
   updatePending(input: UpdatePendingFeedbackInput): Promise<void>;
 };
 
 export class FeedbackSubmissionLimitError extends Error {}
 export class FeedbackStateError extends Error {}
+export class FeedbackPlanRecoveryRequiredError extends Error {}
 
 export function createFeedbackService(
   db: Database,
@@ -130,11 +196,28 @@ export function createFeedbackService(
             .where(
               and(
                 eq(schema.feedback.id, feedbackId),
-                eq(schema.feedback.status, "pending"),
+                inArray(schema.feedback.status, ["pending", "requested"]),
+                isNull(schema.feedback.linearClientUuid),
               ),
             )
             .returning({ id: schema.feedback.id });
-          if (updated.length === 0) throw new FeedbackStateError();
+          if (updated.length > 0) return;
+
+          const [feedback] = await db
+            .select({
+              linearClientUuid: schema.feedback.linearClientUuid,
+              status: schema.feedback.status,
+            })
+            .from(schema.feedback)
+            .where(eq(schema.feedback.id, feedbackId))
+            .limit(1);
+          if (
+            feedback?.status === "requested" &&
+            feedback.linearClientUuid !== null
+          ) {
+            throw new FeedbackPlanRecoveryRequiredError();
+          }
+          throw new FeedbackStateError();
         },
       );
     },
@@ -228,6 +311,36 @@ export function createFeedbackService(
       );
     },
 
+    async listAdminActive(options = {}) {
+      return await logger.operation(
+        loggerMessages.database.feedback.listAdminActive,
+        async () => await listAdminFeedback(db, "active", options),
+      );
+    },
+
+    async listArchive(options = {}) {
+      return await logger.operation(
+        loggerMessages.database.feedback.listArchive,
+        async () => await listAdminFeedback(db, "archive", options),
+      );
+    },
+
+    async listMergeTargets() {
+      return await logger.operation(
+        loggerMessages.database.feedback.listMergeTargets,
+        async () =>
+          await db
+            .select({
+              id: schema.feedback.id,
+              status: schema.feedback.status,
+              title: schema.feedback.title,
+            })
+            .from(schema.feedback)
+            .where(inArray(schema.feedback.status, publicStatuses))
+            .orderBy(asc(schema.feedback.title), asc(schema.feedback.id)),
+      );
+    },
+
     async listMine(submitterClerkId, options = {}) {
       return await logger.operation(
         loggerMessages.database.feedback.listMine,
@@ -256,39 +369,68 @@ export function createFeedbackService(
       );
     },
 
-    async listPending(offset = 0) {
+    async listPending(options = {}) {
       return await logger.operation(
         loggerMessages.database.feedback.listPending,
+        async () =>
+          await listAdminFeedback(
+            db,
+            "pending",
+            typeof options === "number" ? { offset: options } : options,
+          ),
+      );
+    },
+
+    async mergePending(feedbackId, targetId) {
+      await logger.operation(
+        loggerMessages.database.feedback.mergePending,
         async () => {
-          if (!Number.isSafeInteger(offset) || offset < 0) {
-            throw new Error("offset must be a non-negative integer.");
-          }
-          const rows = await db
-            .select({
-              category: schema.feedback.category,
-              createdAt: schema.feedback.createdAt,
-              description: schema.feedback.description,
-              id: schema.feedback.id,
-              status: schema.feedback.status,
-              submitterClerkId: schema.feedback.submitterClerkId,
-              submitterUsername: schema.user.username,
-              title: schema.feedback.title,
-              updatedAt: schema.feedback.updatedAt,
-              voteCount: sql<number>`(
-                select count(*)::int from feedback_votes
-                where feedback_id = ${schema.feedback.id}
-              )`,
-            })
-            .from(schema.feedback)
-            .leftJoin(
-              schema.user,
-              eq(schema.user.clerkId, schema.feedback.submitterClerkId),
-            )
-            .where(eq(schema.feedback.status, "pending"))
-            .orderBy(desc(schema.feedback.createdAt), desc(schema.feedback.id))
-            .limit(31)
-            .offset(offset);
-          return { hasNext: rows.length > 30, items: rows.slice(0, 30) };
+          assertPositiveInteger(feedbackId, "feedbackId");
+          assertPositiveInteger(targetId, "targetId");
+          if (feedbackId === targetId) throw new FeedbackStateError();
+
+          await db.transaction(async (tx) => {
+            const [source] = await tx
+              .select({
+                status: schema.feedback.status,
+                submitterClerkId: schema.feedback.submitterClerkId,
+              })
+              .from(schema.feedback)
+              .where(eq(schema.feedback.id, feedbackId))
+              .for("update");
+            const [target] = await tx
+              .select({ status: schema.feedback.status })
+              .from(schema.feedback)
+              .where(eq(schema.feedback.id, targetId))
+              .for("update");
+            if (
+              source?.status !== "pending" ||
+              !target ||
+              !publicStatuses.includes(target.status)
+            ) {
+              throw new FeedbackStateError();
+            }
+
+            await tx
+              .insert(schema.feedbackVotes)
+              .values({
+                feedbackId: targetId,
+                isPermanent: false,
+                voterClerkId: source.submitterClerkId,
+              })
+              .onConflictDoNothing();
+            const updated = await tx
+              .update(schema.feedback)
+              .set({ status: "merged", updatedAt: new Date() })
+              .where(
+                and(
+                  eq(schema.feedback.id, feedbackId),
+                  eq(schema.feedback.status, "pending"),
+                ),
+              )
+              .returning({ id: schema.feedback.id });
+            if (updated.length === 0) throw new FeedbackStateError();
+          });
         },
       );
     },
@@ -406,32 +548,176 @@ export function createFeedbackService(
       );
     },
 
+    async updateAdmin(input) {
+      await logger.operation(
+        loggerMessages.database.feedback.updateAdmin,
+        async () => await updateAdminFeedback(db, input),
+      );
+    },
+
     async updatePending(input) {
       await logger.operation(
         loggerMessages.database.feedback.updatePending,
-        async () => {
-          assertPositiveInteger(input.feedbackId, "feedbackId");
-          const normalized = normalizeFeedbackDetails(input);
-          const updated = await db
-            .update(schema.feedback)
-            .set({
-              category: normalized.category ?? null,
-              description: normalized.description,
-              title: normalized.title,
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(schema.feedback.id, input.feedbackId),
-                eq(schema.feedback.status, "pending"),
-              ),
-            )
-            .returning({ id: schema.feedback.id });
-          if (updated.length === 0) throw new FeedbackStateError();
-        },
+        async () => await updateAdminFeedback(db, input, ["pending"]),
       );
     },
   };
+}
+
+async function updateAdminFeedback(
+  db: Database,
+  input: UpdateAdminFeedbackInput,
+  statuses = editableStatuses,
+) {
+  assertPositiveInteger(input.feedbackId, "feedbackId");
+  const normalized = normalizeFeedbackDetails(input);
+  const updated = await db
+    .update(schema.feedback)
+    .set({
+      category: normalized.category ?? null,
+      description: normalized.description,
+      title: normalized.title,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(schema.feedback.id, input.feedbackId),
+        inArray(schema.feedback.status, statuses),
+      ),
+    )
+    .returning({ id: schema.feedback.id });
+  if (updated.length === 0) throw new FeedbackStateError();
+}
+
+async function listAdminFeedback(
+  db: Database,
+  scope: "active" | "archive" | "pending",
+  options: ListAdminFeedbackOptions,
+): Promise<AdminFeedbackPage> {
+  const offset = normalizedOffset(options.offset);
+  const terms = normalizedSearch(options.search);
+  const allowedSorts =
+    scope === "pending"
+      ? (["category", "submitted", "submitter", "title"] as const)
+      : scope === "active"
+        ? ([
+            "category",
+            "status",
+            "submitter",
+            "title",
+            "updated",
+            "votes",
+          ] as const)
+        : (["category", "status", "submitter", "title"] as const);
+  const sorts = normalizedAdminSort(
+    options.sort,
+    scope === "pending" ? 1 : 2,
+    allowedSorts,
+  );
+  const statuses =
+    scope === "archive" ? normalizedArchiveStatuses(options.statuses) : [];
+  const statusCondition =
+    scope === "pending"
+      ? eq(schema.feedback.status, "pending")
+      : scope === "active"
+        ? inArray(schema.feedback.status, publicStatuses)
+        : statuses.length > 0
+          ? inArray(schema.feedback.status, statuses)
+          : notInArray(schema.feedback.status, activeStatuses);
+  const orderBy = sorts.map(adminSortExpression);
+  if (scope === "pending" && orderBy.length === 0) {
+    orderBy.push(desc(schema.feedback.createdAt));
+  }
+  if (scope === "archive" && orderBy.length === 0) {
+    orderBy.push(desc(schema.feedback.updatedAt));
+  }
+  if (scope === "active" && !sorts.some(({ field }) => field === "votes")) {
+    orderBy.push(desc(feedbackVoteCount()));
+  }
+  orderBy.push(desc(schema.feedback.id));
+
+  const rows = await db
+    .select(adminFeedbackColumns())
+    .from(schema.feedback)
+    .leftJoin(
+      schema.user,
+      eq(schema.user.clerkId, schema.feedback.submitterClerkId),
+    )
+    .where(
+      and(
+        statusCondition,
+        terms.length > 0 ? and(...terms.map(feedbackContains)) : undefined,
+      ),
+    )
+    .orderBy(...orderBy)
+    .limit(31)
+    .offset(offset);
+  return { hasNext: rows.length > 30, items: rows.slice(0, 30) };
+}
+
+function adminFeedbackColumns() {
+  return {
+    category: schema.feedback.category,
+    createdAt: schema.feedback.createdAt,
+    description: schema.feedback.description,
+    id: schema.feedback.id,
+    status: schema.feedback.status,
+    submitterUsername: schema.user.username,
+    title: schema.feedback.title,
+    updatedAt: sql<Date>`coalesce(${schema.feedback.updatedAt}, ${schema.feedback.createdAt})`,
+    voteCount: feedbackVoteCount(),
+  };
+}
+
+function normalizedAdminSort(
+  value: AdminFeedbackSort[] | undefined,
+  max: number,
+  allowed: readonly AdminFeedbackSortField[],
+) {
+  const sorts = value ?? [];
+  if (sorts.length > max) throw new Error(`At most ${max} sorts are allowed.`);
+  const seen = new Set<AdminFeedbackSortField>();
+  for (const sort of sorts) {
+    if (
+      !allowed.includes(sort.field) ||
+      (sort.direction !== "asc" && sort.direction !== "desc") ||
+      seen.has(sort.field)
+    ) {
+      throw new Error("Invalid feedback sort.");
+    }
+    seen.add(sort.field);
+  }
+  return sorts;
+}
+
+function normalizedArchiveStatuses(value: FeedbackStatus[] | undefined) {
+  const statuses = value ?? [];
+  if (
+    new Set(statuses).size !== statuses.length ||
+    statuses.some((status) => !adminFeedbackArchiveStatuses.includes(status))
+  ) {
+    throw new Error("Invalid feedback archive status.");
+  }
+  return statuses;
+}
+
+function adminSortExpression(sort: AdminFeedbackSort): SQL {
+  const direction = sort.direction === "asc" ? asc : desc;
+  if (sort.field === "category") return direction(schema.feedback.category);
+  if (sort.field === "status") return direction(schema.feedback.status);
+  if (sort.field === "submitted") return direction(schema.feedback.createdAt);
+  if (sort.field === "submitter") {
+    return direction(
+      sql<string>`coalesce(${schema.user.username}, ${schema.feedback.submitterClerkId})`,
+    );
+  }
+  if (sort.field === "title") return direction(schema.feedback.title);
+  if (sort.field === "updated") {
+    return direction(
+      sql<Date>`coalesce(${schema.feedback.updatedAt}, ${schema.feedback.createdAt})`,
+    );
+  }
+  return direction(feedbackVoteCount());
 }
 
 function normalizeFeedbackInput(input: SubmitFeedbackInput) {
