@@ -237,6 +237,23 @@ describe("resource storage", () => {
     }
   });
 
+  it("creates a valid Node request for a streamed upload", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      new Request(input, init);
+      return new Response(null, { status: 201 });
+    });
+    const storage = createUploadStorage({ ...config, fetch: fetchMock });
+
+    await expect(
+      storage.putFile({
+        body: new Blob([new Uint8Array([1, 2, 3])]).stream(),
+        contentLength: 3,
+        contentType: "application/octet-stream",
+        objectPath: "resources/dev/resource.stl",
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it("accepts octet-stream for every supported resource extension", () => {
     const storage = createUploadStorage(config);
 
