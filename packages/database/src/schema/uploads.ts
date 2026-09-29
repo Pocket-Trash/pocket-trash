@@ -95,9 +95,13 @@ export const storageObjectDeletion = pgTable(
   "storage_object_deletion",
   {
     objectPath: text("object_path").primaryKey(),
+    ownerClerkId: text("owner_clerk_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
   },
-  (t) => [index("storage_object_deletion_created_idx").on(t.createdAt)],
+  (t) => [
+    index("storage_object_deletion_created_idx").on(t.createdAt),
+    index("storage_object_deletion_owner_idx").on(t.ownerClerkId),
+  ],
 );

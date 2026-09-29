@@ -42,7 +42,10 @@ const operationSteps = [
 
 export type ApprovedErasureExceptionCode = keyof typeof exceptionMaximumMs;
 
-export type ErasureReceipt = Omit<ErasureRequest, "targetClerkId">;
+export type ErasureReceipt = Omit<
+  ErasureRequest,
+  "storageTargets" | "targetClerkId"
+>;
 
 export type ErasureOperationRequest = Pick<
   ErasureRequest,
@@ -646,7 +649,8 @@ function requiredValue(value: string, name: string): string {
 }
 
 function receipt(request: ErasureRequest): ErasureReceipt {
-  const { targetClerkId, ...safe } = request;
+  const { storageTargets, targetClerkId, ...safe } = request;
+  void storageTargets;
   void targetClerkId;
   return safe;
 }

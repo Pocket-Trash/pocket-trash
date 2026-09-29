@@ -14,6 +14,7 @@ Durable, idempotent complete-erasure requests and their minimal temporary receip
 | `initiator` | `text` | yes |  |  |  |  |  |
 | `verification_reference` | `text` | no |  |  |  |  |  |
 | `status` | `text` | yes |  | `'pending'` |  |  |  |
+| `storage_targets` | `text[]` | no |  |  |  |  |  |
 | `step_results` | `jsonb` | yes |  |  |  |  |  |
 | `attempts` | `integer` | yes |  |  |  |  |  |
 | `next_attempt_at` | `timestamp with time zone` | no |  |  |  |  |  |

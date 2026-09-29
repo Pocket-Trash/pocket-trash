@@ -53,6 +53,7 @@ export const erasureRequest = pgTable(
     status: text("status", { enum: erasureStatuses })
       .default("pending")
       .notNull(),
+    storageTargets: text("storage_targets").array(),
     stepResults: jsonb("step_results").$type<ErasureStepResults>().notNull(),
     attempts: integer("attempts").default(0).notNull(),
     nextAttemptAt: timestamp("next_attempt_at", {

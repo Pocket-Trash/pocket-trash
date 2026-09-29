@@ -42,12 +42,15 @@ export type ApiBindings = Omit<Env, "APP_ENV" | "BUNNY_IMAGE_FOLDER_PREFIX"> & {
   LOG_LEVEL?: string;
   LOG_PROXY_CLIENT_KEY?: string;
   URL_INITIALS?: string;
+  BUNNY_API_KEY?: string;
   BUNNY_CDN_BASE_URL?: string;
+  BUNNY_CDN_TOKEN_KEY?: string;
   BUNNY_RESOURCE_FOLDER_PREFIX?: string;
   BUNNY_IMAGE_FOLDER_PREFIX?: string;
   BUNNY_STORAGE_ACCESS_KEY?: string;
   BUNNY_STORAGE_ENDPOINT?: string;
   BUNNY_STORAGE_ZONE_NAME?: string;
+  BUNNY_PULL_ZONE_ID?: string;
 };
 
 type RuntimeConfig = {

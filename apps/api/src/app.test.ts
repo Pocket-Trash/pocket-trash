@@ -300,6 +300,8 @@ describe("api", () => {
 
 function createUploadServiceMock() {
   return {
+    eraseAccountObjects: vi.fn(async () => ({ exceptions: [] })),
+    snapshotErasureTargets: vi.fn(async () => {}),
     cleanupExpired: vi.fn(async () => 0),
     completeUpload: vi.fn(async () => ({ resourceId: 1000, version: 1 })),
     deleteFile: vi.fn(async () => {}),

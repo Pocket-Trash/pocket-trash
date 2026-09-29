@@ -53,10 +53,13 @@ export function createApiServices(
       ? {
           storage: {
             accessKey: bindings.BUNNY_STORAGE_ACCESS_KEY,
+            apiKey: bindings.BUNNY_API_KEY,
             cdnBaseUrl: bindings.BUNNY_CDN_BASE_URL,
             endpoint: bindings.BUNNY_STORAGE_ENDPOINT,
             folderPrefix: bindings.BUNNY_RESOURCE_FOLDER_PREFIX,
             imageFolderPrefix: bindings.BUNNY_IMAGE_FOLDER_PREFIX,
+            pullZoneId: bindings.BUNNY_PULL_ZONE_ID,
+            tokenKey: bindings.BUNNY_CDN_TOKEN_KEY,
             zoneName: bindings.BUNNY_STORAGE_ZONE_NAME,
           },
         }
