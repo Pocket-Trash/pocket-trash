@@ -32,11 +32,11 @@ export const featureFlags = pgTable("feature_flags", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-  createdByClerkId: text("created_by_clerk_id").notNull(),
+  createdByClerkId: text("created_by_clerk_id"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-  updatedByClerkId: text("updated_by_clerk_id").notNull(),
+  updatedByClerkId: text("updated_by_clerk_id"),
 });
 
 export const featureFlagUserOverrides = pgTable(
@@ -54,11 +54,11 @@ export const featureFlagUserOverrides = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    createdByClerkId: text("created_by_clerk_id").notNull(),
+    createdByClerkId: text("created_by_clerk_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    updatedByClerkId: text("updated_by_clerk_id").notNull(),
+    updatedByClerkId: text("updated_by_clerk_id"),
   },
   (table) => [
     unique("feature_flag_user_overrides_flag_user_source_unique").on(

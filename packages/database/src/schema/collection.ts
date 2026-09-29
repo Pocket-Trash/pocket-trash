@@ -64,7 +64,7 @@ export const userCollection = pgTable(
     ),
     check(
       "user_collection_private_metadata_consistent",
-      sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
+      sql`(not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0) or (${table.isPrivate} and (num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0 or (${table.privateReason} is not null and ${table.privatedAt} is not null)))`,
     ),
   ],
 );
@@ -121,7 +121,7 @@ export const collectionItem = pgTable(
     ),
     check(
       "collection_item_private_metadata_consistent",
-      sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
+      sql`(not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0) or (${table.isPrivate} and (num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0 or (${table.privateReason} is not null and ${table.privatedAt} is not null)))`,
     ),
     check(
       "collection_item_description_length_valid",
@@ -148,7 +148,7 @@ export const collectionImage = pgTable(
     storageProvider: text("storage_provider").default("bunny").notNull(),
     objectPath: text("object_path").notNull(),
     url: text("url").notNull(),
-    uploadedByClerkId: text("uploaded_by_clerk_id").notNull(),
+    uploadedByClerkId: text("uploaded_by_clerk_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -184,7 +184,7 @@ export const product = pgTable(
     makerId: bigint("maker_id", { mode: "number" })
       .notNull()
       .references(() => maker.id, { onDelete: "restrict" }),
-    ownerClerkId: text("owner_clerk_id").notNull(),
+    ownerClerkId: text("owner_clerk_id"),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     description: text("description"),
@@ -209,7 +209,7 @@ export const product = pgTable(
     index("product_visibility_idx").on(table.isPrivate),
     check(
       "product_private_metadata_consistent",
-      sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
+      sql`(not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0) or (${table.isPrivate} and (num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0 or (${table.privateReason} is not null and ${table.privatedAt} is not null)))`,
     ),
     check(
       "product_description_length_valid",
@@ -235,7 +235,7 @@ export const productImage = pgTable(
     storageProvider: text("storage_provider").default("bunny").notNull(),
     objectPath: text("object_path").notNull(),
     url: text("url").notNull(),
-    uploadedByClerkId: text("uploaded_by_clerk_id").notNull(),
+    uploadedByClerkId: text("uploaded_by_clerk_id"),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
     deletedByClerkId: text("deleted_by_clerk_id"),
     deletedByRole: text("deleted_by_role", { enum: catalogDeletionRoles }),
@@ -258,7 +258,7 @@ export const productImage = pgTable(
     ),
     check(
       "product_image_deletion_metadata_consistent",
-      sql`num_nonnulls(${table.deletedAt}, ${table.deletedByClerkId}, ${table.deletedByRole}) in (0, 3)`,
+      sql`(${table.deletedAt} is null and ${table.deletedByClerkId} is null and ${table.deletedByRole} is null) or (${table.deletedAt} is not null and ${table.deletedByRole} is not null)`,
     ),
     check(
       "product_image_deleted_by_role_valid",
@@ -284,7 +284,7 @@ export const collectionItemImage = pgTable(
     storageProvider: text("storage_provider").default("bunny").notNull(),
     objectPath: text("object_path").notNull(),
     url: text("url").notNull(),
-    uploadedByClerkId: text("uploaded_by_clerk_id").notNull(),
+    uploadedByClerkId: text("uploaded_by_clerk_id"),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
     deletedByClerkId: text("deleted_by_clerk_id"),
     deletedByRole: text("deleted_by_role", { enum: catalogDeletionRoles }),
@@ -307,7 +307,7 @@ export const collectionItemImage = pgTable(
     ),
     check(
       "collection_item_image_deletion_metadata_consistent",
-      sql`num_nonnulls(${table.deletedAt}, ${table.deletedByClerkId}, ${table.deletedByRole}) in (0, 3)`,
+      sql`(${table.deletedAt} is null and ${table.deletedByClerkId} is null and ${table.deletedByRole} is null) or (${table.deletedAt} is not null and ${table.deletedByRole} is not null)`,
     ),
     check(
       "collection_item_image_deleted_by_role_valid",

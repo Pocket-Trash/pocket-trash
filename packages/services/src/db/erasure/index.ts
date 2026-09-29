@@ -9,6 +9,10 @@ import { schema } from "@package/database";
 import type { Logger } from "@package/logger";
 import { loggerMessages } from "@package/logger";
 import { and, asc, eq, inArray, lte, or, sql } from "drizzle-orm";
+import {
+  DatabaseErasureVerificationError,
+  eraseAccountDatabaseData,
+} from "./database.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LEASE_MS = 30 * 60 * 1000;
@@ -173,6 +177,20 @@ export function createErasureService(
         { attributes: { initiator: values.initiator } },
       );
       return receipt(request);
+    },
+
+    async eraseDatabase(targetClerkId: string): Promise<void> {
+      try {
+        await eraseAccountDatabaseData(
+          db,
+          requiredValue(targetClerkId, "Subject"),
+        );
+      } catch (error) {
+        if (error instanceof DatabaseErasureVerificationError) {
+          throw new ErasureOperationError(error.code);
+        }
+        throw error;
+      }
     },
 
     async getReceipt(input: {
