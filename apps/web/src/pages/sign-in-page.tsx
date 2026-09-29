@@ -4,7 +4,7 @@ import { clientEnv } from "@/env/client";
 
 export function SignInPage() {
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-4 py-10 text-foreground">
+    <main className="flex flex-1 items-center justify-center bg-background px-4 py-10 text-foreground">
       <ClerkLoading>
         <AuthPageSkeleton />
       </ClerkLoading>

@@ -10,9 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UserRouteImport } from './routes/user'
+import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as ResourcesRouteImport } from './routes/resources'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as FeedbackRouteImport } from './routes/feedback'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AutmogRouteImport } from './routes/autmog'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -67,9 +70,19 @@ const UserRoute = UserRouteImport.update({
   path: '/user',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
+  id: '/terms-of-service',
+  path: '/terms-of-service',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResourcesRoute = ResourcesRouteImport.update({
   id: '/resources',
   path: '/resources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NotificationsRoute = NotificationsRouteImport.update({
@@ -80,6 +93,11 @@ const NotificationsRoute = NotificationsRouteImport.update({
 const FeedbackRoute = FeedbackRouteImport.update({
   id: '/feedback',
   path: '/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AutmogRoute = AutmogRouteImport.update({
@@ -339,9 +357,12 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/autmog': typeof AutmogRouteWithChildren
+  '/contact': typeof ContactRoute
   '/feedback': typeof FeedbackRouteWithChildren
   '/notifications': typeof NotificationsRoute
+  '/privacy': typeof PrivacyRoute
   '/resources': typeof ResourcesRouteWithChildren
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
@@ -392,7 +413,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/autmog': typeof AutmogRouteWithChildren
+  '/contact': typeof ContactRoute
   '/notifications': typeof NotificationsRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -444,9 +468,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/autmog': typeof AutmogRouteWithChildren
+  '/contact': typeof ContactRoute
   '/feedback': typeof FeedbackRouteWithChildren
   '/notifications': typeof NotificationsRoute
+  '/privacy': typeof PrivacyRoute
   '/resources': typeof ResourcesRouteWithChildren
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
@@ -500,9 +527,12 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/autmog'
+    | '/contact'
     | '/feedback'
     | '/notifications'
+    | '/privacy'
     | '/resources'
+    | '/terms-of-service'
     | '/user'
     | '/autmog/$penId'
     | '/collections/$userId'
@@ -553,7 +583,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/autmog'
+    | '/contact'
     | '/notifications'
+    | '/privacy'
+    | '/terms-of-service'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
@@ -604,9 +637,12 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/autmog'
+    | '/contact'
     | '/feedback'
     | '/notifications'
+    | '/privacy'
     | '/resources'
+    | '/terms-of-service'
     | '/user'
     | '/autmog/$penId'
     | '/collections/$userId'
@@ -659,9 +695,12 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AutmogRoute: typeof AutmogRouteWithChildren
+  ContactRoute: typeof ContactRoute
   FeedbackRoute: typeof FeedbackRouteWithChildren
   NotificationsRoute: typeof NotificationsRoute
+  PrivacyRoute: typeof PrivacyRoute
   ResourcesRoute: typeof ResourcesRouteWithChildren
+  TermsOfServiceRoute: typeof TermsOfServiceRoute
   UserRoute: typeof UserRouteWithChildren
   CollectionsUserIdRoute: typeof CollectionsUserIdRoute
   CollectionsAddRoute: typeof CollectionsAddRoute
@@ -689,11 +728,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/terms-of-service': {
+      id: '/terms-of-service'
+      path: '/terms-of-service'
+      fullPath: '/terms-of-service'
+      preLoaderRoute: typeof TermsOfServiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/resources': {
       id: '/resources'
       path: '/resources'
       fullPath: '/resources'
       preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/notifications': {
@@ -708,6 +761,13 @@ declare module '@tanstack/react-router' {
       path: '/feedback'
       fullPath: '/feedback'
       preLoaderRoute: typeof FeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/autmog': {
@@ -1158,9 +1218,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AutmogRoute: AutmogRouteWithChildren,
+  ContactRoute: ContactRoute,
   FeedbackRoute: FeedbackRouteWithChildren,
   NotificationsRoute: NotificationsRoute,
+  PrivacyRoute: PrivacyRoute,
   ResourcesRoute: ResourcesRouteWithChildren,
+  TermsOfServiceRoute: TermsOfServiceRoute,
   UserRoute: UserRouteWithChildren,
   CollectionsUserIdRoute: CollectionsUserIdRoute,
   CollectionsAddRoute: CollectionsAddRoute,

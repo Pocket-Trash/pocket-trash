@@ -8,7 +8,6 @@ import { ChevronRight, Home } from "lucide-react";
 import type * as React from "react";
 import { toast } from "sonner";
 import { LanguageSelect } from "@/components/language-select";
-import { PageFooter } from "@/components/page-footer";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { updateLocaleSetting } from "@/lib/locale-api";
@@ -69,7 +68,7 @@ export function AppShell({
   return (
     <div
       className={cn(
-        "flex min-h-svh flex-col bg-background text-foreground",
+        "flex flex-1 flex-col bg-background text-foreground",
         contained && "container mx-auto",
       )}
     >
@@ -152,7 +151,6 @@ export function AppShell({
       >
         {children}
       </div>
-      <PageFooter />
     </div>
   );
 }

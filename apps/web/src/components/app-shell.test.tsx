@@ -16,10 +16,6 @@ vi.mock("@/components/language-select", () => ({
   LanguageSelect: () => <span>language-control</span>,
 }));
 
-vi.mock("@/components/page-footer", () => ({
-  PageFooter: () => <footer>footer</footer>,
-}));
-
 vi.mock("@/components/theme-toggle", () => ({
   ThemeToggle: () => <span>theme-control</span>,
 }));
@@ -49,6 +45,7 @@ describe("AppShell", () => {
     expect(html).not.toContain('data-slot="sidebar"');
     expect(html).toContain("container mx-auto");
     expect(html).not.toContain("flex-1 flex justify-center");
+    expect(html).not.toContain("<footer>footer</footer>");
 
     const language = html.indexOf("language-control");
     const theme = html.indexOf("theme-control");

@@ -10,7 +10,7 @@ export function NotFoundPage() {
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-4 py-10 text-foreground">
+    <main className="flex flex-1 items-center justify-center bg-background px-4 py-10 text-foreground">
       <section className="w-full max-w-md rounded-lg border border-border bg-card px-6 py-8 text-center text-card-foreground shadow-sm">
         <p className="text-[12px] font-semibold tracking-[1px] text-muted-foreground uppercase">
           {t("web.page.notFound.title")}

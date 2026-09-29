@@ -2,7 +2,7 @@
 
 # resource_downloads
 
-Append-only download events for resource versions.
+Unique authenticated user downloads per resource version.
 
 ## Columns
 

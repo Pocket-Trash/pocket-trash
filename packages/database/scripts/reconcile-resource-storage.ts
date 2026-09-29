@@ -6,7 +6,7 @@ export type StoredObject = {
   id: number;
   objectPath: string;
   resourceId: number;
-  table: "image" | "legacy-image" | "legacy-resource" | "resource";
+  table: "archive" | "image" | "legacy-image" | "legacy-resource" | "resource";
 };
 
 type BunnyObject = {
@@ -263,6 +263,20 @@ async function getStoredObjects(
     );
   }
 
+  if (
+    (await tableExists(database, "resource_versions")) &&
+    (await columnExists(database, "resource_versions", "archive_object_path"))
+  ) {
+    const rows = await database`
+      select id, resource_id, archive_object_path as object_path
+      from resource_versions
+      where archive_object_path is not null
+    `;
+    records.push(
+      ...rows.map((row) => storedObject(branchName, database, row, "archive")),
+    );
+  }
+
   return records;
 }
 
@@ -360,10 +374,16 @@ async function updateStoredObject(
       set preview_image_object_path = ${objectPath}, preview_image_url = ${url}
       where id = ${record.id}
     `;
-  } else {
+  } else if (record.table === "legacy-resource") {
     await record.database`
       update resource_versions
       set object_path = ${objectPath}, url = ${url}
+      where id = ${record.id}
+    `;
+  } else {
+    await record.database`
+      update resource_versions
+      set archive_object_path = ${objectPath}
       where id = ${record.id}
     `;
   }

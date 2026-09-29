@@ -52,7 +52,10 @@ describe("resource management routes", () => {
     "/admin/trash/",
     "/admin/trash/catalog-images",
     "/admin/trash/resources",
+    "/contact",
     "/notifications",
+    "/privacy",
+    "/terms-of-service",
     "/user/resources/trash",
   ])("registers %s", (fullPath) => {
     expect(

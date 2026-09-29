@@ -2,6 +2,7 @@ import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
 import {
+  createUncompressedZip,
   createUploadStorage,
   maxResourceImages,
   maxResourceSessionBytes,
@@ -74,7 +75,6 @@ export type ResourceVersionDetail = {
 
 export type ResourceFileDetail = {
   contentType: string;
-  downloadCount: number;
   fileName: string;
   id: number;
   size: number;
@@ -117,9 +117,11 @@ export type ResourceDirectoryItem = {
   categories: { id: number; name: string; slug: string }[];
   createdAt: Date;
   currentVersion: {
+    fileCount: number;
     fileId: number;
     fileName: string;
     id: number;
+    version: number;
   };
   downloadCount: number;
   coverImageUrl: string | null;
@@ -160,9 +162,14 @@ export type ResourcesService = {
     input: UploadResourceVersionInput,
   ): Promise<{ id: number; version: number }>;
   create(input: CreateResourceInput): Promise<{ id: number }>;
-  download(
+  downloadFile(
     resourceId: number,
     fileId: number,
+    viewer?: ResourceViewer,
+  ): Promise<string | null>;
+  downloadVersion(
+    resourceId: number,
+    versionId: number,
     viewer?: ResourceViewer,
   ): Promise<string | null>;
   getDetail(
@@ -299,43 +306,94 @@ export function createResourcesService(
         },
       );
     },
-    async download(resourceId, fileId, viewer = {}) {
+    async downloadFile(resourceId, fileId, viewer = {}) {
       return await logger.operation(
         loggerMessages.resources.download,
         async () => {
           assertPositiveInteger(resourceId, "resourceId");
           assertPositiveInteger(fileId, "fileId");
 
-          const [file] = await db
-            .select({
-              id: schema.resourceFiles.id,
-              objectPath: schema.resourceFiles.objectPath,
-            })
-            .from(schema.resourceFiles)
-            .innerJoin(
-              schema.resourceVersions,
-              eq(schema.resourceVersions.id, schema.resourceFiles.versionId),
-            )
-            .innerJoin(
-              schema.resources,
-              eq(schema.resources.id, schema.resourceVersions.resourceId),
-            )
-            .where(
-              sql`${schema.resourceFiles.id} = ${fileId}
-                and ${schema.resourceVersions.resourceId} = ${resourceId}
-                and ${schema.resources.deletedAt} is null
-                and (${schema.resources.isPrivate} = false
-                  or ${Boolean(viewer.isAdmin)}
-                  or ${schema.resources.uploaderClerkId} = ${viewer.clerkId ?? ""})`,
-            )
-            .limit(1);
+          const result = await db.execute<{
+            objectPath: string;
+            versionId: number;
+          }>(sql`
+            select resource_files.object_path as "objectPath",
+              resource_versions.id as "versionId"
+            from resource_files
+            inner join resource_versions
+              on resource_versions.id = resource_files.version_id
+            inner join resources
+              on resources.id = resource_versions.resource_id
+            where resource_files.id = ${fileId}
+              and resource_versions.resource_id = ${resourceId}
+              and resources.deleted_at is null
+              and (resources.is_private = false
+                or ${Boolean(viewer.isAdmin)}
+                or resources.uploader_clerk_id = ${viewer.clerkId ?? ""})
+            limit 1
+          `);
+          const file = result.rows[0];
 
           if (!file) return null;
 
-          await db.insert(schema.resourceDownloads).values({ fileId: file.id });
-          return await signUrl(file.objectPath);
+          const url = await signUrl(file.objectPath);
+          await recordResourceDownload(db, file.versionId, viewer.clerkId);
+          return url;
         },
         { attributes: { fileId, resourceId } },
+      );
+    },
+    async downloadVersion(resourceId, versionId, viewer = {}) {
+      return await logger.operation(
+        loggerMessages.resources.download,
+        async () => {
+          assertPositiveInteger(resourceId, "resourceId");
+          assertPositiveInteger(versionId, "versionId");
+          const result = await db.execute<{
+            archiveObjectPath: string | null;
+            fileName: string;
+            objectPath: string;
+            size: number;
+            version: number;
+            versionId: number;
+          }>(sql`
+            select resource_versions.id as "versionId",
+              resource_versions.version,
+              resource_versions.archive_object_path as "archiveObjectPath",
+              resource_files.file_name as "fileName",
+              resource_files.object_path as "objectPath",
+              resource_files.size
+            from resource_versions
+            inner join resources
+              on resources.id = resource_versions.resource_id
+            inner join resource_files
+              on resource_files.version_id = resource_versions.id
+            where resource_versions.id = ${versionId}
+              and resource_versions.resource_id = ${resourceId}
+              and resources.deleted_at is null
+              and (resources.is_private = false
+                or ${Boolean(viewer.isAdmin)}
+                or resources.uploader_clerk_id = ${viewer.clerkId ?? ""})
+            order by resource_files.id
+          `);
+          const firstFile = result.rows[0];
+          if (!firstFile || result.rows.length < 2) return null;
+
+          const objectPath =
+            firstFile.archiveObjectPath ??
+            (await createVersionArchive(
+              db,
+              storage,
+              resourceId,
+              versionId,
+              firstFile.version,
+              result.rows,
+            ));
+          const url = await signUrl(objectPath);
+          await recordResourceDownload(db, versionId, viewer.clerkId);
+          return url;
+        },
+        { attributes: { resourceId, versionId } },
       );
     },
     async getDetail(resourceId, viewer = {}) {
@@ -387,26 +445,30 @@ export function createResourcesService(
               db
                 .select({
                   createdAt: schema.resourceVersions.createdAt,
+                  downloadCount: count(schema.resourceDownloads.id),
                   id: schema.resourceVersions.id,
                   version: schema.resourceVersions.version,
                 })
                 .from(schema.resourceVersions)
+                .leftJoin(
+                  schema.resourceDownloads,
+                  eq(
+                    schema.resourceDownloads.versionId,
+                    schema.resourceVersions.id,
+                  ),
+                )
                 .where(eq(schema.resourceVersions.resourceId, resourceId))
+                .groupBy(schema.resourceVersions.id)
                 .orderBy(desc(schema.resourceVersions.version)),
               db
                 .select({
                   contentType: schema.resourceFiles.contentType,
-                  downloadCount: count(schema.resourceDownloads.id),
                   fileName: schema.resourceFiles.fileName,
                   id: schema.resourceFiles.id,
                   size: schema.resourceFiles.size,
                   versionId: schema.resourceFiles.versionId,
                 })
                 .from(schema.resourceFiles)
-                .leftJoin(
-                  schema.resourceDownloads,
-                  eq(schema.resourceDownloads.fileId, schema.resourceFiles.id),
-                )
                 .innerJoin(
                   schema.resourceVersions,
                   eq(
@@ -415,7 +477,6 @@ export function createResourcesService(
                   ),
                 )
                 .where(eq(schema.resourceVersions.resourceId, resourceId))
-                .groupBy(schema.resourceFiles.id)
                 .orderBy(schema.resourceFiles.id),
               db
                 .select({
@@ -436,16 +497,12 @@ export function createResourcesService(
               db
                 .select({ downloadCount: count(schema.resourceDownloads.id) })
                 .from(schema.resourceVersions)
-                .innerJoin(
-                  schema.resourceFiles,
-                  eq(
-                    schema.resourceFiles.versionId,
-                    schema.resourceVersions.id,
-                  ),
-                )
                 .leftJoin(
                   schema.resourceDownloads,
-                  eq(schema.resourceDownloads.fileId, schema.resourceFiles.id),
+                  eq(
+                    schema.resourceDownloads.versionId,
+                    schema.resourceVersions.id,
+                  ),
                 )
                 .where(eq(schema.resourceVersions.resourceId, resourceId)),
             ]);
@@ -455,14 +512,9 @@ export function createResourcesService(
             );
             return {
               ...version,
-              downloadCount: versionFiles.reduce(
-                (total, file) => total + file.downloadCount,
-                0,
-              ),
               files: versionFiles.map(
-                ({ contentType, downloadCount, fileName, id, size }) => ({
+                ({ contentType, fileName, id, size }) => ({
                   contentType,
-                  downloadCount,
                   fileName,
                   id,
                   size,
@@ -498,7 +550,7 @@ export function createResourcesService(
             privatedAt: resource.privatedAt,
             uploaderClerkId: resource.uploaderClerkId,
             uploaderUsername: record.uploaderUsername,
-            versions: versionDetails,
+            versions: versionDetails.slice(1),
           };
         },
         { attributes: { resourceId } },
@@ -558,6 +610,8 @@ export function createResourcesService(
               cover_image.object_path as "coverImageObjectPath",
               jsonb_build_object(
                 'id', current_version.id,
+                'version', current_version.version,
+                'fileCount', current_version.file_count,
                 'fileId', current_version.file_id,
                 'fileName', current_version.file_name
               ) as "currentVersion",
@@ -575,8 +629,11 @@ export function createResourcesService(
             from resources
             inner join users on users.clerk_id = resources.uploader_clerk_id
             inner join lateral (
-              select resource_versions.id, first_file.id as file_id,
-                first_file.file_name
+              select resource_versions.id, resource_versions.version,
+                first_file.id as file_id, first_file.file_name,
+                (select count(*)::int from resource_files
+                  where resource_files.version_id = resource_versions.id
+                ) as file_count
               from resource_versions
               inner join lateral (
                 select id, file_name
@@ -598,10 +655,8 @@ export function createResourcesService(
             ) cover_image on true
             left join resource_versions all_versions
               on all_versions.resource_id = resources.id
-            left join resource_files all_files
-              on all_files.version_id = all_versions.id
             left join resource_downloads
-              on resource_downloads.file_id = all_files.id
+              on resource_downloads.version_id = all_versions.id
             left join resources_to_categories
               on resources_to_categories.resource_id = resources.id
             left join resource_categories
@@ -612,7 +667,8 @@ export function createResourcesService(
               and ${schema.resources.deletedAt} is null
               and users.username is not null
               and ${filter}
-            group by resources.id, current_version.id, current_version.file_id,
+            group by resources.id, current_version.id, current_version.version,
+              current_version.file_count, current_version.file_id,
               current_version.file_name, cover_image.object_path, users.id
             order by resources.created_at desc
           `);
@@ -856,6 +912,11 @@ export function createResourcesService(
               from resource_versions
               where resource_versions.resource_id = resources.id
                 and resource_versions.object_path is not null
+              union
+              select resource_versions.archive_object_path
+              from resource_versions
+              where resource_versions.resource_id = resources.id
+                and resource_versions.archive_object_path is not null
             ) stored_objects on true
             where resources.id = ${input.resourceId}
               and resources.deleted_at is not null
@@ -1359,6 +1420,85 @@ async function deleteUploadedFiles(
   await Promise.allSettled(
     files.map(({ objectPath }) => storage.delete(objectPath)),
   );
+}
+
+async function createVersionArchive(
+  db: Database,
+  storage: UploadStorage,
+  resourceId: number,
+  versionId: number,
+  version: number,
+  files: Array<{ fileName: string; objectPath: string; size: number }>,
+): Promise<string> {
+  const archive = createUncompressedZip(
+    files.map((file) => ({
+      fileName: file.fileName,
+      open: async () => await storage.readFile(file.objectPath),
+      size: file.size,
+    })),
+  );
+  const candidate = storage.createArchiveTarget(
+    resourceId,
+    version,
+    archive.contentLength,
+  );
+  let recorded = false;
+
+  try {
+    await storage.putFile({
+      body: archive.body,
+      contentLength: archive.contentLength,
+      contentType: candidate.contentType,
+      objectPath: candidate.objectPath,
+    });
+    const result = await db.execute<{ objectPath: string }>(sql`
+      with selected_archive as (
+        update resource_versions
+        set archive_object_path = ${candidate.objectPath}
+        where id = ${versionId} and archive_object_path is null
+        returning archive_object_path
+      )
+      select archive_object_path as "objectPath"
+      from selected_archive
+      union all
+      select archive_object_path as "objectPath"
+      from resource_versions
+      where id = ${versionId}
+        and archive_object_path is not null
+        and not exists (select 1 from selected_archive)
+      limit 1
+    `);
+    const winner = result.rows[0]?.objectPath;
+    if (!winner) throw new Error("Resource archive could not be recorded.");
+    recorded = winner === candidate.objectPath;
+    if (!recorded) await storage.delete(candidate.objectPath);
+    return winner;
+  } catch (error) {
+    if (!recorded)
+      await Promise.allSettled([storage.delete(candidate.objectPath)]);
+    throw error;
+  }
+}
+
+async function recordResourceDownload(
+  db: Database,
+  versionId: number,
+  userClerkId?: string,
+): Promise<void> {
+  if (userClerkId) {
+    await db.execute(sql`
+      insert into resource_downloads (version_id, user_clerk_id)
+      values (${versionId}, ${userClerkId})
+      on conflict (version_id, user_clerk_id) do nothing
+    `);
+    return;
+  }
+
+  await db.execute(sql`
+    update resource_versions
+    set anonymous_download_count = anonymous_download_count + 1
+    where id = ${versionId}
+  `);
 }
 
 export function canViewResource(

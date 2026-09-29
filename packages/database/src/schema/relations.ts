@@ -97,8 +97,8 @@ export const resourceImagesRelations = relations(resourceImages, ({ one }) => ({
 export const resourceVersionsRelations = relations(
   resourceVersions,
   ({ many, one }) => ({
+    downloads: many(resourceDownloads),
     files: many(resourceFiles),
-    legacyDownloads: many(resourceDownloads),
     resource: one(resources, {
       fields: [resourceVersions.resourceId],
       references: [resources.id],
@@ -116,16 +116,12 @@ export const collectionImageRelations = relations(
   }),
 );
 
-export const resourceFilesRelations = relations(
-  resourceFiles,
-  ({ many, one }) => ({
-    downloads: many(resourceDownloads),
-    version: one(resourceVersions, {
-      fields: [resourceFiles.versionId],
-      references: [resourceVersions.id],
-    }),
+export const resourceFilesRelations = relations(resourceFiles, ({ one }) => ({
+  version: one(resourceVersions, {
+    fields: [resourceFiles.versionId],
+    references: [resourceVersions.id],
   }),
-);
+}));
 
 export const resourceCategoriesRelations = relations(
   resourceCategories,
@@ -166,11 +162,7 @@ export const resourcesToCategoriesRelations = relations(
 export const resourceDownloadsRelations = relations(
   resourceDownloads,
   ({ one }) => ({
-    file: one(resourceFiles, {
-      fields: [resourceDownloads.fileId],
-      references: [resourceFiles.id],
-    }),
-    legacyVersion: one(resourceVersions, {
+    version: one(resourceVersions, {
       fields: [resourceDownloads.versionId],
       references: [resourceVersions.id],
     }),

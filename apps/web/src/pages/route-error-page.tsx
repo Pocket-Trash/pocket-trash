@@ -101,7 +101,7 @@ export function RouteErrorView({
   };
 
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-4 py-10 text-foreground">
+    <main className="flex flex-1 items-center justify-center bg-background px-4 py-10 text-foreground">
       <section
         aria-labelledby="route-error-title"
         className="w-full max-w-xl rounded-lg border border-border bg-card px-6 py-8 text-card-foreground shadow-sm"
