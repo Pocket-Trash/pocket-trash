@@ -70,17 +70,20 @@ export function HomePage() {
   const t = useCatalogCopy();
   const cards = [
     {
-      image: "https://cdn.pocket-trash.app/assets/products.webp",
+      image:
+        "https://cdn.pocket-trash.app/assets/static/hero-cards/products.webp",
       key: "web.navigation.products" as const,
       to: "/products" as const,
     },
     {
-      image: "https://cdn.pocket-trash.app/assets/collections.webp",
+      image:
+        "https://cdn.pocket-trash.app/assets/static/hero-cards/collections.webp",
       key: "web.navigation.collections" as const,
       to: "/collections" as const,
     },
     {
-      image: "https://cdn.pocket-trash.app/assets/resosurces.webp",
+      image:
+        "https://cdn.pocket-trash.app/assets/static/hero-cards/resosurces.webp",
       key: "web.navigation.resources" as const,
       to: "/resources" as const,
     },
