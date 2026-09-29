@@ -128,3 +128,7 @@ export function useLocale() {
 
   return context;
 }
+
+export function useOptionalLocale() {
+  return React.useContext(LocaleContext)?.locale ?? null;
+}

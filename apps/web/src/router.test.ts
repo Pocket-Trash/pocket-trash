@@ -7,6 +7,26 @@ vi.mock("@/env/client", () => ({
 import { getRouter } from "./router";
 
 describe("resource management routes", () => {
+  it("uses one router-wide error component for every route", () => {
+    const router = getRouter();
+
+    expect(router.options.defaultErrorComponent).toBeDefined();
+    expect(
+      Object.values(router.routesById).every(
+        (route) => route.options.errorComponent === undefined,
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps the document shell outside the root route boundary", () => {
+    const rootRoute = getRouter().routesById.__root__;
+    const options = rootRoute.options as typeof rootRoute.options & {
+      shellComponent?: unknown;
+    };
+
+    expect(options.shellComponent).toBeDefined();
+  });
+
   it("uses the router not-found page without remounting root providers", () => {
     const rootRoute = getRouter().routesById.__root__;
 

@@ -8,9 +8,6 @@ import {
 
 export const Route = createFileRoute("/resources/")({
   component: ResourceDirectoryRoute,
-  errorComponent: () => (
-    <ResourceDirectoryStatusPage messageKey="web.resources.error.loadDirectory" />
-  ),
   head: () => ({
     meta: [{ title: formatTranslation("web.resources.directory.title") }],
   }),
