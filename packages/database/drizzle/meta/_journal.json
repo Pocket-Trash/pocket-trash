@@ -253,6 +253,13 @@
       "when": 1790715782788,
       "tag": "0035_small_magma",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790719399700,
+      "tag": "0036_normal_machine_man",
+      "breakpoints": true
     }
   ]
 }
