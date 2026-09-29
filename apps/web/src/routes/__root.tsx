@@ -7,6 +7,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import type * as React from "react";
+import { PageFooter } from "@/components/page-footer";
 import { logger } from "@/lib/logger";
 import { themeStorageKey } from "@/lib/theme";
 import type { ThemeBootstrapState } from "@/lib/theme-bootstrap";
@@ -41,6 +42,7 @@ export const Route = createRootRoute({
     );
 
     return {
+      copyrightYear: new Date().getFullYear(),
       settingsState,
       themeBootstrap: resolveServerThemeBootstrap(settingsState),
     };
@@ -121,23 +123,22 @@ function RootDocument({ children }: { children?: React.ReactNode }) {
 
 function RootContent() {
   const loaderData = Route.useLoaderData();
-  const themeBootstrap = loaderData?.themeBootstrap ?? {
-    serverTheme: null,
-    shouldUseServerTheme: false,
-  };
+  const themeBootstrap = loaderData.themeBootstrap;
 
   return (
     <>
       <script
         dangerouslySetInnerHTML={{
-          __html: bootstrapScript(
-            themeBootstrap,
-            loaderData?.settingsState ?? null,
-          ),
+          __html: bootstrapScript(themeBootstrap, loaderData.settingsState),
         }}
       />
-      <AppProviders initialSettingsState={loaderData?.settingsState ?? null}>
-        <Outlet />
+      <AppProviders initialSettingsState={loaderData.settingsState}>
+        <div className="flex min-h-svh flex-col bg-background text-foreground">
+          <div className="flex flex-1 flex-col">
+            <Outlet />
+          </div>
+          <PageFooter year={loaderData.copyrightYear} />
+        </div>
       </AppProviders>
     </>
   );
