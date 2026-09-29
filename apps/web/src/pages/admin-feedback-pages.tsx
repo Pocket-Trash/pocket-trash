@@ -12,7 +12,7 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { Search } from "lucide-react";
+import { CircleX, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
@@ -105,6 +105,7 @@ function AdminFeedbackPage({
   const [sort, setSort] = useState<Sort[]>([]);
   const [status, setStatus] = useState<ArchiveStatus | "">("");
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const loadRequestRef = useRef(0);
   const openerRef = useRef<HTMLElement | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const { locale } = useLocale();
@@ -122,12 +123,13 @@ function AdminFeedbackPage({
     nextStatus = status,
     nextSearch = search,
   ) {
+    const requestId = ++loadRequestRef.current;
     clearTimeout(searchTimerRef.current);
     setError(false);
     setLoading(true);
     try {
       const data = { offset: nextOffset, search: nextSearch, sort: nextSort };
-      setPage(
+      const nextPage =
         scope === "pending"
           ? await listPendingFeedback({ data })
           : scope === "active"
@@ -137,15 +139,16 @@ function AdminFeedbackPage({
                   ...data,
                   statuses: nextStatus ? [nextStatus] : [],
                 },
-              }),
-      );
+              });
+      if (requestId !== loadRequestRef.current) return;
+      setPage(nextPage);
       setOffset(nextOffset);
       setSort(nextSort);
       setStatus(nextStatus);
     } catch {
-      setError(true);
+      if (requestId === loadRequestRef.current) setError(true);
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
   }
 
@@ -268,9 +271,16 @@ function AdminFeedbackPage({
   }, [locale, scope, search, sort, status, t]);
   const table = useTable({ columns, data: page.items, features });
   const copyScope = scope === "pending" ? "requests" : scope;
+  const pageTitle = t(`web.feedback.admin.navigation.${copyScope}`);
 
   return (
-    <AppShell title={t(`web.feedback.admin.${copyScope}.title`)}>
+    <AppShell
+      breadcrumbItems={[
+        { label: t("web.navigation.admin") },
+        { label: t("web.feedback.title") },
+      ]}
+      title={pageTitle}
+    >
       <main
         aria-busy={loading}
         className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-6 md:px-6"
@@ -288,22 +298,41 @@ function AdminFeedbackPage({
               <label className="sr-only" htmlFor={`${scope}-feedback-search`}>
                 {t(`web.feedback.admin.${scope}.searchLabel`)}
               </label>
-              <Input
-                className="min-w-56 flex-1"
-                id={`${scope}-feedback-search`}
-                maxLength={120}
-                onChange={(event) => {
-                  const nextSearch = event.target.value;
-                  setSearch(nextSearch);
-                  searchTimerRef.current = scheduleAdminSearch(
-                    searchTimerRef.current,
-                    () => void load(0, sort, status, nextSearch),
-                  );
-                }}
-                placeholder={t(`web.feedback.admin.${scope}.searchPlaceholder`)}
-                type="search"
-                value={search}
-              />
+              <div className="relative min-w-56 flex-1">
+                <Input
+                  className="pr-10 [&::-webkit-search-cancel-button]:appearance-none"
+                  id={`${scope}-feedback-search`}
+                  maxLength={120}
+                  onChange={(event) => {
+                    const nextSearch = event.target.value;
+                    setSearch(nextSearch);
+                    searchTimerRef.current = scheduleAdminSearch(
+                      searchTimerRef.current,
+                      () => void load(0, sort, status, nextSearch),
+                    );
+                  }}
+                  placeholder={t(
+                    `web.feedback.admin.${scope}.searchPlaceholder`,
+                  )}
+                  type="search"
+                  value={search}
+                />
+                {search ? (
+                  <Button
+                    aria-label={t("web.action.clearSearch")}
+                    className="absolute top-1/2 right-1 size-7 -translate-y-1/2"
+                    onClick={() => {
+                      setSearch("");
+                      void load(0, sort, status, "");
+                    }}
+                    size="icon"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <CircleX aria-hidden="true" />
+                  </Button>
+                ) : null}
+              </div>
               {scope === "archive" ? (
                 <select
                   aria-label={t("web.feedback.admin.archive.statusLabel")}
@@ -518,17 +547,33 @@ function AdminFeedbackDialog({
             onSubmit={async (event) => {
               event.preventDefault();
               const data = new FormData(event.currentTarget);
+              const approveAfterSave =
+                (event.nativeEvent as SubmitEvent).submitter?.getAttribute(
+                  "value",
+                ) === "approve" && current.status === "pending";
+              const input = {
+                category: String(data.get("category") ?? ""),
+                description: String(data.get("description") ?? ""),
+                feedbackId: item.id,
+                title: String(data.get("title") ?? ""),
+              };
+              if (approveAfterSave && !input.category) {
+                toast.error(t("web.feedback.admin.requests.categoryRequired"));
+                return;
+              }
               setSaving(true);
               try {
-                await updateAdminFeedback({
-                  data: {
-                    category: String(data.get("category") ?? ""),
-                    description: String(data.get("description") ?? ""),
-                    feedbackId: item.id,
-                    title: String(data.get("title") ?? ""),
-                  },
-                });
-                toast.success(t("web.feedback.admin.requests.updated"));
+                await updateAdminFeedback({ data: input });
+                if (approveAfterSave) {
+                  await approveFeedback({ data: { feedbackId: item.id } });
+                }
+                toast.success(
+                  t(
+                    approveAfterSave
+                      ? "web.feedback.admin.requests.approved"
+                      : "web.feedback.admin.requests.updated",
+                  ),
+                );
                 await onChanged();
               } catch {
                 toast.error(t("web.feedback.admin.requests.actionFailed"));
@@ -590,6 +635,16 @@ function AdminFeedbackDialog({
               <Button disabled={saving} type="submit">
                 {t("action.save")}
               </Button>
+              {current.status === "pending" ? (
+                <Button
+                  disabled={saving}
+                  name="intent"
+                  type="submit"
+                  value="approve"
+                >
+                  {t("web.feedback.admin.requests.saveAndApprove")}
+                </Button>
+              ) : null}
               <Button
                 onClick={() => setEditing(false)}
                 type="button"

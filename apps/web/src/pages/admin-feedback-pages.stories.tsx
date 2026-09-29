@@ -1,9 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect, mocked, waitFor, within } from "storybook/test";
 import {
+  approveFeedback,
   listAdminActiveFeedback,
   listArchivedFeedback,
+  listFeedbackMergeTargets,
   listPendingFeedback,
+  updateAdminFeedback,
 } from "@/lib/feedback";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import {
@@ -45,6 +48,9 @@ const meta = {
       hasNext: false,
       items: [{ ...request, status: "completed" }],
     });
+    mocked(listFeedbackMergeTargets).mockResolvedValue([]);
+    mocked(updateAdminFeedback).mockResolvedValue(undefined);
+    mocked(approveFeedback).mockResolvedValue(undefined);
   },
   component: AdminFeedbackRequestsPage,
   decorators: [
@@ -63,6 +69,12 @@ type Story = StoryObj<typeof meta>;
 
 export const Requests: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
+    const breadcrumbs = within(
+      within(canvas.getByRole("banner")).getByRole("navigation"),
+    );
+    await expect(breadcrumbs.getByText("Admin")).toBeVisible();
+    await expect(breadcrumbs.getByText("Feedback")).toBeVisible();
+    await expect(breadcrumbs.getByText("Requests")).toBeVisible();
     const opener = canvas.getByRole("button", {
       name: "Manage Saved searches",
     });
@@ -78,10 +90,23 @@ export const Requests: Story = {
       request.title,
     );
     await userEvent.click(
-      within(dialog).getByRole("button", { name: "Cancel" }),
+      within(dialog).getByRole("button", { name: "Save & Approve" }),
     );
-    await userEvent.click(
-      within(dialog).getByRole("button", { name: "Close" }),
+    await waitFor(() =>
+      expect(mocked(updateAdminFeedback)).toHaveBeenCalledWith({
+        data: {
+          category: "feature",
+          description: request.description,
+          feedbackId: request.id,
+          title: request.title,
+        },
+      }),
+    );
+    await expect(mocked(approveFeedback)).toHaveBeenCalledWith({
+      data: { feedbackId: request.id },
+    });
+    await waitFor(() =>
+      expect(mocked(listFeedbackMergeTargets)).toHaveBeenCalled(),
     );
     await expect(opener).toHaveFocus();
     await userEvent.click(
@@ -109,6 +134,12 @@ export const Active: Story = {
     />
   ),
   play: async ({ canvas, canvasElement, userEvent }) => {
+    const breadcrumbs = within(
+      within(canvas.getByRole("banner")).getByRole("navigation"),
+    );
+    await expect(breadcrumbs.getByText("Admin")).toBeVisible();
+    await expect(breadcrumbs.getByText("Feedback")).toBeVisible();
+    await expect(breadcrumbs.getByText("Planned")).toBeVisible();
     const opener = canvas.getByRole("button", {
       name: "Manage Saved searches",
     });
@@ -124,10 +155,23 @@ export const Active: Story = {
       within(dialog).getByRole("button", { name: "Close" }),
     );
     await expect(opener).toHaveFocus();
-    await userEvent.type(
-      canvas.getByRole("searchbox", { name: "Search active feedback" }),
-      "saved",
+    const search = canvas.getByRole("searchbox", {
+      name: "Search planned feedback",
+    });
+    await userEvent.type(search, "saved");
+    await waitFor(() =>
+      expect(mocked(listAdminActiveFeedback)).toHaveBeenCalledWith({
+        data: { offset: 0, search: "saved", sort: [] },
+      }),
     );
+    await userEvent.click(canvas.getByRole("button", { name: "Clear search" }));
+    await expect(search).toHaveValue("");
+    await waitFor(() =>
+      expect(mocked(listAdminActiveFeedback)).toHaveBeenCalledWith({
+        data: { offset: 0, search: "", sort: [] },
+      }),
+    );
+    await userEvent.type(search, "saved");
     await waitFor(() =>
       expect(mocked(listAdminActiveFeedback)).toHaveBeenCalledWith({
         data: { offset: 0, search: "saved", sort: [] },
@@ -169,6 +213,12 @@ export const Archive: Story = {
     />
   ),
   play: async ({ canvas, canvasElement, userEvent }) => {
+    const breadcrumbs = within(
+      within(canvas.getByRole("banner")).getByRole("navigation"),
+    );
+    await expect(breadcrumbs.getByText("Admin")).toBeVisible();
+    await expect(breadcrumbs.getByText("Feedback")).toBeVisible();
+    await expect(breadcrumbs.getByText("Archive")).toBeVisible();
     const opener = canvas.getByRole("button", {
       name: "Manage Saved searches",
     });

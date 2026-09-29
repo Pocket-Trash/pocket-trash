@@ -479,13 +479,7 @@ function VoteButton({
   const [saving, setSaving] = useState(false);
   const t = useFeedbackCopy();
 
-  if (item.hasPermanentVote) {
-    return (
-      <span className="self-center text-xs text-muted-foreground">
-        {t("web.feedback.vote.permanent")}
-      </span>
-    );
-  }
+  if (item.hasPermanentVote) return null;
 
   return (
     <Button

@@ -64,6 +64,22 @@ export const ActiveBoard: Story = {
   },
 };
 
+export const PermanentVoteHidden: Story = {
+  render: () => (
+    <FeedbackBoardPage
+      initialItems={[{ ...requested, hasPermanentVote: true, hasVoted: true }]}
+    />
+  ),
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.queryByText("Your submission vote is permanent."),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "Remove vote" }),
+    ).not.toBeInTheDocument();
+  },
+};
+
 export const EmptyBoard: Story = {
   render: () => <FeedbackBoardPage initialItems={[]} />,
 };
