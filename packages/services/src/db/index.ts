@@ -55,7 +55,10 @@ export type {
   UserCollectionSummary,
 } from "./catalog/index.js";
 export type {
+  FeedbackListItem,
+  FeedbackPage,
   FeedbackService,
+  ListMyFeedbackOptions,
   SubmitFeedbackInput,
   UpdatePendingFeedbackInput,
 } from "./feedback/index.js";

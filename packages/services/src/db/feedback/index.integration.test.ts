@@ -33,7 +33,7 @@ describe("feedback lifecycle", () => {
         status: "pending",
         title: "Saved searches",
       });
-      expect(await service.listMine("user-test")).toEqual([
+      expect((await service.listMine("user-test")).items).toEqual([
         expect.objectContaining({ id: created.id, voteCount: 1 }),
       ]);
       expect((await service.listPending()).items).toEqual([
@@ -100,7 +100,10 @@ describe("feedback lifecycle", () => {
       expect(
         results.filter(({ status }) => status === "rejected"),
       ).toHaveLength(1);
-      expect(await service.listMine("user-at-limit")).toHaveLength(60);
+      expect((await service.listMine("user-at-limit")).items).toHaveLength(30);
+      expect(
+        (await service.listMine("user-at-limit", { offset: 30 })).items,
+      ).toHaveLength(30);
     } finally {
       await client.close();
     }
@@ -154,7 +157,7 @@ describe("feedback lifecycle", () => {
       await service.approve(approved.id);
       await service.deny(denied.id);
 
-      expect(await service.listMine("user-test")).toEqual([
+      expect((await service.listMine("user-test")).items).toEqual([
         expect.objectContaining({
           category: "feature",
           id: approved.id,
@@ -193,6 +196,238 @@ describe("feedback lifecycle", () => {
       expect(firstPage.hasNext).toBe(true);
       expect(secondPage.items).toHaveLength(1);
       expect(secondPage.hasNext).toBe(false);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("searches before the active cap and groups by status then votes", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      await migrate(client);
+      const [needle, popular] = await db
+        .insert(schema.feedback)
+        .values([
+          {
+            category: "feature",
+            description: "Needle description",
+            status: "requested",
+            submitterClerkId: "submitter-needle",
+            title: "Old needle",
+          },
+          {
+            category: "feature",
+            description: "Popular request",
+            status: "requested",
+            submitterClerkId: "submitter-popular",
+            title: "Popular",
+          },
+          ...Array.from({ length: 40 }, (_, index) => ({
+            category: "feature" as const,
+            description: `Filler ${index}`,
+            status: "requested" as const,
+            submitterClerkId: `submitter-${index}`,
+            title: `Filler ${index}`,
+          })),
+          {
+            category: "feature",
+            description: "Planned request",
+            status: "planned",
+            submitterClerkId: "submitter-planned",
+            title: "Planned",
+          },
+          {
+            category: "feature",
+            description: "In progress request",
+            status: "in_progress",
+            submitterClerkId: "submitter-progress",
+            title: "In progress",
+          },
+        ])
+        .returning();
+      if (!needle || !popular) throw new Error("Failed to seed feedback.");
+      await db.insert(schema.feedbackVotes).values([
+        { feedbackId: popular.id, voterClerkId: "voter-1" },
+        { feedbackId: popular.id, voterClerkId: "voter-2" },
+      ]);
+      const service = createFeedbackService(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      );
+
+      const active = await service.listActive("viewer");
+      const searched = await service.listActive("viewer", "old description");
+
+      expect(active).toHaveLength(40);
+      expect(active[0]?.status).toBe("in_progress");
+      expect(active[1]?.status).toBe("planned");
+      expect(active.findIndex(({ id }) => id === popular.id)).toBeLessThan(
+        active.findIndex(({ status }) => status === "requested") + 2,
+      );
+      expect(active.some(({ id }) => id === needle.id)).toBe(false);
+      expect(searched).toEqual([
+        expect.objectContaining({ id: needle.id, voteCount: 0 }),
+      ]);
+      expect(searched[0]).not.toHaveProperty("submitterClerkId");
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("toggles ordinary votes without removing a submitter's permanent vote", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      await migrate(client);
+      const service = createFeedbackService(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      );
+      const created = await service.submit({
+        category: "feature",
+        description: "Vote safely",
+        submitterClerkId: "submitter",
+        title: "Permanent vote",
+      });
+      await service.approve(created.id);
+
+      await expect(service.toggleVote(created.id, "submitter")).resolves.toBe(
+        true,
+      );
+      await expect(service.toggleVote(created.id, "voter")).resolves.toBe(true);
+      expect(await service.listActive("voter")).toEqual([
+        expect.objectContaining({
+          hasPermanentVote: false,
+          hasVoted: true,
+          id: created.id,
+          voteCount: 2,
+        }),
+      ]);
+
+      await expect(service.toggleVote(created.id, "voter")).resolves.toBe(
+        false,
+      );
+      expect(await service.listActive("submitter")).toEqual([
+        expect.objectContaining({
+          hasPermanentVote: true,
+          hasVoted: true,
+          id: created.id,
+          voteCount: 1,
+        }),
+      ]);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("suggests at most five active duplicates and excludes pending and completed feedback", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      await migrate(client);
+      await db.insert(schema.feedback).values([
+        ...Array.from({ length: 6 }, (_, index) => ({
+          category: "feature" as const,
+          description: `Save a search ${index}`,
+          status: "requested" as const,
+          submitterClerkId: `active-${index}`,
+          title: `Saved search ${index}`,
+        })),
+        {
+          description: "Saved search pending",
+          status: "pending",
+          submitterClerkId: "pending",
+          title: "Saved search pending",
+        },
+        {
+          category: "feature",
+          description: "Saved search completed",
+          status: "completed",
+          submitterClerkId: "completed",
+          title: "Saved search completed",
+        },
+        {
+          category: "feature",
+          description: "A chair for email alerts",
+          status: "requested",
+          submitterClerkId: "substring-only",
+          title: "Email alerts",
+        },
+      ]);
+      const service = createFeedbackService(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      );
+
+      const duplicates = await service.findDuplicates("viewer", "Saved search");
+
+      expect(duplicates).toHaveLength(5);
+      expect(duplicates.every(({ status }) => status === "requested")).toBe(
+        true,
+      );
+      expect(duplicates[0]).not.toHaveProperty("submitterClerkId");
+      await expect(service.findDuplicates("viewer", "ai")).resolves.toEqual([]);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("searches and paginates eligible My Requests before applying the page limit", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      await migrate(client);
+      const [needle] = await db
+        .insert(schema.feedback)
+        .values([
+          {
+            category: "feature",
+            description: "Needle request",
+            status: "completed",
+            submitterClerkId: "owner",
+            title: "Old needle",
+          },
+          ...Array.from({ length: 30 }, (_, index) => ({
+            category: "feature" as const,
+            description: `Visible ${index}`,
+            status: "requested" as const,
+            submitterClerkId: "owner",
+            title: `Visible ${index}`,
+          })),
+          {
+            category: "feature",
+            description: "Hidden denied",
+            status: "denied",
+            submitterClerkId: "owner",
+            title: "Hidden denied",
+          },
+        ])
+        .returning();
+      if (!needle) throw new Error("Failed to seed feedback.");
+      const service = createFeedbackService(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      );
+
+      const firstPage = await service.listMine("owner");
+      const searched = await service.listMine("owner", {
+        search: "needle",
+      });
+
+      expect(await service.hasMine("owner")).toBe(true);
+      expect(firstPage.items).toHaveLength(30);
+      expect(firstPage.hasNext).toBe(true);
+      expect(searched).toEqual({
+        hasNext: false,
+        items: [
+          expect.objectContaining({ id: needle.id, status: "completed" }),
+        ],
+      });
     } finally {
       await client.close();
     }

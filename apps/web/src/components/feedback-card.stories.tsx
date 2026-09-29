@@ -43,3 +43,9 @@ export const Requested: Story = {
     voteCount: 8,
   },
 };
+
+export const Planned: Story = { args: { status: "planned" } };
+
+export const InProgress: Story = { args: { status: "in_progress" } };
+
+export const Completed: Story = { args: { status: "completed" } };

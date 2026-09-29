@@ -4,7 +4,7 @@ import { listMyFeedback } from "@/lib/feedback";
 import { MyFeedbackPage } from "@/pages/feedback-pages";
 
 export const Route = createFileRoute("/feedback/my-requests")({
-  loader: async () => await listMyFeedback(),
+  loader: async () => await listMyFeedback({ data: { offset: 0, search: "" } }),
   component: MyFeedbackRoute,
   head: () => ({
     meta: [{ title: formatTranslation("web.feedback.myRequests.title") }],
@@ -12,5 +12,5 @@ export const Route = createFileRoute("/feedback/my-requests")({
 });
 
 function MyFeedbackRoute() {
-  return <MyFeedbackPage items={Route.useLoaderData()} />;
+  return <MyFeedbackPage initialPage={Route.useLoaderData()} />;
 }

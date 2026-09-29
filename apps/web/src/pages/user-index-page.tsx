@@ -8,6 +8,7 @@ import {
   FlaskConical,
   Folder,
   ListTodo,
+  MessageSquare,
   MessageSquarePlus,
   Settings,
   User,
@@ -15,7 +16,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { useLocale } from "@/providers/locale-provider";
 
-export function UserIndexPage() {
+export function UserIndexPage({ hasFeedback }: { hasFeedback: boolean }) {
   const { locale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const links = [
@@ -45,15 +46,24 @@ export function UserIndexPage() {
       to: "/user/settings/beta-features" as const,
     },
     {
+      icon: MessageSquare,
+      label: t("web.feedback.title"),
+      to: "/feedback" as const,
+    },
+    {
       icon: MessageSquarePlus,
       label: t("web.feedback.new.title"),
       to: "/feedback/new" as const,
     },
-    {
-      icon: ListTodo,
-      label: t("web.feedback.myRequests.title"),
-      to: "/feedback/my-requests" as const,
-    },
+    ...(hasFeedback
+      ? [
+          {
+            icon: ListTodo,
+            label: t("web.feedback.myRequests.title"),
+            to: "/feedback/my-requests" as const,
+          },
+        ]
+      : []),
   ];
 
   return (

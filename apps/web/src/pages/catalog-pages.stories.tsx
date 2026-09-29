@@ -225,7 +225,7 @@ export const UserCollections: Story = {
   ),
 };
 
-export const User: Story = { render: () => <UserIndexPage /> };
+export const User: Story = { render: () => <UserIndexPage hasFeedback /> };
 
 function image(id: number, fileName: string, path: string): CatalogImage {
   return {
