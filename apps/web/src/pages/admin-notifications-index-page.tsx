@@ -4,7 +4,7 @@ import {
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
 import { Bell } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
+import { AdminPageShell } from "@/components/admin-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
 export function AdminNotificationsIndexPage() {
@@ -22,8 +22,9 @@ export function AdminNotificationsIndexPage() {
   ];
 
   return (
-    <AppShell
+    <AdminPageShell
       breadcrumbItems={[{ label: t("web.navigation.admin"), to: "/admin" }]}
+      section="notifications"
       title={t("web.admin.notifications.title")}
     >
       <main className="grid w-full max-w-3xl gap-3 p-4 md:grid-cols-2 md:p-6">
@@ -38,6 +39,6 @@ export function AdminNotificationsIndexPage() {
           </Link>
         ))}
       </main>
-    </AppShell>
+    </AdminPageShell>
   );
 }

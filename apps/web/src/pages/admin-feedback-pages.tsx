@@ -6,7 +6,6 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { Link } from "@tanstack/react-router";
 import {
   createColumnHelper,
   tableFeatures,
@@ -15,7 +14,7 @@ import {
 import { CircleX, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/app-shell";
+import { AdminPageShell } from "@/components/admin-page-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -295,18 +294,18 @@ function AdminFeedbackPage({
   const searchCopyScope = scope === "archive" ? "archive" : "active";
 
   return (
-    <AppShell
+    <AdminPageShell
       breadcrumbItems={[
         { label: t("web.navigation.admin"), to: "/admin" },
         { label: t("web.feedback.title"), to: "/admin/feedback" },
       ]}
+      section="feedback"
       title={pageTitle}
     >
       <main
         aria-busy={loading}
-        className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-6 md:px-6"
+        className="grid w-full max-w-6xl gap-4 px-4 py-6 md:px-6"
       >
-        <AdminFeedbackNav />
         {scope !== "pending" ? (
           <search>
             <form
@@ -501,7 +500,7 @@ function AdminFeedbackPage({
           openerRef.current?.focus();
         }}
       />
-    </AppShell>
+    </AdminPageShell>
   );
 }
 
@@ -779,45 +778,6 @@ function AdminFeedbackDialog({
         </Button>
       </div>
     </dialog>
-  );
-}
-
-function AdminFeedbackNav() {
-  const t = useCopy();
-  return (
-    <nav
-      aria-label={t("web.feedback.admin.requests.title")}
-      className="flex flex-wrap gap-2"
-    >
-      <Button
-        nativeButton={false}
-        render={<Link to="/admin/feedback" />}
-        variant="outline"
-      >
-        {t("web.feedback.admin.navigation.allActive")}
-      </Button>
-      <Button
-        nativeButton={false}
-        render={<Link to="/admin/feedback/requests" />}
-        variant="outline"
-      >
-        {t("web.feedback.admin.navigation.requests")}
-      </Button>
-      <Button
-        nativeButton={false}
-        render={<Link to="/admin/feedback/planned" />}
-        variant="outline"
-      >
-        {t("web.feedback.admin.navigation.active")}
-      </Button>
-      <Button
-        nativeButton={false}
-        render={<Link to="/admin/feedback/archive" />}
-        variant="outline"
-      >
-        {t("web.feedback.admin.navigation.archive")}
-      </Button>
-    </nav>
   );
 }
 

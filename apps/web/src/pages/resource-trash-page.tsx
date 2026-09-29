@@ -6,7 +6,7 @@ import {
 import { RotateCcw, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/app-shell";
+import { AdminPageShell } from "@/components/admin-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UserPageShell } from "@/components/user-page-shell";
@@ -44,7 +44,7 @@ export function AdminResourceTrashPage({
 }) {
   const { locale } = useLocale();
   return (
-    <AppShell
+    <AdminPageShell
       breadcrumbItems={[
         {
           label: formatTranslation("web.navigation.admin", {}, locale),
@@ -55,9 +55,10 @@ export function AdminResourceTrashPage({
           to: "/admin/trash",
         },
       ]}
+      section="trash"
       title={formatTranslation("web.resources.trash.adminTitle", {}, locale)}
     >
-      <main className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6">
+      <main className="w-full max-w-5xl px-4 py-6 md:px-6">
         <ResourceTrashList
           emptyKey="web.resources.trash.adminEmpty"
           initialResources={initialResources}
@@ -66,7 +67,7 @@ export function AdminResourceTrashPage({
           showActor
         />
       </main>
-    </AppShell>
+    </AdminPageShell>
   );
 }
 

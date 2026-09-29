@@ -2,7 +2,7 @@ import type { CatalogImageTrashItem } from "@package/services";
 import { formatTranslation } from "@pocket-trash/localizations";
 import { RotateCcw } from "lucide-react";
 import { useState } from "react";
-import { AppShell } from "@/components/app-shell";
+import { AdminPageShell } from "@/components/admin-page-shell";
 import { Button } from "@/components/ui/button";
 import { restoreCatalogImage } from "@/lib/catalog-api";
 import { useLocale } from "@/providers/locale-provider";
@@ -19,11 +19,12 @@ export function CatalogImageTrashPage({
     values: Record<string, unknown> = {},
   ) => formatTranslation(key, values, locale);
   return (
-    <AppShell
+    <AdminPageShell
       breadcrumbItems={[
         { label: t("web.navigation.admin"), to: "/admin" },
         { label: t("web.admin.trash.title"), to: "/admin/trash" },
       ]}
+      section="trash"
       title={t("web.admin.hub.catalogImageTrash")}
     >
       <main className="grid max-w-4xl gap-3 p-6">
@@ -65,6 +66,6 @@ export function CatalogImageTrashPage({
           </article>
         ))}
       </main>
-    </AppShell>
+    </AdminPageShell>
   );
 }

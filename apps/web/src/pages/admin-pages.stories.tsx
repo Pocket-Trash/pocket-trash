@@ -54,7 +54,7 @@ type Story = StoryObj<typeof meta>;
 export const Hub: Story = {
   play: async ({ canvas }) => {
     const main = within(
-      canvas.getByRole("region", {
+      canvas.getByRole("main", {
         name: "Manage Pocket Trash administration.",
       }),
     );
@@ -90,11 +90,14 @@ export const Hub: Story = {
 export const NotificationsHub: Story = {
   render: () => <AdminNotificationsIndexPage />,
   play: async ({ canvas }) => {
+    const sidebar = within(
+      canvas.getByRole("navigation", { name: "Admin Panel" }),
+    );
     await expect(
-      canvas.getByRole("link", { name: "Feedback notifications" }),
+      sidebar.getByRole("link", { name: "Feedback notifications" }),
     ).toHaveAttribute("href", "/admin/notifications/feedback");
     await expect(
-      canvas.getByRole("link", { name: "Resource notifications" }),
+      sidebar.getByRole("link", { name: "Resource notifications" }),
     ).toHaveAttribute("href", "/admin/notifications/resources");
   },
 };
@@ -102,11 +105,14 @@ export const NotificationsHub: Story = {
 export const TrashHub: Story = {
   render: () => <AdminTrashIndexPage />,
   play: async ({ canvas }) => {
+    const sidebar = within(
+      canvas.getByRole("navigation", { name: "Admin Panel" }),
+    );
     await expect(
-      canvas.getByRole("link", { name: "Resource trash" }),
+      sidebar.getByRole("link", { name: "Resource trash" }),
     ).toHaveAttribute("href", "/admin/trash/resources");
     await expect(
-      canvas.getByRole("link", { name: "Catalog image trash" }),
+      sidebar.getByRole("link", { name: "Catalog image trash" }),
     ).toHaveAttribute("href", "/admin/trash/catalog-images");
   },
 };

@@ -15,7 +15,7 @@ import { updateLocaleSetting } from "@/lib/locale-api";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
-type AppShellProps = {
+export type AppShellProps = {
   breadcrumbItems?: Array<
     | {
         label: string;

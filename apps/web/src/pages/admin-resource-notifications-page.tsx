@@ -7,7 +7,7 @@ import { Link } from "@tanstack/react-router";
 import { Check, ShieldMinus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/app-shell";
+import { AdminPageShell } from "@/components/admin-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { listResourceNotifications } from "@/lib/resources";
@@ -53,14 +53,15 @@ export function AdminResourceNotificationsPage({
   }
 
   return (
-    <AppShell
+    <AdminPageShell
       breadcrumbItems={[
         { label: t("web.navigation.admin"), to: "/admin" },
         { label: t("web.admin.notifications.title"), to: "/notifications" },
       ]}
+      section="notifications"
       title={t("web.resources.notification.title")}
     >
-      <main className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-6 md:px-6">
+      <main className="grid w-full max-w-5xl gap-6 px-4 py-6 md:px-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="m-0 text-sm text-muted-foreground">
             {t("web.resources.notification.description")}
@@ -259,7 +260,7 @@ export function AdminResourceNotificationsPage({
           </form>
         </dialog>
       </main>
-    </AppShell>
+    </AdminPageShell>
   );
 }
 

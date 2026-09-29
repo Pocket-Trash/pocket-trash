@@ -146,9 +146,20 @@ export const Active: Story = {
     await expect(breadcrumbs.getByText("Admin")).toBeVisible();
     await expect(breadcrumbs.getByText("Feedback")).toBeVisible();
     await expect(breadcrumbs.getByText("Planned")).toBeVisible();
-    await expect(
-      canvas.getByRole("button", { name: "Planned" }),
-    ).toHaveAttribute("href", "/admin/feedback/planned");
+    const sidebar = within(
+      canvas.getByRole("navigation", { name: "Admin Panel" }),
+    );
+    for (const [name, href] of [
+      ["All active", "/admin/feedback"],
+      ["Requests", "/admin/feedback/requests"],
+      ["Planned", "/admin/feedback/planned"],
+      ["Archive", "/admin/feedback/archive"],
+    ] as const) {
+      await expect(sidebar.getByRole("link", { name })).toHaveAttribute(
+        "href",
+        href,
+      );
+    }
     const opener = canvas.getByRole("button", {
       name: "Manage Saved searches",
     });
