@@ -32,7 +32,7 @@ const resource = {
 } satisfies ResourceCardItem;
 
 describe("resource card", () => {
-  it("downloads one file directly and labels multi-file versions as ZIPs", () => {
+  it("distinguishes direct file and multi-file archive downloads", () => {
     const single = renderToStaticMarkup(<ResourceCard resource={resource} />);
     const multiple = renderToStaticMarkup(
       <ResourceCard
@@ -43,9 +43,10 @@ describe("resource card", () => {
       />,
     );
 
-    expect(single).toContain(">Download</button>");
-    expect(single).not.toContain("Download ZIP");
-    expect(multiple).toContain("Download ZIP");
+    expect(single).toContain("lucide-file-down");
+    expect(single).not.toContain("lucide-file-archive");
+    expect(multiple).toContain("lucide-file-archive");
+    expect(multiple).toContain(">Download</button>");
     expect(multiple).toContain("Downloads: 4");
   });
 });

@@ -21,7 +21,7 @@ import { ResourceVisibilityToggle } from "@/components/resource-visibility-toggl
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  downloadResource,
+  downloadResourceFile,
   downloadResourceVersion,
   type getResourceDetail,
   softDeleteResource,
@@ -53,7 +53,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
   ) {
     setDownloadingFileId(file.id);
     try {
-      const url = await downloadResource({
+      const url = await downloadResourceFile({
         data: { fileId: file.id, resourceId: detail.id },
       });
       if (!url) throw new Error("missing download");
@@ -379,7 +379,7 @@ function VersionCard({
               variant="outline"
             >
               <FileArchive />
-              {t("web.resources.action.download")} ZIP
+              {t("web.resources.action.download")}
             </Button>
           ) : null}
           {collapsible ? (

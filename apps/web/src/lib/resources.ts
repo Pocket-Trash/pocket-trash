@@ -260,7 +260,7 @@ export function parseResourceDirectoryInput(input: unknown) {
   return { categorySlugs: categorySlugs as string[] };
 }
 
-export const downloadResource = createServerFn({ method: "POST" })
+export const downloadResourceFile = createServerFn({ method: "POST" })
   .validator(parseResourceDownload)
   .handler(async ({ data }) => {
     const { s } = await import("@/lib/services");

@@ -550,7 +550,7 @@ export function createResourcesService(
             privatedAt: resource.privatedAt,
             uploaderClerkId: resource.uploaderClerkId,
             uploaderUsername: record.uploaderUsername,
-            versions: versionDetails,
+            versions: versionDetails.slice(1),
           };
         },
         { attributes: { resourceId } },

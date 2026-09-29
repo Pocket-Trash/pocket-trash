@@ -380,7 +380,7 @@ describe("resources service", () => {
       privatedAt: null,
       uploaderClerkId: "user_123",
       uploaderUsername: "roy",
-      versions: [currentVersion],
+      versions: [],
     });
   });
 

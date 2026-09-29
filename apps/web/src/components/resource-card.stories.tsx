@@ -66,7 +66,7 @@ export const MultiFile: Story = {
   },
   play: async ({ canvas }) => {
     await expect(
-      canvas.getByRole("button", { name: "Download ZIP" }),
+      canvas.getByRole("button", { name: "Download" }),
     ).toBeVisible();
   },
 };

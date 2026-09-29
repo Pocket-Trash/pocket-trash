@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  downloadResource,
+  downloadResourceFile,
   downloadResourceVersion,
   type listResourceDirectory,
 } from "@/lib/resources";
@@ -63,7 +63,7 @@ export function ResourceCard({
                           versionId: resource.currentVersion.id,
                         },
                       })
-                    : await downloadResource({
+                    : await downloadResourceFile({
                         data: {
                           fileId: resource.currentVersion.fileId,
                           resourceId: resource.id,
@@ -98,9 +98,8 @@ export function ResourceCard({
               }}
               type="button"
             >
-              <FileDown />
+              {downloadsArchive ? <FileArchive /> : <FileDown />}
               {t("web.resources.action.download")}
-              {downloadsArchive ? " ZIP" : null}
             </Button>
             <Button
               className="flex-1"
