@@ -188,6 +188,80 @@ describe("audit service", () => {
       await client.close();
     }
   }, 30_000);
+
+  it("authorizes, filters, and keyset-paginates audit events", async () => {
+    const client = new PGlite();
+    await migrate(client);
+    const db = drizzle(client, { schema }) as unknown as Database;
+    const service = createAuditService(
+      createLogger({
+        app: "test",
+        environment: "test",
+        transports: [{ log() {} }],
+      }),
+      [profileUpdated, largeEvent],
+      db,
+    );
+
+    try {
+      const [actor] = await db
+        .insert(schema.user)
+        .values({ clerkId: "audit_reader", username: "Ada" })
+        .returning();
+      if (!actor) throw new Error("Audit user was not created.");
+      const startedAt = new Date("2026-09-01T00:00:00.000Z");
+      await db.insert(schema.auditEvent).values(
+        Array.from({ length: 51 }, (_, index) => ({
+          action: "test.profile_updated",
+          afterState: { index },
+          actorRole: "admin" as const,
+          actorUserId: actor.id,
+          actorUsername: actor.username,
+          authorizationType: "permission" as const,
+          occurredAt: new Date(startedAt.getTime() + index * 1_000),
+          permission: "audit.read" as const,
+          recordedAt: new Date(startedAt.getTime() + index * 1_000),
+          targetId: `profile-${index}`,
+          targetType: "test.profile",
+        })),
+      );
+
+      await expect(
+        service.list({ actor: { clerkId: "user", role: "user" } }),
+      ).rejects.toThrow("Audit events do not exist.");
+
+      const input = {
+        action: "test.profile_updated",
+        actor: { clerkId: "admin", role: "admin" as const },
+        actorUserId: actor.id,
+        recordedFrom: startedAt,
+        targetType: "test.profile",
+      };
+      const first = await service.list(input);
+      expect(first).toMatchObject({
+        coverageStartAt: startedAt,
+        coveredDomains: ["test"],
+      });
+      expect(first.items).toHaveLength(50);
+      expect(first.items[0]?.targetId).toBe("profile-50");
+      expect(first.nextCursor).toEqual({
+        id: first.items[49]?.id,
+        recordedAt: first.items[49]?.recordedAt,
+      });
+      if (!first.nextCursor) throw new Error("Next cursor is missing.");
+
+      const second = await service.list({
+        ...input,
+        cursor: first.nextCursor,
+      });
+      expect(second.items.map(({ targetId }) => targetId)).toEqual([
+        "profile-0",
+      ]);
+      expect(second.nextCursor).toBeNull();
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
 });
 
 async function migrate(client: PGlite) {

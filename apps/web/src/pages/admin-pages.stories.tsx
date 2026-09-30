@@ -62,6 +62,10 @@ export const Hub: Story = {
       "href",
       "/admin/feedback",
     );
+    await expect(main.getByRole("link", { name: "Audit log" })).toHaveAttribute(
+      "href",
+      "/admin/audit",
+    );
     await expect(
       main.getByRole("link", { name: "Notifications" }),
     ).toHaveAttribute("href", "/notifications");
@@ -70,6 +74,7 @@ export const Hub: Story = {
     );
     for (const [name, href] of [
       ["Feedback", "/admin/feedback"],
+      ["Audit log", "/admin/audit"],
       ["Notifications", "/notifications"],
       ["Feature flags", "/admin/settings/feature-flags"],
       ["Trash", "/admin/trash"],
