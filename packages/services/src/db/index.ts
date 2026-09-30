@@ -32,10 +32,11 @@ export type DbServices = {
 };
 
 export function createDbServices(db: Database, logger: Logger): DbServices {
-  const audit = createAuditService(logger, [
-    ...collectionAuditEvents,
-    ...productAuditEvents,
-  ]);
+  const audit = createAuditService(
+    logger,
+    [...collectionAuditEvents, ...productAuditEvents],
+    db,
+  );
   const users = createUsersService(db, logger);
 
   return {
@@ -50,11 +51,14 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
 }
 
 export type {
+  AuditEventCursor,
   AuditEventDefinition,
+  AuditEventPage,
   AuditPayload,
   AuditRedactionContext,
   AuditService,
   AuditWriteInput,
+  ListAuditEventsInput,
 } from "./audit/index.js";
 export {
   AuditEventValidationError,

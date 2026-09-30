@@ -5,13 +5,14 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { Bell, Flag, MessageSquare, Trash2 } from "lucide-react";
+import { Bell, Flag, MessageSquare, ScrollText, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { AppShell, type AppShellProps } from "@/components/app-shell";
 import { useLocale } from "@/providers/locale-provider";
 
-type AdminSection = "feedback" | "notifications" | "trash";
+type AdminSection = "audit" | "feedback" | "notifications" | "trash";
 type AdminPath =
+  | "/admin/audit"
   | "/admin/feedback"
   | "/admin/feedback/archive"
   | "/admin/feedback/planned"
@@ -54,9 +55,20 @@ function AdminSidebar({ section }: { section?: AdminSection }) {
     hasPermission(actor, "products.manage") ||
     hasPermission(actor, "collections.manage");
   const canManageFlags = hasPermission(actor, "feature_flags.manage");
+  const canReadAudit = hasPermission(actor, "audit.read");
   const { locale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const primaryLinks = [
+    ...(canReadAudit
+      ? [
+          {
+            icon: ScrollText,
+            label: t("web.admin.audit.title"),
+            section: "audit" as const,
+            to: "/admin/audit" as const,
+          },
+        ]
+      : []),
     ...(canManageFeedback || canManageResources
       ? [
           {
