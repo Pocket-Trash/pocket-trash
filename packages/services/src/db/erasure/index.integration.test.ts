@@ -155,6 +155,80 @@ describe("complete erasure service", () => {
     }
   }, 30_000);
 
+  it("converges after a retryable failure at every operation step", async () => {
+    const client = new PGlite();
+    await migrate(client);
+    const db = drizzle(client, { schema }) as unknown as Database;
+    let currentTime = new Date("2026-09-29T12:00:00.000Z");
+    const service = createErasureService(
+      db,
+      captureLogger([]),
+      () => currentTime,
+    );
+    const steps = [
+      "snapshot",
+      "inaccessible",
+      "storage",
+      "database",
+      "providers",
+      "verify",
+    ] as const;
+
+    try {
+      for (const [index, failedStep] of steps.entries()) {
+        const targetClerkId = `retry_${failedStep}`;
+        const request = await service.create({
+          initiator: "self",
+          subjectHmac: (index + 1).toString(16).repeat(64),
+          targetClerkId,
+          verificationMethod: "clerk_reverification",
+          verifiedAt: currentTime,
+          verifiedByClerkId: targetClerkId,
+        });
+        let failed = false;
+        const operations = Object.fromEntries(
+          steps.map((step) => [
+            step,
+            vi.fn(async () => {
+              if (step === failedStep && !failed) {
+                failed = true;
+                throw new ErasureOperationError(`${step}_failed`);
+              }
+            }),
+          ]),
+        ) as unknown as ErasureOperations;
+
+        await expect(service.processDue(operations)).resolves.toBe(true);
+        await expect(
+          service.getReceipt({
+            id: request.id,
+            subjectHmac: request.subjectHmac,
+          }),
+        ).resolves.toMatchObject({
+          errorCode: `${failedStep}_failed`,
+          status: "running",
+        });
+
+        currentTime = new Date(currentTime.getTime() + 5 * 60 * 1000);
+        await expect(service.processDue(operations)).resolves.toBe(true);
+        await expect(
+          service.getReceipt({
+            id: request.id,
+            subjectHmac: request.subjectHmac,
+          }),
+        ).resolves.toMatchObject({ errorCode: null, status: "completed" });
+
+        for (const [step, operation] of Object.entries(operations)) {
+          expect(operation, step).toHaveBeenCalledTimes(
+            step === failedStep ? 2 : 1,
+          );
+        }
+      }
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("hides content and pauses on an unexpected Clerk deletion", async () => {
     const client = new PGlite();
     await migrate(client);

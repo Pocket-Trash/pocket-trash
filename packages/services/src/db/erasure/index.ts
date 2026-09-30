@@ -184,6 +184,9 @@ export function createErasureService(
         loggerMessages.database.erasure.create,
         async () =>
           await db.transaction(async (tx) => {
+            await tx.execute(
+              sql`select pg_advisory_xact_lock(hashtextextended(${`account-erasure:${values.targetClerkId}`}, 0))`,
+            );
             const [inserted] = await tx
               .insert(schema.erasureRequest)
               .values({
@@ -260,6 +263,9 @@ export function createErasureService(
       const targetClerkId = requiredValue(input.targetClerkId, "Subject");
       const handledAt = now();
       const result = await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`account-erasure:${targetClerkId}`}, 0))`,
+        );
         const [existing] = await tx
           .select()
           .from(schema.erasureRequest)
