@@ -34,7 +34,6 @@ export function formatMiB(
   );
 }
 
-const resourceContentType = "application/octet-stream";
 type UploadMetadata = {
   contentType: string;
   fileName: string;
@@ -128,7 +127,7 @@ export function validateResourceUpload(
     const unsafe = validateFile(
       file,
       resourceMimeTypesByExtension,
-      resourceContentType,
+      resourceContentType(file.name),
       maxResourceFileBytes,
       locale,
     );
@@ -288,7 +287,7 @@ async function uploadSession(input: {
           ].map(async ({ file, kind }) => ({
             ...toMetadata(
               file,
-              kind === "file" ? resourceContentType : file.type,
+              kind === "file" ? resourceContentType(file.name) : file.type,
             ),
             kind,
             sha256: await hashFile(file),
@@ -461,6 +460,13 @@ function validateFile(
       params: { filename: file.name },
     };
   }
+}
+
+function resourceContentType(fileName: string): string {
+  const extension = fileName.slice(fileName.lastIndexOf(".")).toLowerCase();
+  const allowedTypes: Readonly<Record<string, readonly string[]>> =
+    resourceMimeTypesByExtension;
+  return allowedTypes[extension]?.[0] ?? "application/octet-stream";
 }
 
 function toMetadata(file: File, contentType = file.type): UploadMetadata {

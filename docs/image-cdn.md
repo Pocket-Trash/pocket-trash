@@ -100,7 +100,7 @@ deleted from Bunny Storage.
 `@package/storage` replaces `@package/images` and `@package/resources`. It owns
 Bunny transport, upload validation and targets, signed downloads, image delivery
 URLs, deletion, and preview cleanup. Images retain their original bytes, MIME
-type, extension, and dimensions in storage. JPEG, PNG, and WebP inputs are
+type, extension, and dimensions in storage. AVIF, JPEG, PNG, and WebP inputs are
 supported up to 25 MiB and 80 million pixels. The API handles user uploads; the
 scraper imports this package through services for its own uploads only. No
 service calls the scraper, and no always-on Node processor is needed.

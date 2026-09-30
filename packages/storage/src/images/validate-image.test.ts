@@ -6,8 +6,59 @@ import {
   maxImageBytes,
   signResourceUrl,
 } from "../index.js";
+import { inspectImage } from "./validate-image.js";
 
 describe("original image storage and Bunny delivery", () => {
+  it("accepts AVIF bytes, metadata and upload targets", async () => {
+    const bytes = await sharp({
+      create: { width: 3, height: 2, channels: 3, background: "red" },
+    })
+      .avif()
+      .toBuffer();
+    const fetchMock = vi.fn<typeof fetch>(async (_request, init) => {
+      expect(init?.headers).toMatchObject({
+        "content-length": String(bytes.length),
+        "content-type": "image/avif",
+      });
+      return new Response(null, { status: 201 });
+    });
+    const storage = createUploadStorage({
+      accessKey: "key",
+      cdnBaseUrl: "https://cdn.example.test",
+      endpoint: "https://storage.example.test",
+      folderPrefix: "resources/dev",
+      imageFolderPrefix: "images/dev",
+      zoneName: "zone",
+      fetch: fetchMock,
+    });
+    const target = storage.createImageTarget(
+      {
+        contentType: "image/avif",
+        fileName: "image.avif",
+        sha256: "a".repeat(64),
+        size: bytes.length,
+      },
+      { entity: "products", entityId: 1 },
+    );
+
+    expect(inspectImage(bytes)).toEqual({
+      contentType: "image/avif",
+      extension: "avif",
+      height: 2,
+      width: 3,
+    });
+    expect(target.objectPath).toBe(
+      `images/dev/products/1/${"a".repeat(64)}.avif`,
+    );
+    await storage.putImage({
+      body: bytes,
+      contentLength: bytes.length,
+      contentType: target.contentType,
+      objectPath: target.objectPath,
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("preserves a 25 MiB image and rejects oversized or mismatched bytes before upload", async () => {
     const png = await sharp({
       create: { width: 2, height: 1, channels: 3, background: "red" },

@@ -238,7 +238,7 @@ function ResourceEditForm({ detail }: { detail: ResourceDetail }) {
           ))}
       </div>
       <FileDropInput
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/avif,image/jpeg,image/png,image/webp"
         browseLabel={t("web.resources.upload.browseFiles")}
         description={t("web.resources.upload.imagesHelp", {
           maxFileSize: formatMiB(maxImageBytes, locale),

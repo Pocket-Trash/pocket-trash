@@ -95,7 +95,7 @@ export function CollectionForm({
         />
       </div>
       <FileDropInput
-        accept=".jpeg,.jpg,.png,.webp"
+        accept=".avif,.jpeg,.jpg,.png,.webp"
         aspectRatio={4 / 3}
         aspectRatioHelpHref="/help/image-size-and-resolution-guide"
         aspectRatioHelpLabel={imageGuidance.helpLabel}

@@ -518,7 +518,7 @@ function ProductEditor({
 
       {formError ? <Notice>{t(formError)}</Notice> : null}
       <FileDropInput
-        accept=".jpeg,.jpg,.png,.webp"
+        accept=".avif,.jpeg,.jpg,.png,.webp"
         aspectRatio={4 / 3}
         aspectRatioHelpHref="/help/image-size-and-resolution-guide"
         aspectRatioHelpLabel={imageGuidance.helpLabel}
@@ -1617,7 +1617,7 @@ export function CollectionAddPage({
         ) : null}
         {product ? (
           <FileDropInput
-            accept=".jpeg,.jpg,.png,.webp"
+            accept=".avif,.jpeg,.jpg,.png,.webp"
             aspectRatio={4 / 3}
             aspectRatioHelpHref="/help/image-size-and-resolution-guide"
             aspectRatioHelpLabel={imageGuidance.helpLabel}
@@ -1979,7 +1979,7 @@ export function CollectionEditPage({
           />
         ) : null}
         <FileDropInput
-          accept=".jpeg,.jpg,.png,.webp"
+          accept=".avif,.jpeg,.jpg,.png,.webp"
           aspectRatio={4 / 3}
           aspectRatioHelpHref="/help/image-size-and-resolution-guide"
           aspectRatioHelpLabel={imageGuidance.helpLabel}
