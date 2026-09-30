@@ -883,15 +883,20 @@ describe("catalog lookup writes", () => {
   });
 
   it("updates maker product URL validity without rewriting the product", async () => {
-    const { db, updates } = setup([], []);
+    const { db, updates } = setup(
+      [],
+      [[{ makerProductUrlValid: true, ownerUserId: 1000 }]],
+    );
     const service = createCatalogService(
       db,
       createLogger({ app: "api", environment: "test" }),
     );
 
     await service.setMakerProductUrlValidity({
+      actor: actor("admin-secret", "admin"),
       makerProductUrlValid: false,
       productId: 900,
+      reason: "Broken source link",
     });
 
     expect(updates).toContainEqual({
@@ -962,6 +967,7 @@ describe("catalog lookup writes", () => {
         const query = {
           from: vi.fn(() => query),
           innerJoin: vi.fn(() => query),
+          leftJoin: vi.fn(() => query),
           where: vi.fn(() => query),
           limit: vi.fn().mockResolvedValue(rows),
         };
@@ -1007,6 +1013,9 @@ describe("catalog lookup writes", () => {
           })),
         })),
       })),
+      transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
+        callback(db),
+      ),
     } as unknown as Database;
     const service = createCatalogService(
       db,
@@ -1017,26 +1026,26 @@ describe("catalog lookup writes", () => {
       switch (kind) {
         case "color":
           return service.createColor({
-            actorClerkId: "user-secret",
+            actor: actor("user-secret", "admin"),
             hex: "#CD7F32",
             name: "bronze",
             slug: "bronze-2",
           });
         case "finish":
           return service.createFinish({
-            actorClerkId: "user-secret",
+            actor: actor("user-secret", "admin"),
             name: "bronze",
             slug: "bronze-2",
           });
         case "maker":
           return service.createMaker({
-            actorClerkId: "user-secret",
+            actor: actor("user-secret", "admin"),
             name: "bronze",
             rootUrl: null,
           });
         case "material":
           return service.createMaterial({
-            actorClerkId: "user-secret",
+            actor: actor("user-secret", "admin"),
             name: "bronze",
             slug: "bronze-2",
           });

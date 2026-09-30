@@ -143,6 +143,7 @@ export const productFormSchema = z
     name: slugNameSchema,
     productId: idSchema.nullable(),
     productTypeSlug: productTypeSchema,
+    reason: z.string().trim().max(1000).optional(),
     spinDiameterMm: numericSpecSchema,
     thicknessMm: numericSpecSchema,
     thicknessWithButtonMm: numericSpecSchema,
@@ -456,7 +457,7 @@ export const createCatalogMaker = createServerFn({ method: "POST" })
     const { s } = await import("@/lib/services");
     try {
       const maker = await s.db.catalog.createMaker({
-        actorClerkId: actor.clerkId,
+        actor,
         name: parsed.data.name,
         rootUrl: normalizeOptionalUrl(parsed.data.rootUrl),
       });
@@ -481,7 +482,7 @@ export const createCatalogMaterial = createServerFn({ method: "POST" })
     );
     try {
       const material = await s.db.catalog.createMaterial({
-        actorClerkId: actor.clerkId,
+        actor,
         name: parsed.data.name,
         slug,
       });
@@ -502,7 +503,7 @@ export const createCatalogFinish = createServerFn({ method: "POST" })
     const finishes = await s.db.catalog.listFinishes();
     try {
       const finish = await s.db.catalog.createFinish({
-        actorClerkId: actor.clerkId,
+        actor,
         name: parsed.data.name,
         slug: nextAvailableSlug(
           parsed.data.name,
@@ -529,7 +530,7 @@ export const createCatalogColor = createServerFn({ method: "POST" })
       const colors = await s.db.catalog.listColors();
       try {
         const color = await s.db.catalog.createColor({
-          actorClerkId: actor.clerkId,
+          actor,
           hex: parsed.data.hex,
           name: parsed.data.name,
           slug: nextAvailableSlug(
@@ -592,6 +593,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       materialIds: parsed.data.materialIds,
       name: parsed.data.name,
       productTypeSlug: parsed.data.productTypeSlug,
+      reason: parsed.data.reason,
       slug,
       specs: {
         bearing: parsed.data.bearing,
