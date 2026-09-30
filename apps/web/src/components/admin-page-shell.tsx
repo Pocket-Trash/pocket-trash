@@ -1,3 +1,5 @@
+import { useAuth } from "@clerk/tanstack-react-start";
+import { hasPermission, normalizeActor } from "@package/services/authorization";
 import {
   formatTranslation,
   type TranslationKey,
@@ -44,72 +46,112 @@ export function AdminPageShell({
 }
 
 function AdminSidebar({ section }: { section?: AdminSection }) {
+  const { sessionClaims, userId } = useAuth();
+  const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
+  const canManageFeedback = hasPermission(actor, "feedback.manage");
+  const canManageResources = hasPermission(actor, "resources.manage");
+  const canManageCatalog =
+    hasPermission(actor, "products.manage") ||
+    hasPermission(actor, "collections.manage");
+  const canManageFlags = hasPermission(actor, "feature_flags.manage");
   const { locale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const primaryLinks = [
-    {
-      icon: Bell,
-      label: t("web.admin.notifications.title"),
-      links: [
-        {
-          label: t("web.feedback.notification.title"),
-          to: "/admin/notifications/feedback" as const,
-        },
-        {
-          label: t("web.resources.notification.title"),
-          to: "/admin/notifications/resources" as const,
-        },
-      ],
-      section: "notifications" as const,
-      to: "/notifications" as const,
-    },
-    {
-      icon: MessageSquare,
-      label: t("web.feedback.title"),
-      links: [
-        {
-          label: t("web.feedback.admin.navigation.allActive"),
-          to: "/admin/feedback" as const,
-        },
-        {
-          label: t("web.feedback.admin.navigation.requests"),
-          to: "/admin/feedback/requests" as const,
-        },
-        {
-          label: t("web.feedback.admin.navigation.active"),
-          to: "/admin/feedback/planned" as const,
-        },
-        {
-          label: t("web.feedback.admin.navigation.archive"),
-          to: "/admin/feedback/archive" as const,
-        },
-      ],
-      section: "feedback" as const,
-      to: "/admin/feedback" as const,
-    },
+    ...(canManageFeedback || canManageResources
+      ? [
+          {
+            icon: Bell,
+            label: t("web.admin.notifications.title"),
+            links: [
+              ...(canManageFeedback
+                ? [
+                    {
+                      label: t("web.feedback.notification.title"),
+                      to: "/admin/notifications/feedback" as const,
+                    },
+                  ]
+                : []),
+              ...(canManageResources
+                ? [
+                    {
+                      label: t("web.resources.notification.title"),
+                      to: "/admin/notifications/resources" as const,
+                    },
+                  ]
+                : []),
+            ],
+            section: "notifications" as const,
+            to: "/notifications" as const,
+          },
+        ]
+      : []),
+    ...(canManageFeedback
+      ? [
+          {
+            icon: MessageSquare,
+            label: t("web.feedback.title"),
+            links: [
+              {
+                label: t("web.feedback.admin.navigation.allActive"),
+                to: "/admin/feedback" as const,
+              },
+              {
+                label: t("web.feedback.admin.navigation.requests"),
+                to: "/admin/feedback/requests" as const,
+              },
+              {
+                label: t("web.feedback.admin.navigation.active"),
+                to: "/admin/feedback/planned" as const,
+              },
+              {
+                label: t("web.feedback.admin.navigation.archive"),
+                to: "/admin/feedback/archive" as const,
+              },
+            ],
+            section: "feedback" as const,
+            to: "/admin/feedback" as const,
+          },
+        ]
+      : []),
   ];
   const utilityLinks = [
-    {
-      icon: Flag,
-      label: t("web.admin.featureFlags.featureFlags"),
-      to: "/admin/settings/feature-flags" as const,
-    },
-    {
-      icon: Trash2,
-      label: t("web.admin.trash.title"),
-      links: [
-        {
-          label: t("web.resources.trash.adminTitle"),
-          to: "/admin/trash/resources" as const,
-        },
-        {
-          label: t("web.admin.hub.catalogImageTrash"),
-          to: "/admin/trash/catalog-images" as const,
-        },
-      ],
-      section: "trash" as const,
-      to: "/admin/trash" as const,
-    },
+    ...(canManageFlags
+      ? [
+          {
+            icon: Flag,
+            label: t("web.admin.featureFlags.featureFlags"),
+            to: "/admin/settings/feature-flags" as const,
+          },
+        ]
+      : []),
+    ...(canManageResources || canManageCatalog
+      ? [
+          {
+            icon: Trash2,
+            label: t("web.admin.trash.title"),
+            links: [
+              ...(canManageResources
+                ? [
+                    {
+                      label: t("web.resources.trash.adminTitle"),
+                      to: "/admin/trash/resources" as const,
+                    },
+                  ]
+                : []),
+              ...(canManageCatalog
+                ? [
+                    {
+                      label: t("web.admin.hub.catalogImageTrash"),
+                      to: "/admin/trash/catalog-images" as const,
+                    },
+                  ]
+                : []),
+            ],
+            section: "trash" as const,
+            to: "/admin/trash" as const,
+          },
+        ]
+      : []),
   ];
 
   return (

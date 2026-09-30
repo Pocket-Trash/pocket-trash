@@ -1,7 +1,8 @@
 import type { Database } from "@package/database";
 import type { UploadMetadata } from "@package/storage";
+import type { Actor } from "../authorization.js";
 export type StorageDb = Pick<Database, "execute">;
-export type UploadActor = { clerkId: string; isAdmin: boolean };
+export type UploadActor = Actor;
 
 import type { UploadTargetType } from "@package/storage/constants";
 

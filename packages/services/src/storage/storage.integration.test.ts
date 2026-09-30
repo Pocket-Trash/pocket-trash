@@ -58,7 +58,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     ],
   });
   const service = createStorageService({ db, storage, logger });
-  const actor = { clerkId: "storage-test-owner", isAdmin: false };
+  const actor = { clerkId: "storage-test-owner", role: "user" } as const;
   const image = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB9sAAAAASUVORK5CYII=",
     "base64",
@@ -309,7 +309,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       await expect(
         service.create(
           { target, files: [file] },
-          { clerkId: "stranger", isAdmin: false },
+          { clerkId: "stranger", role: "user" },
         ),
       ).rejects.toMatchObject({ code: "session_not_found" });
       const results = await Promise.allSettled([
@@ -417,10 +417,10 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       createNoopLogger({ app: "web", environment: "test" }),
     );
     const created = await resources.create({
+      actor,
       name: "Buffered resource",
       description: "Buffered test",
       categories: ["Tools"],
-      uploaderClerkId: actor.clerkId,
       files: [
         {
           bytes: pdf,
@@ -433,8 +433,8 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       ],
     });
     const version = await resources.addVersion({
+      actor,
       resourceId: created.id,
-      uploaderClerkId: actor.clerkId,
       files: [
         {
           bytes: pdf,
@@ -450,9 +450,8 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     );
     expect(cover.rows[0].position).toBe(0);
     const update = {
+      actor,
       resourceId: created.id,
-      actorClerkId: actor.clerkId,
-      actorIsAdmin: false,
       name: "Updated resource",
       description: "Updated",
       categories: ["Tools"],
@@ -668,10 +667,10 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
   it("queues resource replacements and purges while protecting attached paths", async () => {
     const resources = createResourcesService(db, storage, logger);
     const created = await resources.create({
+      actor,
       name: "Deletion test",
       description: "Test",
       categories: ["Tools"],
-      uploaderClerkId: actor.clerkId,
       files: [
         { bytes: pdf, fileName: "model.pdf", contentType: "application/pdf" },
       ],
@@ -687,9 +686,8 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     ).rows[0].object_path;
     const replacement = new Uint8Array([...image, 22]);
     const update = {
+      actor,
       resourceId: created.id,
-      actorClerkId: actor.clerkId,
-      actorIsAdmin: false,
       name: "Updated",
       description: "Updated",
       categories: ["Tools"],
@@ -732,16 +730,14 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     await service.cleanupExpired();
     expect(objects.has(attached)).toBe(true);
     await resources.softDelete({
+      actor,
       resourceId: created.id,
-      actorClerkId: actor.clerkId,
-      actorIsAdmin: false,
     });
     failDelete = true;
     try {
       await resources.permanentlyDelete({
+        actor: { clerkId: "admin", role: "system_admin" },
         resourceId: created.id,
-        actorClerkId: "admin",
-        actorIsAdmin: true,
       });
     } finally {
       failDelete = false;

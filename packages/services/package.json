@@ -13,6 +13,10 @@
     "./constants": {
       "types": "./dist/constants.d.ts",
       "default": "./dist/constants.js"
+    },
+    "./authorization": {
+      "types": "./dist/authorization.d.ts",
+      "default": "./dist/authorization.js"
     }
   },
   "scripts": {

@@ -1,10 +1,9 @@
 import { reverificationError } from "@clerk/shared/authorization-errors";
 import { auth as clerkAuth } from "@clerk/tanstack-react-start/server";
+import { hasPermission } from "@package/services/authorization";
 import { createServerFn } from "@tanstack/react-start";
-import { activeAuth } from "@/lib/auth";
+import { getActor, requirePermission } from "@/lib/authorization";
 import { localizedServerError } from "@/lib/server-errors";
-
-type SessionClaimsWithRole = { role?: unknown };
 
 export type ErasureStatusView = {
   requestId: string;
@@ -61,9 +60,8 @@ export function selfErasureClerkId(state: {
   return state.isAuthenticated ? state.userId : null;
 }
 
-export const isErasureAdmin = createServerFn().handler(async () => {
-  const state = await activeAuth();
-  return isAdmin(state);
+export const canEraseAccounts = createServerFn().handler(async () => {
+  return hasPermission(await getActor(), "accounts.erase");
 });
 
 export const findErasureTarget = createServerFn({ method: "GET" })
@@ -210,16 +208,7 @@ function requireSignedInUser(state: {
 }
 
 async function requireAdmin(): Promise<string> {
-  const state = await activeAuth();
-  if (!isAdmin(state) || !state.userId) {
-    throw localizedServerError("error.generic");
-  }
-  return state.userId;
-}
-
-function isAdmin(state: { isAuthenticated: boolean; sessionClaims: unknown }) {
-  const claims = state.sessionClaims as SessionClaimsWithRole | null;
-  return state.isAuthenticated && claims?.role === "admin";
+  return (await requirePermission("accounts.erase")).clerkId;
 }
 
 async function findClerkUserByEmail(

@@ -8,19 +8,30 @@ import { AdminPageShell } from "@/components/admin-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
 export function AdminTrashIndexPage() {
+  const { sessionClaims, userId } = useAuth();
+  const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
   const { locale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const links = [
-    {
-      icon: PackageX,
-      label: t("web.resources.trash.adminTitle"),
-      to: "/admin/trash/resources" as const,
-    },
-    {
-      icon: ImageOff,
-      label: t("web.admin.hub.catalogImageTrash"),
-      to: "/admin/trash/catalog-images" as const,
-    },
+    ...(hasPermission(actor, "resources.manage")
+      ? [
+          {
+            icon: PackageX,
+            label: t("web.resources.trash.adminTitle"),
+            to: "/admin/trash/resources" as const,
+          },
+        ]
+      : []),
+    ...(hasPermission(actor, "products.manage") ||
+    hasPermission(actor, "collections.manage")
+      ? [
+          {
+            icon: ImageOff,
+            label: t("web.admin.hub.catalogImageTrash"),
+            to: "/admin/trash/catalog-images" as const,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -44,3 +55,6 @@ export function AdminTrashIndexPage() {
     </AdminPageShell>
   );
 }
+
+import { useAuth } from "@clerk/tanstack-react-start";
+import { hasPermission, normalizeActor } from "@package/services/authorization";

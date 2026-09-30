@@ -16,6 +16,13 @@ vi.mock("@/providers/locale-provider", () => ({
   useLocale: () => ({ locale: "en-US" }),
 }));
 
+vi.mock("@clerk/tanstack-react-start", () => ({
+  useAuth: () => ({
+    sessionClaims: { role: "admin" },
+    userId: "user_admin",
+  }),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => (
     <a href={to.replace("$resourceId", "1000")}>{children}</a>

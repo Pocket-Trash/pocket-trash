@@ -1,5 +1,6 @@
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import { isLogLevel, loggerMessages } from "@package/logger";
+import { type Actor, normalizeActor } from "@package/services/authorization";
 import { type ApiBindings, createApp } from "./app.js";
 import { findClerkOrphans } from "./clerk-orphans.js";
 import { createClerkWebhookHandler } from "./clerk-webhooks.js";
@@ -222,7 +223,7 @@ async function authenticateClerkRequest(
   request: Request,
   env: ApiBindings,
   assertAccountActive: (clerkId: string) => Promise<void>,
-): Promise<{ clerkId: string; isAdmin: boolean } | null> {
+): Promise<Actor | null> {
   const authorization = request.headers.get("authorization");
   const origin = request.headers.get("origin");
   const token = authorization?.match(/^Bearer (.+)$/u)?.[1];
@@ -241,10 +242,7 @@ async function authenticateClerkRequest(
       secretKey: env.CLERK_SECRET_KEY,
     });
     await assertAccountActive(payload.sub);
-    return {
-      clerkId: payload.sub,
-      isAdmin: (payload as { role?: unknown }).role === "admin",
-    };
+    return normalizeActor(payload.sub, payload);
   } catch {
     return null;
   }
