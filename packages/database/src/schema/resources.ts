@@ -50,11 +50,11 @@ export const resources = pgTable(
     index("resources_uploader_clerk_id_idx").on(table.uploaderClerkId),
     check(
       "resources_private_metadata_consistent",
-      sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
+      sql`(not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0) or (${table.isPrivate} and (num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0 or (${table.privateReason} is not null and ${table.privatedAt} is not null)))`,
     ),
     check(
       "resources_deletion_metadata_consistent",
-      sql`num_nonnulls(${table.deletedAt}, ${table.deletedByClerkId}, ${table.deletedByRole}) in (0, 3)`,
+      sql`(${table.deletedAt} is null and ${table.deletedByClerkId} is null and ${table.deletedByRole} is null) or (${table.deletedAt} is not null and ${table.deletedByRole} is not null)`,
     ),
     check(
       "resources_deleted_by_role_valid",
@@ -174,7 +174,7 @@ export const resourceCategories = pgTable("resource_categories", {
     .generatedAlwaysAsIdentity({ startWith: 1000 }),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
-  createdByClerkId: text("created_by_clerk_id").notNull(),
+  createdByClerkId: text("created_by_clerk_id"),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
     .defaultNow()
     .notNull(),

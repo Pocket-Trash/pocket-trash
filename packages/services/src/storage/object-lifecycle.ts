@@ -35,6 +35,7 @@ export async function objectIsAttached(db: StorageDb, path: string) {
           ({ table }) => sql`select object_path from ${sql.identifier(table)}`,
         ),
         sql`select object_path from resource_versions`,
+        sql`select archive_object_path as object_path from resource_versions`,
       ],
       sql` union all `,
     )}) objects where object_path = ${path} limit 1`,
@@ -56,10 +57,49 @@ export async function assertNotPendingDeletion(db: StorageDb, path: string) {
 export async function queueObjectDeletions(db: StorageDb, paths: string[]) {
   for (const path of [...new Set(paths)].sort()) {
     await lockObjectPath(db, path);
+    const ownerClerkId = await erasableObjectOwner(db, path);
     await db.execute(
-      sql`insert into storage_object_deletion(object_path) values (${path}) on conflict do nothing`,
+      sql`insert into storage_object_deletion(object_path, owner_clerk_id)
+        values (${path}, ${ownerClerkId})
+        on conflict (object_path) do update set owner_clerk_id =
+          coalesce(storage_object_deletion.owner_clerk_id, excluded.owner_clerk_id)`,
     );
   }
+}
+
+async function erasableObjectOwner(db: StorageDb, path: string) {
+  const result = await db.execute<{ clerkId: string }>(sql`
+    select distinct owned.clerk_id as "clerkId" from (
+      select users.clerk_id, collection_image.object_path
+      from collection_image
+      join user_collection on user_collection.id = collection_image.collection_id
+      join users on users.id = user_collection.owner_id
+      union all
+      select users.clerk_id, collection_item_image.object_path
+      from collection_item_image
+      join collection_item on collection_item.id = collection_item_image.collection_item_id
+      join users on users.id = collection_item.owner_id
+      union all
+      select resources.uploader_clerk_id, resource_images.object_path
+      from resource_images
+      join resources on resources.id = resource_images.resource_id
+      union all
+      select resources.uploader_clerk_id, resource_files.object_path
+      from resource_files
+      join resource_versions on resource_versions.id = resource_files.version_id
+      join resources on resources.id = resource_versions.resource_id
+      union all
+      select resources.uploader_clerk_id, resource_versions.object_path
+      from resource_versions
+      join resources on resources.id = resource_versions.resource_id
+      where resource_versions.object_path is not null
+      union all
+      select resources.uploader_clerk_id, resource_versions.archive_object_path
+      from resource_versions
+      join resources on resources.id = resource_versions.resource_id
+      where resource_versions.archive_object_path is not null
+    ) owned where owned.object_path = ${path}`);
+  return result.rows.length === 1 ? result.rows[0]?.clerkId : null;
 }
 
 export async function cleanupObjectDeletions(

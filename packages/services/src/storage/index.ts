@@ -386,6 +386,121 @@ export function createStorageService(input: {
       await cleanupObjectDeletions(db, storage, logger);
       return removed;
     },
+    async snapshotErasureTargets(requestId: string, targetClerkId: string) {
+      await db.transaction(async (tx) => {
+        const request = await tx.execute<{ storageTargets: string[] | null }>(
+          sql`select storage_targets as "storageTargets" from erasure_request
+            where id = ${requestId} and target_clerk_id = ${targetClerkId}
+            for update`,
+        );
+        const current = request.rows[0];
+        if (!current) throw new Error("Erasure request target was not found.");
+        if (current.storageTargets !== null) return;
+        const targets = await tx.execute<{ objectPath: string }>(sql`
+          select distinct owned.object_path as "objectPath" from (
+            select collection_image.object_path
+            from collection_image
+            join user_collection on user_collection.id = collection_image.collection_id
+            join users on users.id = user_collection.owner_id
+            where users.clerk_id = ${targetClerkId}
+            union all
+            select collection_item_image.object_path
+            from collection_item_image
+            join collection_item on collection_item.id = collection_item_image.collection_item_id
+            join users on users.id = collection_item.owner_id
+            where users.clerk_id = ${targetClerkId}
+            union all
+            select resource_images.object_path
+            from resource_images
+            join resources on resources.id = resource_images.resource_id
+            where resources.uploader_clerk_id = ${targetClerkId}
+            union all
+            select resource_files.object_path
+            from resource_files
+            join resource_versions on resource_versions.id = resource_files.version_id
+            join resources on resources.id = resource_versions.resource_id
+            where resources.uploader_clerk_id = ${targetClerkId}
+            union all
+            select resource_versions.object_path
+            from resource_versions
+            join resources on resources.id = resource_versions.resource_id
+            where resources.uploader_clerk_id = ${targetClerkId}
+              and resource_versions.object_path is not null
+            union all
+            select resource_versions.archive_object_path
+            from resource_versions
+            join resources on resources.id = resource_versions.resource_id
+            where resources.uploader_clerk_id = ${targetClerkId}
+              and resource_versions.archive_object_path is not null
+            union all
+            select upload_file.object_path
+            from upload_file
+            join upload_session on upload_session.id = upload_file.session_id
+            where upload_session.uploader_clerk_id = ${targetClerkId}
+              and upload_session.target_type <> 'product'
+            union all
+            select storage_object_deletion.object_path
+            from storage_object_deletion
+            where storage_object_deletion.owner_clerk_id = ${targetClerkId}
+          ) owned order by owned.object_path`);
+        await tx
+          .update(schema.erasureRequest)
+          .set({
+            storageTargets: targets.rows.map(({ objectPath }) => objectPath),
+            updatedAt: now(),
+          })
+          .where(eq(schema.erasureRequest.id, requestId));
+      });
+    },
+    async eraseAccountObjects(requestId: string, targetClerkId: string) {
+      await storage.assertErasureReady();
+      const request = await db.execute<{ storageTargets: string[] | null }>(
+        sql`select storage_targets as "storageTargets" from erasure_request
+          where id = ${requestId} and target_clerk_id = ${targetClerkId}`,
+      );
+      const targets = request.rows[0]?.storageTargets;
+      if (!targets)
+        throw new Error("Erasure storage targets have not been captured.");
+
+      for (const objectPath of targets) {
+        await db.transaction(async (tx) => {
+          await lockObjectPath(tx, objectPath);
+          const current = await tx.execute<{ storageTargets: string[] }>(
+            sql`select storage_targets as "storageTargets" from erasure_request
+              where id = ${requestId} and target_clerk_id = ${targetClerkId}
+              for update`,
+          );
+          if (!current.rows[0]?.storageTargets.includes(objectPath)) return;
+          if (!(await hasSurvivingReference(tx, objectPath, targetClerkId)))
+            await storage.erase(objectPath);
+          await tx.execute(
+            sql`delete from storage_object_deletion where object_path = ${objectPath}`,
+          );
+          await tx.execute(sql`update erasure_request
+            set storage_targets = array_remove(storage_targets, ${objectPath}),
+                updated_at = ${now()}
+            where id = ${requestId}`);
+        });
+      }
+
+      const completedAt = now();
+      return {
+        exceptions: [
+          {
+            code: "bunny_cache_30_days",
+            expiresAt: new Date(
+              completedAt.getTime() + 30 * 24 * 60 * 60 * 1000,
+            ).toISOString(),
+          },
+          {
+            code: "bunny_logs_3_days",
+            expiresAt: new Date(
+              completedAt.getTime() + 3 * 24 * 60 * 60 * 1000,
+            ).toISOString(),
+          },
+        ],
+      };
+    },
     async deleteFile(
       {
         fileType,
@@ -453,6 +568,8 @@ export function createStorageService(input: {
     },
   };
   return {
+    snapshotErasureTargets: service.snapshotErasureTargets,
+    eraseAccountObjects: service.eraseAccountObjects,
     create: (value: unknown, actor: UploadActor) => {
       const attributes = actorAttributes(actor);
       return loggedMutation(
@@ -505,6 +622,52 @@ export function createStorageService(input: {
       );
     },
   };
+}
+
+async function hasSurvivingReference(
+  db: Parameters<typeof objectIsAttached>[0],
+  objectPath: string,
+  targetClerkId: string,
+) {
+  const result = await db.execute(sql`
+    select 1 from (
+      select product_image.object_path, null::text as owner_clerk_id,
+        true as protected
+      from product_image
+      union all
+      select collection_image.object_path, users.clerk_id, false
+      from collection_image
+      join user_collection on user_collection.id = collection_image.collection_id
+      join users on users.id = user_collection.owner_id
+      union all
+      select collection_item_image.object_path, users.clerk_id, false
+      from collection_item_image
+      join collection_item on collection_item.id = collection_item_image.collection_item_id
+      join users on users.id = collection_item.owner_id
+      union all
+      select resource_images.object_path, resources.uploader_clerk_id, false
+      from resource_images join resources on resources.id = resource_images.resource_id
+      union all
+      select resource_files.object_path, resources.uploader_clerk_id, false
+      from resource_files
+      join resource_versions on resource_versions.id = resource_files.version_id
+      join resources on resources.id = resource_versions.resource_id
+      union all
+      select resource_versions.object_path, resources.uploader_clerk_id, false
+      from resource_versions join resources on resources.id = resource_versions.resource_id
+      where resource_versions.object_path is not null
+      union all
+      select resource_versions.archive_object_path, resources.uploader_clerk_id, false
+      from resource_versions join resources on resources.id = resource_versions.resource_id
+      where resource_versions.archive_object_path is not null
+      union all
+      select upload_file.object_path, upload_session.uploader_clerk_id, false
+      from upload_file join upload_session on upload_session.id = upload_file.session_id
+    ) surviving
+    where surviving.object_path = ${objectPath}
+      and (surviving.protected or surviving.owner_clerk_id <> ${targetClerkId})
+    limit 1`);
+  return result.rows.length > 0;
 }
 function actorAttributes(actor: UploadActor, sessionId?: string): LogContext {
   return {

@@ -6,6 +6,7 @@ import {
   createCatalogService,
   createCollectionsService,
 } from "./catalog/index.js";
+import { createErasureService, type ErasureService } from "./erasure/index.js";
 import {
   createFeedbackService,
   type FeedbackService,
@@ -20,6 +21,7 @@ import { createUsersService, type UsersService } from "./users/index.js";
 export type DbServices = {
   catalog: CatalogService;
   collections: CollectionsService;
+  erasure: ErasureService;
   feedback: FeedbackService;
   userSettings: UserSettingsService;
   users: UsersService;
@@ -31,6 +33,7 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
   return {
     catalog: createCatalogService(db, logger),
     collections: createCollectionsService(db, users, logger),
+    erasure: createErasureService(db, logger),
     feedback: createFeedbackService(db, logger),
     userSettings: createUserSettingsService(db, users, logger),
     users,
@@ -54,6 +57,20 @@ export type {
   UserCollectionItem,
   UserCollectionSummary,
 } from "./catalog/index.js";
+export type {
+  ApprovedErasureExceptionCode,
+  ErasureOperationRequest,
+  ErasureOperationResult,
+  ErasureOperations,
+  ErasureReceipt,
+  ErasureService,
+} from "./erasure/index.js";
+export {
+  AccountErasureInProgressError,
+  createErasureService,
+  createErasureSubjectHmac,
+  ErasureOperationError,
+} from "./erasure/index.js";
 export type {
   AdminFeedbackItem,
   AdminFeedbackPage,

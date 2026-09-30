@@ -1,7 +1,9 @@
-import { verifyToken } from "@clerk/backend";
+import { createClerkClient, verifyToken } from "@clerk/backend";
 import { isLogLevel, loggerMessages } from "@package/logger";
 import { type ApiBindings, createApp } from "./app.js";
+import { findClerkOrphans } from "./clerk-orphans.js";
 import { createClerkWebhookHandler } from "./clerk-webhooks.js";
+import { createErasureOperations, drainErasureQueue } from "./erasure.js";
 import { createApiLogger, createApiServices } from "./lib/services.js";
 
 const app = createApp({
@@ -9,6 +11,8 @@ const app = createApp({
     validateClerkWebhookBindings(bindings);
     const { logger, services } = createApiServices(bindings);
     const handle = createClerkWebhookHandler({
+      erasure: services.db.erasure,
+      erasureHmacSecret: bindings.ERASURE_HMAC_SECRET,
       logger,
       signingSecret: bindings.CLERK_WEBHOOK_SIGNING_SECRET as string,
       targets: bindings.CLERK_WEBHOOK_TARGETS,
@@ -43,7 +47,11 @@ const app = createApp({
     return {
       logger,
       authenticate: (request: Request) =>
-        authenticateClerkRequest(request, bindings),
+        authenticateClerkRequest(
+          request,
+          bindings,
+          services.db.erasure.assertAccountActive,
+        ),
       isAllowedOrigin: (origin: string) =>
         isAllowedWebOrigin(origin, bindings.APP_ENV),
       service: services.storage,
@@ -99,7 +107,11 @@ export function validateUploadBindings(env: ApiBindings) {
 }
 
 export function validateClerkWebhookBindings(env: ApiBindings) {
-  const required = ["CLERK_WEBHOOK_SIGNING_SECRET", "DATABASE_URL"] as const;
+  const required = [
+    "CLERK_WEBHOOK_SIGNING_SECRET",
+    "DATABASE_URL",
+    "ERASURE_HMAC_SECRET",
+  ] as const;
   const invalidVariables = required.filter((name) => !env[name]?.trim());
   if (invalidVariables.length > 0) {
     throw new ApiEnvValidationError(invalidVariables);
@@ -136,10 +148,42 @@ export async function handleWorkerScheduled(
       let runtime: ReturnType<typeof storageRuntime> | undefined;
       try {
         runtime = storageRuntime(env);
-        await runtime.services.storage.cleanupExpired();
+        const clerk = createClerkClient({
+          secretKey: env.CLERK_SECRET_KEY as string,
+        });
+        await drainErasureQueue(
+          runtime.services.db.erasure,
+          createErasureOperations({
+            clerk: clerk.users,
+            erasure: runtime.services.db.erasure,
+            storage: runtime.services.storage,
+          }),
+        );
+        if (new Date(_controller.scheduledTime).getUTCHours() === 0) {
+          const candidates = await findClerkOrphans(
+            clerk.users,
+            runtime.services.db.users,
+          );
+          if (candidates.length > 0) {
+            runtime.logger.error(
+              loggerMessages.database.erasure.orphanCandidates,
+              {
+                attributes: {
+                  adminLink: "https://pocket-trash.app/admin/account-erasure",
+                  candidateCount: candidates.length,
+                  state: "needs_attention",
+                },
+              },
+            );
+          }
+        }
+        await Promise.all([
+          runtime.services.storage.cleanupExpired(),
+          runtime.services.db.erasure.purgeExpiredReceipts(),
+        ]);
       } catch {
         await logWorkerException(
-          new Error("Storage cleanup failed."),
+          new Error("Scheduled maintenance failed."),
           env,
           new Request("https://api.pocket-trash.app/__scheduled"),
           "scheduled",
@@ -177,6 +221,7 @@ export function isAllowedWebOrigin(
 async function authenticateClerkRequest(
   request: Request,
   env: ApiBindings,
+  assertAccountActive: (clerkId: string) => Promise<void>,
 ): Promise<{ clerkId: string; isAdmin: boolean } | null> {
   const authorization = request.headers.get("authorization");
   const origin = request.headers.get("origin");
@@ -195,6 +240,7 @@ async function authenticateClerkRequest(
       authorizedParties: [origin],
       secretKey: env.CLERK_SECRET_KEY,
     });
+    await assertAccountActive(payload.sub);
     return {
       clerkId: payload.sub,
       isAdmin: (payload as { role?: unknown }).role === "admin",

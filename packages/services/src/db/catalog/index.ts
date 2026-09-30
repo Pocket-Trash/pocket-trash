@@ -59,7 +59,7 @@ export type CatalogImageTargetType =
   | "collection_item"
   | "product";
 export type CatalogImageTrashItem = CatalogImage & {
-  ownerClerkId: string;
+  ownerClerkId: string | null;
   targetId: number;
   targetName: string;
   targetType: CatalogImageTargetType;
@@ -93,7 +93,7 @@ export type CatalogProduct = {
   makerUrl: string | null;
   materials: Array<{ id: number; name: string; slug: string }>;
   name: string;
-  ownerClerkId: string;
+  ownerClerkId: string | null;
   isPrivate: boolean;
   isAdminPrivate: boolean;
   isOwner?: boolean;
@@ -2596,7 +2596,7 @@ function assertCanRestoreImage(
     | {
         deletedByClerkId: string | null;
         deletedByRole: "admin" | "owner" | null;
-        ownerClerkId: string;
+        ownerClerkId: string | null;
       }
     | undefined,
   actor: { actorClerkId: string; actorIsAdmin: boolean },

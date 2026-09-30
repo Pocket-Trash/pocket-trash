@@ -46,6 +46,13 @@ export const loggerMessages = {
   },
   common: {},
   database: {
+    erasure: {
+      completed: "database.erasure.completed",
+      create: "database.erasure.create",
+      orphanCandidates: "database.erasure.clerkOrphans.detected",
+      stepFailed: "database.erasure.step.failed",
+      unexpectedClerkDeletion: "database.erasure.clerkDeletion.unexpected",
+    },
     storage: {
       create: "database.storage.create",
       upload: "database.storage.upload",

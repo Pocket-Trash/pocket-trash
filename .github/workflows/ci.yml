@@ -104,6 +104,7 @@ jobs:
         env:
           CLERK_SECRET_KEY: ci-placeholder
           DATABASE_URL: postgres://ci:ci@localhost/ci
+          ERASURE_HMAC_SECRET: ci-placeholder-erasure-secret-000000000
           NITRO_PRESET: vercel
           VITE_API_URL: https://example.com
           VITE_CLERK_PUBLISHABLE_KEY: ci-placeholder

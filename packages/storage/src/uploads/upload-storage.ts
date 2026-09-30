@@ -31,6 +31,7 @@ import {
   imageFolderPrefix,
   resourceFolderPrefix,
 } from "../object-paths.js";
+import { signResourceUrl } from "./signed-url.js";
 
 export type ResourceDeploymentEnvironment =
   | "development"
@@ -38,8 +39,10 @@ export type ResourceDeploymentEnvironment =
   | "production";
 
 export type UploadStorageConfig = BunnyStorageConfig & {
+  apiKey?: string;
   folderPrefix?: string;
   imageFolderPrefix?: string;
+  pullZoneId?: number | string;
   tokenKey?: string;
 };
 
@@ -97,6 +100,8 @@ export type UploadStorage = {
     target: { resourceId: number; version: number },
   ): UploadTarget;
   delete(objectPath: string): Promise<UploadDeleteResult>;
+  assertErasureReady(): Promise<void>;
+  erase(objectPath: string): Promise<void>;
   readFile(objectPath: string): Promise<ReadableStream<Uint8Array>>;
   putFile(input: PutInput): Promise<void>;
   putImage(
@@ -105,8 +110,11 @@ export type UploadStorage = {
 };
 
 type UploadBunnyConfig = BunnyConfig & {
+  apiKey?: string;
   folderPrefix: string;
   imageFolderPrefix: string;
+  pullZoneId?: number;
+  tokenKey?: string;
 };
 
 export function buildResourceFolderPrefix(input: {
@@ -149,6 +157,31 @@ export function createUploadStorage(input: UploadStorageConfig): UploadStorage {
         size,
         url: buildCdnUrl(config.cdnBaseUrl, objectPath),
       };
+    },
+    async assertErasureReady() {
+      const { apiKey, pullZoneId } = erasureConfig(config);
+      const response = await config.fetch(
+        `https://api.bunny.net/pullzone/${pullZoneId}`,
+        {
+          headers: { AccessKey: apiKey },
+          method: "GET",
+          signal: AbortSignal.timeout(config.fetchTimeoutMs),
+        },
+      );
+      if (!response.ok)
+        throw new Error(`Bunny Pull Zone request failed: ${response.status}.`);
+      const value: unknown = await response.json();
+      if (
+        !value ||
+        typeof value !== "object" ||
+        !("PermaCacheStorageZoneId" in value) ||
+        ((value as { PermaCacheStorageZoneId?: unknown })
+          .PermaCacheStorageZoneId !== null &&
+          (value as { PermaCacheStorageZoneId?: unknown })
+            .PermaCacheStorageZoneId !== 0)
+      ) {
+        throw new Error("Bunny Perma-Cache must be disabled before erasure.");
+      }
     },
     createImageTarget(metadata, { entity, entityId }) {
       assertEntityId(entityId);
@@ -210,6 +243,47 @@ export function createUploadStorage(input: UploadStorageConfig): UploadStorage {
       });
 
       return response.status === 404 ? "missing" : "deleted";
+    },
+    async erase(objectPath) {
+      const normalizedPath = normalizeObjectPath(objectPath);
+      if (!isErasablePath(config, normalizedPath))
+        throw new Error("Object path is outside an erasable namespace.");
+      const { apiKey, tokenKey } = erasureConfig(config);
+      const cdnUrl = buildCdnUrl(config.cdnBaseUrl, normalizedPath);
+
+      await bunnyRequest(config, normalizedPath, {
+        expectedStatuses: [200, 404],
+        method: "DELETE",
+      });
+      const purgeUrl = new URL("https://api.bunny.net/purge");
+      purgeUrl.searchParams.set("url", cdnUrl);
+      purgeUrl.searchParams.set("async", "false");
+      const purge = await config.fetch(purgeUrl, {
+        headers: { AccessKey: apiKey },
+        method: "POST",
+        signal: AbortSignal.timeout(config.fetchTimeoutMs),
+      });
+      if (![200, 204].includes(purge.status))
+        throw new Error(`Bunny cache purge failed: ${purge.status}.`);
+
+      await bunnyRequest(config, normalizedPath, {
+        expectedStatuses: [404],
+        method: "GET",
+      });
+      const delivery = await config.fetch(
+        await signResourceUrl({
+          cdnBaseUrl: config.cdnBaseUrl,
+          objectPath: normalizedPath,
+          tokenKey,
+        }),
+        {
+          headers: { "cache-control": "no-cache, no-store" },
+          method: "GET",
+          signal: AbortSignal.timeout(config.fetchTimeoutMs),
+        },
+      );
+      if (![404, 410].includes(delivery.status))
+        throw new Error(`Bunny CDN verification failed: ${delivery.status}.`);
     },
     async readFile(objectPath) {
       const normalizedPath = normalizeObjectPath(objectPath);
@@ -322,11 +396,40 @@ export function validateUploadMetadata(
 }
 
 function readConfig(input: UploadStorageConfig): UploadBunnyConfig {
+  const pullZoneId = Number(input.pullZoneId);
   return {
     ...readBunnyConfig(input),
+    apiKey: input.apiKey?.trim() || undefined,
     folderPrefix: resourceFolderPrefix(input.folderPrefix),
     imageFolderPrefix: imageFolderPrefix(input.imageFolderPrefix),
+    pullZoneId:
+      Number.isSafeInteger(pullZoneId) && pullZoneId > 0
+        ? pullZoneId
+        : undefined,
+    tokenKey: input.tokenKey?.trim() || undefined,
   };
+}
+
+function erasureConfig(config: UploadBunnyConfig) {
+  if (!config.apiKey) throw new Error("BUNNY_API_KEY is required for erasure.");
+  if (!config.pullZoneId)
+    throw new Error("BUNNY_PULL_ZONE_ID is required for erasure.");
+  if (!config.tokenKey)
+    throw new Error("BUNNY_CDN_TOKEN_KEY is required for erasure.");
+  return {
+    apiKey: config.apiKey,
+    pullZoneId: config.pullZoneId,
+    tokenKey: config.tokenKey,
+  };
+}
+
+function isErasablePath(config: UploadBunnyConfig, objectPath: string) {
+  return (
+    objectPath.startsWith(`${config.folderPrefix}/`) ||
+    ["collections", "collection-items", "resources"].some((entity) =>
+      objectPath.startsWith(`${config.imageFolderPrefix}/${entity}/`),
+    )
+  );
 }
 
 function buildPreviewFolderPath(prNumber: number): string {

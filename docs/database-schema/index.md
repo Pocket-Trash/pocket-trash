@@ -11,6 +11,7 @@ Generated schema documentation for committed Drizzle tables.
 - [`collection_spinner_button`](./collection-spinner-button.md)
 - [`color`](./color.md)
 - [`color_effect`](./color-effect.md)
+- [`erasure_request`](./erasure-request.md)
 - [`feature_flag_user_overrides`](./feature-flag-user-overrides.md)
 - [`feature_flags`](./feature-flags.md)
 - [`feedback`](./feedback.md)

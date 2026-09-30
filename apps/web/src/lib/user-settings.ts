@@ -1,4 +1,3 @@
-import { auth } from "@clerk/tanstack-react-start/server";
 import type { UpsertUserSettingsInput } from "@package/services";
 import {
   formatTranslation,
@@ -7,6 +6,7 @@ import {
   type SupportedLocale,
 } from "@pocket-trash/localizations";
 import { createServerFn } from "@tanstack/react-start";
+import { activeAuth as auth } from "@/lib/auth";
 import {
   type CurrencyCode,
   currencies,

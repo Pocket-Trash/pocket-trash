@@ -9,6 +9,7 @@ Durable post-commit object deletion queue. Paths remain reserved until cleanup f
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `object_path` | `text` | yes | PK |  |  |  |  |
+| `owner_clerk_id` | `text` | no |  |  |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 
 ## Indexes
@@ -16,3 +17,4 @@ Durable post-commit object deletion queue. Paths remain reserved until cleanup f
 | Name | Unique | Method | Columns |
 | --- | --- | --- | --- |
 | `storage_object_deletion_created_idx` | no | `btree` | `created_at` |
+| `storage_object_deletion_owner_idx` | no | `btree` | `owner_clerk_id` |

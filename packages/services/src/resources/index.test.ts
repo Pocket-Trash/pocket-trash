@@ -680,6 +680,7 @@ describe("resources service", () => {
         : [],
     }));
     const storage: UploadStorage = {
+      assertErasureReady: vi.fn(),
       createArchiveTarget: vi.fn(),
       createFileTarget: vi.fn(),
       async delete(objectPath) {
@@ -694,6 +695,7 @@ describe("resources service", () => {
           url: "https://cdn.example.test/dev/new-preview.webp",
         };
       },
+      erase: vi.fn(),
       putFile: vi.fn(),
       putImage: vi.fn(),
       readFile: vi.fn(),

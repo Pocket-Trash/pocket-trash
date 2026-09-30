@@ -1,4 +1,3 @@
-import { auth } from "@clerk/tanstack-react-start/server";
 import type {
   CatalogColor,
   CatalogImage,
@@ -11,6 +10,7 @@ import type {
 } from "@package/services";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { activeAuth as auth } from "@/lib/auth";
 import {
   nextAvailableSlug,
   normalizeOptionalUrl,

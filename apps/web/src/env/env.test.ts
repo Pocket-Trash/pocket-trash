@@ -107,6 +107,7 @@ describe("web server env", () => {
       AXIOM_TOKEN: "xaat-example",
       CLERK_SECRET_KEY: "sk_test_example",
       DATABASE_URL: "postgres://user:password@example.com:5432/pocket_trash",
+      ERASURE_HMAC_SECRET: "test-erasure-hmac-secret-at-least-32-characters",
       BUNNY_IMAGE_FOLDER_PREFIX: "images/preview/pr-52",
       LOGGER: "verbose",
       LOG_DEPLOYMENT_ID: "pr-52",
@@ -128,6 +129,9 @@ describe("web server env", () => {
     expect(env.CLERK_SECRET_KEY).toBe("sk_test_example");
     expect(env.DATABASE_URL).toBe(
       "postgres://user:password@example.com:5432/pocket_trash",
+    );
+    expect(env.ERASURE_HMAC_SECRET).toBe(
+      "test-erasure-hmac-secret-at-least-32-characters",
     );
     expect(env.BUNNY_IMAGE_FOLDER_PREFIX).toBe("images/preview/pr-52");
     expect(env.LOGGER).toBe("verbose");

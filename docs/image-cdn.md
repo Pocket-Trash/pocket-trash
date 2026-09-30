@@ -33,6 +33,13 @@ uploads.
 | `BUNNY_STORAGE_ENDPOINT` | `https://ny.storage.bunnycdn.com` | Use the endpoint shown in Bunny if it differs. |
 | `BUNNY_STORAGE_ACCESS_KEY` | Storage Zone password | Secret. Required outside dry-run mode. |
 
+Complete account erasure uses `BUNNY_API_KEY`, `BUNNY_PULL_ZONE_ID`, and
+`BUNNY_CDN_TOKEN_KEY` in addition to the Storage Zone password. It refuses to
+run while Pull Zone Perma-Cache is configured, rejects every `products` path,
+purges each exact delivery URL, and verifies both Storage and CDN return a
+missing response. Purging an original also invalidates its Dynamic Images
+variants.
+
 ## Upload Behavior
 
 Upload folders are built from:

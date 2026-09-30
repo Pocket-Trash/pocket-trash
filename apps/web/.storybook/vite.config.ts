@@ -18,6 +18,15 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: /^@pocket-trash\/localizations$/u,
+        replacement: fileURLToPath(
+          new URL(
+            "../node_modules/@pocket-trash/localizations/dist/index.js",
+            import.meta.url,
+          ),
+        ),
+      },
+      {
         find: "@/env/client",
         replacement: fileURLToPath(new URL("./env-client.ts", import.meta.url)),
       },

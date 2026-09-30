@@ -1,6 +1,7 @@
 export * from "./collection.js";
 export * from "./descriptions.js";
 export * from "./enums.js";
+export * from "./erasure.js";
 export * from "./feature-flags.js";
 export * from "./feedback.js";
 export * from "./relations.js";

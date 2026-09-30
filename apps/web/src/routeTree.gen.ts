@@ -18,6 +18,8 @@ import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AutmogRouteImport } from './routes/autmog'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AccountErasureRouteImport } from './routes/account-erasure'
+import { Route as AccountErasedRouteImport } from './routes/account-erased'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UserIndexRouteImport } from './routes/user.index'
 import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
@@ -42,6 +44,7 @@ import { Route as FeedbackMyRequestsRouteImport } from './routes/feedback.my-req
 import { Route as CollectionsAddRouteImport } from './routes/collections.add'
 import { Route as CollectionsUserIdRouteImport } from './routes/collections.$userId'
 import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
+import { Route as AdminAccountErasureRouteImport } from './routes/admin.account-erasure'
 import { Route as AdminTrashIndexRouteImport } from './routes/admin.trash.index'
 import { Route as AdminFeedbackIndexRouteImport } from './routes/admin.feedback.index'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
@@ -108,6 +111,16 @@ const AutmogRoute = AutmogRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountErasureRoute = AccountErasureRouteImport.update({
+  id: '/account-erasure',
+  path: '/account-erasure',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountErasedRoute = AccountErasedRouteImport.update({
+  id: '/account-erased',
+  path: '/account-erased',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -229,6 +242,11 @@ const AutmogPenIdRoute = AutmogPenIdRouteImport.update({
   id: '/$penId',
   path: '/$penId',
   getParentRoute: () => AutmogRoute,
+} as any)
+const AdminAccountErasureRoute = AdminAccountErasureRouteImport.update({
+  id: '/account-erasure',
+  path: '/account-erasure',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminTrashIndexRoute = AdminTrashIndexRouteImport.update({
   id: '/trash/',
@@ -355,6 +373,8 @@ const CollectionsUserIdCollectionIdCollectionItemIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account-erased': typeof AccountErasedRoute
+  '/account-erasure': typeof AccountErasureRoute
   '/admin': typeof AdminRouteWithChildren
   '/autmog': typeof AutmogRouteWithChildren
   '/contact': typeof ContactRoute
@@ -364,6 +384,7 @@ export interface FileRoutesByFullPath {
   '/resources': typeof ResourcesRouteWithChildren
   '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
+  '/admin/account-erasure': typeof AdminAccountErasureRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -412,11 +433,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account-erased': typeof AccountErasedRoute
+  '/account-erasure': typeof AccountErasureRoute
   '/autmog': typeof AutmogRouteWithChildren
   '/contact': typeof ContactRoute
   '/notifications': typeof NotificationsRoute
   '/privacy': typeof PrivacyRoute
   '/terms-of-service': typeof TermsOfServiceRoute
+  '/admin/account-erasure': typeof AdminAccountErasureRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -466,6 +490,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account-erased': typeof AccountErasedRoute
+  '/account-erasure': typeof AccountErasureRoute
   '/admin': typeof AdminRouteWithChildren
   '/autmog': typeof AutmogRouteWithChildren
   '/contact': typeof ContactRoute
@@ -475,6 +501,7 @@ export interface FileRoutesById {
   '/resources': typeof ResourcesRouteWithChildren
   '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
+  '/admin/account-erasure': typeof AdminAccountErasureRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -525,6 +552,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/account-erased'
+    | '/account-erasure'
     | '/admin'
     | '/autmog'
     | '/contact'
@@ -534,6 +563,7 @@ export interface FileRouteTypes {
     | '/resources'
     | '/terms-of-service'
     | '/user'
+    | '/admin/account-erasure'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
@@ -582,11 +612,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/account-erased'
+    | '/account-erasure'
     | '/autmog'
     | '/contact'
     | '/notifications'
     | '/privacy'
     | '/terms-of-service'
+    | '/admin/account-erasure'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
@@ -635,6 +668,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/account-erased'
+    | '/account-erasure'
     | '/admin'
     | '/autmog'
     | '/contact'
@@ -644,6 +679,7 @@ export interface FileRouteTypes {
     | '/resources'
     | '/terms-of-service'
     | '/user'
+    | '/admin/account-erasure'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
@@ -693,6 +729,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountErasedRoute: typeof AccountErasedRoute
+  AccountErasureRoute: typeof AccountErasureRoute
   AdminRoute: typeof AdminRouteWithChildren
   AutmogRoute: typeof AutmogRouteWithChildren
   ContactRoute: typeof ContactRoute
@@ -782,6 +820,20 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account-erasure': {
+      id: '/account-erasure'
+      path: '/account-erasure'
+      fullPath: '/account-erasure'
+      preLoaderRoute: typeof AccountErasureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account-erased': {
+      id: '/account-erased'
+      path: '/account-erased'
+      fullPath: '/account-erased'
+      preLoaderRoute: typeof AccountErasedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -952,6 +1004,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AutmogPenIdRouteImport
       parentRoute: typeof AutmogRoute
     }
+    '/admin/account-erasure': {
+      id: '/admin/account-erasure'
+      path: '/account-erasure'
+      fullPath: '/admin/account-erasure'
+      preLoaderRoute: typeof AdminAccountErasureRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/trash/': {
       id: '/admin/trash/'
       path: '/trash'
@@ -1110,6 +1169,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminAccountErasureRoute: typeof AdminAccountErasureRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminFeedbackArchiveRoute: typeof AdminFeedbackArchiveRoute
   AdminFeedbackPlannedRoute: typeof AdminFeedbackPlannedRoute
@@ -1124,6 +1184,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAccountErasureRoute: AdminAccountErasureRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminFeedbackArchiveRoute: AdminFeedbackArchiveRoute,
   AdminFeedbackPlannedRoute: AdminFeedbackPlannedRoute,
@@ -1216,6 +1277,8 @@ const UserRouteWithChildren = UserRoute._addFileChildren(UserRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountErasedRoute: AccountErasedRoute,
+  AccountErasureRoute: AccountErasureRoute,
   AdminRoute: AdminRouteWithChildren,
   AutmogRoute: AutmogRouteWithChildren,
   ContactRoute: ContactRoute,

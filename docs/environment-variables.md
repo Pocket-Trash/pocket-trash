@@ -36,10 +36,12 @@ the scraper on Railway. Browser logs are forwarded to Axiom through the API.
 | `LOG_DEPLOYMENT_ID` | Server/build | Optional deployment id. Aliased to `VITE_LOG_DEPLOYMENT_ID`. |
 | `LOG_DEPLOYMENT_TARGET` | Server/build | Optional deployment target. Aliased to `VITE_LOG_DEPLOYMENT_TARGET`. |
 | `BUNNY_IMAGE_FOLDER_PREFIX` | Server | Image folder prefix for preview isolation. |
+| `BUNNY_API_KEY` | Secret | Bunny account API key used only for exact CDN purges and Pull Zone checks during account erasure. |
 | `ASSET_FOLDER_PREFIX` | Server/build | Static asset namespace; always `assets`. |
 | `BUNNY_CDN_BASE_URL` | Server | Public Bunny resource delivery origin. |
 | `BUNNY_CDN_TOKEN_KEY` | Secret | Signs short-lived Bunny resource URLs. |
 | `BUNNY_RESOURCE_FOLDER_PREFIX` | Server | Resource namespace: `resources/files`, `resources/dev`, `resources/preview`, or `resources/preview/pr-<number>`. |
+| `BUNNY_PULL_ZONE_ID` | Server | Pull Zone ID checked for disabled Perma-Cache during account erasure. |
 | `BUNNY_STORAGE_ACCESS_KEY` | Server | Resource Storage Zone password. |
 | `BUNNY_STORAGE_ENDPOINT` | Server | Regional Bunny Storage API origin. |
 | `BUNNY_STORAGE_ZONE_NAME` | Server | Shared `pocket-trash-storage` Storage Zone name. |
@@ -71,10 +73,14 @@ runner exposes the normalized `URL_INITIALS` to child processes.
 | --- | --- | --- |
 | `DATABASE_URL` | Secret | Neon Postgres connection string. GitHub Actions resolves the deployment-specific branch URL. |
 | `CLERK_SECRET_KEY` | Secret | Verifies Clerk bearer tokens. |
-| `CLERK_WEBHOOK_SIGNING_SECRET` | Secret | Verifies Clerk `user.created` and `user.updated` webhooks. |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | Secret | Verifies Clerk user webhooks. |
+| `ERASURE_HMAC_SECRET` | Secret | HMAC key for opaque erasure-subject identifiers. Use at least 32 characters and keep it stable until every receipt expires. |
 | `URL_INITIALS` | Local server | Normalized developer selector exposed by the Infisical runner. |
+| `BUNNY_API_KEY` | Secret | Bunny account API key for erasure-time Pull Zone checks and exact CDN purges. |
 | `BUNNY_CDN_BASE_URL` | Worker | Public Bunny delivery origin. |
 | `BUNNY_IMAGE_FOLDER_PREFIX` | Worker | Required for upload storage. Complete image namespace: `images`, `images/dev`, `images/preview`, or `images/preview/pr-<number>`. |
+| `BUNNY_CDN_TOKEN_KEY` | Secret | Signs delivery verification URLs during account erasure. |
+| `BUNNY_PULL_ZONE_ID` | Worker | Pull Zone checked for disabled Perma-Cache before account erasure. |
 | `BUNNY_RESOURCE_FOLDER_PREFIX` | Worker | Resource namespace selected for the deployment. |
 | `BUNNY_STORAGE_ACCESS_KEY` | Secret | Bunny Storage Zone password. |
 | `BUNNY_STORAGE_ENDPOINT` | Worker | Regional Bunny Storage API origin. |

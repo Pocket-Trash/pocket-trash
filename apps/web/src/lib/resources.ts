@@ -1,7 +1,7 @@
-import { auth } from "@clerk/tanstack-react-start/server";
 import type { ResourceTrashItem } from "@package/services";
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createServerFn } from "@tanstack/react-start";
+import { activeAuth as auth } from "@/lib/auth";
 
 type ResourceIdInput = { resourceId: number };
 type ResourceDownloadInput = ResourceIdInput & { fileId: number };

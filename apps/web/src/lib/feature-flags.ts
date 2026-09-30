@@ -1,4 +1,3 @@
-import { auth } from "@clerk/tanstack-react-start/server";
 import type { FeatureFlagAudience } from "@package/feature-flags";
 import type {
   AdminTargetingFeatureFlag,
@@ -6,6 +5,7 @@ import type {
   UserBetaFeatureFlag,
 } from "@package/services";
 import { createServerFn } from "@tanstack/react-start";
+import { activeAuth as auth } from "@/lib/auth";
 import { localizedServerError } from "@/lib/server-errors";
 
 export type ClerkUserSearchResult = {

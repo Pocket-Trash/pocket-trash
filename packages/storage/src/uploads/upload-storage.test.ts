@@ -13,10 +13,13 @@ import {
 const hash = await sha256(new Uint8Array([1, 2, 3]));
 const config = {
   accessKey: "storage-key",
+  apiKey: "account-key",
   cdnBaseUrl: "https://cdn.pocket-trash.app",
   endpoint: "https://ny.storage.bunnycdn.com",
   folderPrefix: "resources/dev",
   imageFolderPrefix: "images/dev",
+  pullZoneId: 123,
+  tokenKey: "cdn-token-key",
   zoneName: "pocket-trash-storage",
 };
 
@@ -395,6 +398,60 @@ describe("resource storage", () => {
     ).rejects.toThrow(
       "Upload object path is outside the configured namespace.",
     );
+  });
+
+  it("deletes an erasure target, purges its exact CDN URL, and proves it is gone", async () => {
+    const objectPath = "images/dev/collections/1005/photo.png";
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = toUrl(input);
+      if (url.pathname === "/pullzone/123") {
+        expect(init).toMatchObject({
+          headers: { AccessKey: "account-key" },
+          method: "GET",
+        });
+        return Response.json({ PermaCacheStorageZoneId: 0 });
+      }
+      if (url.pathname === "/purge") {
+        expect(init).toMatchObject({
+          headers: { AccessKey: "account-key" },
+          method: "POST",
+        });
+        expect(url.searchParams.get("url")).toBe(
+          `https://cdn.pocket-trash.app/${objectPath}`,
+        );
+        expect(url.searchParams.get("async")).toBe("false");
+        return new Response(null, { status: 204 });
+      }
+      if (url.hostname === "cdn.pocket-trash.app") {
+        expect(url.pathname).toBe(`/${objectPath}`);
+        expect(url.searchParams.get("token")).toMatch(/^HS256-/u);
+        return new Response(null, { status: 404 });
+      }
+      expect(url.pathname).toBe(`/pocket-trash-storage/${objectPath}`);
+      return new Response(null, {
+        status: init?.method === "DELETE" ? 200 : 404,
+      });
+    });
+    const storage = createUploadStorage({ ...config, fetch: fetchMock });
+
+    await expect(storage.assertErasureReady()).resolves.toBeUndefined();
+    await expect(storage.erase(objectPath)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+  });
+
+  it("fails closed for Perma-Cache and product objects", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ PermaCacheStorageZoneId: 456 }),
+    );
+    const storage = createUploadStorage({ ...config, fetch: fetchMock });
+
+    await expect(storage.assertErasureReady()).rejects.toThrow(
+      "Bunny Perma-Cache must be disabled before erasure.",
+    );
+    await expect(
+      storage.erase("images/dev/products/1005/photo.png"),
+    ).rejects.toThrow("Object path is outside an erasable namespace.");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

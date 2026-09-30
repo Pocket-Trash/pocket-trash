@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { createNoopLogger } from "@package/logger";
+import { createErasureSubjectHmac } from "@package/services";
 import { describe, expect, it, vi } from "vitest";
 import {
   clerkWebhookPath,
@@ -41,6 +42,34 @@ function signedRequest(type: "user.created" | "user.updated" = "user.created") {
 }
 
 describe("Clerk webhooks", () => {
+  it("resumes erasure for a verified user.deleted event", async () => {
+    const handleClerkDeletion = vi.fn().mockResolvedValue({
+      requestId: "request-id",
+      unexpected: false,
+    });
+    const erasureHmacSecret = "test-erasure-hmac-secret-at-least-32-characters";
+    const response = await createClerkWebhookHandler({
+      erasure: { handleClerkDeletion },
+      erasureHmacSecret,
+      logger: createNoopLogger(),
+      signingSecret,
+      users: { syncFromClerk: vi.fn() },
+      verify: vi.fn().mockResolvedValue({
+        data: { id: "user_secret" },
+        type: "user.deleted",
+      }) as never,
+    })(signedRequest(), "production");
+
+    expect(response.status).toBe(204);
+    expect(handleClerkDeletion).toHaveBeenCalledWith({
+      subjectHmac: await createErasureSubjectHmac(
+        "user_secret",
+        erasureHmacSecret,
+      ),
+      targetClerkId: "user_secret",
+    });
+  });
+
   it.each([
     "user.created",
     "user.updated",

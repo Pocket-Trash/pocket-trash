@@ -19,7 +19,7 @@ Current and previous cover images for a collection.
 | `storage_provider` | `text` | yes |  | `'bunny'` |  |  |  |
 | `object_path` | `text` | yes | unique |  |  | Storage-provider object path. | `collections/1000/cover.webp` |
 | `url` | `text` | yes |  |  |  | Unsigned CDN URL stored for the image. | `https://cdn.example.test/collections/1000/cover.webp` |
-| `uploaded_by_clerk_id` | `text` | yes |  |  |  |  |  |
+| `uploaded_by_clerk_id` | `text` | no |  |  |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 
 ## Indexes
