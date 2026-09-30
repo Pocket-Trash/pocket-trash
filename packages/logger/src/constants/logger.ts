@@ -101,6 +101,7 @@ export const loggerMessages = {
     },
     feedback: {
       approve: "database.feedback.approve",
+      completeLinearPlan: "database.feedback.completeLinearPlan",
       deny: "database.feedback.deny",
       findDuplicates: "database.feedback.findDuplicates",
       hasMine: "database.feedback.hasMine",
@@ -113,6 +114,7 @@ export const loggerMessages = {
       listPending: "database.feedback.listPending",
       markNotificationRead: "database.feedback.markNotificationRead",
       mergePending: "database.feedback.mergePending",
+      reserveLinearPlan: "database.feedback.reserveLinearPlan",
       submit: "database.feedback.submit",
       toggleVote: "database.feedback.toggleVote",
       updateAdmin: "database.feedback.updateAdmin",

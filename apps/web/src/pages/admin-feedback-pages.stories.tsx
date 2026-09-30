@@ -2,11 +2,13 @@ import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect, mocked, waitFor, within } from "storybook/test";
 import {
   approveFeedback,
+  getLinearPlanOptions,
   listAdminActiveFeedback,
   listAdminAllActiveFeedback,
   listArchivedFeedback,
   listFeedbackMergeTargets,
   listPendingFeedback,
+  planFeedback,
   updateAdminFeedback,
 } from "@/lib/feedback";
 import { mockStoryRole, StoryProviders } from "../../.storybook/story-fixtures";
@@ -22,6 +24,7 @@ const request = {
   createdAt: new Date("2026-09-28T12:00:00Z"),
   description: "Let people save searches they use often.",
   id: 1000,
+  linearClientUuid: null,
   status: "pending" as const,
   submitterUsername: "ada",
   title: "Saved searches",
@@ -57,6 +60,15 @@ const meta = {
     mocked(listFeedbackMergeTargets).mockResolvedValue([]);
     mocked(updateAdminFeedback).mockResolvedValue(undefined);
     mocked(approveFeedback).mockResolvedValue(undefined);
+    mocked(getLinearPlanOptions).mockResolvedValue({
+      labels: [
+        { id: "feature-label", name: "Feature" },
+        { id: "customer-label", name: "Customer request" },
+      ],
+      ok: true,
+      viewerName: "Ada",
+    });
+    mocked(planFeedback).mockResolvedValue({ ok: true });
   },
   component: AdminFeedbackRequestsPage,
   decorators: [
@@ -216,6 +228,56 @@ export const Active: Story = {
           offset: 30,
           search: "saved",
           sort: [{ direction: "asc", field: "title" }],
+        },
+      }),
+    );
+  },
+};
+
+export const Planning: Story = {
+  render: () => (
+    <AdminActiveFeedbackPage
+      initialPage={{
+        hasNext: false,
+        items: [{ ...request, status: "requested" }],
+      }}
+    />
+  ),
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Manage Saved searches" }),
+    );
+    const dialog = within(canvasElement.ownerDocument.body).getByRole(
+      "dialog",
+      { name: "Manage request" },
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: "Plan" }));
+    await expect(
+      within(canvasElement.ownerDocument.body).getByRole("dialog", {
+        name: "Plan request",
+      }),
+    ).toBeVisible();
+    await expect(
+      within(dialog).getByRole("radio", { name: "Issue" }),
+    ).toBeChecked();
+    await expect(
+      within(dialog).getByRole("checkbox", { name: "Feature" }),
+    ).toBeChecked();
+    await expect(
+      within(dialog).getByRole("checkbox", { name: "Assign to me" }),
+    ).not.toBeChecked();
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Create and plan" }),
+    );
+    await waitFor(() =>
+      expect(mocked(planFeedback)).toHaveBeenCalledWith({
+        data: {
+          assignToMe: false,
+          clientUuid: expect.any(String),
+          feedbackId: request.id,
+          kind: "issue",
+          labelIds: ["feature-label"],
+          leadProject: false,
         },
       }),
     );
