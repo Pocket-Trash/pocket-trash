@@ -12,6 +12,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { type Actor, hasPermission } from "../../authorization.js";
 import { hashLogIdentifier, loggedMutation } from "../../logging.js";
 import {
   attachImages as attachStoredImages,
@@ -38,7 +39,7 @@ export type CatalogFinishOption = {
   id: number;
 };
 
-export type CatalogViewer = { clerkId?: string; isAdmin?: boolean };
+export type CatalogViewer = Actor;
 
 export type CatalogImage = {
   contentType: string;
@@ -110,8 +111,7 @@ export type CatalogProduct = {
 };
 
 export type ProductWriteInput = {
-  actorClerkId: string;
-  actorIsAdmin?: boolean;
+  actor: Actor;
   description?: string | null;
   makerId: number;
   makerProductUrl?: string | null;
@@ -190,25 +190,19 @@ export type CatalogService = {
     productTypeSlug: string,
     exceptProductId?: number,
   ): Promise<string[]>;
-  listImageTrash(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
-  }): Promise<CatalogImageTrashItem[]>;
+  listImageTrash(input: { actor: Actor }): Promise<CatalogImageTrashItem[]>;
   restoreImage(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     imageId: number;
     targetType: CatalogImageTargetType;
   }): Promise<void>;
   softDeleteImage(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     imageId: number;
     targetType: CatalogImageTargetType;
   }): Promise<void>;
   setVisibility(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     isPrivate: boolean;
     productId: number;
     reason?: string;
@@ -327,15 +321,13 @@ export type CollectionsService = {
     productIds: number[];
   }): Promise<Record<number, number>>;
   getOwnedItem(
-    actorClerkId: string,
+    actor: Actor,
     collectionItemId: number,
-    actorIsAdmin?: boolean,
   ): Promise<UserCollectionItem | null>;
   getDefaultCollectionName(actorClerkId: string): Promise<string>;
   getOwnedCollection(
-    actorClerkId: string,
+    actor: Actor,
     collectionId: number,
-    actorIsAdmin?: boolean,
   ): Promise<UserCollectionSummary | null>;
   getPublicCollection(input: {
     collectionId: number;
@@ -348,37 +340,27 @@ export type CollectionsService = {
     ownerUserId: number;
     viewer?: CatalogViewer;
   }): Promise<UserCollectionItem | null>;
-  listOwned(
-    actorClerkId: string,
-    actorIsAdmin?: boolean,
-    collectionId?: number,
-  ): Promise<UserCollectionItem[]>;
-  listOwnedCollections(
-    actorClerkId: string,
-    actorIsAdmin?: boolean,
-  ): Promise<UserCollectionSummary[]>;
+  listOwned(actor: Actor, collectionId?: number): Promise<UserCollectionItem[]>;
+  listOwnedCollections(actor: Actor): Promise<UserCollectionSummary[]>;
   listProductItems(
     productId: number,
     viewer?: CatalogViewer,
   ): Promise<UserCollectionItem[]>;
   listOwners(viewer?: CatalogViewer): Promise<PublicCollectionOwner[]>;
   setCollectionVisibility(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     collectionId: number;
     isPrivate: boolean;
     reason?: string;
   }): Promise<void>;
   setItemVisibility(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     collectionItemId: number;
     isPrivate: boolean;
     reason?: string;
   }): Promise<void>;
   updateItem(input: {
-    actorClerkId: string;
-    actorIsAdmin?: boolean;
+    actor: Actor;
     bearing?: string | null;
     collectionId?: number;
     collectionItemId: number;
@@ -396,8 +378,7 @@ export type CollectionsService = {
   }): Promise<void>;
   updateCollection(
     input: CollectionWriteInput & {
-      actorClerkId: string;
-      actorIsAdmin: boolean;
+      actor: Actor;
       collectionId: number;
     },
   ): Promise<UserCollectionSummary>;
@@ -573,7 +554,7 @@ export function createCatalogService(
                     }
                   : {}),
                 name: input.name,
-                ownerClerkId: input.actorClerkId,
+                ownerClerkId: input.actor.clerkId,
                 productTypeId: type.id,
                 slug: input.slug,
               })
@@ -608,7 +589,7 @@ export function createCatalogService(
           const created = await this.getProduct(
             input.productTypeSlug,
             input.slug,
-            { clerkId: input.actorClerkId, isAdmin: input.actorIsAdmin },
+            input.actor,
           );
           if (!created || created.id !== productId) {
             throw new Error("Failed to load created product.");
@@ -735,16 +716,18 @@ export function createCatalogService(
         .limit(1);
       if (
         !product ||
-        (!input.actorIsAdmin && product.ownerClerkId !== input.actorClerkId)
+        (product.ownerClerkId !== input.actor.clerkId &&
+          !hasPermission(input.actor, "products.manage"))
       ) {
         throw new Error("Product does not exist.");
       }
       const actorIsModerating =
-        input.actorIsAdmin && product.ownerClerkId !== input.actorClerkId;
+        product.ownerClerkId !== input.actor.clerkId &&
+        hasPermission(input.actor, "products.manage");
       if (
         !input.isPrivate &&
         product.privatedByClerkId &&
-        product.privatedByClerkId !== input.actorClerkId &&
+        product.privatedByClerkId !== input.actor.clerkId &&
         !actorIsModerating
       ) {
         throw new Error("Product is private by an administrator.");
@@ -754,7 +737,14 @@ export function createCatalogService(
       }
       await db
         .update(schema.product)
-        .set(privacyUpdate({ ...input, actorIsAdmin: actorIsModerating }))
+        .set(
+          privacyUpdate({
+            actorClerkId: input.actor.clerkId,
+            actorIsModerating,
+            isPrivate: input.isPrivate,
+            reason: input.reason,
+          }),
+        )
         .where(eq(schema.product.id, input.productId));
     },
     async setMakerProductUrlValidity(input) {
@@ -804,8 +794,8 @@ export function createCatalogService(
               .limit(1);
             if (!existing) throw new Error("Product does not exist.");
             if (
-              !input.actorIsAdmin &&
-              existing.ownerClerkId !== input.actorClerkId
+              existing.ownerClerkId !== input.actor.clerkId &&
+              !hasPermission(input.actor, "products.manage")
             ) {
               throw new Error("Product does not exist.");
             }
@@ -870,7 +860,7 @@ export function createCatalogService(
           const updated = await this.getProduct(
             input.productTypeSlug,
             input.slug,
-            { clerkId: input.actorClerkId, isAdmin: input.actorIsAdmin },
+            input.actor,
           );
           if (!updated) throw new Error("Failed to load updated product.");
           return updated;
@@ -901,7 +891,7 @@ export function createCollectionsService(
               includePrivate: true,
               ownerUserId: owner.id,
               viewerClerkId: input.actorClerkId,
-              viewerIsAdmin: false,
+              viewerCanManage: false,
             })
           )[0];
           if (!collection) throw new Error("Failed to load collection.");
@@ -1095,17 +1085,18 @@ export function createCollectionsService(
       }
       return result;
     },
-    async getOwnedItem(actorClerkId, collectionItemId, actorIsAdmin = false) {
+    async getOwnedItem(actor, collectionItemId) {
+      const canManage = hasPermission(actor, "collections.manage");
       return (
         (
           await queryOwnedItems(
             db,
-            actorIsAdmin ? undefined : actorClerkId,
+            canManage ? undefined : actor.clerkId,
             collectionItemId,
             {
               includePrivate: true,
-              viewerClerkId: actorClerkId,
-              viewerIsAdmin: actorIsAdmin,
+              viewerClerkId: actor.clerkId,
+              viewerCanManage: canManage,
             },
           )
         )[0] ?? null
@@ -1122,17 +1113,18 @@ export function createCollectionsService(
       }
       return `${owner.username}'s Collection`;
     },
-    async getOwnedCollection(actorClerkId, collectionId, actorIsAdmin = false) {
-      const owner = await users.getByClerkId(actorClerkId);
-      if (!owner && !actorIsAdmin) return null;
+    async getOwnedCollection(actor, collectionId) {
+      const canManage = hasPermission(actor, "collections.manage");
+      const owner = await users.getByClerkId(actor.clerkId);
+      if (!owner && !canManage) return null;
       return (
         (
           await queryCollections(db, {
             collectionId,
             includePrivate: true,
-            ownerUserId: actorIsAdmin ? undefined : owner?.id,
-            viewerClerkId: actorClerkId,
-            viewerIsAdmin: actorIsAdmin,
+            ownerUserId: canManage ? undefined : owner?.id,
+            viewerClerkId: actor.clerkId,
+            viewerCanManage: canManage,
           })
         )[0] ?? null
       );
@@ -1142,10 +1134,10 @@ export function createCollectionsService(
         (
           await queryCollections(db, {
             collectionId,
-            includePrivate: Boolean(viewer?.isAdmin),
+            includePrivate: hasPermission(viewer, "collections.manage"),
             ownerUserId,
             viewerClerkId: viewer?.clerkId,
-            viewerIsAdmin: viewer?.isAdmin,
+            viewerCanManage: hasPermission(viewer, "collections.manage"),
           })
         )[0] ?? null
       );
@@ -1160,30 +1152,30 @@ export function createCollectionsService(
         (
           await queryOwnedItems(db, undefined, collectionItemId, {
             collectionId,
-            includePrivate: Boolean(viewer?.isAdmin),
+            includePrivate: hasPermission(viewer, "collections.manage"),
             ownerUserId,
             viewerClerkId: viewer?.clerkId,
-            viewerIsAdmin: viewer?.isAdmin,
+            viewerCanManage: hasPermission(viewer, "collections.manage"),
           })
         )[0] ?? null
       );
     },
-    async listOwned(actorClerkId, actorIsAdmin = false, collectionId) {
-      return await queryOwnedItems(db, actorClerkId, undefined, {
+    async listOwned(actor, collectionId) {
+      return await queryOwnedItems(db, actor.clerkId, undefined, {
         collectionId,
         includePrivate: true,
-        viewerClerkId: actorClerkId,
-        viewerIsAdmin: actorIsAdmin,
+        viewerClerkId: actor.clerkId,
+        viewerCanManage: hasPermission(actor, "collections.manage"),
       });
     },
-    async listOwnedCollections(actorClerkId, actorIsAdmin = false) {
-      const owner = await users.getByClerkId(actorClerkId);
+    async listOwnedCollections(actor) {
+      const owner = await users.getByClerkId(actor.clerkId);
       if (!owner) return [];
       return await queryCollections(db, {
         includePrivate: true,
         ownerUserId: owner.id,
-        viewerClerkId: actorClerkId,
-        viewerIsAdmin: actorIsAdmin,
+        viewerClerkId: actor.clerkId,
+        viewerCanManage: hasPermission(actor, "collections.manage"),
       });
     },
     async listProductItems(productId, viewer) {
@@ -1191,7 +1183,7 @@ export function createCollectionsService(
         productId,
         publicOnly: true,
         viewerClerkId: viewer?.clerkId,
-        viewerIsAdmin: viewer?.isAdmin,
+        viewerCanManage: hasPermission(viewer, "collections.manage"),
       });
     },
     async listOwners(viewer) {
@@ -1199,12 +1191,12 @@ export function createCollectionsService(
         queryOwnedItems(db, undefined, undefined, {
           publicOnly: true,
           viewerClerkId: viewer?.clerkId,
-          viewerIsAdmin: viewer?.isAdmin,
+          viewerCanManage: hasPermission(viewer, "collections.manage"),
         }),
         queryCollections(db, {
           publicOnly: true,
           viewerClerkId: viewer?.clerkId,
-          viewerIsAdmin: viewer?.isAdmin,
+          viewerCanManage: hasPermission(viewer, "collections.manage"),
         }),
       ]);
       const ownerIds = [
@@ -1237,9 +1229,9 @@ export function createCollectionsService(
         .sort((left, right) => left.username.localeCompare(right.username));
     },
     async setCollectionVisibility(input) {
-      const owner = await users.getByClerkId(input.actorClerkId);
-      if (!owner && !input.actorIsAdmin)
-        throw new Error("Collection does not exist.");
+      const canManage = hasPermission(input.actor, "collections.manage");
+      const owner = await users.getByClerkId(input.actor.clerkId);
+      if (!owner && !canManage) throw new Error("Collection does not exist.");
       const [collection] = await db
         .select({
           isPrivate: schema.userCollection.isPrivate,
@@ -1249,18 +1241,14 @@ export function createCollectionsService(
         .from(schema.userCollection)
         .where(eq(schema.userCollection.id, input.collectionId))
         .limit(1);
-      if (
-        !collection ||
-        (!input.actorIsAdmin && collection.ownerId !== owner?.id)
-      ) {
+      if (!collection || (collection.ownerId !== owner?.id && !canManage)) {
         throw new Error("Collection does not exist.");
       }
-      const actorIsModerating =
-        input.actorIsAdmin && collection.ownerId !== owner?.id;
+      const actorIsModerating = canManage && collection.ownerId !== owner?.id;
       if (
         !input.isPrivate &&
         collection.privatedByClerkId &&
-        collection.privatedByClerkId !== input.actorClerkId &&
+        collection.privatedByClerkId !== input.actor.clerkId &&
         !actorIsModerating
       ) {
         throw new Error("Collection is private by an administrator.");
@@ -1270,14 +1258,22 @@ export function createCollectionsService(
       }
       await db
         .update(schema.userCollection)
-        .set(privacyUpdate({ ...input, actorIsAdmin: actorIsModerating }))
+        .set(
+          privacyUpdate({
+            actorClerkId: input.actor.clerkId,
+            actorIsModerating,
+            isPrivate: input.isPrivate,
+            reason: input.reason,
+          }),
+        )
         .where(eq(schema.userCollection.id, input.collectionId));
     },
     async updateCollection(input) {
       return await logger.operation(
         loggerMessages.database.collections.update,
         async () => {
-          const owner = await users.getByClerkId(input.actorClerkId);
+          const canManage = hasPermission(input.actor, "collections.manage");
+          const owner = await users.getByClerkId(input.actor.clerkId);
           const [current] = await db
             .select({
               isPrivate: schema.userCollection.isPrivate,
@@ -1287,18 +1283,14 @@ export function createCollectionsService(
             .from(schema.userCollection)
             .where(eq(schema.userCollection.id, input.collectionId))
             .limit(1);
-          if (
-            !current ||
-            (!input.actorIsAdmin && current.ownerId !== owner?.id)
-          ) {
+          if (!current || (current.ownerId !== owner?.id && !canManage)) {
             throw new Error("Collection does not exist.");
           }
-          const actorIsModerating =
-            input.actorIsAdmin && current.ownerId !== owner?.id;
+          const actorIsModerating = canManage && current.ownerId !== owner?.id;
           if (
             !input.isPrivate &&
             current.privatedByClerkId &&
-            current.privatedByClerkId !== input.actorClerkId &&
+            current.privatedByClerkId !== input.actor.clerkId &&
             !actorIsModerating
           ) {
             throw new Error("Collection is private by an administrator.");
@@ -1319,8 +1311,10 @@ export function createCollectionsService(
               ...(input.isPrivate === current.isPrivate
                 ? { updatedAt: new Date() }
                 : privacyUpdate({
-                    ...input,
-                    actorIsAdmin: actorIsModerating,
+                    actorClerkId: input.actor.clerkId,
+                    actorIsModerating,
+                    isPrivate: input.isPrivate,
+                    reason: input.reason,
                   })),
             })
             .where(eq(schema.userCollection.id, input.collectionId));
@@ -1329,20 +1323,21 @@ export function createCollectionsService(
               collectionId: input.collectionId,
               includePrivate: true,
               ownerUserId: current.ownerId,
-              viewerClerkId: input.actorClerkId,
-              viewerIsAdmin: input.actorIsAdmin,
+              viewerClerkId: input.actor.clerkId,
+              viewerCanManage: canManage,
             })
           )[0];
           if (!collection) throw new Error("Failed to load collection.");
           return collection;
         },
-        actorAttributes(input.actorClerkId, {
+        actorAttributes(input.actor.clerkId, {
           collectionId: input.collectionId,
         }),
       );
     },
     async setItemVisibility(input) {
-      const owner = await users.getByClerkId(input.actorClerkId);
+      const canManage = hasPermission(input.actor, "collections.manage");
+      const owner = await users.getByClerkId(input.actor.clerkId);
       const [item] = await db
         .select({
           ownerId: schema.collectionItem.ownerId,
@@ -1351,14 +1346,13 @@ export function createCollectionsService(
         .from(schema.collectionItem)
         .where(eq(schema.collectionItem.id, input.collectionItemId))
         .limit(1);
-      if (!item || (!input.actorIsAdmin && item.ownerId !== owner?.id))
+      if (!item || (item.ownerId !== owner?.id && !canManage))
         throw new Error("Collection item does not exist.");
-      const actorIsModerating =
-        input.actorIsAdmin && item.ownerId !== owner?.id;
+      const actorIsModerating = canManage && item.ownerId !== owner?.id;
       if (
         !input.isPrivate &&
         item.privatedByClerkId &&
-        item.privatedByClerkId !== input.actorClerkId &&
+        item.privatedByClerkId !== input.actor.clerkId &&
         !actorIsModerating
       ) {
         throw new Error("Collection item is private by an administrator.");
@@ -1367,15 +1361,23 @@ export function createCollectionsService(
         throw new Error("A privacy reason is required.");
       await db
         .update(schema.collectionItem)
-        .set(privacyUpdate({ ...input, actorIsAdmin: actorIsModerating }))
+        .set(
+          privacyUpdate({
+            actorClerkId: input.actor.clerkId,
+            actorIsModerating,
+            isPrivate: input.isPrivate,
+            reason: input.reason,
+          }),
+        )
         .where(eq(schema.collectionItem.id, input.collectionItemId));
     },
     async updateItem(input) {
       await logger.operation(
         loggerMessages.database.collections.updateItem,
         async () => {
-          const owner = await users.getByClerkId(input.actorClerkId);
-          if (!owner && !input.actorIsAdmin)
+          const canManage = hasPermission(input.actor, "collections.manage");
+          const owner = await users.getByClerkId(input.actor.clerkId);
+          if (!owner && !canManage)
             throw new Error("Collection item does not exist.");
           await db.transaction(async (tx) => {
             const [item] = await tx
@@ -1399,7 +1401,7 @@ export function createCollectionsService(
               .where(
                 and(
                   eq(schema.collectionItem.id, input.collectionItemId),
-                  input.actorIsAdmin
+                  canManage
                     ? undefined
                     : owner
                       ? eq(schema.collectionItem.ownerId, owner.id)
@@ -1509,7 +1511,7 @@ export function createCollectionsService(
                         schema.collectionSpinnerButton.id,
                         input.installedButton.collectionItemId,
                       ),
-                      input.actorIsAdmin
+                      canManage
                         ? undefined
                         : owner
                           ? eq(schema.collectionItem.ownerId, owner.id)
@@ -1544,7 +1546,7 @@ export function createCollectionsService(
             await touchCollection(tx, targetCollectionId);
           });
         },
-        actorAttributes(input.actorClerkId, {
+        actorAttributes(input.actor.clerkId, {
           collectionItemId: input.collectionItemId,
           installedButtonId: input.installedButton?.collectionItemId,
           materialId: input.materialId,
@@ -1663,7 +1665,7 @@ async function queryCollections(
     ownerUserId?: number;
     publicOnly?: boolean;
     viewerClerkId?: string;
-    viewerIsAdmin?: boolean;
+    viewerCanManage?: boolean;
   } = {},
 ): Promise<UserCollectionSummary[]> {
   const conditions = [];
@@ -1756,9 +1758,9 @@ async function queryCollections(
       ]),
   );
   return visibleRows.map((row) => ({
-    canAdminister: Boolean(options.viewerIsAdmin),
+    canAdminister: Boolean(options.viewerCanManage),
     canEdit: Boolean(
-      options.viewerIsAdmin || options.viewerClerkId === row.ownerClerkId,
+      options.viewerCanManage || options.viewerClerkId === row.ownerClerkId,
     ),
     coverImage: coverByCollection.get(row.id) ?? null,
     coverImages: covers
@@ -1844,7 +1846,7 @@ async function queryProducts(
     conditions.push(eq(schema.productType.slug, productTypeSlug));
   }
   if (productSlug) conditions.push(eq(schema.product.slug, productSlug));
-  if (!viewer?.isAdmin) {
+  if (!hasPermission(viewer, "products.manage")) {
     conditions.push(
       viewer?.clerkId
         ? sql`(${schema.product.isPrivate} = false or ${schema.product.ownerClerkId} = ${viewer.clerkId})`
@@ -1937,8 +1939,11 @@ async function queryProducts(
       buttonDiameterMm: row.buttonDiameterMm,
       compatibleButtonId: row.compatibleButtonId,
       compatibleButtonName: row.compatibleButtonName,
-      canAdminister: Boolean(viewer?.isAdmin),
-      canEdit: Boolean(viewer?.isAdmin || viewer?.clerkId === row.ownerClerkId),
+      canAdminister: hasPermission(viewer, "products.manage"),
+      canEdit: Boolean(
+        viewer?.clerkId === row.ownerClerkId ||
+          hasPermission(viewer, "products.manage"),
+      ),
       createdAt: row.createdAt,
       description: row.description,
       diameterMm: row.diameterMm,
@@ -2019,7 +2024,7 @@ async function loadProductImages(
     const product = productById.get(row.productId);
     if (!product) continue;
     const canSeeDeleted =
-      viewer?.isAdmin ||
+      hasPermission(viewer, "products.manage") ||
       (viewer?.clerkId === product.ownerClerkId &&
         row.deletedByRole === "owner");
     if (row.deletedAt && !canSeeDeleted) continue;
@@ -2156,7 +2161,7 @@ async function queryOwnedItems(
     productId?: number;
     publicOnly?: boolean;
     viewerClerkId?: string;
-    viewerIsAdmin?: boolean;
+    viewerCanManage?: boolean;
   } = {},
 ): Promise<UserCollectionItem[]> {
   const conditions = [eq(schema.collectionItem.owned, true)];
@@ -2293,9 +2298,9 @@ async function queryOwnedItems(
   const items: UserCollectionItem[] = visibleRows.map((row) => ({
     bearing: row.bearingOverride ?? row.productBearing,
     bearingOverride: row.bearingOverride,
-    canAdminister: Boolean(options.viewerIsAdmin),
+    canAdminister: Boolean(options.viewerCanManage),
     canEdit: Boolean(
-      options.viewerIsAdmin || options.viewerClerkId === row.ownerClerkId,
+      options.viewerCanManage || options.viewerClerkId === row.ownerClerkId,
     ),
     collectionIsPrivate: row.collectionIsPrivate,
     collectionId: row.collectionId,
@@ -2437,14 +2442,14 @@ function toCatalogImage(row: {
 
 function privacyUpdate(input: {
   actorClerkId: string;
-  actorIsAdmin: boolean;
+  actorIsModerating: boolean;
   isPrivate: boolean;
   reason?: string;
 }) {
   return input.isPrivate
     ? {
         isPrivate: true,
-        privateReason: input.actorIsAdmin ? input.reason?.trim() : "",
+        privateReason: input.actorIsModerating ? input.reason?.trim() : "",
         privatedAt: new Date(),
         privatedByClerkId: input.actorClerkId,
         updatedAt: new Date(),
@@ -2461,14 +2466,14 @@ function privacyUpdate(input: {
 async function softDeleteCatalogImage(
   db: Database,
   input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     imageId: number;
     targetType: CatalogImageTargetType;
   },
 ) {
   const deletedAt = new Date();
   if (input.targetType === "product") {
+    const canManage = hasPermission(input.actor, "products.manage");
     const [image] = await db
       .select({
         deletedAt: schema.productImage.deletedAt,
@@ -2481,19 +2486,16 @@ async function softDeleteCatalogImage(
       )
       .where(eq(schema.productImage.id, input.imageId))
       .limit(1);
-    if (
-      !image ||
-      (!input.actorIsAdmin && image.ownerClerkId !== input.actorClerkId)
-    )
+    if (!image || (image.ownerClerkId !== input.actor.clerkId && !canManage))
       throw new Error("Image does not exist.");
     if (image.deletedAt) return;
     const actorIsModerating =
-      input.actorIsAdmin && image.ownerClerkId !== input.actorClerkId;
+      canManage && image.ownerClerkId !== input.actor.clerkId;
     await db
       .update(schema.productImage)
       .set({
         deletedAt,
-        deletedByClerkId: input.actorClerkId,
+        deletedByClerkId: input.actor.clerkId,
         deletedByRole: actorIsModerating ? "admin" : "owner",
       })
       .where(eq(schema.productImage.id, input.imageId));
@@ -2512,19 +2514,17 @@ async function softDeleteCatalogImage(
     .innerJoin(schema.user, eq(schema.collectionItem.ownerId, schema.user.id))
     .where(eq(schema.collectionItemImage.id, input.imageId))
     .limit(1);
-  if (
-    !image ||
-    (!input.actorIsAdmin && image.ownerClerkId !== input.actorClerkId)
-  )
+  const canManage = hasPermission(input.actor, "collections.manage");
+  if (!image || (image.ownerClerkId !== input.actor.clerkId && !canManage))
     throw new Error("Image does not exist.");
   if (image.deletedAt) return;
   const actorIsModerating =
-    input.actorIsAdmin && image.ownerClerkId !== input.actorClerkId;
+    canManage && image.ownerClerkId !== input.actor.clerkId;
   await db
     .update(schema.collectionItemImage)
     .set({
       deletedAt,
-      deletedByClerkId: input.actorClerkId,
+      deletedByClerkId: input.actor.clerkId,
       deletedByRole: actorIsModerating ? "admin" : "owner",
     })
     .where(eq(schema.collectionItemImage.id, input.imageId));
@@ -2533,8 +2533,7 @@ async function softDeleteCatalogImage(
 async function restoreCatalogImage(
   db: Database,
   input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     imageId: number;
     targetType: CatalogImageTargetType;
   },
@@ -2558,7 +2557,7 @@ async function restoreCatalogImage(
         ),
       )
       .limit(1);
-    assertCanRestoreImage(image, input);
+    assertCanRestoreImage(image, input.actor, "products.manage");
     await db
       .update(schema.productImage)
       .set({ deletedAt: null, deletedByClerkId: null, deletedByRole: null })
@@ -2584,7 +2583,7 @@ async function restoreCatalogImage(
       ),
     )
     .limit(1);
-  assertCanRestoreImage(image, input);
+  assertCanRestoreImage(image, input.actor, "collections.manage");
   await db
     .update(schema.collectionItemImage)
     .set({ deletedAt: null, deletedByClerkId: null, deletedByRole: null })
@@ -2599,16 +2598,17 @@ function assertCanRestoreImage(
         ownerClerkId: string | null;
       }
     | undefined,
-  actor: { actorClerkId: string; actorIsAdmin: boolean },
+  actor: Actor,
+  permission: "products.manage" | "collections.manage",
 ) {
-  const isOwner = image?.ownerClerkId === actor.actorClerkId;
-  const actorIsModerating = actor.actorIsAdmin && !isOwner;
+  const isOwner = image?.ownerClerkId === actor.clerkId;
+  const actorIsModerating = hasPermission(actor, permission) && !isOwner;
   if (
     !image ||
     (!actorIsModerating &&
       (!isOwner ||
         image.deletedByRole === "admin" ||
-        image.deletedByClerkId !== actor.actorClerkId))
+        image.deletedByClerkId !== actor.clerkId))
   ) {
     throw new Error("Image does not exist.");
   }
@@ -2616,8 +2616,9 @@ function assertCanRestoreImage(
 
 async function listCatalogImageTrash(
   db: Database,
-  actor: { actorClerkId: string; actorIsAdmin: boolean },
+  input: { actor: Actor },
 ): Promise<CatalogImageTrashItem[]> {
+  const { actor } = input;
   const [products, collectionItems] = await Promise.all([
     db
       .select({
@@ -2644,12 +2645,12 @@ async function listCatalogImageTrash(
       .where(
         and(
           isNotNull(schema.productImage.deletedAt),
-          actor.actorIsAdmin
+          hasPermission(actor, "products.manage")
             ? undefined
             : and(
-                eq(schema.product.ownerClerkId, actor.actorClerkId),
+                eq(schema.product.ownerClerkId, actor.clerkId),
                 eq(schema.productImage.deletedByRole, "owner"),
-                eq(schema.productImage.deletedByClerkId, actor.actorClerkId),
+                eq(schema.productImage.deletedByClerkId, actor.clerkId),
               ),
         ),
       ),
@@ -2697,15 +2698,12 @@ async function listCatalogImageTrash(
       .where(
         and(
           isNotNull(schema.collectionItemImage.deletedAt),
-          actor.actorIsAdmin
+          hasPermission(actor, "collections.manage")
             ? undefined
             : and(
-                eq(schema.user.clerkId, actor.actorClerkId),
+                eq(schema.user.clerkId, actor.clerkId),
                 eq(schema.collectionItemImage.deletedByRole, "owner"),
-                eq(
-                  schema.collectionItemImage.deletedByClerkId,
-                  actor.actorClerkId,
-                ),
+                eq(schema.collectionItemImage.deletedByClerkId, actor.clerkId),
               ),
         ),
       ),
@@ -3022,7 +3020,7 @@ function actorAttributes(
 }
 
 function productAttributes(input: ProductWriteInput) {
-  return actorAttributes(input.actorClerkId, {
+  return actorAttributes(input.actor.clerkId, {
     finishOptionCount: input.finishOptions.length,
     materialIds: input.materialIds,
     productTypeSlug: input.productTypeSlug,

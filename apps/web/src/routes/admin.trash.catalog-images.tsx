@@ -1,11 +1,10 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { listCatalogImageTrash } from "@/lib/catalog-api";
-import { isResourceAdmin } from "@/lib/resources";
+import { isCatalogAdmin, listCatalogImageTrash } from "@/lib/catalog-api";
 import { CatalogImageTrashPage } from "@/pages/catalog-image-trash-page";
 
 export const Route = createFileRoute("/admin/trash/catalog-images")({
   beforeLoad: async () => {
-    if (!(await isResourceAdmin())) throw redirect({ to: "/" });
+    if (!(await isCatalogAdmin())) throw redirect({ to: "/" });
   },
   loader: () => listCatalogImageTrash(),
   component: () => (

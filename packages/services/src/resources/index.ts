@@ -24,6 +24,7 @@ import {
   type SQL,
   sql,
 } from "drizzle-orm";
+import { type Actor, hasPermission } from "../authorization.js";
 import { signImages } from "../images/sign-images.js";
 import { hashLogIdentifier, loggedMutation } from "../logging.js";
 import { lockTarget } from "../storage/image-records.js";
@@ -35,17 +36,16 @@ import {
 } from "../storage/object-lifecycle.js";
 
 export type CreateResourceInput = {
+  actor: Actor;
   categories: string[];
   description: string;
   files: UploadInput[];
   images: UploadInput[];
   name: string;
-  uploaderClerkId: string;
 };
 
 export type UpdateResourceInput = {
-  actorClerkId: string;
-  actorIsAdmin: boolean;
+  actor: Actor;
   categories: string[];
   description: string;
   images: UploadInput[];
@@ -54,15 +54,12 @@ export type UpdateResourceInput = {
   resourceId: number;
 };
 
-export type ResourceViewer = {
-  clerkId?: string;
-  isAdmin?: boolean;
-};
+export type ResourceViewer = Actor;
 
 export type UploadResourceVersionInput = {
+  actor: Actor;
   files: UploadInput[];
   resourceId: number;
-  uploaderClerkId: string;
 };
 
 export type ResourceVersionDetail = {
@@ -205,25 +202,15 @@ export type ResourcesService = {
     reason: string;
     resourceId: number;
   }): Promise<void>;
-  permanentlyDelete(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
-    resourceId: number;
-  }): Promise<void>;
+  permanentlyDelete(input: { actor: Actor; resourceId: number }): Promise<void>;
   setVisibility(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     isPublic: boolean;
     resourceId: number;
   }): Promise<void>;
-  restore(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
-    resourceId: number;
-  }): Promise<void>;
+  restore(input: { actor: Actor; resourceId: number }): Promise<void>;
   softDelete(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     resourceId: number;
   }): Promise<{ deletedByRole: ResourceTrashItem["deletedByRole"] }>;
   update(input: UpdateResourceInput): Promise<{ id: number }>;
@@ -271,7 +258,7 @@ export function createResourcesService(
           attributes: {
             fileCount: input.files.length,
             resourceId: input.resourceId,
-            uploaderClerkIdHash: hashLogIdentifier(input.uploaderClerkId),
+            uploaderClerkIdHash: hashLogIdentifier(input.actor.clerkId),
           },
         },
       );
@@ -301,12 +288,12 @@ export function createResourcesService(
             categoryCount: input.categories.length,
             fileCount: input.files.length,
             imageCount: input.images.length,
-            uploaderClerkIdHash: hashLogIdentifier(input.uploaderClerkId),
+            uploaderClerkIdHash: hashLogIdentifier(input.actor.clerkId),
           },
         },
       );
     },
-    async downloadFile(resourceId, fileId, viewer = {}) {
+    async downloadFile(resourceId, fileId, viewer) {
       return await logger.operation(
         loggerMessages.resources.download,
         async () => {
@@ -328,8 +315,8 @@ export function createResourcesService(
               and resource_versions.resource_id = ${resourceId}
               and resources.deleted_at is null
               and (resources.is_private = false
-                or ${Boolean(viewer.isAdmin)}
-                or resources.uploader_clerk_id = ${viewer.clerkId ?? ""})
+                or ${hasPermission(viewer, "resources.manage")}
+                or resources.uploader_clerk_id = ${viewer?.clerkId ?? ""})
             limit 1
           `);
           const file = result.rows[0];
@@ -337,13 +324,13 @@ export function createResourcesService(
           if (!file) return null;
 
           const url = await signUrl(file.objectPath);
-          await recordResourceDownload(db, file.versionId, viewer.clerkId);
+          await recordResourceDownload(db, file.versionId, viewer?.clerkId);
           return url;
         },
         { attributes: { fileId, resourceId } },
       );
     },
-    async downloadVersion(resourceId, versionId, viewer = {}) {
+    async downloadVersion(resourceId, versionId, viewer) {
       return await logger.operation(
         loggerMessages.resources.download,
         async () => {
@@ -372,8 +359,8 @@ export function createResourcesService(
               and resource_versions.resource_id = ${resourceId}
               and resources.deleted_at is null
               and (resources.is_private = false
-                or ${Boolean(viewer.isAdmin)}
-                or resources.uploader_clerk_id = ${viewer.clerkId ?? ""})
+                or ${hasPermission(viewer, "resources.manage")}
+                or resources.uploader_clerk_id = ${viewer?.clerkId ?? ""})
             order by resource_files.id
           `);
           const firstFile = result.rows[0];
@@ -390,13 +377,13 @@ export function createResourcesService(
               result.rows,
             ));
           const url = await signUrl(objectPath);
-          await recordResourceDownload(db, versionId, viewer.clerkId);
+          await recordResourceDownload(db, versionId, viewer?.clerkId);
           return url;
         },
         { attributes: { resourceId, versionId } },
       );
     },
-    async getDetail(resourceId, viewer = {}) {
+    async getDetail(resourceId, viewer) {
       return await logger.operation(
         loggerMessages.resources.getDetail,
         async () => {
@@ -556,7 +543,7 @@ export function createResourcesService(
         { attributes: { resourceId } },
       );
     },
-    async listDirectory(categorySlugs = [], viewer = {}) {
+    async listDirectory(categorySlugs = [], viewer) {
       return await logger.operation(
         loggerMessages.resources.listDirectory,
         async () => {
@@ -662,8 +649,8 @@ export function createResourcesService(
             left join resource_categories
               on resource_categories.id = resources_to_categories.category_id
             where (${schema.resources.isPrivate} = false
-                or ${Boolean(viewer.isAdmin)}
-                or ${schema.resources.uploaderClerkId} = ${viewer.clerkId ?? ""})
+                or ${hasPermission(viewer, "resources.manage")}
+                or ${schema.resources.uploaderClerkId} = ${viewer?.clerkId ?? ""})
               and ${schema.resources.deletedAt} is null
               and users.username is not null
               and ${filter}
@@ -887,8 +874,8 @@ export function createResourcesService(
         loggerMessages.resources.permanentlyDelete,
         async () => {
           assertPositiveInteger(input.resourceId, "resourceId");
-          const actorClerkId = input.actorClerkId.trim();
-          if (!actorClerkId || !input.actorIsAdmin) {
+          const actorClerkId = input.actor.clerkId.trim();
+          if (!actorClerkId || !hasPermission(input.actor, "resources.purge")) {
             throw new Error("Resource permanent deletion requires an admin.");
           }
 
@@ -952,7 +939,7 @@ export function createResourcesService(
         },
         {
           attributes: {
-            actorClerkIdHash: hashLogIdentifier(input.actorClerkId),
+            actorClerkIdHash: hashLogIdentifier(input.actor.clerkId),
             resourceId: input.resourceId,
           },
         },
@@ -963,16 +950,17 @@ export function createResourcesService(
         loggerMessages.resources.update,
         async () => {
           assertPositiveInteger(input.resourceId, "resourceId");
-          const actorClerkId = input.actorClerkId.trim();
+          const actorClerkId = input.actor.clerkId.trim();
           if (!actorClerkId) throw new Error("actorClerkId is required.");
+          const canManage = hasPermission(input.actor, "resources.manage");
           const result = await db.execute<{ id: number }>(sql`
             update resources
             set is_private = ${!input.isPublic}, private_reason = null,
               privated_at = null, privated_by_clerk_id = null,
               updated_at = now()
             where id = ${input.resourceId}
-              and (uploader_clerk_id = ${actorClerkId} or ${input.actorIsAdmin})
-              and (${input.actorIsAdmin} or privated_by_clerk_id is null)
+              and (uploader_clerk_id = ${actorClerkId} or ${canManage})
+              and (${canManage} or privated_by_clerk_id is null)
               and (${input.isPublic} or uploader_clerk_id = ${actorClerkId})
               and deleted_at is null
             returning id
@@ -983,7 +971,7 @@ export function createResourcesService(
         },
         {
           attributes: {
-            actorClerkIdHash: hashLogIdentifier(input.actorClerkId),
+            actorClerkIdHash: hashLogIdentifier(input.actor.clerkId),
             isPublic: input.isPublic,
             resourceId: input.resourceId,
           },
@@ -995,15 +983,16 @@ export function createResourcesService(
         loggerMessages.resources.restore,
         async () => {
           assertPositiveInteger(input.resourceId, "resourceId");
-          const actorClerkId = input.actorClerkId.trim();
+          const actorClerkId = input.actor.clerkId.trim();
           if (!actorClerkId) throw new Error("actorClerkId is required.");
+          const canManage = hasPermission(input.actor, "resources.manage");
           const result = await db.execute<{ id: number }>(sql`
             update resources
             set deleted_at = null, deleted_by_clerk_id = null,
               deleted_by_role = null, updated_at = now()
             where id = ${input.resourceId}
               and deleted_at is not null
-              and (${input.actorIsAdmin} or (
+              and (${canManage} or (
                 uploader_clerk_id = ${actorClerkId}
                 and deleted_by_clerk_id = ${actorClerkId}
                 and deleted_by_role = 'owner'
@@ -1016,7 +1005,7 @@ export function createResourcesService(
         },
         {
           attributes: {
-            actorClerkIdHash: hashLogIdentifier(input.actorClerkId),
+            actorClerkIdHash: hashLogIdentifier(input.actor.clerkId),
             resourceId: input.resourceId,
           },
         },
@@ -1027,8 +1016,9 @@ export function createResourcesService(
         loggerMessages.resources.softDelete,
         async () => {
           assertPositiveInteger(input.resourceId, "resourceId");
-          const actorClerkId = input.actorClerkId.trim();
+          const actorClerkId = input.actor.clerkId.trim();
           if (!actorClerkId) throw new Error("actorClerkId is required.");
+          const canManage = hasPermission(input.actor, "resources.manage");
           const result = await db.execute<{
             deletedByRole: ResourceTrashItem["deletedByRole"];
           }>(sql`
@@ -1041,7 +1031,7 @@ export function createResourcesService(
               updated_at = now()
             where id = ${input.resourceId}
               and deleted_at is null
-              and (uploader_clerk_id = ${actorClerkId} or ${input.actorIsAdmin})
+              and (uploader_clerk_id = ${actorClerkId} or ${canManage})
             returning deleted_by_role as "deletedByRole"
           `);
           const deleted = result.rows[0];
@@ -1050,7 +1040,7 @@ export function createResourcesService(
         },
         {
           attributes: {
-            actorClerkIdHash: hashLogIdentifier(input.actorClerkId),
+            actorClerkIdHash: hashLogIdentifier(input.actor.clerkId),
             resourceId: input.resourceId,
           },
         },
@@ -1073,8 +1063,8 @@ export function createResourcesService(
               .from(schema.resources)
               .where(
                 sql`${schema.resources.id} = ${normalized.resourceId}
-                and (${schema.resources.uploaderClerkId} = ${normalized.actorClerkId}
-                  or ${normalized.actorIsAdmin})
+                and (${schema.resources.uploaderClerkId} = ${normalized.actor.clerkId}
+                  or ${normalized.canManage})
                 and ${schema.resources.deletedAt} is null`,
               )
               .limit(1);
@@ -1134,7 +1124,7 @@ export function createResourcesService(
             categoryCount: input.categories.length,
             imageCount: input.images.length,
             resourceId: input.resourceId,
-            actorClerkIdHash: hashLogIdentifier(input.actorClerkId),
+            actorClerkIdHash: hashLogIdentifier(input.actor.clerkId),
           },
         },
       );
@@ -1176,7 +1166,7 @@ async function persistResourceUpdate(
       update resources
       set name = ${input.name}, description = ${input.description}, updated_at = now()
       where id = ${input.resourceId}
-        and (uploader_clerk_id = ${input.actorClerkId} or ${input.actorIsAdmin})
+        and (uploader_clerk_id = ${input.actor.clerkId} or ${input.canManage})
         and deleted_at is null
       returning id
     ),
@@ -1276,9 +1266,10 @@ function normalizeUpdateInput(input: UpdateResourceInput) {
   assertCombinedUploadSize(images);
   return {
     ...input,
+    canManage: hasPermission(input.actor, "resources.manage"),
     ...normalizeMetadata({
       ...input,
-      uploaderClerkId: input.actorClerkId,
+      uploaderClerkId: input.actor.clerkId,
     }),
     images,
     retainedImageIds,
@@ -1503,12 +1494,12 @@ async function recordResourceDownload(
 
 export function canViewResource(
   resource: { isPrivate: boolean; uploaderClerkId: string },
-  viewer: ResourceViewer,
+  viewer?: ResourceViewer,
 ): boolean {
   return (
     !resource.isPrivate ||
-    Boolean(viewer.isAdmin) ||
-    resource.uploaderClerkId === viewer.clerkId
+    hasPermission(viewer, "resources.manage") ||
+    resource.uploaderClerkId === viewer?.clerkId
   );
 }
 
@@ -1521,7 +1512,7 @@ async function uploadBufferedSession(
   payload: Record<string, unknown>,
 ) {
   const service = createStorageService({ db, storage, logger });
-  const actor = { clerkId: input.uploaderClerkId, isAdmin: false };
+  const actor = input.actor;
   const inputs = [
     ...input.files.map((file) => ({ ...file, kind: "file" as const })),
     ...("images" in input

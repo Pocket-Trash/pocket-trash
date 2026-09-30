@@ -139,7 +139,7 @@ describe("api", () => {
     const service = createUploadServiceMock();
     const app = createApp({
       uploadRuntime: {
-        authenticate: async () => ({ clerkId: "user_123", isAdmin: false }),
+        authenticate: async () => ({ clerkId: "user_123", role: "user" }),
         isAllowedOrigin: (origin) => origin === "https://preview.vercel.app",
         service,
       },
@@ -190,7 +190,7 @@ describe("api", () => {
           operation: "create",
         }),
       }),
-      { clerkId: "user_123", isAdmin: false },
+      { clerkId: "user_123", role: "user" },
     );
 
     const uploadRequest = new Request(
@@ -210,7 +210,7 @@ describe("api", () => {
     expect(service.upload).toHaveBeenCalledWith(
       "00000000-0000-4000-8000-000000000001",
       "00000000-0000-4000-8000-000000000002",
-      { clerkId: "user_123", isAdmin: false },
+      { clerkId: "user_123", role: "user" },
       uploadRequest,
     );
   });
@@ -240,7 +240,7 @@ describe("api", () => {
     );
     const app = createApp({
       uploadRuntime: {
-        authenticate: async () => ({ clerkId: "user_123", isAdmin: false }),
+        authenticate: async () => ({ clerkId: "user_123", role: "user" }),
         isAllowedOrigin: () => true,
         service,
       },
@@ -253,7 +253,7 @@ describe("api", () => {
 
     expect(service.completeUpload).toHaveBeenCalledWith(
       "00000000-0000-4000-8000-000000000001",
-      { clerkId: "user_123", isAdmin: false },
+      { clerkId: "user_123", role: "user" },
     );
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
@@ -264,7 +264,7 @@ describe("api", () => {
     const service = createUploadServiceMock();
     const app = createApp({
       uploadRuntime: {
-        authenticate: async () => ({ clerkId: "user_123", isAdmin: false }),
+        authenticate: async () => ({ clerkId: "user_123", role: "user" }),
         isAllowedOrigin: () => true,
         service,
       },
@@ -293,7 +293,7 @@ describe("api", () => {
     expect(service.deleteFile).toHaveBeenCalledWith({
       fileType: "resource_image",
       fileId: 42,
-      actor: { clerkId: "user_123", isAdmin: false },
+      actor: { clerkId: "user_123", role: "user" },
     });
   });
 });
@@ -337,7 +337,7 @@ describe("upload runtime lifecycle", () => {
     const getUploadRuntime = vi.fn(() => ({
       logger,
       service,
-      authenticate: async () => ({ clerkId: "owner", isAdmin: false }),
+      authenticate: async () => ({ clerkId: "owner", role: "user" as const }),
       isAllowedOrigin: () => true,
     }));
     const app = createApp({ getUploadRuntime });

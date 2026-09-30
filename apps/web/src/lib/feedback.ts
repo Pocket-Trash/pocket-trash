@@ -2,32 +2,30 @@ import type {
   AdminFeedbackSortField,
   ListAdminFeedbackOptions,
 } from "@package/services";
+import { hasPermission } from "@package/services/authorization";
 import { createServerFn } from "@tanstack/react-start";
+import { requirePermission } from "@/lib/authorization";
 import {
   type FeedbackCategory,
   feedbackCategories,
 } from "@/lib/feedback-shared";
-import {
-  getResourceViewer,
-  requireResourceAdmin,
-  requireResourceUploader,
-} from "@/lib/resources";
+import { getResourceViewer, requireResourceUploader } from "@/lib/resources";
 import { localizedServerError } from "@/lib/server-errors";
 
-export const isFeedbackAdmin = createServerFn().handler(async () => {
-  return (await getResourceViewer()).isAdmin;
+export const canManageFeedback = createServerFn().handler(async () => {
+  return hasPermission(await getResourceViewer(), "feedback.manage");
 });
 
 export const submitFeedback = createServerFn({ method: "POST" })
   .validator(parseFeedbackInput)
   .handler(async ({ data }) => {
-    const submitterClerkId = await requireResourceUploader();
+    const submitter = await requireResourceUploader();
     const { s } = await import("@/lib/services");
     const { FeedbackSubmissionLimitError } = await import("@package/services");
     try {
       const feedback = await s.db.feedback.submit({
         ...data,
-        submitterClerkId,
+        submitterClerkId: submitter.clerkId,
       });
       return { feedbackId: feedback.id, ok: true as const };
     } catch (error) {
@@ -44,39 +42,39 @@ export const submitFeedback = createServerFn({ method: "POST" })
 export const findDuplicateFeedback = createServerFn({ method: "POST" })
   .validator(parseFeedbackTitleInput)
   .handler(async ({ data }) => {
-    const viewerClerkId = await requireResourceUploader();
+    const viewer = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    return await s.db.feedback.findDuplicates(viewerClerkId, data.title);
+    return await s.db.feedback.findDuplicates(viewer.clerkId, data.title);
   });
 
 export const hasMyFeedback = createServerFn({ method: "GET" }).handler(
   async () => {
-    const submitterClerkId = await requireResourceUploader();
+    const submitter = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    return await s.db.feedback.hasMine(submitterClerkId);
+    return await s.db.feedback.hasMine(submitter.clerkId);
   },
 );
 
 export const listActiveFeedback = createServerFn({ method: "GET" })
   .validator(parseFeedbackListInput)
   .handler(async ({ data }) => {
-    const viewerClerkId = await requireResourceUploader();
+    const viewer = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    return await s.db.feedback.listActive(viewerClerkId, data.search);
+    return await s.db.feedback.listActive(viewer.clerkId, data.search);
   });
 
 export const listMyFeedback = createServerFn({ method: "GET" })
   .validator(parseFeedbackListInput)
   .handler(async ({ data }) => {
-    const submitterClerkId = await requireResourceUploader();
+    const submitter = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    return await s.db.feedback.listMine(submitterClerkId, data);
+    return await s.db.feedback.listMine(submitter.clerkId, data);
   });
 
 export const listPendingFeedback = createServerFn({ method: "GET" })
   .validator((input) => parseAdminFeedbackListInput(input, "pending"))
   .handler(async ({ data }) => {
-    await requireResourceAdmin();
+    await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
     return await s.db.feedback.listPending(data);
   });
@@ -84,7 +82,7 @@ export const listPendingFeedback = createServerFn({ method: "GET" })
 export const listAdminActiveFeedback = createServerFn({ method: "GET" })
   .validator((input) => parseAdminFeedbackListInput(input, "active"))
   .handler(async ({ data }) => {
-    await requireResourceAdmin();
+    await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
     return await s.db.feedback.listAdminActive({
       ...data,
@@ -95,7 +93,7 @@ export const listAdminActiveFeedback = createServerFn({ method: "GET" })
 export const listAdminAllActiveFeedback = createServerFn({ method: "GET" })
   .validator((input) => parseAdminFeedbackListInput(input, "active"))
   .handler(async ({ data }) => {
-    await requireResourceAdmin();
+    await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
     return await s.db.feedback.listAdminActive(data);
   });
@@ -103,7 +101,7 @@ export const listAdminAllActiveFeedback = createServerFn({ method: "GET" })
 export const listArchivedFeedback = createServerFn({ method: "GET" })
   .validator((input) => parseAdminFeedbackListInput(input, "archive"))
   .handler(async ({ data }) => {
-    await requireResourceAdmin();
+    await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
     return await s.db.feedback.listArchive(data);
   });
@@ -111,7 +109,7 @@ export const listArchivedFeedback = createServerFn({ method: "GET" })
 export const listFeedbackArchiveStatuses = createServerFn({
   method: "GET",
 }).handler(async () => {
-  await requireResourceAdmin();
+  await requireFeedbackAdmin();
   const { adminFeedbackArchiveStatuses } = await import("@package/services");
   return adminFeedbackArchiveStatuses;
 });
@@ -119,7 +117,7 @@ export const listFeedbackArchiveStatuses = createServerFn({
 export const listFeedbackMergeTargets = createServerFn({
   method: "GET",
 }).handler(async () => {
-  await requireResourceAdmin();
+  await requireFeedbackAdmin();
   const { s } = await import("@/lib/services");
   return await s.db.feedback.listMergeTargets();
 });
@@ -127,7 +125,7 @@ export const listFeedbackMergeTargets = createServerFn({
 export const listFeedbackNotifications = createServerFn({
   method: "GET",
 }).handler(async () => {
-  await requireResourceAdmin();
+  await requireFeedbackAdmin();
   const { s } = await import("@/lib/services");
   return await s.db.feedback.listNotifications();
 });
@@ -135,15 +133,18 @@ export const listFeedbackNotifications = createServerFn({
 export const markFeedbackNotificationRead = createServerFn({ method: "POST" })
   .validator(parseNotificationId)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireResourceAdmin();
+    const actor = await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
-    await s.db.feedback.markNotificationRead(data.notificationId, actorClerkId);
+    await s.db.feedback.markNotificationRead(
+      data.notificationId,
+      actor.clerkId,
+    );
   });
 
 export const updateAdminFeedback = createServerFn({ method: "POST" })
   .validator(parseAdminFeedbackInput)
   .handler(async ({ data }) => {
-    await requireResourceAdmin();
+    await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
     await s.db.feedback.updateAdmin(data);
   });
@@ -151,7 +152,7 @@ export const updateAdminFeedback = createServerFn({ method: "POST" })
 export const mergePendingFeedback = createServerFn({ method: "POST" })
   .validator(parseMergeFeedbackInput)
   .handler(async ({ data }) => {
-    await requireResourceAdmin();
+    await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
     await s.db.feedback.mergePending(data.feedbackId, data.targetId);
   });
@@ -159,7 +160,7 @@ export const mergePendingFeedback = createServerFn({ method: "POST" })
 export const approveFeedback = createServerFn({ method: "POST" })
   .validator(parseFeedbackId)
   .handler(async ({ data }) => {
-    await requireResourceAdmin();
+    await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
     await s.db.feedback.approve(data.feedbackId);
   });
@@ -167,7 +168,7 @@ export const approveFeedback = createServerFn({ method: "POST" })
 export const denyFeedback = createServerFn({ method: "POST" })
   .validator(parseFeedbackId)
   .handler(async ({ data }) => {
-    await requireResourceAdmin();
+    await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
     const { FeedbackPlanRecoveryRequiredError } = await import(
       "@package/services"
@@ -189,10 +190,14 @@ export const denyFeedback = createServerFn({ method: "POST" })
 export const toggleFeedbackVote = createServerFn({ method: "POST" })
   .validator(parseFeedbackId)
   .handler(async ({ data }) => {
-    const voterClerkId = await requireResourceUploader();
+    const voter = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    return await s.db.feedback.toggleVote(data.feedbackId, voterClerkId);
+    return await s.db.feedback.toggleVote(data.feedbackId, voter.clerkId);
   });
+
+async function requireFeedbackAdmin() {
+  return await requirePermission("feedback.manage");
+}
 
 export function parseFeedbackInput(input: unknown) {
   const value = parseRecord(input);

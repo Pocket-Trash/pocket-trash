@@ -9,6 +9,14 @@ import { createUploadStorage, signResourceUrl } from "@package/storage";
 import { createDbServices, type DbServices } from "./db/index.js";
 import { createStorageService, type StorageService } from "./storage/index.js";
 
+export type { Actor, Permission, Role } from "./authorization.js";
+export {
+  hasPermission,
+  hasStaffPermission,
+  normalizeActor,
+  permissions,
+} from "./authorization.js";
+
 export { adminFeedbackArchiveStatuses } from "./db/feedback/index.js";
 export type {
   AdminFeedbackItem,
