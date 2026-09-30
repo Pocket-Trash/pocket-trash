@@ -44,6 +44,7 @@ import { Route as FeedbackMyRequestsRouteImport } from './routes/feedback.my-req
 import { Route as CollectionsAddRouteImport } from './routes/collections.add'
 import { Route as CollectionsUserIdRouteImport } from './routes/collections.$userId'
 import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminAccountErasureRouteImport } from './routes/admin.account-erasure'
 import { Route as AdminTrashIndexRouteImport } from './routes/admin.trash.index'
 import { Route as AdminSettingsIndexRouteImport } from './routes/admin.settings.index'
@@ -244,6 +245,11 @@ const AutmogPenIdRoute = AutmogPenIdRouteImport.update({
   path: '/$penId',
   getParentRoute: () => AutmogRoute,
 } as any)
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAccountErasureRoute = AdminAccountErasureRouteImport.update({
   id: '/account-erasure',
   path: '/account-erasure',
@@ -391,6 +397,7 @@ export interface FileRoutesByFullPath {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
   '/admin/account-erasure': typeof AdminAccountErasureRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -448,6 +455,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/account-erasure': typeof AdminAccountErasureRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -510,6 +518,7 @@ export interface FileRoutesById {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
   '/admin/account-erasure': typeof AdminAccountErasureRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -573,6 +582,7 @@ export interface FileRouteTypes {
     | '/terms-of-service'
     | '/user'
     | '/admin/account-erasure'
+    | '/admin/audit'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
@@ -630,6 +640,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms-of-service'
     | '/admin/account-erasure'
+    | '/admin/audit'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
@@ -691,6 +702,7 @@ export interface FileRouteTypes {
     | '/terms-of-service'
     | '/user'
     | '/admin/account-erasure'
+    | '/admin/audit'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
@@ -1016,6 +1028,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AutmogPenIdRouteImport
       parentRoute: typeof AutmogRoute
     }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/account-erasure': {
       id: '/admin/account-erasure'
       path: '/account-erasure'
@@ -1189,6 +1208,7 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminAccountErasureRoute: typeof AdminAccountErasureRoute
+  AdminAuditRoute: typeof AdminAuditRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminFeedbackArchiveRoute: typeof AdminFeedbackArchiveRoute
   AdminFeedbackPlannedRoute: typeof AdminFeedbackPlannedRoute
@@ -1205,6 +1225,7 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAccountErasureRoute: AdminAccountErasureRoute,
+  AdminAuditRoute: AdminAuditRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminFeedbackArchiveRoute: AdminFeedbackArchiveRoute,
   AdminFeedbackPlannedRoute: AdminFeedbackPlannedRoute,

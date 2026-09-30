@@ -1,8 +1,21 @@
 import type { AuditEvent, AuditJsonObject, Database } from "@package/database";
 import { schema } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
-import { and, eq, or, sql } from "drizzle-orm";
 import {
+  and,
+  desc,
+  eq,
+  gte,
+  lt,
+  lte,
+  min,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
+import {
+  type Actor,
+  hasPermission,
   type Permission,
   permissions,
   type Role,
@@ -75,11 +88,35 @@ export type AuditWriteInput<T> = {
 };
 
 export type AuditService = {
+  list(input: ListAuditEventsInput): Promise<AuditEventPage>;
   redactAccount(transaction: AuditTransaction, userId: number): Promise<void>;
   write<T>(
     transaction: AuditTransaction,
     input: AuditWriteInput<T>,
   ): Promise<AuditEvent>;
+};
+
+export type AuditEventCursor = {
+  id: number;
+  recordedAt: Date;
+};
+
+export type ListAuditEventsInput = {
+  action?: string;
+  actor: Actor;
+  actorUserId?: number;
+  cursor?: AuditEventCursor;
+  recordedFrom?: Date;
+  recordedTo?: Date;
+  targetId?: string;
+  targetType?: string;
+};
+
+export type AuditEventPage = {
+  coverageStartAt: Date | null;
+  coveredDomains: string[];
+  items: AuditEvent[];
+  nextCursor: AuditEventCursor | null;
 };
 
 export class AuditEventValidationError extends Error {}
@@ -88,6 +125,7 @@ export class AuditPayloadTooLargeError extends Error {}
 export function createAuditService(
   logger: Logger,
   definitions: readonly AuditEventDefinition<never>[] = [],
+  database?: Pick<Database, "select">,
 ): AuditService {
   const registered = new Map<string, AuditEventDefinition<never>>();
   for (const definition of definitions) {
@@ -99,6 +137,81 @@ export function createAuditService(
   }
 
   return {
+    async list(input) {
+      if (!hasPermission(input.actor, "audit.read")) {
+        throw new Error("Audit events do not exist.");
+      }
+      if (!database) throw new Error("Audit queries are not configured.");
+      const normalized = normalizedListInput(input);
+      const conditions: SQL[] = [];
+      if (normalized.action) {
+        conditions.push(eq(schema.auditEvent.action, normalized.action));
+      }
+      if (normalized.actorUserId) {
+        conditions.push(
+          eq(schema.auditEvent.actorUserId, normalized.actorUserId),
+        );
+      }
+      if (normalized.recordedFrom) {
+        conditions.push(
+          gte(schema.auditEvent.recordedAt, normalized.recordedFrom),
+        );
+      }
+      if (normalized.recordedTo) {
+        conditions.push(
+          lte(schema.auditEvent.recordedAt, normalized.recordedTo),
+        );
+      }
+      if (normalized.targetId) {
+        conditions.push(eq(schema.auditEvent.targetId, normalized.targetId));
+      }
+      if (normalized.targetType) {
+        conditions.push(
+          eq(schema.auditEvent.targetType, normalized.targetType),
+        );
+      }
+      if (normalized.cursor) {
+        conditions.push(
+          or(
+            lt(schema.auditEvent.recordedAt, normalized.cursor.recordedAt),
+            and(
+              eq(schema.auditEvent.recordedAt, normalized.cursor.recordedAt),
+              lt(schema.auditEvent.id, normalized.cursor.id),
+            ),
+          ) as SQL,
+        );
+      }
+      const [rows, coverage] = await Promise.all([
+        database
+          .select()
+          .from(schema.auditEvent)
+          .where(conditions.length ? and(...conditions) : undefined)
+          .orderBy(
+            desc(schema.auditEvent.recordedAt),
+            desc(schema.auditEvent.id),
+          )
+          .limit(51),
+        database
+          .select({ coverageStartAt: min(schema.auditEvent.recordedAt) })
+          .from(schema.auditEvent),
+      ]);
+      const items = rows.slice(0, 50);
+      const last = items.at(-1);
+      return {
+        coverageStartAt: coverage[0]?.coverageStartAt ?? null,
+        coveredDomains: [
+          ...new Set(definitions.map(({ action }) => action.split(".")[0])),
+        ]
+          .filter((domain): domain is string => Boolean(domain))
+          .sort(),
+        items,
+        nextCursor:
+          rows.length > items.length && last
+            ? { id: last.id, recordedAt: last.recordedAt }
+            : null,
+      };
+    },
+
     async write(transaction, input) {
       return await logger.operation(
         loggerMessages.database.audit.write,
@@ -205,6 +318,55 @@ export function createAuditService(
       );
     },
   };
+}
+
+function normalizedListInput(input: ListAuditEventsInput) {
+  const actorUserId = input.actorUserId
+    ? positiveInteger(input.actorUserId, "actorUserId")
+    : undefined;
+  const action = input.action
+    ? namespacedName(input.action.trim(), "action")
+    : undefined;
+  const targetType = input.targetType
+    ? namespacedName(input.targetType.trim(), "targetType")
+    : undefined;
+  const targetId = input.targetId
+    ? requiredText(input.targetId, "targetId", 200, targetIdPattern)
+    : undefined;
+  const recordedFrom = validDate(input.recordedFrom, "recordedFrom");
+  const recordedTo = validDate(input.recordedTo, "recordedTo");
+  if (recordedFrom && recordedTo && recordedFrom > recordedTo) {
+    throw new AuditEventValidationError("recordedAt range is invalid.");
+  }
+  const cursor = input.cursor
+    ? {
+        id: positiveInteger(input.cursor.id, "cursor.id"),
+        recordedAt:
+          validDate(input.cursor.recordedAt, "cursor.recordedAt") ??
+          failInvalidCursor(),
+      }
+    : undefined;
+  return {
+    action,
+    actorUserId,
+    cursor,
+    recordedFrom,
+    recordedTo,
+    targetId,
+    targetType,
+  };
+}
+
+function validDate(value: Date | undefined, name: string) {
+  if (value === undefined) return undefined;
+  if (Number.isNaN(value.getTime())) {
+    throw new AuditEventValidationError(`${name} is invalid.`);
+  }
+  return value;
+}
+
+function failInvalidCursor(): never {
+  throw new AuditEventValidationError("cursor.recordedAt is invalid.");
 }
 
 function normalizedInput<T>(input: AuditWriteInput<T>) {
@@ -357,6 +519,7 @@ function positiveInteger(value: number, name: string) {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new AuditEventValidationError(`${name} is invalid.`);
   }
+  return value;
 }
 
 function redactionMatches(

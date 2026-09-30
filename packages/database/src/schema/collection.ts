@@ -344,6 +344,9 @@ const lookupColumns = () => ({
 });
 
 export const finish = pgTable("finish", lookupColumns(), (table) => [
+  uniqueIndex("finish_name_case_insensitive_unique").on(
+    sql`lower(${table.name})`,
+  ),
   uniqueIndex("finish_slug_unique").on(table.slug),
 ]);
 
@@ -354,6 +357,9 @@ export const color = pgTable(
     hex: text("hex").notNull(),
   },
   (table) => [
+    uniqueIndex("color_name_case_insensitive_unique").on(
+      sql`lower(${table.name})`,
+    ),
     uniqueIndex("color_slug_unique").on(table.slug),
     check("color_hex_check", sql`${table.hex} ~ '^#[0-9A-Fa-f]{6}$'`),
   ],
@@ -518,6 +524,9 @@ export const collectionSpinner = pgTable(
     bearing: text("bearing"),
   },
   (table) => [
+    uniqueIndex("collection_spinner_installed_button_unique")
+      .on(table.installedButtonId)
+      .where(sql`${table.installedButtonId} is not null`),
     check(
       "collection_spinner_bearing_length_valid",
       sql`${table.bearing} is null or char_length(${table.bearing}) <= 200`,

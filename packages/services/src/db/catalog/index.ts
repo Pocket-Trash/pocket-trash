@@ -26,7 +26,48 @@ import type {
 } from "../../storage/types.js";
 import { collectionAudit, writeCollectionAudit } from "../audit/collections.js";
 import type { AuditService } from "../audit/index.js";
+import {
+  productAudit,
+  writeProductAdminAudit,
+  writeProductAudit,
+} from "../audit/products.js";
 import type { UsersService } from "../users/index.js";
+
+export class CollectionButtonAlreadyInstalledError extends Error {
+  constructor() {
+    super("Collection button is already installed on another spinner.");
+    this.name = "CollectionButtonAlreadyInstalledError";
+  }
+}
+
+function uniqueConstraint(error: unknown): string | undefined {
+  const databaseError =
+    error instanceof Error && error.cause !== undefined ? error.cause : error;
+  if (
+    typeof databaseError === "object" &&
+    databaseError !== null &&
+    "code" in databaseError &&
+    databaseError.code === "23505" &&
+    "constraint" in databaseError &&
+    typeof databaseError.constraint === "string"
+  ) {
+    return databaseError.constraint;
+  }
+  return undefined;
+}
+
+const catalogNameConflictMessages: Record<string, string> = {
+  color_name_case_insensitive_unique: "Color name already exists.",
+  finish_name_case_insensitive_unique: "Finish name already exists.",
+  makers_name_case_insensitive_unique: "Maker name already exists.",
+  materials_name_case_insensitive_unique: "Material name already exists.",
+};
+
+function mapCatalogNameConflict(error: unknown): never {
+  const message = catalogNameConflictMessages[uniqueConstraint(error) ?? ""];
+  if (message) throw new Error(message);
+  throw error;
+}
 
 export type CatalogProductType = "spinner" | "spinner-button";
 
@@ -121,6 +162,7 @@ export type ProductWriteInput = {
   materialIds: number[];
   name: string;
   productTypeSlug: CatalogProductType;
+  reason?: string;
   slug: string;
   specs: {
     bearing?: string | null;
@@ -150,23 +192,23 @@ export type CatalogService = {
     reason?: string;
   }): Promise<void>;
   createColor(input: {
-    actorClerkId: string;
+    actor: Actor;
     hex: string;
     name: string;
     slug: string;
   }): Promise<CatalogColor>;
   createFinish(input: {
-    actorClerkId: string;
+    actor: Actor;
     name: string;
     slug: string;
   }): Promise<CatalogLookup>;
   createMaker(input: {
-    actorClerkId: string;
+    actor: Actor;
     name: string;
     rootUrl: string | null;
   }): Promise<{ id: number; name: string; rootUrl: string | null }>;
   createMaterial(input: {
-    actorClerkId: string;
+    actor: Actor;
     name: string;
     slug: string;
   }): Promise<{ id: number; name: string; slug: string }>;
@@ -214,8 +256,10 @@ export type CatalogService = {
     reason?: string;
   }): Promise<void>;
   setMakerProductUrlValidity(input: {
+    actor: Actor;
     makerProductUrlValid: boolean;
     productId: number;
+    reason?: string;
   }): Promise<void>;
   updateProduct(
     input: ProductWriteInput & { productId: number },
@@ -399,11 +443,16 @@ export function createCatalogService(
 ): CatalogService {
   return {
     async attachImages(input) {
-      const dependencies = requireCollectionAudit(
+      const collectionDependencies = requireCollectionAudit(
         users,
         audit,
         input.target.type,
       );
+      const productDependencies =
+        input.target.type === "product"
+          ? requireProductAudit(users, audit)
+          : null;
+      const dependencies = collectionDependencies ?? productDependencies;
       const actorUser = dependencies
         ? await dependencies.users.getByClerkId(input.actor.clerkId)
         : null;
@@ -415,17 +464,21 @@ export function createCatalogService(
         () =>
           db.transaction(async (tx) => {
             await lockTarget(tx, input.target);
-            const context = await collectionImageTargetContext(
+            const collectionContext = await collectionImageTargetContext(
+              tx,
+              input.target,
+            );
+            const productContext = await productImageTargetContext(
               tx,
               input.target,
             );
             const before = await collectionImageState(tx, input.target);
             await attachStoredImages(tx, input);
-            if (context) {
+            if (collectionContext) {
               const after = await collectionImageState(tx, input.target);
-              if (!dependencies || !actorUser)
+              if (!collectionDependencies || !actorUser)
                 throw new Error("Collection audit is not configured.");
-              await writeCollectionAudit(dependencies.audit, tx, {
+              await writeCollectionAudit(collectionDependencies.audit, tx, {
                 actor: input.actor,
                 actorUser,
                 after,
@@ -436,7 +489,21 @@ export function createCatalogService(
                     : before.currentImageId === null
                       ? collectionAudit.coverAdded
                       : collectionAudit.coverReplaced,
-                ownerUserId: context.ownerUserId,
+                ownerUserId: collectionContext.ownerUserId,
+                reason: input.reason,
+                targetId: input.target.id,
+              });
+            } else if (productContext) {
+              if (!productDependencies || !actorUser)
+                throw new Error("Product audit is not configured.");
+              await writeProductAudit(productDependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: await collectionImageState(tx, input.target),
+                before,
+                definition: productAudit.imageAdded,
+                ownerClerkId: productContext.ownerClerkId,
+                ownerUserId: productContext.ownerUserId,
                 reason: input.reason,
                 targetId: input.target.id,
               });
@@ -488,115 +555,190 @@ export function createCatalogService(
       );
     },
     async createColor(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       return await logger.operation(
         loggerMessages.database.catalog.createColor,
-        async () => {
-          const [duplicate] = await db
-            .select({ id: schema.color.id })
-            .from(schema.color)
-            .where(
-              eq(sql`lower(${schema.color.name})`, input.name.toLowerCase()),
-            )
-            .limit(1);
-          if (duplicate) throw new Error("Color name already exists.");
+        async () =>
+          await db.transaction(async (tx) => {
+            const [duplicate] = await tx
+              .select({ id: schema.color.id })
+              .from(schema.color)
+              .where(
+                eq(sql`lower(${schema.color.name})`, input.name.toLowerCase()),
+              )
+              .limit(1);
+            if (duplicate) throw new Error("Color name already exists.");
 
-          const [row] = await db
-            .insert(schema.color)
-            .values({ hex: input.hex, name: input.name, slug: input.slug })
-            .returning({
-              hex: schema.color.hex,
-              id: schema.color.id,
-              name: schema.color.name,
-              slug: schema.color.slug,
-            });
-          if (!row) throw new Error("Failed to create color.");
-          return row;
-        },
-        actorAttributes(input.actorClerkId, { slug: input.slug }),
+            const [row] = await tx
+              .insert(schema.color)
+              .values({ hex: input.hex, name: input.name, slug: input.slug })
+              .returning({
+                hex: schema.color.hex,
+                id: schema.color.id,
+                name: schema.color.name,
+                slug: schema.color.slug,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create color.");
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: row,
+                definition: productAudit.colorCreated,
+                targetId: row.id,
+              });
+            }
+            return row;
+          }),
+        actorAttributes(input.actor.clerkId, { slug: input.slug }),
       );
     },
     async createFinish(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       return await logger.operation(
         loggerMessages.database.catalog.createFinish,
-        async () => {
-          const [duplicate] = await db
-            .select({ id: schema.finish.id })
-            .from(schema.finish)
-            .where(
-              eq(sql`lower(${schema.finish.name})`, input.name.toLowerCase()),
-            )
-            .limit(1);
-          if (duplicate) throw new Error("Finish name already exists.");
+        async () =>
+          await db.transaction(async (tx) => {
+            const [duplicate] = await tx
+              .select({ id: schema.finish.id })
+              .from(schema.finish)
+              .where(
+                eq(sql`lower(${schema.finish.name})`, input.name.toLowerCase()),
+              )
+              .limit(1);
+            if (duplicate) throw new Error("Finish name already exists.");
 
-          const [row] = await db
-            .insert(schema.finish)
-            .values({ name: input.name, slug: input.slug })
-            .returning({
-              id: schema.finish.id,
-              name: schema.finish.name,
-              slug: schema.finish.slug,
-            });
-          if (!row) throw new Error("Failed to create finish.");
-          return row;
-        },
-        actorAttributes(input.actorClerkId, { slug: input.slug }),
+            const [row] = await tx
+              .insert(schema.finish)
+              .values({ name: input.name, slug: input.slug })
+              .returning({
+                id: schema.finish.id,
+                name: schema.finish.name,
+                slug: schema.finish.slug,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create finish.");
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: row,
+                definition: productAudit.finishCreated,
+                targetId: row.id,
+              });
+            }
+            return row;
+          }),
+        actorAttributes(input.actor.clerkId, { slug: input.slug }),
       );
     },
     async createMaker(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       return await logger.operation(
         loggerMessages.database.catalog.createMaker,
-        async () => {
-          const [duplicate] = await db
-            .select({ id: schema.maker.id })
-            .from(schema.maker)
-            .where(
-              eq(sql`lower(${schema.maker.name})`, input.name.toLowerCase()),
-            )
-            .limit(1);
-          if (duplicate) throw new Error("Maker name already exists.");
+        async () =>
+          await db.transaction(async (tx) => {
+            const [duplicate] = await tx
+              .select({ id: schema.maker.id })
+              .from(schema.maker)
+              .where(
+                eq(sql`lower(${schema.maker.name})`, input.name.toLowerCase()),
+              )
+              .limit(1);
+            if (duplicate) throw new Error("Maker name already exists.");
 
-          const [row] = await db
-            .insert(schema.maker)
-            .values({ name: input.name, rootUrl: input.rootUrl })
-            .returning({
-              id: schema.maker.id,
-              name: schema.maker.name,
-              rootUrl: schema.maker.rootUrl,
-            });
-          if (!row) throw new Error("Failed to create maker.");
-          return row;
-        },
-        actorAttributes(input.actorClerkId),
+            const [row] = await tx
+              .insert(schema.maker)
+              .values({ name: input.name, rootUrl: input.rootUrl })
+              .returning({
+                id: schema.maker.id,
+                name: schema.maker.name,
+                rootUrl: schema.maker.rootUrl,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create maker.");
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: row,
+                definition: productAudit.makerCreated,
+                targetId: row.id,
+              });
+            }
+            return row;
+          }),
+        actorAttributes(input.actor.clerkId),
       );
     },
     async createMaterial(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       return await logger.operation(
         loggerMessages.database.catalog.createMaterial,
-        async () => {
-          const [duplicate] = await db
-            .select({ id: schema.material.id })
-            .from(schema.material)
-            .where(
-              eq(sql`lower(${schema.material.name})`, input.name.toLowerCase()),
-            )
-            .limit(1);
-          if (duplicate) throw new Error("Material name already exists.");
+        async () =>
+          await db.transaction(async (tx) => {
+            const [duplicate] = await tx
+              .select({ id: schema.material.id })
+              .from(schema.material)
+              .where(
+                eq(
+                  sql`lower(${schema.material.name})`,
+                  input.name.toLowerCase(),
+                ),
+              )
+              .limit(1);
+            if (duplicate) throw new Error("Material name already exists.");
 
-          const [row] = await db
-            .insert(schema.material)
-            .values({ name: input.name, slug: input.slug })
-            .returning({
-              id: schema.material.id,
-              name: schema.material.name,
-              slug: schema.material.slug,
-            });
-          if (!row) throw new Error("Failed to create material.");
-          return row;
-        },
-        actorAttributes(input.actorClerkId, { slug: input.slug }),
+            const [row] = await tx
+              .insert(schema.material)
+              .values({ name: input.name, slug: input.slug })
+              .returning({
+                id: schema.material.id,
+                name: schema.material.name,
+                slug: schema.material.slug,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create material.");
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: row,
+                definition: productAudit.materialCreated,
+                targetId: row.id,
+              });
+            }
+            return row;
+          }),
+        actorAttributes(input.actor.clerkId, { slug: input.slug }),
       );
     },
     async createProduct(input) {
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       return await logger.operation(
         loggerMessages.database.catalog.createProduct,
         async () => {
@@ -656,6 +798,24 @@ export function createCatalogService(
               await tx.insert(schema.productSpinnerButton).values({
                 id: row.id,
                 ...buttonSpecs(input.specs),
+              });
+            }
+            if (dependencies && actorUser) {
+              const [created] = await queryProducts(
+                tx as unknown as Database,
+                input.productTypeSlug,
+                input.slug,
+                input.actor,
+              );
+              if (!created) throw new Error("Failed to load created product.");
+              await writeProductAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: productAuditState(created),
+                definition: productAudit.productCreated,
+                ownerClerkId: input.actor.clerkId,
+                ownerUserId: actorUser.id,
+                targetId: row.id,
               });
             }
             return row.id;
@@ -779,7 +939,30 @@ export function createCatalogService(
     },
     async restoreImage(input) {
       if (input.targetType === "product") {
-        await restoreCatalogImage(db, input);
+        const dependencies = requireProductAudit(users, audit);
+        const actorUser = dependencies
+          ? await dependencies.users.getByClerkId(input.actor.clerkId)
+          : null;
+        await db.transaction(async (tx) => {
+          const context = dependencies
+            ? await productImageContext(tx, input.imageId)
+            : null;
+          await restoreCatalogImage(tx, input);
+          if (dependencies && actorUser) {
+            if (!context) throw new Error("Image does not exist.");
+            await writeProductAudit(dependencies.audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: { deleted: false, imageId: input.imageId },
+              before: { deleted: true, imageId: input.imageId },
+              definition: productAudit.imageRestored,
+              ownerClerkId: context.ownerClerkId,
+              ownerUserId: context.ownerUserId,
+              reason: input.reason,
+              targetId: context.productId,
+            });
+          }
+        });
         return;
       }
       const dependencies = requireCollectionAudit(
@@ -809,56 +992,122 @@ export function createCatalogService(
       });
     },
     async setVisibility(input) {
-      const [product] = await db
-        .select({
-          ownerClerkId: schema.product.ownerClerkId,
-          privatedByClerkId: schema.product.privatedByClerkId,
-        })
-        .from(schema.product)
-        .where(eq(schema.product.id, input.productId))
-        .limit(1);
-      if (
-        !product ||
-        (product.ownerClerkId !== input.actor.clerkId &&
-          !hasPermission(input.actor, "products.manage"))
-      ) {
-        throw new Error("Product does not exist.");
-      }
-      const actorIsModerating =
-        product.ownerClerkId !== input.actor.clerkId &&
-        hasPermission(input.actor, "products.manage");
-      if (
-        !input.isPrivate &&
-        product.privatedByClerkId &&
-        product.privatedByClerkId !== input.actor.clerkId &&
-        !actorIsModerating
-      ) {
-        throw new Error("Product is private by an administrator.");
-      }
-      if (actorIsModerating && input.isPrivate && !input.reason?.trim()) {
-        throw new Error("A privacy reason is required.");
-      }
-      await db
-        .update(schema.product)
-        .set(
-          privacyUpdate({
-            actorClerkId: input.actor.clerkId,
-            actorIsModerating,
-            isPrivate: input.isPrivate,
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      await db.transaction(async (tx) => {
+        const [product] = await tx
+          .select({
+            isPrivate: schema.product.isPrivate,
+            ownerClerkId: schema.product.ownerClerkId,
+            ownerUserId: schema.user.id,
+            privatedByClerkId: schema.product.privatedByClerkId,
+          })
+          .from(schema.product)
+          .leftJoin(
+            schema.user,
+            eq(schema.product.ownerClerkId, schema.user.clerkId),
+          )
+          .where(eq(schema.product.id, input.productId))
+          .limit(1);
+        if (
+          !product ||
+          (product.ownerClerkId !== input.actor.clerkId &&
+            !hasPermission(input.actor, "products.manage"))
+        ) {
+          throw new Error("Product does not exist.");
+        }
+        const actorIsModerating =
+          product.ownerClerkId !== input.actor.clerkId &&
+          hasPermission(input.actor, "products.manage");
+        if (
+          !input.isPrivate &&
+          product.privatedByClerkId &&
+          product.privatedByClerkId !== input.actor.clerkId &&
+          !actorIsModerating
+        ) {
+          throw new Error("Product is private by an administrator.");
+        }
+        if (actorIsModerating && input.isPrivate && !input.reason?.trim()) {
+          throw new Error("A privacy reason is required.");
+        }
+        await tx
+          .update(schema.product)
+          .set(
+            privacyUpdate({
+              actorClerkId: input.actor.clerkId,
+              actorIsModerating,
+              isPrivate: input.isPrivate,
+              reason: input.reason,
+            }),
+          )
+          .where(eq(schema.product.id, input.productId));
+        if (dependencies && actorUser) {
+          await writeProductAudit(dependencies.audit, tx, {
+            actor: input.actor,
+            actorUser,
+            after: { isPrivate: input.isPrivate },
+            before: { isPrivate: product.isPrivate },
+            definition: productAudit.productVisibilityChanged,
+            ownerClerkId: product.ownerClerkId,
+            ownerUserId: product.ownerUserId,
             reason: input.reason,
-          }),
-        )
-        .where(eq(schema.product.id, input.productId));
+            targetId: input.productId,
+          });
+        }
+      });
     },
     async setMakerProductUrlValidity(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       await logger.operation(
         loggerMessages.database.catalog.setMakerProductUrlValidity,
-        async () => {
-          await db
-            .update(schema.product)
-            .set({ makerProductUrlValid: input.makerProductUrlValid })
-            .where(eq(schema.product.id, input.productId));
-        },
+        async () =>
+          await db.transaction(async (tx) => {
+            const [product] = await tx
+              .select({
+                makerProductUrlValid: schema.product.makerProductUrlValid,
+                ownerClerkId: schema.product.ownerClerkId,
+                ownerUserId: schema.user.id,
+              })
+              .from(schema.product)
+              .leftJoin(
+                schema.user,
+                eq(schema.product.ownerClerkId, schema.user.clerkId),
+              )
+              .where(eq(schema.product.id, input.productId))
+              .limit(1);
+            if (!product) throw new Error("Product does not exist.");
+            if (
+              product.ownerClerkId !== input.actor.clerkId &&
+              !input.reason?.trim()
+            ) {
+              throw new Error("A moderation reason is required.");
+            }
+            await tx
+              .update(schema.product)
+              .set({ makerProductUrlValid: input.makerProductUrlValid })
+              .where(eq(schema.product.id, input.productId));
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: { makerProductUrlValid: input.makerProductUrlValid },
+                before: {
+                  makerProductUrlValid: product.makerProductUrlValid,
+                },
+                definition: productAudit.makerProductUrlValidityChanged,
+                ownerUserId: product.ownerUserId,
+                reason: input.reason,
+                targetId: input.productId,
+              });
+            }
+          }),
         {
           attributes: {
             makerProductUrlValid: input.makerProductUrlValid,
@@ -869,7 +1118,30 @@ export function createCatalogService(
     },
     async softDeleteImage(input) {
       if (input.targetType === "product") {
-        await softDeleteCatalogImage(db, input);
+        const dependencies = requireProductAudit(users, audit);
+        const actorUser = dependencies
+          ? await dependencies.users.getByClerkId(input.actor.clerkId)
+          : null;
+        await db.transaction(async (tx) => {
+          const context = dependencies
+            ? await productImageContext(tx, input.imageId)
+            : null;
+          if (!(await softDeleteCatalogImage(tx, input))) return;
+          if (dependencies && actorUser) {
+            if (!context) throw new Error("Image does not exist.");
+            await writeProductAudit(dependencies.audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: { deleted: true, imageId: input.imageId },
+              before: { deleted: false, imageId: input.imageId },
+              definition: productAudit.imageDeleted,
+              ownerClerkId: context.ownerClerkId,
+              ownerUserId: context.ownerUserId,
+              reason: input.reason,
+              targetId: context.productId,
+            });
+          }
+        });
         return;
       }
       const dependencies = requireCollectionAudit(
@@ -899,6 +1171,10 @@ export function createCatalogService(
       });
     },
     async updateProduct(input) {
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       return await logger.operation(
         loggerMessages.database.catalog.updateProduct,
         async () => {
@@ -910,11 +1186,17 @@ export function createCatalogService(
                 makerProductUrl: schema.product.makerProductUrl,
                 makerProductUrlValid: schema.product.makerProductUrlValid,
                 ownerClerkId: schema.product.ownerClerkId,
+                ownerUserId: schema.user.id,
+                slug: schema.product.slug,
               })
               .from(schema.product)
               .innerJoin(
                 schema.productType,
                 eq(schema.product.productTypeId, schema.productType.id),
+              )
+              .leftJoin(
+                schema.user,
+                eq(schema.product.ownerClerkId, schema.user.clerkId),
               )
               .where(
                 and(
@@ -930,6 +1212,19 @@ export function createCatalogService(
             ) {
               throw new Error("Product does not exist.");
             }
+            const before =
+              dependencies && actorUser
+                ? productAuditState(
+                    (
+                      await queryProducts(
+                        tx as unknown as Database,
+                        input.productTypeSlug,
+                        existing.slug,
+                        input.actor,
+                      )
+                    )[0] ?? failProductLoad(),
+                  )
+                : undefined;
             const makerProductUrl =
               input.makerProductUrl === undefined
                 ? undefined
@@ -985,6 +1280,26 @@ export function createCatalogService(
                 .update(schema.productSpinnerButton)
                 .set({ ...buttonSpecs(input.specs), updatedAt: new Date() })
                 .where(eq(schema.productSpinnerButton.id, input.productId));
+            }
+            if (dependencies && actorUser) {
+              const [updated] = await queryProducts(
+                tx as unknown as Database,
+                input.productTypeSlug,
+                input.slug,
+                input.actor,
+              );
+              if (!updated) throw new Error("Failed to load updated product.");
+              await writeProductAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: productAuditState(updated),
+                before,
+                definition: productAudit.productUpdated,
+                ownerClerkId: existing.ownerClerkId,
+                ownerUserId: existing.ownerUserId,
+                reason: input.reason,
+                targetId: input.productId,
+              });
             }
           });
 
@@ -1831,13 +2146,25 @@ export function createCollectionsService(
                   productId: button.productId,
                 });
               }
-              await tx
-                .update(schema.collectionSpinner)
-                .set({
-                  installedButtonId:
-                    input.installedButton?.collectionItemId ?? null,
-                })
-                .where(eq(schema.collectionSpinner.id, input.collectionItemId));
+              try {
+                await tx
+                  .update(schema.collectionSpinner)
+                  .set({
+                    installedButtonId:
+                      input.installedButton?.collectionItemId ?? null,
+                  })
+                  .where(
+                    eq(schema.collectionSpinner.id, input.collectionItemId),
+                  );
+              } catch (error) {
+                if (
+                  uniqueConstraint(error) ===
+                  "collection_spinner_installed_button_unique"
+                ) {
+                  throw new CollectionButtonAlreadyInstalledError();
+                }
+                throw error;
+              }
             }
             await touchCollection(tx, targetCollectionId);
             const after = {
@@ -1911,6 +2238,23 @@ async function collectionImageTargetContext(
   return null;
 }
 
+async function productImageTargetContext(
+  db: Pick<Database, "select">,
+  target: UploadTarget,
+) {
+  if (target.type !== "product") return null;
+  const [row] = await db
+    .select({
+      ownerClerkId: schema.product.ownerClerkId,
+      ownerUserId: schema.user.id,
+    })
+    .from(schema.product)
+    .leftJoin(schema.user, eq(schema.product.ownerClerkId, schema.user.clerkId))
+    .where(eq(schema.product.id, target.id))
+    .limit(1);
+  return row ?? null;
+}
+
 async function collectionImageState(
   db: Pick<Database, "select">,
   target: UploadTarget,
@@ -1935,6 +2279,13 @@ async function collectionImageState(
       .where(eq(schema.collectionItemImage.collectionItemId, target.id));
     return { imageIds: images.map(({ id }) => id) };
   }
+  if (target.type === "product") {
+    const images = await db
+      .select({ id: schema.productImage.id })
+      .from(schema.productImage)
+      .where(eq(schema.productImage.productId, target.id));
+    return { imageIds: images.map(({ id }) => id) };
+  }
   return {};
 }
 
@@ -1957,6 +2308,27 @@ async function collectionItemImageContext(
   return row ?? null;
 }
 
+async function productImageContext(
+  db: Pick<Database, "select">,
+  imageId: number,
+) {
+  const [row] = await db
+    .select({
+      ownerClerkId: schema.product.ownerClerkId,
+      ownerUserId: schema.user.id,
+      productId: schema.productImage.productId,
+    })
+    .from(schema.productImage)
+    .innerJoin(
+      schema.product,
+      eq(schema.productImage.productId, schema.product.id),
+    )
+    .leftJoin(schema.user, eq(schema.product.ownerClerkId, schema.user.clerkId))
+    .where(eq(schema.productImage.id, imageId))
+    .limit(1);
+  return row ?? null;
+}
+
 function requireCollectionAudit(
   users: UsersService | undefined,
   audit: AuditService | undefined,
@@ -1965,6 +2337,52 @@ function requireCollectionAudit(
   if (targetType === "product" || targetType === "resource") return null;
   if (!users || !audit) throw new Error("Collection audit is not configured.");
   return { audit, users };
+}
+
+function requireProductAudit(
+  users: UsersService | undefined,
+  audit: AuditService | undefined,
+) {
+  if (!users && !audit) return null;
+  if (!users || !audit) throw new Error("Product audit is not configured.");
+  return { audit, users };
+}
+
+function productAuditState(product: CatalogProduct): AuditJsonObject {
+  return {
+    bearing: product.bearing,
+    buttonDiameterMm: product.buttonDiameterMm,
+    compatibleButtonId: product.compatibleButtonId,
+    description: product.description,
+    diameterMm: product.diameterMm,
+    finishOptions: product.finishOptions.map((option) => ({
+      colorEffectId: option.colorEffect?.id ?? null,
+      colorIds: option.colors.map(({ id }) => id),
+      finishIds: option.finishes.map(({ id }) => id),
+      id: option.id,
+    })),
+    id: product.id,
+    imageIds: product.images.map(({ id }) => id),
+    isPrivate: product.isPrivate,
+    lengthMm: product.lengthMm,
+    makerId: product.makerId,
+    makerProductUrl: product.makerProductUrl,
+    makerProductUrlValid: product.makerProductUrlValid,
+    materialIds: product.materials.map(({ id }) => id),
+    name: product.name,
+    productTypeId: product.productTypeId,
+    productTypeSlug: product.productTypeSlug,
+    slug: product.slug,
+    spinDiameterMm: product.spinDiameterMm,
+    thicknessMm: product.thicknessMm,
+    thicknessWithButtonMm: product.thicknessWithButtonMm,
+    weightG: product.weightG,
+    widthMm: product.widthMm,
+  };
+}
+
+function failProductLoad(): never {
+  throw new Error("Failed to load product audit state.");
 }
 
 export function normalizeCollectionName(name: string) {

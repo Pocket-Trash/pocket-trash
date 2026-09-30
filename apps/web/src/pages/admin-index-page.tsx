@@ -3,7 +3,7 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { Bell, MessageSquare, ShieldCheck } from "lucide-react";
+import { Bell, MessageSquare, ScrollText, ShieldCheck } from "lucide-react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -22,7 +22,13 @@ export function AdminIndexPage() {
     label: t("web.admin.notifications.title"),
     to: "/notifications" as const,
   };
+  const auditLink = {
+    icon: ScrollText,
+    label: t("web.admin.audit.title"),
+    to: "/admin/audit" as const,
+  };
   const primaryLinks = [
+    ...(hasPermission(actor, "audit.read") ? [auditLink] : []),
     ...(hasPermission(actor, "feedback.manage") ? [feedbackLink] : []),
     ...(hasPermission(actor, "feedback.manage") ||
     hasPermission(actor, "resources.manage")

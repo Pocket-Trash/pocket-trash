@@ -237,15 +237,20 @@ export const schemaDescriptions = {
     },
   },
   collection_image: {
-    description: "Current and previous cover images for a collection.",
+    description:
+      "Gallery images for a collection, with at most one selected cover.",
     columns: {
-      id: { description: "Internal cover image identifier.", example: 1000 },
+      id: {
+        description: "Internal collection gallery image identifier.",
+        example: 1000,
+      },
       collection_id: {
-        description: "Collection that owns the cover image.",
+        description: "Collection that owns the gallery image.",
         example: 1000,
       },
       is_current: {
-        description: "Whether this image is the collection's active cover.",
+        description:
+          "Whether this gallery image is the collection's selected cover.",
         example: true,
       },
       position: {

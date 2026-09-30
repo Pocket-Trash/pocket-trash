@@ -151,6 +151,9 @@ export const maker = pgTable(
       .notNull(),
   },
   (table) => ({
+    nameCaseInsensitiveUnique: uniqueIndex(
+      "makers_name_case_insensitive_unique",
+    ).on(sql`lower(${table.name})`),
     rootUrlUnique: uniqueIndex("makers_root_url_unique").on(table.rootUrl),
   }),
 );
@@ -202,6 +205,9 @@ export const material = pgTable(
       .notNull(),
   },
   (table) => ({
+    nameCaseInsensitiveUnique: uniqueIndex(
+      "materials_name_case_insensitive_unique",
+    ).on(sql`lower(${table.name})`),
     slugUnique: uniqueIndex("materials_slug_unique").on(table.slug),
   }),
 );

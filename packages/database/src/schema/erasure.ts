@@ -105,6 +105,32 @@ export const erasureRequest = pgTable(
       "erasure_request_verification_method_valid",
       sql`${table.verificationMethod} is null or ${table.verificationMethod} in ('clerk_reverification', 'authenticated_request', 'verified_email', 'clerk_webhook')`,
     ),
+    check(
+      "erasure_request_verification_provenance_valid",
+      sql`${table.verifiedAt} is not null and (
+        (
+          ${table.initiator} = 'self'
+          and ${table.verificationMethod} = 'clerk_reverification'
+          and ${table.verificationReference} is null
+          and (
+            (${table.status} = 'completed' and ${table.targetClerkId} is null and ${table.verifiedByClerkId} is null)
+            or (${table.status} <> 'completed' and ${table.targetClerkId} is not null and ${table.verifiedByClerkId} is not null and ${table.verifiedByClerkId} = ${table.targetClerkId})
+          )
+        )
+        or (
+          ${table.initiator} = 'admin'
+          and ${table.verifiedByClerkId} is not null
+          and (
+            (${table.verificationMethod} in ('authenticated_request', 'verified_email') and ${table.verificationReference} is not null)
+            or (${table.verificationMethod} = 'clerk_webhook' and ${table.verificationReference} = 'clerk_webhook' and ${table.verifiedByClerkId} = 'clerk_webhook')
+          )
+          and (
+            (${table.status} = 'completed' and ${table.targetClerkId} is null)
+            or (${table.status} <> 'completed' and ${table.targetClerkId} is not null)
+          )
+        )
+      )`,
+    ),
     check("erasure_request_attempts_valid", sql`${table.attempts} >= 0`),
     check(
       "erasure_request_completion_valid",

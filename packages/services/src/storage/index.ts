@@ -21,6 +21,7 @@ import {
   writeCollectionAudit,
 } from "../db/audit/collections.js";
 import type { AuditService } from "../db/audit/index.js";
+import { productAudit, writeProductAudit } from "../db/audit/products.js";
 import { hashLogIdentifier, loggedMutation } from "../logging.js";
 import { completeResource, completeVersion } from "./complete-resource.js";
 import {
@@ -99,12 +100,11 @@ export function createStorageService(input: {
         manifest.target.type === "resource"
           ? resourcePayload(manifest.payload)
           : null;
-      const collection =
-        manifest.target.type === "collection" ||
-        manifest.target.type === "collection_item"
-          ? collectionUploadPayload(manifest.payload)
-          : null;
-      const payload = resource ?? collection;
+      const catalog =
+        manifest.target.type === "resource"
+          ? null
+          : catalogUploadPayload(manifest.payload);
+      const payload = resource ?? catalog;
       validateManifest(manifest, resource?.operation);
       return db.transaction(async (tx) => {
         let targetId = manifest.target.id;
@@ -330,10 +330,11 @@ export function createStorageService(input: {
               throw new UploadSessionError("uploads_incomplete", 409);
           }
         } else {
-          const context = await collectionTargetContext(tx, target);
+          const collectionContext = await collectionTargetContext(tx, target);
+          const productContext = await productTargetContext(tx, target);
           const before = await collectionTargetImageState(tx, target);
           await attachImages(tx, { target, files, actor });
-          if (context) {
+          if (collectionContext || productContext) {
             if (!audit) throw new Error("Collection audit is not configured.");
             const [actorUser] = await tx
               .select({ id: schema.user.id, username: schema.user.username })
@@ -341,21 +342,37 @@ export function createStorageService(input: {
               .where(eq(schema.user.clerkId, actor.clerkId))
               .limit(1);
             if (!actorUser) throw new Error("Image target does not exist.");
-            await writeCollectionAudit(audit, tx, {
-              actor,
-              actorUser,
-              after: await collectionTargetImageState(tx, target),
-              before,
-              definition:
-                target.type === "collection_item"
-                  ? collectionAudit.imageAdded
-                  : before.currentImageId === null
-                    ? collectionAudit.coverAdded
-                    : collectionAudit.coverReplaced,
-              ownerUserId: context.ownerUserId,
-              reason: collectionUploadPayload(session.payload)?.reason,
-              targetId: target.id,
-            });
+            const reason = catalogUploadPayload(session.payload)?.reason;
+            const after = await collectionTargetImageState(tx, target);
+            if (collectionContext) {
+              await writeCollectionAudit(audit, tx, {
+                actor,
+                actorUser,
+                after,
+                before,
+                definition:
+                  target.type === "collection_item"
+                    ? collectionAudit.imageAdded
+                    : before.currentImageId === null
+                      ? collectionAudit.coverAdded
+                      : collectionAudit.coverReplaced,
+                ownerUserId: collectionContext.ownerUserId,
+                reason,
+                targetId: target.id,
+              });
+            } else if (productContext) {
+              await writeProductAudit(audit, tx, {
+                actor,
+                actorUser,
+                after,
+                before,
+                definition: productAudit.imageAdded,
+                ownerClerkId: productContext.ownerClerkId,
+                ownerUserId: productContext.ownerUserId,
+                reason,
+                targetId: target.id,
+              });
+            }
           }
         }
         await tx
@@ -591,8 +608,11 @@ export function createStorageService(input: {
         );
         if (!current.rows.length)
           throw new UploadSessionError("session_not_found", 404);
-        if (current.rows[0]?.isCurrent)
-          throw new UploadSessionError("invalid_request", 400);
+        const replacement = current.rows[0]?.isCurrent
+          ? await tx.execute<{ id: number }>(
+              sql`select id from collection_image where collection_id = ${file.targetId} and id <> ${fileId} order by position desc, id desc limit 1`,
+            )
+          : null;
         if (fileType === "resource_image" || fileType === "resource_file") {
           const count = await tx.execute<{ count: number }>(
             sql`select count(*)::int as count from ${sql.identifier(mapping.table)} where ${sql.identifier(mapping.column)} = ${fileType === "resource_file" ? file.versionId : file.targetId}`,
@@ -604,7 +624,14 @@ export function createStorageService(input: {
         await tx.execute(
           sql`delete from ${sql.identifier(mapping.table)} where id = ${fileId}`,
         );
+        if (replacement?.rows[0])
+          await tx.execute(
+            sql`update collection_image set is_current = true where id = ${replacement.rows[0].id}`,
+          );
         if (fileType === "collection_image") {
+          await tx.execute(
+            sql`update user_collection set updated_at = now() where id = ${file.targetId}`,
+          );
           if (!audit) throw new Error("Collection audit is not configured.");
           const [actorUser] = await tx
             .select({ id: schema.user.id, username: schema.user.username })
@@ -687,7 +714,7 @@ export function createStorageService(input: {
   };
 }
 
-function collectionUploadPayload(value: unknown): { reason?: string } | null {
+function catalogUploadPayload(value: unknown): { reason?: string } | null {
   if (value === undefined || value === null) return null;
   if (typeof value !== "object" || Array.isArray(value))
     throw new UploadSessionError("invalid_request", 400);
@@ -721,6 +748,23 @@ async function collectionTargetContext(
   return null;
 }
 
+async function productTargetContext(
+  db: Pick<Database, "select">,
+  target: UploadTarget,
+) {
+  if (target.type !== "product") return null;
+  const [row] = await db
+    .select({
+      ownerClerkId: schema.product.ownerClerkId,
+      ownerUserId: schema.user.id,
+    })
+    .from(schema.product)
+    .leftJoin(schema.user, eq(schema.product.ownerClerkId, schema.user.clerkId))
+    .where(eq(schema.product.id, target.id))
+    .limit(1);
+  return row ?? null;
+}
+
 async function collectionTargetImageState(
   db: Pick<Database, "select">,
   target: UploadTarget,
@@ -743,6 +787,13 @@ async function collectionTargetImageState(
       .select({ id: schema.collectionItemImage.id })
       .from(schema.collectionItemImage)
       .where(eq(schema.collectionItemImage.collectionItemId, target.id));
+    return { currentImageId: null, imageIds: images.map(({ id }) => id) };
+  }
+  if (target.type === "product") {
+    const images = await db
+      .select({ id: schema.productImage.id })
+      .from(schema.productImage)
+      .where(eq(schema.productImage.productId, target.id));
     return { currentImageId: null, imageIds: images.map(({ id }) => id) };
   }
   return { currentImageId: null, imageIds: [] };

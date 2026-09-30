@@ -25,6 +25,7 @@ import {
   CollectionCoverManager,
   CollectionForm,
   type CollectionFormValue,
+  CollectionImageUploader,
 } from "@/components/collection-form";
 import { CollectionSelector } from "@/components/collection-selector";
 import { FileDropInput } from "@/components/resource-file-input";
@@ -188,6 +189,13 @@ function ProductEditor({
       widthMm: initialProduct?.widthMm ?? null,
     },
     onSubmit: async ({ value }) => {
+      const moderating = Boolean(
+        initialProduct?.canAdminister && !initialProduct.isOwner,
+      );
+      const reason = moderating
+        ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
+        : undefined;
+      if (moderating && !reason) return;
       const clientResult = productFormSchema.safeParse(value);
       if (!clientResult.success) {
         setServerErrors(z.flattenError(clientResult.error).fieldErrors);
@@ -200,7 +208,11 @@ function ProductEditor({
         return;
       }
       const result = await saveCatalogProduct({
-        data: { ...value, productId: savedProductId ?? value.productId },
+        data: {
+          ...value,
+          productId: savedProductId ?? value.productId,
+          reason,
+        },
       });
       if (!result.ok) {
         setServerErrors(result.fieldErrors);
@@ -224,12 +236,13 @@ function ProductEditor({
               )
                 return false;
               await restoreCatalogImage({
-                data: { imageId, targetType: "product" },
+                data: { imageId, reason, targetType: "product" },
               });
               return true;
             },
             targetId: result.product.id,
             targetType: "product",
+            reason,
           });
           setImages(uploads.failed);
           if (uploads.failed.length) {
@@ -546,6 +559,14 @@ function ProductEditor({
       />
       {initialProduct ? (
         <CatalogImageEditor
+          getReason={
+            initialProduct.canAdminister && !initialProduct.isOwner
+              ? () =>
+                  window
+                    .prompt(t("web.resources.moderation.reasonLabel"))
+                    ?.trim()
+              : undefined
+          }
           images={existingImages}
           onChange={setExistingImages}
           t={t}
@@ -953,15 +974,16 @@ export function CollectionFormPage({
   const [current, setCurrent] = React.useState(collection);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
   const copy = {
     browse: t("web.resources.upload.browseFiles"),
-    cover: t("web.collections.field.cover"),
+    cover: t("web.resources.upload.imagesLabel"),
     description: t("web.collections.field.description"),
     descriptionPlaceholder: t("web.collections.placeholder.description"),
     imageHelp: t("web.resources.upload.imagesHelp", {
       maxFileSize: formatMiB(maxImageBytes, locale),
-      maxImages: 1,
-      maxSessionSize: formatMiB(maxImageBytes, locale),
+      maxImages: maxImageSessionFiles,
+      maxSessionSize: formatMiB(maxImageSessionBytes, locale),
     }),
     imageTypes: t("web.resources.upload.imageTypes"),
     name: t("web.collections.field.name"),
@@ -971,7 +993,7 @@ export function CollectionFormPage({
     submit: t("action.save"),
   };
 
-  async function submit(value: CollectionFormValue, cover: File | null) {
+  async function submit(value: CollectionFormValue, images: File[]) {
     setSaving(true);
     setError(null);
     const moderating = Boolean(current?.canAdminister && !current.isOwner);
@@ -997,11 +1019,11 @@ export function CollectionFormPage({
       return;
     }
     setCurrent(result.collection);
-    if (cover) {
+    if (images.length) {
       try {
         const upload = await uploadImages({
           locale,
-          files: [cover],
+          files: images,
           getToken,
           reason,
           targetId: result.collection.id,
@@ -1058,6 +1080,7 @@ export function CollectionFormPage({
           copy={copy}
           disabled={saving}
           error={error}
+          includeImages={!collection}
           initialValue={
             current
               ? {
@@ -1069,6 +1092,51 @@ export function CollectionFormPage({
           }
           onSubmit={submit}
         />
+        {collection && current ? (
+          <CollectionImageUploader
+            copy={{
+              browse: t("web.resources.upload.browseFiles"),
+              imageHelp: t("web.collections.gallery.imagesHelp", {
+                maxFileSize: formatMiB(maxImageBytes, locale),
+                maxImages: maxImageSessionFiles,
+                maxSessionSize: formatMiB(maxImageSessionBytes, locale),
+              }),
+              imageTypes: t("web.resources.upload.imageTypes"),
+              label: t("web.collections.gallery.title"),
+              removeFile: t("web.resources.action.removeFile"),
+              submit: t("web.action.uploadImages"),
+            }}
+            disabled={saving}
+            error={uploadError}
+            onUpload={async (files) => {
+              setSaving(true);
+              setUploadError(null);
+              try {
+                const upload = await uploadImages({
+                  locale,
+                  files,
+                  getToken,
+                  targetId: current.id,
+                  targetType: "collection",
+                });
+                if (upload.failed.length) {
+                  setUploadError(t("web.collections.error.upload"));
+                  setSaving(false);
+                  return false;
+                }
+                window.location.reload();
+                return true;
+              } catch (uploadFailure) {
+                const failure = uploadFailure as ImageUploadError;
+                setUploadError(
+                  t(failure.key ?? "error.generic", failure.params),
+                );
+                setSaving(false);
+                return false;
+              }
+            }}
+          />
+        ) : null}
         {current?.coverImages.length ? (
           <CollectionCoverManager
             collection={current}
@@ -1076,9 +1144,15 @@ export function CollectionFormPage({
               clear: t("web.action.clearCover"),
               clearConfirmation: t("web.collections.cover.clearConfirmation"),
               current: t("web.collections.cover.current"),
-              delete: t("web.action.deleteCover"),
-              deleteConfirmation: t("web.collections.cover.deleteConfirmation"),
-              history: t("web.collections.cover.history"),
+              delete: t("web.action.deleteImage"),
+              deleteConfirmation: t(
+                "web.collections.gallery.deleteConfirmation",
+              ),
+              history: t("web.collections.gallery.title"),
+              nextPage: t("web.collections.gallery.nextPage"),
+              pageStatus: (page, pageCount) =>
+                t("web.collections.gallery.pageStatus", { page, pageCount }),
+              previousPage: t("web.collections.gallery.previousPage"),
               select: t("web.action.selectCover"),
             }}
             disabled={saving}
@@ -1145,9 +1219,7 @@ export function CollectionAddPage({
           }
         : null,
     );
-  const [collectionCover, setCollectionCover] = React.useState<File | null>(
-    null,
-  );
+  const [collectionImages, setCollectionImages] = React.useState<File[]>([]);
   const [selectedCollectionId, setSelectedCollectionId] = React.useState<
     number | null
   >(() =>
@@ -1269,10 +1341,10 @@ export function CollectionAddPage({
             return;
           }
         }
-        if (collectionCover) {
+        if (collectionImages.length) {
           const coverUpload = await uploadImages({
             locale,
-            files: [collectionCover],
+            files: collectionImages,
             getToken,
             targetId: savedCollectionId,
             targetType: "collection",
@@ -1281,7 +1353,7 @@ export function CollectionAddPage({
             setFormError("web.collections.error.upload");
             return;
           }
-          setCollectionCover(null);
+          setCollectionImages([]);
         }
         await navigate({
           params: { collectionId: savedCollectionId },
@@ -1367,11 +1439,11 @@ export function CollectionAddPage({
         return;
       }
     }
-    if (collectionCover) {
+    if (collectionImages.length) {
       try {
         const upload = await uploadImages({
           locale,
-          files: [collectionCover],
+          files: collectionImages,
           getToken,
           targetId: result.collectionId,
           targetType: "collection",
@@ -1438,7 +1510,7 @@ export function CollectionAddPage({
             setSelectedCollectionId(collectionId);
             if (collectionId !== -1) {
               setNewCollection(null);
-              setCollectionCover(null);
+              setCollectionImages([]);
             }
           }}
           placeholder={t("web.collections.select.placeholder")}
@@ -1452,15 +1524,15 @@ export function CollectionAddPage({
             <CollectionForm
               copy={{
                 browse: t("web.resources.upload.browseFiles"),
-                cover: t("web.collections.field.cover"),
+                cover: t("web.resources.upload.imagesLabel"),
                 description: t("web.collections.field.description"),
                 descriptionPlaceholder: t(
                   "web.collections.placeholder.description",
                 ),
                 imageHelp: t("web.resources.upload.imagesHelp", {
                   maxFileSize: formatMiB(maxImageBytes, locale),
-                  maxImages: 1,
-                  maxSessionSize: formatMiB(maxImageBytes, locale),
+                  maxImages: maxImageSessionFiles,
+                  maxSessionSize: formatMiB(maxImageSessionBytes, locale),
                 }),
                 imageTypes: t("web.resources.upload.imageTypes"),
                 name: t("web.collections.field.name"),
@@ -1469,9 +1541,9 @@ export function CollectionAddPage({
                 removeFile: t("web.resources.action.removeFile"),
                 submit: t("action.save"),
               }}
-              onSubmit={(value, cover) => {
+              onSubmit={(value, collectionImages) => {
                 setNewCollection(value);
-                setCollectionCover(cover);
+                setCollectionImages(collectionImages);
                 setSelectedCollectionId(-1);
                 collectionDialog.current?.close();
               }}

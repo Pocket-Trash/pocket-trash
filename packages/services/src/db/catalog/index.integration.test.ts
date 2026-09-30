@@ -82,8 +82,10 @@ describe("catalog product persistence", () => {
       );
 
       await service.setMakerProductUrlValidity({
+        actor: { clerkId: "admin-test", role: "admin" },
         makerProductUrlValid: false,
         productId: created.id,
+        reason: "Broken source link",
       });
       const updated = await service.updateProduct({
         actor: { clerkId: "user-test", role: "user" },

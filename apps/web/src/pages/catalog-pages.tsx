@@ -14,6 +14,7 @@ import {
   type CatalogFilterCopy,
 } from "@/components/catalog-filter-bar";
 import { CollectionCard } from "@/components/collection-card";
+import { CollectionGallery } from "@/components/collection-gallery";
 import { ImageGallery } from "@/components/image-gallery";
 import { MakerLink } from "@/components/maker-link";
 import { MarkdownContent } from "@/components/markdown-content";
@@ -77,7 +78,7 @@ export function HomePage() {
     },
     {
       image:
-        "https://cdn.pocket-trash.app/assets/static/hero-cards/collections.webp",
+        "https://cdn.pocket-trash.app/assets/static/hero-cards/collections.jpg",
       key: "web.navigation.collections" as const,
       to: "/collections" as const,
     },
@@ -684,15 +685,33 @@ export function CollectionPage({
       title={collection.name}
     >
       <main className="grid gap-6 p-3 md:p-[18px_22px_22px]">
-        {collection.coverImage ? (
-          <img
-            alt={t("web.resources.detail.imageAlt", {
+        <CollectionGallery
+          collection={collection}
+          copy={{
+            closeImage: t("web.resources.action.closeImage"),
+            gallery: t("web.collections.gallery.title"),
+            imageAlt: t("web.resources.detail.imageAlt", {
               name: collection.name,
-            })}
-            className="mx-auto aspect-4/3 w-full max-w-5xl rounded-xl border border-border object-cover"
-            src={collection.coverImage.url}
-          />
-        ) : null}
+            }),
+            itemCount: t("web.collections.directory.itemCount", {
+              count: collection.itemCount,
+            }),
+            nextImage: t("web.resources.action.nextImage"),
+            nextPage: t("web.collections.gallery.nextPage"),
+            owner: ownerUsername
+              ? t("web.collections.gallery.owner", { owner: ownerUsername })
+              : undefined,
+            pageStatus: (page, pageCount) =>
+              t("web.collections.gallery.pageStatus", { page, pageCount }),
+            previousImage: t("web.resources.action.previousImage"),
+            previousPage: t("web.collections.gallery.previousPage"),
+            visibility: t(
+              collection.isPrivate
+                ? "web.resources.visibility.private"
+                : "web.resources.visibility.public",
+            ),
+          }}
+        />
         <section className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
           {filtered.length ? (
             filtered.map((item) => (

@@ -4,6 +4,7 @@ import { createLogger, type LogEvent, loggerMessages } from "@package/logger";
 import { describe, expect, it, vi } from "vitest";
 import {
   assertValidFinishOptions,
+  CollectionButtonAlreadyInstalledError,
   createCatalogService,
   createCollectionsService,
   normalizeCollectionName,
@@ -13,6 +14,39 @@ const actor = (
   clerkId: string,
   role: "user" | "admin" | "system_admin" = "user",
 ) => ({ clerkId, role }) as const;
+
+function createLookup(
+  service: ReturnType<typeof createCatalogService>,
+  kind: "color" | "finish" | "maker" | "material",
+) {
+  switch (kind) {
+    case "color":
+      return service.createColor({
+        actor: actor("user-secret", "admin"),
+        hex: "#CD7F32",
+        name: "bronze",
+        slug: "bronze-2",
+      });
+    case "finish":
+      return service.createFinish({
+        actor: actor("user-secret", "admin"),
+        name: "bronze",
+        slug: "bronze-2",
+      });
+    case "maker":
+      return service.createMaker({
+        actor: actor("user-secret", "admin"),
+        name: "bronze",
+        rootUrl: null,
+      });
+    case "material":
+      return service.createMaterial({
+        actor: actor("user-secret", "admin"),
+        name: "bronze",
+        slug: "bronze-2",
+      });
+  }
+}
 
 describe("collection name normalization", () => {
   it("collapses case, spacing, punctuation, and diacritics", () => {
@@ -25,7 +59,11 @@ describe("collection name normalization", () => {
   });
 });
 
-function setup(returningRows: unknown[][], selectRows: unknown[][]) {
+function setup(
+  returningRows: unknown[][],
+  selectRows: unknown[][],
+  spinnerUpdateError?: unknown,
+) {
   const updates: Array<{ table: unknown; value: unknown }> = [];
   const writes: Array<{ table: unknown; value: unknown }> = [];
   const query = () => {
@@ -53,7 +91,18 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
   const update = (table: unknown) => ({
     set: vi.fn((value: unknown) => {
       updates.push({ table, value });
-      return { where: vi.fn(async () => []) };
+      return {
+        where: vi.fn(async () => {
+          if (
+            table === schema.collectionSpinner &&
+            spinnerUpdateError &&
+            "installedButtonId" in (value as object)
+          ) {
+            throw spinnerUpdateError;
+          }
+          return [];
+        }),
+      };
     }),
   });
   const tx = {
@@ -601,6 +650,58 @@ describe("collection catalog writes", () => {
     );
   });
 
+  it("returns a domain error when a button is already installed", async () => {
+    const { service } = setup(
+      [],
+      [
+        [
+          {
+            buttonProductId: null,
+            collectionId: 900,
+            installedButtonId: null,
+            ownerId: 1000,
+            spinnerProductId: 1100,
+          },
+        ],
+        [{ id: 900 }],
+        [{ materialId: 1101 }],
+        [{ id: 3100 }],
+        [{ id: 2000, productId: 1200 }],
+        [{ materialId: 1201 }],
+        [{ id: 3200 }],
+      ],
+      new Error("Query failed", {
+        cause: {
+          code: "23505",
+          constraint: "collection_spinner_installed_button_unique",
+        },
+      }),
+    );
+
+    const error = await service
+      .updateItem({
+        actor: actor("user-secret"),
+        collectionItemId: 2001,
+        customFinish: null,
+        displayName: "My spinner",
+        finishOptionId: null,
+        installedButton: {
+          collectionItemId: 2000,
+          customFinish: null,
+          finishOptionId: null,
+          materialId: 1201,
+        },
+        materialId: 1101,
+      })
+      .catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(CollectionButtonAlreadyInstalledError);
+    expect(error).toHaveProperty(
+      "message",
+      "Collection button is already installed on another spinner.",
+    );
+  });
+
   it("moves a spinner and its linked items to the selected collection", async () => {
     const { service, updates } = setup(
       [],
@@ -883,15 +984,20 @@ describe("catalog lookup writes", () => {
   });
 
   it("updates maker product URL validity without rewriting the product", async () => {
-    const { db, updates } = setup([], []);
+    const { db, updates } = setup(
+      [],
+      [[{ makerProductUrlValid: true, ownerUserId: 1000 }]],
+    );
     const service = createCatalogService(
       db,
       createLogger({ app: "api", environment: "test" }),
     );
 
     await service.setMakerProductUrlValidity({
+      actor: actor("admin-secret", "admin"),
       makerProductUrlValid: false,
       productId: 900,
+      reason: "Broken source link",
     });
 
     expect(updates).toContainEqual({
@@ -962,6 +1068,7 @@ describe("catalog lookup writes", () => {
         const query = {
           from: vi.fn(() => query),
           innerJoin: vi.fn(() => query),
+          leftJoin: vi.fn(() => query),
           where: vi.fn(() => query),
           limit: vi.fn().mockResolvedValue(rows),
         };
@@ -1007,44 +1114,55 @@ describe("catalog lookup writes", () => {
           })),
         })),
       })),
+      transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
+        callback(db),
+      ),
     } as unknown as Database;
     const service = createCatalogService(
       db,
       createLogger({ app: "api", environment: "test" }),
     );
 
-    const result = (() => {
-      switch (kind) {
-        case "color":
-          return service.createColor({
-            actorClerkId: "user-secret",
-            hex: "#CD7F32",
-            name: "bronze",
-            slug: "bronze-2",
-          });
-        case "finish":
-          return service.createFinish({
-            actorClerkId: "user-secret",
-            name: "bronze",
-            slug: "bronze-2",
-          });
-        case "maker":
-          return service.createMaker({
-            actorClerkId: "user-secret",
-            name: "bronze",
-            rootUrl: null,
-          });
-        case "material":
-          return service.createMaterial({
-            actorClerkId: "user-secret",
-            name: "bronze",
-            slug: "bronze-2",
-          });
-      }
-    })();
+    const result = createLookup(service, kind);
 
     await expect(result).rejects.toThrow(/already exists/i);
     expect(insert).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["color", "color_name_case_insensitive_unique", "Color"],
+    ["finish", "finish_name_case_insensitive_unique", "Finish"],
+    ["maker", "makers_name_case_insensitive_unique", "Maker"],
+    ["material", "materials_name_case_insensitive_unique", "Material"],
+  ] as const)("maps a concurrent duplicate %s name to the existing domain error", async (kind, constraint, label) => {
+    const databaseError = new Error("Query failed", {
+      cause: { code: "23505", constraint },
+    });
+    const db = {
+      insert: vi.fn(() => ({
+        values: vi.fn(() => ({
+          returning: vi.fn().mockRejectedValue(databaseError),
+        })),
+      })),
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn().mockResolvedValue([]),
+          })),
+        })),
+      })),
+      transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
+        callback(db),
+      ),
+    } as unknown as Database;
+    const service = createCatalogService(
+      db,
+      createLogger({ app: "api", environment: "test" }),
+    );
+
+    await expect(createLookup(service, kind)).rejects.toThrow(
+      `${label} name already exists.`,
+    );
   });
 });
 
