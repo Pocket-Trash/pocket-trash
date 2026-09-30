@@ -2,4 +2,4 @@
 "@app/web": patch
 ---
 
-Keep the Pocket Trash agent skill installation current.
+Remove legacy Pocket Trash skill version checks and install the current skills on demand.
