@@ -120,7 +120,7 @@ export async function attachImages(
     );
   for (const [index, file] of files.entries()) {
     await db.execute(
-      sql`insert into ${table} (${column}, position, file_name, content_type, size, sha256, object_path, url, uploaded_by_clerk_id${target.type === "collection" ? sql`, is_current` : sql``}) values (${target.id}, ${position++}, ${file.fileName}, ${file.contentType}, ${file.size}, ${file.sha256}, ${file.objectPath}, ${file.url}, ${actor.clerkId}${target.type === "collection" ? sql`, ${index === files.length - 1}` : sql``})`,
+      sql`insert into ${table} (${column}, position, file_name, content_type, size, sha256, object_path, url, uploaded_by_clerk_id${target.type === "collection" ? sql`, is_current` : sql``}) values (${target.id}, ${position++}, ${file.fileName}, ${file.contentType}, ${file.size}, ${file.sha256}, ${file.objectPath}, ${file.url}, ${actor.clerkId}${target.type === "collection" ? sql`, ${index === 0}` : sql``})`,
     );
   }
   if (target.type === "collection")

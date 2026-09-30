@@ -122,6 +122,7 @@ export function FileDropInput({
         <Input
           accept={accept}
           aria-describedby={descriptionId}
+          aria-label={label}
           className="peer sr-only"
           disabled={disabled}
           id={id}

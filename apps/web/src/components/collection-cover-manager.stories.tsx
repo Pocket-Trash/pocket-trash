@@ -82,8 +82,22 @@ export const ConfirmDelete: Story = {
     window.confirm = fn(() => true);
   },
   play: async ({ args, canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "Delete cover" }));
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Delete cover three.webp" }),
+    );
     await expect(args.onDelete).toHaveBeenCalledWith(previous);
+  },
+};
+
+export const ConfirmDeleteCurrent: Story = {
+  beforeEach: () => {
+    window.confirm = fn(() => true);
+  },
+  play: async ({ args, canvas, userEvent }) => {
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Delete cover one.webp" }),
+    );
+    await expect(args.onDelete).toHaveBeenCalledWith(current);
   },
 };
 

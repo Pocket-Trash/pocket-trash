@@ -21,7 +21,14 @@ const collectionImages = [
 ];
 const firstProductImage = productImages[0];
 const secondProductImage = productImages[1];
-if (!firstProductImage || !secondProductImage) {
+const fifthProductImage = productImages[4];
+const sixthProductImage = productImages[5];
+if (
+  !firstProductImage ||
+  !secondProductImage ||
+  !fifthProductImage ||
+  !sixthProductImage
+) {
   throw new Error("Image gallery stories require product images.");
 }
 
@@ -74,6 +81,40 @@ export const GroupedProductOnly: Story = {
 };
 
 export const Empty: Story = { args: { groups: [] } };
+
+export const Paginated: Story = {
+  args: { pageSize: 5 },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await expect(
+      canvas.getByRole("button", { name: "Images: one.webp" }),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole("button", { name: "Images: seven.webp" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Next image" }));
+    await expect(
+      canvas.getByRole("button", { name: "Images: seven.webp" }),
+    ).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Images: seven.webp" }),
+    );
+    const dialog = within(canvasElement.ownerDocument.body).getByRole(
+      "dialog",
+      { name: "Images" },
+    );
+    await expect(within(dialog).getByRole("img")).toHaveAttribute(
+      "src",
+      sixthProductImage.url,
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Previous image" }),
+    );
+    await expect(within(dialog).getByRole("img")).toHaveAttribute(
+      "src",
+      fifthProductImage.url,
+    );
+  },
+};
 
 export const LightboxNavigation: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {

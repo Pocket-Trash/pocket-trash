@@ -684,15 +684,37 @@ export function CollectionPage({
       title={collection.name}
     >
       <main className="grid gap-6 p-3 md:p-[18px_22px_22px]">
-        {collection.coverImage ? (
-          <img
-            alt={t("web.resources.detail.imageAlt", {
-              name: collection.name,
-            })}
-            className="mx-auto aspect-4/3 w-full max-w-5xl rounded-xl border border-border object-cover"
-            src={collection.coverImage.url}
-          />
-        ) : null}
+        <section
+          className={cn(
+            "grid gap-6",
+            collection.coverImages.length &&
+              "lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]",
+          )}
+        >
+          <div className="grid content-start gap-4 rounded-xl border border-border bg-card p-6 text-card-foreground">
+            <p className="text-sm text-muted-foreground">
+              {t("web.collections.directory.itemCount", {
+                count: collection.itemCount,
+              })}
+            </p>
+            {collection.description ? (
+              <MarkdownContent markdown={collection.description} />
+            ) : null}
+          </div>
+          <div className="grid content-start gap-3">
+            <ImageGallery
+              alt={t("web.resources.detail.imageAlt", {
+                name: collection.name,
+              })}
+              closeLabel={t("web.resources.action.closeImage")}
+              groups={[{ images: collection.coverImages }]}
+              label={t("web.resources.upload.imagesLabel")}
+              nextLabel={t("web.resources.action.nextImage")}
+              pageSize={5}
+              previousLabel={t("web.resources.action.previousImage")}
+            />
+          </div>
+        </section>
         <section className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
           {filtered.length ? (
             filtered.map((item) => (

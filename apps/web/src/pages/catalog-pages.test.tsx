@@ -1,4 +1,8 @@
-import type { CatalogProduct, PublicCollectionOwner } from "@package/services";
+import type {
+  CatalogImage,
+  CatalogProduct,
+  PublicCollectionOwner,
+} from "@package/services";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ProductCard } from "@/components/product-card";
@@ -209,6 +213,7 @@ describe("CollectionPage", () => {
     expect(html).toContain('href="/collections/add"');
     expect(html).toContain("Add to collection");
     expect(html.indexOf("Edit")).toBeLessThan(html.indexOf("Public"));
+    expect(html).not.toContain("lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]");
   });
 
   it("keeps descriptions and bearings off collection lists", () => {
@@ -233,7 +238,49 @@ describe("CollectionPage", () => {
     expect(html).not.toContain("LIST_ONLY_BEARING");
     expect(html).not.toContain("LIST_ONLY_DESCRIPTION");
   });
+
+  it("shows a paginated image gallery beside the collection summary", () => {
+    const collection = owners[0]?.collections[0];
+    if (!collection) throw new Error("Collection fixture is required.");
+    const images = Array.from({ length: 7 }, (_, index) =>
+      collectionImage(index + 1),
+    );
+
+    const html = renderToStaticMarkup(
+      <CollectionPage
+        collection={{
+          ...collection,
+          coverImage: images[6] ?? null,
+          coverImages: images,
+          description: "A focused collection summary.",
+        }}
+        items={owners[0]?.items ?? []}
+      />,
+    );
+
+    expect(html).toContain("A focused collection summary.");
+    expect(html).toContain('src="https://cdn.test/collection-1.webp"');
+    expect(html).not.toContain('src="https://cdn.test/collection-7.webp"');
+    expect(html).toContain('aria-label="Next image"');
+    expect(html).toContain("lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]");
+  });
 });
+
+function collectionImage(id: number): CatalogImage {
+  return {
+    contentType: "image/webp",
+    createdAt: new Date(0),
+    deletedAt: null,
+    deletedByClerkId: null,
+    deletedByRole: null,
+    fileName: `collection-${id}.webp`,
+    id,
+    objectPath: `collections/1000/collection-${id}.webp`,
+    position: id,
+    size: 1024,
+    url: `https://cdn.test/collection-${id}.webp`,
+  };
+}
 
 describe("ProductCard", () => {
   it("keeps descriptions off cards", () => {

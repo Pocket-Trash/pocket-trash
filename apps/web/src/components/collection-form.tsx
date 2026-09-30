@@ -36,10 +36,7 @@ export function CollectionForm({
   disabled?: boolean;
   error?: string | null;
   initialValue?: CollectionFormValue;
-  onSubmit(
-    value: CollectionFormValue,
-    cover: File | null,
-  ): void | Promise<void>;
+  onSubmit(value: CollectionFormValue, images: File[]): void | Promise<void>;
 }) {
   const { locale } = useLocale();
   const imageGuidance = getImageUploadGuidance(locale);
@@ -55,7 +52,7 @@ export function CollectionForm({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
-        void onSubmit(value, files[0] ?? null);
+        void onSubmit(value, files);
       }}
     >
       <label className="grid gap-2 text-sm font-medium" htmlFor={nameId}>
@@ -105,10 +102,17 @@ export function CollectionForm({
         disabled={disabled}
         fileTypes={copy.imageTypes}
         files={files}
-        id="collection-cover"
+        id="collection-images"
         label={copy.cover}
-        onFilesChange={setFiles}
-        onRemove={() => setFiles([])}
+        multiple
+        onFilesChange={(additions) =>
+          setFiles((current) => [...current, ...additions])
+        }
+        onRemove={(index) =>
+          setFiles((current) =>
+            current.filter((_, candidate) => candidate !== index),
+          )
+        }
         removeFileLabel={copy.removeFile}
       />
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -142,30 +146,45 @@ export function CollectionCoverManager({
   onDelete(image: CatalogImage): void | Promise<void>;
   onSelect(image: CatalogImage): void | Promise<void>;
 }) {
+  const current = collection.coverImage;
   const previous = collection.coverImages.filter(
-    ({ id }) => id !== collection.coverImage?.id,
+    ({ id }) => id !== current?.id,
   );
   return (
     <section className="grid max-w-3xl gap-4 rounded-xl border border-border bg-card p-6">
       <h2 className="font-semibold">{copy.current}</h2>
-      {collection.coverImage ? (
+      {current ? (
         <>
           <img
             alt=""
             className="aspect-4/3 max-w-sm rounded-lg object-cover"
-            src={collection.coverImage.url}
+            src={current.url}
           />
-          <Button
-            className="w-fit"
-            disabled={disabled}
-            onClick={() => {
-              if (window.confirm(copy.clearConfirmation)) void onClear();
-            }}
-            type="button"
-            variant="outline"
-          >
-            {copy.clear}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={disabled}
+              onClick={() => {
+                if (window.confirm(copy.clearConfirmation)) void onClear();
+              }}
+              type="button"
+              variant="outline"
+            >
+              {copy.clear}
+            </Button>
+            <Button
+              disabled={disabled}
+              onClick={() => {
+                if (window.confirm(copy.deleteConfirmation)) {
+                  void onDelete(current);
+                }
+              }}
+              type="button"
+              variant="destructive"
+            >
+              {copy.delete}
+              <span className="sr-only">{current.fileName}</span>
+            </Button>
+          </div>
         </>
       ) : null}
       {previous.length ? (
@@ -199,6 +218,7 @@ export function CollectionCoverManager({
                     variant="destructive"
                   >
                     {copy.delete}
+                    <span className="sr-only">{image.fileName}</span>
                   </Button>
                 </div>
               </li>

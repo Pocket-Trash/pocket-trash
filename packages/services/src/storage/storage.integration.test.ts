@@ -12,7 +12,6 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { hashLogIdentifier } from "../logging.js";
 import { createResourcesService } from "../resources/index.js";
-import { selectCollectionCover } from "./image-records.js";
 import { createStorageService } from "./index.js";
 
 const url = process.env.STORAGE_TEST_DATABASE_URL;
@@ -299,7 +298,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       }),
     ).rejects.toMatchObject({ code: "invalid_request" });
   });
-  it("uses all three image targets, rejects duplicate/unauthorized sessions, and protects the collection cover", async () => {
+  it("uses all image targets, accepts collection batches, and replaces a deleted cover", async () => {
     const file = await manifest(image, "image", "photo.png", "image/png");
     for (const target of [
       { type: "product", id: productId },
@@ -328,17 +327,43 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
         service.create({ target, files: [file] }, actor),
       ).rejects.toMatchObject({ code: "duplicate_active" });
     }
-    const cover = await pool.query(
-      "select id from collection_image where collection_id=$1",
+    const replacementBytes = new Uint8Array([...image, 0]);
+    const replacementFile = await manifest(
+      replacementBytes,
+      "image",
+      "replacement.png",
+      "image/png",
+    );
+    const galleryBytes = new Uint8Array([...image, 0, 1]);
+    const galleryFile = await manifest(
+      galleryBytes,
+      "image",
+      "gallery.png",
+      "image/png",
+    );
+    const replacementSession = await service.create(
+      {
+        target: { type: "collection", id: collectionId },
+        files: [replacementFile, galleryFile],
+      },
+      actor,
+    );
+    await put(replacementSession, {
+      "gallery.png": galleryBytes,
+      "replacement.png": replacementBytes,
+    });
+    await service.completeUpload(replacementSession.id, actor);
+    const covers = await pool.query(
+      "select id,is_current from collection_image where collection_id=$1 order by position desc",
       [collectionId],
     );
-    const id = Number(cover.rows[0].id);
-    await expect(
-      service.deleteFile({ fileType: "collection_image", fileId: id, actor }),
-    ).rejects.toMatchObject({ code: "invalid_request" });
-    await db.transaction((tx) =>
-      selectCollectionCover(tx, { collectionId, imageId: null, actor }),
-    );
+    const id = Number(covers.rows[1].id);
+    const replacementId = Number(covers.rows[0].id);
+    expect(covers.rows.map(({ is_current }) => is_current)).toEqual([
+      false,
+      true,
+      false,
+    ]);
     await service.deleteFile({
       fileType: "collection_image",
       fileId: id,
@@ -348,6 +373,14 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       (await pool.query("select id from collection_image where id=$1", [id]))
         .rowCount,
     ).toBe(0);
+    expect(
+      (
+        await pool.query(
+          "select is_current from collection_image where id=$1",
+          [replacementId],
+        )
+      ).rows[0]?.is_current,
+    ).toBe(true);
   });
   it("keeps attached objects during expiry cleanup and rejects incorrect file hashes", async () => {
     const bytes = new Uint8Array([...image, 0]);
@@ -645,6 +678,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
           (event) =>
             event.message ===
               `${loggerMessages.database.storage.deleteFile}.${outcome}` &&
+            event.attributes?.fileType === "product_image" &&
             event.attributes?.fileIdHash === hashLogIdentifier(String(row.id)),
         )?.attributes,
       ).toMatchObject({
