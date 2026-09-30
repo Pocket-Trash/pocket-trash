@@ -1,0 +1,2 @@
+DROP INDEX "scraper_runs_source_job_status_idx";--> statement-breakpoint
+CREATE UNIQUE INDEX "scraper_runs_active_source_job_unique" ON "scraper_runs" USING btree ("source","job_type") WHERE "scraper_runs"."status" = 'running';

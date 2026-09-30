@@ -267,6 +267,13 @@
       "when": 1790785626808,
       "tag": "0037_simple_morph",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1790803299566,
+      "tag": "0038_early_war_machine",
+      "breakpoints": true
     }
   ]
 }
