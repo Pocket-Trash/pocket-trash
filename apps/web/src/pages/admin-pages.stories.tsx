@@ -4,7 +4,7 @@ import {
   listFeedbackNotifications,
   markFeedbackNotificationRead,
 } from "@/lib/feedback";
-import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
+import { mockStoryRole, StoryProviders } from "../../.storybook/story-fixtures";
 import { AdminFeedbackNotificationsPage } from "./admin-feedback-notifications-page";
 import { AdminIndexPage } from "./admin-index-page";
 import { AdminNotificationsIndexPage } from "./admin-notifications-index-page";
@@ -29,7 +29,7 @@ const completed = {
 
 const meta = {
   beforeEach: () => {
-    mockStoryAuth();
+    mockStoryRole("admin");
     mocked(markFeedbackNotificationRead).mockResolvedValue(undefined);
     mocked(listFeedbackNotifications).mockResolvedValue([
       { ...unread, readAt: new Date("2026-09-29T12:05:00Z") },
@@ -84,6 +84,31 @@ export const Hub: Story = {
         sidebar.queryByRole("link", { name }),
       ).not.toBeInTheDocument();
     }
+  },
+};
+
+export const EditorHub: Story = {
+  beforeEach: () => mockStoryRole("editor"),
+  play: async ({ canvas }) => {
+    const main = within(
+      canvas.getByRole("main", {
+        name: "Manage Pocket Trash administration.",
+      }),
+    );
+    await expect(
+      main.queryByRole("link", { name: "Feedback" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      main.getByRole("link", { name: "Notifications" }),
+    ).toBeVisible();
+
+    const sidebar = within(
+      canvas.getByRole("navigation", { name: "Admin Panel" }),
+    );
+    await expect(
+      sidebar.queryByRole("link", { name: "Feature flags" }),
+    ).not.toBeInTheDocument();
+    await expect(sidebar.getByRole("link", { name: "Trash" })).toBeVisible();
   },
 };
 

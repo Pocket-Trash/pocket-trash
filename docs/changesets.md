@@ -36,6 +36,3 @@ AI tooling must double-confirm before creating or updating a Changeset with a
 
 If either confirmation is missing, do not create or update the Changeset as
 `major`. Stop and report that explicit double confirmation is required.
-
-When creating or updating a GitHub PR, apply the release-impact label that
-matches the PR Changeset: `patch`, `minor`, or `major`.

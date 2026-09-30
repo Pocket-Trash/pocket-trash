@@ -9,6 +9,11 @@ import {
   normalizeCollectionName,
 } from "./index.js";
 
+const actor = (
+  clerkId: string,
+  role: "user" | "admin" | "system_admin" = "user",
+) => ({ clerkId, role }) as const;
+
 describe("collection name normalization", () => {
   it("collapses case, spacing, punctuation, and diacritics", () => {
     expect(["Roy's", " roys ", "RÓY’S"].map(normalizeCollectionName)).toEqual([
@@ -136,7 +141,7 @@ describe("collection catalog writes", () => {
     await expect(
       service.listProductItems(1100, {
         clerkId: "user-secret",
-        isAdmin: true,
+        role: "admin",
       }),
     ).resolves.toEqual([]);
   });
@@ -272,7 +277,7 @@ describe("collection catalog writes", () => {
     );
 
     await expect(
-      service.listOwnedCollections("user-secret", true),
+      service.listOwnedCollections(actor("user-secret", "admin")),
     ).resolves.toEqual([]);
   });
 
@@ -284,8 +289,7 @@ describe("collection catalog writes", () => {
 
     await expect(
       service.setCollectionVisibility({
-        actorClerkId: "user-secret",
-        actorIsAdmin: true,
+        actor: actor("user-secret", "admin"),
         collectionId: 900,
         isPrivate: true,
       }),
@@ -304,8 +308,7 @@ describe("collection catalog writes", () => {
 
     await expect(
       service.setItemVisibility({
-        actorClerkId: "user-secret",
-        actorIsAdmin: true,
+        actor: actor("user-secret", "admin"),
         collectionItemId: 900,
         isPrivate: true,
       }),
@@ -528,7 +531,7 @@ describe("collection catalog writes", () => {
 
     await expect(
       service.updateItem({
-        actorClerkId: "other-user",
+        actor: actor("other-user"),
         collectionItemId: 2001,
         customFinish: null,
         displayName: "My spinner",
@@ -563,7 +566,7 @@ describe("collection catalog writes", () => {
 
     await expect(
       service.updateItem({
-        actorClerkId: "user-secret",
+        actor: actor("user-secret"),
         collectionId: 900,
         collectionItemId: 2001,
         customFinish: null,
@@ -613,7 +616,7 @@ describe("collection catalog writes", () => {
     );
 
     await service.updateItem({
-      actorClerkId: "user-secret",
+      actor: actor("user-secret"),
       collectionId: 901,
       collectionItemId: 2001,
       customFinish: null,
@@ -698,7 +701,7 @@ describe("catalog lookup writes", () => {
 
     await expect(
       service.createProduct({
-        actorClerkId: "user-secret",
+        actor: actor("user-secret"),
         description: "**Fast** spinner",
         finishOptions: [
           {
@@ -835,7 +838,7 @@ describe("catalog lookup writes", () => {
     service.getProduct = vi.fn().mockResolvedValue({ id: 900 } as never);
 
     await service.updateProduct({
-      actorClerkId: "user-secret",
+      actor: actor("user-secret"),
       description: "Updated **description**",
       finishOptions: [
         {
@@ -903,8 +906,7 @@ describe("catalog lookup writes", () => {
 
     await expect(
       service.setVisibility({
-        actorClerkId: "user-secret",
-        actorIsAdmin: true,
+        actor: actor("user-secret", "admin"),
         isPrivate: true,
         productId: 900,
       }),
@@ -926,8 +928,7 @@ describe("catalog lookup writes", () => {
     );
 
     await service.softDeleteImage({
-      actorClerkId: "user-secret",
-      actorIsAdmin: true,
+      actor: actor("user-secret", "admin"),
       imageId: 1000,
       targetType: "product",
     });
@@ -969,8 +970,7 @@ describe("catalog lookup writes", () => {
 
     await expect(
       service.softDeleteImage({
-        actorClerkId: "user-secret",
-        actorIsAdmin: false,
+        actor: actor("user-secret"),
         imageId: 1000,
         targetType,
       }),
@@ -1112,14 +1112,14 @@ describe("catalog image operation logging", () => {
       { transaction } as unknown as Database,
       logger,
     );
-    const actor = { clerkId: "private-owner", isAdmin: false };
+    const uploadActor = actor("private-owner");
     await service.attachImages({
-      actor,
+      actor: uploadActor,
       target: { type: "product", id: 1 },
       files: [],
     });
     await service.selectCollectionCover({
-      actor,
+      actor: uploadActor,
       collectionId: 1,
       imageId: null,
     });
@@ -1128,7 +1128,11 @@ describe("catalog image operation logging", () => {
     );
     transaction.mockRejectedValueOnce(failure);
     await expect(
-      service.selectCollectionCover({ actor, collectionId: 1, imageId: null }),
+      service.selectCollectionCover({
+        actor: uploadActor,
+        collectionId: 1,
+        imageId: null,
+      }),
     ).rejects.toBe(failure);
     await logger.flush();
     expect(events.map((event) => event.message)).toEqual([

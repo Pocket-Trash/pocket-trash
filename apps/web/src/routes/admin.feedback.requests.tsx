@@ -1,7 +1,7 @@
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import {
-  isFeedbackAdmin,
+  canManageFeedback,
   listFeedbackMergeTargets,
   listPendingFeedback,
 } from "@/lib/feedback";
@@ -9,7 +9,7 @@ import { AdminFeedbackRequestsPage } from "@/pages/admin-feedback-pages";
 
 export const Route = createFileRoute("/admin/feedback/requests")({
   beforeLoad: async () => {
-    if (!(await isFeedbackAdmin())) throw notFound();
+    if (!(await canManageFeedback())) throw notFound();
   },
   loader: async () => {
     const [initialPage, mergeTargets] = await Promise.all([

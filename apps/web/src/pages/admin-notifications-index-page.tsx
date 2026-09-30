@@ -8,17 +8,27 @@ import { AdminPageShell } from "@/components/admin-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
 export function AdminNotificationsIndexPage() {
+  const { sessionClaims, userId } = useAuth();
+  const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
   const { locale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const links = [
-    {
-      label: t("web.feedback.notification.title"),
-      to: "/admin/notifications/feedback" as const,
-    },
-    {
-      label: t("web.resources.notification.title"),
-      to: "/admin/notifications/resources" as const,
-    },
+    ...(hasPermission(actor, "feedback.manage")
+      ? [
+          {
+            label: t("web.feedback.notification.title"),
+            to: "/admin/notifications/feedback" as const,
+          },
+        ]
+      : []),
+    ...(hasPermission(actor, "resources.manage")
+      ? [
+          {
+            label: t("web.resources.notification.title"),
+            to: "/admin/notifications/resources" as const,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -42,3 +52,6 @@ export function AdminNotificationsIndexPage() {
     </AdminPageShell>
   );
 }
+
+import { useAuth } from "@clerk/tanstack-react-start";
+import { hasPermission, normalizeActor } from "@package/services/authorization";
