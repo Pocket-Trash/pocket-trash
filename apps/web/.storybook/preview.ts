@@ -1,0 +1,42 @@
+import type { Preview } from "@storybook/tanstack-react";
+import { sb } from "storybook/test";
+import { applyTheme } from "../src/lib/theme";
+import "../src/styles.css";
+
+sb.mock(import("@clerk/tanstack-react-start"));
+sb.mock(import("../src/lib/locale-api.ts"));
+sb.mock(import("../src/lib/resources.ts"));
+sb.mock(import("../src/lib/feedback.ts"), { spy: true });
+sb.mock(import("../src/lib/account-erasure.ts"), { spy: true });
+
+const preview: Preview = {
+  decorators: [
+    (Story, context) => {
+      applyTheme(context.globals.theme === "dark" ? "dark" : "light");
+      return Story();
+    },
+  ],
+  globalTypes: {
+    theme: {
+      toolbar: {
+        dynamicTitle: true,
+        icon: "circlehollow",
+        items: ["light", "dark"],
+        title: "Theme",
+      },
+    },
+  },
+  initialGlobals: { theme: "light" },
+  parameters: {
+    a11y: { test: "error" },
+    layout: "centered",
+    options: {
+      storySort: {
+        method: "alphabetical",
+        order: ["Components", "Pages", "UI"],
+      },
+    },
+  },
+};
+
+export default preview;

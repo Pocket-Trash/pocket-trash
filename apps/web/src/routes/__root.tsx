@@ -1,3 +1,5 @@
+import { loggerMessages } from "@package/logger";
+import { formatTranslation } from "@pocket-trash/localizations";
 import {
   createRootRoute,
   HeadContent,
@@ -5,27 +7,82 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import type * as React from "react";
-import { SITE_NAME } from "@/lib/constants";
+import { PageFooter } from "@/components/page-footer";
+import { logger } from "@/lib/logger";
 import { themeStorageKey } from "@/lib/theme";
 import type { ThemeBootstrapState } from "@/lib/theme-bootstrap";
 import { resolveServerThemeBootstrap } from "@/lib/theme-bootstrap";
-import { getCurrentUserSettingsState } from "@/lib/user-settings";
-import { NotFoundPage } from "@/pages/not-found-page";
+import {
+  getCurrentUserSettingsState,
+  type UserSettingsState,
+} from "@/lib/user-settings";
 import { AppProviders } from "@/providers/app-providers";
 import "../styles.css";
 
 export const Route = createRootRoute({
-  component: RootDocument,
+  component: RootContent,
   loader: async () => {
-    const settingsState = await getCurrentUserSettingsState();
+    const settingsState = await getCurrentUserSettingsState().catch(
+      async (error) => {
+        try {
+          if (import.meta.env.SSR) {
+            const { s } = await import("@/lib/services");
+            s.logger.warn(loggerMessages.web.userSettingsFetchFailed, {
+              error,
+            });
+          } else {
+            logger.warn(loggerMessages.web.userSettingsFetchFailed, { error });
+          }
+        } catch {
+          // Optional settings and logging must never prevent first paint.
+        }
+
+        return null;
+      },
+    );
 
     return {
+      copyrightYear: new Date().getFullYear(),
       settingsState,
       themeBootstrap: resolveServerThemeBootstrap(settingsState),
     };
   },
-  notFoundComponent: RootNotFoundDocument,
   head: () => ({
+    links: [
+      {
+        rel: "icon",
+        href: "https://pocket-trash.b-cdn.net/assets/favicon/favicon.ico",
+        sizes: "any",
+      },
+      {
+        rel: "icon",
+        type: "image/png",
+        sizes: "16x16",
+        href: "https://pocket-trash.b-cdn.net/assets/favicon/favicon-16x16.png",
+      },
+      {
+        rel: "icon",
+        type: "image/png",
+        sizes: "32x32",
+        href: "https://pocket-trash.b-cdn.net/assets/favicon/favicon-32x32.png",
+      },
+      {
+        rel: "icon",
+        type: "image/png",
+        sizes: "192x192",
+        href: "https://pocket-trash.b-cdn.net/assets/favicon/android-chrome-192x192.png",
+      },
+      {
+        rel: "icon",
+        type: "image/png",
+        sizes: "512x512",
+        href: "https://pocket-trash.b-cdn.net/assets/favicon/android-chrome-512x512.png",
+      },
+      {
+        rel: "apple-touch-icon",
+        href: "https://pocket-trash.b-cdn.net/assets/favicon/apple-touch-icon.png",
+      },
+    ],
     meta: [
       {
         charSet: "utf-8",
@@ -35,62 +92,76 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
       {
-        title: SITE_NAME,
+        title: formatTranslation("web.site.name"),
       },
     ],
   }),
+  shellComponent: RootDocument,
 });
 
 function RootDocument({ children }: { children?: React.ReactNode }) {
-  const loaderData = Route.useLoaderData();
-  const themeBootstrap = loaderData?.themeBootstrap ?? {
-    serverTheme: null,
-    shouldUseServerTheme: false,
-  };
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
         <script
           dangerouslySetInnerHTML={{
-            __html: themeBootstrapScript(themeBootstrap),
+            __html: bootstrapScript(
+              { serverTheme: null, shouldUseServerTheme: false },
+              null,
+            ),
           }}
         />
       </head>
       <body>
-        <div className="root">
-          <AppProviders
-            initialSettingsState={loaderData?.settingsState ?? null}
-          >
-            {children ?? <Outlet />}
-          </AppProviders>
-        </div>
+        <div className="root">{children}</div>
         <Scripts />
       </body>
     </html>
   );
 }
 
-function RootNotFoundDocument() {
+function RootContent() {
+  const loaderData = Route.useLoaderData();
+  const themeBootstrap = loaderData.themeBootstrap;
+
   return (
-    <RootDocument>
-      <NotFoundPage />
-    </RootDocument>
+    <>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: bootstrapScript(themeBootstrap, loaderData.settingsState),
+        }}
+      />
+      <AppProviders initialSettingsState={loaderData.settingsState}>
+        <div className="flex min-h-svh flex-col bg-background text-foreground">
+          <div className="flex flex-1 flex-col">
+            <Outlet />
+          </div>
+          <PageFooter year={loaderData.copyrightYear} />
+        </div>
+      </AppProviders>
+    </>
   );
 }
 
-function themeBootstrapScript(themeBootstrap: ThemeBootstrapState) {
+function bootstrapScript(
+  themeBootstrap: ThemeBootstrapState,
+  settingsState: UserSettingsState | null,
+) {
   return `
 (() => {
   try {
     const serverTheme = ${JSON.stringify(themeBootstrap.serverTheme)};
     const shouldUseServerTheme = ${JSON.stringify(themeBootstrap.shouldUseServerTheme)};
+    const serverLocale = ${JSON.stringify(settingsState?.settings.locale ?? null)};
     const theme = shouldUseServerTheme
       ? serverTheme
       : localStorage.getItem(${JSON.stringify(themeStorageKey)}) || "system";
     const dark = theme === "dark" || (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", dark);
+    const storedLocale = localStorage.getItem("field-log.locale");
+    const locale = serverLocale || (storedLocale === "en" || storedLocale === "en-US" ? "en-US" : storedLocale === "es-MX" ? "es-MX" : "en-US");
+    document.documentElement.lang = locale;
   } catch {}
 })();
 `;

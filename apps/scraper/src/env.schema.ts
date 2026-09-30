@@ -10,8 +10,8 @@ export type ScraperRuntimeEnv = {
   BUNNY_STORAGE_ENDPOINT?: string;
   BUNNY_STORAGE_ZONE_NAME?: string;
   DATABASE_URL?: string;
-  IMAGE_CDN_BASE_URL?: string;
-  IMAGE_FOLDER_PREFIX?: string;
+  BUNNY_CDN_BASE_URL?: string;
+  BUNNY_IMAGE_FOLDER_PREFIX?: string;
   IMAGE_STORAGE_PROVIDER?: string;
   LOGGER?: string;
   LOG_DEPLOYMENT_ID?: string;
@@ -65,6 +65,9 @@ export class ScraperEnvValidationError extends Error {
 }
 
 const scraperServerSchema = {
+  BUNNY_IMAGE_FOLDER_PREFIX: z
+    .string()
+    .regex(/^images(?:\/(?:dev|preview(?:\/pr-[1-9]\d*)?))?$/u),
   APP_ENV: z.string().min(1).optional(),
   AXIOM_DATASET: z.string().min(1).optional(),
   AXIOM_EDGE_DOMAIN: z.string().min(1).optional(),
@@ -115,8 +118,7 @@ export function createScraperJobEnv(runtimeEnv: ScraperRuntimeEnv) {
       BUNNY_STORAGE_ENDPOINT: z.string().min(1).url().optional(),
       BUNNY_STORAGE_ZONE_NAME: z.string().min(1).optional(),
       DATABASE_URL: z.string().min(1).url(),
-      IMAGE_CDN_BASE_URL: z.string().min(1).url().optional(),
-      IMAGE_FOLDER_PREFIX: z.string().min(1).optional(),
+      BUNNY_CDN_BASE_URL: z.string().min(1).url().optional(),
       IMAGE_STORAGE_PROVIDER: z.string().min(1).default("bunny"),
       REDIS_URL: redisUrlSchema,
       GRIMSMO_PROXY_URL: z.string().min(1).url().optional(),
@@ -216,8 +218,8 @@ function getScraperRuntimeEnvStrict(runtimeEnv: ScraperRuntimeEnv) {
     BUNNY_STORAGE_ENDPOINT: runtimeEnv.BUNNY_STORAGE_ENDPOINT,
     BUNNY_STORAGE_ZONE_NAME: runtimeEnv.BUNNY_STORAGE_ZONE_NAME,
     DATABASE_URL: runtimeEnv.DATABASE_URL,
-    IMAGE_CDN_BASE_URL: runtimeEnv.IMAGE_CDN_BASE_URL,
-    IMAGE_FOLDER_PREFIX: runtimeEnv.IMAGE_FOLDER_PREFIX,
+    BUNNY_CDN_BASE_URL: runtimeEnv.BUNNY_CDN_BASE_URL,
+    BUNNY_IMAGE_FOLDER_PREFIX: runtimeEnv.BUNNY_IMAGE_FOLDER_PREFIX,
     IMAGE_STORAGE_PROVIDER: runtimeEnv.IMAGE_STORAGE_PROVIDER,
     GRIMSMO_PROXY_URL: runtimeEnv.GRIMSMO_PROXY_URL,
     LOGGER: runtimeEnv.LOGGER,

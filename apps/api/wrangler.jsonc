@@ -1,0 +1,71 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pocket-trash-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": true,
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+      "persist": true
+    },
+    "traces": {
+      "enabled": true,
+      "persist": true
+    }
+  },
+  "routes": [
+    {
+      "pattern": "api.pocket-trash.app",
+      "custom_domain": true
+    }
+  ],
+  "triggers": {
+    "crons": ["15 * * * *"]
+  },
+  "vars": {
+    "APP_ENV": "production",
+    "BUNNY_IMAGE_FOLDER_PREFIX": "images"
+  },
+  "env": {
+    "development": {
+      "name": "pocket-trash-api-development",
+      "preview_urls": false,
+      "routes": [
+        {
+          "pattern": "dev-api.pocket-trash.app",
+          "custom_domain": true
+        }
+      ],
+      "triggers": {
+        "crons": []
+      },
+      "vars": {
+        "APP_ENV": "development",
+        "BUNNY_IMAGE_FOLDER_PREFIX": "images/dev"
+      },
+      "kv_namespaces": [
+        {
+          "binding": "CLERK_WEBHOOK_TARGETS"
+        }
+      ]
+    },
+    "preview": {
+      "name": "pocket-trash-api-preview",
+      "preview_urls": true,
+      "routes": [],
+      "triggers": {
+        "crons": []
+      },
+      "workers_dev": false,
+      "vars": {
+        "APP_ENV": "preview",
+        "BUNNY_IMAGE_FOLDER_PREFIX": "images/preview"
+      }
+    }
+  }
+}

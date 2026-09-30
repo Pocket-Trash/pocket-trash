@@ -1,7 +1,7 @@
 # Image CDN
 
 Pocket Trash uses Bunny for product and collection image storage and delivery.
-Shared upload, update, and delete behavior lives in `@package/images` and is
+Shared upload, update, and delete behavior lives in `@package/storage` and is
 exposed to apps through `@package/services`.
 
 ## Bunny Services
@@ -10,10 +10,10 @@ Create these Bunny resources:
 
 | Service | Suggested value | Purpose |
 | --- | --- | --- |
-| Storage Zone | `pocket-trash-images` | Stores optimized WebP source files. |
+| Storage Zone | `pocket-trash-storage` | Stores all Pocket Trash files. |
 | Storage tier | Standard | Keeps storage simple for the initial launch. |
 | Primary region | New York | Closest default region for North American users. |
-| Pull Zone | `pocket-trash-images` | Public CDN delivery for the Storage Zone. |
+| Pull Zone | `pocket-trash` | CDN delivery for the Storage Zone. |
 | Optimizer | Enabled | Enables cached query-based transformations. |
 | Dynamic Images API | Enabled | Supports width/format/quality query transforms. |
 | Custom hostname | `cdn.pocket-trash.app` | Serves images from the Pocket Trash domain. |
@@ -27,60 +27,55 @@ uploads.
 | Variable | Suggested value | Notes |
 | --- | --- | --- |
 | `IMAGE_STORAGE_PROVIDER` | unset, defaults to `bunny` | Set only to override provider selection. Unsupported values fail fast. |
-| `IMAGE_FOLDER_PREFIX` | production unset; local `dev`; shared preview `preview`; isolated PR preview `preview/pr-<number>` | Prepended to upload folders. |
-| `IMAGE_CDN_BASE_URL` | `https://cdn.pocket-trash.app/pocket-trash-images` | Public delivery root for this Storage Zone. Use `https://pocket-trash-images.b-cdn.net` only until DNS/SSL is ready. |
-| `BUNNY_STORAGE_ZONE_NAME` | `pocket-trash-images` | Storage Zone name. |
+| `BUNNY_IMAGE_FOLDER_PREFIX` | production `images`; local `images/dev`; shared preview `images/preview`; isolated PR preview `images/preview/pr-<number>` | Complete image namespace prepended to upload folders. |
+| `BUNNY_CDN_BASE_URL` | `https://cdn.pocket-trash.app` | Shared public delivery root. |
+| `BUNNY_STORAGE_ZONE_NAME` | `pocket-trash-storage` | Shared Storage Zone name. |
 | `BUNNY_STORAGE_ENDPOINT` | `https://ny.storage.bunnycdn.com` | Use the endpoint shown in Bunny if it differs. |
 | `BUNNY_STORAGE_ACCESS_KEY` | Storage Zone password | Secret. Required outside dry-run mode. |
+
+Complete account erasure uses `BUNNY_API_KEY`, `BUNNY_PULL_ZONE_ID`, and
+`BUNNY_CDN_TOKEN_KEY` in addition to the Storage Zone password. It refuses to
+run while Pull Zone Perma-Cache is configured, rejects every `products` path,
+purges each exact delivery URL, and verifies both Storage and CDN return a
+missing response. Purging an original also invalidates its Dynamic Images
+variants.
 
 ## Upload Behavior
 
 Upload folders are built from:
 
 ```text
-/<IMAGE_FOLDER_PREFIX>/products/<image-owner-key>
+{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{id}/{sha256}.{ext}
 ```
 
-When `IMAGE_FOLDER_PREFIX` is empty or unset, omit that segment.
-
-Before upload, Pocket Trash fetches the remote source image, auto-rotates it,
-resizes it so the longest edge is at most 2,000 pixels without enlargement, and
-converts it to WebP quality 85. Bunny stores that optimized WebP object.
+Pocket Trash validates the source format, dimensions, and 25 MiB size limit,
+then uploads the original bytes to Bunny Storage with their original format.
+Bunny Optimizer performs conversion, resizing, and compression at delivery time.
 
 | Environment | Folder prefix | Lifetime |
 | --- | --- | --- |
-| Production | unset | Long term. |
-| Preview with isolated PR DB | `preview/pr-<number>` | Ephemeral. Delete when the PR closes or merges. |
-| Preview using shared staging DB | `preview` | Long term non-production. |
-| Local dev | `dev` | Shared local development namespace. |
+| Production | `images` | Long term. |
+| Preview with isolated PR DB | `images/preview/pr-<number>` | Ephemeral. Delete when the PR closes or merges. |
+| Preview using shared staging DB | `images/preview` | Long term non-production. |
+| Local dev | `images/dev` | Shared local development namespace. |
 
-## Product Paths
+## Image Paths
 
-Products use:
+Display images use `{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{id}/{sha256}.{ext}`.
+The entity values are `products`, `collections`, `collection-items`, and `resources`.
+Uploaded filenames use the SHA-256 of the original bytes and the original extension.
 
-```text
-/<prefix>/products/<tmp-products-id>
-```
-
-Variation images use:
-
-```text
-/<prefix>/products/<tmp-products-id>-<tmp-product-variations-id>
-```
-
-Autmog pen images are product-level images and use `tmp_products.id` as the
-image folder key. Grimsmo images are variation-level images because each scraped
-listing handle is a product variation under a stable Grimsmo product.
+Scraper images use the same path builder, with a source image ID instead of the hash when it contains only letters, digits, underscores and hyphens; otherwise the original image bytes supply the SHA-256 hash. Product owner IDs remain `tmp_products.id`; variation owner IDs remain `<tmp-products-id>-<tmp-product-variations-id>`. Autmog pen images are product-level, while Grimsmo images are variation-level. Previously persisted URLs are not automatically rewritten. New or retried uploads use the original file extension and byte-hash fallback instead of the previous `.webp` extension and metadata `sourceHash` fallback.
 
 ## Delivery And Transforms
 
-Stored image URLs are built from `IMAGE_CDN_BASE_URL` and the object path.
-`IMAGE_CDN_BASE_URL` must include the public Storage Zone path when the CDN
+Stored image URLs are built from `BUNNY_CDN_BASE_URL` and the object path.
+`BUNNY_CDN_BASE_URL` must include the public Storage Zone path when the CDN
 serves one. Thumbnail URLs use Bunny Dynamic Images query transforms, for
 example:
 
 ```text
-https://cdn.pocket-trash.app/pocket-trash-images/products/1000/image.webp?width=500&format=webp&quality=85
+https://cdn.pocket-trash.app/images/products/1000/image.webp?width=500&format=webp&quality=85
 ```
 
 Bunny CDN caches served files and Optimizer transformations.
@@ -90,12 +85,54 @@ Bunny CDN caches served files and Optimizer transformations.
 The API deploy workflow selects the preview image prefix from the same DB-change
 detection that selects the database branch:
 
-- DB-changing PRs get `IMAGE_FOLDER_PREFIX=preview/pr-<number>`.
-- PRs without DB changes get `IMAGE_FOLDER_PREFIX=preview`.
+- DB-changing PRs get `BUNNY_IMAGE_FOLDER_PREFIX=images/preview/pr-<number>`.
+- PRs without DB changes get `BUNNY_IMAGE_FOLDER_PREFIX=images/preview`.
 - DB-changing PR scraper previews set `SCRAPER_CRON_ENABLED=true` because they
   have an isolated Neon branch. PRs without DB changes set
   `SCRAPER_CRON_ENABLED=false` because they share the preview database.
 
-The cleanup workflow removes branch-specific Vercel `IMAGE_FOLDER_PREFIX` when
-the PR closes. Isolated PR image folders under `/preview/pr-<number>` are deleted
-from Bunny Storage.
+The cleanup workflow removes branch-specific Vercel `BUNNY_IMAGE_FOLDER_PREFIX` when
+the PR closes. Isolated PR image folders under `/images/preview/pr-<number>` are
+deleted from Bunny Storage.
+
+## Central storage package
+
+`@package/storage` replaces `@package/images` and `@package/resources`. It owns
+Bunny transport, upload validation and targets, signed downloads, image delivery
+URLs, deletion, and preview cleanup. Images retain their original bytes, MIME
+type, extension, and dimensions in storage. JPEG, PNG, and WebP inputs are
+supported up to 25 MiB and 80 million pixels. The API handles user uploads; the
+scraper imports this package through services for its own uploads only. No
+service calls the scraper, and no always-on Node processor is needed.
+
+### Bunny Dynamic Image API
+
+Enable both Bunny Optimizer and **Dynamic Image API** on the Pull Zone.
+`imageDeliveryUrl` adds `format=webp&quality=85` to image URLs, including signed
+catalog and resource image URLs. Thumbnail URLs additionally request `width=500`.
+Original resource-file downloads retain their existing URLs without transforms.
+See [Dynamic Image API](https://bunny.net/docs/optimizer/dynamic-images/overview).
+
+Full-size image URLs omit an explicit width so Smart Image Optimization uses the
+configured dashboard limits: **2000 px desktop width**, **1000 px mobile width**,
+and **85 quality** for both. These are width limits, not longest-edge limits.
+Bunny preserves the stored original and caches transformed variants at the edge.
+Existing objects do not require a conversion or storage migration.
+
+Cloudflare Image Transformations, temporary source objects, and API signing keys
+for processing are unnecessary. Existing signed-download credentials remain in
+the web/services configuration. No scraper deployment or scheduler changes are
+required.
+
+Preview cleanup runs `pnpm --filter @package/storage cleanup:preview` once to delete both isolated image and resource prefixes.
+
+## Shared paths and signing
+
+The scraper and upload service use the same validated image path builder:
+`{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{entityId}/{name}.{ext}`.
+Entities are `products`, `collections`, `collection-items`, and `resources`.
+Uploaded names are the SHA-256 of the original bytes. Scraper names use the source image ID when available, otherwise the same SHA-256 rule. Variation owner keys remain unchanged.
+
+`BUNNY_IMAGE_FOLDER_PREFIX` is required by the API Worker as well as the scraper and web storage configuration. The deploy workflow sets it alongside the resource prefix for each environment.
+
+The services `signImages` helper signs uploaded product, collection, collection-item and resource images at render, then applies Bunny Dynamic Image API parameters. Tokens last 120 seconds. Enforcing tokens on the `images/*` CDN namespace remains a separate Bunny dashboard change; scraper delivery is unchanged.

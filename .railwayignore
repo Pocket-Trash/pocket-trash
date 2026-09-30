@@ -23,8 +23,8 @@
 !packages/eslint/**
 !packages/feature-flags/
 !packages/feature-flags/**
-!packages/images/
-!packages/images/**
+!packages/storage/
+!packages/storage/**
 !packages/logger/
 !packages/logger/**
 !packages/markdown/

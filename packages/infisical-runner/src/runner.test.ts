@@ -20,9 +20,7 @@ function getEnvAliasRunnerOptions(args: readonly string[]) {
 
   return JSON.parse(args[runnerIndex + 1] ?? "{}") as {
     databaseUrlUserOverride?: boolean;
-    databaseUrlUserOverridePath?: string;
-    environmentSlug?: string;
-    secretPaths?: string[];
+    databaseUrlUserOverrideFilePaths?: string[];
   };
 }
 
@@ -43,8 +41,60 @@ describe("parseCliArguments", () => {
 });
 
 describe("buildInfisicalRunArgs", () => {
+  const quietArgs = ["--silent", "--log-level=error"];
+  const quietRunArgs = (path: string) => [
+    "run",
+    ...quietArgs,
+    "--project-config-dir=/repo",
+    "--env=dev",
+    `--path=${path}`,
+    "--",
+  ];
+
+  it("builds API dev args with API and personal database secrets", () => {
+    const args = buildInfisicalRunArgs({
+      app: "api",
+      command: "dev",
+      commandArgs: ["wrangler", "dev", "--port", "4006"],
+      repoRoot: "/repo",
+    });
+
+    expect(getEnvAliasRunnerOptions(args)).toMatchObject({
+      databaseUrlUserOverride: true,
+      databaseUrlUserOverrideFilePaths: ["/repo/.env.local", "/repo/.env"],
+    });
+    expect(args).toContain("--path=/apps/api");
+    expect(args).toContain("--path=/local/database");
+    expect(args).not.toContain("--path=/apps/web");
+  });
+
+  it.each([
+    ["deploy", "prod", ""],
+    ["deploy:preview", "preview", "preview"],
+  ])("builds API %s args with Cloudflare secrets", (command, env, workerEnv) => {
+    expect(
+      buildInfisicalRunArgs({
+        app: "api",
+        command,
+        commandArgs: ["wrangler", "deploy", `--env=${workerEnv}`],
+        repoRoot: "/repo",
+      }),
+    ).toEqual([
+      "run",
+      ...quietArgs,
+      "--project-config-dir=/repo",
+      `--env=${env}`,
+      "--path=/tools/cloudflare",
+      "--",
+      "wrangler",
+      "deploy",
+      `--env=${workerEnv}`,
+    ]);
+  });
+
   it.each([
     ["cron:run"],
+    ["dev"],
     ["process:dead-letter"],
     ["process:queue"],
     ["scrape"],
@@ -66,9 +116,7 @@ describe("buildInfisicalRunArgs", () => {
     expect(args).toContain("--path=/apps/scraper");
     expect(getEnvAliasRunnerOptions(args)).toMatchObject({
       databaseUrlUserOverride: true,
-      databaseUrlUserOverridePath: "/local/database",
-      environmentSlug: "dev",
-      secretPaths: ["/apps/scraper"],
+      databaseUrlUserOverrideFilePaths: ["/repo/.env.local", "/repo/.env"],
     });
   });
 
@@ -93,6 +141,7 @@ describe("buildInfisicalRunArgs", () => {
       }),
     ).toEqual([
       "run",
+      ...quietArgs,
       "--project-config-dir=/repo",
       "--env=dev",
       "--path=/local/bunny",
@@ -111,17 +160,35 @@ describe("buildInfisicalRunArgs", () => {
         repoRoot: "/repo",
       }),
     ).toEqual([
-      "run",
-      "--project-config-dir=/repo",
-      "--env=dev",
-      "--path=/apps/web",
-      "--",
+      ...quietRunArgs("/apps/web"),
+      "infisical",
+      ...quietRunArgs("/local/database"),
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
       expect.stringContaining("databaseUrlUserOverride"),
       "--",
       "vite",
       "build",
+    ]);
+  });
+
+  it("loads local Clerk IDs for the webhook listener", () => {
+    expect(
+      buildInfisicalRunArgs({
+        app: "webhooks",
+        command: "listen",
+        commandArgs: ["node", "scripts/dev-webhooks.mjs"],
+        repoRoot: "/repo",
+      }),
+    ).toEqual([
+      "run",
+      ...quietArgs,
+      "--project-config-dir=/repo",
+      "--env=dev",
+      "--path=/local/clerk",
+      "--",
+      "node",
+      "scripts/dev-webhooks.mjs",
     ]);
   });
 
@@ -134,11 +201,9 @@ describe("buildInfisicalRunArgs", () => {
         repoRoot: "/repo",
       }),
     ).toEqual([
-      "run",
-      "--project-config-dir=/repo",
-      "--env=dev",
-      "--path=/apps/scraper",
-      "--",
+      ...quietRunArgs("/apps/scraper"),
+      "infisical",
+      ...quietRunArgs("/local/database"),
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
       expect.stringContaining("databaseUrlUserOverride"),
@@ -159,11 +224,9 @@ describe("buildInfisicalRunArgs", () => {
         repoRoot: "/repo",
       }),
     ).toEqual([
-      "run",
-      "--project-config-dir=/repo",
-      "--env=dev",
-      "--path=/apps/scraper",
-      "--",
+      ...quietRunArgs("/apps/scraper"),
+      "infisical",
+      ...quietRunArgs("/local/database"),
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
       expect.stringContaining("databaseUrlUserOverride"),
@@ -185,6 +248,7 @@ describe("buildInfisicalRunArgs", () => {
       }),
     ).toEqual([
       "run",
+      ...quietArgs,
       "--projectId=project-1",
       "--project-config-dir=/repo",
       "--env=dev",
@@ -210,6 +274,7 @@ describe("buildInfisicalRunArgs", () => {
       }),
     ).toEqual([
       "run",
+      ...quietArgs,
       "--project-config-dir=/repo",
       "--env=dev",
       "--path=tools/github/secrets",
@@ -230,11 +295,9 @@ describe("buildInfisicalRunArgs", () => {
     });
 
     expect(args).toEqual([
-      "run",
-      "--project-config-dir=/repo",
-      "--env=dev",
-      "--path=/apps/web",
-      "--",
+      ...quietRunArgs("/apps/web"),
+      "infisical",
+      ...quietRunArgs("/local/database"),
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
       expect.stringContaining("databaseUrlUserOverride"),
@@ -245,9 +308,35 @@ describe("buildInfisicalRunArgs", () => {
     ]);
     expect(getEnvAliasRunnerOptions(args)).toMatchObject({
       databaseUrlUserOverride: true,
-      databaseUrlUserOverridePath: "/local/database",
-      environmentSlug: "dev",
-      secretPaths: ["/apps/web"],
+      databaseUrlUserOverrideFilePaths: ["/repo/.env.local", "/repo/.env"],
+    });
+  });
+
+  it("builds database seed args with the database URL user override", () => {
+    const args = buildInfisicalRunArgs({
+      app: "database",
+      command: "db:seed",
+      commandArgs: ["tsx", "scripts/seed.ts"],
+      repoRoot: "/repo",
+    });
+
+    expect(args).toEqual([
+      "run",
+      ...quietArgs,
+      "--project-config-dir=/repo",
+      "--env=dev",
+      "--path=/apps/web",
+      "--",
+      "tsx",
+      "/repo/packages/infisical-runner/src/env-alias-runner.ts",
+      expect.stringContaining("databaseUrlUserOverride"),
+      "--",
+      "tsx",
+      "scripts/seed.ts",
+    ]);
+    expect(getEnvAliasRunnerOptions(args)).toMatchObject({
+      databaseUrlUserOverride: true,
+      databaseUrlUserOverrideFilePaths: ["/repo/.env.local", "/repo/.env"],
     });
   });
 
@@ -266,11 +355,9 @@ describe("buildInfisicalRunArgs", () => {
     });
 
     expect(args).toEqual([
-      "run",
-      "--project-config-dir=/repo",
-      "--env=dev",
-      "--path=/apps/web",
-      "--",
+      ...quietRunArgs("/apps/web"),
+      "infisical",
+      ...quietRunArgs("/local/database"),
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
       expect.stringContaining("databaseUrlUserOverride"),
@@ -283,10 +370,22 @@ describe("buildInfisicalRunArgs", () => {
     ]);
     expect(getEnvAliasRunnerOptions(args)).toMatchObject({
       databaseUrlUserOverride: true,
-      databaseUrlUserOverridePath: "/local/database",
-      environmentSlug: "dev",
-      secretPaths: ["/apps/web"],
+      databaseUrlUserOverrideFilePaths: ["/repo/.env.local", "/repo/.env"],
     });
+  });
+
+  it("shows provider information without enabling secret-dumping trace logs", () => {
+    const args = buildInfisicalRunArgs({
+      app: "web",
+      command: "dev",
+      commandArgs: ["vite", "dev"],
+      repoRoot: "/repo",
+      verbose: true,
+    });
+
+    expect(args).toContain("--log-level=info");
+    expect(args).not.toContain("--silent");
+    expect(args).not.toContain("--log-level=trace");
   });
 });
 
@@ -303,13 +402,13 @@ describe("infisical auth checks", () => {
 });
 
 describe("secret path policy", () => {
-  it("deduplicates configured paths", () => {
+  it("deduplicates configured paths in order", () => {
     expect(
       getSecretPaths({
         allowServerSecrets: false,
-        paths: ["/apps/web", "/apps/web"],
+        paths: ["/apps/web", "/shared", "/apps/web"],
       }),
-    ).toEqual(["/apps/web"]);
+    ).toEqual(["/apps/web", "/shared"]);
   });
 
   it("rejects server-only paths for client commands", () => {

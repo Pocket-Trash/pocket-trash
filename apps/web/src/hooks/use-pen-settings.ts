@@ -1,7 +1,8 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import { loggerMessages } from "@package/logger";
+import { formatTranslation } from "@pocket-trash/localizations";
 import * as React from "react";
 import { toast } from "sonner";
-import { compactMediaQuery } from "@/lib/breakpoints";
 import { logger } from "@/lib/logger";
 import {
   baseCurrency,
@@ -17,11 +18,10 @@ import {
   getCurrentUserSettingsState,
   patchCurrentUserSettings,
   type UserSettingsPatch,
-  userSettingsSaveFailureMessage,
   userSettingsStorageKey,
 } from "@/lib/user-settings";
+import { useLocale } from "@/providers/locale-provider";
 
-const filtersClosedStorageKey = "pocket-trash.filtersClosed";
 const rateStorageKey = `pocket-trash.fxRates.${baseCurrency}`;
 type PenSettings = Pick<
   typeof defaultUserSettings,
@@ -77,6 +77,13 @@ function writeStoredPenSettings(settings: PenSettings): void {
 }
 
 export function usePenSettings() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { locale } = useLocale();
+  const settingsSaveFailureMessage = formatTranslation(
+    "web.error.settingsSaveFailed",
+    {},
+    locale,
+  );
   const initialSettings = React.useMemo(readStoredPenSettings, []);
   const [units, setUnitsState] = React.useState<DimensionUnit>(
     initialSettings.dimensionUnit,
@@ -98,6 +105,8 @@ export function usePenSettings() {
   }, []);
 
   React.useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
     let cancelled = false;
     const requestVersion = mutationVersionRef.current;
 
@@ -120,7 +129,7 @@ export function usePenSettings() {
     return () => {
       cancelled = true;
     };
-  }, [applyPenSettings]);
+  }, [applyPenSettings, isLoaded, isSignedIn]);
 
   const saveSettings = React.useCallback(
     (patch: UserSettingsPatch, previousSettings: PenSettings) => {
@@ -129,6 +138,11 @@ export function usePenSettings() {
       const optimisticSettings = { ...previousSettings, ...patch };
 
       applyPenSettings(optimisticSettings);
+
+      if (!isLoaded || !isSignedIn) {
+        return;
+      }
+
       setSaving(true);
 
       patchCurrentUserSettings({ data: patch })
@@ -145,7 +159,7 @@ export function usePenSettings() {
           if (mutationVersion !== mutationVersionRef.current) return;
 
           applyPenSettings(previousSettings);
-          toast.error(userSettingsSaveFailureMessage);
+          toast.error(settingsSaveFailureMessage);
         })
         .finally(() => {
           if (mutationVersion === mutationVersionRef.current) {
@@ -153,7 +167,7 @@ export function usePenSettings() {
           }
         });
     },
-    [applyPenSettings],
+    [applyPenSettings, isLoaded, isSignedIn, settingsSaveFailureMessage],
   );
 
   const setUnits = React.useCallback(
@@ -292,36 +306,4 @@ export function useCurrencyRates() {
   const refreshRates = React.useCallback(() => loadRates(true), [loadRates]);
 
   return { rates, refreshRates };
-}
-
-export function useFiltersOpen() {
-  const [filtersOpen, setFiltersOpenState] = React.useState(true);
-
-  React.useEffect(() => {
-    const media = window.matchMedia(compactMediaQuery);
-    const sync = () => {
-      if (media.matches) {
-        setFiltersOpenState(false);
-        return;
-      }
-
-      setFiltersOpenState(
-        window.localStorage.getItem(filtersClosedStorageKey) !== "1",
-      );
-    };
-
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
-
-  const setFiltersOpen = React.useCallback((open: boolean) => {
-    setFiltersOpenState(open);
-
-    if (!window.matchMedia(compactMediaQuery).matches) {
-      window.localStorage.setItem(filtersClosedStorageKey, open ? "0" : "1");
-    }
-  }, []);
-
-  return [filtersOpen, setFiltersOpen] as const;
 }

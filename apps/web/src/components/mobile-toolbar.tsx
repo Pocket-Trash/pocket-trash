@@ -1,14 +1,10 @@
 import {
-  ArrowUpDown,
-  Check,
-  Search,
-  Settings,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
+import { ArrowUpDown, Check, Search, SlidersHorizontal, X } from "lucide-react";
 import * as React from "react";
 import { FilterSidebar } from "@/components/filter-sidebar";
-import { SettingsPanel } from "@/components/settings-drawer";
 import {
   Drawer,
   DrawerContent,
@@ -27,12 +23,8 @@ import type {
   MatchModes,
   SortKey,
 } from "@/lib/pen-filters";
-import type {
-  CurrencyCode,
-  DimensionUnit,
-  WeightUnit,
-} from "@/lib/pen-formatters";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
 
 // Height of the bar itself (excludes the safe-area padding below it). Kept in
 // sync with the reserved bottom padding in `app-shell.tsx`.
@@ -40,54 +32,42 @@ const BAR_HEIGHT = "3.5rem";
 
 type MobileToolbarProps = {
   active: ActiveFilters;
-  currency: CurrencyCode;
   filterCount: number;
   matchModes: MatchModes;
   onClearFilters: () => void;
-  onCurrencyChange: (currency: CurrencyCode) => void;
   onMatchModeChange: (key: FilterKey, mode: MatchMode) => void;
   onQueryChange: (query: string) => void;
   onSortChange: (sort: SortKey) => void;
   onToggleFilter: (key: FilterKey, value: string) => void;
-  onUnitsChange: (unit: DimensionUnit) => void;
-  onWeightChange: (unit: WeightUnit) => void;
   products: PenProduct[];
   query: string;
-  settingsDisabled?: boolean;
   sort: SortKey;
   sortOptions: Array<{ label: string; value: SortKey }>;
-  units: DimensionUnit;
-  weight: WeightUnit;
 };
 
 /**
- * Compact-only (`< md`) bottom toolbar. It is a toolbar, not a nav bar: each
- * item opens a sheet or field rather than switching screens. Filters / Sort /
- * Settings are vaul bottom sheets (swipe-to-dismiss); Search expands a field
- * docked above the bar. Hidden at `md` and up, where the persistent sidebar and
- * header controls take over.
+ * Compact-only (`<= 880px`) bottom toolbar. It is a toolbar, not a nav bar: each
+ * item opens a sheet or field rather than switching screens. Filters and Sort
+ * are vaul bottom sheets (swipe-to-dismiss); Search expands a field docked
+ * above the bar. Hidden above 880px, where the persistent sidebar and header
+ * controls take over.
  */
 export function MobileToolbar({
   active,
-  currency,
   filterCount,
   matchModes,
   onClearFilters,
-  onCurrencyChange,
   onMatchModeChange,
   onQueryChange,
   onSortChange,
   onToggleFilter,
-  onUnitsChange,
-  onWeightChange,
   products,
   query,
-  settingsDisabled = false,
   sort,
   sortOptions,
-  units,
-  weight,
 }: MobileToolbarProps) {
+  const { locale } = useLocale();
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [sortOpen, setSortOpen] = React.useState(false);
   // Distinct from the desktop header search field so the two inputs never share
@@ -106,7 +86,7 @@ export function MobileToolbar({
   const keyboardInset = useKeyboardInset(searchOpen);
 
   return (
-    <div className="md:hidden">
+    <div className="min-[881px]:hidden">
       {searchOpen ? (
         <div
           className="fixed inset-x-0 z-40 flex items-center gap-2 border-t border-border bg-background/95 p-2 backdrop-blur"
@@ -125,19 +105,19 @@ export function MobileToolbar({
           >
             <Search className="pointer-events-none absolute left-3 size-4 text-muted-foreground" />
             <Input
-              aria-label="Search pens by title, specs, or description"
+              aria-label={t("web.archive.searchProducts")}
               autoComplete="off"
               className="pr-3 pl-9"
               id={searchInputId}
               onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="Search..."
+              placeholder={t("web.archive.searchPlaceholder")}
               ref={searchRef}
               type="search"
               value={query}
             />
           </label>
           <button
-            aria-label="Close search"
+            aria-label={t("web.archive.closeSearch")}
             className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
             onClick={() => setSearchOpen(false)}
             type="button"
@@ -148,14 +128,14 @@ export function MobileToolbar({
       ) : null}
 
       <nav
-        aria-label="Archive controls"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+        aria-label={t("web.archive.controls")}
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
         style={{ height: `calc(${BAR_HEIGHT} + env(safe-area-inset-bottom))` }}
       >
         <ToolbarButton
           active={searchOpen || query.length > 0}
           icon={Search}
-          label="Search"
+          label={t("web.action.search")}
           onClick={() => setSearchOpen((open) => !open)}
         />
 
@@ -165,14 +145,14 @@ export function MobileToolbar({
               active={filterCount > 0}
               badge={filterCount}
               icon={SlidersHorizontal}
-              label="Filters"
+              label={t("web.archive.filters")}
             />
           </DrawerTrigger>
           <DrawerContent>
             <DrawerHeader>
-              <DrawerTitle>Filters</DrawerTitle>
+              <DrawerTitle>{t("web.archive.filters")}</DrawerTitle>
               <DrawerDescription className="sr-only">
-                Filter the archive by category, size, material, and more.
+                {t("web.archive.filterDescription")}
               </DrawerDescription>
             </DrawerHeader>
             <div className="overflow-y-auto px-2 pb-4">
@@ -190,13 +170,16 @@ export function MobileToolbar({
 
         <Drawer onOpenChange={setSortOpen} open={sortOpen}>
           <DrawerTrigger asChild>
-            <ToolbarButton icon={ArrowUpDown} label="Sort" />
+            <ToolbarButton
+              icon={ArrowUpDown}
+              label={t("web.archive.sortLabel")}
+            />
           </DrawerTrigger>
           <DrawerContent>
             <DrawerHeader>
-              <DrawerTitle>Sort</DrawerTitle>
+              <DrawerTitle>{t("web.archive.sortLabel")}</DrawerTitle>
               <DrawerDescription className="sr-only">
-                Choose how the archive is ordered.
+                {t("web.archive.sortDescription")}
               </DrawerDescription>
             </DrawerHeader>
             <div className="overflow-y-auto p-2">
@@ -221,30 +204,6 @@ export function MobileToolbar({
                 );
               })}
             </div>
-          </DrawerContent>
-        </Drawer>
-
-        <Drawer>
-          <DrawerTrigger asChild>
-            <ToolbarButton icon={Settings} label="Settings" />
-          </DrawerTrigger>
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>Settings</DrawerTitle>
-              <DrawerDescription className="sr-only">
-                Display preferences for the archive.
-              </DrawerDescription>
-            </DrawerHeader>
-            <SettingsPanel
-              currency={currency}
-              disabled={settingsDisabled}
-              onCurrencyChange={onCurrencyChange}
-              onUnitsChange={onUnitsChange}
-              onWeightChange={onWeightChange}
-              showTheme
-              units={units}
-              weight={weight}
-            />
           </DrawerContent>
         </Drawer>
       </nav>

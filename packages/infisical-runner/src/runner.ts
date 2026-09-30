@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import {
   type CommandSecretConfig,
   commandSecrets,
-  databaseUrlUserOverrideSecretPath,
   defaultEnvironmentSlug,
 } from "./config.js";
 
@@ -22,6 +21,7 @@ export type ParsedCliArguments = {
 export type InfisicalRunRequest = ParsedCliArguments & {
   infisicalProjectId?: string;
   repoRoot: string;
+  verbose?: boolean;
 };
 
 export function getRepoRoot(): string {
@@ -86,8 +86,14 @@ export function isServerSecretPath(secretPath: string): boolean {
   return secretPath.endsWith("/server") || secretPath.includes("/server/");
 }
 
-export function getSecretPaths(config: CommandSecretConfig): string[] {
-  return [...new Set(config.paths)];
+export function getSecretPaths(
+  config: CommandSecretConfig,
+): [string, ...string[]] {
+  const [firstPath, ...remainingPaths] = config.paths;
+  return [
+    firstPath,
+    ...new Set(remainingPaths.filter((path) => path !== firstPath)),
+  ];
 }
 
 export function validateSecretPaths(
@@ -116,6 +122,9 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
 
   const runArgsForPath = (secretPath: string): string[] => [
     "run",
+    ...(request.verbose
+      ? ["--log-level=info"]
+      : ["--silent", "--log-level=error"]),
     ...(request.infisicalProjectId
       ? [`--projectId=${request.infisicalProjectId}`]
       : []),
@@ -136,12 +145,12 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
         "packages/infisical-runner/src/env-alias-runner.ts",
       ),
       JSON.stringify({
-        databaseUrlUserOverridePath: databaseUrlUserOverrideSecretPath,
+        databaseUrlUserOverrideFilePaths: [
+          join(request.repoRoot, ".env.local"),
+          join(request.repoRoot, ".env"),
+        ],
         databaseUrlUserOverride: config.databaseUrlUserOverride ?? false,
         envAliases: config.envAliases ?? [],
-        environmentSlug,
-        infisicalProjectId: request.infisicalProjectId,
-        secretPaths: paths,
       }),
       "--",
     );
@@ -151,12 +160,13 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
 
   // Infisical accepts a single secret path per `run`, so nest runs to
   // accumulate each path's secrets before the wrapped command executes.
-  let args = [...runArgsForPath(paths[paths.length - 1]!), ...innerCommand];
-  for (let index = paths.length - 2; index >= 0; index -= 1) {
-    args = [...runArgsForPath(paths[index]!), "infisical", ...args];
+  const [outermostPath, ...remainingPaths] = paths;
+  const args = runArgsForPath(outermostPath);
+  for (const secretPath of remainingPaths) {
+    args.push("infisical", ...runArgsForPath(secretPath));
   }
 
-  return args;
+  return [...args, ...innerCommand];
 }
 
 export function hasInfisicalProjectConfig(repoRoot: string): boolean {
@@ -237,6 +247,8 @@ export function assertInfisicalAuthenticated(
       "secrets",
       "folders",
       "get",
+      "--silent",
+      "--log-level=error",
       `--env=${environmentSlug}`,
       "--path=/",
       "--output=json",

@@ -10,24 +10,168 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UserRouteImport } from './routes/user'
+import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
+import { Route as ResourcesRouteImport } from './routes/resources'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as FeedbackRouteImport } from './routes/feedback'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as AutmogRouteImport } from './routes/autmog'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AccountErasureRouteImport } from './routes/account-erasure'
+import { Route as AccountErasedRouteImport } from './routes/account-erased'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as UserIndexRouteImport } from './routes/user.index'
+import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
+import { Route as ProductsIndexRouteImport } from './routes/products.index'
+import { Route as HelpIndexRouteImport } from './routes/help.index'
+import { Route as FeedbackIndexRouteImport } from './routes/feedback.index'
+import { Route as CollectionsIndexRouteImport } from './routes/collections.index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as UserSettingsRouteImport } from './routes/user.settings_'
+import { Route as UserResourcesRouteImport } from './routes/user.resources'
 import { Route as UserCollectionsRouteImport } from './routes/user.collections'
 import { Route as UserAccountRouteImport } from './routes/user.account'
 import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
+import { Route as ResourcesAddRouteImport } from './routes/resources.add'
+import { Route as ResourcesResourceIdRouteImport } from './routes/resources.$resourceId'
+import { Route as ProductsAddRouteImport } from './routes/products.add'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
+import { Route as HelpSlugRouteImport } from './routes/help.$slug'
+import { Route as FeedbackNewRouteImport } from './routes/feedback.new'
+import { Route as FeedbackMyRequestsRouteImport } from './routes/feedback.my-requests'
+import { Route as CollectionsAddRouteImport } from './routes/collections.add'
+import { Route as CollectionsUserIdRouteImport } from './routes/collections.$userId'
+import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
+import { Route as AdminAccountErasureRouteImport } from './routes/admin.account-erasure'
+import { Route as AdminTrashIndexRouteImport } from './routes/admin.trash.index'
+import { Route as AdminFeedbackIndexRouteImport } from './routes/admin.feedback.index'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
+import { Route as UserResourcesTrashRouteImport } from './routes/user.resources_.trash'
+import { Route as UserCollectionsAddRouteImport } from './routes/user.collections_.add'
+import { Route as UserCollectionsCollectionIdRouteImport } from './routes/user.collections_.$collectionId'
+import { Route as ResourcesResourceIdEditRouteImport } from './routes/resources.$resourceId_.edit'
+import { Route as ProductsProductTypeSlugProductSlugRouteImport } from './routes/products.$productTypeSlug.$productSlug'
+import { Route as CollectionsUserIdCollectionIdRouteImport } from './routes/collections_.$userId.$collectionId'
+import { Route as CollectionsEditCollectionItemIdRouteImport } from './routes/collections.edit.$collectionItemId'
+import { Route as AdminTrashResourcesRouteImport } from './routes/admin.trash.resources'
+import { Route as AdminTrashCatalogImagesRouteImport } from './routes/admin.trash.catalog-images'
 import { Route as AdminSettingsFeatureFlagsRouteImport } from './routes/admin.settings.feature-flags'
+import { Route as AdminNotificationsResourcesRouteImport } from './routes/admin.notifications.resources'
+import { Route as AdminNotificationsFeedbackRouteImport } from './routes/admin.notifications.feedback'
+import { Route as AdminFeedbackRequestsRouteImport } from './routes/admin.feedback.requests'
+import { Route as AdminFeedbackPlannedRouteImport } from './routes/admin.feedback.planned'
+import { Route as AdminFeedbackArchiveRouteImport } from './routes/admin.feedback.archive'
+import { Route as UserCollectionsCollectionIdEditRouteImport } from './routes/user.collections_.$collectionId_.edit'
+import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId_.versions.new'
+import { Route as ProductsProductTypeSlugProductSlugEditRouteImport } from './routes/products.$productTypeSlug.$productSlug_.edit'
+import { Route as CollectionsUserIdCollectionIdCollectionItemIdRouteImport } from './routes/collections_.$userId.$collectionId_.$collectionItemId'
 
 const UserRoute = UserRouteImport.update({
   id: '/user',
   path: '/user',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
+  id: '/terms-of-service',
+  path: '/terms-of-service',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResourcesRoute = ResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackRoute = FeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AutmogRoute = AutmogRouteImport.update({
+  id: '/autmog',
+  path: '/autmog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountErasureRoute = AccountErasureRouteImport.update({
+  id: '/account-erasure',
+  path: '/account-erasure',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountErasedRoute = AccountErasedRouteImport.update({
+  id: '/account-erased',
+  path: '/account-erased',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const UserIndexRoute = UserIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => UserRoute,
+} as any)
+const ResourcesIndexRoute = ResourcesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ResourcesRoute,
+} as any)
+const ProductsIndexRoute = ProductsIndexRouteImport.update({
+  id: '/products/',
+  path: '/products/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelpIndexRoute = HelpIndexRouteImport.update({
+  id: '/help/',
+  path: '/help/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackIndexRoute = FeedbackIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => FeedbackRoute,
+} as any)
+const CollectionsIndexRoute = CollectionsIndexRouteImport.update({
+  id: '/collections/',
+  path: '/collections/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const UserSettingsRoute = UserSettingsRouteImport.update({
+  id: '/settings_',
+  path: '/settings',
+  getParentRoute: () => UserRoute,
+} as any)
+const UserResourcesRoute = UserResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => UserRoute,
 } as any)
 const UserCollectionsRoute = UserCollectionsRouteImport.update({
   id: '/collections',
@@ -49,10 +193,70 @@ const SignInSplatRoute = SignInSplatRouteImport.update({
   path: '/sign-in/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResourcesAddRoute = ResourcesAddRouteImport.update({
+  id: '/add',
+  path: '/add',
+  getParentRoute: () => ResourcesRoute,
+} as any)
+const ResourcesResourceIdRoute = ResourcesResourceIdRouteImport.update({
+  id: '/$resourceId',
+  path: '/$resourceId',
+  getParentRoute: () => ResourcesRoute,
+} as any)
+const ProductsAddRoute = ProductsAddRouteImport.update({
+  id: '/products/add',
+  path: '/products/add',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PensPenIdRoute = PensPenIdRouteImport.update({
   id: '/pens/$penId',
   path: '/pens/$penId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const HelpSlugRoute = HelpSlugRouteImport.update({
+  id: '/help/$slug',
+  path: '/help/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackNewRoute = FeedbackNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => FeedbackRoute,
+} as any)
+const FeedbackMyRequestsRoute = FeedbackMyRequestsRouteImport.update({
+  id: '/my-requests',
+  path: '/my-requests',
+  getParentRoute: () => FeedbackRoute,
+} as any)
+const CollectionsAddRoute = CollectionsAddRouteImport.update({
+  id: '/collections/add',
+  path: '/collections/add',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollectionsUserIdRoute = CollectionsUserIdRouteImport.update({
+  id: '/collections/$userId',
+  path: '/collections/$userId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AutmogPenIdRoute = AutmogPenIdRouteImport.update({
+  id: '/$penId',
+  path: '/$penId',
+  getParentRoute: () => AutmogRoute,
+} as any)
+const AdminAccountErasureRoute = AdminAccountErasureRouteImport.update({
+  id: '/account-erasure',
+  path: '/account-erasure',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTrashIndexRoute = AdminTrashIndexRouteImport.update({
+  id: '/trash/',
+  path: '/trash/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFeedbackIndexRoute = AdminFeedbackIndexRouteImport.update({
+  id: '/feedback/',
+  path: '/feedback/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const UserSettingsBetaFeaturesRoute =
   UserSettingsBetaFeaturesRouteImport.update({
@@ -60,90 +264,497 @@ const UserSettingsBetaFeaturesRoute =
     path: '/settings/beta-features',
     getParentRoute: () => UserRoute,
   } as any)
+const UserResourcesTrashRoute = UserResourcesTrashRouteImport.update({
+  id: '/resources_/trash',
+  path: '/resources/trash',
+  getParentRoute: () => UserRoute,
+} as any)
+const UserCollectionsAddRoute = UserCollectionsAddRouteImport.update({
+  id: '/collections_/add',
+  path: '/collections/add',
+  getParentRoute: () => UserRoute,
+} as any)
+const UserCollectionsCollectionIdRoute =
+  UserCollectionsCollectionIdRouteImport.update({
+    id: '/collections_/$collectionId',
+    path: '/collections/$collectionId',
+    getParentRoute: () => UserRoute,
+  } as any)
+const ResourcesResourceIdEditRoute = ResourcesResourceIdEditRouteImport.update({
+  id: '/$resourceId_/edit',
+  path: '/$resourceId/edit',
+  getParentRoute: () => ResourcesRoute,
+} as any)
+const ProductsProductTypeSlugProductSlugRoute =
+  ProductsProductTypeSlugProductSlugRouteImport.update({
+    id: '/products/$productTypeSlug/$productSlug',
+    path: '/products/$productTypeSlug/$productSlug',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const CollectionsUserIdCollectionIdRoute =
+  CollectionsUserIdCollectionIdRouteImport.update({
+    id: '/collections_/$userId/$collectionId',
+    path: '/collections/$userId/$collectionId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const CollectionsEditCollectionItemIdRoute =
+  CollectionsEditCollectionItemIdRouteImport.update({
+    id: '/collections/edit/$collectionItemId',
+    path: '/collections/edit/$collectionItemId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const AdminTrashResourcesRoute = AdminTrashResourcesRouteImport.update({
+  id: '/trash/resources',
+  path: '/trash/resources',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTrashCatalogImagesRoute = AdminTrashCatalogImagesRouteImport.update({
+  id: '/trash/catalog-images',
+  path: '/trash/catalog-images',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSettingsFeatureFlagsRoute =
   AdminSettingsFeatureFlagsRouteImport.update({
-    id: '/admin/settings/feature-flags',
-    path: '/admin/settings/feature-flags',
+    id: '/settings/feature-flags',
+    path: '/settings/feature-flags',
+    getParentRoute: () => AdminRoute,
+  } as any)
+const AdminNotificationsResourcesRoute =
+  AdminNotificationsResourcesRouteImport.update({
+    id: '/notifications/resources',
+    path: '/notifications/resources',
+    getParentRoute: () => AdminRoute,
+  } as any)
+const AdminNotificationsFeedbackRoute =
+  AdminNotificationsFeedbackRouteImport.update({
+    id: '/notifications/feedback',
+    path: '/notifications/feedback',
+    getParentRoute: () => AdminRoute,
+  } as any)
+const AdminFeedbackRequestsRoute = AdminFeedbackRequestsRouteImport.update({
+  id: '/feedback/requests',
+  path: '/feedback/requests',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFeedbackPlannedRoute = AdminFeedbackPlannedRouteImport.update({
+  id: '/feedback/planned',
+  path: '/feedback/planned',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFeedbackArchiveRoute = AdminFeedbackArchiveRouteImport.update({
+  id: '/feedback/archive',
+  path: '/feedback/archive',
+  getParentRoute: () => AdminRoute,
+} as any)
+const UserCollectionsCollectionIdEditRoute =
+  UserCollectionsCollectionIdEditRouteImport.update({
+    id: '/collections_/$collectionId_/edit',
+    path: '/collections/$collectionId/edit',
+    getParentRoute: () => UserRoute,
+  } as any)
+const ResourcesResourceIdVersionsNewRoute =
+  ResourcesResourceIdVersionsNewRouteImport.update({
+    id: '/$resourceId_/versions/new',
+    path: '/$resourceId/versions/new',
+    getParentRoute: () => ResourcesRoute,
+  } as any)
+const ProductsProductTypeSlugProductSlugEditRoute =
+  ProductsProductTypeSlugProductSlugEditRouteImport.update({
+    id: '/products/$productTypeSlug/$productSlug_/edit',
+    path: '/products/$productTypeSlug/$productSlug/edit',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const CollectionsUserIdCollectionIdCollectionItemIdRoute =
+  CollectionsUserIdCollectionIdCollectionItemIdRouteImport.update({
+    id: '/collections_/$userId/$collectionId_/$collectionItemId',
+    path: '/collections/$userId/$collectionId/$collectionItemId',
     getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account-erased': typeof AccountErasedRoute
+  '/account-erasure': typeof AccountErasureRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/autmog': typeof AutmogRouteWithChildren
+  '/contact': typeof ContactRoute
+  '/feedback': typeof FeedbackRouteWithChildren
+  '/notifications': typeof NotificationsRoute
+  '/privacy': typeof PrivacyRoute
+  '/resources': typeof ResourcesRouteWithChildren
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
+  '/admin/account-erasure': typeof AdminAccountErasureRoute
+  '/autmog/$penId': typeof AutmogPenIdRoute
+  '/collections/$userId': typeof CollectionsUserIdRoute
+  '/collections/add': typeof CollectionsAddRoute
+  '/feedback/my-requests': typeof FeedbackMyRequestsRoute
+  '/feedback/new': typeof FeedbackNewRoute
+  '/help/$slug': typeof HelpSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
+  '/products/add': typeof ProductsAddRoute
+  '/resources/$resourceId': typeof ResourcesResourceIdRoute
+  '/resources/add': typeof ResourcesAddRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/user/resources': typeof UserResourcesRoute
+  '/user/settings': typeof UserSettingsRoute
+  '/admin/': typeof AdminIndexRoute
+  '/collections/': typeof CollectionsIndexRoute
+  '/feedback/': typeof FeedbackIndexRoute
+  '/help/': typeof HelpIndexRoute
+  '/products/': typeof ProductsIndexRoute
+  '/resources/': typeof ResourcesIndexRoute
+  '/user/': typeof UserIndexRoute
+  '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
+  '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
+  '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
+  '/admin/notifications/feedback': typeof AdminNotificationsFeedbackRoute
+  '/admin/notifications/resources': typeof AdminNotificationsResourcesRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
+  '/admin/trash/catalog-images': typeof AdminTrashCatalogImagesRoute
+  '/admin/trash/resources': typeof AdminTrashResourcesRoute
+  '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
+  '/collections/$userId/$collectionId': typeof CollectionsUserIdCollectionIdRoute
+  '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
+  '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
+  '/user/collections/$collectionId': typeof UserCollectionsCollectionIdRoute
+  '/user/collections/add': typeof UserCollectionsAddRoute
+  '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/admin/feedback/': typeof AdminFeedbackIndexRoute
+  '/admin/trash/': typeof AdminTrashIndexRoute
+  '/collections/$userId/$collectionId/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
+  '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
+  '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
+  '/user/collections/$collectionId/edit': typeof UserCollectionsCollectionIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/user': typeof UserRouteWithChildren
+  '/account-erased': typeof AccountErasedRoute
+  '/account-erasure': typeof AccountErasureRoute
+  '/autmog': typeof AutmogRouteWithChildren
+  '/contact': typeof ContactRoute
+  '/notifications': typeof NotificationsRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
+  '/admin/account-erasure': typeof AdminAccountErasureRoute
+  '/autmog/$penId': typeof AutmogPenIdRoute
+  '/collections/$userId': typeof CollectionsUserIdRoute
+  '/collections/add': typeof CollectionsAddRoute
+  '/feedback/my-requests': typeof FeedbackMyRequestsRoute
+  '/feedback/new': typeof FeedbackNewRoute
+  '/help/$slug': typeof HelpSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
+  '/products/add': typeof ProductsAddRoute
+  '/resources/$resourceId': typeof ResourcesResourceIdRoute
+  '/resources/add': typeof ResourcesAddRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/user/resources': typeof UserResourcesRoute
+  '/user/settings': typeof UserSettingsRoute
+  '/admin': typeof AdminIndexRoute
+  '/collections': typeof CollectionsIndexRoute
+  '/feedback': typeof FeedbackIndexRoute
+  '/help': typeof HelpIndexRoute
+  '/products': typeof ProductsIndexRoute
+  '/resources': typeof ResourcesIndexRoute
+  '/user': typeof UserIndexRoute
+  '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
+  '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
+  '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
+  '/admin/notifications/feedback': typeof AdminNotificationsFeedbackRoute
+  '/admin/notifications/resources': typeof AdminNotificationsResourcesRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
+  '/admin/trash/catalog-images': typeof AdminTrashCatalogImagesRoute
+  '/admin/trash/resources': typeof AdminTrashResourcesRoute
+  '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
+  '/collections/$userId/$collectionId': typeof CollectionsUserIdCollectionIdRoute
+  '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
+  '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
+  '/user/collections/$collectionId': typeof UserCollectionsCollectionIdRoute
+  '/user/collections/add': typeof UserCollectionsAddRoute
+  '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/admin/feedback': typeof AdminFeedbackIndexRoute
+  '/admin/trash': typeof AdminTrashIndexRoute
+  '/collections/$userId/$collectionId/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
+  '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
+  '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
+  '/user/collections/$collectionId/edit': typeof UserCollectionsCollectionIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account-erased': typeof AccountErasedRoute
+  '/account-erasure': typeof AccountErasureRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/autmog': typeof AutmogRouteWithChildren
+  '/contact': typeof ContactRoute
+  '/feedback': typeof FeedbackRouteWithChildren
+  '/notifications': typeof NotificationsRoute
+  '/privacy': typeof PrivacyRoute
+  '/resources': typeof ResourcesRouteWithChildren
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
+  '/admin/account-erasure': typeof AdminAccountErasureRoute
+  '/autmog/$penId': typeof AutmogPenIdRoute
+  '/collections/$userId': typeof CollectionsUserIdRoute
+  '/collections/add': typeof CollectionsAddRoute
+  '/feedback/my-requests': typeof FeedbackMyRequestsRoute
+  '/feedback/new': typeof FeedbackNewRoute
+  '/help/$slug': typeof HelpSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
+  '/products/add': typeof ProductsAddRoute
+  '/resources/$resourceId': typeof ResourcesResourceIdRoute
+  '/resources/add': typeof ResourcesAddRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/user/account': typeof UserAccountRoute
   '/user/collections': typeof UserCollectionsRoute
+  '/user/resources': typeof UserResourcesRoute
+  '/user/settings_': typeof UserSettingsRoute
+  '/admin/': typeof AdminIndexRoute
+  '/collections/': typeof CollectionsIndexRoute
+  '/feedback/': typeof FeedbackIndexRoute
+  '/help/': typeof HelpIndexRoute
+  '/products/': typeof ProductsIndexRoute
+  '/resources/': typeof ResourcesIndexRoute
+  '/user/': typeof UserIndexRoute
+  '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
+  '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
+  '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
+  '/admin/notifications/feedback': typeof AdminNotificationsFeedbackRoute
+  '/admin/notifications/resources': typeof AdminNotificationsResourcesRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
+  '/admin/trash/catalog-images': typeof AdminTrashCatalogImagesRoute
+  '/admin/trash/resources': typeof AdminTrashResourcesRoute
+  '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
+  '/collections_/$userId/$collectionId': typeof CollectionsUserIdCollectionIdRoute
+  '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
+  '/resources/$resourceId_/edit': typeof ResourcesResourceIdEditRoute
+  '/user/collections_/$collectionId': typeof UserCollectionsCollectionIdRoute
+  '/user/collections_/add': typeof UserCollectionsAddRoute
+  '/user/resources_/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/admin/feedback/': typeof AdminFeedbackIndexRoute
+  '/admin/trash/': typeof AdminTrashIndexRoute
+  '/collections_/$userId/$collectionId_/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
+  '/products/$productTypeSlug/$productSlug_/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
+  '/resources/$resourceId_/versions/new': typeof ResourcesResourceIdVersionsNewRoute
+  '/user/collections_/$collectionId_/edit': typeof UserCollectionsCollectionIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/account-erased'
+    | '/account-erasure'
+    | '/admin'
+    | '/autmog'
+    | '/contact'
+    | '/feedback'
+    | '/notifications'
+    | '/privacy'
+    | '/resources'
+    | '/terms-of-service'
     | '/user'
+    | '/admin/account-erasure'
+    | '/autmog/$penId'
+    | '/collections/$userId'
+    | '/collections/add'
+    | '/feedback/my-requests'
+    | '/feedback/new'
+    | '/help/$slug'
     | '/pens/$penId'
+    | '/products/add'
+    | '/resources/$resourceId'
+    | '/resources/add'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/user/resources'
+    | '/user/settings'
+    | '/admin/'
+    | '/collections/'
+    | '/feedback/'
+    | '/help/'
+    | '/products/'
+    | '/resources/'
+    | '/user/'
+    | '/admin/feedback/archive'
+    | '/admin/feedback/planned'
+    | '/admin/feedback/requests'
+    | '/admin/notifications/feedback'
+    | '/admin/notifications/resources'
     | '/admin/settings/feature-flags'
+    | '/admin/trash/catalog-images'
+    | '/admin/trash/resources'
+    | '/collections/edit/$collectionItemId'
+    | '/collections/$userId/$collectionId'
+    | '/products/$productTypeSlug/$productSlug'
+    | '/resources/$resourceId/edit'
+    | '/user/collections/$collectionId'
+    | '/user/collections/add'
+    | '/user/resources/trash'
     | '/user/settings/beta-features'
+    | '/admin/feedback/'
+    | '/admin/trash/'
+    | '/collections/$userId/$collectionId/$collectionItemId'
+    | '/products/$productTypeSlug/$productSlug/edit'
+    | '/resources/$resourceId/versions/new'
+    | '/user/collections/$collectionId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/user'
+    | '/account-erased'
+    | '/account-erasure'
+    | '/autmog'
+    | '/contact'
+    | '/notifications'
+    | '/privacy'
+    | '/terms-of-service'
+    | '/admin/account-erasure'
+    | '/autmog/$penId'
+    | '/collections/$userId'
+    | '/collections/add'
+    | '/feedback/my-requests'
+    | '/feedback/new'
+    | '/help/$slug'
     | '/pens/$penId'
+    | '/products/add'
+    | '/resources/$resourceId'
+    | '/resources/add'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/user/resources'
+    | '/user/settings'
+    | '/admin'
+    | '/collections'
+    | '/feedback'
+    | '/help'
+    | '/products'
+    | '/resources'
+    | '/user'
+    | '/admin/feedback/archive'
+    | '/admin/feedback/planned'
+    | '/admin/feedback/requests'
+    | '/admin/notifications/feedback'
+    | '/admin/notifications/resources'
     | '/admin/settings/feature-flags'
+    | '/admin/trash/catalog-images'
+    | '/admin/trash/resources'
+    | '/collections/edit/$collectionItemId'
+    | '/collections/$userId/$collectionId'
+    | '/products/$productTypeSlug/$productSlug'
+    | '/resources/$resourceId/edit'
+    | '/user/collections/$collectionId'
+    | '/user/collections/add'
+    | '/user/resources/trash'
     | '/user/settings/beta-features'
+    | '/admin/feedback'
+    | '/admin/trash'
+    | '/collections/$userId/$collectionId/$collectionItemId'
+    | '/products/$productTypeSlug/$productSlug/edit'
+    | '/resources/$resourceId/versions/new'
+    | '/user/collections/$collectionId/edit'
   id:
     | '__root__'
     | '/'
+    | '/account-erased'
+    | '/account-erasure'
+    | '/admin'
+    | '/autmog'
+    | '/contact'
+    | '/feedback'
+    | '/notifications'
+    | '/privacy'
+    | '/resources'
+    | '/terms-of-service'
     | '/user'
+    | '/admin/account-erasure'
+    | '/autmog/$penId'
+    | '/collections/$userId'
+    | '/collections/add'
+    | '/feedback/my-requests'
+    | '/feedback/new'
+    | '/help/$slug'
     | '/pens/$penId'
+    | '/products/add'
+    | '/resources/$resourceId'
+    | '/resources/add'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/user/account'
     | '/user/collections'
+    | '/user/resources'
+    | '/user/settings_'
+    | '/admin/'
+    | '/collections/'
+    | '/feedback/'
+    | '/help/'
+    | '/products/'
+    | '/resources/'
+    | '/user/'
+    | '/admin/feedback/archive'
+    | '/admin/feedback/planned'
+    | '/admin/feedback/requests'
+    | '/admin/notifications/feedback'
+    | '/admin/notifications/resources'
     | '/admin/settings/feature-flags'
+    | '/admin/trash/catalog-images'
+    | '/admin/trash/resources'
+    | '/collections/edit/$collectionItemId'
+    | '/collections_/$userId/$collectionId'
+    | '/products/$productTypeSlug/$productSlug'
+    | '/resources/$resourceId_/edit'
+    | '/user/collections_/$collectionId'
+    | '/user/collections_/add'
+    | '/user/resources_/trash'
     | '/user/settings/beta-features'
+    | '/admin/feedback/'
+    | '/admin/trash/'
+    | '/collections_/$userId/$collectionId_/$collectionItemId'
+    | '/products/$productTypeSlug/$productSlug_/edit'
+    | '/resources/$resourceId_/versions/new'
+    | '/user/collections_/$collectionId_/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountErasedRoute: typeof AccountErasedRoute
+  AccountErasureRoute: typeof AccountErasureRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  AutmogRoute: typeof AutmogRouteWithChildren
+  ContactRoute: typeof ContactRoute
+  FeedbackRoute: typeof FeedbackRouteWithChildren
+  NotificationsRoute: typeof NotificationsRoute
+  PrivacyRoute: typeof PrivacyRoute
+  ResourcesRoute: typeof ResourcesRouteWithChildren
+  TermsOfServiceRoute: typeof TermsOfServiceRoute
   UserRoute: typeof UserRouteWithChildren
+  CollectionsUserIdRoute: typeof CollectionsUserIdRoute
+  CollectionsAddRoute: typeof CollectionsAddRoute
+  HelpSlugRoute: typeof HelpSlugRoute
   PensPenIdRoute: typeof PensPenIdRoute
+  ProductsAddRoute: typeof ProductsAddRoute
   SignInSplatRoute: typeof SignInSplatRoute
   SignUpSplatRoute: typeof SignUpSplatRoute
-  AdminSettingsFeatureFlagsRoute: typeof AdminSettingsFeatureFlagsRoute
+  CollectionsIndexRoute: typeof CollectionsIndexRoute
+  HelpIndexRoute: typeof HelpIndexRoute
+  ProductsIndexRoute: typeof ProductsIndexRoute
+  CollectionsEditCollectionItemIdRoute: typeof CollectionsEditCollectionItemIdRoute
+  CollectionsUserIdCollectionIdRoute: typeof CollectionsUserIdCollectionIdRoute
+  ProductsProductTypeSlugProductSlugRoute: typeof ProductsProductTypeSlugProductSlugRoute
+  CollectionsUserIdCollectionIdCollectionItemIdRoute: typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
+  ProductsProductTypeSlugProductSlugEditRoute: typeof ProductsProductTypeSlugProductSlugEditRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -155,12 +766,145 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/terms-of-service': {
+      id: '/terms-of-service'
+      path: '/terms-of-service'
+      fullPath: '/terms-of-service'
+      preLoaderRoute: typeof TermsOfServiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resources': {
+      id: '/resources'
+      path: '/resources'
+      fullPath: '/resources'
+      preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feedback': {
+      id: '/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof FeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/autmog': {
+      id: '/autmog'
+      path: '/autmog'
+      fullPath: '/autmog'
+      preLoaderRoute: typeof AutmogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account-erasure': {
+      id: '/account-erasure'
+      path: '/account-erasure'
+      fullPath: '/account-erasure'
+      preLoaderRoute: typeof AccountErasureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account-erased': {
+      id: '/account-erased'
+      path: '/account-erased'
+      fullPath: '/account-erased'
+      preLoaderRoute: typeof AccountErasedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/user/': {
+      id: '/user/'
+      path: '/'
+      fullPath: '/user/'
+      preLoaderRoute: typeof UserIndexRouteImport
+      parentRoute: typeof UserRoute
+    }
+    '/resources/': {
+      id: '/resources/'
+      path: '/'
+      fullPath: '/resources/'
+      preLoaderRoute: typeof ResourcesIndexRouteImport
+      parentRoute: typeof ResourcesRoute
+    }
+    '/products/': {
+      id: '/products/'
+      path: '/products'
+      fullPath: '/products/'
+      preLoaderRoute: typeof ProductsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help/': {
+      id: '/help/'
+      path: '/help'
+      fullPath: '/help/'
+      preLoaderRoute: typeof HelpIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feedback/': {
+      id: '/feedback/'
+      path: '/'
+      fullPath: '/feedback/'
+      preLoaderRoute: typeof FeedbackIndexRouteImport
+      parentRoute: typeof FeedbackRoute
+    }
+    '/collections/': {
+      id: '/collections/'
+      path: '/collections'
+      fullPath: '/collections/'
+      preLoaderRoute: typeof CollectionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/user/settings_': {
+      id: '/user/settings_'
+      path: '/settings'
+      fullPath: '/user/settings'
+      preLoaderRoute: typeof UserSettingsRouteImport
+      parentRoute: typeof UserRoute
+    }
+    '/user/resources': {
+      id: '/user/resources'
+      path: '/resources'
+      fullPath: '/user/resources'
+      preLoaderRoute: typeof UserResourcesRouteImport
+      parentRoute: typeof UserRoute
     }
     '/user/collections': {
       id: '/user/collections'
@@ -190,12 +934,96 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignInSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/resources/add': {
+      id: '/resources/add'
+      path: '/add'
+      fullPath: '/resources/add'
+      preLoaderRoute: typeof ResourcesAddRouteImport
+      parentRoute: typeof ResourcesRoute
+    }
+    '/resources/$resourceId': {
+      id: '/resources/$resourceId'
+      path: '/$resourceId'
+      fullPath: '/resources/$resourceId'
+      preLoaderRoute: typeof ResourcesResourceIdRouteImport
+      parentRoute: typeof ResourcesRoute
+    }
+    '/products/add': {
+      id: '/products/add'
+      path: '/products/add'
+      fullPath: '/products/add'
+      preLoaderRoute: typeof ProductsAddRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pens/$penId': {
       id: '/pens/$penId'
       path: '/pens/$penId'
       fullPath: '/pens/$penId'
       preLoaderRoute: typeof PensPenIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/help/$slug': {
+      id: '/help/$slug'
+      path: '/help/$slug'
+      fullPath: '/help/$slug'
+      preLoaderRoute: typeof HelpSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feedback/new': {
+      id: '/feedback/new'
+      path: '/new'
+      fullPath: '/feedback/new'
+      preLoaderRoute: typeof FeedbackNewRouteImport
+      parentRoute: typeof FeedbackRoute
+    }
+    '/feedback/my-requests': {
+      id: '/feedback/my-requests'
+      path: '/my-requests'
+      fullPath: '/feedback/my-requests'
+      preLoaderRoute: typeof FeedbackMyRequestsRouteImport
+      parentRoute: typeof FeedbackRoute
+    }
+    '/collections/add': {
+      id: '/collections/add'
+      path: '/collections/add'
+      fullPath: '/collections/add'
+      preLoaderRoute: typeof CollectionsAddRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collections/$userId': {
+      id: '/collections/$userId'
+      path: '/collections/$userId'
+      fullPath: '/collections/$userId'
+      preLoaderRoute: typeof CollectionsUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/autmog/$penId': {
+      id: '/autmog/$penId'
+      path: '/$penId'
+      fullPath: '/autmog/$penId'
+      preLoaderRoute: typeof AutmogPenIdRouteImport
+      parentRoute: typeof AutmogRoute
+    }
+    '/admin/account-erasure': {
+      id: '/admin/account-erasure'
+      path: '/account-erasure'
+      fullPath: '/admin/account-erasure'
+      preLoaderRoute: typeof AdminAccountErasureRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/trash/': {
+      id: '/admin/trash/'
+      path: '/trash'
+      fullPath: '/admin/trash/'
+      preLoaderRoute: typeof AdminTrashIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/feedback/': {
+      id: '/admin/feedback/'
+      path: '/feedback'
+      fullPath: '/admin/feedback/'
+      preLoaderRoute: typeof AdminFeedbackIndexRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/user/settings/beta-features': {
       id: '/user/settings/beta-features'
@@ -204,37 +1032,280 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserSettingsBetaFeaturesRouteImport
       parentRoute: typeof UserRoute
     }
+    '/user/resources_/trash': {
+      id: '/user/resources_/trash'
+      path: '/resources/trash'
+      fullPath: '/user/resources/trash'
+      preLoaderRoute: typeof UserResourcesTrashRouteImport
+      parentRoute: typeof UserRoute
+    }
+    '/user/collections_/add': {
+      id: '/user/collections_/add'
+      path: '/collections/add'
+      fullPath: '/user/collections/add'
+      preLoaderRoute: typeof UserCollectionsAddRouteImport
+      parentRoute: typeof UserRoute
+    }
+    '/user/collections_/$collectionId': {
+      id: '/user/collections_/$collectionId'
+      path: '/collections/$collectionId'
+      fullPath: '/user/collections/$collectionId'
+      preLoaderRoute: typeof UserCollectionsCollectionIdRouteImport
+      parentRoute: typeof UserRoute
+    }
+    '/resources/$resourceId_/edit': {
+      id: '/resources/$resourceId_/edit'
+      path: '/$resourceId/edit'
+      fullPath: '/resources/$resourceId/edit'
+      preLoaderRoute: typeof ResourcesResourceIdEditRouteImport
+      parentRoute: typeof ResourcesRoute
+    }
+    '/products/$productTypeSlug/$productSlug': {
+      id: '/products/$productTypeSlug/$productSlug'
+      path: '/products/$productTypeSlug/$productSlug'
+      fullPath: '/products/$productTypeSlug/$productSlug'
+      preLoaderRoute: typeof ProductsProductTypeSlugProductSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collections_/$userId/$collectionId': {
+      id: '/collections_/$userId/$collectionId'
+      path: '/collections/$userId/$collectionId'
+      fullPath: '/collections/$userId/$collectionId'
+      preLoaderRoute: typeof CollectionsUserIdCollectionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collections/edit/$collectionItemId': {
+      id: '/collections/edit/$collectionItemId'
+      path: '/collections/edit/$collectionItemId'
+      fullPath: '/collections/edit/$collectionItemId'
+      preLoaderRoute: typeof CollectionsEditCollectionItemIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/trash/resources': {
+      id: '/admin/trash/resources'
+      path: '/trash/resources'
+      fullPath: '/admin/trash/resources'
+      preLoaderRoute: typeof AdminTrashResourcesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/trash/catalog-images': {
+      id: '/admin/trash/catalog-images'
+      path: '/trash/catalog-images'
+      fullPath: '/admin/trash/catalog-images'
+      preLoaderRoute: typeof AdminTrashCatalogImagesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/settings/feature-flags': {
       id: '/admin/settings/feature-flags'
-      path: '/admin/settings/feature-flags'
+      path: '/settings/feature-flags'
       fullPath: '/admin/settings/feature-flags'
       preLoaderRoute: typeof AdminSettingsFeatureFlagsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/notifications/resources': {
+      id: '/admin/notifications/resources'
+      path: '/notifications/resources'
+      fullPath: '/admin/notifications/resources'
+      preLoaderRoute: typeof AdminNotificationsResourcesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/notifications/feedback': {
+      id: '/admin/notifications/feedback'
+      path: '/notifications/feedback'
+      fullPath: '/admin/notifications/feedback'
+      preLoaderRoute: typeof AdminNotificationsFeedbackRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/feedback/requests': {
+      id: '/admin/feedback/requests'
+      path: '/feedback/requests'
+      fullPath: '/admin/feedback/requests'
+      preLoaderRoute: typeof AdminFeedbackRequestsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/feedback/planned': {
+      id: '/admin/feedback/planned'
+      path: '/feedback/planned'
+      fullPath: '/admin/feedback/planned'
+      preLoaderRoute: typeof AdminFeedbackPlannedRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/feedback/archive': {
+      id: '/admin/feedback/archive'
+      path: '/feedback/archive'
+      fullPath: '/admin/feedback/archive'
+      preLoaderRoute: typeof AdminFeedbackArchiveRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/user/collections_/$collectionId_/edit': {
+      id: '/user/collections_/$collectionId_/edit'
+      path: '/collections/$collectionId/edit'
+      fullPath: '/user/collections/$collectionId/edit'
+      preLoaderRoute: typeof UserCollectionsCollectionIdEditRouteImport
+      parentRoute: typeof UserRoute
+    }
+    '/resources/$resourceId_/versions/new': {
+      id: '/resources/$resourceId_/versions/new'
+      path: '/$resourceId/versions/new'
+      fullPath: '/resources/$resourceId/versions/new'
+      preLoaderRoute: typeof ResourcesResourceIdVersionsNewRouteImport
+      parentRoute: typeof ResourcesRoute
+    }
+    '/products/$productTypeSlug/$productSlug_/edit': {
+      id: '/products/$productTypeSlug/$productSlug_/edit'
+      path: '/products/$productTypeSlug/$productSlug/edit'
+      fullPath: '/products/$productTypeSlug/$productSlug/edit'
+      preLoaderRoute: typeof ProductsProductTypeSlugProductSlugEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collections_/$userId/$collectionId_/$collectionItemId': {
+      id: '/collections_/$userId/$collectionId_/$collectionItemId'
+      path: '/collections/$userId/$collectionId/$collectionItemId'
+      fullPath: '/collections/$userId/$collectionId/$collectionItemId'
+      preLoaderRoute: typeof CollectionsUserIdCollectionIdCollectionItemIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
 }
 
+interface AdminRouteChildren {
+  AdminAccountErasureRoute: typeof AdminAccountErasureRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminFeedbackArchiveRoute: typeof AdminFeedbackArchiveRoute
+  AdminFeedbackPlannedRoute: typeof AdminFeedbackPlannedRoute
+  AdminFeedbackRequestsRoute: typeof AdminFeedbackRequestsRoute
+  AdminNotificationsFeedbackRoute: typeof AdminNotificationsFeedbackRoute
+  AdminNotificationsResourcesRoute: typeof AdminNotificationsResourcesRoute
+  AdminSettingsFeatureFlagsRoute: typeof AdminSettingsFeatureFlagsRoute
+  AdminTrashCatalogImagesRoute: typeof AdminTrashCatalogImagesRoute
+  AdminTrashResourcesRoute: typeof AdminTrashResourcesRoute
+  AdminFeedbackIndexRoute: typeof AdminFeedbackIndexRoute
+  AdminTrashIndexRoute: typeof AdminTrashIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAccountErasureRoute: AdminAccountErasureRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminFeedbackArchiveRoute: AdminFeedbackArchiveRoute,
+  AdminFeedbackPlannedRoute: AdminFeedbackPlannedRoute,
+  AdminFeedbackRequestsRoute: AdminFeedbackRequestsRoute,
+  AdminNotificationsFeedbackRoute: AdminNotificationsFeedbackRoute,
+  AdminNotificationsResourcesRoute: AdminNotificationsResourcesRoute,
+  AdminSettingsFeatureFlagsRoute: AdminSettingsFeatureFlagsRoute,
+  AdminTrashCatalogImagesRoute: AdminTrashCatalogImagesRoute,
+  AdminTrashResourcesRoute: AdminTrashResourcesRoute,
+  AdminFeedbackIndexRoute: AdminFeedbackIndexRoute,
+  AdminTrashIndexRoute: AdminTrashIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface AutmogRouteChildren {
+  AutmogPenIdRoute: typeof AutmogPenIdRoute
+}
+
+const AutmogRouteChildren: AutmogRouteChildren = {
+  AutmogPenIdRoute: AutmogPenIdRoute,
+}
+
+const AutmogRouteWithChildren =
+  AutmogRoute._addFileChildren(AutmogRouteChildren)
+
+interface FeedbackRouteChildren {
+  FeedbackMyRequestsRoute: typeof FeedbackMyRequestsRoute
+  FeedbackNewRoute: typeof FeedbackNewRoute
+  FeedbackIndexRoute: typeof FeedbackIndexRoute
+}
+
+const FeedbackRouteChildren: FeedbackRouteChildren = {
+  FeedbackMyRequestsRoute: FeedbackMyRequestsRoute,
+  FeedbackNewRoute: FeedbackNewRoute,
+  FeedbackIndexRoute: FeedbackIndexRoute,
+}
+
+const FeedbackRouteWithChildren = FeedbackRoute._addFileChildren(
+  FeedbackRouteChildren,
+)
+
+interface ResourcesRouteChildren {
+  ResourcesResourceIdRoute: typeof ResourcesResourceIdRoute
+  ResourcesAddRoute: typeof ResourcesAddRoute
+  ResourcesIndexRoute: typeof ResourcesIndexRoute
+  ResourcesResourceIdEditRoute: typeof ResourcesResourceIdEditRoute
+  ResourcesResourceIdVersionsNewRoute: typeof ResourcesResourceIdVersionsNewRoute
+}
+
+const ResourcesRouteChildren: ResourcesRouteChildren = {
+  ResourcesResourceIdRoute: ResourcesResourceIdRoute,
+  ResourcesAddRoute: ResourcesAddRoute,
+  ResourcesIndexRoute: ResourcesIndexRoute,
+  ResourcesResourceIdEditRoute: ResourcesResourceIdEditRoute,
+  ResourcesResourceIdVersionsNewRoute: ResourcesResourceIdVersionsNewRoute,
+}
+
+const ResourcesRouteWithChildren = ResourcesRoute._addFileChildren(
+  ResourcesRouteChildren,
+)
+
 interface UserRouteChildren {
   UserAccountRoute: typeof UserAccountRoute
   UserCollectionsRoute: typeof UserCollectionsRoute
+  UserResourcesRoute: typeof UserResourcesRoute
+  UserSettingsRoute: typeof UserSettingsRoute
+  UserIndexRoute: typeof UserIndexRoute
+  UserCollectionsCollectionIdRoute: typeof UserCollectionsCollectionIdRoute
+  UserCollectionsAddRoute: typeof UserCollectionsAddRoute
+  UserResourcesTrashRoute: typeof UserResourcesTrashRoute
   UserSettingsBetaFeaturesRoute: typeof UserSettingsBetaFeaturesRoute
+  UserCollectionsCollectionIdEditRoute: typeof UserCollectionsCollectionIdEditRoute
 }
 
 const UserRouteChildren: UserRouteChildren = {
   UserAccountRoute: UserAccountRoute,
   UserCollectionsRoute: UserCollectionsRoute,
+  UserResourcesRoute: UserResourcesRoute,
+  UserSettingsRoute: UserSettingsRoute,
+  UserIndexRoute: UserIndexRoute,
+  UserCollectionsCollectionIdRoute: UserCollectionsCollectionIdRoute,
+  UserCollectionsAddRoute: UserCollectionsAddRoute,
+  UserResourcesTrashRoute: UserResourcesTrashRoute,
   UserSettingsBetaFeaturesRoute: UserSettingsBetaFeaturesRoute,
+  UserCollectionsCollectionIdEditRoute: UserCollectionsCollectionIdEditRoute,
 }
 
 const UserRouteWithChildren = UserRoute._addFileChildren(UserRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountErasedRoute: AccountErasedRoute,
+  AccountErasureRoute: AccountErasureRoute,
+  AdminRoute: AdminRouteWithChildren,
+  AutmogRoute: AutmogRouteWithChildren,
+  ContactRoute: ContactRoute,
+  FeedbackRoute: FeedbackRouteWithChildren,
+  NotificationsRoute: NotificationsRoute,
+  PrivacyRoute: PrivacyRoute,
+  ResourcesRoute: ResourcesRouteWithChildren,
+  TermsOfServiceRoute: TermsOfServiceRoute,
   UserRoute: UserRouteWithChildren,
+  CollectionsUserIdRoute: CollectionsUserIdRoute,
+  CollectionsAddRoute: CollectionsAddRoute,
+  HelpSlugRoute: HelpSlugRoute,
   PensPenIdRoute: PensPenIdRoute,
+  ProductsAddRoute: ProductsAddRoute,
   SignInSplatRoute: SignInSplatRoute,
   SignUpSplatRoute: SignUpSplatRoute,
-  AdminSettingsFeatureFlagsRoute: AdminSettingsFeatureFlagsRoute,
+  CollectionsIndexRoute: CollectionsIndexRoute,
+  HelpIndexRoute: HelpIndexRoute,
+  ProductsIndexRoute: ProductsIndexRoute,
+  CollectionsEditCollectionItemIdRoute: CollectionsEditCollectionItemIdRoute,
+  CollectionsUserIdCollectionIdRoute: CollectionsUserIdCollectionIdRoute,
+  ProductsProductTypeSlugProductSlugRoute:
+    ProductsProductTypeSlugProductSlugRoute,
+  CollectionsUserIdCollectionIdCollectionItemIdRoute:
+    CollectionsUserIdCollectionIdCollectionItemIdRoute,
+  ProductsProductTypeSlugProductSlugEditRoute:
+    ProductsProductTypeSlugProductSlugEditRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

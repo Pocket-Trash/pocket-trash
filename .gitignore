@@ -10,6 +10,7 @@ build/
 .tanstack/
 .turbo/
 coverage/
+storybook-static/
 
 # Logs
 *.log
@@ -34,6 +35,10 @@ yarn-error.log*
 .figjam/inbox/
 .figjam/outbox/
 .figjam/payload-input/
+.yalc/
+**/.yalc/
+yalc.lock
+**/yalc.lock
 assets/
 /bunny-audit/
 plans/
@@ -42,3 +47,4 @@ pr-summarys/
 # Local tool config
 .linear.toml
 
+.wrangler/

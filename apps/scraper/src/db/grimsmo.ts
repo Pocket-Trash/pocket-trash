@@ -5,7 +5,7 @@ import {
   type GrimsmoProductNormalizedData,
   schema,
 } from "@package/database";
-import { and, eq, isNull, notInArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { getGrimsmoSourceDefinition } from "../grimsmo/source.js";
 import { hashObject } from "../lib/hash.js";
 import {
@@ -42,6 +42,66 @@ export type GrimsmoSyncResult = {
   updated: boolean;
   versioned: boolean;
 };
+
+export async function getGrimsmoVariationSyncState(
+  db: Database,
+  source: GrimsmoSourceName,
+  sourceHandles: readonly string[],
+) {
+  if (sourceHandles.length === 0) {
+    return [];
+  }
+
+  const definition = getGrimsmoSourceDefinition(source);
+
+  if (definition.kind === "pen") {
+    return db
+      .select({
+        archivedAt: schema.tmpGrimsmoPenVariations.archivedAt,
+        detailsHash: schema.tmpGrimsmoPenVariations.detailsHash,
+        imageSetHash: schema.tmpGrimsmoPenVariations.imageSetHash,
+        parentDetailsHash: schema.tmpGrimsmoPens.detailsHash,
+        sourceCollection: schema.tmpGrimsmoPenVariations.sourceCollection,
+        sourceHandle: schema.tmpGrimsmoPenVariations.sourceHandle,
+      })
+      .from(schema.tmpGrimsmoPenVariations)
+      .innerJoin(
+        schema.tmpGrimsmoPens,
+        eq(schema.tmpGrimsmoPenVariations.penId, schema.tmpGrimsmoPens.id),
+      )
+      .where(
+        and(
+          eq(schema.tmpGrimsmoPens.productHandle, definition.productHandle),
+          inArray(schema.tmpGrimsmoPenVariations.sourceHandle, [
+            ...sourceHandles,
+          ]),
+        ),
+      );
+  }
+
+  return db
+    .select({
+      archivedAt: schema.tmpGrimsmoKnifeVariations.archivedAt,
+      detailsHash: schema.tmpGrimsmoKnifeVariations.detailsHash,
+      imageSetHash: schema.tmpGrimsmoKnifeVariations.imageSetHash,
+      parentDetailsHash: schema.tmpGrimsmoKnives.detailsHash,
+      sourceCollection: schema.tmpGrimsmoKnifeVariations.sourceCollection,
+      sourceHandle: schema.tmpGrimsmoKnifeVariations.sourceHandle,
+    })
+    .from(schema.tmpGrimsmoKnifeVariations)
+    .innerJoin(
+      schema.tmpGrimsmoKnives,
+      eq(schema.tmpGrimsmoKnifeVariations.knifeId, schema.tmpGrimsmoKnives.id),
+    )
+    .where(
+      and(
+        eq(schema.tmpGrimsmoKnives.productHandle, definition.productHandle),
+        inArray(schema.tmpGrimsmoKnifeVariations.sourceHandle, [
+          ...sourceHandles,
+        ]),
+      ),
+    );
+}
 
 export async function syncGrimsmoPenVariation(
   db: Database,
@@ -414,10 +474,10 @@ export async function reconcileGrimsmoKnifeVariationBatch(
 
 async function ensureGrimsmoMaker(db: Database) {
   const [maker] = await db
-    .insert(schema.makers)
+    .insert(schema.maker)
     .values(grimsmoMaker)
     .onConflictDoNothing({
-      target: schema.makers.rootUrl,
+      target: schema.maker.rootUrl,
     })
     .returning();
 
@@ -433,8 +493,8 @@ async function ensureGrimsmoMaker(db: Database) {
 async function getMakerByRootUrl(db: Database, rootUrl: string) {
   const [maker] = await db
     .select()
-    .from(schema.makers)
-    .where(eq(schema.makers.rootUrl, rootUrl))
+    .from(schema.maker)
+    .where(eq(schema.maker.rootUrl, rootUrl))
     .limit(1);
 
   return maker;

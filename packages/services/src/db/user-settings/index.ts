@@ -8,13 +8,19 @@ import type {
 } from "@package/database";
 import { schema } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
-import { eq } from "drizzle-orm";
+import {
+  type LocalePreference,
+  resolveLocale,
+  type SupportedLocale,
+} from "@pocket-trash/localizations";
+import { eq, sql } from "drizzle-orm";
 import { hashLogIdentifier } from "../../logging.js";
 import type { UsersService } from "../users/index.js";
 
 export type UpsertUserSettingsInput = {
   currencyCode: CurrencyCode;
   dimensionUnit: DimensionUnit;
+  locale?: SupportedLocale | null;
   theme: ThemeMode;
   weightUnit: WeightUnit;
 };
@@ -27,6 +33,14 @@ export type UserSettingsService = {
     clerkId: string,
     settings: PatchUserSettingsInput,
   ): Promise<UserSettings>;
+  resolveLocaleForClerkId(
+    clerkId: string,
+    preferences: readonly LocalePreference[],
+  ): Promise<SupportedLocale>;
+  updateLocaleForClerkId(
+    clerkId: string,
+    locale: SupportedLocale | null,
+  ): Promise<SupportedLocale | null>;
   upsertForClerkId(
     clerkId: string,
     settings: UpsertUserSettingsInput,
@@ -36,9 +50,26 @@ export type UserSettingsService = {
 export const defaultUserSettings: UpsertUserSettingsInput = {
   currencyCode: "USD",
   dimensionUnit: "in",
+  locale: null,
   theme: "system",
   weightUnit: "g",
 };
+
+function normalizeSavedLocale(locale: string | null | undefined) {
+  if (locale === "en") return "en-US";
+  return locale ? resolveLocale(locale) : null;
+}
+
+function buildPatchConflictSet(settings: PatchUserSettingsInput) {
+  return Object.fromEntries(
+    (Object.keys(settings) as (keyof PatchUserSettingsInput)[])
+      .filter((key) => settings[key] !== undefined)
+      .map((key) => [
+        key,
+        sql.raw(`excluded.${schema.userSettings[key].name}`),
+      ]),
+  );
+}
 
 export function createUserSettingsService(
   db: Database,
@@ -54,16 +85,17 @@ export function createUserSettingsService(
             .select({
               currencyCode: schema.userSettings.currencyCode,
               dimensionUnit: schema.userSettings.dimensionUnit,
+              locale: schema.userSettings.locale,
               theme: schema.userSettings.theme,
               userId: schema.userSettings.userId,
               weightUnit: schema.userSettings.weightUnit,
             })
             .from(schema.userSettings)
             .innerJoin(
-              schema.users,
-              eq(schema.userSettings.userId, schema.users.id),
+              schema.user,
+              eq(schema.userSettings.userId, schema.user.id),
             )
-            .where(eq(schema.users.clerkId, clerkId))
+            .where(eq(schema.user.clerkId, clerkId))
             .limit(1);
 
           return row ?? null;
@@ -79,34 +111,16 @@ export function createUserSettingsService(
       return await logger.operation(
         loggerMessages.database.userSettings.patchForClerkId,
         async () => {
-          const existing = await this.getByClerkId(clerkId);
-          const mergedSettings: UpsertUserSettingsInput = {
-            currencyCode:
-              settings.currencyCode ??
-              existing?.currencyCode ??
-              defaultUserSettings.currencyCode,
-            dimensionUnit:
-              settings.dimensionUnit ??
-              existing?.dimensionUnit ??
-              defaultUserSettings.dimensionUnit,
-            theme:
-              settings.theme ?? existing?.theme ?? defaultUserSettings.theme,
-            weightUnit:
-              settings.weightUnit ??
-              existing?.weightUnit ??
-              defaultUserSettings.weightUnit,
-          };
-
           const user = await usersService.ensure({ clerkId });
 
           const [userSettings] = await db
             .insert(schema.userSettings)
             .values({
-              ...mergedSettings,
+              ...settings,
               userId: user.id,
             })
             .onConflictDoUpdate({
-              set: mergedSettings,
+              set: buildPatchConflictSet(settings),
               target: schema.userSettings.userId,
             })
             .returning();
@@ -125,6 +139,24 @@ export function createUserSettingsService(
           },
         },
       );
+    },
+    async resolveLocaleForClerkId(clerkId, preferences) {
+      const settings = await this.getByClerkId(clerkId);
+      const savedLocale = normalizeSavedLocale(settings?.locale);
+      const locale = savedLocale ?? resolveLocale(...preferences);
+
+      if (savedLocale === locale) {
+        return locale;
+      }
+
+      await this.patchForClerkId(clerkId, { locale });
+
+      return locale;
+    },
+    async updateLocaleForClerkId(clerkId, locale) {
+      await this.patchForClerkId(clerkId, { locale });
+
+      return locale;
     },
     async upsertForClerkId(clerkId, settings) {
       return await logger.operation(

@@ -1,0 +1,50 @@
+import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+
+import {
+  createChangelogEntry,
+  findTagRunId,
+  parseChangeset,
+} from "./release.mjs";
+
+test("changelog entries include selected changeset packages", () => {
+  const directory = mkdtempSync(join(tmpdir(), "release-test-"));
+  mkdirSync(join(directory, ".changeset"));
+  const changesetPath = join(directory, ".changeset", "app-change.md");
+
+  writeFileSync(
+    changesetPath,
+    `---
+"@app/web": patch
+"@package/logger": minor
+---
+
+Improve release notes.
+`,
+  );
+
+  assert.equal(
+    parseChangeset(changesetPath).packages.join(", "),
+    "@app/web, @package/logger",
+  );
+  assert.match(
+    createChangelogEntry("1.2.3", [parseChangeset(changesetPath)]),
+    /\* Improve release notes\. \(@app\/web, @package\/logger\)/,
+  );
+});
+
+test("release waits for the tag workflow run", () => {
+  assert.equal(
+    findTagRunId(
+      JSON.stringify([
+        { databaseId: 1, headBranch: "main" },
+        { databaseId: 2, headBranch: "v1.2.3" },
+      ]),
+      "v1.2.3",
+    ),
+    2,
+  );
+});

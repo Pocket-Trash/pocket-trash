@@ -27,6 +27,25 @@ describe("services", () => {
     );
   });
 
+  it("throws a clear error when resource services are used before configuration", () => {
+    expect(() => createServices().resources).toThrow(
+      "Resource services have not been configured",
+    );
+  });
+
+  it("rejects resource configuration without database configuration", () => {
+    expect(() =>
+      createServices().configure({
+        logger: {
+          app: "web",
+          environment: "test",
+          transports: [],
+        },
+        storage: {},
+      }),
+    ).toThrow("Storage services require database configuration");
+  });
+
   it("configures logger independently", () => {
     const services = createServices();
 

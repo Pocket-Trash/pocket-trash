@@ -8,6 +8,7 @@ permissions:
   contents: read
 
 env:
+  API_PREVIEW_COMMENT_MARKER: "<!-- pocket-trash-api-preview-app -->"
   DB_PREVIEW_COMMENT_MARKER: "<!-- pocket-trash-db-preview -->"
 
 jobs:
@@ -15,6 +16,9 @@ jobs:
     name: Preview Infrastructure Closed
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    concurrency:
+      group: preview-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     permissions:
       contents: read
       id-token: write
@@ -51,6 +55,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Remove preview webhook target
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler kv key delete "target:preview:${{ github.event.pull_request.number }}" \
+            --binding CLERK_WEBHOOK_TARGETS \
+            --env development \
+            --remote
+
       - name: Delete Neon PR branch
         id: neon_cleanup
         shell: bash
@@ -71,11 +84,23 @@ jobs:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
         run: bash .github/scripts/vercel-branch-database-url.sh remove-image-folder-prefix
 
-      - name: Delete image PR preview folder
-        id: image_cleanup
+      - name: Remove Vercel branch resource folder prefix
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: bash .github/scripts/vercel-branch-database-url.sh remove-resource-folder-prefix
+
+      - name: Remove Vercel branch resource API URL
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: bash .github/scripts/vercel-branch-database-url.sh remove-resource-api-base-url
+
+      - name: Delete storage PR preview folders
+        id: storage_cleanup
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: pnpm --filter @package/images run cleanup:preview-folder
+        run: pnpm --filter @package/storage run cleanup:preview
 
       - name: Remove db-change label
         uses: actions/github-script@v8
@@ -94,6 +119,52 @@ jobs:
               }
             }
 
+      - name: Create API preview comment app token
+        id: api-preview-comment-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ env.GITHUB_CF_APP_CLIENT_ID }}
+          private-key: ${{ env.GITHUB_CF_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Mark API preview comment closed
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ steps.api-preview-comment-token.outputs.token }}
+          script: |
+            const marker = process.env.API_PREVIEW_COMMENT_MARKER;
+            const alias = `pr-${context.issue.number}`;
+            const body = [
+              marker,
+              "Cloudflare API preview",
+              "",
+              "| Worker | Alias | Status | Endpoints |",
+              "| --- | --- | --- | --- |",
+              `| \`pocket-trash-api-preview\` | \`${alias}\` | ⚪ Inactive | — |`,
+            ].join("\n");
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            }
+
       - name: Create DB preview comment app token
         id: db-preview-comment-token
         uses: actions/create-github-app-token@v3
@@ -109,8 +180,10 @@ jobs:
         uses: actions/github-script@v8
         env:
           CLEANUP_PERFORMED: ${{ steps.neon_cleanup.outputs.cleanup_performed }}
-          IMAGE_CLEANUP_STATUS: ${{ steps.image_cleanup.outputs.status }}
-          IMAGE_FOLDER_PATH: ${{ steps.image_cleanup.outputs.folder_path }}
+          IMAGE_CLEANUP_STATUS: ${{ steps.storage_cleanup.outputs.image_status }}
+          IMAGE_FOLDER_PATH: ${{ steps.storage_cleanup.outputs.image_folder_path }}
+          RESOURCE_CLEANUP_STATUS: ${{ steps.storage_cleanup.outputs.resource_status }}
+          RESOURCE_FOLDER_PATH: ${{ steps.storage_cleanup.outputs.resource_folder_path }}
           TARGET_BRANCH: ${{ steps.neon_cleanup.outputs.target_branch }}
         with:
           github-token: ${{ steps.db-preview-comment-token.outputs.token }}
@@ -125,7 +198,8 @@ jobs:
               "",
               `Neon cleanup: ${cleanup} for \`${process.env.TARGET_BRANCH}\``,
               `Image cleanup: ${process.env.IMAGE_CLEANUP_STATUS} for \`${process.env.IMAGE_FOLDER_PATH}\``,
-              "Vercel branch-specific `DATABASE_URL` and `IMAGE_FOLDER_PREFIX` cleanup was attempted.",
+              `Resource cleanup: ${process.env.RESOURCE_CLEANUP_STATUS} for \`${process.env.RESOURCE_FOLDER_PATH}\``,
+              "Vercel branch-specific `DATABASE_URL`, `BUNNY_IMAGE_FOLDER_PREFIX`, and `BUNNY_RESOURCE_FOLDER_PREFIX` cleanup was attempted.",
             ].join("\n");
 
             const { owner, repo } = context.repo;

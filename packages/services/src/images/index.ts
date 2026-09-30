@@ -1,15 +1,15 @@
+import { type Logger, loggerMessages } from "@package/logger";
 import {
   createImageStorage,
   type ImageFileDeleteResult,
   type ImageStorage,
-  type ImageStorageConfig,
   type ImageUpdateInput,
   type ImageUpdateResult,
   type ImageUploadInput,
   type ImageUploadResult,
+  type RemoteImageStorageConfig,
   type RemoteImageUploadInput,
-} from "@package/images";
-import { type Logger, loggerMessages } from "@package/logger";
+} from "@package/storage";
 import { hashLogIdentifier } from "../logging.js";
 
 export type ImagesService = {
@@ -18,14 +18,13 @@ export type ImagesService = {
     fileId: string,
     input: ImageUpdateInput,
   ): Promise<ImageUpdateResult | null>;
-  uploadImage(input: ImageUploadInput): Promise<ImageUploadResult | null>;
   uploadRemoteImage(
     input: RemoteImageUploadInput,
   ): Promise<ImageUploadResult | null>;
 };
 
 export function createImagesService(
-  config: ImageStorageConfig,
+  config: RemoteImageStorageConfig,
   logger: Logger,
 ): ImagesService {
   return wrapImageStorage(createImageStorage(config), logger);
@@ -59,15 +58,6 @@ function wrapImageStorage(
         },
       );
     },
-    async uploadImage(input) {
-      return await logger.operation(
-        loggerMessages.images.upload,
-        () => imageStorage.uploadImage(input),
-        {
-          attributes: summarizeUploadInput(input),
-        },
-      );
-    },
     async uploadRemoteImage(input) {
       return await logger.operation(
         loggerMessages.images.upload,
@@ -87,7 +77,9 @@ function summarizeUploadInput(
   input: ImageUploadInput | RemoteImageUploadInput,
 ) {
   return {
-    fileNameHash: hashLogIdentifier(input.fileName),
+    fileNameHash: input.fileName
+      ? hashLogIdentifier(input.fileName)
+      : undefined,
     folderHash: input.folder ? hashLogIdentifier(input.folder) : undefined,
     hasFolder: Boolean(input.folder),
     overwriteFile: input.overwriteFile,

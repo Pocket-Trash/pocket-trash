@@ -130,8 +130,6 @@ Use normal dev commands:
 
 ```sh
 pnpm dev:web
-pnpm dev:ios
-pnpm dev:android
 ```
 
 ## Development Terminal Logs
@@ -179,6 +177,8 @@ PR, preview cleanup, and scheduled preview database events read the Infisical
 events read the Infisical `prod` environment. `AXIOM_EDGE_DOMAIN` is optional.
 
 Current CI event namespaces include:
+
+- `ci.storage.*`: preview folder cleanup, including `ci.storage.previewFolders.cleanup.completed`.
 
 - `ci.database.preview.*`: PR database change detection, shared preview branch
   selection, preview branch creation/recreation/deletion, branch-limit blocking,

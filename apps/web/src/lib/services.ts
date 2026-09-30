@@ -44,6 +44,22 @@ services.configure({
     databaseUrl: serverEnv.DATABASE_URL,
   },
   logger,
+  storage:
+    serverEnv.BUNNY_STORAGE_ACCESS_KEY &&
+    serverEnv.BUNNY_CDN_BASE_URL &&
+    serverEnv.BUNNY_CDN_TOKEN_KEY &&
+    serverEnv.BUNNY_STORAGE_ENDPOINT &&
+    serverEnv.BUNNY_STORAGE_ZONE_NAME
+      ? {
+          accessKey: serverEnv.BUNNY_STORAGE_ACCESS_KEY,
+          cdnBaseUrl: serverEnv.BUNNY_CDN_BASE_URL,
+          endpoint: serverEnv.BUNNY_STORAGE_ENDPOINT,
+          folderPrefix: serverEnv.BUNNY_RESOURCE_FOLDER_PREFIX,
+          imageFolderPrefix: serverEnv.BUNNY_IMAGE_FOLDER_PREFIX,
+          tokenKey: serverEnv.BUNNY_CDN_TOKEN_KEY,
+          zoneName: serverEnv.BUNNY_STORAGE_ZONE_NAME,
+        }
+      : undefined,
 });
 
 export { services as s };

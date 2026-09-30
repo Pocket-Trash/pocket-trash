@@ -9,7 +9,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { featureFlagAudiences, featureFlagOverrideSources } from "./enums.js";
-import { users } from "./users.js";
+import { user } from "./users.js";
 
 export const featureFlagAudienceEnum = pgEnum(
   "feature_flag_audience",
@@ -32,11 +32,11 @@ export const featureFlags = pgTable("feature_flags", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-  createdByClerkId: text("created_by_clerk_id").notNull(),
+  createdByClerkId: text("created_by_clerk_id"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-  updatedByClerkId: text("updated_by_clerk_id").notNull(),
+  updatedByClerkId: text("updated_by_clerk_id"),
 });
 
 export const featureFlagUserOverrides = pgTable(
@@ -48,17 +48,17 @@ export const featureFlagUserOverrides = pgTable(
       .references(() => featureFlags.id, { onDelete: "cascade" }),
     userId: bigint("user_id", { mode: "number" })
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => user.id, { onDelete: "cascade" }),
     source: featureFlagOverrideSourceEnum("source").notNull(),
     enabled: boolean("enabled").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    createdByClerkId: text("created_by_clerk_id").notNull(),
+    createdByClerkId: text("created_by_clerk_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    updatedByClerkId: text("updated_by_clerk_id").notNull(),
+    updatedByClerkId: text("updated_by_clerk_id"),
   },
   (table) => [
     unique("feature_flag_user_overrides_flag_user_source_unique").on(

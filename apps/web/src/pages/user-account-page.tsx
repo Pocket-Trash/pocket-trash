@@ -1,19 +1,33 @@
+import { ClerkLoaded, ClerkLoading } from "@clerk/tanstack-react-start";
 import {
-  ClerkLoaded,
-  ClerkLoading,
-  UserProfile,
-} from "@clerk/tanstack-react-start";
+  UserProfileAccountPanel,
+  UserProfileProvider,
+  UserProfileSecurityPanel,
+} from "@clerk/ui/experimental";
+import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserPageShell } from "@/components/user-page-shell";
+import { DeleteAccountSection } from "@/pages/delete-account-section";
+import { useLocale } from "@/providers/locale-provider";
 
 export function UserAccountPage() {
+  const { locale } = useLocale();
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
+
   return (
-    <UserPageShell title="Account">
+    <UserPageShell title={t("web.navigation.account")}>
       <ClerkLoading>
         <UserProfileSkeleton />
       </ClerkLoading>
       <ClerkLoaded>
-        <UserProfile routing="hash" />
+        <UserProfileProvider>
+          <UserProfileAccountPanel />
+          <UserProfileSecurityPanel />
+        </UserProfileProvider>
+        <DeleteAccountSection />
       </ClerkLoaded>
     </UserPageShell>
   );

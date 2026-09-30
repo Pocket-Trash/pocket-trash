@@ -1,10 +1,39 @@
 import { relations } from "drizzle-orm";
+import {
+  collectionImage,
+  collectionItem,
+  collectionItemImage,
+  collectionSpinner,
+  collectionSpinnerButton,
+  color,
+  colorEffect,
+  finish,
+  finishOption,
+  finishOptionColor,
+  finishOptionFinish,
+  product,
+  productImage,
+  productMaterial,
+  productSpinner,
+  productSpinnerButton,
+  userCollection,
+} from "./collection.js";
 import { featureFlags, featureFlagUserOverrides } from "./feature-flags.js";
 import {
-  makers,
-  materials,
-  mechanisms,
-  productTypes,
+  resourceCategories,
+  resourceDownloads,
+  resourceFiles,
+  resourceImages,
+  resourceNotifications,
+  resources,
+  resourcesToCategories,
+  resourceVersions,
+} from "./resources.js";
+import {
+  maker,
+  material,
+  mechanism,
+  productType,
   scraperRuns,
   tmpAutmogPenMaterials,
   tmpAutmogPens,
@@ -22,19 +51,123 @@ import {
   tmpProducts,
   tmpProductVariations,
 } from "./scraper.js";
+import { uploadFile, uploadSession } from "./uploads.js";
 import { userSettings } from "./user-settings.js";
-import { users } from "./users.js";
+import { user } from "./users.js";
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(user, ({ many, one }) => ({
+  collections: many(userCollection),
+  collectionItems: many(collectionItem),
   settings: one(userSettings),
 }));
 
+export const userCollectionRelations = relations(
+  userCollection,
+  ({ many, one }) => ({
+    images: many(collectionImage),
+    items: many(collectionItem),
+    owner: one(user, {
+      fields: [userCollection.ownerId],
+      references: [user.id],
+    }),
+  }),
+);
+
 export const userSettingsRelations = relations(userSettings, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userSettings.userId],
-    references: [users.id],
+    references: [user.id],
   }),
 }));
+
+export const resourcesRelations = relations(resources, ({ many }) => ({
+  categories: many(resourcesToCategories),
+  images: many(resourceImages),
+  notifications: many(resourceNotifications),
+  versions: many(resourceVersions),
+}));
+
+export const resourceImagesRelations = relations(resourceImages, ({ one }) => ({
+  resource: one(resources, {
+    fields: [resourceImages.resourceId],
+    references: [resources.id],
+  }),
+}));
+
+export const resourceVersionsRelations = relations(
+  resourceVersions,
+  ({ many, one }) => ({
+    downloads: many(resourceDownloads),
+    files: many(resourceFiles),
+    resource: one(resources, {
+      fields: [resourceVersions.resourceId],
+      references: [resources.id],
+    }),
+  }),
+);
+
+export const collectionImageRelations = relations(
+  collectionImage,
+  ({ one }) => ({
+    collection: one(userCollection, {
+      fields: [collectionImage.collectionId],
+      references: [userCollection.id],
+    }),
+  }),
+);
+
+export const resourceFilesRelations = relations(resourceFiles, ({ one }) => ({
+  version: one(resourceVersions, {
+    fields: [resourceFiles.versionId],
+    references: [resourceVersions.id],
+  }),
+}));
+
+export const resourceCategoriesRelations = relations(
+  resourceCategories,
+  ({ many }) => ({
+    notifications: many(resourceNotifications),
+    resources: many(resourcesToCategories),
+  }),
+);
+
+export const resourceNotificationsRelations = relations(
+  resourceNotifications,
+  ({ one }) => ({
+    category: one(resourceCategories, {
+      fields: [resourceNotifications.categoryId],
+      references: [resourceCategories.id],
+    }),
+    resource: one(resources, {
+      fields: [resourceNotifications.resourceId],
+      references: [resources.id],
+    }),
+  }),
+);
+
+export const resourcesToCategoriesRelations = relations(
+  resourcesToCategories,
+  ({ one }) => ({
+    category: one(resourceCategories, {
+      fields: [resourcesToCategories.categoryId],
+      references: [resourceCategories.id],
+    }),
+    resource: one(resources, {
+      fields: [resourcesToCategories.resourceId],
+      references: [resources.id],
+    }),
+  }),
+);
+
+export const resourceDownloadsRelations = relations(
+  resourceDownloads,
+  ({ one }) => ({
+    version: one(resourceVersions, {
+      fields: [resourceDownloads.versionId],
+      references: [resourceVersions.id],
+    }),
+  }),
+);
 
 export const featureFlagsRelations = relations(featureFlags, ({ many }) => ({
   userOverrides: many(featureFlagUserOverrides),
@@ -47,44 +180,254 @@ export const featureFlagUserOverridesRelations = relations(
       fields: [featureFlagUserOverrides.flagId],
       references: [featureFlags.id],
     }),
-    user: one(users, {
+    user: one(user, {
       fields: [featureFlagUserOverrides.userId],
-      references: [users.id],
+      references: [user.id],
     }),
   }),
 );
 
-export const makersRelations = relations(makers, ({ many }) => ({
+export const makersRelations = relations(maker, ({ many }) => ({
   autmogPens: many(tmpAutmogPens),
   grimsmoKnives: many(tmpGrimsmoKnives),
   grimsmoPens: many(tmpGrimsmoPens),
+  products: many(product),
 }));
 
-export const materialsRelations = relations(materials, ({ many }) => ({
+export const materialsRelations = relations(material, ({ many }) => ({
   autmogPens: many(tmpAutmogPenMaterials),
+  collectionItems: many(collectionItem),
+  products: many(productMaterial),
 }));
 
-export const mechanismsRelations = relations(mechanisms, ({ many }) => ({
+export const mechanismsRelations = relations(mechanism, ({ many }) => ({
   autmogPens: many(tmpAutmogPens),
 }));
 
-export const productTypesRelations = relations(productTypes, ({ many }) => ({
+export const productTypesRelations = relations(productType, ({ many }) => ({
+  catalogProducts: many(product),
   products: many(tmpProductProductTypes),
 }));
 
 export const scraperRunsRelations = relations(scraperRuns, () => ({}));
 
+export const collectionItemRelations = relations(
+  collectionItem,
+  ({ many, one }) => ({
+    collection: one(userCollection, {
+      fields: [collectionItem.collectionId],
+      references: [userCollection.id],
+    }),
+    finishOption: one(finishOption),
+    images: many(collectionItemImage),
+    material: one(material, {
+      fields: [collectionItem.materialId],
+      references: [material.id],
+    }),
+    owner: one(user, {
+      fields: [collectionItem.ownerId],
+      references: [user.id],
+    }),
+    purchasedFromUser: one(user, {
+      fields: [collectionItem.purchasedFromUserId],
+      references: [user.id],
+    }),
+    soldToUser: one(user, {
+      fields: [collectionItem.soldToUserId],
+      references: [user.id],
+    }),
+    spinner: one(collectionSpinner, {
+      fields: [collectionItem.id],
+      references: [collectionSpinner.id],
+    }),
+    spinnerButton: one(collectionSpinnerButton, {
+      fields: [collectionItem.id],
+      references: [collectionSpinnerButton.id],
+    }),
+  }),
+);
+
+export const collectionItemImageRelations = relations(
+  collectionItemImage,
+  ({ one }) => ({
+    collectionItem: one(collectionItem, {
+      fields: [collectionItemImage.collectionItemId],
+      references: [collectionItem.id],
+    }),
+  }),
+);
+
+export const productRelations = relations(product, ({ many, one }) => ({
+  finishOptions: many(finishOption),
+  images: many(productImage),
+  maker: one(maker, {
+    fields: [product.makerId],
+    references: [maker.id],
+  }),
+  materials: many(productMaterial),
+  productType: one(productType, {
+    fields: [product.productTypeId],
+    references: [productType.id],
+  }),
+  spinner: one(productSpinner, {
+    fields: [product.id],
+    references: [productSpinner.id],
+  }),
+  spinnerButton: one(productSpinnerButton, {
+    fields: [product.id],
+    references: [productSpinnerButton.id],
+  }),
+}));
+
+export const productImageRelations = relations(productImage, ({ one }) => ({
+  product: one(product, {
+    fields: [productImage.productId],
+    references: [product.id],
+  }),
+}));
+
+export const productMaterialRelations = relations(
+  productMaterial,
+  ({ one }) => ({
+    material: one(material, {
+      fields: [productMaterial.materialId],
+      references: [material.id],
+    }),
+    product: one(product, {
+      fields: [productMaterial.productId],
+      references: [product.id],
+    }),
+  }),
+);
+
+export const finishesRelations = relations(finish, ({ many }) => ({
+  options: many(finishOptionFinish),
+}));
+
+export const colorsRelations = relations(color, ({ many }) => ({
+  options: many(finishOptionColor),
+}));
+
+export const colorEffectsRelations = relations(colorEffect, ({ many }) => ({
+  options: many(finishOption),
+}));
+
+export const finishOptionRelations = relations(
+  finishOption,
+  ({ many, one }) => ({
+    product: one(product, {
+      fields: [finishOption.productId],
+      references: [product.id],
+    }),
+    collectionItem: one(collectionItem, {
+      fields: [finishOption.collectionItemId],
+      references: [collectionItem.id],
+    }),
+    sourceProductFinishOption: one(finishOption, {
+      fields: [finishOption.sourceProductFinishOptionId],
+      references: [finishOption.id],
+      relationName: "finishOptionSource",
+    }),
+    derivedCollectionOptions: many(finishOption, {
+      relationName: "finishOptionSource",
+    }),
+    colorEffect: one(colorEffect, {
+      fields: [finishOption.colorEffectId],
+      references: [colorEffect.id],
+    }),
+    colors: many(finishOptionColor),
+    finishes: many(finishOptionFinish),
+  }),
+);
+
+export const finishOptionFinishRelations = relations(
+  finishOptionFinish,
+  ({ one }) => ({
+    finishOption: one(finishOption, {
+      fields: [finishOptionFinish.finishOptionId],
+      references: [finishOption.id],
+    }),
+    finish: one(finish, {
+      fields: [finishOptionFinish.finishId],
+      references: [finish.id],
+    }),
+  }),
+);
+
+export const finishOptionColorRelations = relations(
+  finishOptionColor,
+  ({ one }) => ({
+    finishOption: one(finishOption, {
+      fields: [finishOptionColor.finishOptionId],
+      references: [finishOption.id],
+    }),
+    color: one(color, {
+      fields: [finishOptionColor.colorId],
+      references: [color.id],
+    }),
+  }),
+);
+
+export const productSpinnerRelations = relations(productSpinner, ({ one }) => ({
+  product: one(product, {
+    fields: [productSpinner.id],
+    references: [product.id],
+  }),
+}));
+
+export const productSpinnerButtonRelations = relations(
+  productSpinnerButton,
+  ({ one }) => ({
+    product: one(product, {
+      fields: [productSpinnerButton.id],
+      references: [product.id],
+    }),
+  }),
+);
+
+export const collectionSpinnerRelations = relations(
+  collectionSpinner,
+  ({ one }) => ({
+    item: one(collectionItem, {
+      fields: [collectionSpinner.id],
+      references: [collectionItem.id],
+    }),
+    product: one(productSpinner, {
+      fields: [collectionSpinner.productSpinnerId],
+      references: [productSpinner.id],
+    }),
+    installedButton: one(collectionSpinnerButton, {
+      fields: [collectionSpinner.installedButtonId],
+      references: [collectionSpinnerButton.id],
+    }),
+  }),
+);
+
+export const collectionSpinnerButtonRelations = relations(
+  collectionSpinnerButton,
+  ({ one }) => ({
+    item: one(collectionItem, {
+      fields: [collectionSpinnerButton.id],
+      references: [collectionItem.id],
+    }),
+    product: one(productSpinnerButton, {
+      fields: [collectionSpinnerButton.productSpinnerButtonId],
+      references: [productSpinnerButton.id],
+    }),
+  }),
+);
+
 export const tmpAutmogPensRelations = relations(
   tmpAutmogPens,
   ({ many, one }) => ({
-    maker: one(makers, {
+    maker: one(maker, {
       fields: [tmpAutmogPens.makerId],
-      references: [makers.id],
+      references: [maker.id],
     }),
     materials: many(tmpAutmogPenMaterials),
-    mechanism: one(mechanisms, {
+    mechanism: one(mechanism, {
       fields: [tmpAutmogPens.mechanismId],
-      references: [mechanisms.id],
+      references: [mechanism.id],
     }),
     product: one(tmpProducts, {
       fields: [tmpAutmogPens.productId],
@@ -97,9 +440,9 @@ export const tmpAutmogPensRelations = relations(
 export const tmpAutmogPenMaterialsRelations = relations(
   tmpAutmogPenMaterials,
   ({ one }) => ({
-    material: one(materials, {
+    material: one(material, {
       fields: [tmpAutmogPenMaterials.materialId],
-      references: [materials.id],
+      references: [material.id],
     }),
     pen: one(tmpAutmogPens, {
       fields: [tmpAutmogPenMaterials.penId],
@@ -152,9 +495,9 @@ export const tmpProductProductTypesRelations = relations(
       fields: [tmpProductProductTypes.productId],
       references: [tmpProducts.id],
     }),
-    productType: one(productTypes, {
+    productType: one(productType, {
       fields: [tmpProductProductTypes.productTypeId],
-      references: [productTypes.id],
+      references: [productType.id],
     }),
   }),
 );
@@ -183,9 +526,9 @@ export const tmpAutmogPenVersionsRelations = relations(
 export const tmpGrimsmoPensRelations = relations(
   tmpGrimsmoPens,
   ({ many, one }) => ({
-    maker: one(makers, {
+    maker: one(maker, {
       fields: [tmpGrimsmoPens.makerId],
-      references: [makers.id],
+      references: [maker.id],
     }),
     product: one(tmpProducts, {
       fields: [tmpGrimsmoPens.productId],
@@ -234,9 +577,9 @@ export const tmpGrimsmoPenVariationVersionsRelations = relations(
 export const tmpGrimsmoKnivesRelations = relations(
   tmpGrimsmoKnives,
   ({ many, one }) => ({
-    maker: one(makers, {
+    maker: one(maker, {
       fields: [tmpGrimsmoKnives.makerId],
-      references: [makers.id],
+      references: [maker.id],
     }),
     product: one(tmpProducts, {
       fields: [tmpGrimsmoKnives.productId],
@@ -281,3 +624,13 @@ export const tmpGrimsmoKnifeVariationVersionsRelations = relations(
     }),
   }),
 );
+
+export const uploadSessionRelations = relations(uploadSession, ({ many }) => ({
+  files: many(uploadFile),
+}));
+export const uploadFileRelations = relations(uploadFile, ({ one }) => ({
+  session: one(uploadSession, {
+    fields: [uploadFile.sessionId],
+    references: [uploadSession.id],
+  }),
+}));

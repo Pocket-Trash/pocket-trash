@@ -14,6 +14,6 @@ No table description has been added yet.
 | `source` | `feature_flag_override_source` | yes |  |  |  |  |  |
 | `enabled` | `boolean` | yes |  |  |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
-| `created_by_clerk_id` | `text` | yes |  |  |  |  |  |
+| `created_by_clerk_id` | `text` | no |  |  |  |  |  |
 | `updated_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
-| `updated_by_clerk_id` | `text` | yes |  |  |  |  |  |
+| `updated_by_clerk_id` | `text` | no |  |  |  |  |  |

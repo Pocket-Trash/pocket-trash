@@ -10,7 +10,7 @@ Canonical source makers that scraped or user-created products can belong to.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | yes | PK |  |  | Internal maker row identifier. | `1000` |
 | `name` | `text` | yes |  |  |  | Human-readable maker name. | `Autmog` |
-| `root_url` | `text` | yes | unique |  |  | Canonical root URL for the maker source. | `https://www.autmog.com` |
+| `root_url` | `text` | no | unique |  |  | Canonical root URL for the maker source. | `https://www.autmog.com` |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the maker row was created. | `2026-07-17T20:45:00.000Z` |
 | `updated_at` | `timestamp with time zone` | yes |  | `now()` |  | Timestamp when the maker row was last updated. | `2026-07-17T20:45:00.000Z` |
 

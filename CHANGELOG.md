@@ -17,6 +17,85 @@
 
 
 
+
+
+
+
+
+
+
+## 0.5.1
+
+### Patch Changes
+
+* Serve responsive navigation covers and site favicons directly from Bunny CDN. (@app/web)
+* Load help documents from the shared localization package.
+  Only flag preview database changes introduced by the PR in schema, migration,
+  or Drizzle configuration files. (@app/web)
+
+## 0.5.0
+
+### Minor Changes
+
+* Add product catalogs, composable finishes, image galleries, filtering, and multiple collections. (@app/web, @app/api, @app/scraper, @package/database, @package/infisical-runner, @package/logger, @package/resources, @package/services)
+
+## 0.4.2
+
+### Patch Changes
+
+* Wait for production deployment and GitHub release before the release command completes. (@app/api, @app/scraper, @app/web)
+
+## 0.4.1
+
+### Patch Changes
+
+* Set Railway production metadata in one request. (@app/scraper)
+* Remove stale Expo dependencies from the workspace. (@app/api, @app/scraper, @app/web, @package/database, @package/services)
+
+## 0.4.0
+
+### Minor Changes
+
+* Add an Advent of Code-inspired theme and composable account panels. (@app/web)
+
+### Patch Changes
+
+* Prevent successful Railway releases from failing during deployment verification. (@app/scraper)
+
+## 0.3.1
+
+### Patch Changes
+
+* Validate deploy artifacts before release and publish releases after production succeeds. (@app/api, @app/scraper, @app/web)
+* Fix repo lint warnings. (@app/scraper, @app/web, @package/infisical-runner)
+
+## 0.3.0
+
+### Minor Changes
+
+- **pocket-trash.app**: Move web UI text to shared localizations.
+- **@pocket-trash/repo**: Allow administrators to permanently delete soft-deleted resources and their stored files.
+- **@pocket-trash/repo**: Add the resource directory, management workflows, and streamed uploads.
+- **@pocket-trash/repo**: Add resource galleries, organized Bunny storage, and reversible deletion.
+- **@pocket-trash/repo**: Add secure multi-file resource uploads, management, and delivery.
+- **@pocket-trash/repo**: Sync Clerk usernames for resource attribution.
+
+### Patch Changes
+
+- **@package/services**: Preserve concurrent partial user settings updates.
+- **@app/web**: Installed pocket-trash skills v0.1.1
+- **@app/scraper**: Filter unchanged scraper items before queueing and run source scrapes hourly.
+- **@pocket-trash/repo**: Fix Railway release deployment verification.
+- **@pocket-trash/repo**: Add `@pocket-trash/repo` as a repo-level Changesets option and include selected packages in changelog entries.
+- **pocket-trash.app**: Add Storybook component stories, coverage support, and a dedicated CI check.
+- **pocket-trash.app**: Update Pocket Trash skills to v0.1.2.
+- **pocket-trash.app**: Update Pocket Trash skills to v0.2.0.
+- **pocket-trash.app**: Update Pocket Trash skills to v0.3.1.
+- **@pocket-trash/repo**: Move repo agent skills to the shared skills repo.
+- **@pocket-trash/repo**: Use the shared Pocket Trash skill router.
+- **@pocket-trash/repo**: Pin shared Pocket Trash skills by version, scope installed skills, and add install/update checks.
+- **@pocket-trash/repo**: Added i-have-adhd and ponytail skills
+
 ## 0.2.8
 
 ### Patch Changes

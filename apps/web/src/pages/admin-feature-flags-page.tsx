@@ -1,5 +1,9 @@
 import type { FeatureFlagAudience } from "@package/feature-flags";
 import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
+import {
   Archive,
   Check,
   Search,
@@ -8,10 +12,17 @@ import {
   ToggleLeft,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { AppShell } from "@/components/app-shell";
+import { AdminPageShell } from "@/components/admin-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { ClerkUserSearchResult } from "@/lib/feature-flags";
 import {
   archiveAdminFeatureFlag,
@@ -22,6 +33,7 @@ import {
   setAdminFeatureFlagForUser,
   updateAdminFeatureFlag,
 } from "@/lib/feature-flags";
+import { useLocale } from "@/providers/locale-provider";
 
 type AdminFlag = Awaited<ReturnType<typeof listAdminFeatureFlags>>[number];
 type TargetFlag = Awaited<ReturnType<typeof listAdminTargetingForUser>>[number];
@@ -29,6 +41,9 @@ type TargetFlag = Awaited<ReturnType<typeof listAdminTargetingForUser>>[number];
 const audiences: FeatureFlagAudience[] = ["global", "admin", "user"];
 
 export function AdminFeatureFlagsPage() {
+  const { locale } = useLocale();
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
+  const failedToLoadText = t("web.status.failedToLoad");
   const [flags, setFlags] = useState<AdminFlag[]>([]);
   const [form, setForm] = useState({
     audience: "user" as FeatureFlagAudience,
@@ -60,9 +75,9 @@ export function AdminFeatureFlagsPage() {
 
   useEffect(() => {
     loadFlags().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Failed to load.");
+      setStatus(error instanceof Error ? error.message : failedToLoadText);
     });
-  }, []);
+  }, [failedToLoadText]);
 
   async function saveFlag() {
     if (editingSlug) {
@@ -102,25 +117,29 @@ export function AdminFeatureFlagsPage() {
   }
 
   return (
-    <AppShell sidebarContent={null} title="Feature flags">
-      <main className="mx-auto grid w-full max-w-6xl gap-5 px-4 py-6 md:grid-cols-[minmax(0,1fr)_360px] md:px-6">
+    <AdminPageShell title={t("web.admin.featureFlags.featureFlags")}>
+      <main className="grid w-full max-w-6xl gap-5 px-4 py-6 md:grid-cols-[minmax(0,1fr)_360px] md:px-6">
         <section className="min-w-0">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="m-0 text-base font-semibold">Flags</h2>
+              <h2 className="m-0 text-base font-semibold">
+                {t("web.admin.featureFlags.flags")}
+              </h2>
               <p className="m-0 text-sm text-muted-foreground">
-                Boolean controls for global, private, and beta surfaces.
+                {t("web.admin.featureFlags.booleanControls")}
               </p>
             </div>
             {status ? (
-              <Badge className="bg-destructive text-white">{status}</Badge>
+              <Badge className="bg-destructive text-destructive-foreground">
+                {status}
+              </Badge>
             ) : null}
           </div>
           <div className="overflow-hidden rounded-lg border border-border bg-card">
             <div className="grid grid-cols-[1fr_auto_auto] gap-3 border-b border-border px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-              <span>Flag</span>
-              <span>Audience</span>
-              <span>Actions</span>
+              <span>{t("web.admin.featureFlags.flag")}</span>
+              <span>{t("web.admin.featureFlags.audience")}</span>
+              <span>{t("web.admin.featureFlags.actions")}</span>
             </div>
             {flags.map((flag) => (
               <div
@@ -131,7 +150,9 @@ export function AdminFeatureFlagsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{flag.name}</span>
                     {flag.archivedAt ? (
-                      <Badge variant="outline">Archived</Badge>
+                      <Badge variant="outline">
+                        {t("web.archive.state.archived")}
+                      </Badge>
                     ) : null}
                   </div>
                   <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
@@ -150,7 +171,7 @@ export function AdminFeatureFlagsPage() {
                 </Badge>
                 <div className="flex items-center gap-2">
                   <Button
-                    aria-label={`Edit ${flag.slug}`}
+                    aria-label={`${t("web.action.edit")} ${flag.slug}`}
                     onClick={() => {
                       setEditingSlug(flag.slug);
                       setForm({
@@ -168,7 +189,7 @@ export function AdminFeatureFlagsPage() {
                     <Settings2 />
                   </Button>
                   <Button
-                    aria-label={`Archive ${flag.slug}`}
+                    aria-label={`${t("web.action.archive")} ${flag.slug}`}
                     disabled={Boolean(flag.archivedAt)}
                     onClick={async () => {
                       await archiveAdminFeatureFlag({
@@ -191,7 +212,9 @@ export function AdminFeatureFlagsPage() {
         <aside className="grid content-start gap-5">
           <section className="rounded-lg border border-border bg-card p-4">
             <h2 className="m-0 mb-3 text-sm font-semibold">
-              {editingSlug ? "Edit flag" : "New flag"}
+              {editingSlug
+                ? t("web.admin.featureFlags.editFlag")
+                : t("web.admin.featureFlags.newFlag")}
             </h2>
             <div className="grid gap-3">
               <Input
@@ -202,7 +225,7 @@ export function AdminFeatureFlagsPage() {
                     slug: event.target.value,
                   }))
                 }
-                placeholder="new-library-ui"
+                placeholder={t("web.admin.featureFlags.slugPlaceholder")}
                 value={form.slug}
               />
               <Input
@@ -212,7 +235,7 @@ export function AdminFeatureFlagsPage() {
                     name: event.target.value,
                   }))
                 }
-                placeholder="Display name"
+                placeholder={t("web.admin.featureFlags.displayName")}
                 value={form.name}
               />
               <Input
@@ -222,26 +245,36 @@ export function AdminFeatureFlagsPage() {
                     description: event.target.value,
                   }))
                 }
-                placeholder="Description"
+                placeholder={t("web.admin.featureFlags.description")}
                 value={form.description}
               />
-              <select
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              <Select
                 disabled={Boolean(editingSlug)}
-                onChange={(event) =>
+                items={audiences.map((audience) => ({
+                  label: audience,
+                  value: audience,
+                }))}
+                onValueChange={(audience) =>
                   setForm((current) => ({
                     ...current,
-                    audience: event.target.value as FeatureFlagAudience,
+                    audience: audience as FeatureFlagAudience,
                   }))
                 }
                 value={form.audience}
               >
-                {audiences.map((audience) => (
-                  <option key={audience} value={audience}>
-                    {audience}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  aria-label={t("web.admin.featureFlags.audience")}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {audiences.map((audience) => (
+                    <SelectItem key={audience} value={audience}>
+                      {audience}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <label className="flex items-center gap-2 text-sm">
                 <input
                   checked={form.defaultEnabled}
@@ -254,27 +287,27 @@ export function AdminFeatureFlagsPage() {
                   }
                   type="checkbox"
                 />
-                Global default enabled
+                {t("web.admin.featureFlags.globalDefaultEnabled")}
               </label>
               <Button onClick={saveFlag} type="button">
                 <Check />
-                Save flag
+                {t("web.action.saveFlag")}
               </Button>
             </div>
           </section>
 
           <section className="rounded-lg border border-border bg-card p-4">
             <h2 className="m-0 mb-3 text-sm font-semibold">
-              Admin-only targeting
+              {t("web.admin.featureFlags.adminOnlyTargeting")}
             </h2>
             <div className="flex gap-2">
               <Input
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Email, username, or name"
+                placeholder={t("web.admin.featureFlags.emailUsernameOrName")}
                 value={query}
               />
               <Button
-                aria-label="Search users"
+                aria-label={t("web.admin.featureFlags.searchUsers")}
                 onClick={searchUsers}
                 size="icon"
                 type="button"
@@ -328,7 +361,9 @@ export function AdminFeatureFlagsPage() {
                       <span>{flag.name}</span>
                       <span className="flex items-center gap-2 text-xs">
                         <ToggleLeft />
-                        {flag.enabled ? "Enabled" : "Disabled"}
+                        {flag.enabled
+                          ? t("web.status.enabled")
+                          : t("web.status.disabled")}
                       </span>
                     </Button>
                   ))}
@@ -338,6 +373,6 @@ export function AdminFeatureFlagsPage() {
           </section>
         </aside>
       </main>
-    </AppShell>
+    </AdminPageShell>
   );
 }

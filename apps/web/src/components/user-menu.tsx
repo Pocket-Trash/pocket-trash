@@ -1,10 +1,16 @@
-import { useClerk, useUser } from "@clerk/tanstack-react-start";
+import { useAuth, useClerk, useUser } from "@clerk/tanstack-react-start";
+import {
+  formatTranslation,
+  type TranslationKey,
+} from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
 import {
-  ChevronsUpDown,
+  Files,
   FlaskConical,
   Folder,
   LogOut,
+  Settings,
+  Shield,
   User,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,95 +25,52 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLocale } from "@/providers/locale-provider";
 
-export function UserMenu({ compact = false }: { compact?: boolean }) {
+export function UserMenu() {
+  const { sessionClaims } = useAuth();
   const clerk = useClerk();
+  const { locale } = useLocale();
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const { isLoaded, user } = useUser();
 
   if (!isLoaded) {
-    return compact ? (
-      <Skeleton className="size-9 rounded-full" />
-    ) : (
-      <div className="flex h-12 items-center gap-3 rounded-md border border-sidebar-border bg-sidebar px-3">
-        <Skeleton className="size-8 rounded-full" />
-        <div className="flex flex-1 flex-col gap-1.5">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-3 w-32" />
-        </div>
-      </div>
-    );
+    return <Skeleton className="size-9 rounded-full" />;
   }
 
   if (!user) {
-    return compact ? (
+    return (
       <Button
-        aria-label="Sign in"
-        className="rounded-full"
-        nativeButton={false}
-        render={<Link params={{ _splat: "" }} to="/sign-in/$" />}
-        size="icon"
-        variant="outline"
-      >
-        <User />
-      </Button>
-    ) : (
-      <Button
-        className="w-full"
         nativeButton={false}
         render={<Link params={{ _splat: "" }} to="/sign-in/$" />}
         variant="outline"
       >
-        Sign in
+        {t("web.action.signIn")}
       </Button>
     );
   }
 
-  const username = user.username ?? "User";
+  const username = user.username ?? t("web.navigation.user");
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          compact ? (
-            <Button
-              aria-label="Account menu"
-              className="rounded-full p-0"
-              size="icon"
-              type="button"
-              variant="outline"
-            />
-          ) : (
-            <Button
-              className="h-12 w-full justify-start gap-3 px-3"
-              type="button"
-              variant="outline"
-            />
-          )
+          <Button
+            aria-label={t("web.navigation.accountMenu")}
+            className="rounded-full p-0"
+            size="icon"
+            type="button"
+            variant="outline"
+          />
         }
       >
-        <Avatar size={compact ? "sm" : undefined}>
+        <Avatar size="sm">
           <AvatarImage alt={username} src={user.imageUrl} />
           <AvatarFallback>{initialsFor(username)}</AvatarFallback>
         </Avatar>
-        {compact ? null : (
-          <>
-            <span className="min-w-0 flex-1 text-left">
-              <span className="block truncate text-sm font-medium">
-                {username}
-              </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                Account
-              </span>
-            </span>
-            <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
-          </>
-        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-64"
-        side={compact ? "bottom" : "top"}
-      >
+      <DropdownMenuContent align="end" className="w-64" side="bottom">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex items-center gap-3">
             <Avatar size="sm">
@@ -127,15 +90,29 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link to="/user/account" />}>
           <User />
-          Account
+          {t("web.navigation.account")}
         </DropdownMenuItem>
+        {sessionClaims?.role === "admin" ? (
+          <DropdownMenuItem render={<Link to="/admin" />}>
+            <Shield />
+            {t("web.admin.hub.title")}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem render={<Link to="/user/collections" />}>
           <Folder />
-          Collections
+          {t("web.navigation.collections")}
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link to="/user/resources" />}>
+          <Files />
+          {t("web.resources.management.title")}
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link to="/user/settings" />}>
+          <Settings />
+          {t("web.settings.settings")}
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/settings/beta-features" />}>
           <FlaskConical />
-          Beta features
+          {t("web.navigation.betaFeatures")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -144,7 +121,7 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
           }}
         >
           <LogOut />
-          Log out
+          {t("web.navigation.logOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

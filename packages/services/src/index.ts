@@ -1,20 +1,76 @@
 import type { DatabaseConfig } from "@package/database";
 import { createDb } from "@package/database";
-import type { ImageStorageConfig } from "@package/images";
 import { createLogger, type Logger, type LoggerConfig } from "@package/logger";
+import type {
+  RemoteImageStorageConfig,
+  UploadStorageConfig,
+} from "@package/storage";
+import { createUploadStorage, signResourceUrl } from "@package/storage";
 import { createDbServices, type DbServices } from "./db/index.js";
+import { createStorageService, type StorageService } from "./storage/index.js";
 
+export { adminFeedbackArchiveStatuses } from "./db/feedback/index.js";
 export type {
+  AdminFeedbackItem,
+  AdminFeedbackPage,
+  AdminFeedbackSort,
+  AdminFeedbackSortField,
+  ApprovedErasureExceptionCode,
+  CatalogColor,
+  CatalogFinishOption,
+  CatalogImage,
+  CatalogImageTargetType,
+  CatalogImageTrashItem,
+  CatalogLookup,
+  CatalogProduct,
+  CatalogProductType,
+  CatalogService,
+  CatalogViewer,
+  CollectionsService,
+  ErasureOperationRequest,
+  ErasureOperationResult,
+  ErasureOperations,
+  ErasureReceipt,
+  ErasureService,
+  FeedbackListItem,
+  FeedbackMergeTarget,
+  FeedbackNotificationItem,
+  FeedbackPage,
+  FeedbackService,
+  ListAdminFeedbackOptions,
+  ListMyFeedbackOptions,
+  ProductWriteInput,
+  PublicCollectionOwner,
+  SubmitFeedbackInput,
+  UpdateAdminFeedbackInput,
+  UpdatePendingFeedbackInput,
   UpsertUserSettingsInput,
+  UserCollectionItem,
+  UserCollectionSummary,
   UserSettingsService,
+  UserSyncResult,
+  UsersService,
 } from "./db/index.js";
-export { defaultUserSettings } from "./db/index.js";
+export {
+  AccountErasureInProgressError,
+  createErasureService,
+  createErasureSubjectHmac,
+  defaultUserSettings,
+  ErasureOperationError,
+  FeedbackPlanRecoveryRequiredError,
+  FeedbackStateError,
+  FeedbackSubmissionLimitError,
+} from "./db/index.js";
 
 import {
   createFeatureFlagsService,
   type FeatureFlagsService,
 } from "./flags/index.js";
 import { createImagesService, type ImagesService } from "./images/index.js";
+import {
+  createResourcesService,
+  type ResourcesService,
+} from "./resources/index.js";
 
 export type {
   AdminTargetingFeatureFlag,
@@ -27,8 +83,9 @@ export type ServicesLoggerConfig = LoggerConfig | Logger;
 
 export type ServicesConfig = {
   db?: DatabaseConfig;
-  images?: ImageStorageConfig;
+  images?: RemoteImageStorageConfig;
   logger?: ServicesLoggerConfig;
+  storage?: UploadStorageConfig;
 };
 
 export class Services {
@@ -36,6 +93,8 @@ export class Services {
   #flags?: FeatureFlagsService;
   #images?: ImagesService;
   #logger?: Logger;
+  #resources?: ResourcesService;
+  #storage?: StorageService;
 
   configure(config: ServicesConfig): void {
     if (config.db && !config.logger && !this.#logger) {
@@ -44,6 +103,10 @@ export class Services {
 
     if (config.images && !config.logger && !this.#logger) {
       throw new Error("Image services require logger configuration.");
+    }
+
+    if (config.storage && !config.db) {
+      throw new Error("Storage services require database configuration.");
     }
 
     if (config.logger) {
@@ -60,6 +123,21 @@ export class Services {
       const db = createDb(config.db);
       this.#db = createDbServices(db, this.#logger);
       this.#flags = createFeatureFlagsService(db, this.#db.users, this.#logger);
+      if (config.storage) {
+        const configStorage = config.storage;
+        const storage = createUploadStorage(configStorage);
+        this.#storage = createStorageService({
+          db,
+          storage,
+          logger: this.#logger,
+        });
+        this.#resources = createResourcesService(
+          db,
+          storage,
+          this.#logger,
+          (objectPath) => signResourceUrl({ ...configStorage, objectPath }),
+        );
+      }
     }
 
     if (config.images) {
@@ -110,6 +188,22 @@ export class Services {
 
     return this.#images;
   }
+
+  get storage(): StorageService {
+    if (!this.#storage)
+      throw new Error("Storage services have not been configured.");
+    return this.#storage;
+  }
+
+  get resources(): ResourcesService {
+    if (!this.#resources) {
+      throw new Error(
+        "Resource services have not been configured. Import the app-local services module and provide database and resource storage configuration before using s.resources.",
+      );
+    }
+
+    return this.#resources;
+  }
 }
 
 export function createServices(): Services {
@@ -130,12 +224,36 @@ function isLogger(value: ServicesLoggerConfig): value is Logger {
 }
 
 export type {
-  ImageStorageConfig,
   ImageUpdateInput,
   ImageUpdateResult,
   ImageUploadInput,
   ImageUploadResult,
+  RemoteImageStorageConfig,
   RemoteImageUploadInput,
-} from "@package/images";
+  UploadInput,
+  UploadResult,
+  UploadStorageConfig,
+} from "@package/storage";
+export { signResourceUrl } from "@package/storage";
+export { signImages } from "./images/sign-images.js";
+export type {
+  CreateResourceInput,
+  ResourceDetail,
+  ResourceDirectory,
+  ResourceDirectoryItem,
+  ResourceImageDetail,
+  ResourceNotificationItem,
+  ResourcesService,
+  ResourceTrashItem,
+  ResourceVersionDetail,
+  UpdateResourceInput,
+  UploadResourceVersionInput,
+} from "./resources/index.js";
+export {
+  createConfiguredResourcesService,
+  createResourcesService,
+} from "./resources/index.js";
+
+export * from "./storage/index.js";
 export type { ImagesService };
 export { createImagesService };

@@ -80,13 +80,49 @@ pnpm lint
 pnpm typecheck
 ```
 
-### Developing the web app
+### Developing the web app and API
 
-Run the TanStack Start web app from the repo root:
+Run the TanStack Start web app and Cloudflare API Worker from the repo root:
 
 ```sh
 pnpm dev:web
 ```
+
+### Testing localizations locally with yalc
+
+Install yalc once:
+
+```sh
+pnpm add -g yalc
+```
+
+Build and publish the sibling `localizations` repo:
+
+```sh
+cd ../localizations
+pnpm install
+pnpm build
+yalc publish
+```
+
+Add it in Pocket Trash:
+
+```sh
+cd ../pocket-trash
+yalc add @pocket-trash/localizations --link
+pnpm install
+```
+
+After localization changes:
+
+```sh
+cd ../localizations
+pnpm build
+yalc push
+```
+
+For further information, see
+[Localizations Local Dev With yalc](docs/localizations-yalc-local-dev.md).
 
 ## AI commands
 
@@ -107,7 +143,9 @@ Local app dev commands use Infisical to load Development secrets. Configure the 
 | Command | What it does |
 | --- | --- |
 | `pnpm dev` | Starts app dev servers through Turborepo. |
-| `pnpm dev:web` | Starts the TanStack Start web app. |
+| `pnpm dev:verbose` | Starts app dev servers and shows Infisical provider information. |
+| `pnpm dev:web` | Starts the TanStack Start web app and Cloudflare API Worker. |
+| `pnpm dev:web:verbose` | Starts the web app and API with Infisical provider information. |
 | `pnpm dev:scraper` | Runs scraper development commands. |
 
 

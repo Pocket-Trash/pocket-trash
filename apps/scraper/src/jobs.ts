@@ -34,7 +34,7 @@ export const scraperSourceKeys = Object.values(scraperSources);
 export type ScraperJobContext = {
   close: () => Promise<void>;
   db: Database;
-  imageFolderPrefix?: string;
+  imageFolderPrefix: string;
   imageStorage: ImagesService;
   redis: ReturnType<typeof createRedisConnection>;
   queues: ScraperQueues;
@@ -57,10 +57,10 @@ export async function createScraperJobContext(
   const services = createServices();
   services.configure({
     images: {
-      bunnyStorageAccessKey: env.BUNNY_STORAGE_ACCESS_KEY,
-      bunnyStorageEndpoint: env.BUNNY_STORAGE_ENDPOINT,
-      bunnyStorageZoneName: env.BUNNY_STORAGE_ZONE_NAME,
-      cdnBaseUrl: env.IMAGE_CDN_BASE_URL,
+      accessKey: env.BUNNY_STORAGE_ACCESS_KEY,
+      endpoint: env.BUNNY_STORAGE_ENDPOINT,
+      zoneName: env.BUNNY_STORAGE_ZONE_NAME,
+      cdnBaseUrl: env.BUNNY_CDN_BASE_URL,
       dryRun: env.SCRAPER_DRY_RUN,
       provider: env.IMAGE_STORAGE_PROVIDER,
     },
@@ -86,7 +86,7 @@ export async function createScraperJobContext(
       redis.disconnect();
     },
     db,
-    imageFolderPrefix: env.IMAGE_FOLDER_PREFIX,
+    imageFolderPrefix: env.BUNNY_IMAGE_FOLDER_PREFIX,
     imageStorage: services.images,
     queues,
     redis,
@@ -109,6 +109,7 @@ export async function runAutmogProducerJob({
     db: context.db,
     execute: async (signal) => {
       const result = await runAutmogProducer({
+        db: context.db,
         logger,
         limit: sourceLimit,
         pageLimit: sourceLimit ? 1 : undefined,
@@ -192,6 +193,7 @@ export async function runGrimsmoProducerJob({
     db: context.db,
     execute: async (signal) => {
       const result = await runGrimsmoProducer({
+        db: context.db,
         logger,
         maxProducts: sourceLimit,
         proxyUrl,

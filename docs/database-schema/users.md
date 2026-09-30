@@ -10,3 +10,5 @@ Application users mirrored from Clerk identity records.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | yes | PK |  |  | Internal user row identifier. | `1000` |
 | `clerk_id` | `text` | yes | unique |  |  | Clerk user identifier. | `user_2abc123` |
+| `clerk_updated_at` | `timestamp with time zone` | no |  |  |  | Clerk profile timestamp used to ignore stale updates. | `2026-09-22T12:00:00.000Z` |
+| `username` | `text` | no |  |  |  | Display username mirrored from Clerk. | `roy` |

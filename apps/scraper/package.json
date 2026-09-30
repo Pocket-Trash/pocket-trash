@@ -1,12 +1,12 @@
 {
   "name": "@app/scraper",
-  "version": "0.0.0",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx ../../packages/infisical-runner/src/cli.ts scraper dev -- tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "build:ci": "tsc -p tsconfig.json",
     "cron:run": "node dist/cli.js cron:run",
