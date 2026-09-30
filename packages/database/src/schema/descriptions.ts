@@ -10,6 +10,10 @@ export type SchemaDescription = {
 };
 
 export const schemaDescriptions = {
+  audit_export: {
+    description:
+      "Bounded audit-event export ranges, completion checksums, and retention-consumption state.",
+  },
   erasure_request: {
     description:
       "Durable, idempotent complete-erasure requests and their minimal temporary receipts.",
