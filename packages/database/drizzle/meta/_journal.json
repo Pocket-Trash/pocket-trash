@@ -253,6 +253,13 @@
       "when": 1790720594746,
       "tag": "0035_stormy_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790741544774,
+      "tag": "0036_block_erasing_account_writes",
+      "breakpoints": true
     }
   ]
 }

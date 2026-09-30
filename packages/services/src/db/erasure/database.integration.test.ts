@@ -38,6 +38,12 @@ describe("account database erasure", () => {
         verifiedAt: new Date(),
         verifiedByClerkId: targetClerkId,
       });
+      await expect(
+        client.exec(`
+          insert into feedback (submitter_clerk_id, title, description)
+          values ('user_to_erase', 'Late write', 'must be blocked');
+        `),
+      ).rejects.toThrow("Account erasure is in progress.");
       await client.exec(`
         create rule erasure_test_block as on update to product
         where old.owner_clerk_id = 'user_to_erase'
