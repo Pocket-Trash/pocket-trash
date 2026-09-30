@@ -1,11 +1,20 @@
-import type { AuditEvent, AuditJsonObject, Database } from "@package/database";
+import { createHash } from "node:crypto";
+import type {
+  AuditEvent,
+  AuditExport,
+  AuditJsonObject,
+  Database,
+} from "@package/database";
 import { schema } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
 import {
   and,
+  asc,
   desc,
   eq,
+  gt,
   gte,
+  isNull,
   lt,
   lte,
   min,
@@ -22,6 +31,9 @@ import {
 } from "../../authorization.js";
 
 const MAX_PAYLOAD_BYTES = 256 * 1024;
+const MAX_EXPORT_EVENTS = 10_000;
+const EXPORT_BATCH_SIZE = 100;
+const EXPORT_MINIMUM_AGE_MS = 60 * 24 * 60 * 60 * 1000;
 const DELETED_REASON = "[erased]";
 const DELETED_USERNAME = "Deleted user";
 const namePattern = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/u;
@@ -88,12 +100,43 @@ export type AuditWriteInput<T> = {
 };
 
 export type AuditService = {
+  createExport(input: CreateAuditExportInput): Promise<AuditExportView>;
+  downloadExport(input: DownloadAuditExportInput): Promise<AuditExportDownload>;
+  getActiveExport(actor: Actor): Promise<AuditExportView | null>;
   list(input: ListAuditEventsInput): Promise<AuditEventPage>;
   redactAccount(transaction: AuditTransaction, userId: number): Promise<void>;
   write<T>(
     transaction: AuditTransaction,
     input: AuditWriteInput<T>,
   ): Promise<AuditEvent>;
+};
+
+export type CreateAuditExportInput = {
+  actor: Actor;
+  reason: string;
+};
+
+export type DownloadAuditExportInput = {
+  actor: Actor;
+  exportId: string;
+};
+
+export type AuditExportView = Pick<
+  AuditExport,
+  | "completedAt"
+  | "createdAt"
+  | "cutoffAt"
+  | "eventCount"
+  | "highWaterEventId"
+  | "highWaterRecordedAt"
+  | "id"
+  | "reason"
+  | "sha256"
+>;
+
+export type AuditExportDownload = {
+  body: ReadableStream<Uint8Array>;
+  filename: string;
 };
 
 export type AuditEventCursor = {
@@ -120,15 +163,36 @@ export type AuditEventPage = {
 };
 
 export class AuditEventValidationError extends Error {}
+export class AuditExportEmptyError extends Error {}
+export class AuditExportInProgressError extends Error {}
 export class AuditPayloadTooLargeError extends Error {}
+
+type AuditExportCompletedData = {
+  checksum: string;
+  count: number;
+  cutoff: string;
+  highWaterEventId: number;
+};
+
+const auditExportCompleted = {
+  action: "audit.export.completed",
+  targetType: "audit.export",
+  serialize: (data: AuditExportCompletedData) => ({ metadata: data }),
+  redact: (payload: StoredAuditPayload) => ({
+    metadata: payload.metadata ?? { redacted: true },
+  }),
+} satisfies AuditEventDefinition<AuditExportCompletedData>;
 
 export function createAuditService(
   logger: Logger,
   definitions: readonly AuditEventDefinition<never>[] = [],
-  database?: Pick<Database, "select">,
+  database?: Database,
 ): AuditService {
   const registered = new Map<string, AuditEventDefinition<never>>();
-  for (const definition of definitions) {
+  for (const definition of [
+    ...definitions,
+    auditExportCompleted as AuditEventDefinition<never>,
+  ]) {
     const key = definitionKey(definition);
     if (registered.has(key)) {
       throw new AuditEventValidationError(`Duplicate audit event ${key}.`);
@@ -136,7 +200,169 @@ export function createAuditService(
     registered.set(key, definition);
   }
 
+  async function write<T>(
+    transaction: AuditTransaction,
+    input: AuditWriteInput<T>,
+  ) {
+    return await logger.operation(
+      loggerMessages.database.audit.write,
+      async () => {
+        const definition = input.definition as AuditEventDefinition<never>;
+        const key = definitionKey(definition);
+        if (registered.get(key) !== definition) {
+          throw new AuditEventValidationError(
+            `Audit event ${key} is not registered.`,
+          );
+        }
+        const values = normalizedInput(input);
+        const payload = normalizedPayload(
+          input.definition.serialize(input.data),
+        );
+        const [event] = await transaction
+          .insert(schema.auditEvent)
+          .values({
+            ...values,
+            afterState: payload.after,
+            beforeState: payload.before,
+            metadata: payload.metadata,
+          })
+          .returning();
+        if (!event) throw new Error("Failed to write audit event.");
+        return event;
+      },
+      {
+        attributes: {
+          action: input.definition.action,
+          targetType: input.definition.targetType,
+        },
+      },
+    );
+  }
+
   return {
+    async createExport(input) {
+      assertPermission(input.actor, "audit.export");
+      if (!database) throw new Error("Audit exports are not configured.");
+      const reason = requiredText(input.reason, "reason", 500);
+      const cutoffAt = new Date(Date.now() - EXPORT_MINIMUM_AGE_MS);
+
+      return await database.transaction(async (transaction) => {
+        await transaction.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended('audit-export', 0))`,
+        );
+        const [active] = await transaction
+          .select()
+          .from(schema.auditExport)
+          .where(isNull(schema.auditExport.consumedAt))
+          .limit(1)
+          .for("update");
+        if (active) throw new AuditExportInProgressError();
+
+        const [requester] = await transaction
+          .select({
+            id: schema.user.id,
+            username: schema.user.username,
+          })
+          .from(schema.user)
+          .where(eq(schema.user.clerkId, input.actor.clerkId))
+          .limit(1);
+        if (!requester) throw new Error("Audit export requester is missing.");
+
+        const candidates = await transaction
+          .select({
+            id: schema.auditEvent.id,
+            recordedAt: schema.auditEvent.recordedAt,
+          })
+          .from(schema.auditEvent)
+          .where(lt(schema.auditEvent.recordedAt, cutoffAt))
+          .orderBy(asc(schema.auditEvent.recordedAt), asc(schema.auditEvent.id))
+          .limit(MAX_EXPORT_EVENTS);
+        const highWater = candidates.at(-1);
+        if (!highWater) throw new AuditExportEmptyError();
+
+        const [created] = await transaction
+          .insert(schema.auditExport)
+          .values({
+            cutoffAt,
+            eventCount: candidates.length,
+            highWaterEventId: highWater.id,
+            highWaterRecordedAt: highWater.recordedAt,
+            reason,
+            requestedByRole: input.actor.role,
+            requestedByUserId: requester.id,
+            requestedByUsername: requester.username,
+          })
+          .returning();
+        if (!created) throw new Error("Failed to create audit export.");
+        return exportView(created);
+      });
+    },
+
+    async downloadExport(input) {
+      assertPermission(input.actor, "audit.export");
+      if (!database) throw new Error("Audit exports are not configured.");
+      const [record] = await database
+        .select()
+        .from(schema.auditExport)
+        .where(
+          and(
+            eq(schema.auditExport.id, requiredUuid(input.exportId)),
+            isNull(schema.auditExport.consumedAt),
+          ),
+        )
+        .limit(1);
+      if (!record) throw new Error("Audit export does not exist.");
+
+      const hash = createHash("sha256");
+      const encoder = new TextEncoder();
+      const chunks = exportChunks(database, record)[Symbol.asyncIterator]();
+      let completed = false;
+      const body = new ReadableStream<Uint8Array>({
+        async cancel() {
+          await chunks.return?.();
+        },
+        async pull(controller) {
+          try {
+            const next = await chunks.next();
+            if (!next.done) {
+              const bytes = encoder.encode(next.value);
+              hash.update(bytes);
+              controller.enqueue(bytes);
+              return;
+            }
+            if (!completed) {
+              completed = true;
+              await completeExport(
+                database,
+                write,
+                record,
+                input.actor,
+                hash.digest("hex"),
+              );
+            }
+            controller.close();
+          } catch (error) {
+            controller.error(error);
+          }
+        },
+      });
+      return {
+        body,
+        filename: `audit-export-${record.createdAt.toISOString().slice(0, 10)}-${record.id}.json`,
+      };
+    },
+
+    async getActiveExport(actor) {
+      assertPermission(actor, "audit.export");
+      if (!database) throw new Error("Audit exports are not configured.");
+      const [record] = await database
+        .select()
+        .from(schema.auditExport)
+        .where(isNull(schema.auditExport.consumedAt))
+        .limit(1);
+      return record ? exportView(record) : null;
+    },
+
     async list(input) {
       if (!hasPermission(input.actor, "audit.read")) {
         throw new Error("Audit events do not exist.");
@@ -200,7 +426,9 @@ export function createAuditService(
       return {
         coverageStartAt: coverage[0]?.coverageStartAt ?? null,
         coveredDomains: [
-          ...new Set(definitions.map(({ action }) => action.split(".")[0])),
+          ...new Set(
+            [...registered.values()].map(({ action }) => action.split(".")[0]),
+          ),
         ]
           .filter((domain): domain is string => Boolean(domain))
           .sort(),
@@ -212,41 +440,7 @@ export function createAuditService(
       };
     },
 
-    async write(transaction, input) {
-      return await logger.operation(
-        loggerMessages.database.audit.write,
-        async () => {
-          const definition = input.definition as AuditEventDefinition<never>;
-          const key = definitionKey(definition);
-          if (registered.get(key) !== definition) {
-            throw new AuditEventValidationError(
-              `Audit event ${key} is not registered.`,
-            );
-          }
-          const values = normalizedInput(input);
-          const payload = normalizedPayload(
-            input.definition.serialize(input.data),
-          );
-          const [event] = await transaction
-            .insert(schema.auditEvent)
-            .values({
-              ...values,
-              afterState: payload.after,
-              beforeState: payload.before,
-              metadata: payload.metadata,
-            })
-            .returning();
-          if (!event) throw new Error("Failed to write audit event.");
-          return event;
-        },
-        {
-          attributes: {
-            action: input.definition.action,
-            targetType: input.definition.targetType,
-          },
-        },
-      );
-    },
+    write,
 
     async redactAccount(transaction, userId) {
       await logger.operation(
@@ -262,7 +456,11 @@ export function createAuditService(
                 eq(schema.auditEvent.ownerUserId, userId),
               ),
             );
-          if (events.length === 0) return;
+          const exports = await transaction
+            .select()
+            .from(schema.auditExport)
+            .where(eq(schema.auditExport.requestedByUserId, userId));
+          if (events.length === 0 && exports.length === 0) return;
 
           await transaction.execute(
             sql`select set_config('pocket_trash.audit_erasure_redaction', 'on', true)`,
@@ -314,10 +512,183 @@ export function createAuditService(
               throw new Error("Audit erasure redaction verification failed.");
             }
           }
+          if (exports.length) {
+            const redacted = await transaction
+              .update(schema.auditExport)
+              .set({
+                reason: DELETED_REASON,
+                requestedByUserId: null,
+                requestedByUsername: DELETED_USERNAME,
+              })
+              .where(eq(schema.auditExport.requestedByUserId, userId))
+              .returning({ id: schema.auditExport.id });
+            if (redacted.length !== exports.length) {
+              throw new Error("Audit export erasure verification failed.");
+            }
+          }
         },
       );
     },
   };
+}
+
+async function* exportChunks(database: Database, record: AuditExport) {
+  yield `${JSON.stringify({
+    export: {
+      count: record.eventCount,
+      createdAt: record.createdAt.toISOString(),
+      cutoffAt: record.cutoffAt.toISOString(),
+      highWaterEventId: record.highWaterEventId,
+      id: record.id,
+    },
+  }).slice(0, -1)},"events":[`;
+
+  let cursor: AuditEventCursor | undefined;
+  let count = 0;
+  while (count < record.eventCount) {
+    const rows = await database
+      .select()
+      .from(schema.auditEvent)
+      .where(
+        and(
+          lt(schema.auditEvent.recordedAt, record.cutoffAt),
+          or(
+            lt(schema.auditEvent.recordedAt, record.highWaterRecordedAt),
+            and(
+              eq(schema.auditEvent.recordedAt, record.highWaterRecordedAt),
+              lte(schema.auditEvent.id, record.highWaterEventId),
+            ),
+          ),
+          cursor
+            ? or(
+                gt(schema.auditEvent.recordedAt, cursor.recordedAt),
+                and(
+                  eq(schema.auditEvent.recordedAt, cursor.recordedAt),
+                  gt(schema.auditEvent.id, cursor.id),
+                ),
+              )
+            : undefined,
+        ),
+      )
+      .orderBy(asc(schema.auditEvent.recordedAt), asc(schema.auditEvent.id))
+      .limit(Math.min(EXPORT_BATCH_SIZE, record.eventCount - count));
+    if (!rows.length) break;
+    for (const event of rows) {
+      yield `${count ? "," : ""}${JSON.stringify(exportEvent(event))}`;
+      count += 1;
+    }
+    const last = rows.at(-1);
+    if (!last) break;
+    cursor = { id: last.id, recordedAt: last.recordedAt };
+  }
+  if (count !== record.eventCount) {
+    throw new Error("Audit export range changed before completion.");
+  }
+  yield "]}";
+}
+
+async function completeExport(
+  database: Database,
+  write: AuditService["write"],
+  record: AuditExport,
+  actor: Actor,
+  checksum: string,
+) {
+  await database.transaction(async (transaction) => {
+    const [current] = await transaction
+      .select()
+      .from(schema.auditExport)
+      .where(eq(schema.auditExport.id, record.id))
+      .limit(1)
+      .for("update");
+    if (!current || current.consumedAt) {
+      throw new Error("Audit export does not exist.");
+    }
+    const [actorUser] = await transaction
+      .select({ id: schema.user.id, username: schema.user.username })
+      .from(schema.user)
+      .where(eq(schema.user.clerkId, actor.clerkId))
+      .limit(1);
+    if (!actorUser) throw new Error("Audit export requester is missing.");
+
+    await transaction
+      .update(schema.auditExport)
+      .set({ completedAt: new Date(), sha256: checksum })
+      .where(eq(schema.auditExport.id, current.id));
+    await write(transaction, {
+      actor: {
+        role: actor.role,
+        userId: actorUser.id,
+        username: actorUser.username,
+      },
+      authorization: { permission: "audit.export", type: "permission" },
+      data: {
+        checksum,
+        count: current.eventCount,
+        cutoff: current.cutoffAt.toISOString(),
+        highWaterEventId: current.highWaterEventId,
+      },
+      definition: auditExportCompleted,
+      occurredAt: new Date(),
+      reason: current.reason,
+      targetId: current.id,
+    });
+  });
+}
+
+function exportEvent(event: AuditEvent) {
+  return {
+    action: event.action,
+    actorRole: event.actorRole,
+    actorUserId: event.actorUserId,
+    actorUsername: event.actorUsername,
+    afterState: event.afterState,
+    authorizationType: event.authorizationType,
+    beforeState: event.beforeState,
+    correlationId: event.correlationId,
+    id: event.id,
+    metadata: event.metadata,
+    occurredAt: event.occurredAt.toISOString(),
+    ownerUserId: event.ownerUserId,
+    permission: event.permission,
+    reason: event.reason,
+    recordedAt: event.recordedAt.toISOString(),
+    requestId: event.requestId,
+    targetId: event.targetId,
+    targetType: event.targetType,
+  };
+}
+
+function exportView(record: AuditExport): AuditExportView {
+  return {
+    completedAt: record.completedAt,
+    createdAt: record.createdAt,
+    cutoffAt: record.cutoffAt,
+    eventCount: record.eventCount,
+    highWaterEventId: record.highWaterEventId,
+    highWaterRecordedAt: record.highWaterRecordedAt,
+    id: record.id,
+    reason: record.reason,
+    sha256: record.sha256,
+  };
+}
+
+function assertPermission(actor: Actor, permission: Permission) {
+  if (!hasPermission(actor, permission)) {
+    throw new Error("Audit export does not exist.");
+  }
+}
+
+function requiredUuid(value: string) {
+  const normalized = value.trim();
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+      normalized,
+    )
+  ) {
+    throw new AuditEventValidationError("exportId is invalid.");
+  }
+  return normalized;
 }
 
 function normalizedListInput(input: ListAuditEventsInput) {

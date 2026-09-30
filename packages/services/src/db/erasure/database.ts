@@ -176,6 +176,7 @@ export async function eraseAccountDatabaseData(
       union all select 'users.id', count(*) from users where id = ${userId}
       union all select 'audit_event.actor_user_id', count(*) from audit_event where actor_user_id = ${userId}
       union all select 'audit_event.owner_user_id', count(*) from audit_event where owner_user_id = ${userId}
+      union all select 'audit_export.requested_by_user_id', count(*) from audit_export where requested_by_user_id = ${userId}
       union all select 'audit_event.actor_retention', ${targets.auditActorEventIds.length} - count(*) from audit_event where ${inArray(schema.auditEvent.id, numericIds(targets.auditActorEventIds))}
       union all select 'audit_event.owner_retention', ${targets.auditOwnerEventIds.length} - count(*) from audit_event where ${inArray(schema.auditEvent.id, numericIds(targets.auditOwnerEventIds))}
       union all select 'user_settings.user_id', count(*) from user_settings where user_id = ${userId}

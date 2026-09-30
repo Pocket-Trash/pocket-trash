@@ -54,14 +54,20 @@ export type {
   AuditEventCursor,
   AuditEventDefinition,
   AuditEventPage,
+  AuditExportDownload,
+  AuditExportView,
   AuditPayload,
   AuditRedactionContext,
   AuditService,
   AuditWriteInput,
+  CreateAuditExportInput,
+  DownloadAuditExportInput,
   ListAuditEventsInput,
 } from "./audit/index.js";
 export {
   AuditEventValidationError,
+  AuditExportEmptyError,
+  AuditExportInProgressError,
   AuditPayloadTooLargeError,
   createAuditService,
 } from "./audit/index.js";
