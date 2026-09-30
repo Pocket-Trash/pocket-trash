@@ -1,0 +1,209 @@
+// machinedpens — pens, tips and refills, as an extension of the shipped catalog
+//
+// Paste with:  pbcopy < docs/data-model/pen-refills.eraser
+// Companion doc: docs/data-model/pen-refills.md
+//
+// Gray  = already shipped (packages/database/src/schema/collection.ts)
+// Color = proposed, 12 new tables
+//
+// ERASER DOC URL: ____________________________________________
+
+title machinedpens — pens, tips and refills
+
+notation crows-feet
+typeface clean
+styleMode plain
+
+// ─────────────── SHIPPED — nothing here changes ───────────────
+
+product_types [icon: layers, color: gray] {
+  id bigint pk
+  name text            // Pen · Spinner · Spinner Button · Slider · Fountain Pen
+  slug text unique     // add two rows: "pen-tip", "refill"
+}
+
+product [icon: package, color: gray] {
+  id bigint pk
+  product_type_id bigint fk
+  maker_id bigint fk
+  owner_clerk_id text null
+  name text
+  slug text
+  description text null
+  maker_product_url text null
+  is_private boolean
+}
+
+makers [icon: tool, color: gray] {
+  id bigint pk
+  name text
+  root_url text
+}
+
+mechanisms [icon: settings, color: gray] {
+  id bigint pk
+  name text            // Bolt · Click · Switch — more as we work through them
+  slug text unique     // exists, but wired only to tmp_autmog_pens today
+}
+
+collection_item [icon: bookmark, color: gray] {
+  id bigint pk
+  owner_id bigint fk
+  collection_id bigint fk
+  display_name text null
+  material_id bigint fk null
+  purchased_at timestamptz null
+  owned boolean
+}
+
+// ─────────────── NEW — the refill style ───────────────
+
+refill_style [icon: crosshair, color: purple] {
+  id bigint pk
+  name text            // "Parker-style" · "Pilot G2" · "D1"
+  slug text unique
+  reliability text     // reliable | varies
+  note text null
+}
+
+// ─────────────── NEW — the clip kinds ───────────────
+
+clips [icon: paperclip, color: purple] {
+  id bigint pk
+  name text            // Formed · Milled · Clipless
+  slug text unique     // clipless is a ROW, so null means "not recorded yet"
+}
+
+// ─────────────── NEW — milling, at two grains ───────────────
+
+pen_milling [icon: grid, color: purple] {
+  id bigint pk
+  maker_id bigint fk null  // the maker whose word this is; null = genuinely generic
+  name text                // THEIR word: "grip rings", "overlapping ring grip"
+  kind text                // the coarse bucket: rings | lines | knurling |
+                           //   facets | flutes | smooth
+                           // ⚠️ CURATED, never derived from name. Cross-maker
+                           //   filtering happens on kind ONLY — one maker's
+                           //   "grip ring" is another's custom overlapping
+                           //   pattern, so matching on name asserts a
+                           //   sameness that isn't there.
+}
+
+// ─────────────── NEW — three more product subtypes ───────────────
+
+product_pen [icon: edit-3, color: blue] {
+  id bigint pk                     // = product.id
+  mechanism_id bigint fk null      // bolt | click | switch, and growing
+  clip_id bigint fk null           // formed | milled | clipless
+  size text null                   // the maker's own designator, "36"
+  length_mm decimal null
+  diameter_mm decimal null
+  weight_g decimal null
+                                   // NO refill_style_id — the TIP decides that
+}
+
+product_pen_tip [icon: git-commit, color: blue] {
+  id bigint pk                     // = product.id — tips are sold separately
+  refill_style_id bigint fk        // the style lives HERE
+  native_pen_id bigint fk null     // the body it was designed for
+  nose text null                   // "cone" — a tip trait, not a body trait
+  bore_mm decimal null
+}
+
+product_refill [icon: minus, color: blue] {
+  id bigint pk                     // = product.id
+  refill_style_id bigint fk
+  ink_type text                    // ballpoint | gel | rollerball | pressurized
+  tip_size_mm decimal null
+  length_mm decimal null
+  diameter_mm decimal null
+}
+
+product_pen_milling [icon: grid, color: teal] {
+  id bigint pk
+  product_pen_id bigint fk
+  pen_milling_id bigint fk
+}
+
+// ─────────────── NEW — the body + tip pairing ───────────────
+
+pen_tip_option [icon: link, color: teal] {
+  id bigint pk
+  product_pen_id bigint fk
+  product_pen_tip_id bigint fk
+  native boolean                   // true when this is the tip's own body
+  accepts_length_min_mm decimal null   // the window is true of the PAIRING,
+  accepts_length_max_mm decimal null   //   not of the body or tip alone
+  adjustable_length boolean
+}
+
+// ─────────────── NEW — the exceptions, per pairing ───────────────
+
+pen_refill_fit [icon: check-circle, color: orange] {
+  id bigint pk
+  pen_tip_option_id bigint fk      // a body + tip, never a bare pen
+  product_refill_id bigint fk
+  fits boolean
+  reason text null                 // required when fits = false
+  needs_trim boolean
+  trim_note text null              // "trim to Parker ballpoint length"
+  warning text null                // fits, and you shouldn't
+  tested boolean
+  source_url text null
+}
+
+// ─────────────── NEW — the owned side ───────────────
+
+collection_pen [icon: edit-3, color: green] {
+  id bigint pk                     // = collection_item.id
+  pen_tip_option_id bigint fk      // which body + tip you are running
+  installed_refill_id bigint fk null
+}
+
+collection_pen_tip [icon: git-commit, color: green] {
+  id bigint pk                     // = collection_item.id
+  product_pen_tip_id bigint fk     // a spare tip you own
+}
+
+collection_refill [icon: minus, color: green] {
+  id bigint pk                     // = collection_item.id
+  product_refill_id bigint fk
+}
+
+// ─────────────── RELATIONSHIPS ───────────────
+
+product.product_type_id > product_types.id
+
+// subtypes share their parent's primary key
+product_pen.id - product.id
+product_pen_tip.id - product.id
+product_refill.id - product.id
+collection_pen.id - collection_item.id
+collection_pen_tip.id - collection_item.id
+collection_refill.id - collection_item.id
+
+// the style is the default answer, and the tip is what carries it
+product_pen_tip.refill_style_id > refill_style.id
+product_refill.refill_style_id > refill_style.id
+product_pen_tip.native_pen_id > product_pen.id
+
+// browse facets
+product_pen.mechanism_id > mechanisms.id
+product_pen.clip_id > clips.id
+product_pen_milling.product_pen_id > product_pen.id
+product_pen_milling.pen_milling_id > pen_milling.id
+pen_milling.maker_id > makers.id
+
+// which tips go on which bodies
+pen_tip_option.product_pen_id > product_pen.id
+pen_tip_option.product_pen_tip_id > product_pen_tip.id
+
+// exceptions, always against a pairing
+pen_refill_fit.pen_tip_option_id > pen_tip_option.id
+pen_refill_fit.product_refill_id > product_refill.id
+
+// what you own, and what is in it
+collection_pen.pen_tip_option_id > pen_tip_option.id
+collection_pen.installed_refill_id > collection_refill.id
+collection_pen_tip.product_pen_tip_id > product_pen_tip.id
+collection_refill.product_refill_id > product_refill.id
