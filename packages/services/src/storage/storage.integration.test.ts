@@ -370,7 +370,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       service.deleteFile({
         fileType: "collection_image",
         fileId: currentId,
-        actor: { clerkId: "stranger", isAdmin: false },
+        actor: { clerkId: "stranger", role: "user" },
       }),
     ).rejects.toMatchObject({ code: "session_not_found" });
     await Promise.all([
@@ -424,7 +424,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     await service.deleteFile({
       fileType: "collection_image",
       fileId: laterId,
-      actor: { clerkId: "admin", isAdmin: true },
+      actor: { clerkId: "admin", role: "admin" },
     });
     expect(
       (
@@ -450,7 +450,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     await service.deleteFile({
       fileType: "collection_image",
       fileId: replacementId,
-      actor: { clerkId: "admin", isAdmin: true },
+      actor: { clerkId: "admin", role: "admin" },
     });
     expect(
       (
