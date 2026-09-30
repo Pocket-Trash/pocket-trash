@@ -179,11 +179,9 @@ export const scraperRuns = pgTable(
       .notNull(),
   },
   (table) => ({
-    sourceJobStatusIdx: index("scraper_runs_source_job_status_idx").on(
-      table.source,
-      table.jobType,
-      table.status,
-    ),
+    activeSourceJobUnique: uniqueIndex("scraper_runs_active_source_job_unique")
+      .on(table.source, table.jobType)
+      .where(sql`${table.status} = 'running'`),
     startedAtIdx: index("scraper_runs_started_at_idx").on(table.startedAt),
   }),
 );

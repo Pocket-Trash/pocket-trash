@@ -1,6 +1,7 @@
 import {
   createDb,
   type Database,
+  type ScraperRun,
   type ScraperRunStats,
   schema,
 } from "@package/database";
@@ -171,25 +172,48 @@ export async function startScraperRun(
     .limit(1);
 
   if (activeRun) {
-    throw new Error(
-      `Scraper run already active for ${input.source}:${input.jobType}.`,
-    );
+    throw createScraperRunAlreadyActiveError(input);
   }
 
-  const [run] = await db
-    .insert(schema.scraperRuns)
-    .values({
-      jobType: input.jobType,
-      source: input.source,
-      status: "running",
-    })
-    .returning();
+  let run: ScraperRun | undefined;
+  try {
+    [run] = await db
+      .insert(schema.scraperRuns)
+      .values({
+        jobType: input.jobType,
+        source: input.source,
+        status: "running",
+      })
+      .returning();
+  } catch (error) {
+    const databaseError = (
+      error && typeof error === "object" && "cause" in error
+        ? error.cause
+        : error
+    ) as { code?: unknown; constraint?: unknown };
+    if (
+      databaseError.code === "23505" &&
+      databaseError.constraint === "scraper_runs_active_source_job_unique"
+    ) {
+      throw createScraperRunAlreadyActiveError(input);
+    }
+    throw error;
+  }
 
   if (!run) {
     throw new Error("Failed to create scraper run.");
   }
 
   return run;
+}
+
+function createScraperRunAlreadyActiveError(input: {
+  jobType: string;
+  source: string;
+}) {
+  return new Error(
+    `Scraper run already active for ${input.source}:${input.jobType}.`,
+  );
 }
 
 export async function pruneScraperRuns(db: Database, now = new Date()) {

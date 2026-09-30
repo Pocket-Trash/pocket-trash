@@ -148,6 +148,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.8
+        version: 0.5.8
       '@package/eslint':
         specifier: workspace:*
         version: link:../../packages/eslint
