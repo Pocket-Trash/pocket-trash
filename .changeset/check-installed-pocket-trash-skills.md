@@ -1,5 +1,5 @@
 ---
-"pocket-trash.app": patch
+"@app/web": patch
 ---
 
 Keep the Pocket Trash agent skill installation current.
