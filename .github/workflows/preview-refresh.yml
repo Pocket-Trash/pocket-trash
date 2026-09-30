@@ -51,7 +51,7 @@ jobs:
       - name: Run preview migrations
         working-directory: packages/database
         env:
-          DATABASE_URL: ${{ steps.preview_db.outputs.database_url }}
+          DATABASE_URL: ${{ steps.preview_db.outputs.migration_database_url }}
         run: |
           set -euo pipefail
 
