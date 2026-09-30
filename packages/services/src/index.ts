@@ -24,6 +24,11 @@ export type {
   AdminFeedbackSort,
   AdminFeedbackSortField,
   ApprovedErasureExceptionCode,
+  AuditEventDefinition,
+  AuditPayload,
+  AuditRedactionContext,
+  AuditService,
+  AuditWriteInput,
   CatalogColor,
   CatalogFinishOption,
   CatalogImage,
@@ -61,6 +66,9 @@ export type {
 } from "./db/index.js";
 export {
   AccountErasureInProgressError,
+  AuditEventValidationError,
+  AuditPayloadTooLargeError,
+  createAuditService,
   createErasureService,
   createErasureSubjectHmac,
   defaultUserSettings,

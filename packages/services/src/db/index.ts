@@ -1,5 +1,6 @@
 import type { Database } from "@package/database";
 import type { Logger } from "@package/logger";
+import { type AuditService, createAuditService } from "./audit/index.js";
 import {
   type CatalogService,
   type CollectionsService,
@@ -19,6 +20,7 @@ import {
 import { createUsersService, type UsersService } from "./users/index.js";
 
 export type DbServices = {
+  audit: AuditService;
   catalog: CatalogService;
   collections: CollectionsService;
   erasure: ErasureService;
@@ -28,17 +30,32 @@ export type DbServices = {
 };
 
 export function createDbServices(db: Database, logger: Logger): DbServices {
+  const audit = createAuditService();
   const users = createUsersService(db, logger);
 
   return {
+    audit,
     catalog: createCatalogService(db, logger),
     collections: createCollectionsService(db, users, logger),
-    erasure: createErasureService(db, logger),
+    erasure: createErasureService(db, logger, undefined, audit),
     feedback: createFeedbackService(db, logger),
     userSettings: createUserSettingsService(db, users, logger),
     users,
   };
 }
+
+export type {
+  AuditEventDefinition,
+  AuditPayload,
+  AuditRedactionContext,
+  AuditService,
+  AuditWriteInput,
+} from "./audit/index.js";
+export {
+  AuditEventValidationError,
+  AuditPayloadTooLargeError,
+  createAuditService,
+} from "./audit/index.js";
 
 export type {
   CatalogColor,

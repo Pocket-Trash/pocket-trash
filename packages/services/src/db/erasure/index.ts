@@ -10,6 +10,7 @@ import { schema } from "@package/database";
 import type { Logger } from "@package/logger";
 import { loggerMessages } from "@package/logger";
 import { and, asc, eq, inArray, lte, or, sql } from "drizzle-orm";
+import { type AuditService, createAuditService } from "../audit/index.js";
 import {
   DatabaseErasureVerificationError,
   eraseAccountDatabaseData,
@@ -117,6 +118,7 @@ export function createErasureService(
   db: Database,
   logger: Logger,
   now: () => Date = () => new Date(),
+  audit: Pick<AuditService, "redactAccount"> = createAuditService(),
 ) {
   return {
     async assertAccountActive(clerkId: string): Promise<void> {
@@ -226,6 +228,7 @@ export function createErasureService(
         await eraseAccountDatabaseData(
           db,
           requiredValue(targetClerkId, "Subject"),
+          audit,
         );
       } catch (error) {
         if (error instanceof DatabaseErasureVerificationError) {
