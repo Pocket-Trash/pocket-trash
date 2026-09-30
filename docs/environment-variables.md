@@ -16,12 +16,30 @@ the scraper on Railway. Browser logs are forwarded to Axiom through the API.
 | `tools/github/secrets` | GitHub Actions runtime values fetched with OIDC. |
 | `tools/github/infisical-connection` | GitHub repository bootstrap secrets synced from Infisical. |
 
+### Erasure HMAC Secret
+
+Store `ERASURE_HMAC_SECRET` in both `/apps/api` and `/apps/web` for every
+Infisical environment. The two paths must use the same value within an
+environment because both applications create erasure-subject identifiers. Use a
+different value for each environment.
+
+Generate a 256-bit value with:
+
+```sh
+openssl rand -hex 32
+```
+
+Keep the value stable until every erasure receipt created with it has expired.
+Deployed web environments must receive the matching value through Vercel because
+Vercel builds do not read `/apps/web` from Infisical.
+
 ## Web
 
 | Variable | Scope | Notes |
 | --- | --- | --- |
 | `DATABASE_URL` | Server | Postgres connection string. |
 | `CLERK_SECRET_KEY` | Server | Clerk server API key. |
+| `ERASURE_HMAC_SECRET` | Secret | HMAC key for opaque erasure-subject identifiers. Must match the API value for the environment. |
 | `CLERK_PUBLISHABLE_KEY` | Build/client | Aliased to `VITE_CLERK_PUBLISHABLE_KEY` for Vite. |
 | `VITE_CLERK_PUBLISHABLE_KEY` | Client | Clerk browser key. |
 | `VITE_CLERK_SIGN_IN_URL` | Client | Sign-in route. |
@@ -74,7 +92,7 @@ runner exposes the normalized `URL_INITIALS` to child processes.
 | `DATABASE_URL` | Secret | Neon Postgres connection string. GitHub Actions resolves the deployment-specific branch URL. |
 | `CLERK_SECRET_KEY` | Secret | Verifies Clerk bearer tokens. |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | Secret | Verifies Clerk user webhooks. |
-| `ERASURE_HMAC_SECRET` | Secret | HMAC key for opaque erasure-subject identifiers. Use at least 32 characters and keep it stable until every receipt expires. |
+| `ERASURE_HMAC_SECRET` | Secret | HMAC key for opaque erasure-subject identifiers. Must match the web value for the environment. |
 | `URL_INITIALS` | Local server | Normalized developer selector exposed by the Infisical runner. |
 | `BUNNY_API_KEY` | Secret | Bunny account API key for erasure-time Pull Zone checks and exact CDN purges. |
 | `BUNNY_CDN_BASE_URL` | Worker | Public Bunny delivery origin. |
