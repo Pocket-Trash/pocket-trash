@@ -94,6 +94,7 @@ describe("buildInfisicalRunArgs", () => {
 
   it.each([
     ["cron:run"],
+    ["dev"],
     ["process:dead-letter"],
     ["process:queue"],
     ["scrape"],
