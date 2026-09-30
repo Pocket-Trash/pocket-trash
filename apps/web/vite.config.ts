@@ -111,7 +111,7 @@ export default defineConfig(async ({ mode }) => {
       include: ["@clerk/tanstack-react-start", "@clerk/ui/experimental"],
     },
     plugins: [
-      tanstackStart(),
+      tanstackStart({ router: { routeFileIgnorePattern: "\\.test\\." } }),
       ...(isTest ? [] : [nitro()]),
       react(),
       tailwindcss(),

@@ -78,6 +78,7 @@ export type {
   AdminFeedbackSortField,
   FeedbackListItem,
   FeedbackMergeTarget,
+  FeedbackNotificationItem,
   FeedbackPage,
   FeedbackService,
   ListAdminFeedbackOptions,

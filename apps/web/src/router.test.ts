@@ -45,7 +45,17 @@ describe("resource management routes", () => {
   });
 
   it.each([
-    "/admin/resources/trash",
+    "/admin",
+    "/admin/feedback/",
+    "/admin/notifications/feedback",
+    "/admin/notifications/resources",
+    "/admin/trash/",
+    "/admin/trash/catalog-images",
+    "/admin/trash/resources",
+    "/contact",
+    "/notifications",
+    "/privacy",
+    "/terms-of-service",
     "/user/resources/trash",
   ])("registers %s", (fullPath) => {
     expect(
@@ -55,15 +65,22 @@ describe("resource management routes", () => {
     ).toBe(true);
   });
 
+  it("does not register the old resource notification route", () => {
+    expect(
+      Object.values(getRouter().routesById).some(
+        (candidate) => candidate.fullPath === "/admin/resources/notifications",
+      ),
+    ).toBe(false);
+  });
+
   it.each([
-    "/contact",
-    "/privacy",
-    "/terms-of-service",
-  ])("registers the public %s route", (fullPath) => {
+    "/admin/resources/trash",
+    "/admin/catalog-images/trash",
+  ])("does not register the moved route %s", (fullPath) => {
     expect(
       Object.values(getRouter().routesById).some(
         (candidate) => candidate.fullPath === fullPath,
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 });

@@ -34,6 +34,7 @@ export type {
   ErasureService,
   FeedbackListItem,
   FeedbackMergeTarget,
+  FeedbackNotificationItem,
   FeedbackPage,
   FeedbackService,
   ListAdminFeedbackOptions,

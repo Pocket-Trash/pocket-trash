@@ -101,6 +101,17 @@ export type FeedbackMergeTarget = Pick<
   "id" | "status" | "title"
 >;
 
+export type FeedbackNotificationItem = {
+  createdAt: Date;
+  feedbackId: number;
+  id: number;
+  readAt: Date | null;
+  readByUsername: string | null;
+  submitterUsername: string | null;
+  title: string;
+  type: (typeof schema.feedbackNotificationTypes)[number];
+};
+
 export type ListMyFeedbackOptions = {
   offset?: number;
   search?: string;
@@ -143,9 +154,14 @@ export type FeedbackService = {
     submitterClerkId: string,
     options?: ListMyFeedbackOptions,
   ): Promise<FeedbackPage>;
+  listNotifications(): Promise<FeedbackNotificationItem[]>;
   listPending(
     options?: ListAdminFeedbackOptions | number,
   ): Promise<AdminFeedbackPage>;
+  markNotificationRead(
+    notificationId: number,
+    actorClerkId: string,
+  ): Promise<void>;
   mergePending(feedbackId: number, targetId: number): Promise<void>;
   submit(
     input: SubmitFeedbackInput,
@@ -369,6 +385,35 @@ export function createFeedbackService(
       );
     },
 
+    async listNotifications() {
+      return await logger.operation(
+        loggerMessages.database.feedback.listNotifications,
+        async () => {
+          const result = await db.execute<FeedbackNotificationItem>(sql`
+            select
+              feedback_notifications.id,
+              feedback_notifications.type,
+              feedback_notifications.feedback_id as "feedbackId",
+              feedback.title,
+              submitter.username as "submitterUsername",
+              feedback_notifications.created_at as "createdAt",
+              feedback_notifications.read_at as "readAt",
+              reader.username as "readByUsername"
+            from feedback_notifications
+            inner join feedback
+              on feedback.id = feedback_notifications.feedback_id
+            left join users submitter
+              on submitter.clerk_id = feedback.submitter_clerk_id
+            left join users reader
+              on reader.clerk_id = feedback_notifications.read_by_clerk_id
+            order by feedback_notifications.created_at desc,
+              feedback_notifications.id desc
+          `);
+          return result.rows;
+        },
+      );
+    },
+
     async listPending(options = {}) {
       return await logger.operation(
         loggerMessages.database.feedback.listPending,
@@ -378,6 +423,28 @@ export function createFeedbackService(
             "pending",
             typeof options === "number" ? { offset: options } : options,
           ),
+      );
+    },
+
+    async markNotificationRead(notificationId, actorClerkId) {
+      await logger.operation(
+        loggerMessages.database.feedback.markNotificationRead,
+        async () => {
+          assertPositiveInteger(notificationId, "notificationId");
+          const actor = actorClerkId.trim();
+          if (!actor) throw new Error("actorClerkId is required.");
+          await db.execute(sql`
+            update feedback_notifications
+            set read_at = now(), read_by_clerk_id = ${actor}
+            where id = ${notificationId} and read_at is null
+          `);
+        },
+        {
+          attributes: {
+            actorClerkIdHash: hashLogIdentifier(actorClerkId),
+            notificationId,
+          },
+        },
       );
     },
 
@@ -615,12 +682,16 @@ async function listAdminFeedback(
     allowedSorts,
   );
   const statuses =
-    scope === "archive" ? normalizedArchiveStatuses(options.statuses) : [];
+    scope === "archive"
+      ? normalizedArchiveStatuses(options.statuses)
+      : scope === "active"
+        ? normalizedActiveStatuses(options.statuses)
+        : [];
   const statusCondition =
     scope === "pending"
       ? eq(schema.feedback.status, "pending")
       : scope === "active"
-        ? inArray(schema.feedback.status, publicStatuses)
+        ? inArray(schema.feedback.status, statuses)
         : statuses.length > 0
           ? inArray(schema.feedback.status, statuses)
           : notInArray(schema.feedback.status, activeStatuses);
@@ -697,6 +768,17 @@ function normalizedArchiveStatuses(value: FeedbackStatus[] | undefined) {
     statuses.some((status) => !adminFeedbackArchiveStatuses.includes(status))
   ) {
     throw new Error("Invalid feedback archive status.");
+  }
+  return statuses;
+}
+
+function normalizedActiveStatuses(value: FeedbackStatus[] | undefined) {
+  const statuses = value?.length ? value : activeStatuses;
+  if (
+    new Set(statuses).size !== statuses.length ||
+    statuses.some((status) => !activeStatuses.includes(status))
+  ) {
+    throw new Error("Invalid active feedback status.");
   }
   return statuses;
 }

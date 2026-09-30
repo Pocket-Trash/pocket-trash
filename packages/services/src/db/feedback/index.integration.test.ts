@@ -66,6 +66,61 @@ describe("feedback lifecycle", () => {
     }
   }, 30_000);
 
+  it("lists repeated completion notifications and marks one read", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      await migrate(client);
+      const service = createFeedbackService(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      );
+      const feedback = await service.submit({
+        description: "Notify admins about lifecycle changes.",
+        submitterClerkId: "submitter",
+        title: "Feedback notifications",
+      });
+      await db
+        .update(schema.user)
+        .set({ username: "ada" })
+        .where(eq(schema.user.clerkId, "submitter"));
+      await db.insert(schema.user).values({
+        clerkId: "admin",
+        username: "grace",
+      });
+      const completed = await db
+        .insert(schema.feedbackNotifications)
+        .values([
+          { feedbackId: feedback.id, type: "completed" },
+          { feedbackId: feedback.id, type: "completed" },
+        ])
+        .returning();
+
+      expect(
+        (await service.listNotifications()).map(({ type }) => type),
+      ).toEqual(["completed", "completed", "submitted"]);
+
+      const notification = completed[0];
+      if (!notification) throw new Error("Failed to seed notification.");
+      await service.markNotificationRead(notification.id, "admin");
+
+      expect(
+        (await service.listNotifications()).find(
+          ({ id }) => id === notification.id,
+        ),
+      ).toEqual(
+        expect.objectContaining({
+          readAt: expect.anything(),
+          readByUsername: "grace",
+          submitterUsername: "ada",
+        }),
+      );
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("allows only one concurrent submission at the active-request limit", async () => {
     const client = new PGlite();
     const db = drizzle(client, { schema });
@@ -443,7 +498,7 @@ describe("feedback lifecycle", () => {
 
     try {
       await migrate(client);
-      const [lessPopular, morePopular, archived] = await db
+      const [lessPopular, morePopular, pending, archived] = await db
         .insert(schema.feedback)
         .values([
           {
@@ -462,6 +517,13 @@ describe("feedback lifecycle", () => {
           },
           {
             category: "bug",
+            description: "New admin request",
+            status: "pending",
+            submitterClerkId: "pending",
+            title: "Pending request",
+          },
+          {
+            category: "bug",
             description: "Archived search result",
             status: "denied",
             submitterClerkId: "archived",
@@ -469,7 +531,7 @@ describe("feedback lifecycle", () => {
           },
         ])
         .returning();
-      if (!lessPopular || !morePopular || !archived) {
+      if (!lessPopular || !morePopular || !pending || !archived) {
         throw new Error("Failed to seed admin feedback.");
       }
       await db.insert(schema.feedbackVotes).values([
@@ -489,6 +551,9 @@ describe("feedback lifecycle", () => {
       const votesAscending = await service.listAdminActive({
         sort: [{ direction: "asc", field: "votes" }],
       });
+      const planned = await service.listAdminActive({
+        statuses: ["requested", "planned", "in_progress"],
+      });
       const archive = await service.listArchive({ statuses: ["denied"] });
 
       expect(active.items.map(({ id }) => id)).toEqual([
@@ -496,8 +561,13 @@ describe("feedback lifecycle", () => {
         lessPopular.id,
       ]);
       expect(votesAscending.items.map(({ id }) => id)).toEqual([
+        pending.id,
         lessPopular.id,
         morePopular.id,
+      ]);
+      expect(planned.items.map(({ id }) => id)).toEqual([
+        morePopular.id,
+        lessPopular.id,
       ]);
       expect(active.items[0]).not.toHaveProperty("submitterClerkId");
       expect(archive.items).toEqual([
@@ -512,6 +582,9 @@ describe("feedback lifecycle", () => {
           ],
         }),
       ).rejects.toThrow("At most 2 sorts");
+      await expect(
+        service.listAdminActive({ statuses: ["denied"] }),
+      ).rejects.toThrow("Invalid active feedback status");
     } finally {
       await client.close();
     }

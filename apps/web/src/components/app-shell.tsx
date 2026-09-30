@@ -14,14 +14,18 @@ import { updateLocaleSetting } from "@/lib/locale-api";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
-type AppShellProps = {
+export type AppShellProps = {
   breadcrumbItems?: Array<
     | {
         label: string;
         to?:
+          | "/admin"
+          | "/admin/feedback"
+          | "/admin/trash"
           | "/collections"
           | "/help"
           | "/products"
+          | "/notifications"
           | "/user"
           | "/user/account"
           | "/user/collections";
@@ -139,7 +143,12 @@ export function AppShell({
           </div>
         ) : null}
       </header>
-      <div className={cn("flex-1", contained && "[&>*]:mx-auto [&>*]:w-full")}>
+      <div
+        className={cn(
+          "flex flex-1 flex-col",
+          contained && "[&>*]:mx-auto [&>*]:w-full",
+        )}
+      >
         {children}
       </div>
     </div>

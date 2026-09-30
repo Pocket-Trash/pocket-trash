@@ -97,6 +97,7 @@ export const commandSecrets = {
   },
   scraper: {
     "cron:run": scraperCommandSecretConfig,
+    dev: scraperCommandSecretConfig,
     "process:dead-letter": scraperCommandSecretConfig,
     "process:queue": scraperCommandSecretConfig,
     scrape: scraperCommandSecretConfig,

@@ -3,7 +3,7 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { isResourceAdmin, listAdminResourceTrash } from "@/lib/resources";
 import { AdminResourceTrashPage } from "@/pages/resource-trash-page";
 
-export const Route = createFileRoute("/admin/resources/trash")({
+export const Route = createFileRoute("/admin/trash/resources")({
   beforeLoad: async () => {
     if (!(await isResourceAdmin())) throw notFound();
   },
