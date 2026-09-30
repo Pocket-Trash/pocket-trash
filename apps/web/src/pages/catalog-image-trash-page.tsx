@@ -46,13 +46,10 @@ export function CatalogImageTrashPage({
             </div>
             <Button
               onClick={async () => {
-                const reason =
-                  image.targetType === "collection_item"
-                    ? window
-                        .prompt(t("web.resources.moderation.reasonLabel"))
-                        ?.trim()
-                    : undefined;
-                if (image.targetType === "collection_item" && !reason) return;
+                const reason = window
+                  .prompt(t("web.resources.moderation.reasonLabel"))
+                  ?.trim();
+                if (!reason) return;
                 await restoreCatalogImage({
                   data: {
                     imageId: image.id,

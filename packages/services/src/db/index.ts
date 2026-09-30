@@ -2,6 +2,7 @@ import type { Database } from "@package/database";
 import type { Logger } from "@package/logger";
 import { collectionAuditEvents } from "./audit/collections.js";
 import { type AuditService, createAuditService } from "./audit/index.js";
+import { productAuditEvents } from "./audit/products.js";
 import {
   type CatalogService,
   type CollectionsService,
@@ -31,7 +32,10 @@ export type DbServices = {
 };
 
 export function createDbServices(db: Database, logger: Logger): DbServices {
-  const audit = createAuditService(logger, collectionAuditEvents);
+  const audit = createAuditService(logger, [
+    ...collectionAuditEvents,
+    ...productAuditEvents,
+  ]);
   const users = createUsersService(db, logger);
 
   return {

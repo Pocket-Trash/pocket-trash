@@ -189,6 +189,13 @@ function ProductEditor({
       widthMm: initialProduct?.widthMm ?? null,
     },
     onSubmit: async ({ value }) => {
+      const moderating = Boolean(
+        initialProduct?.canAdminister && !initialProduct.isOwner,
+      );
+      const reason = moderating
+        ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
+        : undefined;
+      if (moderating && !reason) return;
       const clientResult = productFormSchema.safeParse(value);
       if (!clientResult.success) {
         setServerErrors(z.flattenError(clientResult.error).fieldErrors);
@@ -201,7 +208,11 @@ function ProductEditor({
         return;
       }
       const result = await saveCatalogProduct({
-        data: { ...value, productId: savedProductId ?? value.productId },
+        data: {
+          ...value,
+          productId: savedProductId ?? value.productId,
+          reason,
+        },
       });
       if (!result.ok) {
         setServerErrors(result.fieldErrors);
@@ -225,12 +236,13 @@ function ProductEditor({
               )
                 return false;
               await restoreCatalogImage({
-                data: { imageId, targetType: "product" },
+                data: { imageId, reason, targetType: "product" },
               });
               return true;
             },
             targetId: result.product.id,
             targetType: "product",
+            reason,
           });
           setImages(uploads.failed);
           if (uploads.failed.length) {
@@ -547,6 +559,14 @@ function ProductEditor({
       />
       {initialProduct ? (
         <CatalogImageEditor
+          getReason={
+            initialProduct.canAdminister && !initialProduct.isOwner
+              ? () =>
+                  window
+                    .prompt(t("web.resources.moderation.reasonLabel"))
+                    ?.trim()
+              : undefined
+          }
           images={existingImages}
           onChange={setExistingImages}
           t={t}

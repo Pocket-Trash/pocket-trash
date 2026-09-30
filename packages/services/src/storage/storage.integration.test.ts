@@ -12,6 +12,7 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { collectionAuditEvents } from "../db/audit/collections.js";
 import { createAuditService } from "../db/audit/index.js";
+import { productAuditEvents } from "../db/audit/products.js";
 import { hashLogIdentifier } from "../logging.js";
 import { createResourcesService } from "../resources/index.js";
 import { selectCollectionCover } from "./image-records.js";
@@ -60,7 +61,10 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     ],
   });
   const service = createStorageService({
-    audit: createAuditService(logger, collectionAuditEvents),
+    audit: createAuditService(logger, [
+      ...collectionAuditEvents,
+      ...productAuditEvents,
+    ]),
     db,
     storage,
     logger,
