@@ -2,15 +2,15 @@
 
 # collection_image
 
-Current and previous cover images for a collection.
+Gallery images for a collection, with at most one selected cover.
 
 ## Columns
 
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `id` | `bigint` | yes | PK |  |  | Internal cover image identifier. | `1000` |
-| `collection_id` | `bigint` | yes | unique, FK |  | `user_collection.id` (on delete cascade) | Collection that owns the cover image. | `1000` |
-| `is_current` | `boolean` | yes |  |  |  | Whether this image is the collection's active cover. | `true` |
+| `id` | `bigint` | yes | PK |  |  | Internal collection gallery image identifier. | `1000` |
+| `collection_id` | `bigint` | yes | unique, FK |  | `user_collection.id` (on delete cascade) | Collection that owns the gallery image. | `1000` |
+| `is_current` | `boolean` | yes |  |  |  | Whether this gallery image is the collection's selected cover. | `true` |
 | `position` | `integer` | yes |  |  |  | Stable upload order within the collection. | `0` |
 | `file_name` | `text` | yes |  |  |  | Original uploaded file name. | `cover.webp` |
 | `content_type` | `text` | yes |  |  |  | Validated image MIME type. | `image/webp` |

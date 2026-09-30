@@ -66,6 +66,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     logger,
   });
   const actor = { clerkId: "storage-test-owner", role: "user" } as const;
+  const admin = { clerkId: "admin", role: "admin" } as const;
   const image = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB9sAAAAASUVORK5CYII=",
     "base64",
@@ -77,6 +78,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       "insert into users(clerk_id) values($1) returning id",
       [actor.clerkId],
     );
+    await pool.query("insert into users(clerk_id) values($1)", [admin.clerkId]);
     const collection = await pool.query(
       "insert into user_collection(owner_id,name,normalized_name) values($1,'Test collection','test collection') returning id",
       [user.rows[0].id],
@@ -306,7 +308,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       }),
     ).rejects.toMatchObject({ code: "invalid_request" });
   });
-  it("uses all three image targets, rejects duplicate/unauthorized sessions, and protects the collection cover", async () => {
+  it("uses all image targets, accepts collection batches, and replaces a deleted cover", async () => {
     const file = await manifest(image, "image", "photo.png", "image/png");
     for (const target of [
       { type: "product", id: productId },
@@ -335,25 +337,139 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
         service.create({ target, files: [file] }, actor),
       ).rejects.toMatchObject({ code: "duplicate_active" });
     }
-    const cover = await pool.query(
-      "select id from collection_image where collection_id=$1",
+    const replacementBytes = new Uint8Array([...image, 0]);
+    const replacementFile = await manifest(
+      replacementBytes,
+      "image",
+      "replacement.png",
+      "image/png",
+    );
+    const galleryBytes = new Uint8Array([...image, 0, 1]);
+    const galleryFile = await manifest(
+      galleryBytes,
+      "image",
+      "gallery.png",
+      "image/png",
+    );
+    const replacementSession = await service.create(
+      {
+        target: { type: "collection", id: collectionId },
+        files: [replacementFile, galleryFile],
+      },
+      actor,
+    );
+    await put(replacementSession, {
+      "gallery.png": galleryBytes,
+      "replacement.png": replacementBytes,
+    });
+    await service.completeUpload(replacementSession.id, actor);
+    const covers = await pool.query(
+      "select id,is_current,position from collection_image where collection_id=$1 order by position desc",
       [collectionId],
     );
-    const id = Number(cover.rows[0].id);
+    const currentId = Number(covers.rows[2].id);
+    const selectedId = Number(covers.rows[1].id);
+    const replacementId = Number(covers.rows[0].id);
+    expect(covers.rows.map(({ is_current }) => is_current)).toEqual([
+      false,
+      false,
+      true,
+    ]);
     await expect(
-      service.deleteFile({ fileType: "collection_image", fileId: id, actor }),
-    ).rejects.toMatchObject({ code: "invalid_request" });
-    await db.transaction((tx) =>
-      selectCollectionCover(tx, { collectionId, imageId: null, actor }),
+      service.deleteFile({
+        fileType: "collection_image",
+        fileId: currentId,
+        actor: { clerkId: "stranger", role: "user" },
+      }),
+    ).rejects.toMatchObject({ code: "session_not_found" });
+    await Promise.all([
+      db.transaction((tx) =>
+        selectCollectionCover(tx, {
+          collectionId,
+          imageId: selectedId,
+          actor,
+        }),
+      ),
+      service.deleteFile({
+        fileType: "collection_image",
+        fileId: currentId,
+        actor,
+      }),
+    ]);
+    const afterConcurrentChange = await pool.query(
+      "select id,is_current,position from collection_image where collection_id=$1 order by position desc",
+      [collectionId],
     );
+    expect(afterConcurrentChange.rows).toEqual([
+      { id: String(replacementId), is_current: false, position: 2 },
+      { id: String(selectedId), is_current: true, position: 1 },
+    ]);
+    const laterBytes = new Uint8Array([...image, 0, 1, 2]);
+    const laterFile = await manifest(
+      laterBytes,
+      "image",
+      "later.png",
+      "image/png",
+    );
+    const laterSession = await service.create(
+      {
+        target: { type: "collection", id: collectionId },
+        files: [laterFile],
+      },
+      actor,
+    );
+    await put(laterSession, { "later.png": laterBytes });
+    await service.completeUpload(laterSession.id, actor);
+    const later = await pool.query(
+      "select id,is_current from collection_image where collection_id=$1 order by position desc",
+      [collectionId],
+    );
+    const laterId = Number(later.rows[0].id);
+    expect(later.rows.map(({ is_current }) => is_current)).toEqual([
+      false,
+      false,
+      true,
+    ]);
     await service.deleteFile({
       fileType: "collection_image",
-      fileId: id,
+      fileId: laterId,
+      actor: admin,
+      reason: "Moderation test",
+    });
+    expect(
+      (
+        await pool.query(
+          "select is_current from collection_image where id=$1",
+          [selectedId],
+        )
+      ).rows[0]?.is_current,
+    ).toBe(true);
+    await service.deleteFile({
+      fileType: "collection_image",
+      fileId: selectedId,
       actor,
     });
     expect(
-      (await pool.query("select id from collection_image where id=$1", [id]))
-        .rowCount,
+      (
+        await pool.query(
+          "select is_current from collection_image where id=$1",
+          [replacementId],
+        )
+      ).rows[0]?.is_current,
+    ).toBe(true);
+    await service.deleteFile({
+      fileType: "collection_image",
+      fileId: replacementId,
+      actor: admin,
+      reason: "Moderation test",
+    });
+    expect(
+      (
+        await pool.query(
+          "select count(*)::int as count from collection_image where collection_id=$1",
+          [collectionId],
+        )
+      ).rows[0]?.count,
     ).toBe(0);
   });
   it("keeps attached objects during expiry cleanup and rejects incorrect file hashes", async () => {
@@ -651,6 +767,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
           (event) =>
             event.message ===
               `${loggerMessages.database.storage.deleteFile}.${outcome}` &&
+            event.attributes?.fileType === "product_image" &&
             event.attributes?.fileIdHash === hashLogIdentifier(String(row.id)),
         )?.attributes,
       ).toMatchObject({

@@ -37,9 +37,12 @@ const meta = {
       clear: "Clear cover",
       clearConfirmation: "Clear the current cover?",
       current: "Current cover",
-      delete: "Delete cover",
-      deleteConfirmation: "Permanently delete this cover?",
-      history: "Previous covers",
+      delete: "Delete image",
+      deleteConfirmation: "Permanently delete this image?",
+      history: "Gallery",
+      nextPage: "Next page",
+      pageStatus: (page, pageCount) => `Page ${page} of ${pageCount}`,
+      previousPage: "Previous page",
       select: "Use this cover",
     },
     onClear: fn(),
@@ -82,8 +85,53 @@ export const ConfirmDelete: Story = {
     window.confirm = fn(() => true);
   },
   play: async ({ args, canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "Delete cover" }));
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Delete image three.webp" }),
+    );
     await expect(args.onDelete).toHaveBeenCalledWith(previous);
+  },
+};
+
+export const ConfirmDeleteCurrent: Story = {
+  beforeEach: () => {
+    window.confirm = fn(() => true);
+  },
+  play: async ({ args, canvas, userEvent }) => {
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Delete image one.webp" }),
+    );
+    await expect(args.onDelete).toHaveBeenCalledWith(current);
+  },
+};
+
+export const Paginated: Story = {
+  args: {
+    collection: {
+      ...collection,
+      coverImages: [
+        current,
+        previous,
+        ...Array.from({ length: 13 }, (_, index) =>
+          image(
+            1002 + index,
+            `image-${index + 2}.webp`,
+            index + 2,
+            previous.url,
+          ),
+        ),
+      ],
+    },
+  },
+  play: async ({ canvas, userEvent }) => {
+    await expect(canvas.getByText("Page 1 of 2")).toBeVisible();
+    await expect(
+      canvas.queryByRole("button", { name: "Delete image image-2.webp" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Next page" }));
+    await expect(canvas.getByText("Page 2 of 2")).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "Delete image image-2.webp" }),
+    ).toBeVisible();
   },
 };
 

@@ -591,8 +591,11 @@ export function createStorageService(input: {
         );
         if (!current.rows.length)
           throw new UploadSessionError("session_not_found", 404);
-        if (current.rows[0]?.isCurrent)
-          throw new UploadSessionError("invalid_request", 400);
+        const replacement = current.rows[0]?.isCurrent
+          ? await tx.execute<{ id: number }>(
+              sql`select id from collection_image where collection_id = ${file.targetId} and id <> ${fileId} order by position desc, id desc limit 1`,
+            )
+          : null;
         if (fileType === "resource_image" || fileType === "resource_file") {
           const count = await tx.execute<{ count: number }>(
             sql`select count(*)::int as count from ${sql.identifier(mapping.table)} where ${sql.identifier(mapping.column)} = ${fileType === "resource_file" ? file.versionId : file.targetId}`,
@@ -604,7 +607,14 @@ export function createStorageService(input: {
         await tx.execute(
           sql`delete from ${sql.identifier(mapping.table)} where id = ${fileId}`,
         );
+        if (replacement?.rows[0])
+          await tx.execute(
+            sql`update collection_image set is_current = true where id = ${replacement.rows[0].id}`,
+          );
         if (fileType === "collection_image") {
+          await tx.execute(
+            sql`update user_collection set updated_at = now() where id = ${file.targetId}`,
+          );
           if (!audit) throw new Error("Collection audit is not configured.");
           const [actorUser] = await tx
             .select({ id: schema.user.id, username: schema.user.username })
