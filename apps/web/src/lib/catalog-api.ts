@@ -8,9 +8,10 @@ import type {
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
+import { hasPermission } from "@package/services/authorization";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { activeAuth as auth } from "@/lib/auth";
+import { getActor, requireActor, requirePermission } from "@/lib/authorization";
 import {
   nextAvailableSlug,
   normalizeOptionalUrl,
@@ -19,9 +20,16 @@ import {
   slugPattern,
 } from "./catalog";
 import { getResourceViewer } from "./resources";
-import { localizedServerError } from "./server-errors";
 
 const requiredMessage = "web.catalog.error.required";
+
+export const isCatalogAdmin = createServerFn().handler(async () => {
+  const actor = await getActor();
+  return (
+    hasPermission(actor, "products.manage") ||
+    hasPermission(actor, "collections.manage")
+  );
+});
 const urlMessage = "web.catalog.error.url";
 
 const productTypeSchema = z.enum(["spinner", "spinner-button"]);
@@ -439,7 +447,7 @@ export const getCatalogProductDetail = createServerFn({ method: "GET" })
 export const createCatalogMaker = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
-    const actor = await requireActor();
+    const actor = await requirePermission("products.manage");
     const parsed = makerSchema.safeParse(data);
     if (!parsed.success) return validationFailure(parsed.error);
 
@@ -459,7 +467,7 @@ export const createCatalogMaker = createServerFn({ method: "POST" })
 export const createCatalogMaterial = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
-    const actor = await requireActor();
+    const actor = await requirePermission("products.manage");
     const parsed = materialSchema.safeParse(data);
     if (!parsed.success) return validationFailure(parsed.error);
 
@@ -484,7 +492,7 @@ export const createCatalogMaterial = createServerFn({ method: "POST" })
 export const createCatalogFinish = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }): Promise<CatalogLookupMutationResult<"finish">> => {
-    const actor = await requireActor();
+    const actor = await requirePermission("products.manage");
     const parsed = finishSchema.safeParse(data);
     if (!parsed.success) return validationFailure(parsed.error);
 
@@ -511,7 +519,7 @@ export const createCatalogColor = createServerFn({ method: "POST" })
     async ({
       data,
     }): Promise<CatalogLookupMutationResult<"color", CatalogColor>> => {
-      const actor = await requireActor();
+      const actor = await requirePermission("products.manage");
       const parsed = colorSchema.safeParse(data);
       if (!parsed.success) return validationFailure(parsed.error);
 
@@ -568,8 +576,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     );
     const slug = nextAvailableSlug(parsed.data.name, slugs);
     const input: ProductWriteInput = {
-      actorClerkId: actor.clerkId,
-      actorIsAdmin: actor.isAdmin,
+      actor,
       description: parsed.data.description,
       finishOptions: parsed.data.finishOptions.map(
         ({ colorEffectId, colorIds, finishIds }) => ({
@@ -673,11 +680,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
               newCollection: parsed.data.newCollection,
               productId: parsed.data.productId,
             });
-      const item = await s.db.collections.getOwnedItem(
-        actor.clerkId,
-        collectionItemId,
-        actor.isAdmin,
-      );
+      const item = await s.db.collections.getOwnedItem(actor, collectionItemId);
       if (!item) throw new Error("Failed to load collection item.");
       return {
         collectionId: item.collectionId,
@@ -748,15 +751,10 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
 
 export const getUserCollection = createServerFn({ method: "GET" }).handler(
   async () => {
-    const actorClerkId = await requireActor();
+    const actor = await requireActor();
     const { s } = await import("@/lib/services");
     return await Promise.all(
-      (
-        await s.db.collections.listOwned(
-          actorClerkId.clerkId,
-          actorClerkId.isAdmin,
-        )
-      ).map(signCollectionItem),
+      (await s.db.collections.listOwned(actor)).map(signCollectionItem),
     );
   },
 );
@@ -766,7 +764,7 @@ export const getUserCollections = createServerFn({ method: "GET" }).handler(
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
     return await signCollectionSummaries(
-      await s.db.collections.listOwnedCollections(actor.clerkId, actor.isAdmin),
+      await s.db.collections.listOwnedCollections(actor),
     );
   },
 );
@@ -776,10 +774,7 @@ export const getCollectionAddContext = createServerFn({
 }).handler(async () => {
   const actor = await requireActor();
   const { s } = await import("@/lib/services");
-  const collections = await s.db.collections.listOwnedCollections(
-    actor.clerkId,
-    actor.isAdmin,
-  );
+  const collections = await s.db.collections.listOwnedCollections(actor);
   let defaultCollectionName: string | null = null;
   let syncIncomplete = false;
   if (collections.length === 0) {
@@ -806,16 +801,8 @@ export const getUserCollectionById = createServerFn({ method: "GET" })
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
     const [collection, items] = await Promise.all([
-      s.db.collections.getOwnedCollection(
-        actor.clerkId,
-        data.collectionId,
-        actor.isAdmin,
-      ),
-      s.db.collections.listOwned(
-        actor.clerkId,
-        actor.isAdmin,
-        data.collectionId,
-      ),
+      s.db.collections.getOwnedCollection(actor, data.collectionId),
+      s.db.collections.listOwned(actor, data.collectionId),
     ]);
     if (!collection) return null;
     const [signedCollection] = await signCollectionSummaries([collection]);
@@ -882,8 +869,7 @@ export const saveCollection = createServerFn({ method: "POST" })
       const collection = parsed.data.collectionId
         ? await s.db.collections.updateCollection({
             ...parsed.data,
-            actorClerkId: actor.clerkId,
-            actorIsAdmin: actor.isAdmin,
+            actor,
             collectionId: parsed.data.collectionId,
           })
         : await s.db.collections.createCollection({
@@ -910,11 +896,7 @@ export const getUserCollectionSummary = createServerFn({
   .handler(async ({ data }) => {
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
-    return await s.db.collections.getOwnedCollection(
-      actor.clerkId,
-      data.collectionId,
-      actor.isAdmin,
-    );
+    return await s.db.collections.getOwnedCollection(actor, data.collectionId);
   });
 
 export const getCollectionEditData = createServerFn({ method: "GET" })
@@ -922,12 +904,11 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
     z.object({ collectionItemId: idSchema }).parse(input),
   )
   .handler(async ({ data }) => {
-    const actorClerkId = await requireActor();
+    const actor = await requireActor();
     const { s } = await import("@/lib/services");
     const item = await s.db.collections.getOwnedItem(
-      actorClerkId.clerkId,
+      actor,
       data.collectionItemId,
-      actorClerkId.isAdmin,
     );
     if (!item) {
       return {
@@ -939,15 +920,12 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
       };
     }
     const [items, products, buttonProducts, collections] = await Promise.all([
-      s.db.collections.listOwned(actorClerkId.clerkId, actorClerkId.isAdmin),
-      s.db.catalog.listProducts(item.productTypeSlug, actorClerkId),
+      s.db.collections.listOwned(actor),
+      s.db.catalog.listProducts(item.productTypeSlug, actor),
       item.productTypeSlug === "spinner"
-        ? s.db.catalog.listProducts("spinner-button", actorClerkId)
+        ? s.db.catalog.listProducts("spinner-button", actor)
         : Promise.resolve([]),
-      s.db.collections.listOwnedCollections(
-        actorClerkId.clerkId,
-        actorClerkId.isAdmin,
-      ),
+      s.db.collections.listOwnedCollections(actor),
     ]);
     return {
       buttonProducts,
@@ -968,15 +946,14 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
 export const updateCollectionItem = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireActor();
+    const actor = await requireActor();
     const parsed = collectionEditSchema.safeParse(data);
     if (!parsed.success) return validationFailure(parsed.error);
 
     const { s } = await import("@/lib/services");
     try {
       await s.db.collections.updateItem({
-        actorClerkId: actorClerkId.clerkId,
-        actorIsAdmin: actorClerkId.isAdmin,
+        actor,
         ...parsed.data,
         customFinish: parsed.data.customFinish
           ? toFinishWriteOption(parsed.data.customFinish)
@@ -1009,8 +986,7 @@ export const softDeleteCatalogImage = createServerFn({ method: "POST" })
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
     await s.db.catalog.softDeleteImage({
-      actorClerkId: actor.clerkId,
-      actorIsAdmin: actor.isAdmin,
+      actor,
       ...data,
     });
   });
@@ -1028,8 +1004,7 @@ export const restoreCatalogImage = createServerFn({ method: "POST" })
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
     await s.db.catalog.restoreImage({
-      actorClerkId: actor.clerkId,
-      actorIsAdmin: actor.isAdmin,
+      actor,
       ...data,
     });
   });
@@ -1039,10 +1014,7 @@ export const listCatalogImageTrash = createServerFn({ method: "GET" }).handler(
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
     return await signCatalogImageUrls(
-      await s.db.catalog.listImageTrash({
-        actorClerkId: actor.clerkId,
-        actorIsAdmin: actor.isAdmin,
-      }),
+      await s.db.catalog.listImageTrash({ actor }),
     );
   },
 );
@@ -1061,8 +1033,7 @@ export const setProductVisibility = createServerFn({ method: "POST" })
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
     await s.db.catalog.setVisibility({
-      actorClerkId: actor.clerkId,
-      actorIsAdmin: actor.isAdmin,
+      actor,
       ...data,
     });
   });
@@ -1081,8 +1052,7 @@ export const setCollectionVisibility = createServerFn({ method: "POST" })
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
     await s.db.collections.setCollectionVisibility({
-      actorClerkId: actor.clerkId,
-      actorIsAdmin: actor.isAdmin,
+      actor,
       ...data,
     });
   });
@@ -1101,8 +1071,7 @@ export const setCollectionItemVisibility = createServerFn({ method: "POST" })
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
     await s.db.collections.setItemVisibility({
-      actorClerkId: actor.clerkId,
-      actorIsAdmin: actor.isAdmin,
+      actor,
       ...data,
     });
   });
@@ -1145,15 +1114,6 @@ async function listMaterials() {
 async function listProductTypes() {
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listProductTypes();
-}
-
-async function requireActor(): Promise<{ clerkId: string; isAdmin: boolean }> {
-  const { isAuthenticated, sessionClaims, userId } = await auth();
-  if (!isAuthenticated || !userId) throw localizedServerError("error.generic");
-  return {
-    clerkId: userId,
-    isAdmin: (sessionClaims as { role?: unknown } | null)?.role === "admin",
-  };
 }
 
 function validationFailure(error: z.ZodError) {

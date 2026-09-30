@@ -12,6 +12,11 @@ import { describe, expect, it, vi } from "vitest";
 import { hashLogIdentifier } from "../logging.js";
 import { canViewResource, createResourcesService } from "./index.js";
 
+const actor = (
+  clerkId: string,
+  role: "user" | "admin" | "system_admin" = "user",
+) => ({ clerkId, role }) as const;
+
 function captureLogger(events: LogEvent[]) {
   const transport: LogTransport = {
     log(event) {
@@ -33,28 +38,15 @@ describe("resources service", () => {
       uploaderClerkId: "user_owner",
     };
 
-    expect(canViewResource({ ...privateResource, isPrivate: false }, {})).toBe(
+    expect(canViewResource({ ...privateResource, isPrivate: false })).toBe(
       true,
     );
-    expect(canViewResource(privateResource, {})).toBe(false);
-    expect(
-      canViewResource(privateResource, {
-        clerkId: "user_other",
-        isAdmin: false,
-      }),
-    ).toBe(false);
-    expect(
-      canViewResource(privateResource, {
-        clerkId: "user_owner",
-        isAdmin: false,
-      }),
-    ).toBe(true);
-    expect(
-      canViewResource(privateResource, {
-        clerkId: "admin_123",
-        isAdmin: true,
-      }),
-    ).toBe(true);
+    expect(canViewResource(privateResource)).toBe(false);
+    expect(canViewResource(privateResource, actor("user_other"))).toBe(false);
+    expect(canViewResource(privateResource, actor("user_owner"))).toBe(true);
+    expect(canViewResource(privateResource, actor("admin_123", "admin"))).toBe(
+      true,
+    );
   });
 
   it("rejects duplicate filenames case-insensitively before upload", async () => {
@@ -67,6 +59,7 @@ describe("resources service", () => {
 
     await expect(
       service.create({
+        actor: actor("user_123"),
         categories: ["3D printing"],
         description: "A useful clip.",
         files: [
@@ -89,7 +82,6 @@ describe("resources service", () => {
           },
         ],
         name: "Pocket clip",
-        uploaderClerkId: "user_123",
       }),
     ).rejects.toThrow("invalid_request");
     expect(upload).not.toHaveBeenCalled();
@@ -128,7 +120,7 @@ describe("resources service", () => {
     );
 
     await expect(
-      service.downloadFile(1000, 1002, { clerkId: "user_123" }),
+      service.downloadFile(1000, 1002, actor("user_123")),
     ).resolves.toBe(
       "https://cdn.example.test/resources/dev/file.stl?token=signed",
     );
@@ -410,7 +402,7 @@ describe("resources service", () => {
     );
 
     await expect(
-      service.getDetail(1000, { clerkId: "user_other" }),
+      service.getDetail(1000, actor("user_other")),
     ).resolves.toBeNull();
     expect(select).toHaveBeenCalledTimes(1);
   });
@@ -564,24 +556,21 @@ describe("resources service", () => {
 
     await expect(
       service.setVisibility({
-        actorClerkId: "user_123",
-        actorIsAdmin: false,
+        actor: actor("user_123"),
         isPublic: true,
         resourceId: 1000,
       }),
     ).rejects.toThrow("Resource visibility update is not allowed.");
     await expect(
       service.setVisibility({
-        actorClerkId: "user_123",
-        actorIsAdmin: false,
+        actor: actor("user_123"),
         isPublic: false,
         resourceId: 1000,
       }),
     ).rejects.toThrow("Resource visibility update is not allowed.");
     await expect(
       service.setVisibility({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
+        actor: actor("admin_123", "admin"),
         isPublic: true,
         resourceId: 1000,
       }),
@@ -615,8 +604,7 @@ describe("resources service", () => {
 
     await expect(
       service.update({
-        actorClerkId: "user_other",
-        actorIsAdmin: false,
+        actor: actor("user_other"),
         categories: ["3D printing"],
         description: "Updated.",
         images: [],
@@ -656,8 +644,7 @@ describe("resources service", () => {
 
     await expect(
       service.update({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
+        actor: actor("admin_123", "admin"),
         categories: ["3D printing"],
         description: "Updated.",
         images: [],
@@ -726,8 +713,7 @@ describe("resources service", () => {
 
     await expect(
       service.update({
-        actorClerkId: "user_123",
-        actorIsAdmin: false,
+        actor: actor("user_123"),
         categories: ["3D printing"],
         description: "Updated description.",
         images: [
@@ -774,22 +760,19 @@ describe("resources service", () => {
 
     await expect(
       service.softDelete({
-        actorClerkId: "user_owner",
-        actorIsAdmin: false,
+        actor: actor("user_owner"),
         resourceId: 1000,
       }),
     ).resolves.toEqual({ deletedByRole: "owner" });
     await expect(
       service.softDelete({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
+        actor: actor("admin_123", "admin"),
         resourceId: 1001,
       }),
     ).resolves.toEqual({ deletedByRole: "admin" });
     await expect(
       service.softDelete({
-        actorClerkId: "user_other",
-        actorIsAdmin: false,
+        actor: actor("user_other"),
         resourceId: 1001,
       }),
     ).rejects.toThrow("Resource deletion is not allowed.");
@@ -827,8 +810,7 @@ describe("resources service", () => {
       createNoopLogger(),
     );
     await service.permanentlyDelete({
-      actorClerkId: "admin",
-      actorIsAdmin: true,
+      actor: actor("admin", "system_admin"),
       resourceId: 1000,
     });
     expect(transaction).toHaveBeenCalledOnce();
@@ -864,16 +846,14 @@ describe("resources service", () => {
     );
     await expect(
       service.permanentlyDelete({
-        actorClerkId: "owner",
-        actorIsAdmin: false,
+        actor: actor("owner"),
         resourceId: 1000,
       }),
     ).rejects.toThrow("requires an admin");
     expect(transaction).not.toHaveBeenCalled();
     await expect(
       service.permanentlyDelete({
-        actorClerkId: "admin",
-        actorIsAdmin: true,
+        actor: actor("admin", "system_admin"),
         resourceId: 1000,
       }),
     ).rejects.toThrow("must be soft-deleted");
@@ -896,8 +876,7 @@ describe("resources service", () => {
     );
     await expect(
       service.permanentlyDelete({
-        actorClerkId: "admin_private",
-        actorIsAdmin: true,
+        actor: actor("admin_private", "system_admin"),
         resourceId: 1000,
       }),
     ).rejects.toBe(failure);
@@ -927,22 +906,19 @@ describe("resources service", () => {
 
     await expect(
       service.restore({
-        actorClerkId: "user_owner",
-        actorIsAdmin: false,
+        actor: actor("user_owner"),
         resourceId: 1000,
       }),
     ).resolves.toBeUndefined();
     await expect(
       service.restore({
-        actorClerkId: "user_other",
-        actorIsAdmin: false,
+        actor: actor("user_other"),
         resourceId: 1001,
       }),
     ).rejects.toThrow("Resource restoration is not allowed.");
     await expect(
       service.restore({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
+        actor: actor("admin_123", "admin"),
         resourceId: 1001,
       }),
     ).resolves.toBeUndefined();

@@ -1,31 +1,29 @@
 import type { ResourceTrashItem } from "@package/services";
+import { hasPermission } from "@package/services/authorization";
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createServerFn } from "@tanstack/react-start";
 import { activeAuth as auth } from "@/lib/auth";
+import { getActor, requireActor, requirePermission } from "@/lib/authorization";
 
 type ResourceIdInput = { resourceId: number };
 type ResourceDownloadInput = ResourceIdInput & { fileId: number };
 type ResourceVersionDownloadInput = ResourceIdInput & { versionId: number };
 
-type SessionClaimsWithRole = {
-  role?: unknown;
-};
-
-export const isResourceAdmin = createServerFn().handler(async () => {
-  return (await getResourceViewer()).isAdmin;
+export const canManageResources = createServerFn().handler(async () => {
+  return hasPermission(await getResourceViewer(), "resources.manage");
 });
 
 export const createResource = createServerFn({ method: "POST" })
   .validator(parseResourceUpload)
   .handler(async ({ data }) => {
-    const userId = await requireResourceUploader();
+    const actor = await requireResourceUploader();
     const { s } = await import("@/lib/services");
 
     return await s.resources.create({
       ...data,
       files: await Promise.all(data.files.map(toUploadInput)),
       images: await Promise.all(data.images.map(toUploadInput)),
-      uploaderClerkId: userId,
+      actor,
     });
   });
 
@@ -39,9 +37,11 @@ export const getResourceDetail = createServerFn({ method: "GET" })
     const { uploaderClerkId, ...browserDetail } = detail;
     return {
       ...browserDetail,
-      canAdminister: viewer.isAdmin,
-      canEdit: viewer.isAdmin || uploaderClerkId === viewer.clerkId,
-      isOwner: uploaderClerkId === viewer.clerkId,
+      canAdminister: hasPermission(viewer, "resources.manage"),
+      canEdit:
+        uploaderClerkId === viewer?.clerkId ||
+        hasPermission(viewer, "resources.manage"),
+      isOwner: uploaderClerkId === viewer?.clerkId,
     };
   });
 
@@ -49,15 +49,16 @@ export const getEditableResourceDetail = createServerFn({ method: "GET" })
   .validator(parseResourceId)
   .handler(async ({ data }) => {
     const viewer = await getResourceViewer();
-    if (!viewer.clerkId) throw invalidResourceRequest();
+    if (!viewer) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     const detail = await s.resources.getDetail(data.resourceId, viewer);
     if (!detail) return null;
     const { uploaderClerkId, ...browserDetail } = detail;
-    return viewer.isAdmin || uploaderClerkId === viewer.clerkId
+    return uploaderClerkId === viewer.clerkId ||
+      hasPermission(viewer, "resources.manage")
       ? {
           ...browserDetail,
-          canAdminister: viewer.isAdmin,
+          canAdminister: hasPermission(viewer, "resources.manage"),
           isOwner: uploaderClerkId === viewer.clerkId,
         }
       : null;
@@ -66,14 +67,12 @@ export const getEditableResourceDetail = createServerFn({ method: "GET" })
 export const getOwnedResourceDetail = createServerFn({ method: "GET" })
   .validator(parseResourceId)
   .handler(async ({ data }) => {
-    const userId = await requireResourceUploader();
+    const actor = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    const detail = await s.resources.getDetail(data.resourceId, {
-      clerkId: userId,
-    });
+    const detail = await s.resources.getDetail(data.resourceId, actor);
     if (!detail) return null;
     const { uploaderClerkId, ...browserDetail } = detail;
-    if (uploaderClerkId !== userId) return null;
+    if (uploaderClerkId !== actor.clerkId) return null;
     return browserDetail;
   });
 
@@ -108,7 +107,9 @@ export const listResourceDirectory = createServerFn({ method: "GET" })
       resources: directory.resources.map(
         ({ uploaderClerkId, ...resource }) => ({
           ...resource,
-          canEdit: viewer.isAdmin || uploaderClerkId === viewer.clerkId,
+          canEdit:
+            uploaderClerkId === viewer?.clerkId ||
+            hasPermission(viewer, "resources.manage"),
         }),
       ),
     };
@@ -116,22 +117,20 @@ export const listResourceDirectory = createServerFn({ method: "GET" })
 
 export const listOwnedResources = createServerFn({ method: "GET" }).handler(
   async () => {
-    const userId = await requireResourceUploader();
+    const actor = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    const directory = await s.resources.listDirectory([], {
-      clerkId: userId,
-    });
+    const directory = await s.resources.listDirectory([], actor);
     return directory.resources.flatMap(({ uploaderClerkId, ...resource }) =>
-      uploaderClerkId === userId ? [{ ...resource, canEdit: true }] : [],
+      uploaderClerkId === actor.clerkId ? [{ ...resource, canEdit: true }] : [],
     );
   },
 );
 
 export const listOwnerResourceTrash = createServerFn({ method: "GET" }).handler(
   async (): Promise<ResourceTrashItem[]> => {
-    const userId = await requireResourceUploader();
+    const actor = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    return await s.resources.listOwnerTrash(userId);
+    return await s.resources.listOwnerTrash(actor.clerkId);
   },
 );
 
@@ -154,29 +153,28 @@ export const listResourceNotifications = createServerFn({
 export const markResourceNotificationRead = createServerFn({ method: "POST" })
   .validator(parseNotificationId)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireResourceAdmin();
+    const actor = await requireResourceAdmin();
     const { s } = await import("@/lib/services");
-    await s.resources.markNotificationRead(data.notificationId, actorClerkId);
+    await s.resources.markNotificationRead(data.notificationId, actor.clerkId);
   });
 
 export const markResourcePrivate = createServerFn({ method: "POST" })
   .validator(parseMarkPrivate)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireResourceAdmin();
+    const actor = await requireResourceAdmin();
     const { s } = await import("@/lib/services");
-    await s.resources.markPrivate({ ...data, actorClerkId });
+    await s.resources.markPrivate({ ...data, actorClerkId: actor.clerkId });
   });
 
 export const setResourceVisibility = createServerFn({ method: "POST" })
   .validator(parseResourceVisibility)
   .handler(async ({ data }) => {
     const viewer = await getResourceViewer();
-    if (!viewer.clerkId) throw invalidResourceRequest();
+    if (!viewer) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     await s.resources.setVisibility({
       ...data,
-      actorClerkId: viewer.clerkId,
-      actorIsAdmin: viewer.isAdmin,
+      actor: viewer,
     });
   });
 
@@ -184,11 +182,10 @@ export const softDeleteResource = createServerFn({ method: "POST" })
   .validator(parseResourceId)
   .handler(async ({ data }) => {
     const viewer = await getResourceViewer();
-    if (!viewer.clerkId) throw invalidResourceRequest();
+    if (!viewer) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     return await s.resources.softDelete({
-      actorClerkId: viewer.clerkId,
-      actorIsAdmin: viewer.isAdmin,
+      actor: viewer,
       resourceId: data.resourceId,
     });
   });
@@ -196,11 +193,10 @@ export const softDeleteResource = createServerFn({ method: "POST" })
 export const permanentlyDeleteResource = createServerFn({ method: "POST" })
   .validator(parseResourceId)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireResourceAdmin();
+    const actor = await requirePermission("resources.purge");
     const { s } = await import("@/lib/services");
     await s.resources.permanentlyDelete({
-      actorClerkId,
-      actorIsAdmin: true,
+      actor,
       resourceId: data.resourceId,
     });
   });
@@ -209,11 +205,10 @@ export const restoreResource = createServerFn({ method: "POST" })
   .validator(parseResourceId)
   .handler(async ({ data }) => {
     const viewer = await getResourceViewer();
-    if (!viewer.clerkId) throw invalidResourceRequest();
+    if (!viewer) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     await s.resources.restore({
-      actorClerkId: viewer.clerkId,
-      actorIsAdmin: viewer.isAdmin,
+      actor: viewer,
       resourceId: data.resourceId,
     });
   });
@@ -222,12 +217,11 @@ export const updateResource = createServerFn({ method: "POST" })
   .validator(parseResourceUpdate)
   .handler(async ({ data }) => {
     const viewer = await getResourceViewer();
-    if (!viewer.clerkId) throw invalidResourceRequest();
+    if (!viewer) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     return await s.resources.update({
       ...data,
-      actorClerkId: viewer.clerkId,
-      actorIsAdmin: viewer.isAdmin,
+      actor: viewer,
       images: await Promise.all(data.images.map(toUploadInput)),
     });
   });
@@ -235,12 +229,12 @@ export const updateResource = createServerFn({ method: "POST" })
 export const uploadResourceVersion = createServerFn({ method: "POST" })
   .validator(parseResourceVersionUpload)
   .handler(async ({ data }) => {
-    const userId = await requireResourceUploader();
+    const actor = await requireResourceUploader();
     const { s } = await import("@/lib/services");
     return await s.resources.addVersion({
       files: await Promise.all(data.files.map(toUploadInput)),
       resourceId: data.resourceId,
-      uploaderClerkId: userId,
+      actor,
     });
   });
 
@@ -283,29 +277,15 @@ export const downloadResourceVersion = createServerFn({ method: "POST" })
   });
 
 export async function getResourceViewer(getAuth: typeof auth = auth) {
-  const { isAuthenticated, sessionClaims, userId } = await getAuth();
-  return {
-    clerkId: isAuthenticated && userId ? userId : undefined,
-    isAdmin: isAuthenticated && getRole(sessionClaims) === "admin",
-  };
+  return await getActor(getAuth);
 }
 
-export async function requireResourceUploader(
-  getAuth: typeof auth = auth,
-): Promise<string> {
-  const { isAuthenticated, userId } = await getAuth();
-  if (!isAuthenticated || !userId) throw invalidResourceRequest();
-  return userId;
+export async function requireResourceUploader(getAuth: typeof auth = auth) {
+  return await requireActor(getAuth);
 }
 
-export async function requireResourceAdmin(
-  getAuth: typeof auth = auth,
-): Promise<string> {
-  const { isAuthenticated, sessionClaims, userId } = await getAuth();
-  if (!isAuthenticated || !userId || getRole(sessionClaims) !== "admin") {
-    throw invalidResourceRequest();
-  }
-  return userId;
+export async function requireResourceAdmin(getAuth: typeof auth = auth) {
+  return await requirePermission("resources.manage", getAuth);
 }
 
 export function parseResourceUpload(input: unknown) {
@@ -450,11 +430,6 @@ export function parseResourceVisibility(input: unknown) {
   const isPublic = (input as { isPublic?: unknown }).isPublic;
   if (typeof isPublic !== "boolean") throw invalidResourceRequest();
   return { isPublic, resourceId };
-}
-
-function getRole(sessionClaims: unknown): string | undefined {
-  const claims = sessionClaims as SessionClaimsWithRole | null | undefined;
-  return typeof claims?.role === "string" ? claims.role : undefined;
 }
 
 async function toUploadInput(file: File) {

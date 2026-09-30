@@ -1,5 +1,9 @@
 import { useAuth, useClerk, useUser } from "@clerk/tanstack-react-start";
 import {
+  hasStaffPermission,
+  normalizeActor,
+} from "@package/services/authorization";
+import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
@@ -28,7 +32,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/providers/locale-provider";
 
 export function UserMenu() {
-  const { sessionClaims } = useAuth();
+  const { sessionClaims, userId } = useAuth();
   const clerk = useClerk();
   const { locale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
@@ -92,7 +96,9 @@ export function UserMenu() {
           <User />
           {t("web.navigation.account")}
         </DropdownMenuItem>
-        {sessionClaims?.role === "admin" ? (
+        {hasStaffPermission(
+          userId ? normalizeActor(userId, sessionClaims) : undefined,
+        ) ? (
           <DropdownMenuItem render={<Link to="/admin" />}>
             <Shield />
             {t("web.admin.hub.title")}

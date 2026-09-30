@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const isResourceAdmin = vi.hoisted(() => vi.fn());
+const hasAdminAccess = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/resources", () => ({ isResourceAdmin }));
+vi.mock("@/lib/authorization", () => ({ hasAdminAccess }));
 
 import { Route } from "./admin";
 
@@ -13,10 +13,10 @@ describe("admin route", () => {
     const beforeLoad = Route.options.beforeLoad;
     if (!beforeLoad) throw new Error("Admin authorization is missing.");
 
-    isResourceAdmin.mockResolvedValueOnce(true);
+    hasAdminAccess.mockResolvedValueOnce(true);
     await expect(beforeLoad({} as never)).resolves.toBeUndefined();
 
-    isResourceAdmin.mockResolvedValueOnce(false);
+    hasAdminAccess.mockResolvedValueOnce(false);
     await expect(beforeLoad({} as never)).rejects.toBeDefined();
   });
 });

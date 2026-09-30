@@ -23,10 +23,17 @@ const signedOutAuth = { isSignedIn: false } as ReturnType<typeof useAuth>;
 const signedInAuth = {
   isSignedIn: true,
   sessionClaims: { role: "user" },
+  userId: "user_123",
 } as unknown as ReturnType<typeof useAuth>;
 const adminAuth = {
   isSignedIn: true,
   sessionClaims: { role: "admin" },
+  userId: "admin_123",
+} as unknown as ReturnType<typeof useAuth>;
+const editorAuth = {
+  isSignedIn: true,
+  sessionClaims: { role: "editor" },
+  userId: "editor_123",
 } as unknown as ReturnType<typeof useAuth>;
 
 const loadingUser = {
@@ -138,6 +145,14 @@ export const AdminUser: Story = {
       await page.findByRole("menuitem", { name: "Admin Panel" }),
     ).toHaveAttribute("href", "/admin");
   },
+};
+
+export const EditorUser: Story = {
+  beforeEach: () => {
+    mocked(useAuth).mockReturnValue(editorAuth);
+    mocked(useUser).mockReturnValue(signedInUser);
+  },
+  play: AdminUser.play,
 };
 
 export const SignOut: Story = {

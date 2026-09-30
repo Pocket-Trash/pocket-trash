@@ -9,7 +9,7 @@ import {
   listPendingFeedback,
   updateAdminFeedback,
 } from "@/lib/feedback";
-import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
+import { mockStoryRole, StoryProviders } from "../../.storybook/story-fixtures";
 import {
   AdminActiveFeedbackPage,
   AdminAllActiveFeedbackPage,
@@ -37,7 +37,7 @@ const meta = {
     ],
   },
   beforeEach: () => {
-    mockStoryAuth();
+    mockStoryRole("admin");
     mocked(listPendingFeedback).mockResolvedValue({
       hasNext: true,
       items: [request],

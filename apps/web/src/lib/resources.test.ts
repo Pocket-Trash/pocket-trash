@@ -24,7 +24,7 @@ describe("resource server functions", () => {
     ).rejects.toThrow();
   });
 
-  it("allows only admins to review resource notifications", async () => {
+  it("requires the resource management permission", async () => {
     await expect(
       requireResourceAdmin(
         async () =>
@@ -41,11 +41,11 @@ describe("resource server functions", () => {
         async () =>
           ({
             isAuthenticated: true,
-            sessionClaims: { role: "admin" },
-            userId: "admin_123",
+            sessionClaims: { role: "editor" },
+            userId: "editor_123",
           }) as never,
       ),
-    ).resolves.toBe("admin_123");
+    ).resolves.toEqual({ clerkId: "editor_123", role: "editor" });
   });
 
   it("derives resource visibility from the signed-in role", async () => {
@@ -58,7 +58,7 @@ describe("resource server functions", () => {
             userId: "admin_123",
           }) as never,
       ),
-    ).resolves.toEqual({ clerkId: "admin_123", isAdmin: true });
+    ).resolves.toEqual({ clerkId: "admin_123", role: "admin" });
   });
 
   it("requires a trimmed moderation reason", () => {
