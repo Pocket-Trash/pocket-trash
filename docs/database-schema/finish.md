@@ -18,4 +18,5 @@ Canonical atomic product finish values.
 
 | Name | Unique | Method | Columns |
 | --- | --- | --- | --- |
+| `finish_name_case_insensitive_unique` | yes | `btree` | `lower("name")` |
 | `finish_slug_unique` | yes | `btree` | `slug` |
