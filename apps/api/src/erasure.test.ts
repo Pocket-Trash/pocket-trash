@@ -31,6 +31,7 @@ describe("erasure runtime", () => {
     await expect(operations.providers(request)).resolves.toMatchObject({
       exceptions: expect.arrayContaining([
         expect.objectContaining({ code: "axiom_30_days" }),
+        expect.objectContaining({ code: "clerk_deletion_3_days" }),
         expect.objectContaining({ code: "neon_history_6_hours" }),
       ]),
     });
