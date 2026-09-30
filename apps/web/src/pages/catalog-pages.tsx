@@ -78,7 +78,7 @@ export function HomePage() {
     },
     {
       image:
-        "https://cdn.pocket-trash.app/assets/static/hero-cards/collections.webp",
+        "https://cdn.pocket-trash.app/assets/static/hero-cards/collections.jpg",
       key: "web.navigation.collections" as const,
       to: "/collections" as const,
     },
