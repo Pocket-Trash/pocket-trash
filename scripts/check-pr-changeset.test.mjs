@@ -7,9 +7,33 @@ import test from "node:test";
 
 import {
   getChangedFiles,
+  getHighestChangesetBump,
   parseChangesetEntries,
   validateChangesetEntries,
 } from "./check-pr-changeset.mjs";
+
+test("selects the highest Changeset bump for workspace packages", () => {
+  assert.equal(
+    getHighestChangesetBump(
+      [
+        {
+          filename: ".changeset/fix.md",
+          content: '---\n"@app/web": patch\n---\nFix web.',
+        },
+        {
+          filename: ".changeset/add.md",
+          content: '---\n"@app/api": minor\n---\nAdd API.',
+        },
+        {
+          filename: ".changeset/other.md",
+          content: '---\n"other-package": major\n---\nBreak other.',
+        },
+      ],
+      new Set(["@app/api", "@app/web"]),
+    ),
+    "minor",
+  );
+});
 
 test("only returns files introduced by the PR branch", (context) => {
   const directory = mkdtempSync(join(tmpdir(), "changeset-git-test-"));
