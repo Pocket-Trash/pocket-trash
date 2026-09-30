@@ -33,6 +33,26 @@ import {
 } from "../audit/products.js";
 import type { UsersService } from "../users/index.js";
 
+export class CollectionButtonAlreadyInstalledError extends Error {
+  constructor() {
+    super("Collection button is already installed on another spinner.");
+    this.name = "CollectionButtonAlreadyInstalledError";
+  }
+}
+
+function isCollectionButtonAlreadyInstalledError(error: unknown): boolean {
+  const databaseError =
+    error instanceof Error && error.cause !== undefined ? error.cause : error;
+  return (
+    typeof databaseError === "object" &&
+    databaseError !== null &&
+    "code" in databaseError &&
+    databaseError.code === "23505" &&
+    "constraint" in databaseError &&
+    databaseError.constraint === "collection_spinner_installed_button_unique"
+  );
+}
+
 export type CatalogProductType = "spinner" | "spinner-button";
 
 export type CatalogLookup = { id: number; name: string; slug: string };
@@ -2106,13 +2126,22 @@ export function createCollectionsService(
                   productId: button.productId,
                 });
               }
-              await tx
-                .update(schema.collectionSpinner)
-                .set({
-                  installedButtonId:
-                    input.installedButton?.collectionItemId ?? null,
-                })
-                .where(eq(schema.collectionSpinner.id, input.collectionItemId));
+              try {
+                await tx
+                  .update(schema.collectionSpinner)
+                  .set({
+                    installedButtonId:
+                      input.installedButton?.collectionItemId ?? null,
+                  })
+                  .where(
+                    eq(schema.collectionSpinner.id, input.collectionItemId),
+                  );
+              } catch (error) {
+                if (isCollectionButtonAlreadyInstalledError(error)) {
+                  throw new CollectionButtonAlreadyInstalledError();
+                }
+                throw error;
+              }
             }
             await touchCollection(tx, targetCollectionId);
             const after = {

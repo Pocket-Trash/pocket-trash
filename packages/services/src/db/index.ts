@@ -79,6 +79,7 @@ export type {
   UserCollectionItem,
   UserCollectionSummary,
 } from "./catalog/index.js";
+export { CollectionButtonAlreadyInstalledError } from "./catalog/index.js";
 export type {
   ApprovedErasureExceptionCode,
   ErasureOperationRequest,

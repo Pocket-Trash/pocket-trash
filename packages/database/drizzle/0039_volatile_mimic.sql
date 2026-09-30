@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "collection_spinner_installed_button_unique" ON "collection_spinner" USING btree ("installed_button_id") WHERE "collection_spinner"."installed_button_id" is not null;

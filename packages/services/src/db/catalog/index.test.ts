@@ -4,6 +4,7 @@ import { createLogger, type LogEvent, loggerMessages } from "@package/logger";
 import { describe, expect, it, vi } from "vitest";
 import {
   assertValidFinishOptions,
+  CollectionButtonAlreadyInstalledError,
   createCatalogService,
   createCollectionsService,
   normalizeCollectionName,
@@ -25,7 +26,11 @@ describe("collection name normalization", () => {
   });
 });
 
-function setup(returningRows: unknown[][], selectRows: unknown[][]) {
+function setup(
+  returningRows: unknown[][],
+  selectRows: unknown[][],
+  spinnerUpdateError?: unknown,
+) {
   const updates: Array<{ table: unknown; value: unknown }> = [];
   const writes: Array<{ table: unknown; value: unknown }> = [];
   const query = () => {
@@ -53,7 +58,18 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
   const update = (table: unknown) => ({
     set: vi.fn((value: unknown) => {
       updates.push({ table, value });
-      return { where: vi.fn(async () => []) };
+      return {
+        where: vi.fn(async () => {
+          if (
+            table === schema.collectionSpinner &&
+            spinnerUpdateError &&
+            "installedButtonId" in (value as object)
+          ) {
+            throw spinnerUpdateError;
+          }
+          return [];
+        }),
+      };
     }),
   });
   const tx = {
@@ -598,6 +614,58 @@ describe("collection catalog writes", () => {
           value: { installedButtonId: 2000 },
         },
       ]),
+    );
+  });
+
+  it("returns a domain error when a button is already installed", async () => {
+    const { service } = setup(
+      [],
+      [
+        [
+          {
+            buttonProductId: null,
+            collectionId: 900,
+            installedButtonId: null,
+            ownerId: 1000,
+            spinnerProductId: 1100,
+          },
+        ],
+        [{ id: 900 }],
+        [{ materialId: 1101 }],
+        [{ id: 3100 }],
+        [{ id: 2000, productId: 1200 }],
+        [{ materialId: 1201 }],
+        [{ id: 3200 }],
+      ],
+      new Error("Query failed", {
+        cause: {
+          code: "23505",
+          constraint: "collection_spinner_installed_button_unique",
+        },
+      }),
+    );
+
+    const error = await service
+      .updateItem({
+        actor: actor("user-secret"),
+        collectionItemId: 2001,
+        customFinish: null,
+        displayName: "My spinner",
+        finishOptionId: null,
+        installedButton: {
+          collectionItemId: 2000,
+          customFinish: null,
+          finishOptionId: null,
+          materialId: 1201,
+        },
+        materialId: 1101,
+      })
+      .catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(CollectionButtonAlreadyInstalledError);
+    expect(error).toHaveProperty(
+      "message",
+      "Collection button is already installed on another spinner.",
     );
   });
 
