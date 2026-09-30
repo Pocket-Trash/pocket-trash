@@ -4,9 +4,19 @@ import { expect, within } from "storybook/test";
 import { CollectionGallery } from "./collection-gallery";
 
 const cover = image(1000, "thirteen.webp", 0, "collection-images");
-const gallery = ["one", "eleven", "five", "four", "nine", "seven", "six"].map(
-  (name, index) =>
-    image(1001 + index, `${name}.webp`, index + 1, "product-images"),
+const gallery = [
+  "one",
+  "eleven",
+  "five",
+  "four",
+  "nine",
+  "seven",
+  "six",
+  "ten",
+  "three",
+  "twelve",
+].map((name, index) =>
+  image(1001 + index, `${name}.webp`, index + 1, "product-images"),
 );
 const collection: UserCollectionSummary = {
   coverImage: cover,
@@ -50,6 +60,9 @@ type Story = StoryObj<typeof meta>;
 export const MultiPage: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     await expect(canvas.getByText("Page 1 of 2")).toBeVisible();
+    await expect(
+      canvas.getAllByRole("button", { name: /^Gallery:/u }),
+    ).toHaveLength(10);
     await expect(
       canvas.getByRole("button", { name: "Previous page" }),
     ).toBeDisabled();

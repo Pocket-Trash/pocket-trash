@@ -7,7 +7,7 @@ import {
   useTable,
 } from "@tanstack/react-table";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import {
   type GalleryImage,
   ImageButton,
@@ -80,6 +80,14 @@ export function CollectionGallery({
     },
     (state) => ({ pagination: state.pagination }),
   );
+  const setPageSize = table.setPageSize;
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 64rem)");
+    const updatePageSize = () => setPageSize(desktop.matches ? 9 : 6);
+    updatePageSize();
+    desktop.addEventListener("change", updatePageSize);
+    return () => desktop.removeEventListener("change", updatePageSize);
+  }, [setPageSize]);
   const pageCount = table.getPageCount();
 
   return (
