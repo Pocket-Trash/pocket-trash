@@ -46,6 +46,10 @@ export const loggerMessages = {
   },
   common: {},
   database: {
+    audit: {
+      redactAccount: "database.audit.redactAccount",
+      write: "database.audit.write",
+    },
     erasure: {
       completed: "database.erasure.completed",
       create: "database.erasure.create",

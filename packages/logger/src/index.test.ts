@@ -72,6 +72,10 @@ describe("logger", () => {
         },
       },
       database: {
+        audit: {
+          redactAccount: "database.audit.redactAccount",
+          write: "database.audit.write",
+        },
         userSettings: {
           getByClerkId: "database.userSettings.getByClerkId",
           upsertForClerkId: "database.userSettings.upsertForClerkId",

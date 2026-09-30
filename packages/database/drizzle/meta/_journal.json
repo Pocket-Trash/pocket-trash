@@ -260,6 +260,13 @@
       "when": 1790741544774,
       "tag": "0036_block_erasing_account_writes",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1790785626808,
+      "tag": "0037_simple_morph",
+      "breakpoints": true
     }
   ]
 }

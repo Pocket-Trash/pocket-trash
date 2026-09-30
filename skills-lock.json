@@ -11,7 +11,7 @@
       "source": "pocket-trash/skills",
       "sourceType": "github",
       "skillPath": "skills/pocket-trash/SKILL.md",
-      "computedHash": "07b7c38aa8a0f7a2ff75b380c1870ea69d355e13e27912157a5bf3ce42201af0"
+      "computedHash": "435b5b94a73fb176d29a6bef50a1abd7dbbf49d3166e63fb5586885e3a55fc9f"
     },
     "pocket-trash-bunny-audit": {
       "source": "pocket-trash/skills",
@@ -78,6 +78,12 @@
       "sourceType": "github",
       "skillPath": "skills/pocket-trash-pr-create/SKILL.md",
       "computedHash": "31a2562c1d7e3aa1db1f0a9c4b36e1a2e6abc129394f7e47f6ba8931b0c63b97"
+    },
+    "pocket-trash-pr-review": {
+      "source": "pocket-trash/skills",
+      "sourceType": "github",
+      "skillPath": "skills/pocket-trash-pr-review/SKILL.md",
+      "computedHash": "780072e25fa70683f3fb081f6486a98680a19d1618180bb6b9f67e38b56f0754"
     },
     "pocket-trash-pr-update": {
       "source": "pocket-trash/skills",
