@@ -92,6 +92,7 @@ export const auditEvent = pgTable(
         and ${table.permission} is null
         and ${table.actorRole} = 'system'
         and ${table.actorUserId} is null
+        and ${table.actorUsername} is null
       )`,
     ),
     check(

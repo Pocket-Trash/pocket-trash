@@ -271,7 +271,7 @@
         },
         "audit_event_authorization_metadata_consistent": {
           "name": "audit_event_authorization_metadata_consistent",
-          "value": "(\n        \"audit_event\".\"authorization_type\" = 'permission'\n        and \"audit_event\".\"permission\" is not null\n        and \"audit_event\".\"actor_role\" <> 'system'\n      ) or (\n        \"audit_event\".\"authorization_type\" = 'owner'\n        and \"audit_event\".\"permission\" is null\n        and \"audit_event\".\"actor_role\" <> 'system'\n      ) or (\n        \"audit_event\".\"authorization_type\" = 'system'\n        and \"audit_event\".\"permission\" is null\n        and \"audit_event\".\"actor_role\" = 'system'\n        and \"audit_event\".\"actor_user_id\" is null\n      )"
+          "value": "(\n        \"audit_event\".\"authorization_type\" = 'permission'\n        and \"audit_event\".\"permission\" is not null\n        and \"audit_event\".\"actor_role\" <> 'system'\n      ) or (\n        \"audit_event\".\"authorization_type\" = 'owner'\n        and \"audit_event\".\"permission\" is null\n        and \"audit_event\".\"actor_role\" <> 'system'\n      ) or (\n        \"audit_event\".\"authorization_type\" = 'system'\n        and \"audit_event\".\"permission\" is null\n        and \"audit_event\".\"actor_role\" = 'system'\n        and \"audit_event\".\"actor_user_id\" is null\n        and \"audit_event\".\"actor_username\" is null\n      )"
         },
         "audit_event_payload_shape_valid": {
           "name": "audit_event_payload_shape_valid",

@@ -30,7 +30,7 @@ export type DbServices = {
 };
 
 export function createDbServices(db: Database, logger: Logger): DbServices {
-  const audit = createAuditService();
+  const audit = createAuditService(logger);
   const users = createUsersService(db, logger);
 
   return {

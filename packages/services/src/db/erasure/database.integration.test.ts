@@ -7,7 +7,26 @@ import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
 import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
+import {
+  type AuditEventDefinition,
+  createAuditService,
+} from "../audit/index.js";
 import { createErasureService, createErasureSubjectHmac } from "./index.js";
+
+const erasureAuditEvents = [
+  {
+    action: "test.owner_updated",
+    targetType: "test.owner",
+    serialize: () => ({ metadata: {} }),
+    redact: () => ({ metadata: { redacted: true } }),
+  },
+  {
+    action: "test.admin_updated",
+    targetType: "test.owner",
+    serialize: () => ({ metadata: {} }),
+    redact: () => ({ metadata: { redacted: true } }),
+  },
+] satisfies readonly AuditEventDefinition<never>[];
 
 describe("account database erasure", () => {
   it("rolls back safely, erases every account link, and preserves shared data", async () => {
@@ -16,13 +35,16 @@ describe("account database erasure", () => {
     await stage("fixture setup", async () => await seedInventory(client));
     const db = drizzle(client, { schema }) as unknown as Database;
     const targetClerkId = "user_to_erase";
+    const logger = createLogger({
+      app: "api",
+      environment: "test",
+      transports: [{ log() {} }],
+    });
     const service = createErasureService(
       db,
-      createLogger({
-        app: "api",
-        environment: "test",
-        transports: [{ log() {} }],
-      }),
+      logger,
+      undefined,
+      createAuditService(logger, erasureAuditEvents),
     );
     const subjectHmac = await createErasureSubjectHmac(
       targetClerkId,

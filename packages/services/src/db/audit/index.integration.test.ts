@@ -4,11 +4,13 @@ import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
+import { createLogger } from "@package/logger";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
 import {
   type AuditEventDefinition,
+  AuditEventValidationError,
   AuditPayloadTooLargeError,
   createAuditService,
 } from "./index.js";
@@ -36,7 +38,14 @@ describe("audit service", () => {
     const client = new PGlite();
     await migrate(client);
     const db = drizzle(client, { schema }) as unknown as Database;
-    const service = createAuditService([profileUpdated, largeEvent]);
+    const service = createAuditService(
+      createLogger({
+        app: "test",
+        environment: "test",
+        transports: [{ log() {} }],
+      }),
+      [profileUpdated, largeEvent],
+    );
     const occurredAt = new Date("2026-09-30T16:00:00.000Z");
 
     try {
@@ -115,6 +124,20 @@ describe("audit service", () => {
       ).resolves.toEqual([]);
 
       await expect(
+        db.transaction(
+          async (tx) =>
+            await service.write(tx, {
+              actor: { role: "system", userId: null, username: "Fake user" },
+              authorization: { type: "system" },
+              data: { name: "Visible", secret: "must-not-be-stored" },
+              definition: profileUpdated,
+              occurredAt,
+              targetId: "system-transition",
+            }),
+        ),
+      ).rejects.toBeInstanceOf(AuditEventValidationError);
+
+      await expect(
         db
           .update(schema.auditEvent)
           .set({ reason: "changed" })
@@ -146,6 +169,21 @@ describe("audit service", () => {
           reason: "[erased]",
         }),
       ]);
+
+      await db.insert(schema.auditEvent).values({
+        action: "test.unknown",
+        actorRole: "user",
+        actorUserId: actor.id,
+        actorUsername: "Ada",
+        authorizationType: "owner",
+        metadata: { private: "Ada" },
+        occurredAt,
+        targetId: "unknown",
+        targetType: "test.profile",
+      });
+      await expect(
+        db.transaction(async (tx) => await service.redactAccount(tx, actor.id)),
+      ).rejects.toBeInstanceOf(AuditEventValidationError);
     } finally {
       await client.close();
     }

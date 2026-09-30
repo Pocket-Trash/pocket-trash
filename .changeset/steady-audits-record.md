@@ -1,5 +1,6 @@
 ---
 "@package/database": minor
+"@package/logger": patch
 "@package/services": minor
 ---
 

@@ -32,6 +32,7 @@ CREATE TABLE "audit_event" (
         and "audit_event"."permission" is null
         and "audit_event"."actor_role" = 'system'
         and "audit_event"."actor_user_id" is null
+        and "audit_event"."actor_username" is null
       )),
 	CONSTRAINT "audit_event_payload_shape_valid" CHECK (num_nonnulls("audit_event"."before_state", "audit_event"."after_state", "audit_event"."metadata") > 0
         and ("audit_event"."metadata" is null or ("audit_event"."before_state" is null and "audit_event"."after_state" is null))),

@@ -1,5 +1,6 @@
 import type { AuditEvent, AuditJsonObject, Database } from "@package/database";
 import { schema } from "@package/database";
+import { type Logger, loggerMessages } from "@package/logger";
 import { and, eq, or, sql } from "drizzle-orm";
 import {
   type Permission,
@@ -85,6 +86,7 @@ export class AuditEventValidationError extends Error {}
 export class AuditPayloadTooLargeError extends Error {}
 
 export function createAuditService(
+  logger: Logger,
   definitions: readonly AuditEventDefinition<never>[] = [],
 ): AuditService {
   const registered = new Map<string, AuditEventDefinition<never>>();
@@ -98,80 +100,109 @@ export function createAuditService(
 
   return {
     async write(transaction, input) {
-      const definition = input.definition as AuditEventDefinition<never>;
-      const key = definitionKey(definition);
-      if (registered.get(key) !== definition) {
-        throw new AuditEventValidationError(
-          `Audit event ${key} is not registered.`,
-        );
-      }
-      const values = normalizedInput(input);
-      const payload = normalizedPayload(input.definition.serialize(input.data));
-      const [event] = await transaction
-        .insert(schema.auditEvent)
-        .values({
-          ...values,
-          afterState: payload.after,
-          beforeState: payload.before,
-          metadata: payload.metadata,
-        })
-        .returning();
-      if (!event) throw new Error("Failed to write audit event.");
-      return event;
+      return await logger.operation(
+        loggerMessages.database.audit.write,
+        async () => {
+          const definition = input.definition as AuditEventDefinition<never>;
+          const key = definitionKey(definition);
+          if (registered.get(key) !== definition) {
+            throw new AuditEventValidationError(
+              `Audit event ${key} is not registered.`,
+            );
+          }
+          const values = normalizedInput(input);
+          const payload = normalizedPayload(
+            input.definition.serialize(input.data),
+          );
+          const [event] = await transaction
+            .insert(schema.auditEvent)
+            .values({
+              ...values,
+              afterState: payload.after,
+              beforeState: payload.before,
+              metadata: payload.metadata,
+            })
+            .returning();
+          if (!event) throw new Error("Failed to write audit event.");
+          return event;
+        },
+        {
+          attributes: {
+            action: input.definition.action,
+            targetType: input.definition.targetType,
+          },
+        },
+      );
     },
 
     async redactAccount(transaction, userId) {
-      positiveInteger(userId, "userId");
-      const events = await transaction
-        .select()
-        .from(schema.auditEvent)
-        .where(
-          or(
-            eq(schema.auditEvent.actorUserId, userId),
-            eq(schema.auditEvent.ownerUserId, userId),
-          ),
-        );
-      if (events.length === 0) return;
+      await logger.operation(
+        loggerMessages.database.audit.redactAccount,
+        async () => {
+          positiveInteger(userId, "userId");
+          const events = await transaction
+            .select()
+            .from(schema.auditEvent)
+            .where(
+              or(
+                eq(schema.auditEvent.actorUserId, userId),
+                eq(schema.auditEvent.ownerUserId, userId),
+              ),
+            );
+          if (events.length === 0) return;
 
-      await transaction.execute(
-        sql`select set_config('pocket_trash.audit_erasure_redaction', 'on', true)`,
+          await transaction.execute(
+            sql`select set_config('pocket_trash.audit_erasure_redaction', 'on', true)`,
+          );
+          for (const event of events) {
+            const actorErased = event.actorUserId === userId;
+            const ownerErased = event.ownerUserId === userId;
+            const key = `${event.action}:${event.targetType}`;
+            const definition = registered.get(key);
+            if (!definition) {
+              throw new AuditEventValidationError(
+                `Audit event ${key} is not registered.`,
+              );
+            }
+            const payload = normalizedPayload(
+              definition.redact(
+                {
+                  afterState: event.afterState,
+                  beforeState: event.beforeState,
+                  metadata: event.metadata,
+                },
+                {
+                  erasedParty:
+                    actorErased && ownerErased
+                      ? "actor_and_owner"
+                      : actorErased
+                        ? "actor"
+                        : "owner",
+                },
+              ),
+            );
+            const expected = {
+              actorUserId: actorErased ? null : event.actorUserId,
+              actorUsername: actorErased
+                ? DELETED_USERNAME
+                : event.actorUsername,
+              afterState: payload.after,
+              beforeState: payload.before,
+              metadata: payload.metadata,
+              ownerUserId: ownerErased ? null : event.ownerUserId,
+              reason: event.reason === null ? null : DELETED_REASON,
+            };
+            const [redacted] = await transaction
+              .update(schema.auditEvent)
+              .set(expected)
+              .where(and(eq(schema.auditEvent.id, event.id)))
+              .returning();
+            if (!redacted || !redactionMatches(redacted, expected)) {
+              throw new Error("Audit erasure redaction verification failed.");
+            }
+          }
+        },
       );
-      for (const event of events) {
-        const actorErased = event.actorUserId === userId;
-        const ownerErased = event.ownerUserId === userId;
-        const definition = registered.get(
-          `${event.action}:${event.targetType}`,
-        );
-        const payload = normalizedPayload(
-          definition?.redact(
-            {
-              afterState: event.afterState,
-              beforeState: event.beforeState,
-              metadata: event.metadata,
-            },
-            {
-              erasedParty:
-                actorErased && ownerErased
-                  ? "actor_and_owner"
-                  : actorErased
-                    ? "actor"
-                    : "owner",
-            },
-          ) ?? { metadata: { redacted: true } },
-        );
-        await transaction
-          .update(schema.auditEvent)
-          .set({
-            actorUserId: actorErased ? null : event.actorUserId,
-            actorUsername: actorErased ? DELETED_USERNAME : event.actorUsername,
-            afterState: payload.after,
-            beforeState: payload.before,
-            metadata: payload.metadata,
-            ownerUserId: ownerErased ? null : event.ownerUserId,
-            reason: event.reason === null ? null : DELETED_REASON,
-          })
-          .where(and(eq(schema.auditEvent.id, event.id)));
-      }
     },
   };
 }
@@ -189,7 +220,11 @@ function normalizedInput<T>(input: AuditWriteInput<T>) {
     throw new AuditEventValidationError("actor.role is invalid.");
   }
   if (input.authorization.type === "system") {
-    if (input.actor.role !== "system" || actorUserId !== null) {
+    if (
+      input.actor.role !== "system" ||
+      actorUserId !== null ||
+      input.actor.username !== null
+    ) {
       throw new AuditEventValidationError(
         "System authorization requires the system actor.",
       );
@@ -322,4 +357,48 @@ function positiveInteger(value: number, name: string) {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new AuditEventValidationError(`${name} is invalid.`);
   }
+}
+
+function redactionMatches(
+  event: AuditEvent,
+  expected: Pick<
+    AuditEvent,
+    | "actorUserId"
+    | "actorUsername"
+    | "afterState"
+    | "beforeState"
+    | "metadata"
+    | "ownerUserId"
+    | "reason"
+  >,
+) {
+  return (
+    event.actorUserId === expected.actorUserId &&
+    event.actorUsername === expected.actorUsername &&
+    event.ownerUserId === expected.ownerUserId &&
+    event.reason === expected.reason &&
+    canonicalJson(event.beforeState) === canonicalJson(expected.beforeState) &&
+    canonicalJson(event.afterState) === canonicalJson(expected.afterState) &&
+    canonicalJson(event.metadata) === canonicalJson(expected.metadata)
+  );
+}
+
+function canonicalJson(value: AuditJsonObject | null): string {
+  if (value === null) return "null";
+  return `{${Object.keys(value)
+    .sort()
+    .map(
+      (key) =>
+        `${JSON.stringify(key)}:${canonicalJsonValue(value[key] ?? null)}`,
+    )
+    .join(",")}}`;
+}
+
+function canonicalJsonValue(value: AuditJsonObject[string]): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJsonValue).join(",")}]`;
+  }
+  return typeof value === "object" && value !== null
+    ? canonicalJson(value)
+    : JSON.stringify(value);
 }

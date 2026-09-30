@@ -118,7 +118,7 @@ export function createErasureService(
   db: Database,
   logger: Logger,
   now: () => Date = () => new Date(),
-  audit: Pick<AuditService, "redactAccount"> = createAuditService(),
+  audit: Pick<AuditService, "redactAccount"> = createAuditService(logger),
 ) {
   return {
     async assertAccountActive(clerkId: string): Promise<void> {
