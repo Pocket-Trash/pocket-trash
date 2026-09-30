@@ -10,6 +10,8 @@ import { createUploadStorage, sha256 } from "@package/storage";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { collectionAuditEvents } from "../db/audit/collections.js";
+import { createAuditService } from "../db/audit/index.js";
 import { hashLogIdentifier } from "../logging.js";
 import { createResourcesService } from "../resources/index.js";
 import { selectCollectionCover } from "./image-records.js";
@@ -57,7 +59,12 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       },
     ],
   });
-  const service = createStorageService({ db, storage, logger });
+  const service = createStorageService({
+    audit: createAuditService(logger, collectionAuditEvents),
+    db,
+    storage,
+    logger,
+  });
   const actor = { clerkId: "storage-test-owner", role: "user" } as const;
   const image = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB9sAAAAASUVORK5CYII=",

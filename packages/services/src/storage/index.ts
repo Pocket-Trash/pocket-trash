@@ -16,6 +16,11 @@ import {
 } from "@package/storage";
 import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
+import {
+  collectionAudit,
+  writeCollectionAudit,
+} from "../db/audit/collections.js";
+import type { AuditService } from "../db/audit/index.js";
 import { hashLogIdentifier, loggedMutation } from "../logging.js";
 import { completeResource, completeVersion } from "./complete-resource.js";
 import {
@@ -73,13 +78,14 @@ export type FileType = (typeof fileTypes)[number];
 type Session = typeof schema.uploadSession.$inferSelect;
 
 export function createStorageService(input: {
+  audit?: AuditService;
   db: Database;
   storage: UploadStorage;
   logger: Logger;
   now?: () => Date;
   randomUUID?: () => string;
 }) {
-  const { db, storage, logger } = input;
+  const { audit, db, storage, logger } = input;
   const now = input.now ?? (() => new Date());
   const uuid = input.randomUUID ?? (() => crypto.randomUUID());
   const service = {
@@ -89,14 +95,20 @@ export function createStorageService(input: {
       const manifest = parsed.data;
       attributes.targetType = manifest.target.type;
       Object.assign(attributes, fileCounts(manifest.files));
-      const payload =
+      const resource =
         manifest.target.type === "resource"
           ? resourcePayload(manifest.payload)
           : null;
-      validateManifest(manifest, payload?.operation);
+      const collection =
+        manifest.target.type === "collection" ||
+        manifest.target.type === "collection_item"
+          ? collectionUploadPayload(manifest.payload)
+          : null;
+      const payload = resource ?? collection;
+      validateManifest(manifest, resource?.operation);
       return db.transaction(async (tx) => {
         let targetId = manifest.target.id;
-        const isCreate = payload?.operation === "create";
+        const isCreate = resource?.operation === "create";
         if (isCreate) {
           const reserved = await tx.execute<{ id: number }>(
             sql`select nextval(pg_get_serial_sequence('resources','id'))::bigint as id`,
@@ -113,7 +125,7 @@ export function createStorageService(input: {
         if (!isCreate) await assertCanEditTarget(tx, target, actor);
         await assertNoDuplicateImages(tx, target, manifest.files);
         let version: number | null = null;
-        if (payload) {
+        if (resource) {
           const pending = await tx
             .select({ id: schema.uploadSession.id })
             .from(schema.uploadSession)
@@ -317,7 +329,35 @@ export function createStorageService(input: {
             if (!(await completeVersion(tx, sessionId, actor.clerkId)))
               throw new UploadSessionError("uploads_incomplete", 409);
           }
-        } else await attachImages(tx, { target, files, actor });
+        } else {
+          const context = await collectionTargetContext(tx, target);
+          const before = await collectionTargetImageState(tx, target);
+          await attachImages(tx, { target, files, actor });
+          if (context) {
+            if (!audit) throw new Error("Collection audit is not configured.");
+            const [actorUser] = await tx
+              .select({ id: schema.user.id, username: schema.user.username })
+              .from(schema.user)
+              .where(eq(schema.user.clerkId, actor.clerkId))
+              .limit(1);
+            if (!actorUser) throw new Error("Image target does not exist.");
+            await writeCollectionAudit(audit, tx, {
+              actor,
+              actorUser,
+              after: await collectionTargetImageState(tx, target),
+              before,
+              definition:
+                target.type === "collection_item"
+                  ? collectionAudit.imageAdded
+                  : before.currentImageId === null
+                    ? collectionAudit.coverAdded
+                    : collectionAudit.coverReplaced,
+              ownerUserId: context.ownerUserId,
+              reason: collectionUploadPayload(session.payload)?.reason,
+              targetId: target.id,
+            });
+          }
+        }
         await tx
           .update(schema.uploadSession)
           .set({ completedAt: now() })
@@ -506,10 +546,12 @@ export function createStorageService(input: {
         fileType,
         fileId,
         actor,
+        reason,
       }: {
         fileType: FileType;
         fileId: number;
         actor: UploadActor;
+        reason?: string;
       },
       attributes: LogContext,
     ) {
@@ -562,6 +604,27 @@ export function createStorageService(input: {
         await tx.execute(
           sql`delete from ${sql.identifier(mapping.table)} where id = ${fileId}`,
         );
+        if (fileType === "collection_image") {
+          if (!audit) throw new Error("Collection audit is not configured.");
+          const [actorUser] = await tx
+            .select({ id: schema.user.id, username: schema.user.username })
+            .from(schema.user)
+            .where(eq(schema.user.clerkId, actor.clerkId))
+            .limit(1);
+          const context = await collectionTargetContext(tx, target);
+          if (!actorUser || !context)
+            throw new UploadSessionError("session_not_found", 404);
+          await writeCollectionAudit(audit, tx, {
+            actor,
+            actorUser,
+            after: { deleted: true, imageId: fileId },
+            before: { deleted: false, imageId: fileId },
+            definition: collectionAudit.coverDeleted,
+            ownerUserId: context.ownerUserId,
+            reason,
+            targetId: target.id,
+          });
+        }
         return file.objectPath;
       });
       await cleanupObjectDeletions(db, storage, logger, [objectPath]);
@@ -622,6 +685,67 @@ export function createStorageService(input: {
       );
     },
   };
+}
+
+function collectionUploadPayload(value: unknown): { reason?: string } | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "object" || Array.isArray(value))
+    throw new UploadSessionError("invalid_request", 400);
+  const reason = (value as Record<string, unknown>).reason;
+  if (reason === undefined) return null;
+  if (typeof reason !== "string" || reason.trim().length > 1000)
+    throw new UploadSessionError("invalid_request", 400);
+  return reason.trim() ? { reason: reason.trim() } : null;
+}
+
+async function collectionTargetContext(
+  db: Pick<Database, "select">,
+  target: UploadTarget,
+): Promise<{ ownerUserId: number } | null> {
+  if (target.type === "collection") {
+    const [row] = await db
+      .select({ ownerUserId: schema.userCollection.ownerId })
+      .from(schema.userCollection)
+      .where(eq(schema.userCollection.id, target.id))
+      .limit(1);
+    return row ?? null;
+  }
+  if (target.type === "collection_item") {
+    const [row] = await db
+      .select({ ownerUserId: schema.collectionItem.ownerId })
+      .from(schema.collectionItem)
+      .where(eq(schema.collectionItem.id, target.id))
+      .limit(1);
+    return row ?? null;
+  }
+  return null;
+}
+
+async function collectionTargetImageState(
+  db: Pick<Database, "select">,
+  target: UploadTarget,
+) {
+  if (target.type === "collection") {
+    const images = await db
+      .select({
+        id: schema.collectionImage.id,
+        isCurrent: schema.collectionImage.isCurrent,
+      })
+      .from(schema.collectionImage)
+      .where(eq(schema.collectionImage.collectionId, target.id));
+    return {
+      currentImageId: images.find(({ isCurrent }) => isCurrent)?.id ?? null,
+      imageIds: images.map(({ id }) => id),
+    };
+  }
+  if (target.type === "collection_item") {
+    const images = await db
+      .select({ id: schema.collectionItemImage.id })
+      .from(schema.collectionItemImage)
+      .where(eq(schema.collectionItemImage.collectionItemId, target.id));
+    return { currentImageId: null, imageIds: images.map(({ id }) => id) };
+  }
+  return { currentImageId: null, imageIds: [] };
 }
 
 async function hasSurvivingReference(
