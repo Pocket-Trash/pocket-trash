@@ -8,6 +8,23 @@ description: Create conventional git commits for Pocket Trash repositories.
 Write conventional commits for this repository. Never include AI co-authorship
 lines.
 
+## Pocket Trash Skill Updates First
+
+Before planning or creating any other commit:
+
+1. Run `git status --short` and inspect changes under `skills/pocket-trash*/`,
+   `.agents/skills/pocket-trash*/`, `.claude/skills/pocket-trash*`,
+   `agent-skills.json`, and `skills-lock.json`.
+2. For `skills-lock.json`, confirm the changed entries use
+   `"source": "pocket-trash/skills"`; do not treat changes for other sources as
+   Pocket Trash skill updates.
+3. If new or updated Pocket Trash skill files are present, stage their explicit
+   paths and commit them as the first commit. Include `agent-skills.json` and
+   `skills-lock.json` when their changes belong to that update. Do not ask
+   whether these update files should be committed.
+4. Do not include unrelated changes in that first commit. Continue with the
+   remaining logical commits afterward.
+
 ## Format
 
 ```
