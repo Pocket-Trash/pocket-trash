@@ -477,26 +477,39 @@ export const productSpinner = pgTable(
   },
   (table) => [
     check(
+      "product_spinner_measurements_positive",
+      sql`${table.weightG} > 0 and ${table.lengthMm} > 0 and ${table.widthMm} > 0 and ${table.thicknessMm} > 0 and ${table.thicknessWithButtonMm} > 0 and ${table.buttonDiameterMm} > 0 and ${table.spinDiameterMm} > 0`,
+    ),
+    check(
       "product_spinner_bearing_length_valid",
       sql`${table.bearing} is null or char_length(${table.bearing}) <= 200`,
     ),
   ],
 );
 
-export const productSpinnerButton = pgTable("product_spinner_button", {
-  id: bigint("id", { mode: "number" })
-    .primaryKey()
-    .references(() => product.id, { onDelete: "cascade" }),
-  weightG: decimal("weight_g"),
-  diameterMm: decimal("diameter_mm"),
-  thicknessMm: decimal("thickness_mm"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const productSpinnerButton = pgTable(
+  "product_spinner_button",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .references(() => product.id, { onDelete: "cascade" }),
+    weightG: decimal("weight_g"),
+    diameterMm: decimal("diameter_mm"),
+    thicknessMm: decimal("thickness_mm"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      "product_spinner_button_measurements_positive",
+      sql`${table.weightG} > 0 and ${table.diameterMm} > 0 and ${table.thicknessMm} > 0`,
+    ),
+  ],
+);
 
 export const collectionSpinnerButton = pgTable("collection_spinner_button", {
   id: bigint("id", { mode: "number" })
