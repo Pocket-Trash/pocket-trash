@@ -28,6 +28,7 @@ const exceptionMaximumMs = {
   axiom_30_days: 30 * DAY_MS,
   bunny_cache_30_days: 30 * DAY_MS,
   bunny_logs_3_days: 3 * DAY_MS,
+  clerk_deletion_3_days: 3 * DAY_MS,
   clerk_logs_30_days: 30 * DAY_MS,
   cloudflare_logs_7_days: 7 * DAY_MS,
   neon_history_6_hours: 6 * 60 * 60 * 1000,
