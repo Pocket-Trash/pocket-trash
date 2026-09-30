@@ -1,5 +1,6 @@
+import { useReverification, useUser } from "@clerk/tanstack-react-start";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect, mocked, waitFor, within } from "storybook/test";
+import { expect, fn, mocked, waitFor, within } from "storybook/test";
 import {
   listFeedbackNotifications,
   markFeedbackNotificationRead,
@@ -8,6 +9,7 @@ import { mockStoryRole, StoryProviders } from "../../.storybook/story-fixtures";
 import { AdminFeedbackNotificationsPage } from "./admin-feedback-notifications-page";
 import { AdminIndexPage } from "./admin-index-page";
 import { AdminNotificationsIndexPage } from "./admin-notifications-index-page";
+import { AdminSettingsPage } from "./admin-settings-page";
 import { AdminTrashIndexPage } from "./admin-trash-index-page";
 
 const unread = {
@@ -30,6 +32,7 @@ const completed = {
 const meta = {
   beforeEach: () => {
     mockStoryRole("admin");
+    mocked(useReverification).mockImplementation((action) => action as never);
     mocked(markFeedbackNotificationRead).mockResolvedValue(undefined);
     mocked(listFeedbackNotifications).mockResolvedValue([
       { ...unread, readAt: new Date("2026-09-29T12:05:00Z") },
@@ -144,6 +147,52 @@ export const TrashHub: Story = {
     await expect(
       sidebar.getByRole("link", { name: "Catalog image trash" }),
     ).toHaveAttribute("href", "/admin/trash/catalog-images");
+  },
+};
+
+export const Settings: Story = {
+  render: () => <AdminSettingsPage />,
+  play: async ({ canvas, canvasElement }) => {
+    await expect(canvas.getByText("Admin settings")).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "Connect Linear" }),
+    ).toBeVisible();
+    await expect(
+      canvasElement.querySelector("img")?.getAttribute("src"),
+    ).toContain("linear-logo.svg");
+  },
+};
+
+export const ConnectedSettings: Story = {
+  beforeEach: () => {
+    const linear = {
+      accountIdentifier: () => "ada@example.com",
+      approvedScopes: "read write",
+      destroy: fn(async () => undefined),
+      provider: "linear" as const,
+      reauthorize: fn(async () => linear),
+    };
+    mocked(useUser).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      user: {
+        createExternalAccount: fn(),
+        externalAccounts: [linear],
+        reload: fn(async () => undefined),
+      },
+    } as unknown as ReturnType<typeof useUser>);
+  },
+  render: () => <AdminSettingsPage />,
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByText("Connected as ada@example.com"),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "Update connection" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "Remove connection" }),
+    ).toBeVisible();
   },
 };
 

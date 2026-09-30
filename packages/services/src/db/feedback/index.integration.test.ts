@@ -590,6 +590,52 @@ describe("feedback lifecycle", () => {
     }
   }, 30_000);
 
+  it("reserves one Linear UUID and completes planning idempotently", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      await migrate(client);
+      const service = createFeedbackService(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      );
+      const feedback = await service.submit({
+        category: "feature",
+        description: "Create this once in Linear.",
+        submitterClerkId: "submitter",
+        title: "Idempotent planning",
+      });
+      await service.approve(feedback.id);
+
+      const firstUuid = "11111111-1111-4111-8111-111111111111";
+      const retryUuid = "22222222-2222-4222-8222-222222222222";
+      await expect(
+        service.reserveLinearPlan(feedback.id, firstUuid),
+      ).resolves.toMatchObject({
+        linearClientUuid: firstUuid,
+        title: "Idempotent planning",
+      });
+      await expect(
+        service.reserveLinearPlan(feedback.id, retryUuid),
+      ).resolves.toMatchObject({ linearClientUuid: firstUuid });
+
+      await service.completeLinearPlan(feedback.id, firstUuid);
+      await expect(
+        service.completeLinearPlan(feedback.id, firstUuid),
+      ).resolves.toBeUndefined();
+      expect((await service.listAdminActive()).items).toEqual([
+        expect.objectContaining({
+          id: feedback.id,
+          linearClientUuid: firstUuid,
+          status: "planned",
+        }),
+      ]);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("edits through Completed and protects immutable or reserved feedback", async () => {
     const client = new PGlite();
     const db = drizzle(client, { schema });
