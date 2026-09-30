@@ -518,6 +518,9 @@ export const collectionSpinner = pgTable(
     bearing: text("bearing"),
   },
   (table) => [
+    uniqueIndex("collection_spinner_installed_button_unique")
+      .on(table.installedButtonId)
+      .where(sql`${table.installedButtonId} is not null`),
     check(
       "collection_spinner_bearing_length_valid",
       sql`${table.bearing} is null or char_length(${table.bearing}) <= 200`,

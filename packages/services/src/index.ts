@@ -68,6 +68,7 @@ export {
   AccountErasureInProgressError,
   AuditEventValidationError,
   AuditPayloadTooLargeError,
+  CollectionButtonAlreadyInstalledError,
   createAuditService,
   createErasureService,
   createErasureSubjectHmac,
