@@ -47,6 +47,7 @@ import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminAccountErasureRouteImport } from './routes/admin.account-erasure'
 import { Route as AdminTrashIndexRouteImport } from './routes/admin.trash.index'
+import { Route as AdminSettingsIndexRouteImport } from './routes/admin.settings.index'
 import { Route as AdminFeedbackIndexRouteImport } from './routes/admin.feedback.index'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
 import { Route as UserResourcesTrashRouteImport } from './routes/user.resources_.trash'
@@ -259,6 +260,11 @@ const AdminTrashIndexRoute = AdminTrashIndexRouteImport.update({
   path: '/trash/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSettingsIndexRoute = AdminSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminFeedbackIndexRoute = AdminFeedbackIndexRouteImport.update({
   id: '/feedback/',
   path: '/feedback/',
@@ -432,6 +438,7 @@ export interface FileRoutesByFullPath {
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/admin/feedback/': typeof AdminFeedbackIndexRoute
+  '/admin/settings/': typeof AdminSettingsIndexRoute
   '/admin/trash/': typeof AdminTrashIndexRoute
   '/collections/$userId/$collectionId/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
@@ -489,6 +496,7 @@ export interface FileRoutesByTo {
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/admin/feedback': typeof AdminFeedbackIndexRoute
+  '/admin/settings': typeof AdminSettingsIndexRoute
   '/admin/trash': typeof AdminTrashIndexRoute
   '/collections/$userId/$collectionId/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
@@ -551,6 +559,7 @@ export interface FileRoutesById {
   '/user/resources_/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/admin/feedback/': typeof AdminFeedbackIndexRoute
+  '/admin/settings/': typeof AdminSettingsIndexRoute
   '/admin/trash/': typeof AdminTrashIndexRoute
   '/collections_/$userId/$collectionId_/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug_/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
@@ -614,6 +623,7 @@ export interface FileRouteTypes {
     | '/user/resources/trash'
     | '/user/settings/beta-features'
     | '/admin/feedback/'
+    | '/admin/settings/'
     | '/admin/trash/'
     | '/collections/$userId/$collectionId/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug/edit'
@@ -671,6 +681,7 @@ export interface FileRouteTypes {
     | '/user/resources/trash'
     | '/user/settings/beta-features'
     | '/admin/feedback'
+    | '/admin/settings'
     | '/admin/trash'
     | '/collections/$userId/$collectionId/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug/edit'
@@ -732,6 +743,7 @@ export interface FileRouteTypes {
     | '/user/resources_/trash'
     | '/user/settings/beta-features'
     | '/admin/feedback/'
+    | '/admin/settings/'
     | '/admin/trash/'
     | '/collections_/$userId/$collectionId_/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug_/edit'
@@ -1037,6 +1049,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTrashIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/settings/': {
+      id: '/admin/settings/'
+      path: '/settings'
+      fullPath: '/admin/settings/'
+      preLoaderRoute: typeof AdminSettingsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/feedback/': {
       id: '/admin/feedback/'
       path: '/feedback'
@@ -1200,6 +1219,7 @@ interface AdminRouteChildren {
   AdminTrashCatalogImagesRoute: typeof AdminTrashCatalogImagesRoute
   AdminTrashResourcesRoute: typeof AdminTrashResourcesRoute
   AdminFeedbackIndexRoute: typeof AdminFeedbackIndexRoute
+  AdminSettingsIndexRoute: typeof AdminSettingsIndexRoute
   AdminTrashIndexRoute: typeof AdminTrashIndexRoute
 }
 
@@ -1216,6 +1236,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminTrashCatalogImagesRoute: AdminTrashCatalogImagesRoute,
   AdminTrashResourcesRoute: AdminTrashResourcesRoute,
   AdminFeedbackIndexRoute: AdminFeedbackIndexRoute,
+  AdminSettingsIndexRoute: AdminSettingsIndexRoute,
   AdminTrashIndexRoute: AdminTrashIndexRoute,
 }
 

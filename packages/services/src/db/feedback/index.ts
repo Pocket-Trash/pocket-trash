@@ -63,6 +63,7 @@ export type AdminFeedbackItem = {
   createdAt: Date;
   description: string;
   id: number;
+  linearClientUuid: string | null;
   status: FeedbackStatus;
   submitterUsername: string | null;
   title: string;
@@ -133,8 +134,17 @@ export type UpdateAdminFeedbackInput = {
 
 export type UpdatePendingFeedbackInput = UpdateAdminFeedbackInput;
 
+export type FeedbackPlanReservation = Pick<
+  AdminFeedbackItem,
+  "category" | "description" | "id" | "title"
+> & { linearClientUuid: string };
+
 export type FeedbackService = {
   approve(feedbackId: number): Promise<void>;
+  completeLinearPlan(
+    feedbackId: number,
+    linearClientUuid: string,
+  ): Promise<void>;
   deny(feedbackId: number): Promise<void>;
   findDuplicates(
     viewerClerkId: string,
@@ -163,6 +173,10 @@ export type FeedbackService = {
     actorClerkId: string,
   ): Promise<void>;
   mergePending(feedbackId: number, targetId: number): Promise<void>;
+  reserveLinearPlan(
+    feedbackId: number,
+    linearClientUuid: string,
+  ): Promise<FeedbackPlanReservation>;
   submit(
     input: SubmitFeedbackInput,
   ): Promise<typeof schema.feedback.$inferSelect>;
@@ -197,6 +211,44 @@ export function createFeedbackService(
             )
             .returning({ id: schema.feedback.id });
           if (updated.length === 0) throw new FeedbackStateError();
+        },
+      );
+    },
+
+    async completeLinearPlan(feedbackId, linearClientUuid) {
+      await logger.operation(
+        loggerMessages.database.feedback.completeLinearPlan,
+        async () => {
+          assertPositiveInteger(feedbackId, "feedbackId");
+          assertUuid(linearClientUuid);
+          const updated = await db
+            .update(schema.feedback)
+            .set({ status: "planned", updatedAt: new Date() })
+            .where(
+              and(
+                eq(schema.feedback.id, feedbackId),
+                eq(schema.feedback.status, "requested"),
+                eq(schema.feedback.linearClientUuid, linearClientUuid),
+              ),
+            )
+            .returning({ id: schema.feedback.id });
+          if (updated.length > 0) return;
+
+          const [existing] = await db
+            .select({
+              linearClientUuid: schema.feedback.linearClientUuid,
+              status: schema.feedback.status,
+            })
+            .from(schema.feedback)
+            .where(eq(schema.feedback.id, feedbackId))
+            .limit(1);
+          if (
+            existing?.status === "planned" &&
+            existing.linearClientUuid === linearClientUuid
+          ) {
+            return;
+          }
+          throw new FeedbackStateError();
         },
       );
     },
@@ -444,6 +496,39 @@ export function createFeedbackService(
             actorClerkIdHash: hashLogIdentifier(actorClerkId),
             notificationId,
           },
+        },
+      );
+    },
+
+    async reserveLinearPlan(feedbackId, linearClientUuid) {
+      return await logger.operation(
+        loggerMessages.database.feedback.reserveLinearPlan,
+        async () => {
+          assertPositiveInteger(feedbackId, "feedbackId");
+          assertUuid(linearClientUuid);
+          const [reserved] = await db
+            .update(schema.feedback)
+            .set({
+              linearClientUuid: sql`coalesce(${schema.feedback.linearClientUuid}, ${linearClientUuid})`,
+            })
+            .where(
+              and(
+                eq(schema.feedback.id, feedbackId),
+                eq(schema.feedback.status, "requested"),
+              ),
+            )
+            .returning({
+              category: schema.feedback.category,
+              description: schema.feedback.description,
+              id: schema.feedback.id,
+              linearClientUuid: schema.feedback.linearClientUuid,
+              title: schema.feedback.title,
+            });
+          if (!reserved?.linearClientUuid) throw new FeedbackStateError();
+          return {
+            ...reserved,
+            linearClientUuid: reserved.linearClientUuid,
+          };
         },
       );
     },
@@ -732,6 +817,7 @@ function adminFeedbackColumns() {
     createdAt: schema.feedback.createdAt,
     description: schema.feedback.description,
     id: schema.feedback.id,
+    linearClientUuid: schema.feedback.linearClientUuid,
     status: schema.feedback.status,
     submitterUsername: schema.user.username,
     title: schema.feedback.title,
@@ -905,5 +991,15 @@ function normalizedClerkId(value: string) {
 function assertPositiveInteger(value: number, name: string) {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive integer.`);
+  }
+}
+
+function assertUuid(value: string) {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  ) {
+    throw new Error("linearClientUuid must be a UUID.");
   }
 }

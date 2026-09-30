@@ -87,6 +87,7 @@ export function mockStoryRole(role: Role) {
     isLoaded: true,
     isSignedIn: true,
     user: {
+      externalAccounts: [],
       imageUrl: "",
       primaryEmailAddress: { emailAddress: "story@example.com" },
       username: "Story User",

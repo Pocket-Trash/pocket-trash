@@ -6,6 +6,7 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
+import { Link } from "@tanstack/react-router";
 import {
   createColumnHelper,
   tableFeatures,
@@ -20,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import {
   approveFeedback,
   denyFeedback,
+  getLinearPlanOptions,
   listAdminActiveFeedback,
   listAdminAllActiveFeedback,
   listArchivedFeedback,
@@ -27,6 +29,7 @@ import {
   listFeedbackMergeTargets,
   listPendingFeedback,
   mergePendingFeedback,
+  planFeedback,
   updateAdminFeedback,
 } from "@/lib/feedback";
 import { feedbackCategories, feedbackCategoryKey } from "@/lib/feedback-shared";
@@ -518,11 +521,47 @@ function AdminFeedbackDialog({
   onClosed: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [planError, setPlanError] = useState<TranslationKey>();
+  const [planKind, setPlanKind] = useState<"issue" | "project">("issue");
+  const [planOptions, setPlanOptions] =
+    useState<
+      Extract<Awaited<ReturnType<typeof getLinearPlanOptions>>, { ok: true }>
+    >();
+  const [planReservation, setPlanReservation] = useState<{
+    feedbackId: number;
+    uuid: string;
+  }>();
+  const [planning, setPlanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const t = useCopy();
   if (!item) return <dialog ref={dialogRef} />;
   const current = item;
   const editable = !["merged", "denied", "canceled"].includes(current.status);
+
+  async function openPlanning() {
+    setPlanning(true);
+    setPlanKind("issue");
+    setPlanError(undefined);
+    setPlanReservation((existing) =>
+      existing?.feedbackId === current.id
+        ? existing
+        : {
+            feedbackId: current.id,
+            uuid: current.linearClientUuid ?? crypto.randomUUID(),
+          },
+    );
+    if (planOptions) return;
+    setSaving(true);
+    try {
+      const result = await getLinearPlanOptions();
+      if (result.ok) setPlanOptions(result);
+      else setPlanError(result.error);
+    } catch {
+      setPlanError("web.feedback.admin.plan.connectionRequired");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function act(
     action: "approve" | "deny" | "merge",
@@ -566,6 +605,8 @@ function AdminFeedbackDialog({
       className="m-auto w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
       onClose={() => {
         setEditing(false);
+        setPlanError(undefined);
+        setPlanning(false);
         onClosed();
       }}
       ref={dialogRef}
@@ -575,9 +616,141 @@ function AdminFeedbackDialog({
           className="m-0 text-xl font-semibold"
           id="admin-feedback-dialog-title"
         >
-          {t("web.feedback.admin.requests.detailsTitle")}
+          {t(
+            planning
+              ? "web.feedback.admin.plan.title"
+              : "web.feedback.admin.requests.detailsTitle",
+          )}
         </h2>
-        {editing ? (
+        {planning ? (
+          <form
+            className="grid gap-4"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (!planOptions || !planReservation) return;
+              const data = new FormData(event.currentTarget);
+              setSaving(true);
+              setPlanError(undefined);
+              try {
+                const result = await planFeedback({
+                  data: {
+                    assignToMe: data.get("assignToMe") === "on",
+                    clientUuid: planReservation.uuid,
+                    feedbackId: current.id,
+                    kind: planKind,
+                    labelIds: data.getAll("labelIds").map(String),
+                    leadProject: data.get("leadProject") === "on",
+                  },
+                });
+                if (!result.ok) {
+                  setPlanError(result.error);
+                  toast.error(t(result.error));
+                  return;
+                }
+                toast.success(t("web.feedback.admin.plan.success"));
+                await onChanged();
+              } catch {
+                setPlanError("web.feedback.admin.plan.failure");
+                toast.error(t("web.feedback.admin.plan.failure"));
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <fieldset className="grid gap-2">
+              <legend className="text-sm font-medium">
+                {t("web.feedback.admin.plan.typeLabel")}
+              </legend>
+              <div className="flex gap-4">
+                {(["issue", "project"] as const).map((kind) => (
+                  <label className="flex items-center gap-2 text-sm" key={kind}>
+                    <input
+                      checked={planKind === kind}
+                      disabled={saving}
+                      name="planKind"
+                      onChange={() => setPlanKind(kind)}
+                      type="radio"
+                      value={kind}
+                    />
+                    {t(`web.feedback.admin.plan.${kind}`)}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            {saving && !planOptions ? (
+              <p
+                aria-live="polite"
+                className="m-0 text-sm text-muted-foreground"
+              >
+                {t("web.feedback.admin.plan.loading")}
+              </p>
+            ) : null}
+            {planOptions && planKind === "issue" ? (
+              <>
+                <label className="flex items-center gap-2 text-sm">
+                  <input disabled={saving} name="assignToMe" type="checkbox" />
+                  {t("web.feedback.admin.plan.assignIssue")}
+                </label>
+                <fieldset className="grid gap-2">
+                  <legend className="text-sm font-medium">
+                    {t("web.feedback.admin.plan.labels")}
+                  </legend>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {planOptions.labels.map((label) => (
+                      <label
+                        className="flex items-center gap-2 text-sm"
+                        key={label.id}
+                      >
+                        <input
+                          defaultChecked={
+                            label.name.toLocaleLowerCase() === current.category
+                          }
+                          disabled={saving}
+                          name="labelIds"
+                          type="checkbox"
+                          value={label.id}
+                        />
+                        {label.name}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              </>
+            ) : null}
+            {planOptions && planKind === "project" ? (
+              <label className="flex items-center gap-2 text-sm">
+                <input disabled={saving} name="leadProject" type="checkbox" />
+                {t("web.feedback.admin.plan.leadProject")}
+              </label>
+            ) : null}
+            {planError ? (
+              <div className="grid gap-1 text-sm text-destructive" role="alert">
+                <p className="m-0">{t(planError)}</p>
+                {planError === "web.feedback.admin.plan.connectionRequired" ? (
+                  <Link
+                    className="w-fit underline underline-offset-4"
+                    to="/admin/settings"
+                  >
+                    {t("web.feedback.admin.plan.settingsLink")}
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="flex gap-2">
+              <Button disabled={saving || !planOptions} type="submit">
+                {t("web.feedback.admin.plan.submit")}
+              </Button>
+              <Button
+                disabled={saving}
+                onClick={() => setPlanning(false)}
+                type="button"
+                variant="outline"
+              >
+                {t("action.cancel")}
+              </Button>
+            </div>
+          </form>
+        ) : editing ? (
           <form
             className="grid gap-4"
             onSubmit={async (event) => {
@@ -721,6 +894,15 @@ function AdminFeedbackDialog({
                   type="button"
                 >
                   {t("web.feedback.admin.requests.approve")}
+                </Button>
+              ) : null}
+              {item.status === "requested" ? (
+                <Button
+                  disabled={saving}
+                  onClick={() => void openPlanning()}
+                  type="button"
+                >
+                  {t("web.feedback.admin.plan.action")}
                 </Button>
               ) : null}
               {item.status === "pending" || item.status === "requested" ? (
