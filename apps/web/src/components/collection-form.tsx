@@ -1,5 +1,13 @@
 import type { CatalogImage, UserCollectionSummary } from "@package/services";
-import { useId, useState } from "react";
+import {
+  createColumnHelper,
+  createPaginatedRowModel,
+  rowPaginationFeature,
+  tableFeatures,
+  useTable,
+} from "@tanstack/react-table";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useId, useMemo, useState } from "react";
 import { FileDropInput } from "@/components/resource-file-input";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Button } from "@/components/ui/button";
@@ -13,10 +21,23 @@ export type CollectionFormValue = {
   name: string;
 };
 
+const managerPaginationFeatures = tableFeatures({
+  rowPaginationFeature,
+  paginatedRowModel: createPaginatedRowModel(),
+});
+const managerColumnHelper = createColumnHelper<
+  typeof managerPaginationFeatures,
+  CatalogImage
+>();
+const managerColumns = managerColumnHelper.columns([
+  managerColumnHelper.accessor("id", { header: "id" }),
+]);
+
 export function CollectionForm({
   copy,
   disabled = false,
   error,
+  includeImages = true,
   initialValue,
   onSubmit,
 }: {
@@ -35,6 +56,7 @@ export function CollectionForm({
   };
   disabled?: boolean;
   error?: string | null;
+  includeImages?: boolean;
   initialValue?: CollectionFormValue;
   onSubmit(value: CollectionFormValue, images: File[]): void | Promise<void>;
 }) {
@@ -91,30 +113,32 @@ export function CollectionForm({
           }
         />
       </div>
-      <FileDropInput
-        accept=".avif,.jpeg,.jpg,.png,.webp"
-        aspectRatio={4 / 3}
-        aspectRatioHelpHref="/help/image-size-and-resolution-guide"
-        aspectRatioHelpLabel={imageGuidance.helpLabel}
-        aspectRatioWarning={imageGuidance.warning}
-        browseLabel={copy.browse}
-        description={copy.imageHelp}
-        disabled={disabled}
-        fileTypes={copy.imageTypes}
-        files={files}
-        id="collection-images"
-        label={copy.cover}
-        multiple
-        onFilesChange={(additions) =>
-          setFiles((current) => [...current, ...additions])
-        }
-        onRemove={(index) =>
-          setFiles((current) =>
-            current.filter((_, candidate) => candidate !== index),
-          )
-        }
-        removeFileLabel={copy.removeFile}
-      />
+      {includeImages ? (
+        <FileDropInput
+          accept=".avif,.jpeg,.jpg,.png,.webp"
+          aspectRatio={4 / 3}
+          aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+          aspectRatioHelpLabel={imageGuidance.helpLabel}
+          aspectRatioWarning={imageGuidance.warning}
+          browseLabel={copy.browse}
+          description={copy.imageHelp}
+          disabled={disabled}
+          fileTypes={copy.imageTypes}
+          files={files}
+          id="collection-images"
+          label={copy.cover}
+          multiple
+          onFilesChange={(additions) =>
+            setFiles((current) => [...current, ...additions])
+          }
+          onRemove={(index) =>
+            setFiles((current) =>
+              current.filter((_, candidate) => candidate !== index),
+            )
+          }
+          removeFileLabel={copy.removeFile}
+        />
+      ) : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button disabled={disabled || value.name.trim().length < 2} type="submit">
         {copy.submit}
@@ -139,6 +163,9 @@ export function CollectionCoverManager({
     delete: string;
     deleteConfirmation: string;
     history: string;
+    nextPage: string;
+    pageStatus(page: number, pageCount: number): string;
+    previousPage: string;
     select: string;
   };
   disabled?: boolean;
@@ -147,9 +174,31 @@ export function CollectionCoverManager({
   onSelect(image: CatalogImage): void | Promise<void>;
 }) {
   const current = collection.coverImage;
-  const previous = collection.coverImages.filter(
-    ({ id }) => id !== current?.id,
+  const previous = useMemo(
+    () =>
+      [...collection.coverImages]
+        .filter(({ id }) => id !== current?.id)
+        .sort((left, right) =>
+          right.position === left.position
+            ? right.id - left.id
+            : right.position - left.position,
+        ),
+    [collection.coverImages, current?.id],
   );
+  const initialState = useMemo(
+    () => ({ pagination: { pageIndex: 0, pageSize: 12 } }),
+    [],
+  );
+  const table = useTable(
+    {
+      columns: managerColumns,
+      data: previous,
+      features: managerPaginationFeatures,
+      initialState,
+    },
+    (state) => ({ pagination: state.pagination }),
+  );
+  const pageCount = table.getPageCount();
   return (
     <section className="grid max-w-3xl gap-4 rounded-xl border border-border bg-card p-6">
       <h2 className="font-semibold">{copy.current}</h2>
@@ -191,7 +240,7 @@ export function CollectionCoverManager({
         <>
           <h3 className="font-semibold">{copy.history}</h3>
           <ul className="grid gap-4 sm:grid-cols-2">
-            {previous.map((image) => (
+            {table.getRowModel().rows.map(({ original: image }) => (
               <li className="grid gap-2" key={image.id}>
                 <img
                   alt=""
@@ -224,8 +273,102 @@ export function CollectionCoverManager({
               </li>
             ))}
           </ul>
+          {pageCount > 1 ? (
+            <nav
+              aria-label={copy.history}
+              className="flex items-center justify-center gap-3"
+            >
+              <Button
+                aria-label={copy.previousPage}
+                disabled={!table.getCanPreviousPage()}
+                onClick={() => table.previousPage()}
+                size="icon"
+                type="button"
+                variant="outline"
+              >
+                <ChevronLeft />
+              </Button>
+              <output aria-live="polite" className="text-sm">
+                {copy.pageStatus(
+                  table.state.pagination.pageIndex + 1,
+                  pageCount,
+                )}
+              </output>
+              <Button
+                aria-label={copy.nextPage}
+                disabled={!table.getCanNextPage()}
+                onClick={() => table.nextPage()}
+                size="icon"
+                type="button"
+                variant="outline"
+              >
+                <ChevronRight />
+              </Button>
+            </nav>
+          ) : null}
         </>
       ) : null}
     </section>
+  );
+}
+
+export function CollectionImageUploader({
+  copy,
+  disabled = false,
+  error,
+  onUpload,
+}: {
+  copy: {
+    browse: string;
+    imageHelp: string;
+    imageTypes: string;
+    label: string;
+    removeFile: string;
+    submit: string;
+  };
+  disabled?: boolean;
+  error?: string | null;
+  onUpload(files: File[]): Promise<boolean>;
+}) {
+  const { locale } = useLocale();
+  const imageGuidance = getImageUploadGuidance(locale);
+  const [files, setFiles] = useState<File[]>([]);
+  return (
+    <form
+      className="grid max-w-3xl gap-4 rounded-xl border border-border bg-card p-6"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (files.length && (await onUpload(files))) setFiles([]);
+      }}
+    >
+      <FileDropInput
+        accept=".avif,.jpeg,.jpg,.png,.webp"
+        aspectRatio={4 / 3}
+        aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+        aspectRatioHelpLabel={imageGuidance.helpLabel}
+        aspectRatioWarning={imageGuidance.warning}
+        browseLabel={copy.browse}
+        description={copy.imageHelp}
+        disabled={disabled}
+        fileTypes={copy.imageTypes}
+        files={files}
+        id="collection-gallery-images"
+        label={copy.label}
+        multiple
+        onFilesChange={(additions) =>
+          setFiles((current) => [...current, ...additions])
+        }
+        onRemove={(index) =>
+          setFiles((current) =>
+            current.filter((_, candidate) => candidate !== index),
+          )
+        }
+        removeFileLabel={copy.removeFile}
+      />
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <Button disabled={disabled || !files.length} type="submit">
+        {copy.submit}
+      </Button>
+    </form>
   );
 }

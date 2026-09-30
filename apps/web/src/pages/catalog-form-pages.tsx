@@ -25,6 +25,7 @@ import {
   CollectionCoverManager,
   CollectionForm,
   type CollectionFormValue,
+  CollectionImageUploader,
 } from "@/components/collection-form";
 import { CollectionSelector } from "@/components/collection-selector";
 import { FileDropInput } from "@/components/resource-file-input";
@@ -953,6 +954,7 @@ export function CollectionFormPage({
   const [current, setCurrent] = React.useState(collection);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
   const copy = {
     browse: t("web.resources.upload.browseFiles"),
     cover: t("web.resources.upload.imagesLabel"),
@@ -1043,6 +1045,7 @@ export function CollectionFormPage({
           copy={copy}
           disabled={saving}
           error={error}
+          includeImages={!collection}
           initialValue={
             current
               ? {
@@ -1054,6 +1057,51 @@ export function CollectionFormPage({
           }
           onSubmit={submit}
         />
+        {collection && current ? (
+          <CollectionImageUploader
+            copy={{
+              browse: t("web.resources.upload.browseFiles"),
+              imageHelp: t("web.collections.gallery.imagesHelp", {
+                maxFileSize: formatMiB(maxImageBytes, locale),
+                maxImages: maxImageSessionFiles,
+                maxSessionSize: formatMiB(maxImageSessionBytes, locale),
+              }),
+              imageTypes: t("web.resources.upload.imageTypes"),
+              label: t("web.collections.gallery.title"),
+              removeFile: t("web.resources.action.removeFile"),
+              submit: t("web.action.uploadImages"),
+            }}
+            disabled={saving}
+            error={uploadError}
+            onUpload={async (files) => {
+              setSaving(true);
+              setUploadError(null);
+              try {
+                const upload = await uploadImages({
+                  locale,
+                  files,
+                  getToken,
+                  targetId: current.id,
+                  targetType: "collection",
+                });
+                if (upload.failed.length) {
+                  setUploadError(t("web.collections.error.upload"));
+                  setSaving(false);
+                  return false;
+                }
+                window.location.reload();
+                return true;
+              } catch (uploadFailure) {
+                const failure = uploadFailure as ImageUploadError;
+                setUploadError(
+                  t(failure.key ?? "error.generic", failure.params),
+                );
+                setSaving(false);
+                return false;
+              }
+            }}
+          />
+        ) : null}
         {current?.coverImages.length ? (
           <CollectionCoverManager
             collection={current}
@@ -1061,9 +1109,15 @@ export function CollectionFormPage({
               clear: t("web.action.clearCover"),
               clearConfirmation: t("web.collections.cover.clearConfirmation"),
               current: t("web.collections.cover.current"),
-              delete: t("web.action.deleteCover"),
-              deleteConfirmation: t("web.collections.cover.deleteConfirmation"),
-              history: t("web.resources.upload.imagesLabel"),
+              delete: t("web.action.deleteImage"),
+              deleteConfirmation: t(
+                "web.collections.gallery.deleteConfirmation",
+              ),
+              history: t("web.collections.gallery.title"),
+              nextPage: t("web.collections.gallery.nextPage"),
+              pageStatus: (page, pageCount) =>
+                t("web.collections.gallery.pageStatus", { page, pageCount }),
+              previousPage: t("web.collections.gallery.previousPage"),
               select: t("web.action.selectCover"),
             }}
             disabled={saving}

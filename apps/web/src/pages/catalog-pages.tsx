@@ -14,6 +14,7 @@ import {
   type CatalogFilterCopy,
 } from "@/components/catalog-filter-bar";
 import { CollectionCard } from "@/components/collection-card";
+import { CollectionGallery } from "@/components/collection-gallery";
 import { ImageGallery } from "@/components/image-gallery";
 import { MakerLink } from "@/components/maker-link";
 import { MarkdownContent } from "@/components/markdown-content";
@@ -684,37 +685,33 @@ export function CollectionPage({
       title={collection.name}
     >
       <main className="grid gap-6 p-3 md:p-[18px_22px_22px]">
-        <section
-          className={cn(
-            "grid gap-6",
-            collection.coverImages.length &&
-              "lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]",
-          )}
-        >
-          <div className="grid content-start gap-4 rounded-xl border border-border bg-card p-6 text-card-foreground">
-            <p className="text-sm text-muted-foreground">
-              {t("web.collections.directory.itemCount", {
-                count: collection.itemCount,
-              })}
-            </p>
-            {collection.description ? (
-              <MarkdownContent markdown={collection.description} />
-            ) : null}
-          </div>
-          <div className="grid content-start gap-3">
-            <ImageGallery
-              alt={t("web.resources.detail.imageAlt", {
-                name: collection.name,
-              })}
-              closeLabel={t("web.resources.action.closeImage")}
-              groups={[{ images: collection.coverImages }]}
-              label={t("web.resources.upload.imagesLabel")}
-              nextLabel={t("web.resources.action.nextImage")}
-              pageSize={5}
-              previousLabel={t("web.resources.action.previousImage")}
-            />
-          </div>
-        </section>
+        <CollectionGallery
+          collection={collection}
+          copy={{
+            closeImage: t("web.resources.action.closeImage"),
+            gallery: t("web.collections.gallery.title"),
+            imageAlt: t("web.resources.detail.imageAlt", {
+              name: collection.name,
+            }),
+            itemCount: t("web.collections.directory.itemCount", {
+              count: collection.itemCount,
+            }),
+            nextImage: t("web.resources.action.nextImage"),
+            nextPage: t("web.collections.gallery.nextPage"),
+            owner: ownerUsername
+              ? t("web.collections.gallery.owner", { owner: ownerUsername })
+              : undefined,
+            pageStatus: (page, pageCount) =>
+              t("web.collections.gallery.pageStatus", { page, pageCount }),
+            previousImage: t("web.resources.action.previousImage"),
+            previousPage: t("web.collections.gallery.previousPage"),
+            visibility: t(
+              collection.isPrivate
+                ? "web.resources.visibility.private"
+                : "web.resources.visibility.public",
+            ),
+          }}
+        />
         <section className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
           {filtered.length ? (
             filtered.map((item) => (

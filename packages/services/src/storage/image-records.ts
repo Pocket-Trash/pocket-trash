@@ -114,13 +114,16 @@ export async function attachImages(
     sql`select coalesce(max(position),-1)::int + 1 as position from ${table} where ${column} = ${target.id}`,
   );
   let position = result.rows[0]?.position ?? 0;
-  if (target.type === "collection")
-    await db.execute(
-      sql`update collection_image set is_current = false where collection_id = ${target.id}`,
-    );
+  const collectionHasCover =
+    target.type === "collection" &&
+    (
+      await db.execute(
+        sql`select 1 from collection_image where collection_id = ${target.id} and is_current limit 1`,
+      )
+    ).rows.length > 0;
   for (const [index, file] of files.entries()) {
     await db.execute(
-      sql`insert into ${table} (${column}, position, file_name, content_type, size, sha256, object_path, url, uploaded_by_clerk_id${target.type === "collection" ? sql`, is_current` : sql``}) values (${target.id}, ${position++}, ${file.fileName}, ${file.contentType}, ${file.size}, ${file.sha256}, ${file.objectPath}, ${file.url}, ${actor.clerkId}${target.type === "collection" ? sql`, ${index === 0}` : sql``})`,
+      sql`insert into ${table} (${column}, position, file_name, content_type, size, sha256, object_path, url, uploaded_by_clerk_id${target.type === "collection" ? sql`, is_current` : sql``}) values (${target.id}, ${position++}, ${file.fileName}, ${file.contentType}, ${file.size}, ${file.sha256}, ${file.objectPath}, ${file.url}, ${actor.clerkId}${target.type === "collection" ? sql`, ${!collectionHasCover && index === 0}` : sql``})`,
     );
   }
   if (target.type === "collection")

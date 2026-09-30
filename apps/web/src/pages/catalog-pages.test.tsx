@@ -213,7 +213,7 @@ describe("CollectionPage", () => {
     expect(html).toContain('href="/collections/add"');
     expect(html).toContain("Add to collection");
     expect(html.indexOf("Edit")).toBeLessThan(html.indexOf("Public"));
-    expect(html).not.toContain("lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]");
+    expect(html).toContain("lg:grid-cols-2");
   });
 
   it("keeps descriptions and bearings off collection lists", () => {
@@ -242,7 +242,7 @@ describe("CollectionPage", () => {
   it("shows a paginated image gallery beside the collection summary", () => {
     const collection = owners[0]?.collections[0];
     if (!collection) throw new Error("Collection fixture is required.");
-    const images = Array.from({ length: 7 }, (_, index) =>
+    const images = Array.from({ length: 8 }, (_, index) =>
       collectionImage(index + 1),
     );
 
@@ -250,7 +250,7 @@ describe("CollectionPage", () => {
       <CollectionPage
         collection={{
           ...collection,
-          coverImage: images[6] ?? null,
+          coverImage: images[7] ?? null,
           coverImages: images,
           description: "A focused collection summary.",
         }}
@@ -259,10 +259,10 @@ describe("CollectionPage", () => {
     );
 
     expect(html).toContain("A focused collection summary.");
-    expect(html).toContain('src="https://cdn.test/collection-1.webp"');
-    expect(html).not.toContain('src="https://cdn.test/collection-7.webp"');
-    expect(html).toContain('aria-label="Next image"');
-    expect(html).toContain("lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]");
+    expect(html).toContain('src="https://cdn.test/collection-8.webp"');
+    expect(html).not.toContain('src="https://cdn.test/collection-1.webp"');
+    expect(html).toContain('aria-live="polite"');
+    expect(html).toContain("lg:grid-cols-2");
   });
 });
 

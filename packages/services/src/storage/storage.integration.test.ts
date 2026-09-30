@@ -12,6 +12,7 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { hashLogIdentifier } from "../logging.js";
 import { createResourcesService } from "../resources/index.js";
+import { selectCollectionCover } from "./image-records.js";
 import { createStorageService } from "./index.js";
 
 const url = process.env.STORAGE_TEST_DATABASE_URL;
@@ -354,25 +355,90 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     });
     await service.completeUpload(replacementSession.id, actor);
     const covers = await pool.query(
-      "select id,is_current from collection_image where collection_id=$1 order by position desc",
+      "select id,is_current,position from collection_image where collection_id=$1 order by position desc",
       [collectionId],
     );
-    const id = Number(covers.rows[1].id);
+    const currentId = Number(covers.rows[2].id);
+    const selectedId = Number(covers.rows[1].id);
     const replacementId = Number(covers.rows[0].id);
     expect(covers.rows.map(({ is_current }) => is_current)).toEqual([
       false,
-      true,
       false,
+      true,
+    ]);
+    await expect(
+      service.deleteFile({
+        fileType: "collection_image",
+        fileId: currentId,
+        actor: { clerkId: "stranger", isAdmin: false },
+      }),
+    ).rejects.toMatchObject({ code: "session_not_found" });
+    await Promise.all([
+      db.transaction((tx) =>
+        selectCollectionCover(tx, {
+          collectionId,
+          imageId: selectedId,
+          actor,
+        }),
+      ),
+      service.deleteFile({
+        fileType: "collection_image",
+        fileId: currentId,
+        actor,
+      }),
+    ]);
+    const afterConcurrentChange = await pool.query(
+      "select id,is_current,position from collection_image where collection_id=$1 order by position desc",
+      [collectionId],
+    );
+    expect(afterConcurrentChange.rows).toEqual([
+      { id: String(replacementId), is_current: false, position: 2 },
+      { id: String(selectedId), is_current: true, position: 1 },
+    ]);
+    const laterBytes = new Uint8Array([...image, 0, 1, 2]);
+    const laterFile = await manifest(
+      laterBytes,
+      "image",
+      "later.png",
+      "image/png",
+    );
+    const laterSession = await service.create(
+      {
+        target: { type: "collection", id: collectionId },
+        files: [laterFile],
+      },
+      actor,
+    );
+    await put(laterSession, { "later.png": laterBytes });
+    await service.completeUpload(laterSession.id, actor);
+    const later = await pool.query(
+      "select id,is_current from collection_image where collection_id=$1 order by position desc",
+      [collectionId],
+    );
+    const laterId = Number(later.rows[0].id);
+    expect(later.rows.map(({ is_current }) => is_current)).toEqual([
+      false,
+      false,
+      true,
     ]);
     await service.deleteFile({
       fileType: "collection_image",
-      fileId: id,
-      actor,
+      fileId: laterId,
+      actor: { clerkId: "admin", isAdmin: true },
     });
     expect(
-      (await pool.query("select id from collection_image where id=$1", [id]))
-        .rowCount,
-    ).toBe(0);
+      (
+        await pool.query(
+          "select is_current from collection_image where id=$1",
+          [selectedId],
+        )
+      ).rows[0]?.is_current,
+    ).toBe(true);
+    await service.deleteFile({
+      fileType: "collection_image",
+      fileId: selectedId,
+      actor,
+    });
     expect(
       (
         await pool.query(
@@ -381,6 +447,19 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
         )
       ).rows[0]?.is_current,
     ).toBe(true);
+    await service.deleteFile({
+      fileType: "collection_image",
+      fileId: replacementId,
+      actor: { clerkId: "admin", isAdmin: true },
+    });
+    expect(
+      (
+        await pool.query(
+          "select count(*)::int as count from collection_image where collection_id=$1",
+          [collectionId],
+        )
+      ).rows[0]?.count,
+    ).toBe(0);
   });
   it("keeps attached objects during expiry cleanup and rejects incorrect file hashes", async () => {
     const bytes = new Uint8Array([...image, 0]);
