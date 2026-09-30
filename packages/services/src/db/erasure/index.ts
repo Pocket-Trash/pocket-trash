@@ -10,6 +10,7 @@ import { schema } from "@package/database";
 import type { Logger } from "@package/logger";
 import { loggerMessages } from "@package/logger";
 import { and, asc, eq, inArray, lte, or, sql } from "drizzle-orm";
+import { type AuditService, createAuditService } from "../audit/index.js";
 import {
   DatabaseErasureVerificationError,
   eraseAccountDatabaseData,
@@ -27,6 +28,7 @@ const exceptionMaximumMs = {
   axiom_30_days: 30 * DAY_MS,
   bunny_cache_30_days: 30 * DAY_MS,
   bunny_logs_3_days: 3 * DAY_MS,
+  clerk_deletion_3_days: 3 * DAY_MS,
   clerk_logs_30_days: 30 * DAY_MS,
   cloudflare_logs_7_days: 7 * DAY_MS,
   neon_history_6_hours: 6 * 60 * 60 * 1000,
@@ -117,6 +119,7 @@ export function createErasureService(
   db: Database,
   logger: Logger,
   now: () => Date = () => new Date(),
+  audit: Pick<AuditService, "redactAccount"> = createAuditService(logger),
 ) {
   return {
     async assertAccountActive(clerkId: string): Promise<void> {
@@ -226,6 +229,7 @@ export function createErasureService(
         await eraseAccountDatabaseData(
           db,
           requiredValue(targetClerkId, "Subject"),
+          audit,
         );
       } catch (error) {
         if (error instanceof DatabaseErasureVerificationError) {

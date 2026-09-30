@@ -333,7 +333,18 @@ export function createApp(dependencies: AppDependencies = {}) {
     if (!type.success || !Number.isSafeInteger(fileId) || fileId <= 0)
       return context.json({ error: "invalid_request" }, 400);
     try {
-      await runtime.service.deleteFile({ fileType: type.data, fileId, actor });
+      const body = await context.req.json().catch(() => ({}));
+      const parsed = z
+        .object({ reason: z.string().trim().max(1000).optional() })
+        .safeParse(body);
+      if (!parsed.success)
+        return context.json({ error: "invalid_request" }, 400);
+      await runtime.service.deleteFile({
+        fileType: type.data,
+        fileId,
+        actor,
+        reason: parsed.data.reason,
+      });
       return context.body(null, 204);
     } catch (error) {
       return uploadErrorResponse(error);

@@ -1007,11 +1007,10 @@ function VisibilityButton({
       disabled={locked}
       onClick={async () => {
         const nextPrivate = !isPrivate;
-        const reason =
-          actorIsModerating && nextPrivate
-            ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
-            : undefined;
-        if (actorIsModerating && nextPrivate && !reason) return;
+        const reason = actorIsModerating
+          ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
+          : undefined;
+        if (actorIsModerating && !reason) return;
         await onChange(nextPrivate, reason);
         setIsPrivate(nextPrivate);
       }}

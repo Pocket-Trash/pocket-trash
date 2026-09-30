@@ -85,10 +85,16 @@ function setup(returningRows: unknown[][], selectRows: unknown[][]) {
     }),
   };
   const logger = createLogger({ app: "api", environment: "test" });
+  const audit = { redactAccount: vi.fn(), write: vi.fn() };
 
   return {
     db,
-    service: createCollectionsService(db, users as never, logger),
+    service: createCollectionsService(
+      db,
+      users as never,
+      audit as never,
+      logger,
+    ),
     updates,
     users,
     writes,
@@ -353,7 +359,7 @@ describe("collection catalog writes", () => {
 
     await expect(
       service.addSpinner({
-        actorClerkId: "user-secret",
+        actor: actor("user-secret"),
         buttonCustomFinish: null,
         buttonFinishOptionId: 1202,
         buttonMaterialId: 1201,
@@ -422,7 +428,7 @@ describe("collection catalog writes", () => {
 
     await expect(
       service.addSpinner({
-        actorClerkId: "user-secret",
+        actor: actor("user-secret"),
         buttonCustomFinish: null,
         buttonFinishOptionId: null,
         buttonMaterialId: null,
@@ -478,7 +484,7 @@ describe("collection catalog writes", () => {
 
     await expect(
       service.addSpinnerButton({
-        actorClerkId: "user-secret",
+        actor: actor("user-secret"),
         customFinish: {
           colorEffectId: 10,
           colorIds: [22, 21],
@@ -640,7 +646,7 @@ describe("collection catalog writes", () => {
 
     await expect(
       service.addSpinner({
-        actorClerkId: "user-secret",
+        actor: actor("user-secret"),
         buttonCustomFinish: null,
         buttonFinishOptionId: null,
         buttonMaterialId: null,
@@ -664,7 +670,7 @@ describe("collection catalog writes", () => {
 
     await expect(
       service.addSpinner({
-        actorClerkId: "user-secret",
+        actor: actor("user-secret"),
         buttonCustomFinish: null,
         buttonFinishOptionId: null,
         buttonMaterialId: null,
@@ -961,11 +967,18 @@ describe("catalog lookup writes", () => {
         };
         return query;
       }),
+      transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
+        callback(db),
+      ),
       update,
     } as unknown as Database;
     const service = createCatalogService(
       db,
       createLogger({ app: "api", environment: "test" }),
+      {
+        getByClerkId: vi.fn().mockResolvedValue({ id: 1000, username: null }),
+      } as never,
+      { write: vi.fn() } as never,
     );
 
     await expect(
@@ -1111,6 +1124,10 @@ describe("catalog image operation logging", () => {
     const service = createCatalogService(
       { transaction } as unknown as Database,
       logger,
+      {
+        getByClerkId: vi.fn().mockResolvedValue({ id: 1000, username: null }),
+      } as never,
+      { write: vi.fn() } as never,
     );
     const uploadActor = actor("private-owner");
     await service.attachImages({

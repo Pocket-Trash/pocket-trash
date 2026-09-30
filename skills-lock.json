@@ -93,7 +93,6 @@
     },
     "pocket-trash-pr-view": {
       "source": "pocket-trash/skills",
-      "ref": "v0.4.0",
       "sourceType": "github",
       "skillPath": "skills/pocket-trash-pr-view/SKILL.md",
       "computedHash": "87882061dd222c60d9a5890586c5ed3a4d1687d57ab6c6ba9f397accd09589c0"

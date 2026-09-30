@@ -429,7 +429,7 @@ jobs:
         if: steps.db.outputs.can_deploy == 'true' && steps.db_changes.outputs.database == 'true'
         working-directory: packages/database
         env:
-          DATABASE_URL: ${{ steps.db.outputs.database_url }}
+          DATABASE_URL: ${{ steps.db.outputs.migration_database_url }}
         run: |
           set -euo pipefail
 
@@ -947,9 +947,10 @@ jobs:
       - name: Migrate and reconcile development users
         env:
           DATABASE_URL: ${{ steps.development_db.outputs.database_url }}
+          MIGRATION_DATABASE_URL: ${{ steps.development_db.outputs.migration_database_url }}
         run: |
           set -euo pipefail
-          pnpm --filter @package/database exec drizzle-kit migrate --config=drizzle.config.ts
+          DATABASE_URL="$MIGRATION_DATABASE_URL" pnpm --filter @package/database exec drizzle-kit migrate --config=drizzle.config.ts
           pnpm --filter @app/api exec tsx src/scripts/reconcile-clerk-users.ts
 
       - name: Deploy stable development API
@@ -1106,7 +1107,7 @@ jobs:
       - name: Run production migrations
         working-directory: packages/database
         env:
-          DATABASE_URL: ${{ steps.production_db.outputs.database_url }}
+          DATABASE_URL: ${{ steps.production_db.outputs.migration_database_url }}
         run: |
           set -euo pipefail
 

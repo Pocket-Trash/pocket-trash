@@ -49,6 +49,7 @@ export function createErasureOperations(input: {
       return {
         exceptions: [
           exception("axiom_30_days", deletedAt, 30),
+          exception("clerk_deletion_3_days", deletedAt, 3),
           exception("clerk_logs_30_days", deletedAt, 30),
           exception("cloudflare_logs_7_days", deletedAt, 7),
           exception("neon_history_6_hours", deletedAt, 0.25),

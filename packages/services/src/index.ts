@@ -24,6 +24,11 @@ export type {
   AdminFeedbackSort,
   AdminFeedbackSortField,
   ApprovedErasureExceptionCode,
+  AuditEventDefinition,
+  AuditPayload,
+  AuditRedactionContext,
+  AuditService,
+  AuditWriteInput,
   CatalogColor,
   CatalogFinishOption,
   CatalogImage,
@@ -61,6 +66,9 @@ export type {
 } from "./db/index.js";
 export {
   AccountErasureInProgressError,
+  AuditEventValidationError,
+  AuditPayloadTooLargeError,
+  createAuditService,
   createErasureService,
   createErasureSubjectHmac,
   defaultUserSettings,
@@ -135,6 +143,7 @@ export class Services {
         const configStorage = config.storage;
         const storage = createUploadStorage(configStorage);
         this.#storage = createStorageService({
+          audit: this.#db.audit,
           db,
           storage,
           logger: this.#logger,

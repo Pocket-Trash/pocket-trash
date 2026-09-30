@@ -1,8 +1,11 @@
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { eq, inArray, sql } from "drizzle-orm";
+import type { AuditService } from "../audit/index.js";
 
 type ErasureTargets = {
+  auditActorEventIds: Array<number | string>;
+  auditOwnerEventIds: Array<number | string>;
   collectionIds: Array<number | string>;
   collectionImageIds: Array<number | string>;
   collectionItemIds: Array<number | string>;
@@ -23,6 +26,7 @@ type VerificationFinding = {
 export async function eraseAccountDatabaseData(
   db: Database,
   targetClerkId: string,
+  audit: Pick<AuditService, "redactAccount">,
 ): Promise<void> {
   await db.transaction(async (tx) => {
     const [account] = await tx
@@ -34,6 +38,8 @@ export async function eraseAccountDatabaseData(
     const userId = account?.id ?? -1;
     const targetResult = await tx.execute(sql<ErasureTargets>`
       select
+        array(select id from audit_event where actor_user_id = ${userId}) as "auditActorEventIds",
+        array(select id from audit_event where owner_user_id = ${userId}) as "auditOwnerEventIds",
         array(select id from user_collection where owner_id = ${userId}) as "collectionIds",
         array(select id from collection_item where owner_id = ${userId}) as "collectionItemIds",
         array(select ci.id from collection_image ci join user_collection uc on uc.id = ci.collection_id where uc.owner_id = ${userId}) as "collectionImageIds",
@@ -47,6 +53,8 @@ export async function eraseAccountDatabaseData(
     `);
     const targets = targetResult.rows[0] as ErasureTargets | undefined;
     if (!targets) throw new Error("Database erasure target capture failed.");
+
+    if (account) await audit.redactAccount(tx, account.id);
 
     if (account) {
       await tx.execute(sql`
@@ -166,6 +174,10 @@ export async function eraseAccountDatabaseData(
     const verification = await tx.execute(sql<VerificationFinding>`
       select 'users.clerk_id' as location, count(*) as remaining from users where clerk_id = ${targetClerkId}
       union all select 'users.id', count(*) from users where id = ${userId}
+      union all select 'audit_event.actor_user_id', count(*) from audit_event where actor_user_id = ${userId}
+      union all select 'audit_event.owner_user_id', count(*) from audit_event where owner_user_id = ${userId}
+      union all select 'audit_event.actor_retention', ${targets.auditActorEventIds.length} - count(*) from audit_event where ${inArray(schema.auditEvent.id, numericIds(targets.auditActorEventIds))}
+      union all select 'audit_event.owner_retention', ${targets.auditOwnerEventIds.length} - count(*) from audit_event where ${inArray(schema.auditEvent.id, numericIds(targets.auditOwnerEventIds))}
       union all select 'user_settings.user_id', count(*) from user_settings where user_id = ${userId}
       union all select 'user_collection.owner_id', count(*) from user_collection where owner_id = ${userId}
       union all select 'collection_item.owner_id', count(*) from collection_item where owner_id = ${userId}
