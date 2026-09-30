@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { hasPermission, type Permission } from "../authorization.js";
 import {
   type StorageDb,
   type UploadActor,
@@ -54,9 +55,16 @@ export async function assertCanEditTarget(
   const result = await db.execute<{ owner: string }>(query);
   if (
     !result.rows[0] ||
-    (!actor.isAdmin && result.rows[0].owner !== actor.clerkId)
+    (result.rows[0].owner !== actor.clerkId &&
+      !hasPermission(actor, permissionFor(target.type)))
   )
     throw new UploadSessionError("session_not_found", 404);
+}
+
+function permissionFor(target: UploadTarget["type"]): Permission {
+  if (target === "resource") return "resources.manage";
+  if (target === "product") return "products.manage";
+  return "collections.manage";
 }
 export async function assertNoDuplicateImages(
   db: StorageDb,

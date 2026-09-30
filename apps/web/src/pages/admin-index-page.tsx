@@ -8,6 +8,8 @@ import { AdminPageShell } from "@/components/admin-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
 export function AdminIndexPage() {
+  const { sessionClaims, userId } = useAuth();
+  const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
   const { locale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const feedbackLink = {
@@ -20,7 +22,13 @@ export function AdminIndexPage() {
     label: t("web.admin.notifications.title"),
     to: "/notifications" as const,
   };
-  const primaryLinks = [feedbackLink, notificationsLink];
+  const primaryLinks = [
+    ...(hasPermission(actor, "feedback.manage") ? [feedbackLink] : []),
+    ...(hasPermission(actor, "feedback.manage") ||
+    hasPermission(actor, "resources.manage")
+      ? [notificationsLink]
+      : []),
+  ];
 
   return (
     <AdminPageShell title={t("web.admin.hub.title")}>
@@ -50,3 +58,6 @@ export function AdminIndexPage() {
     </AdminPageShell>
   );
 }
+
+import { useAuth } from "@clerk/tanstack-react-start";
+import { hasPermission, normalizeActor } from "@package/services/authorization";

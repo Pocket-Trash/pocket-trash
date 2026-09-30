@@ -4,6 +4,7 @@ import { UserMenu } from "./user-menu";
 
 const clerkState = vi.hoisted(() => ({
   role: "user",
+  userId: "user_123",
   isLoaded: true,
   user: null as null | {
     imageUrl: string;
@@ -13,7 +14,10 @@ const clerkState = vi.hoisted(() => ({
 }));
 
 vi.mock("@clerk/tanstack-react-start", () => ({
-  useAuth: () => ({ sessionClaims: { role: clerkState.role } }),
+  useAuth: () => ({
+    sessionClaims: { role: clerkState.role },
+    userId: clerkState.userId,
+  }),
   useClerk: () => ({ signOut: vi.fn() }),
   useUser: () => clerkState,
 }));

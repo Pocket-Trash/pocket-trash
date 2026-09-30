@@ -1,9 +1,12 @@
 import { formatTranslation } from "@pocket-trash/localizations";
-import { createFileRoute } from "@tanstack/react-router";
-import { listAdminAllActiveFeedback } from "@/lib/feedback";
+import { createFileRoute, notFound } from "@tanstack/react-router";
+import { canManageFeedback, listAdminAllActiveFeedback } from "@/lib/feedback";
 import { AdminAllActiveFeedbackPage } from "@/pages/admin-feedback-pages";
 
 export const Route = createFileRoute("/admin/feedback/")({
+  beforeLoad: async () => {
+    if (!(await canManageFeedback())) throw notFound();
+  },
   component: AdminAllActiveFeedbackRoute,
   head: () => ({
     meta: [

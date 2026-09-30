@@ -53,7 +53,7 @@ describe("catalog product persistence", () => {
         createLogger({ app: "api", environment: "test" }),
       );
       const created = await service.createProduct({
-        actorClerkId: "user-test",
+        actor: { clerkId: "user-test", role: "user" },
         description: "Created description",
         finishOptions: [
           {
@@ -86,7 +86,7 @@ describe("catalog product persistence", () => {
         productId: created.id,
       });
       const updated = await service.updateProduct({
-        actorClerkId: "user-test",
+        actor: { clerkId: "user-test", role: "user" },
         description: "Edited description",
         finishOptions: [
           {

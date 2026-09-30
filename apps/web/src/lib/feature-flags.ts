@@ -4,8 +4,10 @@ import type {
   FeatureFlagListItem,
   UserBetaFeatureFlag,
 } from "@package/services";
+import { hasPermission } from "@package/services/authorization";
 import { createServerFn } from "@tanstack/react-start";
 import { activeAuth as auth } from "@/lib/auth";
+import { getActor, requirePermission } from "@/lib/authorization";
 import { localizedServerError } from "@/lib/server-errors";
 
 export type ClerkUserSearchResult = {
@@ -16,14 +18,8 @@ export type ClerkUserSearchResult = {
   username: string | null;
 };
 
-type SessionClaimsWithRole = {
-  role?: unknown;
-};
-
-export const isFeatureFlagAdmin = createServerFn().handler(async () => {
-  const { isAuthenticated, sessionClaims } = await auth();
-
-  return isAuthenticated && getRole(sessionClaims) === "admin";
+export const canManageFeatureFlags = createServerFn().handler(async () => {
+  return hasPermission(await getActor(), "feature_flags.manage");
 });
 
 export const listAdminFeatureFlags = createServerFn().handler(
@@ -161,19 +157,7 @@ async function requireAuthenticatedUser(): Promise<string> {
 }
 
 async function requireFeatureFlagAdmin(): Promise<string> {
-  const { isAuthenticated, sessionClaims, userId } = await auth();
-
-  if (!isAuthenticated || !userId || getRole(sessionClaims) !== "admin") {
-    throw localizedServerError("error.generic");
-  }
-
-  return userId;
-}
-
-function getRole(sessionClaims: unknown): string | undefined {
-  const claims = sessionClaims as SessionClaimsWithRole | null | undefined;
-
-  return typeof claims?.role === "string" ? claims.role : undefined;
+  return (await requirePermission("feature_flags.manage")).clerkId;
 }
 
 function parseCreateFeatureFlagInput(input: unknown) {
