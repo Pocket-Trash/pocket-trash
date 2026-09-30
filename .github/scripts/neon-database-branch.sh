@@ -118,22 +118,29 @@ preview_branch_expires_at() {
 
 connection_uri() {
   local branch_id="$1"
+  local pooled="$2"
   local database_name
   database_name="$(url_encode "$NEON_DATABASE_NAME")"
   local role_name
   role_name="$(url_encode "$NEON_DATABASE_USER")"
 
-  api GET "/projects/${NEON_PROJECT_ID}/connection_uri?branch_id=${branch_id}&database_name=${database_name}&role_name=${role_name}&pooled=true" |
+  api GET "/projects/${NEON_PROJECT_ID}/connection_uri?branch_id=${branch_id}&database_name=${database_name}&role_name=${role_name}&pooled=${pooled}" |
     jq -r '.uri'
 }
 
-mask_and_output_database_url() {
-  local value="$1"
+mask_and_output_database_urls() {
+  local branch_id="$1"
+  local database_url
+  database_url="$(connection_uri "$branch_id" true)"
+  local migration_database_url
+  migration_database_url="$(connection_uri "$branch_id" false)"
 
   if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
-    printf '::add-mask::%s\n' "$value"
+    printf '::add-mask::%s\n' "$database_url"
+    printf '::add-mask::%s\n' "$migration_database_url"
   fi
-  write_output database_url "$value"
+  write_output database_url "$database_url"
+  write_output migration_database_url "$migration_database_url"
 }
 
 wait_for_branch_ready() {
@@ -305,8 +312,6 @@ prepare_preview() {
       --arg target_branch "$target_branch" \
       '{pullRequestNumber: $pr_number, targetBranch: $target_branch}')"
     delete_branch_if_exists "$target_branch" "$branches_json"
-    local preview_uri
-    preview_uri="$(connection_uri "$preview_branch_id")"
     write_output can_deploy true
     write_output isolated false
     write_branch_metadata "$PREVIEW_BRANCH_NAME" "$preview_branch_id" "$DEVELOPMENT_BRANCH_NAME"
@@ -315,7 +320,7 @@ prepare_preview() {
       --arg branch_id "$preview_branch_id" \
       --arg parent_branch "$DEVELOPMENT_BRANCH_NAME" \
       '{branchName: $branch_name, branchId: $branch_id, parentBranch: $parent_branch}')"
-    mask_and_output_database_url "$preview_uri"
+    mask_and_output_database_urls "$preview_branch_id"
     return
   fi
 
@@ -344,9 +349,7 @@ prepare_preview() {
   fi
 
   if [[ -n "$target_branch_id" ]]; then
-    local preview_uri
     set_branch_expiration "$target_branch" "$target_branch_id" "$target_branch_expires_at"
-    preview_uri="$(connection_uri "$target_branch_id")"
     write_output can_deploy true
     write_output cleanup_performed false
     write_branch_metadata "$target_branch" "$target_branch_id" "$DEVELOPMENT_BRANCH_NAME"
@@ -355,7 +358,7 @@ prepare_preview() {
       --arg branch_id "$target_branch_id" \
       --arg parent_branch "$DEVELOPMENT_BRANCH_NAME" \
       '{branchName: $branch_name, branchId: $branch_id, parentBranch: $parent_branch}')"
-    mask_and_output_database_url "$preview_uri"
+    mask_and_output_database_urls "$target_branch_id"
     return
   else
     write_output cleanup_performed false
@@ -381,8 +384,6 @@ prepare_preview() {
 
   local created_branch_id
   created_branch_id="$(create_branch_from_parent "$target_branch" "$development_branch_id" "$target_branch_expires_at")"
-  local preview_uri
-  preview_uri="$(connection_uri "$created_branch_id")"
   cleanup_target_on_error=false
   trap - ERR
 
@@ -394,7 +395,7 @@ prepare_preview() {
     --arg branch_id "$created_branch_id" \
     --arg parent_branch "$DEVELOPMENT_BRANCH_NAME" \
     '{branchName: $branch_name, branchId: $branch_id, parentBranch: $parent_branch}')"
-  mask_and_output_database_url "$preview_uri"
+  mask_and_output_database_urls "$created_branch_id"
 }
 
 cleanup_preview() {
@@ -424,9 +425,6 @@ branch_url() {
     exit 1
   fi
 
-  local uri
-  uri="$(connection_uri "$branch_id")"
-
   write_branch_metadata "$BRANCH_NAME" "$branch_id"
   local event_message="ci.database.production.database.selected"
   if [[ "$BRANCH_NAME" == "$PREVIEW_BRANCH_NAME" ]]; then
@@ -437,7 +435,7 @@ branch_url() {
     --arg branch_name "$BRANCH_NAME" \
     --arg branch_id "$branch_id" \
     '{branchName: $branch_name, branchId: $branch_id}')"
-  mask_and_output_database_url "$uri"
+  mask_and_output_database_urls "$branch_id"
 }
 
 refresh_preview() {
@@ -478,16 +476,13 @@ refresh_preview() {
   api POST "/projects/${NEON_PROJECT_ID}/branches/${preview_branch_id}/restore" "$body" > /dev/null
   wait_for_branch_ready "$PREVIEW_BRANCH_NAME"
 
-  local uri
-  uri="$(connection_uri "$preview_branch_id")"
-
   write_branch_metadata "$PREVIEW_BRANCH_NAME" "$preview_branch_id" "$DEVELOPMENT_BRANCH_NAME"
   emit_ci_log info "ci.database.preview.database.selected" "$(jq -n \
     --arg branch_name "$PREVIEW_BRANCH_NAME" \
     --arg branch_id "$preview_branch_id" \
     --arg parent_branch "$DEVELOPMENT_BRANCH_NAME" \
     '{branchName: $branch_name, branchId: $branch_id, parentBranch: $parent_branch}')"
-  mask_and_output_database_url "$uri"
+  mask_and_output_database_urls "$preview_branch_id"
 }
 
 case "${1:-}" in
