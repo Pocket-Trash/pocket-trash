@@ -23,7 +23,7 @@
       "source": "pocket-trash/skills",
       "sourceType": "github",
       "skillPath": "skills/pocket-trash-commit/SKILL.md",
-      "computedHash": "3536e9c57d5c62049d3c4b79b4f4cae3a09cbe5eb373f739a9ce613cfc909e4d"
+      "computedHash": "7cd17a0d44a22dfe1af939869b70f23c669de38a3f40eab273eab8583340039b"
     },
     "pocket-trash-db-diagnostics": {
       "source": "pocket-trash/skills",
@@ -77,13 +77,13 @@
       "source": "pocket-trash/skills",
       "sourceType": "github",
       "skillPath": "skills/pocket-trash-pr-create/SKILL.md",
-      "computedHash": "752c8291c7c9978a64114a32afb039f54fc031114734b4e40ea07fbf252bdd14"
+      "computedHash": "31a2562c1d7e3aa1db1f0a9c4b36e1a2e6abc129394f7e47f6ba8931b0c63b97"
     },
     "pocket-trash-pr-update": {
       "source": "pocket-trash/skills",
       "sourceType": "github",
       "skillPath": "skills/pocket-trash-pr-update/SKILL.md",
-      "computedHash": "0d91104e2fcd3b6a68838707211a8323621597bd434f4d7e5cca26d2bba9fbc9"
+      "computedHash": "0038928b12f543b397a7310a08fae6db197eb44e4610ac2c5f4bad360e510aff"
     },
     "pocket-trash-pr-view": {
       "source": "pocket-trash/skills",
