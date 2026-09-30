@@ -15,6 +15,39 @@ const actor = (
   role: "user" | "admin" | "system_admin" = "user",
 ) => ({ clerkId, role }) as const;
 
+function createLookup(
+  service: ReturnType<typeof createCatalogService>,
+  kind: "color" | "finish" | "maker" | "material",
+) {
+  switch (kind) {
+    case "color":
+      return service.createColor({
+        actor: actor("user-secret", "admin"),
+        hex: "#CD7F32",
+        name: "bronze",
+        slug: "bronze-2",
+      });
+    case "finish":
+      return service.createFinish({
+        actor: actor("user-secret", "admin"),
+        name: "bronze",
+        slug: "bronze-2",
+      });
+    case "maker":
+      return service.createMaker({
+        actor: actor("user-secret", "admin"),
+        name: "bronze",
+        rootUrl: null,
+      });
+    case "material":
+      return service.createMaterial({
+        actor: actor("user-secret", "admin"),
+        name: "bronze",
+        slug: "bronze-2",
+      });
+  }
+}
+
 describe("collection name normalization", () => {
   it("collapses case, spacing, punctuation, and diacritics", () => {
     expect(["Roy's", " roys ", "RÓY’S"].map(normalizeCollectionName)).toEqual([
@@ -1090,38 +1123,46 @@ describe("catalog lookup writes", () => {
       createLogger({ app: "api", environment: "test" }),
     );
 
-    const result = (() => {
-      switch (kind) {
-        case "color":
-          return service.createColor({
-            actor: actor("user-secret", "admin"),
-            hex: "#CD7F32",
-            name: "bronze",
-            slug: "bronze-2",
-          });
-        case "finish":
-          return service.createFinish({
-            actor: actor("user-secret", "admin"),
-            name: "bronze",
-            slug: "bronze-2",
-          });
-        case "maker":
-          return service.createMaker({
-            actor: actor("user-secret", "admin"),
-            name: "bronze",
-            rootUrl: null,
-          });
-        case "material":
-          return service.createMaterial({
-            actor: actor("user-secret", "admin"),
-            name: "bronze",
-            slug: "bronze-2",
-          });
-      }
-    })();
+    const result = createLookup(service, kind);
 
     await expect(result).rejects.toThrow(/already exists/i);
     expect(insert).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["color", "color_name_case_insensitive_unique", "Color"],
+    ["finish", "finish_name_case_insensitive_unique", "Finish"],
+    ["maker", "makers_name_case_insensitive_unique", "Maker"],
+    ["material", "materials_name_case_insensitive_unique", "Material"],
+  ] as const)("maps a concurrent duplicate %s name to the existing domain error", async (kind, constraint, label) => {
+    const databaseError = new Error("Query failed", {
+      cause: { code: "23505", constraint },
+    });
+    const db = {
+      insert: vi.fn(() => ({
+        values: vi.fn(() => ({
+          returning: vi.fn().mockRejectedValue(databaseError),
+        })),
+      })),
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn().mockResolvedValue([]),
+          })),
+        })),
+      })),
+      transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
+        callback(db),
+      ),
+    } as unknown as Database;
+    const service = createCatalogService(
+      db,
+      createLogger({ app: "api", environment: "test" }),
+    );
+
+    await expect(createLookup(service, kind)).rejects.toThrow(
+      `${label} name already exists.`,
+    );
   });
 });
 

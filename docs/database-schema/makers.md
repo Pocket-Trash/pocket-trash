@@ -18,4 +18,5 @@ Canonical source makers that scraped or user-created products can belong to.
 
 | Name | Unique | Method | Columns |
 | --- | --- | --- | --- |
+| `makers_name_case_insensitive_unique` | yes | `btree` | `lower("name")` |
 | `makers_root_url_unique` | yes | `btree` | `root_url` |

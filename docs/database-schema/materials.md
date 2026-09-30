@@ -18,4 +18,5 @@ Canonical material values shared across scraped and user-created products.
 
 | Name | Unique | Method | Columns |
 | --- | --- | --- | --- |
+| `materials_name_case_insensitive_unique` | yes | `btree` | `lower("name")` |
 | `materials_slug_unique` | yes | `btree` | `slug` |

@@ -40,17 +40,33 @@ export class CollectionButtonAlreadyInstalledError extends Error {
   }
 }
 
-function isCollectionButtonAlreadyInstalledError(error: unknown): boolean {
+function uniqueConstraint(error: unknown): string | undefined {
   const databaseError =
     error instanceof Error && error.cause !== undefined ? error.cause : error;
-  return (
+  if (
     typeof databaseError === "object" &&
     databaseError !== null &&
     "code" in databaseError &&
     databaseError.code === "23505" &&
     "constraint" in databaseError &&
-    databaseError.constraint === "collection_spinner_installed_button_unique"
-  );
+    typeof databaseError.constraint === "string"
+  ) {
+    return databaseError.constraint;
+  }
+  return undefined;
+}
+
+const catalogNameConflictMessages: Record<string, string> = {
+  color_name_case_insensitive_unique: "Color name already exists.",
+  finish_name_case_insensitive_unique: "Finish name already exists.",
+  makers_name_case_insensitive_unique: "Maker name already exists.",
+  materials_name_case_insensitive_unique: "Material name already exists.",
+};
+
+function mapCatalogNameConflict(error: unknown): never {
+  const message = catalogNameConflictMessages[uniqueConstraint(error) ?? ""];
+  if (message) throw new Error(message);
+  throw error;
 }
 
 export type CatalogProductType = "spinner" | "spinner-button";
@@ -566,7 +582,8 @@ export function createCatalogService(
                 id: schema.color.id,
                 name: schema.color.name,
                 slug: schema.color.slug,
-              });
+              })
+              .catch(mapCatalogNameConflict);
             if (!row) throw new Error("Failed to create color.");
             if (dependencies && actorUser) {
               await writeProductAdminAudit(dependencies.audit, tx, {
@@ -609,7 +626,8 @@ export function createCatalogService(
                 id: schema.finish.id,
                 name: schema.finish.name,
                 slug: schema.finish.slug,
-              });
+              })
+              .catch(mapCatalogNameConflict);
             if (!row) throw new Error("Failed to create finish.");
             if (dependencies && actorUser) {
               await writeProductAdminAudit(dependencies.audit, tx, {
@@ -652,7 +670,8 @@ export function createCatalogService(
                 id: schema.maker.id,
                 name: schema.maker.name,
                 rootUrl: schema.maker.rootUrl,
-              });
+              })
+              .catch(mapCatalogNameConflict);
             if (!row) throw new Error("Failed to create maker.");
             if (dependencies && actorUser) {
               await writeProductAdminAudit(dependencies.audit, tx, {
@@ -698,7 +717,8 @@ export function createCatalogService(
                 id: schema.material.id,
                 name: schema.material.name,
                 slug: schema.material.slug,
-              });
+              })
+              .catch(mapCatalogNameConflict);
             if (!row) throw new Error("Failed to create material.");
             if (dependencies && actorUser) {
               await writeProductAdminAudit(dependencies.audit, tx, {
@@ -2137,7 +2157,10 @@ export function createCollectionsService(
                     eq(schema.collectionSpinner.id, input.collectionItemId),
                   );
               } catch (error) {
-                if (isCollectionButtonAlreadyInstalledError(error)) {
+                if (
+                  uniqueConstraint(error) ===
+                  "collection_spinner_installed_button_unique"
+                ) {
                   throw new CollectionButtonAlreadyInstalledError();
                 }
                 throw error;
