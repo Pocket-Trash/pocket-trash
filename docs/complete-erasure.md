@@ -104,14 +104,14 @@ production and must be scanned by captured path, not assumed empty.
 
 ## Provider and infrastructure matrix
 
-These values were checked against live configuration on 2026-09-29. A provider
+These values were checked against live configuration on 2026-09-30. A provider
 configuration that is less strict than this table is a release blocker.
 
 | Provider/location | Current finding | Required handling and verification | Approved bound |
 | --- | --- | --- | --- |
 | Neon production branch | Source of record | Run the database transaction, then execute the identifier and target-ID scans below | No retained active copy |
 | Neon history | Project history window is 21,600 seconds | Treat point-in-time history as inaccessible recovery data; keep the receipt available for replay | 6 hours from deletion |
-| Neon branches/snapshots | No scheduled snapshots. `preview`, `dev_branch_roy`, and `preview-pr-127` are production-derived; the first two have no expiry | Erase the subject from every production-derived branch or delete/recreate the branch, then verify it independently. Never promote an unchecked branch | No exception. The two non-expiring branches are current release blockers |
+| Neon branches/snapshots | No scheduled snapshots. `preview` and `dev_branch_roy` are production-derived and have no expiry; `development` is schema-only | Erase the subject from every production-derived branch or delete/recreate the branch, then verify it independently. Never promote an unchecked branch | No exception. The two non-expiring branches are current release blockers |
 | Bunny Storage | One storage zone with Singapore, Los Angeles, and Stockholm replication | Delete every captured object; `DELETE` success/already-absent plus subsequent authorized origin `GET` returning not found is the customer-visible completion event. ENG-200 must obtain a contractual bound or provider confirmation for internal replicas | Active object: until the observable deletion event. Internal-replica expiry is unknown and is a current release blocker; do not claim physical deletion |
 | Bunny CDN/Optimizer | Perma-Cache disabled; cache max-age override is 2,592,000 seconds | Purge each exact URL after origin deletion and verify an uncached request is unavailable. Do not claim provider-internal physical deletion timing | Inaccessible immediately after verified purge; automatic cache ceiling 30 days |
 | Bunny request logs | Logging enabled, IP anonymization enabled, no permanent log storage/forwarding | Keep IP anonymization on; never put raw IDs in paths/query strings; provider expiry is automatic | 3 days |
@@ -122,7 +122,7 @@ configuration that is less strict than this table is a release blocker.
 | Vercel build logs/deployments | Build logs can outlive runtime logs; deployments are retained for rollback | Account data is prohibited from builds and generated artifacts. If an incident puts it there, delete the affected deployment before completing the request | No account-data exception |
 | Railway scraper deploy/build logs | The deployed workload is the catalog scraper; Railway captures stdout/stderr | Keep account data out of scraper jobs and logs. If a future workload contains it, apply the workspace plan's log window and update this matrix | No current account data; maximum supported log window is 90 days |
 | Railway `scraper-queue` Redis volume and backups | Persistent 5 GB volume; current queue is catalog-only | Verify queued payloads contain no account data. If account data is introduced, remove keys and every volume backup before completion | No current account data; no exception approved |
-| Clerk application logs | Clerk events can include user-resource payloads; the live production plan/window is not yet recorded | Provider-only operational access; do not export. ENG-203 must record and verify a configured window no longer than 30 days | Maximum approved bound is 30 days. An unknown or longer Enterprise value is a current release blocker |
+| Clerk application logs | The production dashboard exposes a 30-day searchable window | Provider-only operational access; do not export. Recheck the window after any plan change | 30 days |
 | Clerk CSV exports | Dashboard exports can contain full profiles and credential material | Search export history and approved download locations; delete files and record operator attestation | None |
 
 ### Processing regions and recovery copies
@@ -131,23 +131,26 @@ configuration that is less strict than this table is a release blocker.
 | --- | --- | --- |
 | Neon | `aws-us-east-1` | 6-hour point-in-time history; no scheduled snapshots; production-derived branches are active copies, not backups |
 | Bunny | Origin replicated to Singapore, Los Angeles, and Stockholm; CDN is global | No customer-visible backup schedule. The origin check covers only customer-visible access, not physical replica deletion. ENG-200 must document the provider's contractual replica lifecycle; CDN cache is covered by exact purge and TTL |
-| Axiom | Dataset location is not exposed by the checked dataset API | Provider-managed replication only; no customer restore workflow is approved. Region/DPA confirmation is an ENG-203 release blocker |
+| Axiom | `cloud.us-east-1.aws` | Provider-managed replication only; no customer restore workflow is approved. The public DPA governs provider processing |
 | Cloudflare | Worker and CDN processing are global | Logs/traces are provider-managed and expire; KV is development-only and contains no user payload |
 | Vercel | Global edge; no application region override is checked in | Deployments/build artifacts must contain no account data; no account-data recovery copy is approved |
 | Railway | Production scraper and Redis run in `us-east4-eqdc4a` | Redis is catalog-only. The live volume backup schedule is not exposed by the checked CLI output; introducing account data is blocked until every backup is inventoried |
-| Clerk | Provider-managed identity service; production residency/backup details are not exposed by the checked Platform API | ENG-203 must record the production residency, plan log window, and contractual backup-deletion behavior before release; unknown behavior is not an approved exception |
+| Clerk | Provider-managed identity service; production residency and per-user backup purge timing are not exposed by the dashboard or checked Platform API | The DPA commits to deleting remaining customer personal data within 90 days after service termination, but does not establish a per-user backup purge bound. Do not claim physical backup deletion without provider confirmation |
 
 Provider references: [Neon history](https://neon.com/docs/postgres/backup-restore/history-window),
 [Neon restore behavior](https://neon.com/docs/introduction/branch-restore),
 [Bunny cache purge](https://bunny.net/docs/cdn/purge-cache.md),
 [Bunny logging](https://bunny.net/docs/cdn/logging/index.md),
 [Axiom retention](https://axiom.co/docs/reference/datasets),
+[Axiom edge deployments](https://axiom.co/docs/reference/edge-deployments),
+[Axiom DPA](https://axiom.co/docs/legal/data-processing),
 [Cloudflare Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/),
 [Vercel runtime logs](https://vercel.com/docs/logs/runtime),
 [Vercel deployment retention](https://vercel.com/docs/deployment-retention),
 [Railway logs](https://docs.railway.com/observability/logs),
 [Railway volume backups](https://docs.railway.com/volumes/backups), and
-[Clerk logs](https://clerk.com/docs/guides/dashboard/logs/overview).
+[Clerk logs](https://clerk.com/docs/guides/dashboard/logs/overview), and
+[Clerk DPA](https://clerk.com/legal/dpa).
 
 ### Retention exception register
 
@@ -164,7 +167,7 @@ readers unless a row narrows access further.
 | Axiom events already emitted | Reliability/security; event time, severity, message, request metadata, and legacy subject hash | Platform owner configures dataset lifecycle; Axiom deletes at 30 days | Never restored. Queries are read-only and restricted to operators |
 | Cloudflare logs/traces | Reliability/security; provider request and invocation metadata with opaque routes only | Cloudflare lifecycle; plan value, capped at 7 days | Never restored |
 | Vercel runtime logs | Reliability/security; request/runtime metadata with opaque routes only | Vercel lifecycle; 1 hour on the current Hobby plan | Never restored |
-| Clerk application logs | Identity security/audit; provider event metadata and provider-controlled user payload | Clerk lifecycle; production setting must be verified at no more than 30 days | Never restored into Pocket Trash; do not export |
+| Clerk application logs | Identity security/audit; provider event metadata and provider-controlled user payload | Clerk lifecycle; 30-day production window verified on 2026-09-30 | Never restored into Pocket Trash; do not export |
 
 Neon branches, snapshots, Bunny origin objects, Vercel build artifacts,
 Railway volumes/backups, support records, incident artifacts, exports, and local
