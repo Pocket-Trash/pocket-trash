@@ -70,6 +70,14 @@ export const feedback = pgTable(
       sql`char_length(${table.description}) between 1 and 5000`,
     ),
     check(
+      "feedback_category_valid",
+      sql`${table.category} is null or ${table.category} in ('product_type', 'feature', 'improvement', 'bug')`,
+    ),
+    check(
+      "feedback_status_valid",
+      sql`${table.status} in ('pending', 'requested', 'planned', 'in_progress', 'completed', 'merged', 'denied', 'canceled')`,
+    ),
+    check(
       "feedback_approved_category_required",
       sql`${table.status} in ('pending', 'merged', 'denied') or ${table.category} is not null`,
     ),
@@ -115,6 +123,10 @@ export const feedbackNotifications = pgTable(
     check(
       "feedback_notifications_read_metadata_consistent",
       sql`num_nonnulls(${table.readAt}, ${table.readByClerkId}) in (0, 2)`,
+    ),
+    check(
+      "feedback_notifications_type_valid",
+      sql`${table.type} in ('submitted', 'completed')`,
     ),
   ],
 );
