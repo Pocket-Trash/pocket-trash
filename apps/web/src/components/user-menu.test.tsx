@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UserMenu } from "./user-menu";
 
 const clerkState = vi.hoisted(() => ({
+  role: "user",
   isLoaded: true,
   user: null as null | {
     imageUrl: string;
@@ -12,6 +13,7 @@ const clerkState = vi.hoisted(() => ({
 }));
 
 vi.mock("@clerk/tanstack-react-start", () => ({
+  useAuth: () => ({ sessionClaims: { role: clerkState.role } }),
   useClerk: () => ({ signOut: vi.fn() }),
   useUser: () => clerkState,
 }));
@@ -28,6 +30,7 @@ vi.mock("@/providers/locale-provider", () => ({
 
 describe("UserMenu", () => {
   beforeEach(() => {
+    clerkState.role = "user";
     clerkState.isLoaded = true;
     clerkState.user = null;
   });

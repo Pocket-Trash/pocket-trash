@@ -3,6 +3,7 @@ import { expect, mocked, waitFor, within } from "storybook/test";
 import {
   approveFeedback,
   listAdminActiveFeedback,
+  listAdminAllActiveFeedback,
   listArchivedFeedback,
   listFeedbackMergeTargets,
   listPendingFeedback,
@@ -11,6 +12,7 @@ import {
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import {
   AdminActiveFeedbackPage,
+  AdminAllActiveFeedbackPage,
   AdminFeedbackArchivePage,
   AdminFeedbackRequestsPage,
 } from "./admin-feedback-pages";
@@ -43,6 +45,10 @@ const meta = {
     mocked(listAdminActiveFeedback).mockResolvedValue({
       hasNext: true,
       items: [{ ...request, status: "requested" }],
+    });
+    mocked(listAdminAllActiveFeedback).mockResolvedValue({
+      hasNext: true,
+      items: [request],
     });
     mocked(listArchivedFeedback).mockResolvedValue({
       hasNext: false,
@@ -140,9 +146,20 @@ export const Active: Story = {
     await expect(breadcrumbs.getByText("Admin")).toBeVisible();
     await expect(breadcrumbs.getByText("Feedback")).toBeVisible();
     await expect(breadcrumbs.getByText("Planned")).toBeVisible();
-    await expect(
-      canvas.getByRole("button", { name: "Planned" }),
-    ).toHaveAttribute("href", "/admin/feedback/planned");
+    const sidebar = within(
+      canvas.getByRole("navigation", { name: "Admin Panel" }),
+    );
+    for (const [name, href] of [
+      ["All active", "/admin/feedback"],
+      ["Requests", "/admin/feedback/requests"],
+      ["Planned", "/admin/feedback/planned"],
+      ["Archive", "/admin/feedback/archive"],
+    ] as const) {
+      await expect(sidebar.getByRole("link", { name })).toHaveAttribute(
+        "href",
+        href,
+      );
+    }
     const opener = canvas.getByRole("button", {
       name: "Manage Saved searches",
     });
@@ -200,6 +217,31 @@ export const Active: Story = {
           search: "saved",
           sort: [{ direction: "asc", field: "title" }],
         },
+      }),
+    );
+  },
+};
+
+export const AllActive: Story = {
+  render: () => (
+    <AdminAllActiveFeedbackPage
+      initialPage={{ hasNext: true, items: [request] }}
+    />
+  ),
+  play: async ({ canvas, userEvent }) => {
+    const breadcrumbs = within(
+      within(canvas.getByRole("banner")).getByRole("navigation"),
+    );
+    await expect(breadcrumbs.getByText("Admin")).toBeVisible();
+    await expect(breadcrumbs.getByText("Feedback")).toBeVisible();
+    await expect(breadcrumbs.getByText("All active")).toBeVisible();
+    const search = canvas.getByRole("searchbox", {
+      name: "Search feedback",
+    });
+    await userEvent.type(search, "saved");
+    await waitFor(() =>
+      expect(mocked(listAdminAllActiveFeedback)).toHaveBeenCalledWith({
+        data: { offset: 0, search: "saved", sort: [] },
       }),
     );
   },

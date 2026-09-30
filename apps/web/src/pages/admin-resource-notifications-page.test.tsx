@@ -67,6 +67,6 @@ describe("admin resource notifications", () => {
     expect(html).toContain("Reason for delisting");
     expect(html).toContain("Delist");
     expect(html).toContain('href="/resources/1000"');
-    expect(html).toContain('href="/admin/resources/trash"');
+    expect(html).toContain('href="/admin/trash/resources"');
   });
 });

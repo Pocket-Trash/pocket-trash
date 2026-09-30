@@ -6,8 +6,14 @@ import {
   OwnerResourceTrashPage,
 } from "./resource-trash-page";
 
-vi.mock("@/components/app-shell", () => ({
-  AppShell: ({ children, title }: { children: ReactNode; title: string }) => (
+vi.mock("@/components/admin-page-shell", () => ({
+  AdminPageShell: ({
+    children,
+    title,
+  }: {
+    children: ReactNode;
+    title: string;
+  }) => (
     <div>
       <h1>{title}</h1>
       {children}

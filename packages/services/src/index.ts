@@ -28,6 +28,7 @@ export type {
   CollectionsService,
   FeedbackListItem,
   FeedbackMergeTarget,
+  FeedbackNotificationItem,
   FeedbackPage,
   FeedbackService,
   ListAdminFeedbackOptions,

@@ -109,6 +109,9 @@ export const BasicSignedInUser: Story = {
     await expect(
       await page.findByRole("menuitem", { name: "Log out" }),
     ).toBeVisible();
+    await expect(
+      page.queryByRole("menuitem", { name: "Admin Panel" }),
+    ).not.toBeInTheDocument();
   },
 };
 
@@ -132,8 +135,8 @@ export const AdminUser: Story = {
 
     const page = within(canvasElement.ownerDocument.body);
     await expect(
-      await page.findByRole("menuitem", { name: "Beta features" }),
-    ).toBeVisible();
+      await page.findByRole("menuitem", { name: "Admin Panel" }),
+    ).toHaveAttribute("href", "/admin");
   },
 };
 

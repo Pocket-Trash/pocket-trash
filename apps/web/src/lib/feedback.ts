@@ -86,6 +86,17 @@ export const listAdminActiveFeedback = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     await requireResourceAdmin();
     const { s } = await import("@/lib/services");
+    return await s.db.feedback.listAdminActive({
+      ...data,
+      statuses: ["requested", "planned", "in_progress"],
+    });
+  });
+
+export const listAdminAllActiveFeedback = createServerFn({ method: "GET" })
+  .validator((input) => parseAdminFeedbackListInput(input, "active"))
+  .handler(async ({ data }) => {
+    await requireResourceAdmin();
+    const { s } = await import("@/lib/services");
     return await s.db.feedback.listAdminActive(data);
   });
 
@@ -112,6 +123,22 @@ export const listFeedbackMergeTargets = createServerFn({
   const { s } = await import("@/lib/services");
   return await s.db.feedback.listMergeTargets();
 });
+
+export const listFeedbackNotifications = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  await requireResourceAdmin();
+  const { s } = await import("@/lib/services");
+  return await s.db.feedback.listNotifications();
+});
+
+export const markFeedbackNotificationRead = createServerFn({ method: "POST" })
+  .validator(parseNotificationId)
+  .handler(async ({ data }) => {
+    const actorClerkId = await requireResourceAdmin();
+    const { s } = await import("@/lib/services");
+    await s.db.feedback.markNotificationRead(data.notificationId, actorClerkId);
+  });
 
 export const updateAdminFeedback = createServerFn({ method: "POST" })
   .validator(parseAdminFeedbackInput)
@@ -261,6 +288,14 @@ function parseFeedbackId(input: unknown) {
     throw invalidFeedbackRequest();
   }
   return { feedbackId: Number(feedbackId) };
+}
+
+function parseNotificationId(input: unknown) {
+  const notificationId = parseRecord(input).notificationId;
+  if (!Number.isSafeInteger(notificationId) || Number(notificationId) <= 0) {
+    throw invalidFeedbackRequest();
+  }
+  return { notificationId: Number(notificationId) };
 }
 
 function parseRecord(input: unknown): Record<string, unknown> {
