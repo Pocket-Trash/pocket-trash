@@ -7,7 +7,26 @@ import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
 import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
+import {
+  type AuditEventDefinition,
+  createAuditService,
+} from "../audit/index.js";
 import { createErasureService, createErasureSubjectHmac } from "./index.js";
+
+const erasureAuditEvents = [
+  {
+    action: "test.owner_updated",
+    targetType: "test.owner",
+    serialize: () => ({ metadata: {} }),
+    redact: () => ({ metadata: { redacted: true } }),
+  },
+  {
+    action: "test.admin_updated",
+    targetType: "test.owner",
+    serialize: () => ({ metadata: {} }),
+    redact: () => ({ metadata: { redacted: true } }),
+  },
+] satisfies readonly AuditEventDefinition<never>[];
 
 describe("account database erasure", () => {
   it("rolls back safely, erases every account link, and preserves shared data", async () => {
@@ -16,13 +35,16 @@ describe("account database erasure", () => {
     await stage("fixture setup", async () => await seedInventory(client));
     const db = drizzle(client, { schema }) as unknown as Database;
     const targetClerkId = "user_to_erase";
+    const logger = createLogger({
+      app: "api",
+      environment: "test",
+      transports: [{ log() {} }],
+    });
     const service = createErasureService(
       db,
-      createLogger({
-        app: "api",
-        environment: "test",
-        transports: [{ log() {} }],
-      }),
+      logger,
+      undefined,
+      createAuditService(logger, erasureAuditEvents),
     );
     const subjectHmac = await createErasureSubjectHmac(
       targetClerkId,
@@ -42,6 +64,18 @@ describe("account database erasure", () => {
         client.exec(`
           insert into feedback (submitter_clerk_id, title, description)
           values ('user_to_erase', 'Late write', 'must be blocked');
+        `),
+      ).rejects.toThrow("Account erasure is in progress.");
+      await expect(
+        client.exec(`
+          insert into audit_event (
+            action, target_type, target_id, actor_user_id, actor_username,
+            actor_role, authorization_type, metadata, occurred_at
+          ) values (
+            'test.late_write', 'test.owner', '1000',
+            (select id from users where clerk_id = 'user_to_erase'),
+            'same_username', 'user', 'owner', '{}'::jsonb, now()
+          );
         `),
       ).rejects.toThrow("Account erasure is in progress.");
       await client.exec(`
@@ -202,6 +236,29 @@ describe("account database erasure", () => {
         `,
         ),
       ).toEqual({ collections: 0, overrides: 0, settings: 0 });
+
+      expect(
+        await counts(
+          client,
+          `
+          select
+            count(*)::int as events,
+            count(*) filter (where actor_user_id is not null)::int as "actorLinks",
+            count(*) filter (where owner_user_id is not null)::int as "ownerLinks",
+            count(*) filter (where actor_username = 'Deleted user')::int as "deletedActors",
+            count(*) filter (where reason = '[erased]')::int as "redactedReasons",
+            count(*) filter (where metadata = '{"redacted": true}'::jsonb)::int as "redactedPayloads"
+          from audit_event
+        `,
+        ),
+      ).toEqual({
+        actorLinks: 1,
+        deletedActors: 1,
+        events: 2,
+        ownerLinks: 0,
+        redactedPayloads: 2,
+        redactedReasons: 2,
+      });
     } finally {
       await client.close();
     }
@@ -248,6 +305,23 @@ async function seedInventory(client: PGlite) {
     insert into users (clerk_id, username) values
       ('user_to_erase', 'same_username'),
       ('other_user', 'other_username');
+    insert into audit_event (
+      action, target_type, target_id, actor_user_id, owner_user_id,
+      actor_username, actor_role, authorization_type, permission, reason,
+      metadata, occurred_at
+    ) values (
+      'test.owner_updated', 'test.owner', '1000',
+      (select id from users where clerk_id = 'user_to_erase'),
+      (select id from users where clerk_id = 'user_to_erase'),
+      'same_username', 'user', 'owner', null, 'same_username reason',
+      '{"name":"same_username"}'::jsonb, now()
+    ), (
+      'test.admin_updated', 'test.owner', '1000',
+      (select id from users where clerk_id = 'other_user'),
+      (select id from users where clerk_id = 'user_to_erase'),
+      'other_username', 'admin', 'permission', 'collections.manage',
+      'same_username reason', '{"name":"same_username"}'::jsonb, now()
+    );
     insert into user_settings (user_id)
       select id from users where clerk_id = 'user_to_erase';
 

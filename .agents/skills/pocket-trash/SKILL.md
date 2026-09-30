@@ -19,6 +19,6 @@ Return this list to the user:
 - `$pocket-trash-logger`: audit logger and `console.*` usage.
 - `$pocket-trash-pr-create`: create a GitHub pull request.
 - `$pocket-trash-pr-update`: update the current branch's pull request.
-- `$pocket-trash-pr-view`: review a pull request and run repo checks.
+- `$pocket-trash-pr-review`: review a pull request and run repo checks.
 - `$pocket-trash-storybook`: add or update Storybook stories.
 - `$pocket-trash-update-scopes`: suggest commitlint scope updates.
