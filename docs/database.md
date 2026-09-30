@@ -203,10 +203,10 @@ for production:
 | Branch | Lifetime | Parent | Purpose |
 | --- | --- | --- | --- |
 | `production` | permanent | root | Production data and schema. |
-| `preview` | permanent | `development` | Shared schema-only data for previews that do not change DB schema. |
-| `development` | permanent | schema-only | Shared default database for local development. |
+| `preview` | permanent | `development` | Shared non-production data for previews that do not change DB schema. |
+| `development` | permanent | root | Shared non-production database for local development. |
 | Developer-specific | permanent | `development` | Optional personal local work branch selected through `.env.local`. |
-| `preview-pr-<number>` | ephemeral | `development` | Isolated schema-only PR database, created only for DB-changing PRs. |
+| `preview-pr-<number>` | ephemeral | `development` | Isolated non-production PR database, created only for DB-changing PRs. |
 
 Local development uses `development` unless repository-root `.env.local` or
 `.env` selects a personal Infisical secret with `URL_INITIALS`. Before opening
@@ -215,7 +215,7 @@ or updating a PR with schema changes, generate committed migrations with
 
 PR branches are disposable, but DB-changing PR updates reuse the existing
 `preview-pr-<number>` branch when it already exists. The Deploy workflow creates
-the branch from schema-only `development` when missing, so production user data
+the branch from non-production `development` when missing, so production user data
 never enters preview databases. Isolated PR branches get a
 Neon expiration timestamp, defaulting to 14 days and configurable with
 `NEON_PREVIEW_BRANCH_EXPIRES_DAYS`. Reused PR branches have that expiration
