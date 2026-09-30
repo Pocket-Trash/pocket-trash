@@ -53,7 +53,11 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Populated: Story = {
-  args: { page, search: {} },
+  args: {
+    exportState: { activeExport: null, canExport: false },
+    page,
+    search: {},
+  },
   play: async ({ canvas, userEvent }) => {
     await expect(canvas.getByRole("link", { name: "Audit log" })).toBeVisible();
     await expect(canvas.getByLabelText("Actor ID")).toBeVisible();
@@ -71,6 +75,7 @@ export const Populated: Story = {
 
 export const Empty: Story = {
   args: {
+    exportState: { activeExport: null, canExport: false },
     page: { ...page, items: [], nextCursor: null },
     search: { action: "missing.action" },
   },
@@ -78,5 +83,43 @@ export const Empty: Story = {
     await expect(canvas.getByRole("status")).toHaveTextContent(
       "No audit events match these filters.",
     );
+  },
+};
+
+export const ExportAvailable: Story = {
+  args: {
+    exportState: { activeExport: null, canExport: true },
+    page,
+    search: {},
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByLabelText("Reason")).toBeRequired();
+    await expect(canvas.getByRole("button", { name: "Export" })).toBeVisible();
+  },
+};
+
+export const ExportReady: Story = {
+  args: {
+    exportState: {
+      activeExport: {
+        completedAt: new Date("2026-09-30T12:05:00Z"),
+        createdAt: new Date("2026-09-30T12:00:00Z"),
+        cutoffAt: new Date("2026-08-01T12:00:00Z"),
+        eventCount: 125,
+        highWaterEventId: 1000,
+        highWaterRecordedAt: new Date("2026-07-31T15:30:00Z"),
+        id: "f58c6cac-f41f-4a32-9f4b-08cb32ff7270",
+        reason: "Incident review",
+        sha256: "a".repeat(64),
+      },
+      canExport: true,
+    },
+    page,
+    search: {},
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(/125 events through/)).toBeVisible();
+    await expect(canvas.getByText(/Incident review/)).toBeVisible();
+    await expect(canvas.getByText(/a{64}/)).toBeVisible();
   },
 };

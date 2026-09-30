@@ -7,7 +7,11 @@ import { Link } from "@tanstack/react-router";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { type AuditSearch, auditCursor } from "@/lib/audit";
+import {
+  type AuditExportState,
+  type AuditSearch,
+  auditCursor,
+} from "@/lib/audit";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -15,9 +19,11 @@ type AuditEvent = AuditEventPage["items"][number];
 type AuditState = NonNullable<AuditEvent["beforeState"]>;
 
 export function AdminAuditPage({
+  exportState,
   page,
   search,
 }: {
+  exportState: AuditExportState;
   page: AuditEventPage;
   search: AuditSearch;
 }) {
@@ -39,6 +45,77 @@ export function AdminAuditPage({
         <p className="m-0 text-sm text-muted-foreground">
           {t("web.admin.audit.description")}
         </p>
+        {exportState.canExport ? (
+          <section
+            aria-labelledby="audit-export-title"
+            className="grid gap-3 rounded-lg border border-border bg-card p-4"
+          >
+            <div className="grid gap-1">
+              <h2 className="text-sm font-semibold" id="audit-export-title">
+                {t("web.admin.audit.exportTitle")}
+              </h2>
+              <p className="m-0 text-sm text-muted-foreground">
+                {t("web.admin.audit.exportDescription")}
+              </p>
+            </div>
+            {exportState.activeExport ? (
+              <div className="grid gap-2 text-sm">
+                <p className="m-0">
+                  {t("web.admin.audit.exportSummary", {
+                    count: new Intl.NumberFormat(locale).format(
+                      exportState.activeExport.eventCount,
+                    ),
+                    date: dateTime.format(
+                      exportState.activeExport.highWaterRecordedAt,
+                    ),
+                  })}
+                </p>
+                <p className="m-0 text-muted-foreground">
+                  <strong>{t("web.admin.audit.reason")}:</strong>{" "}
+                  {exportState.activeExport.reason}
+                </p>
+                {exportState.activeExport.sha256 ? (
+                  <p className="m-0 break-all font-mono text-xs text-muted-foreground">
+                    <strong>SHA-256:</strong> {exportState.activeExport.sha256}
+                  </p>
+                ) : null}
+                <form action="/admin/audit/export" method="post">
+                  <input
+                    name="exportId"
+                    type="hidden"
+                    value={exportState.activeExport.id}
+                  />
+                  <button className={buttonVariants()} type="submit">
+                    {t("web.admin.audit.exportAction")}
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <form
+                action="/admin/audit/export"
+                className="grid gap-3"
+                method="post"
+              >
+                <label
+                  className="grid gap-1.5 text-sm font-medium"
+                  htmlFor="audit-export-reason"
+                >
+                  {t("web.admin.audit.reason")}
+                  <Input
+                    id="audit-export-reason"
+                    maxLength={500}
+                    name="reason"
+                    placeholder={t("web.admin.audit.exportReasonPlaceholder")}
+                    required
+                  />
+                </label>
+                <button className={cn(buttonVariants(), "w-fit")} type="submit">
+                  {t("web.admin.audit.exportAction")}
+                </button>
+              </form>
+            )}
+          </section>
+        ) : null}
         <search aria-labelledby="audit-filters-title">
           <form>
             <fieldset className="grid gap-3 rounded-lg border border-border bg-card p-4">

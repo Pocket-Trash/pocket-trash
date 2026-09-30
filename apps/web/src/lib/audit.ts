@@ -1,4 +1,6 @@
+import type { AuditExportView } from "@package/services";
 import { hasPermission } from "@package/services/authorization";
+import { formatTranslation } from "@pocket-trash/localizations";
 import { createServerFn } from "@tanstack/react-start";
 import { getActor, requirePermission } from "@/lib/authorization";
 import { localizedServerError } from "@/lib/server-errors";
@@ -11,6 +13,11 @@ export type AuditSearch = {
   target?: string;
   targetType?: string;
   to?: string;
+};
+
+export type AuditExportState = {
+  activeExport: AuditExportView | null;
+  canExport: boolean;
 };
 
 export const canReadAudit = createServerFn().handler(async () => {
@@ -33,6 +40,49 @@ export const listAdminAuditEvents = createServerFn({ method: "GET" })
       targetType: data.targetType,
     });
   });
+
+export const getAdminAuditExport = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const actor = await requirePermission("audit.read");
+    if (!hasPermission(actor, "audit.export")) {
+      return { activeExport: null, canExport: false } as const;
+    }
+    const { s } = await import("@/lib/services");
+    return {
+      activeExport: await s.db.audit.getActiveExport(actor),
+      canExport: true,
+    } as const;
+  },
+);
+
+export async function handleAuditExportRequest(request: Request) {
+  try {
+    const actor = await requirePermission("audit.export");
+    const form = await request.formData();
+    const exportId = formString(form.get("exportId"));
+    const { s } = await import("@/lib/services");
+    const record = exportId
+      ? { id: exportId }
+      : await s.db.audit.createExport({
+          actor,
+          reason: formString(form.get("reason")),
+        });
+    const download = await s.db.audit.downloadExport({
+      actor,
+      exportId: record.id,
+    });
+    return new Response(download.body, {
+      headers: {
+        "Cache-Control": "no-store",
+        "Content-Disposition": `attachment; filename="${download.filename}"`,
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch {
+    return new Response(formatTranslation("error.generic"), { status: 400 });
+  }
+}
 
 export function parseAuditSearch(search: Record<string, unknown>): AuditSearch {
   return {
@@ -129,4 +179,8 @@ function parseCursor(value: string) {
 
 function invalidAuditRequest() {
   return localizedServerError("error.generic");
+}
+
+function formString(value: FormDataEntryValue | null) {
+  return typeof value === "string" ? value : "";
 }
