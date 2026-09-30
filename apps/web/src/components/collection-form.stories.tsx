@@ -9,7 +9,7 @@ const copy = {
   description: "Description",
   descriptionPlaceholder: "Describe this collection",
   imageHelp: "Choose an optional cover image.",
-  imageTypes: "Allowed image types: JPEG, PNG, and WebP.",
+  imageTypes: "Allowed image types: JPEG, PNG, WebP, and AVIF.",
   name: "Name",
   namePlaceholder: "Collection name",
   public: "Public",

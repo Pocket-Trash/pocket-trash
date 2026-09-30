@@ -341,6 +341,12 @@ describe("image uploads", () => {
         ),
       )?.key,
     ).toBe("web.resources.validation.sessionTooLarge");
+    expect(
+      validateImages([file("image.avif", 1, "image/avif")]),
+    ).toBeUndefined();
+    expect(
+      validateResourceUpload([file("image.avif", 1, "image/avif")]),
+    ).toBeUndefined();
   });
 });
 

@@ -10,6 +10,7 @@ export const resourceUrlLifetimeSeconds = 120;
 export const imageThumbnailWidth = 500;
 export const imageDeliveryQuality = 85;
 export const imageMimeTypesByExtension = {
+  ".avif": ["image/avif"],
   ".jpeg": ["image/jpeg"],
   ".jpg": ["image/jpeg"],
   ".png": ["image/png"],
