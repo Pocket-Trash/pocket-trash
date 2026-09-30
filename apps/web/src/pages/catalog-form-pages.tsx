@@ -974,12 +974,21 @@ export function CollectionFormPage({
   async function submit(value: CollectionFormValue, cover: File | null) {
     setSaving(true);
     setError(null);
+    const moderating = Boolean(current?.canAdminister && !current.isOwner);
+    const reason = moderating
+      ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
+      : undefined;
+    if (moderating && !reason) {
+      setSaving(false);
+      return;
+    }
     const result = await saveCollection({
       data: {
         collectionId: current?.id ?? null,
         description: value.description,
         isPrivate: value.isPrivate,
         name: value.name,
+        reason,
       },
     });
     if (!result.ok) {
@@ -994,6 +1003,7 @@ export function CollectionFormPage({
           locale,
           files: [cover],
           getToken,
+          reason,
           targetId: result.collection.id,
           targetType: "collection",
         });
@@ -1014,12 +1024,17 @@ export function CollectionFormPage({
     });
   }
 
-  async function updateCover(action: () => Promise<void>) {
+  async function updateCover(action: (reason?: string) => Promise<void>) {
     if (!current) return;
+    const moderating = Boolean(current.canAdminister && !current.isOwner);
+    const reason = moderating
+      ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
+      : undefined;
+    if (moderating && !reason) return;
     setSaving(true);
     setError(null);
     try {
-      await action();
+      await action(reason);
       window.location.reload();
     } catch {
       setError(t("error.generic"));
@@ -1068,24 +1083,25 @@ export function CollectionFormPage({
             }}
             disabled={saving}
             onClear={() =>
-              updateCover(() =>
+              updateCover((reason) =>
                 selectCollectionCover({
-                  data: { collectionId: current.id, imageId: null },
+                  data: { collectionId: current.id, imageId: null, reason },
                 }),
               )
             }
             onDelete={(image) =>
-              updateCover(() =>
+              updateCover((reason) =>
                 deleteCollectionCover({
                   getToken,
                   imageId: image.id,
+                  reason,
                 }),
               )
             }
             onSelect={(image) =>
-              updateCover(() =>
+              updateCover((reason) =>
                 selectCollectionCover({
-                  data: { collectionId: current.id, imageId: image.id },
+                  data: { collectionId: current.id, imageId: image.id, reason },
                 }),
               )
             }
@@ -2006,6 +2022,14 @@ export function CollectionEditPage({
           removeFileLabel={t("web.action.close")}
         />
         <CatalogImageEditor
+          getReason={
+            item.canAdminister && !item.isOwner
+              ? () =>
+                  window
+                    .prompt(t("web.resources.moderation.reasonLabel"))
+                    ?.trim()
+              : undefined
+          }
           images={existingImages}
           onChange={setExistingImages}
           t={t}
@@ -2017,6 +2041,11 @@ export function CollectionEditPage({
             if (submissionMode === "disabled") {
               return;
             }
+            const moderating = item.canAdminister && !item.isOwner;
+            const reason = moderating
+              ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
+              : undefined;
+            if (moderating && !reason) return;
             setFormError(null);
             const imageError = validateImages(images, locale);
             if (imageError) {
@@ -2029,6 +2058,7 @@ export function CollectionEditPage({
                   locale,
                   files: images,
                   getToken,
+                  reason,
                   onOwnerDeletedDuplicate: async (imageId) => {
                     if (
                       !window.confirm(
@@ -2040,7 +2070,11 @@ export function CollectionEditPage({
                     )
                       return false;
                     await restoreCatalogImage({
-                      data: { imageId, targetType: "collection_item" },
+                      data: {
+                        imageId,
+                        reason,
+                        targetType: "collection_item",
+                      },
                     });
                     return true;
                   },
@@ -2117,6 +2151,7 @@ export function CollectionEditPage({
                   ? { installedButton }
                   : {}),
                 materialId: material.id,
+                reason,
               },
             });
             if (result.ok) {
@@ -2209,11 +2244,13 @@ function MarkdownTextarea({
 }
 
 function CatalogImageEditor({
+  getReason,
   images,
   onChange,
   t,
   targetType,
 }: {
+  getReason?(): string | undefined;
   images: CatalogImage[];
   onChange(images: CatalogImage[]): void;
   t: ReturnType<typeof useCatalogCopy>;
@@ -2241,9 +2278,11 @@ function CatalogImageEditor({
           <Button
             aria-label={`${t(image.deletedAt ? "web.resources.action.restore" : "web.resources.action.delete")} ${image.fileName}`}
             onClick={async () => {
+              const reason = getReason?.();
+              if (getReason && !reason) return;
               if (image.deletedAt) {
                 await restoreCatalogImage({
-                  data: { imageId: image.id, targetType },
+                  data: { imageId: image.id, reason, targetType },
                 });
                 onChange(
                   images.map((candidate) =>
@@ -2259,7 +2298,7 @@ function CatalogImageEditor({
                 );
               } else {
                 await softDeleteCatalogImage({
-                  data: { imageId: image.id, targetType },
+                  data: { imageId: image.id, reason, targetType },
                 });
                 onChange(
                   images.map((candidate) =>

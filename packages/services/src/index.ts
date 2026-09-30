@@ -143,6 +143,7 @@ export class Services {
         const configStorage = config.storage;
         const storage = createUploadStorage(configStorage);
         this.#storage = createStorageService({
+          audit: this.#db.audit,
           db,
           storage,
           logger: this.#logger,

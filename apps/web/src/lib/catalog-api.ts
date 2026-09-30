@@ -217,6 +217,7 @@ export const collectionWriteSchema = z.object({
     .transform((value) => value || null),
   isPrivate: z.boolean(),
   name: z.string().trim().min(2, requiredMessage).max(80, requiredMessage),
+  reason: z.string().trim().max(1000).optional(),
 });
 
 type CatalogLookupMutationResult<
@@ -308,6 +309,7 @@ const collectionEditSchema = z
       .nullable()
       .optional(),
     materialId: idSchema,
+    reason: z.string().trim().max(1000).optional(),
   })
   .superRefine((input, context) => {
     if (input.finishOptionId !== null && input.customFinish !== null) {
@@ -647,7 +649,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
         parsed.data.productTypeSlug === "spinner"
           ? (
               await s.db.collections.addSpinner({
-                actorClerkId: actor.clerkId,
+                actor,
                 bearing: parsed.data.bearing,
                 buttonCustomFinish: parsed.data.buttonCustomFinish
                   ? toFinishWriteOption(parsed.data.buttonCustomFinish)
@@ -668,7 +670,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
               })
             ).spinnerItemId
           : await s.db.collections.addSpinnerButton({
-              actorClerkId: actor.clerkId,
+              actor,
               customFinish: parsed.data.customFinish
                 ? toFinishWriteOption(parsed.data.customFinish)
                 : null,
@@ -846,7 +848,11 @@ export const getPublicCollection = createServerFn({ method: "GET" })
 export const selectCollectionCover = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
-      .object({ collectionId: idSchema, imageId: idSchema.nullable() })
+      .object({
+        collectionId: idSchema,
+        imageId: idSchema.nullable(),
+        reason: z.string().trim().max(1000).optional(),
+      })
       .parse(input),
   )
   .handler(async ({ data }) => {
@@ -874,7 +880,7 @@ export const saveCollection = createServerFn({ method: "POST" })
           })
         : await s.db.collections.createCollection({
             ...parsed.data,
-            actorClerkId: actor.clerkId,
+            actor,
           });
       const [signedCollection] = await signCollectionSummaries([collection]);
       if (!signedCollection) throw new Error("Failed to sign collection.");
@@ -978,6 +984,7 @@ export const softDeleteCatalogImage = createServerFn({ method: "POST" })
     z
       .object({
         imageId: idSchema,
+        reason: z.string().trim().max(1000).optional(),
         targetType: z.enum(["product", "collection_item"]),
       })
       .parse(input),
@@ -996,6 +1003,7 @@ export const restoreCatalogImage = createServerFn({ method: "POST" })
     z
       .object({
         imageId: idSchema,
+        reason: z.string().trim().max(1000).optional(),
         targetType: z.enum(["product", "collection_item"]),
       })
       .parse(input),

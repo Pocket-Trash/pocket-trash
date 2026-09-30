@@ -527,6 +527,7 @@ export async function uploadImages(input: {
   files: File[];
   getToken(): Promise<string | null>;
   onOwnerDeletedDuplicate?(imageId: number): Promise<boolean>;
+  reason?: string;
   targetId: number;
   targetType: Exclude<UploadTargetType, "resource">;
 }): Promise<{ uploaded: File[]; failed: File[] }> {
@@ -539,6 +540,7 @@ export async function uploadImages(input: {
       files: [],
       images: input.files,
       getToken: input.getToken,
+      payload: input.reason ? { reason: input.reason } : undefined,
     });
     return { uploaded: input.files, failed: [] };
   } catch (error) {
@@ -566,12 +568,20 @@ export async function uploadImages(input: {
 export async function deleteCollectionCover(input: {
   imageId: number;
   getToken(): Promise<string | null>;
+  reason?: string;
 }) {
   const token = await input.getToken();
   if (!token) throw { key: "error.generic" } satisfies ImageUploadError;
   const response = await fetch(
     `${trimTrailingSlash(clientEnv.VITE_API_URL)}/api/v0/storage/file/collection_image/${input.imageId}`,
-    { method: "DELETE", headers: { authorization: `Bearer ${token}` } },
+    {
+      body: JSON.stringify({ reason: input.reason }),
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+    },
   );
   if (!response.ok) throw { key: "error.generic" } satisfies ImageUploadError;
 }
