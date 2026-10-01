@@ -817,6 +817,42 @@ export const getUserCollectionById = createServerFn({ method: "GET" })
     };
   });
 
+export /** Loads deletion choices and their affected item count for a collection. */
+const getCollectionDeletionContext = createServerFn({ method: "GET" })
+  .validator((input: unknown) =>
+    z.object({ collectionId: idSchema }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    const context = await s.db.collections.getDeletionContext(
+      actor,
+      data.collectionId,
+    );
+    if (!context) return null;
+    return {
+      destinations: await signCollectionSummaries(context.destinations),
+      itemCount: context.itemCount,
+    };
+  });
+
+export /** Moves or permanently deletes a collection and its contents. */
+const deleteUserCollection = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z
+      .object({
+        collectionId: idSchema,
+        destinationCollectionId: idSchema.nullable(),
+        reason: z.string().trim().max(1000).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const { s } = await import("@/lib/services");
+    await s.db.collections.deleteCollection({ actor, ...data });
+  });
+
 export const getPublicCollection = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
     z.object({ collectionId: idSchema, userId: idSchema }).parse(input),
