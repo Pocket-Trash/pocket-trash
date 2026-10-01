@@ -111,30 +111,41 @@ export type {
   UserBetaFeatureFlag,
 } from "./flags/index.js";
 
+/** Logger configuration or an existing logger accepted by the service registry. */
 export type ServicesLoggerConfig = LoggerConfig | Logger;
 
+/** Optional dependencies used to configure the application service registry. */
 export type ServicesConfig = {
+  /** Database client configuration for database-backed services. */
   db?: DatabaseConfig;
+  /** Remote image storage configuration. */
   images?: RemoteImageStorageConfig;
+  /** Logger configuration or an existing logger instance. */
   logger?: ServicesLoggerConfig;
+  /** Upload storage configuration for resources and erasure workflows. */
   storage?: UploadStorageConfig;
 };
 
 /** Lazily configured application services. */
 export class Services {
+  /** Configured database-backed services. */
   #db?: DbServices;
+  /** Configured feature-flag service. */
   #flags?: FeatureFlagsService;
+  /** Configured remote-image service. */
   #images?: ImagesService;
+  /** Configured application logger. */
   #logger?: Logger;
+  /** Configured resource service. */
   #resources?: ResourcesService;
+  /** Configured upload-storage service. */
   #storage?: StorageService;
 
   /**
    * Configures services from runtime settings.
    *
    * @param config - Runtime service configuration.
-   * @returns Nothing.
-   * @throws When required logger or database configuration is missing.
+   * @throws When dependencies are missing or database, storage, or image configuration is invalid.
    */
   configure(config: ServicesConfig): void {
     if (config.db && !config.logger && !this.#logger) {
@@ -196,6 +207,12 @@ export class Services {
     }
   }
 
+  /**
+   * Returns configured database-backed services.
+   *
+   * @returns Database-backed service collection.
+   * @throws When database services have not been configured.
+   */
   get db(): DbServices {
     if (!this.#db) {
       throw new Error(
@@ -206,6 +223,12 @@ export class Services {
     return this.#db;
   }
 
+  /**
+   * Returns the configured application logger.
+   *
+   * @returns Application logger.
+   * @throws When a logger has not been configured.
+   */
   get logger(): Logger {
     if (!this.#logger) {
       throw new Error(
@@ -216,6 +239,12 @@ export class Services {
     return this.#logger;
   }
 
+  /**
+   * Returns the configured feature-flag service.
+   *
+   * @returns Feature-flag service.
+   * @throws When database services have not been configured.
+   */
   get flags(): FeatureFlagsService {
     if (!this.#flags) {
       throw new Error(
@@ -226,6 +255,12 @@ export class Services {
     return this.#flags;
   }
 
+  /**
+   * Returns the configured remote-image service.
+   *
+   * @returns Remote-image service.
+   * @throws When image services have not been configured.
+   */
   get images(): ImagesService {
     if (!this.#images) {
       throw new Error(
@@ -236,12 +271,24 @@ export class Services {
     return this.#images;
   }
 
+  /**
+   * Returns the configured upload-storage service.
+   *
+   * @returns Upload-storage service.
+   * @throws When storage services have not been configured.
+   */
   get storage(): StorageService {
     if (!this.#storage)
       throw new Error("Storage services have not been configured.");
     return this.#storage;
   }
 
+  /**
+   * Returns the configured resource service.
+   *
+   * @returns Resource service.
+   * @throws When database-backed resource storage has not been configured.
+   */
   get resources(): ResourcesService {
     if (!this.#resources) {
       throw new Error(
@@ -253,14 +300,26 @@ export class Services {
   }
 }
 
+/**
+ * Creates an unconfigured application service registry.
+ *
+ * @returns New service registry.
+ */
 export function createServices(): Services {
   return new Services();
 }
 
+/** Shared service registry for application-local configuration. */
 const services = createServices();
 
 export default services;
 
+/**
+ * Checks whether a logger configuration value is an existing logger.
+ *
+ * @param value - Logger configuration or candidate logger.
+ * @returns Whether the value exposes the logger operation contract.
+ */
 function isLogger(value: ServicesLoggerConfig): value is Logger {
   return (
     typeof value === "object" &&

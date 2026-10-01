@@ -61,7 +61,11 @@ export type CreateFeatureFlagInput = {
   actor: Actor;
   /** Audience that can receive the flag. */
   audience: FeatureFlagAudience;
-  /** Default evaluation for global flags. */
+  /**
+   * Requested global default; defaults to `false` and is forced `false` for non-global audiences.
+   *
+   * @default false
+   */
   defaultEnabled?: boolean;
   /** Optional administrator-facing description. */
   description?: string | null;
@@ -75,7 +79,7 @@ export type CreateFeatureFlagInput = {
 export type UpdateFeatureFlagInput = {
   /** Authorized staff actor. */
   actor: Actor;
-  /** Updated default evaluation for global flags. */
+  /** Updated global default; omission preserves stored values and non-global flags remain `false`. */
   defaultEnabled?: boolean;
   /** Updated administrator-facing description. */
   description?: string | null;
@@ -130,6 +134,7 @@ export type FeatureFlagsService = {
    *
    * @param input - Authorized actor and target slug.
    * @returns Completion after the transaction commits.
+   * @rejects When validation, authorization, logging, persistence, or auditing fails.
    */
   archive(input: ArchiveFeatureFlagInput): Promise<void>;
   /**
@@ -137,6 +142,7 @@ export type FeatureFlagsService = {
    *
    * @param input - Authorized feature-flag fields.
    * @returns Created feature flag.
+   * @rejects When validation, authorization, logging, persistence, or auditing fails.
    */
   create(input: CreateFeatureFlagInput): Promise<FeatureFlagListItem>;
   /**
@@ -144,6 +150,7 @@ export type FeatureFlagsService = {
    *
    * @param input - Flag slug and optional user identity.
    * @returns Effective evaluation.
+   * @rejects When slug validation or an evaluation dependency fails.
    */
   evaluate(input: EvaluateFeatureFlagInput): Promise<boolean>;
   /**
@@ -151,6 +158,7 @@ export type FeatureFlagsService = {
    *
    * @param input - Flag slugs and optional user identity.
    * @returns Effective evaluations keyed by slug.
+   * @rejects When any slug validation or evaluation dependency fails.
    */
   evaluateMany(input: {
     /** Optional Clerk identifier for audience evaluation. */
@@ -162,6 +170,7 @@ export type FeatureFlagsService = {
    * Lists every flag for administration.
    *
    * @returns Administrative feature-flag list.
+   * @rejects When database access or operation logging fails.
    */
   listAdmin(): Promise<FeatureFlagListItem[]>;
   /**
@@ -169,6 +178,7 @@ export type FeatureFlagsService = {
    *
    * @param targetClerkId - Target user's Clerk identifier.
    * @returns Administrator-targeted flags and stored values.
+   * @rejects When user lookup, database access, or operation logging fails.
    */
   listAdminTargetingForUser(
     targetClerkId: string,
@@ -178,20 +188,25 @@ export type FeatureFlagsService = {
    *
    * @param clerkId - Requesting user's Clerk identifier.
    * @returns User beta flags and effective values.
+   * @rejects When user lookup, database access, or operation logging fails.
    */
   listUserBeta(clerkId: string): Promise<UserBetaFeatureFlag[]>;
   /**
    * Sets an administrator override and its audit event transactionally.
+   * Missing, archived, or non-admin flags fail closed without an override write.
    *
    * @param input - Authorized flag, user, and override value.
    * @returns Completion after the transaction commits.
+   * @rejects When validation, authorization, logging, persistence, or auditing fails.
    */
   setAdminOverride(input: SetAdminOverrideInput): Promise<void>;
   /**
    * Sets a user's own beta preference without administrative auditing.
+   * Missing, archived, or non-user flags fail closed without an override write.
    *
    * @param input - User-owned flag and preference value.
-   * @returns Completion after persistence.
+   * @returns Completion after persistence or a fail-closed no-write result.
+   * @rejects When validation, flag or user lookup, persistence, or operation logging fails.
    */
   setUserPreference(input: SetUserPreferenceInput): Promise<void>;
   /**
@@ -199,6 +214,7 @@ export type FeatureFlagsService = {
    *
    * @param input - Authorized feature-flag changes.
    * @returns Updated feature flag.
+   * @rejects When validation, authorization, logging, persistence, or auditing fails.
    */
   update(input: UpdateFeatureFlagInput): Promise<FeatureFlagListItem>;
 };
@@ -222,11 +238,12 @@ export function createFeatureFlagsService(
     /**
      * Archives a feature flag with its audit event.
      *
-     * @param root0 - Authorized actor and target slug.
+     * @param input - Authorized actor and target slug.
      * @returns Completion after the transaction commits.
-     * @rejects When authorization, persistence, or auditing fails.
+     * @rejects When validation, authorization, logging, persistence, or auditing fails.
      */
-    async archive({ actor, slug }) {
+    async archive(input) {
+      const { actor, slug } = input;
       assertFeatureFlagSlug(slug);
       assertFeatureFlagAdmin(actor);
 
@@ -275,7 +292,7 @@ export function createFeatureFlagsService(
      *
      * @param input - Authorized feature-flag fields.
      * @returns Created feature flag.
-     * @rejects When authorization, persistence, or auditing fails.
+     * @rejects When validation, authorization, logging, persistence, or auditing fails.
      */
     async create(input) {
       assertFeatureFlagSlug(input.slug);
@@ -322,7 +339,15 @@ export function createFeatureFlagsService(
         }),
       );
     },
-    async evaluate({ clerkId, slug }) {
+    /**
+     * Evaluates one flag and fails closed for unavailable contexts.
+     *
+     * @param input - Flag slug and optional Clerk user identifier.
+     * @returns Effective evaluation.
+     * @rejects When slug validation or an evaluation dependency fails.
+     */
+    async evaluate(input) {
+      const { clerkId, slug } = input;
       assertFeatureFlagSlug(slug);
 
       return await logger.operation(
@@ -339,7 +364,15 @@ export function createFeatureFlagsService(
         operationAttributes({ clerkId, slug }),
       );
     },
-    async evaluateMany({ clerkId, slugs }) {
+    /**
+     * Evaluates multiple feature-flag slugs in input order.
+     *
+     * @param input - Flag slugs and optional Clerk user identifier.
+     * @returns Effective evaluations keyed by slug.
+     * @rejects When any slug validation or evaluation dependency fails.
+     */
+    async evaluateMany(input) {
+      const { clerkId, slugs } = input;
       const result: Record<string, boolean> = {};
 
       for (const slug of slugs) {
@@ -348,6 +381,12 @@ export function createFeatureFlagsService(
 
       return result;
     },
+    /**
+     * Lists all active and archived feature flags for administration.
+     *
+     * @returns Administrative feature-flag list.
+     * @rejects When database access or operation logging fails.
+     */
     async listAdmin() {
       return await logger.operation(
         loggerMessages.database.featureFlags.listAdmin,
@@ -358,6 +397,14 @@ export function createFeatureFlagsService(
         },
       );
     },
+    /**
+     * Lists administrator-targeted flags and stored values for one user.
+     * Unknown users receive disabled values.
+     *
+     * @param targetClerkId - Target user's Clerk identifier.
+     * @returns Active administrator-targeted flags.
+     * @rejects When user lookup, database access, or operation logging fails.
+     */
     async listAdminTargetingForUser(targetClerkId) {
       return await logger.operation(
         loggerMessages.database.featureFlags.listAdminTargetingForUser,
@@ -384,6 +431,14 @@ export function createFeatureFlagsService(
         operationAttributes({ clerkId: targetClerkId }),
       );
     },
+    /**
+     * Lists active user beta flags with effective preference values.
+     * Unknown users receive fail-closed evaluations.
+     *
+     * @param clerkId - Requesting user's Clerk identifier.
+     * @returns User beta feature flags.
+     * @rejects When user lookup, database access, or operation logging fails.
+     */
     async listUserBeta(clerkId) {
       return await logger.operation(
         loggerMessages.database.featureFlags.listUserBeta,
@@ -409,10 +464,11 @@ export function createFeatureFlagsService(
     },
     /**
      * Sets an administrator override with its audit event.
+     * Missing, archived, or non-admin flags fail closed without an override write.
      *
      * @param input - Authorized flag, user, and override value.
      * @returns Completion after the transaction commits.
-     * @rejects When authorization, persistence, or auditing fails.
+     * @rejects When validation, authorization, logging, persistence, or auditing fails.
      */
     async setAdminOverride(input) {
       assertFeatureFlagSlug(input.slug);
@@ -485,6 +541,13 @@ export function createFeatureFlagsService(
         }),
       );
     },
+    /**
+     * Stores a user's own preference for an active user-audience flag.
+     * Missing, archived, or non-user flags fail closed without an override write.
+     *
+     * @param input - User identity, flag slug, and preference value.
+     * @rejects When validation, flag or user lookup, logging, or persistence fails.
+     */
     async setUserPreference(input) {
       assertFeatureFlagSlug(input.slug);
 
@@ -521,7 +584,7 @@ export function createFeatureFlagsService(
      *
      * @param input - Authorized feature-flag changes.
      * @returns Updated feature flag.
-     * @rejects When authorization, persistence, or auditing fails.
+     * @rejects When validation, authorization, logging, persistence, or auditing fails.
      */
     async update(input) {
       assertFeatureFlagSlug(input.slug);
@@ -663,23 +726,49 @@ async function evaluateFlag(input: {
   return resolveUserFlagOverride(flag.id, overrides);
 }
 
+/**
+ * Normalizes default evaluation so only global flags can default to enabled.
+ *
+ * @param input - Flag audience and requested default evaluation.
+ * @returns Requested global default, otherwise `false`.
+ */
 function normalizedDefaultEnabled(input: {
+  /** Audience receiving the feature flag. */
   audience: FeatureFlagAudience;
+  /** Requested default evaluation. */
   defaultEnabled?: boolean;
 }) {
   return input.audience === "global" ? (input.defaultEnabled ?? false) : false;
 }
 
+/**
+ * Reads a legacy audience update only when it is recognized.
+ *
+ * @param input - Feature-flag update input from a potentially stale caller.
+ * @returns Requested audience, or `undefined` when absent or invalid.
+ */
 function requestedUpdateAudience(
   input: UpdateFeatureFlagInput,
 ): FeatureFlagAudience | undefined {
-  const value = (input as { audience?: unknown }).audience;
+  const value = (
+    input as {
+      /** Legacy audience value supplied by a stale caller. */
+      audience?: unknown;
+    }
+  ).audience;
 
   return value === "global" || value === "admin" || value === "user"
     ? value
     : undefined;
 }
 
+/**
+ * Loads a feature flag by slug, including archived flags.
+ *
+ * @param db - Application database.
+ * @param slug - Stable feature-flag slug.
+ * @returns Matching flag, or `null` when absent.
+ */
 async function getFlagBySlug(db: Database, slug: string) {
   const [flag] = await db
     .select()
@@ -690,6 +779,13 @@ async function getFlagBySlug(db: Database, slug: string) {
   return flag ?? null;
 }
 
+/**
+ * Loads an unarchived feature flag by slug.
+ *
+ * @param db - Application database.
+ * @param slug - Stable feature-flag slug.
+ * @returns Matching active flag, or `null` when absent or archived.
+ */
 async function getActiveFlagBySlug(db: Database, slug: string) {
   const [flag] = await db
     .select()
@@ -705,6 +801,13 @@ async function getActiveFlagBySlug(db: Database, slug: string) {
   return flag ?? null;
 }
 
+/**
+ * Lists unarchived feature flags for one audience.
+ *
+ * @param db - Application database.
+ * @param audience - Audience used to filter flags.
+ * @returns Matching active flags.
+ */
 async function listActiveFlagsByAudience(
   db: Database,
   audience: FeatureFlagAudience,
@@ -720,11 +823,22 @@ async function listActiveFlagsByAudience(
     );
 }
 
+/**
+ * Lists stored feature-flag overrides for one internal user.
+ * Empty flag identifiers return an empty array without querying.
+ *
+ * @param db - Application database.
+ * @param input - User, flag identifiers, and optional override source.
+ * @returns Matching user overrides.
+ */
 async function listOverridesForUser(
   db: Database,
   input: {
+    /** Feature-flag identifiers to load. */
     flagIds: string[];
+    /** Optional override owner to require. */
     source?: "admin" | "user";
+    /** Internal user identifier. */
     userId: number;
   },
 ): Promise<OverrideRow[]> {
@@ -826,7 +940,6 @@ async function ensureFeatureFlagAuditUser(
  * Rejects feature-flag administration by an actor without its permission.
  *
  * @param actor - Actor requesting an administrative mutation.
- * @returns Nothing after authorization succeeds.
  * @throws When the actor lacks feature-flag management permission.
  */
 function assertFeatureFlagAdmin(actor: Actor): void {
@@ -863,6 +976,14 @@ function overrideAuditState(slug: string, enabled: boolean): AuditJsonObject {
   return { enabled, slug, source: "admin" };
 }
 
+/**
+ * Resolves a user flag with user preferences taking precedence over admin overrides.
+ * Missing overrides fail closed to `false`.
+ *
+ * @param flagId - Target feature-flag identifier.
+ * @param overrides - Candidate overrides for the user.
+ * @returns Effective override value.
+ */
 function resolveUserFlagOverride(
   flagId: string,
   overrides: readonly OverrideRow[],
@@ -878,6 +999,14 @@ function resolveUserFlagOverride(
   );
 }
 
+/**
+ * Logs and flushes a fail-closed feature-flag evaluation.
+ *
+ * @param logger - Application logger.
+ * @param slug - Feature-flag slug that failed closed.
+ * @param reason - Stable failure reason.
+ * @rejects When writing or flushing the log entry fails.
+ */
 async function logFailedClosed(
   logger: Logger,
   slug: string,
@@ -922,6 +1051,12 @@ function operationAttributes(input: {
   };
 }
 
+/**
+ * Converts a persisted feature flag to its administrative list contract.
+ *
+ * @param flag - Persisted feature flag.
+ * @returns Administrative feature-flag item.
+ */
 function toListItem(flag: FeatureFlag): FeatureFlagListItem {
   return {
     archivedAt: flag.archivedAt,
