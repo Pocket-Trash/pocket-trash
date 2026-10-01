@@ -98,7 +98,7 @@ test("@mutation collection selection and linked-item moves use the public UI", a
         `${fixture.spinnerProductName}: Matching products already owned: 1. Confirm to add another.`,
       ),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Confirm add" }).click();
+    await page.getByRole("button", { name: "Add another" }).click();
     await expect(page).toHaveURL(/\/user\/collections\/\d+$/u);
     const secondCollectionUrl = page.url();
 
