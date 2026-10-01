@@ -6,6 +6,7 @@ import { findClerkOrphans } from "./clerk-orphans.js";
 import { createClerkWebhookHandler } from "./clerk-webhooks.js";
 import { createErasureOperations, drainErasureQueue } from "./erasure.js";
 import { createApiLogger, createApiServices } from "./lib/services.js";
+import { createLinearWebhookHandler } from "./linear-webhooks.js";
 
 const app = createApp({
   getClerkWebhookRuntime(bindings) {
@@ -41,6 +42,17 @@ const app = createApp({
     return {
       clientLogKey: bindings.LOG_PROXY_CLIENT_KEY,
       logger: createApiLogger(bindings),
+    };
+  },
+  getLinearWebhookRuntime(bindings) {
+    validateLinearWebhookBindings(bindings);
+    const { logger, services } = createApiServices(bindings);
+    return {
+      handle: createLinearWebhookHandler({
+        feedback: services.db.feedback,
+        logger,
+        signingSecret: bindings.LINEAR_WEBHOOK_SIGNING_SECRET as string,
+      }),
     };
   },
   getUploadRuntime(bindings) {
@@ -113,6 +125,14 @@ export function validateClerkWebhookBindings(env: ApiBindings) {
     "DATABASE_URL",
     "ERASURE_HMAC_SECRET",
   ] as const;
+  const invalidVariables = required.filter((name) => !env[name]?.trim());
+  if (invalidVariables.length > 0) {
+    throw new ApiEnvValidationError(invalidVariables);
+  }
+}
+
+export function validateLinearWebhookBindings(env: ApiBindings) {
+  const required = ["DATABASE_URL", "LINEAR_WEBHOOK_SIGNING_SECRET"] as const;
   const invalidVariables = required.filter((name) => !env[name]?.trim());
   if (invalidVariables.length > 0) {
     throw new ApiEnvValidationError(invalidVariables);

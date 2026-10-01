@@ -92,6 +92,7 @@ runner exposes the normalized `URL_INITIALS` to child processes.
 | `DATABASE_URL` | Secret | Neon Postgres connection string. GitHub Actions resolves the deployment-specific branch URL. |
 | `CLERK_SECRET_KEY` | Secret | Verifies Clerk bearer tokens. |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | Secret | Verifies Clerk user webhooks. |
+| `LINEAR_WEBHOOK_SIGNING_SECRET` | Secret | Verifies Linear lifecycle webhooks. |
 | `ERASURE_HMAC_SECRET` | Secret | HMAC key for opaque erasure-subject identifiers. Must match the web value for the environment. |
 | `URL_INITIALS` | Local server | Normalized developer selector exposed by the Infisical runner. |
 | `BUNNY_API_KEY` | Secret | Bunny account API key for erasure-time Pull Zone checks and exact CDN purges. |
@@ -110,6 +111,8 @@ Production Clerk sends webhooks to
 them to `https://dev-api.pocket-trash.app/api/v0/webhooks/clerk`. Run
 `pnpm dev:web:webhooks` to register a 24-hour local relay target. PR previews
 receive development events only while labeled `preview:webhooks`.
+Linear sends Issue and Project lifecycle webhooks to
+`https://api.pocket-trash.app/api/v0/webhooks/linear`.
 
 ## Scraper
 

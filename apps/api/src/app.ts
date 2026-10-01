@@ -15,6 +15,7 @@ import {
 } from "@package/services";
 import { Scalar } from "@scalar/hono-api-reference";
 import { clerkWebhookPath } from "./clerk-webhooks.js";
+import { linearWebhookPath } from "./linear-webhooks.js";
 
 const uploadErrorSchema = z.object({ error: z.string() });
 
@@ -24,7 +25,7 @@ export const logsPath = `${apiPrefix}/logs`;
 export const uploadSessionsPath = `${apiPrefix}/storage/upload-sessions`;
 export const openApiJsonPath = `${apiPrefix}/openapi.json`;
 export const apiDocsPath = `${apiPrefix}/docs`;
-export { clerkWebhookPath };
+export { clerkWebhookPath, linearWebhookPath };
 
 export type ApiBindings = Omit<Env, "APP_ENV" | "BUNNY_IMAGE_FOLDER_PREFIX"> & {
   APP_ENV?: string;
@@ -41,6 +42,7 @@ export type ApiBindings = Omit<Env, "APP_ENV" | "BUNNY_IMAGE_FOLDER_PREFIX"> & {
   LOG_DEPLOYMENT_TARGET?: string;
   LOG_LEVEL?: string;
   LOG_PROXY_CLIENT_KEY?: string;
+  LINEAR_WEBHOOK_SIGNING_SECRET?: string;
   URL_INITIALS?: string;
   BUNNY_API_KEY?: string;
   BUNNY_CDN_BASE_URL?: string;
@@ -71,11 +73,19 @@ type AppDependencies = {
     bindings: ApiBindings,
   ) => Promise<ClerkWebhookRuntime> | ClerkWebhookRuntime;
   clerkWebhookRuntime?: ClerkWebhookRuntime;
+  getLinearWebhookRuntime?: (
+    bindings: ApiBindings,
+  ) => Promise<LinearWebhookRuntime> | LinearWebhookRuntime;
+  linearWebhookRuntime?: LinearWebhookRuntime;
 };
 
 export type ClerkWebhookRuntime = {
   expectedInitials?: string;
   handle(request: Request, targetKind: "local" | "primary"): Promise<Response>;
+};
+
+export type LinearWebhookRuntime = {
+  handle(request: Request): Promise<Response>;
 };
 
 export type UploadRuntime = {
@@ -171,6 +181,14 @@ export function createApp(dependencies: AppDependencies = {}) {
       return context.body(null, 404);
     }
     return await runtime.handle(context.req.raw, "local");
+  });
+
+  api.post("/webhooks/linear", async (context) => {
+    const runtime = await requireLinearWebhookRuntime(
+      dependencies,
+      context.env,
+    );
+    return await runtime.handle(context.req.raw);
   });
 
   api.openAPIRegistry.registerPath({
@@ -425,6 +443,17 @@ async function requireClerkWebhookRuntime(
     (await dependencies.getClerkWebhookRuntime?.(bindings)) ??
     dependencies.clerkWebhookRuntime;
   if (!runtime) throw new Error("Clerk webhooks are not configured.");
+  return runtime;
+}
+
+async function requireLinearWebhookRuntime(
+  dependencies: AppDependencies,
+  bindings: ApiBindings,
+): Promise<LinearWebhookRuntime> {
+  const runtime =
+    (await dependencies.getLinearWebhookRuntime?.(bindings)) ??
+    dependencies.linearWebhookRuntime;
+  if (!runtime) throw new Error("Linear webhooks are not configured.");
   return runtime;
 }
 

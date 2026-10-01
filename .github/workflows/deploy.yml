@@ -203,7 +203,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for name in AXIOM_DATASET AXIOM_TOKEN CLERK_SECRET_KEY CLERK_WEBHOOK_SIGNING_SECRET CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN LOG_PROXY_CLIENT_KEY ERASURE_HMAC_SECRET BUNNY_API_KEY BUNNY_CDN_BASE_URL BUNNY_CDN_TOKEN_KEY BUNNY_PULL_ZONE_ID BUNNY_STORAGE_ACCESS_KEY BUNNY_STORAGE_ENDPOINT BUNNY_STORAGE_ZONE_NAME; do
+          for name in AXIOM_DATASET AXIOM_TOKEN CLERK_SECRET_KEY CLERK_WEBHOOK_SIGNING_SECRET LINEAR_WEBHOOK_SIGNING_SECRET CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN LOG_PROXY_CLIENT_KEY ERASURE_HMAC_SECRET BUNNY_API_KEY BUNNY_CDN_BASE_URL BUNNY_CDN_TOKEN_KEY BUNNY_PULL_ZONE_ID BUNNY_STORAGE_ACCESS_KEY BUNNY_STORAGE_ENDPOINT BUNNY_STORAGE_ZONE_NAME; do
             if [[ -z "${!name:-}" ]]; then
               echo "$name is required." >&2
               exit 1
@@ -247,13 +247,14 @@ jobs:
             --arg axiom_token "$AXIOM_TOKEN" \
             --arg clerk_secret_key "$CLERK_SECRET_KEY" \
             --arg clerk_webhook_signing_secret "$CLERK_WEBHOOK_SIGNING_SECRET" \
+            --arg linear_webhook_signing_secret "$LINEAR_WEBHOOK_SIGNING_SECRET" \
             --arg erasure_hmac_secret "$ERASURE_HMAC_SECRET" \
             --arg log_proxy_client_key "$LOG_PROXY_CLIENT_KEY" \
             --arg bunny_api_key "$BUNNY_API_KEY" \
             --arg bunny_cdn_token_key "$BUNNY_CDN_TOKEN_KEY" \
             --arg bunny_pull_zone_id "$BUNNY_PULL_ZONE_ID" \
             --arg resource_storage_access_key "$BUNNY_STORAGE_ACCESS_KEY" \
-            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, CLERK_WEBHOOK_SIGNING_SECRET: $clerk_webhook_signing_secret, ERASURE_HMAC_SECRET: $erasure_hmac_secret, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, BUNNY_API_KEY: $bunny_api_key, BUNNY_CDN_TOKEN_KEY: $bunny_cdn_token_key, BUNNY_PULL_ZONE_ID: $bunny_pull_zone_id, BUNNY_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
+            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, CLERK_WEBHOOK_SIGNING_SECRET: $clerk_webhook_signing_secret, LINEAR_WEBHOOK_SIGNING_SECRET: $linear_webhook_signing_secret, ERASURE_HMAC_SECRET: $erasure_hmac_secret, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, BUNNY_API_KEY: $bunny_api_key, BUNNY_CDN_TOKEN_KEY: $bunny_cdn_token_key, BUNNY_PULL_ZONE_ID: $bunny_pull_zone_id, BUNNY_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
             pnpm exec wrangler secret bulk --env preview
           pnpm exec wrangler versions upload \
             --env preview \
@@ -492,6 +493,7 @@ jobs:
             --arg axiom_token "$AXIOM_TOKEN" \
             --arg clerk_secret_key "$CLERK_SECRET_KEY" \
             --arg clerk_webhook_signing_secret "$CLERK_WEBHOOK_SIGNING_SECRET" \
+            --arg linear_webhook_signing_secret "$LINEAR_WEBHOOK_SIGNING_SECRET" \
             --arg database_url "$DATABASE_URL" \
             --arg erasure_hmac_secret "$ERASURE_HMAC_SECRET" \
             --arg log_proxy_client_key "$LOG_PROXY_CLIENT_KEY" \
@@ -499,7 +501,7 @@ jobs:
             --arg bunny_cdn_token_key "$BUNNY_CDN_TOKEN_KEY" \
             --arg bunny_pull_zone_id "$BUNNY_PULL_ZONE_ID" \
             --arg resource_storage_access_key "$BUNNY_STORAGE_ACCESS_KEY" \
-            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, CLERK_WEBHOOK_SIGNING_SECRET: $clerk_webhook_signing_secret, DATABASE_URL: $database_url, ERASURE_HMAC_SECRET: $erasure_hmac_secret, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, BUNNY_API_KEY: $bunny_api_key, BUNNY_CDN_TOKEN_KEY: $bunny_cdn_token_key, BUNNY_PULL_ZONE_ID: $bunny_pull_zone_id, BUNNY_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
+            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, CLERK_WEBHOOK_SIGNING_SECRET: $clerk_webhook_signing_secret, LINEAR_WEBHOOK_SIGNING_SECRET: $linear_webhook_signing_secret, DATABASE_URL: $database_url, ERASURE_HMAC_SECRET: $erasure_hmac_secret, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, BUNNY_API_KEY: $bunny_api_key, BUNNY_CDN_TOKEN_KEY: $bunny_cdn_token_key, BUNNY_PULL_ZONE_ID: $bunny_pull_zone_id, BUNNY_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
             pnpm exec wrangler versions upload \
             --env preview \
             --preview-alias "$PREVIEW_ALIAS" \
@@ -937,7 +939,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for name in AXIOM_DATASET AXIOM_TOKEN CLERK_SECRET_KEY CLERK_WEBHOOK_SIGNING_SECRET CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN LOG_PROXY_CLIENT_KEY ERASURE_HMAC_SECRET BUNNY_API_KEY BUNNY_CDN_BASE_URL BUNNY_CDN_TOKEN_KEY BUNNY_PULL_ZONE_ID BUNNY_STORAGE_ACCESS_KEY BUNNY_STORAGE_ENDPOINT BUNNY_STORAGE_ZONE_NAME; do
+          for name in AXIOM_DATASET AXIOM_TOKEN CLERK_SECRET_KEY CLERK_WEBHOOK_SIGNING_SECRET LINEAR_WEBHOOK_SIGNING_SECRET CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN LOG_PROXY_CLIENT_KEY ERASURE_HMAC_SECRET BUNNY_API_KEY BUNNY_CDN_BASE_URL BUNNY_CDN_TOKEN_KEY BUNNY_PULL_ZONE_ID BUNNY_STORAGE_ACCESS_KEY BUNNY_STORAGE_ENDPOINT BUNNY_STORAGE_ZONE_NAME; do
             if [[ -z "${!name:-}" ]]; then
               echo "$name is required." >&2
               exit 1
@@ -974,6 +976,7 @@ jobs:
             --arg axiom_token "$AXIOM_TOKEN" \
             --arg clerk_secret_key "$CLERK_SECRET_KEY" \
             --arg clerk_webhook_signing_secret "$CLERK_WEBHOOK_SIGNING_SECRET" \
+            --arg linear_webhook_signing_secret "$LINEAR_WEBHOOK_SIGNING_SECRET" \
             --arg database_url "$DATABASE_URL" \
             --arg erasure_hmac_secret "$ERASURE_HMAC_SECRET" \
             --arg log_proxy_client_key "$LOG_PROXY_CLIENT_KEY" \
@@ -981,7 +984,7 @@ jobs:
             --arg bunny_cdn_token_key "$BUNNY_CDN_TOKEN_KEY" \
             --arg bunny_pull_zone_id "$BUNNY_PULL_ZONE_ID" \
             --arg resource_storage_access_key "$BUNNY_STORAGE_ACCESS_KEY" \
-            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, CLERK_WEBHOOK_SIGNING_SECRET: $clerk_webhook_signing_secret, DATABASE_URL: $database_url, ERASURE_HMAC_SECRET: $erasure_hmac_secret, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, BUNNY_API_KEY: $bunny_api_key, BUNNY_CDN_TOKEN_KEY: $bunny_cdn_token_key, BUNNY_PULL_ZONE_ID: $bunny_pull_zone_id, BUNNY_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
+            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, CLERK_WEBHOOK_SIGNING_SECRET: $clerk_webhook_signing_secret, LINEAR_WEBHOOK_SIGNING_SECRET: $linear_webhook_signing_secret, DATABASE_URL: $database_url, ERASURE_HMAC_SECRET: $erasure_hmac_secret, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, BUNNY_API_KEY: $bunny_api_key, BUNNY_CDN_TOKEN_KEY: $bunny_cdn_token_key, BUNNY_PULL_ZONE_ID: $bunny_pull_zone_id, BUNNY_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
             pnpm exec wrangler secret bulk --env development
 
           curl --fail --retry 5 --retry-all-errors --retry-delay 2 \
@@ -1090,7 +1093,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for name in AXIOM_DATASET AXIOM_TOKEN CLERK_SECRET_KEY CLERK_WEBHOOK_SIGNING_SECRET CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN LOG_PROXY_CLIENT_KEY ERASURE_HMAC_SECRET BUNNY_API_KEY BUNNY_CDN_BASE_URL BUNNY_CDN_TOKEN_KEY BUNNY_PULL_ZONE_ID BUNNY_STORAGE_ACCESS_KEY BUNNY_STORAGE_ENDPOINT BUNNY_STORAGE_ZONE_NAME; do
+          for name in AXIOM_DATASET AXIOM_TOKEN CLERK_SECRET_KEY CLERK_WEBHOOK_SIGNING_SECRET LINEAR_WEBHOOK_SIGNING_SECRET CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN LOG_PROXY_CLIENT_KEY ERASURE_HMAC_SECRET BUNNY_API_KEY BUNNY_CDN_BASE_URL BUNNY_CDN_TOKEN_KEY BUNNY_PULL_ZONE_ID BUNNY_STORAGE_ACCESS_KEY BUNNY_STORAGE_ENDPOINT BUNNY_STORAGE_ZONE_NAME; do
             if [[ -z "${!name:-}" ]]; then
               echo "$name is required." >&2
               exit 1
@@ -1166,6 +1169,7 @@ jobs:
             --arg axiom_token "$AXIOM_TOKEN" \
             --arg clerk_secret_key "$CLERK_SECRET_KEY" \
             --arg clerk_webhook_signing_secret "$CLERK_WEBHOOK_SIGNING_SECRET" \
+            --arg linear_webhook_signing_secret "$LINEAR_WEBHOOK_SIGNING_SECRET" \
             --arg database_url "$DATABASE_URL" \
             --arg erasure_hmac_secret "$ERASURE_HMAC_SECRET" \
             --arg log_proxy_client_key "$LOG_PROXY_CLIENT_KEY" \
@@ -1173,7 +1177,7 @@ jobs:
             --arg bunny_cdn_token_key "$BUNNY_CDN_TOKEN_KEY" \
             --arg bunny_pull_zone_id "$BUNNY_PULL_ZONE_ID" \
             --arg resource_storage_access_key "$BUNNY_STORAGE_ACCESS_KEY" \
-            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, CLERK_WEBHOOK_SIGNING_SECRET: $clerk_webhook_signing_secret, DATABASE_URL: $database_url, ERASURE_HMAC_SECRET: $erasure_hmac_secret, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, BUNNY_API_KEY: $bunny_api_key, BUNNY_CDN_TOKEN_KEY: $bunny_cdn_token_key, BUNNY_PULL_ZONE_ID: $bunny_pull_zone_id, BUNNY_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
+            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, CLERK_WEBHOOK_SIGNING_SECRET: $clerk_webhook_signing_secret, LINEAR_WEBHOOK_SIGNING_SECRET: $linear_webhook_signing_secret, DATABASE_URL: $database_url, ERASURE_HMAC_SECRET: $erasure_hmac_secret, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, BUNNY_API_KEY: $bunny_api_key, BUNNY_CDN_TOKEN_KEY: $bunny_cdn_token_key, BUNNY_PULL_ZONE_ID: $bunny_pull_zone_id, BUNNY_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
             pnpm exec wrangler secret bulk --env=""
 
           curl --fail --retry 5 --retry-all-errors --retry-delay 2 \
