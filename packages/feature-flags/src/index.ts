@@ -4,7 +4,7 @@ export const featureFlagAudiences = ["global", "admin", "user"] as const;
 /** Audience scope that may own a feature-flag value. */
 export type FeatureFlagAudience = (typeof featureFlagAudiences)[number];
 
-/** Audience scopes that may override a feature flag's global value. */
+/** Sources permitted for audience-specific feature-flag overrides. */
 export const featureFlagOverrideSources = ["admin", "user"] as const;
 
 /** Audience scope from which a feature-flag override originates. */
@@ -56,7 +56,7 @@ export function isFeatureFlagSlug(value: string): boolean {
  * Asserts that a feature-flag slug uses the required lower-kebab-case format.
  *
  * @param value - Candidate feature-flag slug.
- * @throws When the candidate contains an invalid character or hyphen position.
+ * @throws When the candidate is not a non-empty lower-kebab-case slug.
  */
 export function assertFeatureFlagSlug(value: string): void {
   if (!isFeatureFlagSlug(value)) {
@@ -71,7 +71,7 @@ export function assertFeatureFlagSlug(value: string): void {
  *
  * @param slug - Candidate feature-flag slug.
  * @returns The unchanged validated slug.
- * @throws When the slug contains an invalid character or hyphen position.
+ * @throws When the slug is not a non-empty lower-kebab-case value.
  */
 export function defineFlag(slug: string): string {
   assertFeatureFlagSlug(slug);
