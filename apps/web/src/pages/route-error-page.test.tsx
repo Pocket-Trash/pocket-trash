@@ -17,7 +17,28 @@ const mocks = vi.hoisted(() => ({
   rootLocale: null as "en-US" | "es-MX" | null,
 }));
 
+vi.mock("@clerk/tanstack-react-start", () => ({
+  /**
+   * Rejects authentication access from error recovery UI.
+   *
+   * @throws When the recovery page attempts to read authentication.
+   */
+  useAuth: () => {
+    throw new Error("Authentication provider unavailable");
+  },
+}));
+
 vi.mock("@tanstack/react-router", () => ({
+  /**
+   * Renders navigation without requiring router context.
+   *
+   * @param props - Navigation link properties.
+   * @returns The navigation anchor.
+   */
+  Link: ({ children }: { /** Link contents. */ children: React.ReactNode }) => (
+    <a href="/">{children}</a>
+  ),
+
   /**
    * Returns the router invalidation fixture.
    *
@@ -212,6 +233,30 @@ describe("RouteErrorPage", () => {
     );
   });
 
+  it("keeps the shared header visible without authentication or settings providers", () => {
+    act(() =>
+      root.render(
+        <RouteErrorView
+          development={false}
+          error={new Error("loader failed")}
+          locale="en-US"
+          onRetry={vi.fn()}
+          pathname="/feedback"
+        />,
+      ),
+    );
+    expect(container.querySelector("header")?.textContent).toContain(
+      "Pocket Trash",
+    );
+    expect(container.querySelector('header a[href="/"]')).not.toBeNull();
+    expect(container.querySelector("header")?.textContent).not.toContain(
+      "Sign in",
+    );
+    expect(container.querySelector("main")?.textContent).toContain(
+      "Something went wrong",
+    );
+  });
+
   it("uses a native Return home link", () => {
     act(() =>
       root.render(
@@ -225,7 +270,7 @@ describe("RouteErrorPage", () => {
       ),
     );
 
-    expect(container.querySelector('a[href="/"]')?.textContent).toBe(
+    expect(container.querySelector('main a[href="/"]')?.textContent).toBe(
       "Return home",
     );
   });

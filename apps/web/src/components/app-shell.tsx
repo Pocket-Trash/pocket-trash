@@ -1,5 +1,6 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import {
+  DEFAULT_LOCALE,
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
@@ -12,7 +13,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { updateLocaleSetting } from "@/lib/locale-api";
 import { cn } from "@/lib/utils";
-import { useLocale } from "@/providers/locale-provider";
+import { useLocale, useOptionalLocale } from "@/providers/locale-provider";
 
 /** Content and navigation rendered by the shared application shell. */
 export type AppShellProps = {
@@ -55,6 +56,8 @@ export type AppShellProps = {
   headerActions?: React.ReactNode;
   /** Optional supporting page metadata rendered with the header. */
   meta?: React.ReactNode;
+  /** Whether provider-dependent language, theme, and account controls render. @default true */
+  showControls?: boolean;
   /** Current page title. */
   title: string;
 };
@@ -68,9 +71,10 @@ export type AppShellProps = {
  * @param props.contained - Whether to constrain the shell width. Defaults to `true`.
  * @param props.headerActions - Optional controls rendered at the end of the header.
  * @param props.meta - Optional supporting page metadata.
+ * @param props.showControls - Whether provider-dependent header controls render. Defaults to `true`.
  * @param props.title - Current page title.
  * @returns The shared application page layout.
- * @throws {Error} If the required locale provider is missing.
+ * @throws {Error} If header controls are enabled without their required providers.
  */
 export function AppShell({
   breadcrumbItems = [],
@@ -78,33 +82,11 @@ export function AppShell({
   contained = true,
   headerActions,
   meta,
+  showControls = true,
   title,
 }: AppShellProps) {
-  const { isLoaded, isSignedIn } = useAuth();
-  const { locale, setLocale } = useLocale();
-  /**
-   * Formats an application-shell translation for the active locale.
-   *
-   * @param key - Application-shell localization key.
-   * @returns The localized application-shell text.
-   */
-  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
-  const siteName = t("web.site.name");
-  /**
-   * Applies a locale immediately and requests persistence for loaded signed-in users.
-   * Failed requests show a settings error without reverting the applied locale.
-   *
-   * @param nextLocale - Locale selected by the user.
-   */
-  const onLocaleChange = (nextLocale: typeof locale) => {
-    setLocale(nextLocale);
-
-    if (isLoaded && isSignedIn) {
-      void updateLocaleSetting(nextLocale).catch(() => {
-        toast.error(t("web.error.settingsSaveFailed"));
-      });
-    }
-  };
+  const locale = useOptionalLocale() ?? DEFAULT_LOCALE;
+  const siteName = formatTranslation("web.site.name", {}, locale);
 
   return (
     <div
@@ -162,15 +144,7 @@ export function AppShell({
             </nav>
           ) : null}
         </div>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <LanguageSelect
-            className="w-[9.5rem] max-sm:w-[8.5rem]"
-            locale={locale}
-            onLocaleChange={onLocaleChange}
-          />
-          <ThemeToggle />
-          <UserMenu />
-        </div>
+        {showControls ? <AppShellControls /> : null}
         {meta || headerActions ? (
           <div className="flex w-full flex-wrap items-center gap-3">
             {meta ? (
@@ -192,6 +166,51 @@ export function AppShell({
       >
         {children}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Renders header controls backed by authentication, locale, and theme providers.
+ *
+ * @returns The shared language, theme, and account controls.
+ * @throws {Error} When a required provider is unavailable.
+ */
+function AppShellControls() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { locale, setLocale } = useLocale();
+  /**
+   * Formats an application-shell translation for the active locale.
+   *
+   * @param key - Application-shell localization key.
+   * @returns The localized application-shell text.
+   */
+  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
+  /**
+   * Applies a locale immediately and requests persistence for loaded signed-in users.
+   * Failed requests show a settings error without reverting the applied locale.
+   *
+   * @param nextLocale - Locale selected by the user.
+   */
+  const onLocaleChange = (nextLocale: typeof locale) => {
+    setLocale(nextLocale);
+
+    if (isLoaded && isSignedIn) {
+      void updateLocaleSetting(nextLocale).catch(() => {
+        toast.error(t("web.error.settingsSaveFailed"));
+      });
+    }
+  };
+
+  return (
+    <div className="ml-auto flex shrink-0 items-center gap-2">
+      <LanguageSelect
+        className="w-[9.5rem] max-sm:w-[8.5rem]"
+        locale={locale}
+        onLocaleChange={onLocaleChange}
+      />
+      <ThemeToggle />
+      <UserMenu />
     </div>
   );
 }

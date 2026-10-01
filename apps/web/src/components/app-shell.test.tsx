@@ -61,6 +61,12 @@ vi.mock("@/providers/locale-provider", () => ({
    * @returns Locale state consumed by the shell.
    */
   useLocale: () => ({ locale: "en-US", setLocale: vi.fn() }),
+  /**
+   * Provides the optional locale consumed by the provider-independent header.
+   *
+   * @returns The test locale.
+   */
+  useOptionalLocale: () => "en-US",
 }));
 
 describe("AppShell", () => {
