@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { clerk } from "@clerk/testing/playwright";
 import { createDb, schema } from "@package/database";
 import { and, eq, inArray } from "drizzle-orm";
 import { expect, test, waitForHydration } from "./auth";
@@ -124,7 +125,7 @@ test("@mutation collection covers survive failures and retain reusable history",
       }),
     ).toBeVisible();
 
-    await page.context().clearCookies();
+    await clerk.signOut({ page });
     await page.goto(`/collections/${owner.id}/${createdCollectionId}`);
     await expect(
       page.getByRole("heading", { name: "Page unavailable" }),
@@ -139,7 +140,7 @@ test("@mutation collection covers survive failures and retain reusable history",
       new RegExp(`/user/collections/${createdCollectionId}$`, "u"),
     );
 
-    await page.context().clearCookies();
+    await clerk.signOut({ page });
     await page.goto(`/collections/${owner.id}/${createdCollectionId}`);
     await expect(
       page.getByRole("heading", { name: collectionName }),

@@ -342,7 +342,11 @@ async function archiveCollection(page: Page, collection: CollectionScenario) {
     new RegExp(`/user/collections/${collection.id}$`, "u"),
   );
   await expect(
-    page.getByRole("heading", { level: 2, name: collection.name }),
+    page.getByRole("heading", {
+      exact: true,
+      level: 2,
+      name: collection.name,
+    }),
   ).toBeVisible();
 }
 

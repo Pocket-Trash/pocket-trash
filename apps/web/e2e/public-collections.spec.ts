@@ -119,10 +119,16 @@ test("@mutation public collection browsing preserves effective privacy", async (
       new RegExp(`/collections/${fixture.ownerId}$`, "u"),
     );
     await expect(
-      page.getByText(fixture.publicCollection.name, { exact: true }),
+      page.getByRole("heading", {
+        exact: true,
+        name: fixture.publicCollection.name,
+      }),
     ).toBeVisible();
     await expect(
-      page.getByText(fixture.emptyCollection.name, { exact: true }),
+      page.getByRole("heading", {
+        exact: true,
+        name: fixture.emptyCollection.name,
+      }),
     ).toBeVisible();
     await expect(
       page.getByText(fixture.privateCollection.name, { exact: true }),
