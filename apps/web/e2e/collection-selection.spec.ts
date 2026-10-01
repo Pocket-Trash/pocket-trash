@@ -36,6 +36,7 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     );
     const defaultCollectionName = await page
       .getByRole("combobox", { name: "Collection" })
+      .and(page.locator("input"))
       .inputValue();
     expect(defaultCollectionName).not.toBe("");
     fixture.collectionNames.push(defaultCollectionName);
@@ -49,7 +50,9 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     await page.getByRole("link", { name: "Add to collection" }).click();
     await stageCollection(page, fixture.collectionNames[0]);
     await expect(
-      page.getByRole("combobox", { name: "Collection" }),
+      page
+        .getByRole("combobox", { name: "Collection" })
+        .and(page.locator("input")),
     ).toHaveValue(fixture.collectionNames[0]);
 
     const collectionCheck = await page.context().newPage();
@@ -82,7 +85,9 @@ test("@mutation collection selection and linked-item moves use the public UI", a
 
     await page.goto(`/collections/add?product=${fixture.spinnerProductId}`);
     await expect(
-      page.getByRole("combobox", { name: "Collection" }),
+      page
+        .getByRole("combobox", { name: "Collection" })
+        .and(page.locator("input")),
     ).toHaveValue(fixture.collectionNames[0]);
     await stageCollection(page, fixture.collectionNames[1]);
     await selectOption(page, "Materials", fixture.materialName);
@@ -98,7 +103,9 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     const secondCollectionUrl = page.url();
 
     await page.goto(`/collections/add?product=${fixture.spinnerProductId}`);
-    const collectionInput = page.getByRole("combobox", { name: "Collection" });
+    const collectionInput = page
+      .getByRole("combobox", { name: "Collection" })
+      .and(page.locator("input"));
     await expect(collectionInput).toHaveValue("");
     await selectOption(page, "Collection", fixture.collectionNames[0]);
     await selectOption(page, "Materials", fixture.materialName);
@@ -185,6 +192,10 @@ async function selectOption(
   option: string,
   index = 0,
 ) {
-  await page.getByRole("combobox", { name: label }).nth(index).click();
+  await page
+    .getByRole("combobox", { name: label })
+    .and(page.locator("input"))
+    .nth(index)
+    .click();
   await page.getByRole("option", { exact: true, name: option }).click();
 }
