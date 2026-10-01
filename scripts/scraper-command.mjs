@@ -5,6 +5,7 @@ import {
   runCommand,
 } from "./scraper-redis.mjs";
 
+/** Reports scraper startup and command failures at the CLI boundary. */
 try {
   const [command, ...commandArgs] = process.argv.slice(2);
 
@@ -26,6 +27,14 @@ try {
   process.exitCode = 1;
 }
 
+/**
+ * Builds the Infisical runner invocation for a scraper command.
+ *
+ * @param command - The supported scraper command name.
+ * @param commandArgs - Extra arguments forwarded to scrape commands.
+ * @returns The executable and arguments to run.
+ * @throws When the command is unsupported.
+ */
 function getRunnerCommand(command, commandArgs) {
   if (command === "cron:run") {
     return {

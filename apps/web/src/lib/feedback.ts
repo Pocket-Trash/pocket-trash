@@ -9,6 +9,7 @@ import {
   type FeedbackCategory,
   feedbackCategories,
 } from "@/lib/feedback-shared";
+import type { LinearPlanningOptions } from "@/lib/linear";
 import { getResourceViewer, requireResourceUploader } from "@/lib/resources";
 import { localizedServerError } from "@/lib/server-errors";
 
@@ -61,6 +62,15 @@ export const listActiveFeedback = createServerFn({ method: "GET" })
     const viewer = await requireResourceUploader();
     const { s } = await import("@/lib/services");
     return await s.db.feedback.listActive(viewer.clerkId, data.search);
+  });
+
+/** Lists completed feedback for the public completed page. */
+export const listCompletedFeedback = createServerFn({ method: "GET" })
+  .validator(parseFeedbackListInput)
+  .handler(async ({ data }) => {
+    const viewer = await requireResourceUploader();
+    const { s } = await import("@/lib/services");
+    return await s.db.feedback.listCompleted(viewer.clerkId, data.search);
   });
 
 export const listMyFeedback = createServerFn({ method: "GET" })
@@ -187,6 +197,126 @@ export const denyFeedback = createServerFn({ method: "POST" })
     }
   });
 
+export const getLinearPlanOptions = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const actor = await requireFeedbackAdmin();
+    try {
+      const token = await getLinearToken(actor.clerkId);
+      const { getLinearPlanningOptions } = await import("@/lib/linear");
+      const options = await getLinearPlanningOptions(token);
+      return {
+        labels: options.labels,
+        ok: true as const,
+        viewerName: options.viewer.name,
+      };
+    } catch {
+      return {
+        error: "web.feedback.admin.plan.connectionRequired" as const,
+        ok: false as const,
+      };
+    }
+  },
+);
+
+export const planFeedback = createServerFn({ method: "POST" })
+  .validator(parsePlanFeedbackInput)
+  .handler(async ({ data }) => {
+    const actor = await requireFeedbackAdmin();
+    let token: string;
+    let options: LinearPlanningOptions;
+    try {
+      token = await getLinearToken(actor.clerkId);
+      const { getLinearPlanningOptions } = await import("@/lib/linear");
+      options = await getLinearPlanningOptions(token);
+    } catch {
+      return {
+        error: "web.feedback.admin.plan.connectionRequired" as const,
+        ok: false as const,
+      };
+    }
+
+    const labelIds = new Set(options.labels.map(({ id }) => id));
+    if (data.labelIds.some((id) => !labelIds.has(id))) {
+      throw invalidFeedbackRequest();
+    }
+
+    const { s } = await import("@/lib/services");
+    try {
+      const reservation = await s.db.feedback.reserveLinearPlan(
+        data.feedbackId,
+        data.clientUuid,
+      );
+      const { createLinearIssue, createLinearProject, linearEntityExists } =
+        await import("@/lib/linear");
+      const exists = await linearEntityExists(
+        token,
+        reservation.linearClientUuid,
+      );
+      if (!exists && data.kind === "issue") {
+        await createLinearIssue(token, {
+          assigneeId: data.assignToMe ? options.viewer.id : undefined,
+          description: reservation.description,
+          id: reservation.linearClientUuid,
+          labelIds: data.labelIds,
+          stateId: options.issueStateId,
+          title: reservation.title,
+        });
+      } else if (!exists) {
+        await createLinearProject(token, {
+          description: reservation.description,
+          id: reservation.linearClientUuid,
+          leadId: data.leadProject ? options.viewer.id : undefined,
+          name: reservation.title,
+          statusId: options.projectStatusId,
+        });
+      }
+      await s.db.feedback.completeLinearPlan(
+        data.feedbackId,
+        reservation.linearClientUuid,
+      );
+      return { ok: true as const };
+    } catch {
+      return {
+        error: "web.feedback.admin.plan.failure" as const,
+        ok: false as const,
+      };
+    }
+  });
+
+/** Synchronizes a linked feedback item with its current Linear status. */
+export const syncFeedbackStatus = createServerFn({ method: "POST" })
+  .validator(parseFeedbackId)
+  .handler(async ({ data }) => {
+    const actor = await requireFeedbackAdmin();
+    let token: string;
+    try {
+      token = await getLinearToken(actor.clerkId);
+      const { getLinearPlanningOptions } = await import("@/lib/linear");
+      await getLinearPlanningOptions(token);
+    } catch {
+      return {
+        error: "web.feedback.admin.sync.connectionRequired" as const,
+        ok: false as const,
+      };
+    }
+
+    const { s } = await import("@/lib/services");
+    try {
+      const target = await s.db.feedback.getLinearSyncTarget(data.feedbackId);
+      if (!target) throw new Error("Feedback is not linked to Linear.");
+      const { getLinearFeedbackStatus } = await import("@/lib/linear");
+      await s.db.feedback.syncLinearStatus(
+        await getLinearFeedbackStatus(token, target),
+      );
+      return { ok: true as const };
+    } catch {
+      return {
+        error: "web.feedback.admin.sync.failure" as const,
+        ok: false as const,
+      };
+    }
+  });
+
 export const toggleFeedbackVote = createServerFn({ method: "POST" })
   .validator(parseFeedbackId)
   .handler(async ({ data }) => {
@@ -197,6 +327,17 @@ export const toggleFeedbackVote = createServerFn({ method: "POST" })
 
 async function requireFeedbackAdmin() {
   return await requirePermission("feedback.manage");
+}
+
+async function getLinearToken(clerkId: string) {
+  const { clerkClient } = await import("@clerk/tanstack-react-start/server");
+  const tokens = await clerkClient().users.getUserOauthAccessToken(
+    clerkId,
+    "linear",
+  );
+  const token = tokens.data.find(({ scopes }) => scopes?.includes("write"));
+  if (!token) throw new Error("Linear write access is required.");
+  return token.token;
 }
 
 export function parseFeedbackInput(input: unknown) {
@@ -277,6 +418,8 @@ const activeFeedbackStatuses: readonly string[] = [
   "planned",
   "in_progress",
 ];
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function parseMergeFeedbackInput(input: unknown) {
   const value = parseRecord(input);
@@ -301,6 +444,32 @@ function parseNotificationId(input: unknown) {
     throw invalidFeedbackRequest();
   }
   return { notificationId: Number(notificationId) };
+}
+
+export function parsePlanFeedbackInput(input: unknown) {
+  const value = parseRecord(input);
+  if (value.kind !== "issue" && value.kind !== "project") {
+    throw invalidFeedbackRequest();
+  }
+  if (
+    typeof value.clientUuid !== "string" ||
+    !uuidPattern.test(value.clientUuid) ||
+    typeof value.assignToMe !== "boolean" ||
+    typeof value.leadProject !== "boolean" ||
+    !Array.isArray(value.labelIds) ||
+    value.labelIds.length > 100 ||
+    value.labelIds.some((id) => typeof id !== "string" || !uuidPattern.test(id))
+  ) {
+    throw invalidFeedbackRequest();
+  }
+  return {
+    ...parseFeedbackId(input),
+    assignToMe: value.assignToMe,
+    clientUuid: value.clientUuid,
+    kind: value.kind,
+    labelIds: value.labelIds as string[],
+    leadProject: value.leadProject,
+  };
 }
 
 function parseRecord(input: unknown): Record<string, unknown> {

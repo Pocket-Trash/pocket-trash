@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { collectionAuditEvents } from "../db/audit/collections.js";
 import { createAuditService } from "../db/audit/index.js";
 import { productAuditEvents } from "../db/audit/products.js";
+import { resourceAuditEvents } from "../db/audit/resources.js";
 import { hashLogIdentifier } from "../logging.js";
 import { createResourcesService } from "../resources/index.js";
 import { selectCollectionCover } from "./image-records.js";
@@ -64,6 +65,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     audit: createAuditService(logger, [
       ...collectionAuditEvents,
       ...productAuditEvents,
+      ...resourceAuditEvents,
     ]),
     db,
     storage,
@@ -312,6 +314,72 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       }),
     ).rejects.toMatchObject({ code: "invalid_request" });
   });
+  it("emits one category notification across concurrent and existing categories", async () => {
+    const files = [
+      await manifest(pdf, "file", "merge.pdf", "application/pdf"),
+      await manifest(image, "image", "merge.png", "image/png"),
+    ];
+    const sessions = await Promise.all(
+      ["One", "Two"].map(async (suffix) => {
+        const session = await service.create(
+          {
+            target: { type: "resource" },
+            payload: {
+              operation: "create",
+              name: `Merge resource ${suffix}`,
+              description: "Merge action test",
+              categories: ["Merge Action Category"],
+              isPrivate: false,
+            },
+            files,
+          },
+          actor,
+        );
+        await put(session, { "merge.pdf": pdf, "merge.png": image });
+        return session;
+      }),
+    );
+
+    await expect(
+      Promise.all(
+        sessions.map((session) => service.completeUpload(session.id, actor)),
+      ),
+    ).resolves.toHaveLength(2);
+
+    const category = await pool.query(
+      "select id from resource_categories where slug = 'merge-action-category'",
+    );
+    expect(category.rowCount).toBe(1);
+    const notifications = async () =>
+      Number(
+        (
+          await pool.query(
+            "select count(*)::int as count from resource_notifications where type = 'category_created' and category_id = $1",
+            [category.rows[0].id],
+          )
+        ).rows[0].count,
+      );
+    await expect(notifications()).resolves.toBe(1);
+
+    const existing = await service.create(
+      {
+        target: { type: "resource" },
+        payload: {
+          operation: "create",
+          name: "Existing merge resource",
+          description: "Existing category test",
+          categories: ["Merge Action Category"],
+          isPrivate: false,
+        },
+        files,
+      },
+      actor,
+    );
+    await put(existing, { "merge.pdf": pdf, "merge.png": image });
+    await service.completeUpload(existing.id, actor);
+
+    await expect(notifications()).resolves.toBe(1);
+  });
   it("uses all image targets, accepts collection batches, and replaces a deleted cover", async () => {
     const file = await manifest(image, "image", "photo.png", "image/png");
     for (const target of [
@@ -333,8 +401,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
         results.filter((result) => result.status === "fulfilled"),
       ).toHaveLength(1);
       const winner = results.find((result) => result.status === "fulfilled");
-      if (!winner || winner.status !== "fulfilled")
-        throw new Error("No winning session");
+      if (winner?.status !== "fulfilled") throw new Error("No winning session");
       await put(winner.value, { "photo.png": image });
       await service.completeUpload(winner.value.id, actor);
       await expect(
@@ -483,10 +550,12 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       { target: { type: "product", id: productId }, files: [file] },
       actor,
     );
+    const upload = session.uploads.at(0);
+    if (!upload) throw new Error("No upload");
     await expect(
       service.upload(
         session.id,
-        session.uploads[0]!.id,
+        upload.id,
         actor,
         new Request("https://api.test/upload", {
           method: "PUT",
@@ -521,7 +590,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       targetType: "product",
       fileType: "product_image",
       fileCount: 1,
-      fileIdHash: hashLogIdentifier(session.uploads[0]!.id),
+      fileIdHash: hashLogIdentifier(upload.id),
     });
     expect(
       events
@@ -865,6 +934,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     try {
       await resources.permanentlyDelete({
         actor: { clerkId: "admin", role: "system_admin" },
+        reason: "Expired retention period",
         resourceId: created.id,
       });
     } finally {

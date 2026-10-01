@@ -158,12 +158,13 @@ export const markResourceNotificationRead = createServerFn({ method: "POST" })
     await s.resources.markNotificationRead(data.notificationId, actor.clerkId);
   });
 
+/** Marks a resource private on behalf of staff. */
 export const markResourcePrivate = createServerFn({ method: "POST" })
   .validator(parseMarkPrivate)
   .handler(async ({ data }) => {
     const actor = await requireResourceAdmin();
     const { s } = await import("@/lib/services");
-    await s.resources.markPrivate({ ...data, actorClerkId: actor.clerkId });
+    await s.resources.markPrivate({ ...data, actor });
   });
 
 export const setResourceVisibility = createServerFn({ method: "POST" })
@@ -178,38 +179,41 @@ export const setResourceVisibility = createServerFn({ method: "POST" })
     });
   });
 
+/** Soft-deletes a resource with actor provenance. */
 export const softDeleteResource = createServerFn({ method: "POST" })
-  .validator(parseResourceId)
+  .validator(parseResourceMutation)
   .handler(async ({ data }) => {
     const viewer = await getResourceViewer();
     if (!viewer) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     return await s.resources.softDelete({
       actor: viewer,
-      resourceId: data.resourceId,
+      ...data,
     });
   });
 
+/** Permanently deletes a resource with a required staff reason. */
 export const permanentlyDeleteResource = createServerFn({ method: "POST" })
-  .validator(parseResourceId)
+  .validator(parseRequiredResourceMutation)
   .handler(async ({ data }) => {
     const actor = await requirePermission("resources.purge");
     const { s } = await import("@/lib/services");
     await s.resources.permanentlyDelete({
       actor,
-      resourceId: data.resourceId,
+      ...data,
     });
   });
 
+/** Restores a soft-deleted resource with actor provenance. */
 export const restoreResource = createServerFn({ method: "POST" })
-  .validator(parseResourceId)
+  .validator(parseResourceMutation)
   .handler(async ({ data }) => {
     const viewer = await getResourceViewer();
     if (!viewer) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     await s.resources.restore({
       actor: viewer,
-      resourceId: data.resourceId,
+      ...data,
     });
   });
 
@@ -226,6 +230,7 @@ export const updateResource = createServerFn({ method: "POST" })
     });
   });
 
+/** Uploads a new resource version with actor provenance. */
 export const uploadResourceVersion = createServerFn({ method: "POST" })
   .validator(parseResourceVersionUpload)
   .handler(async ({ data }) => {
@@ -234,6 +239,7 @@ export const uploadResourceVersion = createServerFn({ method: "POST" })
     return await s.resources.addVersion({
       files: await Promise.all(data.files.map(toUploadInput)),
       resourceId: data.resourceId,
+      reason: data.reason,
       actor,
     });
   });
@@ -320,6 +326,13 @@ export function parseResourceUpload(input: unknown) {
   };
 }
 
+/**
+ * Parses a resource update form.
+ *
+ * @param input - Untrusted form input.
+ * @returns The validated resource update.
+ * @throws When the input is invalid.
+ */
 export function parseResourceUpdate(input: unknown) {
   if (!(input instanceof FormData)) throw invalidResourceRequest();
   const resourceId = Number(input.get("resourceId"));
@@ -328,6 +341,7 @@ export function parseResourceUpdate(input: unknown) {
   const images = input.getAll("images").filter(isFile);
   const retainedImageIds = input.getAll("retainedImageIds").map(Number);
   const categories = input.getAll("categories");
+  const reason = parseReason(input.get("reason"));
 
   if (
     !Number.isSafeInteger(resourceId) ||
@@ -352,14 +366,23 @@ export function parseResourceUpdate(input: unknown) {
     images: images as File[],
     name,
     retainedImageIds,
+    reason,
     resourceId,
   };
 }
 
+/**
+ * Parses a resource version upload form.
+ *
+ * @param input - Untrusted form input.
+ * @returns The validated version upload.
+ * @throws When the input is invalid.
+ */
 export function parseResourceVersionUpload(input: unknown) {
   if (!(input instanceof FormData)) throw invalidResourceRequest();
   const resourceId = Number(input.get("resourceId"));
   const files = input.getAll("files");
+  const reason = parseReason(input.get("reason"));
   if (
     !Number.isSafeInteger(resourceId) ||
     resourceId <= 0 ||
@@ -369,7 +392,7 @@ export function parseResourceVersionUpload(input: unknown) {
   ) {
     throw invalidResourceRequest();
   }
-  return { files: files as File[], resourceId };
+  return { files: files as File[], reason, resourceId };
 }
 
 function parseResourceId(input: unknown): ResourceIdInput {
@@ -425,11 +448,77 @@ export function parseMarkPrivate(input: unknown) {
   return { reason: reason.trim(), resourceId };
 }
 
+/**
+ * Parses a resource visibility mutation.
+ *
+ * @param input - Untrusted mutation input.
+ * @returns The validated visibility mutation.
+ * @throws When the input is invalid.
+ */
 export function parseResourceVisibility(input: unknown) {
   const { resourceId } = parseResourceId(input);
   const isPublic = (input as { isPublic?: unknown }).isPublic;
   if (typeof isPublic !== "boolean") throw invalidResourceRequest();
-  return { isPublic, resourceId };
+  return {
+    isPublic,
+    reason: parseReason(
+      (
+        input as {
+          /** Optional moderation reason. */
+          reason?: unknown;
+        }
+      ).reason,
+    ),
+    resourceId,
+  };
+}
+
+/**
+ * Parses a resource mutation with an optional reason.
+ *
+ * @param input - Untrusted mutation input.
+ * @returns The validated mutation.
+ * @throws When the input is invalid.
+ */
+function parseResourceMutation(input: unknown) {
+  const { resourceId } = parseResourceId(input);
+  const reason = parseReason(
+    (
+      input as {
+        /** Optional moderation reason. */
+        reason?: unknown;
+      }
+    ).reason,
+  );
+  return { reason, resourceId };
+}
+
+/**
+ * Parses a resource mutation with a required reason.
+ *
+ * @param input - Untrusted mutation input.
+ * @returns The validated mutation.
+ * @throws When the input is invalid or lacks a reason.
+ */
+function parseRequiredResourceMutation(input: unknown) {
+  const { reason, resourceId } = parseResourceMutation(input);
+  if (!reason) throw invalidResourceRequest();
+  return { reason, resourceId };
+}
+
+/**
+ * Normalizes an optional moderation reason.
+ *
+ * @param value - Untrusted reason input.
+ * @returns The trimmed reason when supplied.
+ * @throws When the reason is invalid.
+ */
+function parseReason(value: unknown): string | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (typeof value !== "string" || value.length > 1000 || !value.trim()) {
+    throw invalidResourceRequest();
+  }
+  return value.trim();
 }
 
 async function toUploadInput(file: File) {

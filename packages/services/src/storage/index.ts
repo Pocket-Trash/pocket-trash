@@ -22,6 +22,12 @@ import {
 } from "../db/audit/collections.js";
 import type { AuditService } from "../db/audit/index.js";
 import { productAudit, writeProductAudit } from "../db/audit/products.js";
+import {
+  loadResourceAuditContext,
+  resourceAudit,
+  resourceAuditAuthorization,
+  writeResourceAudit,
+} from "../db/audit/resources.js";
 import { hashLogIdentifier, loggedMutation } from "../logging.js";
 import { completeResource, completeVersion } from "./complete-resource.js";
 import {
@@ -78,18 +84,47 @@ export const fileTypes = [
 export type FileType = (typeof fileTypes)[number];
 type Session = typeof schema.uploadSession.$inferSelect;
 
+/**
+ * Creates resumable upload-session operations.
+ *
+ * @param input - Storage service dependencies.
+ * @returns Configured storage service.
+ */
 export function createStorageService(input: {
+  /** Shared audit service. */
   audit?: AuditService;
+  /** Application database. */
   db: Database;
+  /** Object storage implementation. */
   storage: UploadStorage;
+  /** Application logger. */
   logger: Logger;
+  /**
+   * Gets the current time.
+   *
+   * @returns Current time.
+   */
   now?: () => Date;
+  /**
+   * Generates an upload identifier.
+   *
+   * @returns New identifier.
+   */
   randomUUID?: () => string;
 }) {
   const { audit, db, storage, logger } = input;
   const now = input.now ?? (() => new Date());
   const uuid = input.randomUUID ?? (() => crypto.randomUUID());
   const service = {
+    /**
+     * Creates an upload session.
+     *
+     * @param value - Untrusted upload manifest.
+     * @param actor - Uploading actor.
+     * @param attributes - Mutable log attributes.
+     * @returns Reserved upload session.
+     * @rejects When the manifest or target is invalid.
+     */
     async create(value: unknown, actor: UploadActor, attributes: LogContext) {
       const parsed = uploadManifestSchema.safeParse(value);
       if (!parsed.success) throw new UploadSessionError("invalid_request", 400);
@@ -123,6 +158,13 @@ export function createStorageService(input: {
         };
         await lockTarget(tx, target);
         if (!isCreate) await assertCanEditTarget(tx, target, actor);
+        if (resource?.operation === "version" && audit) {
+          resourceAuditAuthorization(
+            actor,
+            await loadResourceAuditContext(tx, actor, target.id),
+            resource.reason,
+          );
+        }
         await assertNoDuplicateImages(tx, target, manifest.files);
         let version: number | null = null;
         if (resource) {
@@ -290,6 +332,14 @@ export function createStorageService(input: {
           .where(eq(schema.uploadFile.id, fileId));
       });
     },
+    /**
+     * Completes an uploaded session atomically.
+     *
+     * @param sessionId - Upload session identifier.
+     * @param actor - Uploading actor.
+     * @param attributes - Mutable log attributes.
+     * @returns Completed upload identity.
+     */
     async completeUpload(
       sessionId: string,
       actor: UploadActor,
@@ -324,10 +374,43 @@ export function createStorageService(input: {
               !(await completeResource(tx, sessionId, actor.clerkId, payload))
             )
               throw new UploadSessionError("uploads_incomplete", 409);
+            if (audit) {
+              const context = await loadResourceAuditContext(
+                tx,
+                actor,
+                target.id,
+              );
+              await writeResourceAudit(audit, tx, {
+                actor,
+                after: context.state,
+                context,
+                definition: resourceAudit.created,
+                targetId: target.id,
+              });
+            }
           } else {
             await assertCanEditTarget(tx, target, actor);
+            const context = audit
+              ? await loadResourceAuditContext(tx, actor, target.id)
+              : undefined;
             if (!(await completeVersion(tx, sessionId, actor.clerkId)))
               throw new UploadSessionError("uploads_incomplete", 409);
+            if (audit && context) {
+              const after = await loadResourceAuditContext(
+                tx,
+                actor,
+                target.id,
+              );
+              await writeResourceAudit(audit, tx, {
+                actor,
+                after: after.state,
+                before: context.state,
+                context,
+                definition: resourceAudit.versionAdded,
+                reason: payload.reason,
+                targetId: target.id,
+              });
+            }
           }
         } else {
           const collectionContext = await collectionTargetContext(tx, target);

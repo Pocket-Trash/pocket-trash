@@ -23,10 +23,12 @@ export function UserAccountPage() {
         <UserProfileSkeleton />
       </ClerkLoading>
       <ClerkLoaded>
-        <UserProfileProvider>
-          <UserProfileAccountPanel />
-          <UserProfileSecurityPanel />
-        </UserProfileProvider>
+        <div className="[&_[id=linear]]:hidden">
+          <UserProfileProvider>
+            <UserProfileAccountPanel />
+            <UserProfileSecurityPanel />
+          </UserProfileProvider>
+        </div>
         <DeleteAccountSection />
       </ClerkLoaded>
     </UserPageShell>

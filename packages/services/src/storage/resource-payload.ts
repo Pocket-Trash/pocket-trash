@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { UploadSessionError } from "./types.js";
+/** Validated payload stored for resource upload sessions. */
 export const resourcePayloadSchema = z.discriminatedUnion("operation", [
   z.object({
     operation: z.literal("create"),
@@ -8,7 +9,10 @@ export const resourcePayloadSchema = z.discriminatedUnion("operation", [
     categories: z.array(z.string().trim().min(1).max(60)).min(1).max(10),
     isPrivate: z.boolean().default(false),
   }),
-  z.object({ operation: z.literal("version") }),
+  z.object({
+    operation: z.literal("version"),
+    reason: z.string().trim().min(1).max(1000).optional(),
+  }),
 ]);
 export function resourcePayload(value: unknown) {
   const result = resourcePayloadSchema.safeParse(value);

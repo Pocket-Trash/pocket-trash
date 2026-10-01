@@ -3,10 +3,15 @@ import { chmodSync, existsSync, statSync, unlinkSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
+/** CommonJS resolver scoped to this ES module. */
 const require = createRequire(import.meta.url);
+/** Installed `drizzle-view` package manifest path. */
 const packageJsonPath = require.resolve("drizzle-view/package.json");
+/** Installed `drizzle-view` package directory. */
 const packageDir = dirname(packageJsonPath);
+/** Platform-specific executable filename expected by `drizzle-view`. */
 const binaryName = getBinaryName();
+/** Path to the installed platform executable. */
 const binaryPath = join(packageDir, "bin", binaryName);
 
 if (existsSync(binaryPath)) {
@@ -19,7 +24,9 @@ if (existsSync(binaryPath)) {
   }
 }
 
+/** Installed `drizzle-view` JavaScript CLI entry point. */
 const cliPath = require.resolve("drizzle-view/drizzle-view.js");
+/** Child process running the CLI with inherited terminal I/O. */
 const child = spawn(process.execPath, [cliPath, ...process.argv.slice(2)], {
   stdio: "inherit",
 });
@@ -38,6 +45,11 @@ child.on("exit", (code, signal) => {
   process.exitCode = 1;
 });
 
+/**
+ * Builds the executable filename for the current platform and architecture.
+ *
+ * @returns The installed `drizzle-view` binary filename.
+ */
 function getBinaryName() {
   const extension = process.platform === "win32" ? ".exe" : "";
 

@@ -1,6 +1,8 @@
+/** Stable structured logger message names. */
 export const loggerMessages = {
   api: {
     clerkWebhookDelivery: "api.clerkWebhook.delivery",
+    linearWebhookDelivery: "api.linearWebhook.delivery",
     cronHourly: "api.cron.hourly",
     healthChecked: "api.health.checked",
     serverListening: "api.server.listening",
@@ -84,6 +86,7 @@ export const loggerMessages = {
       addSpinner: "database.collections.addSpinner",
       addSpinnerButton: "database.collections.addSpinnerButton",
       create: "database.collections.create",
+      delete: "database.collections.delete",
       update: "database.collections.update",
       updateItem: "database.collections.updateItem",
     },
@@ -101,19 +104,24 @@ export const loggerMessages = {
     },
     feedback: {
       approve: "database.feedback.approve",
+      completeLinearPlan: "database.feedback.completeLinearPlan",
       deny: "database.feedback.deny",
       findDuplicates: "database.feedback.findDuplicates",
+      getLinearSyncTarget: "database.feedback.getLinearSyncTarget",
       hasMine: "database.feedback.hasMine",
       listActive: "database.feedback.listActive",
       listAdminActive: "database.feedback.listAdminActive",
       listArchive: "database.feedback.listArchive",
+      listCompleted: "database.feedback.listCompleted",
       listMergeTargets: "database.feedback.listMergeTargets",
       listMine: "database.feedback.listMine",
       listNotifications: "database.feedback.listNotifications",
       listPending: "database.feedback.listPending",
       markNotificationRead: "database.feedback.markNotificationRead",
       mergePending: "database.feedback.mergePending",
+      reserveLinearPlan: "database.feedback.reserveLinearPlan",
       submit: "database.feedback.submit",
+      syncLinearStatus: "database.feedback.syncLinearStatus",
       toggleVote: "database.feedback.toggleVote",
       updateAdmin: "database.feedback.updateAdmin",
       updatePending: "database.feedback.updatePending",
@@ -239,6 +247,7 @@ export const loggerMessages = {
   },
 } as const;
 
+/** Stable values shared by logger applications and the log proxy protocol. */
 export const loggerValues = {
   apps: {
     api: "api",

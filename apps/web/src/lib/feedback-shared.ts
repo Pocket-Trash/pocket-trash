@@ -6,6 +6,8 @@ export type VisibleFeedbackStatus = Exclude<
   FeedbackListItem["status"],
   "canceled" | "denied" | "merged"
 >;
+/** Feedback lifecycle status rendered by shared UI. */
+type FeedbackStatus = FeedbackListItem["status"];
 
 export const feedbackCategories: FeedbackCategory[] = [
   "product_type",
@@ -21,7 +23,13 @@ export function feedbackCategoryKey(
   return `web.feedback.category.${category}`;
 }
 
-export function feedbackStatus(status: VisibleFeedbackStatus): {
+/**
+ * Resolves display metadata for a feedback status.
+ *
+ * @param status - Feedback lifecycle status.
+ * @returns The status icon and translation key.
+ */
+export function feedbackStatus(status: FeedbackStatus): {
   icon: string;
   key: TranslationKey;
 } {
@@ -40,5 +48,14 @@ export function feedbackStatus(status: VisibleFeedbackStatus): {
       key: "web.feedback.status.inProgress",
     };
   }
-  return { icon: "status-done.svg", key: "web.feedback.status.completed" };
+  if (status === "completed" || status === "merged") {
+    return {
+      icon: "status-done.svg",
+      key: `web.feedback.status.${status}`,
+    };
+  }
+  return {
+    icon: "status-canceled.svg",
+    key: `web.feedback.status.${status}`,
+  };
 }

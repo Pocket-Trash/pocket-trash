@@ -63,6 +63,10 @@ jobs:
             --binding CLERK_WEBHOOK_TARGETS \
             --env development \
             --remote
+          pnpm exec wrangler kv key delete "linear-target:preview:${{ github.event.pull_request.number }}" \
+            --binding CLERK_WEBHOOK_TARGETS \
+            --env development \
+            --remote
 
       - name: Delete Neon PR branch
         id: neon_cleanup

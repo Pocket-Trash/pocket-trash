@@ -1,6 +1,7 @@
 export * from "./client.js";
 export type {
   AuditEvent,
+  AuditExport,
   AuditJson,
   AuditJsonObject,
   AutmogPenImageRecord,
@@ -27,6 +28,7 @@ export type {
   Material,
   Mechanism,
   NewAuditEvent,
+  NewAuditExport,
   NewErasureRequest,
   NewFeatureFlag,
   NewFeatureFlagUserOverride,

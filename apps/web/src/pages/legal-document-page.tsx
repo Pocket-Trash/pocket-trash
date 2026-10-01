@@ -4,7 +4,19 @@ import { MarkdownContent } from "@/components/markdown-content";
 import type { LegalDocument } from "@/lib/legal-content";
 import { useLocale } from "@/providers/locale-provider";
 
-export function LegalDocumentPage({ document }: { document: LegalDocument }) {
+/** Properties accepted by the public legal document page. */
+type LegalDocumentPageProps = {
+  /** Parsed legal document to display. */
+  document: LegalDocument;
+};
+
+/**
+ * Renders a published legal document with its version and effective date.
+ *
+ * @param props - Legal document page properties.
+ * @returns The public legal document page.
+ */
+export function LegalDocumentPage({ document }: LegalDocumentPageProps) {
   const { locale } = useLocale();
   const modified = document.metadata.dateModified;
   const date = modified ?? document.metadata.effectiveDate;

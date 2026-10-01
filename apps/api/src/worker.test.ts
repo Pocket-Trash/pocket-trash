@@ -5,6 +5,7 @@ import worker, {
   handleWorkerScheduled,
   isAllowedWebOrigin,
   validateApiBindings,
+  validateLinearWebhookBindings,
   validateUploadBindings,
 } from "./worker.js";
 
@@ -67,6 +68,15 @@ describe("api worker", () => {
     );
     expect(isAllowedWebOrigin("https://attacker.example", "production")).toBe(
       false,
+    );
+  });
+
+  it("validates Linear webhook bindings", () => {
+    expect(() => validateLinearWebhookBindings({})).toThrow(
+      new ApiEnvValidationError([
+        "DATABASE_URL",
+        "LINEAR_WEBHOOK_SIGNING_SECRET",
+      ]),
     );
   });
 

@@ -40,13 +40,20 @@ const publicStatuses: (typeof schema.feedbackStatuses)[number][] = [
   "planned",
   "in_progress",
 ];
+/** Feedback statuses eligible for manual Linear synchronization. */
+const syncableStatuses: (typeof schema.feedbackStatuses)[number][] = [
+  ...activeStatuses,
+  "completed",
+  "canceled",
+];
 export const adminFeedbackArchiveStatuses = schema.feedbackStatuses.filter(
   (status) => !activeStatuses.includes(status),
 );
 
+/** Feedback item shown in authenticated public lists. */
 export type FeedbackListItem = Omit<
   typeof schema.feedback.$inferSelect,
-  "linearClientUuid" | "submitterClerkId"
+  "linearClientUuid" | "linearUpdatedAt" | "submitterClerkId"
 > & {
   hasPermanentVote: boolean;
   hasVoted: boolean;
@@ -58,11 +65,14 @@ export type FeedbackPage = {
   items: FeedbackListItem[];
 };
 
+/** Feedback item shown in admin lists. */
 export type AdminFeedbackItem = {
   category: FeedbackCategory | null;
   createdAt: Date;
   description: string;
   id: number;
+  /** Linked Linear entity identifier. */
+  linearClientUuid: string | null;
   status: FeedbackStatus;
   submitterUsername: string | null;
   title: string;
@@ -133,22 +143,124 @@ export type UpdateAdminFeedbackInput = {
 
 export type UpdatePendingFeedbackInput = UpdateAdminFeedbackInput;
 
+/** Reserved feedback data used to create a Linear entity. */
+export type FeedbackPlanReservation = Pick<
+  AdminFeedbackItem,
+  "category" | "description" | "id" | "title"
+> & {
+  /** Reserved Linear client identifier. */
+  linearClientUuid: string;
+};
+
+/** Linear lifecycle event normalized for feedback synchronization. */
+export type LinearFeedbackSyncInput = {
+  /** Linear event action. */
+  action: "create" | "remove" | "sync" | "update";
+  /** Whether the Linear entity is archived. */
+  archived?: boolean;
+  /** Linear entity kind. */
+  entityType: "issue" | "project";
+  /** Linear entity identifier. */
+  entityUuid: string;
+  /** Time the lifecycle change occurred. */
+  occurredAt: Date;
+  /** Linear workflow or project status type. */
+  stateType?: string;
+};
+
+/** Result of synchronizing a Linear lifecycle event. */
+export type LinearFeedbackSyncResult = "ignored" | "not_found" | "updated";
+
+/** Feedback persistence and lifecycle operations. */
 export type FeedbackService = {
+  /**
+   * Approves a feedback request for planning.
+   *
+   * @param feedbackId - Feedback identifier.
+   * @returns Completion of the update.
+   */
   approve(feedbackId: number): Promise<void>;
+  /**
+   * Marks a linked feedback plan as completed.
+   *
+   * @param feedbackId - Feedback identifier.
+   * @param linearClientUuid - Linked Linear entity identifier.
+   * @returns Completion of the update.
+   */
+  completeLinearPlan(
+    feedbackId: number,
+    linearClientUuid: string,
+  ): Promise<void>;
+  /**
+   * Denies a pending feedback request.
+   *
+   * @param feedbackId - Feedback identifier.
+   * @returns Completion of the update.
+   */
   deny(feedbackId: number): Promise<void>;
+  /**
+   * Finds active feedback with similar title terms.
+   *
+   * @param viewerClerkId - Requesting Clerk user identifier.
+   * @param title - Proposed feedback title.
+   * @returns Up to five possible duplicate requests.
+   */
   findDuplicates(
     viewerClerkId: string,
     title: string,
   ): Promise<FeedbackListItem[]>;
+  /**
+   * Finds the Linear entity linked to eligible feedback.
+   *
+   * @param feedbackId - Feedback identifier.
+   * @returns The linked Linear identifier, when eligible.
+   */
+  getLinearSyncTarget(feedbackId: number): Promise<string | undefined>;
+  /**
+   * Checks whether a submitter has visible feedback.
+   *
+   * @param submitterClerkId - Submitter's Clerk identifier.
+   * @returns Whether visible feedback exists.
+   */
   hasMine(submitterClerkId: string): Promise<boolean>;
+  /**
+   * Lists active feedback visible to a user.
+   *
+   * @param viewerClerkId - Requesting Clerk user identifier.
+   * @param search - Optional search text.
+   * @returns Active feedback matching the search.
+   */
   listActive(
     viewerClerkId: string,
     search?: string,
   ): Promise<FeedbackListItem[]>;
+  /**
+   * Lists active feedback for administration.
+   *
+   * @param options - Search, sorting, and pagination options.
+   * @returns The matching active feedback page.
+   */
   listAdminActive(
     options?: ListAdminFeedbackOptions,
   ): Promise<AdminFeedbackPage>;
+  /**
+   * Lists archived feedback for administration.
+   *
+   * @param options - Search, sorting, and pagination options.
+   * @returns The matching archived feedback page.
+   */
   listArchive(options?: ListAdminFeedbackOptions): Promise<AdminFeedbackPage>;
+  /**
+   * Lists completed feedback for public discovery.
+   *
+   * @param viewerClerkId - Requesting Clerk user identifier.
+   * @param search - Optional search text.
+   * @returns Completed feedback ordered by completion date.
+   */
+  listCompleted(
+    viewerClerkId: string,
+    search?: string,
+  ): Promise<FeedbackListItem[]>;
   listMergeTargets(): Promise<FeedbackMergeTarget[]>;
   listMine(
     submitterClerkId: string,
@@ -163,9 +275,22 @@ export type FeedbackService = {
     actorClerkId: string,
   ): Promise<void>;
   mergePending(feedbackId: number, targetId: number): Promise<void>;
+  reserveLinearPlan(
+    feedbackId: number,
+    linearClientUuid: string,
+  ): Promise<FeedbackPlanReservation>;
   submit(
     input: SubmitFeedbackInput,
   ): Promise<typeof schema.feedback.$inferSelect>;
+  /**
+   * Applies one Linear lifecycle event transactionally.
+   *
+   * @param input - Normalized Linear lifecycle event.
+   * @returns The synchronization result.
+   */
+  syncLinearStatus(
+    input: LinearFeedbackSyncInput,
+  ): Promise<LinearFeedbackSyncResult>;
   toggleVote(feedbackId: number, voterClerkId: string): Promise<boolean>;
   updateAdmin(input: UpdateAdminFeedbackInput): Promise<void>;
   updatePending(input: UpdatePendingFeedbackInput): Promise<void>;
@@ -175,6 +300,13 @@ export class FeedbackSubmissionLimitError extends Error {}
 export class FeedbackStateError extends Error {}
 export class FeedbackPlanRecoveryRequiredError extends Error {}
 
+/**
+ * Creates the feedback data service.
+ *
+ * @param db - Application database.
+ * @param logger - Application logger.
+ * @returns The configured feedback service.
+ */
 export function createFeedbackService(
   db: Database,
   logger: Logger,
@@ -201,6 +333,50 @@ export function createFeedbackService(
       );
     },
 
+    async completeLinearPlan(feedbackId, linearClientUuid) {
+      await logger.operation(
+        loggerMessages.database.feedback.completeLinearPlan,
+        async () => {
+          assertPositiveInteger(feedbackId, "feedbackId");
+          assertUuid(linearClientUuid);
+          const updated = await db
+            .update(schema.feedback)
+            .set({ status: "planned", updatedAt: new Date() })
+            .where(
+              and(
+                eq(schema.feedback.id, feedbackId),
+                eq(schema.feedback.status, "requested"),
+                eq(schema.feedback.linearClientUuid, linearClientUuid),
+              ),
+            )
+            .returning({ id: schema.feedback.id });
+          if (updated.length > 0) return;
+
+          const [existing] = await db
+            .select({
+              linearClientUuid: schema.feedback.linearClientUuid,
+              status: schema.feedback.status,
+            })
+            .from(schema.feedback)
+            .where(eq(schema.feedback.id, feedbackId))
+            .limit(1);
+          if (
+            existing?.status === "planned" &&
+            existing.linearClientUuid === linearClientUuid
+          ) {
+            return;
+          }
+          throw new FeedbackStateError();
+        },
+      );
+    },
+
+    /**
+     * Denies eligible feedback.
+     *
+     * @param feedbackId - Feedback identifier.
+     * @returns A promise that resolves after denial.
+     */
     async deny(feedbackId) {
       await logger.operation(
         loggerMessages.database.feedback.deny,
@@ -238,6 +414,13 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Finds active feedback with similar title terms.
+     *
+     * @param viewerClerkId - Requesting Clerk user identifier.
+     * @param title - Proposed feedback title.
+     * @returns Up to five possible duplicate requests.
+     */
     async findDuplicates(viewerClerkId, title) {
       return await logger.operation(
         loggerMessages.database.feedback.findDuplicates,
@@ -273,6 +456,38 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Finds the Linear entity linked to eligible feedback.
+     *
+     * @param feedbackId - Feedback identifier.
+     * @returns The linked Linear identifier, when eligible.
+     */
+    async getLinearSyncTarget(feedbackId) {
+      return await logger.operation(
+        loggerMessages.database.feedback.getLinearSyncTarget,
+        async () => {
+          assertPositiveInteger(feedbackId, "feedbackId");
+          const [target] = await db
+            .select({ linearClientUuid: schema.feedback.linearClientUuid })
+            .from(schema.feedback)
+            .where(
+              and(
+                eq(schema.feedback.id, feedbackId),
+                inArray(schema.feedback.status, syncableStatuses),
+              ),
+            );
+          return target?.linearClientUuid ?? undefined;
+        },
+        { attributes: { feedbackId } },
+      );
+    },
+
+    /**
+     * Checks whether a submitter has visible feedback.
+     *
+     * @param submitterClerkId - Submitter's Clerk identifier.
+     * @returns Whether visible feedback exists.
+     */
     async hasMine(submitterClerkId) {
       return await logger.operation(
         loggerMessages.database.feedback.hasMine,
@@ -294,6 +509,13 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Lists active feedback for public discovery.
+     *
+     * @param viewerClerkId - Requesting Clerk user identifier.
+     * @param search - Optional search text.
+     * @returns Active feedback grouped by lifecycle status.
+     */
     async listActive(viewerClerkId, search) {
       return await logger.operation(
         loggerMessages.database.feedback.listActive,
@@ -338,6 +560,40 @@ export function createFeedbackService(
       return await logger.operation(
         loggerMessages.database.feedback.listArchive,
         async () => await listAdminFeedback(db, "archive", options),
+      );
+    },
+
+    /**
+     * Lists completed feedback for public discovery.
+     *
+     * @param viewerClerkId - Requesting Clerk user identifier.
+     * @param search - Optional search text.
+     * @returns Completed feedback ordered by completion date.
+     */
+    async listCompleted(viewerClerkId, search) {
+      return await logger.operation(
+        loggerMessages.database.feedback.listCompleted,
+        async () => {
+          const viewer = normalizedClerkId(viewerClerkId);
+          const terms = normalizedSearch(search);
+          return await db
+            .select(feedbackListColumns(viewer))
+            .from(schema.feedback)
+            .where(
+              and(
+                eq(schema.feedback.status, "completed"),
+                terms.length > 0
+                  ? and(...terms.map(feedbackContains))
+                  : undefined,
+              ),
+            )
+            .orderBy(
+              desc(schema.feedback.completedAt),
+              desc(schema.feedback.id),
+            )
+            .limit(40);
+        },
+        { attributes: { clerkIdHash: hashLogIdentifier(viewerClerkId) } },
       );
     },
 
@@ -448,6 +704,45 @@ export function createFeedbackService(
       );
     },
 
+    async reserveLinearPlan(feedbackId, linearClientUuid) {
+      return await logger.operation(
+        loggerMessages.database.feedback.reserveLinearPlan,
+        async () => {
+          assertPositiveInteger(feedbackId, "feedbackId");
+          assertUuid(linearClientUuid);
+          const [reserved] = await db
+            .update(schema.feedback)
+            .set({
+              linearClientUuid: sql`coalesce(${schema.feedback.linearClientUuid}, ${linearClientUuid})`,
+            })
+            .where(
+              and(
+                eq(schema.feedback.id, feedbackId),
+                eq(schema.feedback.status, "requested"),
+              ),
+            )
+            .returning({
+              category: schema.feedback.category,
+              description: schema.feedback.description,
+              id: schema.feedback.id,
+              linearClientUuid: schema.feedback.linearClientUuid,
+              title: schema.feedback.title,
+            });
+          if (!reserved?.linearClientUuid) throw new FeedbackStateError();
+          return {
+            ...reserved,
+            linearClientUuid: reserved.linearClientUuid,
+          };
+        },
+      );
+    },
+
+    /**
+     * Merges a pending feedback request into another request.
+     *
+     * @param feedbackId - Source feedback identifier.
+     * @param targetId - Target feedback identifier.
+     */
     async mergePending(feedbackId, targetId) {
       await logger.operation(
         loggerMessages.database.feedback.mergePending,
@@ -502,6 +797,12 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Submits feedback and its permanent initial vote.
+     *
+     * @param input - New feedback details.
+     * @returns The created feedback record.
+     */
     async submit(input) {
       return await logger.operation(
         loggerMessages.database.feedback.submit,
@@ -558,6 +859,74 @@ export function createFeedbackService(
         {
           attributes: {
             clerkIdHash: hashLogIdentifier(input.submitterClerkId),
+          },
+        },
+      );
+    },
+
+    /**
+     * Applies one Linear lifecycle event transactionally.
+     *
+     * @param input - Normalized Linear lifecycle event.
+     * @returns The synchronization result.
+     */
+    async syncLinearStatus(input) {
+      return await logger.operation(
+        loggerMessages.database.feedback.syncLinearStatus,
+        async () => {
+          assertUuid(input.entityUuid);
+          if (Number.isNaN(input.occurredAt.getTime())) {
+            throw new Error("occurredAt must be a valid date.");
+          }
+          const status = linearFeedbackStatus(input);
+
+          return await db.transaction(async (tx) => {
+            const [current] = await tx
+              .select({
+                id: schema.feedback.id,
+                linearUpdatedAt: schema.feedback.linearUpdatedAt,
+                status: schema.feedback.status,
+              })
+              .from(schema.feedback)
+              .where(eq(schema.feedback.linearClientUuid, input.entityUuid))
+              .for("update");
+            if (!current) return "not_found";
+            if (
+              current.linearUpdatedAt &&
+              current.linearUpdatedAt >= input.occurredAt
+            ) {
+              return "ignored";
+            }
+
+            if (!status || current.status === status) {
+              await tx
+                .update(schema.feedback)
+                .set({ linearUpdatedAt: input.occurredAt })
+                .where(eq(schema.feedback.id, current.id));
+              return "ignored";
+            }
+
+            await tx
+              .update(schema.feedback)
+              .set({
+                completedAt: status === "completed" ? input.occurredAt : null,
+                linearUpdatedAt: input.occurredAt,
+                status,
+                updatedAt: input.occurredAt,
+              })
+              .where(eq(schema.feedback.id, current.id));
+            if (status === "completed") {
+              await tx.insert(schema.feedbackNotifications).values({
+                feedbackId: current.id,
+                type: "completed",
+              });
+            }
+            return "updated";
+          });
+        },
+        {
+          attributes: {
+            linearEntityUuidHash: hashLogIdentifier(input.entityUuid),
           },
         },
       );
@@ -656,6 +1025,14 @@ async function updateAdminFeedback(
   if (updated.length === 0) throw new FeedbackStateError();
 }
 
+/**
+ * Lists an admin feedback page for a lifecycle scope.
+ *
+ * @param db - Database connection.
+ * @param scope - Feedback lifecycle scope.
+ * @param options - Search, sorting, and pagination options.
+ * @returns The matching feedback page.
+ */
 async function listAdminFeedback(
   db: Database,
   scope: "active" | "archive" | "pending",
@@ -726,12 +1103,18 @@ async function listAdminFeedback(
   return { hasNext: rows.length > 30, items: rows.slice(0, 30) };
 }
 
+/**
+ * Returns the common admin feedback column selection.
+ *
+ * @returns Columns selected by admin feedback queries.
+ */
 function adminFeedbackColumns() {
   return {
     category: schema.feedback.category,
     createdAt: schema.feedback.createdAt,
     description: schema.feedback.description,
     id: schema.feedback.id,
+    linearClientUuid: schema.feedback.linearClientUuid,
     status: schema.feedback.status,
     submitterUsername: schema.user.username,
     title: schema.feedback.title,
@@ -740,6 +1123,15 @@ function adminFeedbackColumns() {
   };
 }
 
+/**
+ * Validates and normalizes admin feedback sorting.
+ *
+ * @param value - Requested sorting rules.
+ * @param max - Maximum number of sorting rules.
+ * @param allowed - Fields allowed for the query.
+ * @returns Validated sorting rules.
+ * @throws When a sorting rule is invalid.
+ */
 function normalizedAdminSort(
   value: AdminFeedbackSort[] | undefined,
   max: number,
@@ -761,6 +1153,13 @@ function normalizedAdminSort(
   return sorts;
 }
 
+/**
+ * Validates requested archive statuses.
+ *
+ * @param value - Requested archive statuses.
+ * @returns The validated archive statuses.
+ * @throws {Error} When a status is duplicated or not archived.
+ */
 function normalizedArchiveStatuses(value: FeedbackStatus[] | undefined) {
   const statuses = value ?? [];
   if (
@@ -772,6 +1171,13 @@ function normalizedArchiveStatuses(value: FeedbackStatus[] | undefined) {
   return statuses;
 }
 
+/**
+ * Validates requested active statuses.
+ *
+ * @param value - Requested active statuses.
+ * @returns The validated active statuses.
+ * @throws {Error} When a status is duplicated or not active.
+ */
 function normalizedActiveStatuses(value: FeedbackStatus[] | undefined) {
   const statuses = value?.length ? value : activeStatuses;
   if (
@@ -783,6 +1189,12 @@ function normalizedActiveStatuses(value: FeedbackStatus[] | undefined) {
   return statuses;
 }
 
+/**
+ * Builds a database ordering expression for an admin sort.
+ *
+ * @param sort - Admin feedback sort.
+ * @returns The Drizzle ordering expression.
+ */
 function adminSortExpression(sort: AdminFeedbackSort): SQL {
   const direction = sort.direction === "asc" ? asc : desc;
   if (sort.field === "category") return direction(schema.feedback.category);
@@ -802,6 +1214,12 @@ function adminSortExpression(sort: AdminFeedbackSort): SQL {
   return direction(feedbackVoteCount());
 }
 
+/**
+ * Normalizes submitted feedback input.
+ *
+ * @param input - Submitted feedback input.
+ * @returns Normalized feedback fields and submitter identifier.
+ */
 function normalizeFeedbackInput(input: SubmitFeedbackInput) {
   return {
     ...normalizeFeedbackDetails(input),
@@ -809,6 +1227,13 @@ function normalizeFeedbackInput(input: SubmitFeedbackInput) {
   };
 }
 
+/**
+ * Validates and normalizes editable feedback details.
+ *
+ * @param input - Feedback fields to normalize.
+ * @returns Normalized feedback fields.
+ * @throws {Error} When a feedback field is invalid.
+ */
 function normalizeFeedbackDetails(
   input: Pick<SubmitFeedbackInput, "category" | "description" | "title">,
 ) {
@@ -831,9 +1256,16 @@ function normalizeFeedbackDetails(
   };
 }
 
+/**
+ * Builds the shared public feedback selection.
+ *
+ * @param viewerClerkId - Requesting Clerk user identifier.
+ * @returns Drizzle selection columns for feedback lists.
+ */
 function feedbackListColumns(viewerClerkId: string) {
   return {
     category: schema.feedback.category,
+    completedAt: schema.feedback.completedAt,
     createdAt: schema.feedback.createdAt,
     description: schema.feedback.description,
     hasPermanentVote: sql<boolean>`exists (
@@ -853,6 +1285,32 @@ function feedbackListColumns(viewerClerkId: string) {
     updatedAt: schema.feedback.updatedAt,
     voteCount: feedbackVoteCount(),
   };
+}
+
+/**
+ * Maps a Linear lifecycle event to a feedback status.
+ *
+ * @param input - Normalized Linear lifecycle event.
+ * @returns The mapped feedback status, or undefined when ignored.
+ */
+function linearFeedbackStatus(
+  input: LinearFeedbackSyncInput,
+): FeedbackStatus | undefined {
+  if (input.action === "create") return;
+  if (input.action === "remove" || input.archived) return "canceled";
+  if (input.entityType === "issue") {
+    if (input.stateType === "started") return "in_progress";
+    if (input.stateType === "completed") return "completed";
+    if (input.stateType === "canceled") return "canceled";
+    if (input.stateType === "backlog" || input.stateType === "unstarted") {
+      return "requested";
+    }
+    return;
+  }
+  if (input.stateType === "planned") return "planned";
+  if (input.stateType === "started") return "in_progress";
+  if (input.stateType === "completed") return "completed";
+  if (input.stateType === "canceled") return "canceled";
 }
 
 function feedbackVoteCount() {
@@ -905,5 +1363,15 @@ function normalizedClerkId(value: string) {
 function assertPositiveInteger(value: number, name: string) {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive integer.`);
+  }
+}
+
+function assertUuid(value: string) {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  ) {
+    throw new Error("linearClientUuid must be a UUID.");
   }
 }

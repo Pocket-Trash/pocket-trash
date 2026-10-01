@@ -71,6 +71,12 @@ export function AdminResourceTrashPage({
   );
 }
 
+/**
+ * Renders recoverable resources for an owner or administrator.
+ *
+ * @param props - Trash contents and display permissions.
+ * @returns The resource trash list.
+ */
 function ResourceTrashList({
   emptyKey,
   initialResources,
@@ -145,9 +151,20 @@ function ResourceTrashList({
             <Button
               disabled={restoringId === resource.id}
               onClick={async () => {
+                const reason = showPermanentDelete
+                  ? window
+                      .prompt(t("web.resources.moderation.reasonLabel"))
+                      ?.trim()
+                  : undefined;
+                if (showPermanentDelete && !reason) {
+                  toast.error(t("web.resources.moderation.reasonRequired"));
+                  return;
+                }
                 setRestoringId(resource.id);
                 try {
-                  await restoreResource({ data: { resourceId: resource.id } });
+                  await restoreResource({
+                    data: { reason, resourceId: resource.id },
+                  });
                   setResources((current) =>
                     current.filter(({ id }) => id !== resource.id),
                   );
@@ -190,6 +207,12 @@ function ResourceTrashList({
   );
 }
 
+/**
+ * Renders the permanent deletion confirmation flow.
+ *
+ * @param props - Resource, callback, and localized copy.
+ * @returns The permanent deletion button and dialog.
+ */
 function PermanentDeleteButton({
   onDeleted,
   resource,
@@ -200,6 +223,7 @@ function PermanentDeleteButton({
   t: (key: TranslationKey, params?: Record<string, number | string>) => string;
 }) {
   const [deleting, setDeleting] = useState(false);
+  const [reason, setReason] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = `permanently-delete-resource-${resource.id}`;
 
@@ -229,6 +253,17 @@ function PermanentDeleteButton({
               })}
             </p>
           </div>
+          <label className="grid gap-2 text-sm font-medium">
+            {t("web.resources.moderation.reasonLabel")}
+            <textarea
+              className="min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              maxLength={1000}
+              onChange={(event) => setReason(event.currentTarget.value)}
+              placeholder={t("web.resources.moderation.reasonPlaceholder")}
+              required
+              value={reason}
+            />
+          </label>
           <div className="flex justify-end gap-2">
             <Button
               disabled={deleting}
@@ -239,12 +274,12 @@ function PermanentDeleteButton({
               {t("action.cancel")}
             </Button>
             <Button
-              disabled={deleting}
+              disabled={deleting || !reason.trim()}
               onClick={async () => {
                 setDeleting(true);
                 try {
                   await permanentlyDeleteResource({
-                    data: { resourceId: resource.id },
+                    data: { reason, resourceId: resource.id },
                   });
                   dialogRef.current?.close();
                   onDeleted();

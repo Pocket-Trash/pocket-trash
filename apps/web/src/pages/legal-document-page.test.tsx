@@ -3,12 +3,31 @@ import { describe, expect, it, vi } from "vitest";
 import { parseHelpDocument } from "@/lib/help-content";
 import { LegalDocumentPage } from "./legal-document-page";
 
+/**
+ * Renders mocked shell content without layout markup.
+ *
+ * @param props - Mock shell properties.
+ * @returns The supplied children.
+ */
+function MockAppShell({ children }: React.PropsWithChildren) {
+  return <>{children}</>;
+}
+
+/**
+ * Supplies the page test's fixed locale.
+ *
+ * @returns The fixed locale used by the page test.
+ */
+function mockUseLocale() {
+  return { locale: "en-US" };
+}
+
 vi.mock("@/components/app-shell", () => ({
-  AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AppShell: MockAppShell,
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
-  useLocale: () => ({ locale: "en-US" }),
+  useLocale: mockUseLocale,
 }));
 
 describe("LegalDocumentPage", () => {

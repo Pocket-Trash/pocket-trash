@@ -6,6 +6,7 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
+import { Link } from "@tanstack/react-router";
 import {
   createColumnHelper,
   tableFeatures,
@@ -20,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import {
   approveFeedback,
   denyFeedback,
+  getLinearPlanOptions,
   listAdminActiveFeedback,
   listAdminAllActiveFeedback,
   listArchivedFeedback,
@@ -27,9 +29,15 @@ import {
   listFeedbackMergeTargets,
   listPendingFeedback,
   mergePendingFeedback,
+  planFeedback,
+  syncFeedbackStatus,
   updateAdminFeedback,
 } from "@/lib/feedback";
-import { feedbackCategories, feedbackCategoryKey } from "@/lib/feedback-shared";
+import {
+  feedbackCategories,
+  feedbackCategoryKey,
+  feedbackStatus,
+} from "@/lib/feedback-shared";
 import { useLocale } from "@/providers/locale-provider";
 
 type Scope = "allActive" | "archive" | "pending" | "planned";
@@ -92,6 +100,12 @@ export function AdminFeedbackArchivePage({
   );
 }
 
+/**
+ * Renders the shared admin feedback table.
+ *
+ * @param props - Feedback table configuration and initial data.
+ * @returns The admin feedback page.
+ */
 function AdminFeedbackPage({
   archiveStatuses = [],
   initialPage,
@@ -112,6 +126,7 @@ function AdminFeedbackPage({
   const [selected, setSelected] = useState<Item>();
   const [sort, setSort] = useState<Sort[]>([]);
   const [status, setStatus] = useState<ArchiveStatus | "">("");
+  const [syncingId, setSyncingId] = useState<number>();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const loadRequestRef = useRef(0);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -188,6 +203,12 @@ function AdminFeedbackPage({
 
   const columns = useMemo(() => {
     const title = columnHelper.accessor("title", {
+      /**
+       * Renders the feedback title cell.
+       *
+       * @param context - Table cell context.
+       * @returns The title button.
+       */
       cell: ({ row }) => (
         <button
           aria-label={t("web.feedback.admin.requests.detailsOpen", {
@@ -207,6 +228,12 @@ function AdminFeedbackPage({
       ),
     });
     const category = columnHelper.accessor("category", {
+      /**
+       * Renders the feedback category cell.
+       *
+       * @param context - Table cell context.
+       * @returns The localized category label.
+       */
       cell: ({ row }) =>
         row.original.category
           ? t(feedbackCategoryKey(row.original.category))
@@ -218,7 +245,18 @@ function AdminFeedbackPage({
       ),
     });
     const submitter = columnHelper.accessor("submitterUsername", {
+      /**
+       * Renders the feedback submitter cell.
+       *
+       * @param context - Table cell context.
+       * @returns The submitter username.
+       */
       cell: ({ row }) => row.original.submitterUsername ?? "",
+      /**
+       * Renders the submitter column header.
+       *
+       * @returns The sortable submitter header.
+       */
       header: () => (
         <SortButton field="submitter" onChange={changeSort} sort={sort}>
           {t("web.feedback.admin.table.submitter")}
@@ -232,7 +270,18 @@ function AdminFeedbackPage({
         category,
         submitter,
         columnHelper.accessor("createdAt", {
+          /**
+           * Renders the submission date cell.
+           *
+           * @param context - Table cell context.
+           * @returns The localized submission date.
+           */
           cell: ({ row }) => formatDate(row.original.createdAt, locale),
+          /**
+           * Renders the submission-date column header.
+           *
+           * @returns The sortable submission-date header.
+           */
           header: () => (
             <SortButton field="submitted" onChange={changeSort} sort={sort}>
               {t("web.feedback.admin.table.submitted")}
@@ -243,21 +292,104 @@ function AdminFeedbackPage({
       ]);
     }
     const statusColumn = columnHelper.accessor("status", {
-      cell: ({ row }) => t(statusKey(row.original.status)),
+      /**
+       * Renders the feedback status cell.
+       *
+       * @param context - Table cell context.
+       * @returns The status icon and label.
+       */
+      cell: ({ row }) => {
+        const details = feedbackStatus(row.original.status);
+        return (
+          <span className="flex items-center gap-2">
+            <img
+              alt=""
+              aria-hidden="true"
+              className="size-4"
+              src={`https://cdn.pocket-trash.app/assets/static/icons/${details.icon}`}
+            />
+            {t(details.key)}
+          </span>
+        );
+      },
+      /**
+       * Renders the status column header.
+       *
+       * @returns The sortable status header.
+       */
       header: () => (
         <SortButton field="status" onChange={changeSort} sort={sort}>
           {t("web.feedback.admin.table.status")}
         </SortButton>
       ),
     });
+    const syncColumn = columnHelper.display({
+      /**
+       * Renders the feedback synchronization action.
+       *
+       * @param context - Table cell context.
+       * @returns The synchronization button when eligible.
+       */
+      cell: ({ row }) =>
+        row.original.linearClientUuid &&
+        !["merged", "denied"].includes(row.original.status) ? (
+          <Button
+            disabled={syncingId === row.original.id}
+            onClick={async () => {
+              setSyncingId(row.original.id);
+              try {
+                const result = await syncFeedbackStatus({
+                  data: { feedbackId: row.original.id },
+                });
+                if (!result.ok) {
+                  toast.error(t(result.error));
+                  return;
+                }
+                toast.success(t("web.feedback.admin.sync.success"));
+                await load(offset);
+              } catch {
+                toast.error(t("web.feedback.admin.sync.failure"));
+              } finally {
+                setSyncingId(undefined);
+              }
+            }}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {t("web.feedback.admin.sync.action")}
+          </Button>
+        ) : null,
+      /**
+       * Renders the synchronization column header.
+       *
+       * @returns The accessible synchronization column label.
+       */
+      header: () => (
+        <span className="sr-only">{t("web.feedback.admin.sync.action")}</span>
+      ),
+      id: "sync",
+    });
     if (scope === "archive") {
-      return columnHelper.columns([title, statusColumn, category, submitter]);
+      return columnHelper.columns([
+        title,
+        statusColumn,
+        category,
+        submitter,
+        syncColumn,
+      ]);
     }
     return columnHelper.columns([
       title,
       statusColumn,
       category,
       columnHelper.accessor("voteCount", {
+        /**
+         * Renders the feedback vote count.
+         *
+         * @param context - Table cell context.
+         * @returns The vote count.
+         */
         cell: ({ row }) => row.original.voteCount,
         header: () => (
           <SortButton field="votes" onChange={changeSort} sort={sort}>
@@ -268,6 +400,12 @@ function AdminFeedbackPage({
       }),
       submitter,
       columnHelper.accessor("updatedAt", {
+        /**
+         * Renders the feedback update date.
+         *
+         * @param context - Table cell context.
+         * @returns The localized update date.
+         */
         cell: ({ row }) =>
           formatDate(row.original.updatedAt ?? row.original.createdAt, locale),
         header: () => (
@@ -277,8 +415,9 @@ function AdminFeedbackPage({
         ),
         id: "updated",
       }),
+      syncColumn,
     ]);
-  }, [locale, scope, search, sort, status, t]);
+  }, [locale, offset, scope, search, sort, status, syncingId, t]);
   const table = useTable({ columns, data: page.items, features });
   const copyScope =
     scope === "pending"
@@ -518,11 +657,47 @@ function AdminFeedbackDialog({
   onClosed: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [planError, setPlanError] = useState<TranslationKey>();
+  const [planKind, setPlanKind] = useState<"issue" | "project">("issue");
+  const [planOptions, setPlanOptions] =
+    useState<
+      Extract<Awaited<ReturnType<typeof getLinearPlanOptions>>, { ok: true }>
+    >();
+  const [planReservation, setPlanReservation] = useState<{
+    feedbackId: number;
+    uuid: string;
+  }>();
+  const [planning, setPlanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const t = useCopy();
   if (!item) return <dialog ref={dialogRef} />;
   const current = item;
   const editable = !["merged", "denied", "canceled"].includes(current.status);
+
+  async function openPlanning() {
+    setPlanning(true);
+    setPlanKind("issue");
+    setPlanError(undefined);
+    setPlanReservation((existing) =>
+      existing?.feedbackId === current.id
+        ? existing
+        : {
+            feedbackId: current.id,
+            uuid: current.linearClientUuid ?? crypto.randomUUID(),
+          },
+    );
+    if (planOptions) return;
+    setSaving(true);
+    try {
+      const result = await getLinearPlanOptions();
+      if (result.ok) setPlanOptions(result);
+      else setPlanError(result.error);
+    } catch {
+      setPlanError("web.feedback.admin.plan.connectionRequired");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function act(
     action: "approve" | "deny" | "merge",
@@ -566,6 +741,8 @@ function AdminFeedbackDialog({
       className="m-auto w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
       onClose={() => {
         setEditing(false);
+        setPlanError(undefined);
+        setPlanning(false);
         onClosed();
       }}
       ref={dialogRef}
@@ -575,9 +752,141 @@ function AdminFeedbackDialog({
           className="m-0 text-xl font-semibold"
           id="admin-feedback-dialog-title"
         >
-          {t("web.feedback.admin.requests.detailsTitle")}
+          {t(
+            planning
+              ? "web.feedback.admin.plan.title"
+              : "web.feedback.admin.requests.detailsTitle",
+          )}
         </h2>
-        {editing ? (
+        {planning ? (
+          <form
+            className="grid gap-4"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (!planOptions || !planReservation) return;
+              const data = new FormData(event.currentTarget);
+              setSaving(true);
+              setPlanError(undefined);
+              try {
+                const result = await planFeedback({
+                  data: {
+                    assignToMe: data.get("assignToMe") === "on",
+                    clientUuid: planReservation.uuid,
+                    feedbackId: current.id,
+                    kind: planKind,
+                    labelIds: data.getAll("labelIds").map(String),
+                    leadProject: data.get("leadProject") === "on",
+                  },
+                });
+                if (!result.ok) {
+                  setPlanError(result.error);
+                  toast.error(t(result.error));
+                  return;
+                }
+                toast.success(t("web.feedback.admin.plan.success"));
+                await onChanged();
+              } catch {
+                setPlanError("web.feedback.admin.plan.failure");
+                toast.error(t("web.feedback.admin.plan.failure"));
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <fieldset className="grid gap-2">
+              <legend className="text-sm font-medium">
+                {t("web.feedback.admin.plan.typeLabel")}
+              </legend>
+              <div className="flex gap-4">
+                {(["issue", "project"] as const).map((kind) => (
+                  <label className="flex items-center gap-2 text-sm" key={kind}>
+                    <input
+                      checked={planKind === kind}
+                      disabled={saving}
+                      name="planKind"
+                      onChange={() => setPlanKind(kind)}
+                      type="radio"
+                      value={kind}
+                    />
+                    {t(`web.feedback.admin.plan.${kind}`)}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            {saving && !planOptions ? (
+              <p
+                aria-live="polite"
+                className="m-0 text-sm text-muted-foreground"
+              >
+                {t("web.feedback.admin.plan.loading")}
+              </p>
+            ) : null}
+            {planOptions && planKind === "issue" ? (
+              <>
+                <label className="flex items-center gap-2 text-sm">
+                  <input disabled={saving} name="assignToMe" type="checkbox" />
+                  {t("web.feedback.admin.plan.assignIssue")}
+                </label>
+                <fieldset className="grid gap-2">
+                  <legend className="text-sm font-medium">
+                    {t("web.feedback.admin.plan.labels")}
+                  </legend>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {planOptions.labels.map((label) => (
+                      <label
+                        className="flex items-center gap-2 text-sm"
+                        key={label.id}
+                      >
+                        <input
+                          defaultChecked={
+                            label.name.toLocaleLowerCase() === current.category
+                          }
+                          disabled={saving}
+                          name="labelIds"
+                          type="checkbox"
+                          value={label.id}
+                        />
+                        {label.name}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              </>
+            ) : null}
+            {planOptions && planKind === "project" ? (
+              <label className="flex items-center gap-2 text-sm">
+                <input disabled={saving} name="leadProject" type="checkbox" />
+                {t("web.feedback.admin.plan.leadProject")}
+              </label>
+            ) : null}
+            {planError ? (
+              <div className="grid gap-1 text-sm text-destructive" role="alert">
+                <p className="m-0">{t(planError)}</p>
+                {planError === "web.feedback.admin.plan.connectionRequired" ? (
+                  <Link
+                    className="w-fit underline underline-offset-4"
+                    to="/admin/settings"
+                  >
+                    {t("web.feedback.admin.plan.settingsLink")}
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="flex gap-2">
+              <Button disabled={saving || !planOptions} type="submit">
+                {t("web.feedback.admin.plan.submit")}
+              </Button>
+              <Button
+                disabled={saving}
+                onClick={() => setPlanning(false)}
+                type="button"
+                variant="outline"
+              >
+                {t("action.cancel")}
+              </Button>
+            </div>
+          </form>
+        ) : editing ? (
           <form
             className="grid gap-4"
             onSubmit={async (event) => {
@@ -721,6 +1030,15 @@ function AdminFeedbackDialog({
                   type="button"
                 >
                   {t("web.feedback.admin.requests.approve")}
+                </Button>
+              ) : null}
+              {item.status === "requested" ? (
+                <Button
+                  disabled={saving}
+                  onClick={() => void openPlanning()}
+                  type="button"
+                >
+                  {t("web.feedback.admin.plan.action")}
                 </Button>
               ) : null}
               {item.status === "pending" || item.status === "requested" ? (

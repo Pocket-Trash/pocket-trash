@@ -9,7 +9,12 @@ export type SchemaDescription = {
   description?: string;
 };
 
-export const schemaDescriptions = {
+/** Human-readable descriptions for exported database tables. */
+const schemaDescriptions = {
+  audit_export: {
+    description:
+      "Bounded audit-event export ranges, completion checksums, and retention-consumption state.",
+  },
   erasure_request: {
     description:
       "Durable, idempotent complete-erasure requests and their minimal temporary receipts.",
@@ -217,7 +222,10 @@ export const schemaDescriptions = {
     description: "A named collection owned by one user.",
     columns: {
       id: { description: "Internal collection identifier.", example: 1000 },
-      owner_id: { description: "User who owns the collection.", example: 1000 },
+      owner_id: {
+        description: "User who owns the collection.",
+        example: 1000,
+      },
       name: {
         description: "Display name of the collection.",
         example: "Daily Carry",
@@ -328,7 +336,10 @@ export const schemaDescriptions = {
     description: "Canonical atomic product finish values.",
     columns: {
       id: { description: "Internal finish identifier.", example: 1000 },
-      name: { description: "Human-readable finish name.", example: "Polished" },
+      name: {
+        description: "Human-readable finish name.",
+        example: "Polished",
+      },
       slug: { description: "Stable finish slug.", example: "polished" },
       created_at: { description: "Timestamp when the finish was created." },
       updated_at: {
@@ -352,7 +363,10 @@ export const schemaDescriptions = {
   color_effect: {
     description: "Supported relationships between finish-option colours.",
     columns: {
-      id: { description: "Internal colour-effect identifier.", example: 1000 },
+      id: {
+        description: "Internal colour-effect identifier.",
+        example: 1000,
+      },
       name: { description: "Human-readable effect name.", example: "Fade" },
       slug: { description: "Stable colour-effect slug.", example: "fade" },
       created_at: { description: "Timestamp when the effect was created." },
@@ -365,7 +379,10 @@ export const schemaDescriptions = {
     description:
       "Ordered finish composition owned by one product or collection item.",
     columns: {
-      id: { description: "Internal finish-option identifier.", example: 1000 },
+      id: {
+        description: "Internal finish-option identifier.",
+        example: 1000,
+      },
       product_id: {
         description: "Product that offers this option.",
         example: 1000,
@@ -382,23 +399,38 @@ export const schemaDescriptions = {
         description: "Optional relationship between selected colours.",
         example: 1000,
       },
-      position: { description: "Zero-based option display order.", example: 0 },
+      position: {
+        description: "Zero-based option display order.",
+        example: 0,
+      },
     },
   },
   finish_option_finish: {
     description: "Ordered atomic finishes in a finish option.",
     columns: {
-      finish_option_id: { description: "Owning finish option.", example: 1000 },
+      finish_option_id: {
+        description: "Owning finish option.",
+        example: 1000,
+      },
       finish_id: { description: "Selected atomic finish.", example: 1000 },
-      position: { description: "Zero-based finish display order.", example: 0 },
+      position: {
+        description: "Zero-based finish display order.",
+        example: 0,
+      },
     },
   },
   finish_option_color: {
     description: "Ordered atomic colours in a finish option.",
     columns: {
-      finish_option_id: { description: "Owning finish option.", example: 1000 },
+      finish_option_id: {
+        description: "Owning finish option.",
+        example: 1000,
+      },
       color_id: { description: "Selected atomic colour.", example: 1000 },
-      position: { description: "Zero-based colour display order.", example: 0 },
+      position: {
+        description: "Zero-based colour display order.",
+        example: 0,
+      },
     },
   },
   product_spinner: {
@@ -981,3 +1013,5 @@ export const schemaDescriptions = {
     },
   },
 } satisfies Record<string, SchemaDescription>;
+
+export { schemaDescriptions };

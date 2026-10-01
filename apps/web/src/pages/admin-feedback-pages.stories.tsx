@@ -2,11 +2,14 @@ import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect, mocked, waitFor, within } from "storybook/test";
 import {
   approveFeedback,
+  getLinearPlanOptions,
   listAdminActiveFeedback,
   listAdminAllActiveFeedback,
   listArchivedFeedback,
   listFeedbackMergeTargets,
   listPendingFeedback,
+  planFeedback,
+  syncFeedbackStatus,
   updateAdminFeedback,
 } from "@/lib/feedback";
 import { mockStoryRole, StoryProviders } from "../../.storybook/story-fixtures";
@@ -22,6 +25,7 @@ const request = {
   createdAt: new Date("2026-09-28T12:00:00Z"),
   description: "Let people save searches they use often.",
   id: 1000,
+  linearClientUuid: null,
   status: "pending" as const,
   submitterUsername: "ada",
   title: "Saved searches",
@@ -29,6 +33,7 @@ const request = {
   voteCount: 8,
 };
 
+/** Admin feedback page Storybook configuration. */
 const meta = {
   args: {
     initialPage: { hasNext: false, items: [request] },
@@ -36,6 +41,11 @@ const meta = {
       { id: 1001, status: "requested", title: "Existing request" },
     ],
   },
+  /**
+   * Configures admin feedback story mocks.
+   *
+   * @returns Nothing.
+   */
   beforeEach: () => {
     mockStoryRole("admin");
     mocked(listPendingFeedback).mockResolvedValue({
@@ -57,6 +67,16 @@ const meta = {
     mocked(listFeedbackMergeTargets).mockResolvedValue([]);
     mocked(updateAdminFeedback).mockResolvedValue(undefined);
     mocked(approveFeedback).mockResolvedValue(undefined);
+    mocked(getLinearPlanOptions).mockResolvedValue({
+      labels: [
+        { id: "feature-label", name: "Feature" },
+        { id: "customer-label", name: "Customer request" },
+      ],
+      ok: true,
+      viewerName: "Ada",
+    });
+    mocked(planFeedback).mockResolvedValue({ ok: true });
+    mocked(syncFeedbackStatus).mockResolvedValue({ ok: true });
   },
   component: AdminFeedbackRequestsPage,
   decorators: [
@@ -217,6 +237,105 @@ export const Active: Story = {
           search: "saved",
           sort: [{ direction: "asc", field: "title" }],
         },
+      }),
+    );
+  },
+};
+
+/** Linear planning interaction story. */
+export const Planning: Story = {
+  /**
+   * Renders the planning story.
+   *
+   * @returns The planning story page.
+   */
+  render: () => (
+    <AdminActiveFeedbackPage
+      initialPage={{
+        hasNext: false,
+        items: [{ ...request, status: "requested" }],
+      }}
+    />
+  ),
+  /**
+   * Exercises the Linear planning flow.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Manage Saved searches" }),
+    );
+    const dialog = within(canvasElement.ownerDocument.body).getByRole(
+      "dialog",
+      { name: "Manage request" },
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: "Plan" }));
+    await expect(
+      within(canvasElement.ownerDocument.body).getByRole("dialog", {
+        name: "Plan request",
+      }),
+    ).toBeVisible();
+    await expect(
+      within(dialog).getByRole("radio", { name: "Issue" }),
+    ).toBeChecked();
+    await expect(
+      within(dialog).getByRole("checkbox", { name: "Feature" }),
+    ).toBeChecked();
+    await expect(
+      within(dialog).getByRole("checkbox", { name: "Assign to me" }),
+    ).not.toBeChecked();
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Create and plan" }),
+    );
+    await waitFor(() =>
+      expect(mocked(planFeedback)).toHaveBeenCalledWith({
+        data: {
+          assignToMe: false,
+          clientUuid: expect.any(String),
+          feedbackId: request.id,
+          kind: "issue",
+          labelIds: ["feature-label"],
+          leadProject: false,
+        },
+      }),
+    );
+  },
+};
+
+/** Manual feedback synchronization story. */
+export const Synchronization: Story = {
+  /**
+   * Renders the synchronization story.
+   *
+   * @returns The synchronization story page.
+   */
+  render: () => (
+    <AdminActiveFeedbackPage
+      initialPage={{
+        hasNext: false,
+        items: [
+          {
+            ...request,
+            linearClientUuid: "11111111-1111-4111-8111-111111111111",
+            status: "planned",
+          },
+        ],
+      }}
+    />
+  ),
+  /**
+   * Exercises the manual synchronization action.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "Sync" }));
+    await waitFor(() =>
+      expect(mocked(syncFeedbackStatus)).toHaveBeenCalledWith({
+        data: { feedbackId: request.id },
       }),
     );
   },

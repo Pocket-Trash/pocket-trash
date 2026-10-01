@@ -44,6 +44,7 @@ import {
   createCatalogFinish,
   createCatalogMaker,
   createCatalogMaterial,
+  deleteUserCollection,
   finishOptionSchema,
   type ProductFormInput,
   productFormSchema,
@@ -53,6 +54,7 @@ import {
   saveCatalogProduct,
   saveCollection,
   selectCollectionCover,
+  setCollectionVisibility,
   softDeleteCatalogImage,
   updateCollectionItem,
 } from "@/lib/catalog-api";
@@ -962,10 +964,27 @@ function LookupDialog(props: LookupDialogProps) {
   );
 }
 
+/**
+ * Renders the collection create or edit form.
+ *
+ * @param props - Collection form properties.
+ * @param props.collection - Existing collection being edited.
+ * @param props.deletion - Available deletion destinations and item count.
+ * @returns The collection form page.
+ */
 export function CollectionFormPage({
   collection,
+  deletion,
 }: {
+  /** Existing collection being edited. */
   collection?: UserCollectionSummary;
+  /** Available deletion destinations and item count. */
+  deletion?: {
+    /** Collections eligible to receive moved items. */
+    destinations: UserCollectionSummary[];
+    /** Number of items affected by deletion. */
+    itemCount: number;
+  };
 }) {
   const { locale } = useLocale();
   const t = useCatalogCopy();
@@ -1181,8 +1200,238 @@ export function CollectionFormPage({
             }
           />
         ) : null}
+        {current && deletion ? (
+          <CollectionDeletionSection
+            collection={current}
+            destinations={deletion.destinations}
+            itemCount={deletion.itemCount}
+          />
+        ) : null}
       </main>
     </AppShell>
+  );
+}
+
+/**
+ * Renders the archive and deletion choices for an existing collection.
+ *
+ * @param props - Deletion section properties.
+ * @param props.collection - Collection being changed.
+ * @param props.destinations - Collections eligible to receive moved items.
+ * @param props.itemCount - Number of affected items.
+ * @returns The collection deletion controls.
+ */
+function CollectionDeletionSection({
+  collection,
+  destinations,
+  itemCount,
+}: {
+  /** Collection being changed. */
+  collection: UserCollectionSummary;
+  /** Collections eligible to receive moved items. */
+  destinations: UserCollectionSummary[];
+  /** Number of affected items. */
+  itemCount: number;
+}) {
+  const t = useCatalogCopy();
+  const navigate = useNavigate();
+  const dialog = React.useRef<HTMLDialogElement>(null);
+  const [choice, setChoice] = React.useState<"archive" | "delete" | "move">(
+    "archive",
+  );
+  const [confirmed, setConfirmed] = React.useState(false);
+  const [destinationId, setDestinationId] = React.useState<number | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [failed, setFailed] = React.useState(false);
+  const destination = destinations.find(({ id }) => id === destinationId);
+  const destructive = choice !== "archive";
+
+  return (
+    <section className="border-t border-border pt-6">
+      <Button
+        onClick={() => dialog.current?.showModal()}
+        type="button"
+        variant="destructive"
+      >
+        <Trash2 />
+        {t("web.collections.deletion.open")}
+      </Button>
+      <dialog
+        aria-labelledby="collection-deletion-title"
+        className="m-auto w-[min(36rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
+        onClose={() => {
+          setChoice("archive");
+          setConfirmed(false);
+          setDestinationId(null);
+          setFailed(false);
+        }}
+        ref={dialog}
+      >
+        <form
+          className="grid gap-5 p-6"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (
+              submitting ||
+              (destructive && !confirmed) ||
+              (choice === "move" && destinationId === null)
+            ) {
+              return;
+            }
+            const moderating = Boolean(
+              collection.canAdminister && !collection.isOwner,
+            );
+            const reason = moderating
+              ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
+              : undefined;
+            if (moderating && !reason) return;
+            setFailed(false);
+            setSubmitting(true);
+            try {
+              if (choice === "archive") {
+                await setCollectionVisibility({
+                  data: {
+                    collectionId: collection.id,
+                    isPrivate: true,
+                    reason,
+                  },
+                });
+                await navigate({
+                  params: { collectionId: collection.id },
+                  to: "/user/collections/$collectionId",
+                });
+              } else {
+                await deleteUserCollection({
+                  data: {
+                    collectionId: collection.id,
+                    destinationCollectionId:
+                      choice === "move" ? destinationId : null,
+                    reason,
+                  },
+                });
+                await navigate(
+                  choice === "move" && destinationId !== null
+                    ? {
+                        params: { collectionId: destinationId },
+                        to: "/user/collections/$collectionId",
+                      }
+                    : { to: "/user/collections" },
+                );
+              }
+            } catch {
+              setFailed(true);
+              setSubmitting(false);
+            }
+          }}
+        >
+          <fieldset className="grid gap-3">
+            <legend
+              className="mb-2 text-xl font-semibold"
+              id="collection-deletion-title"
+            >
+              {t("web.collections.deletion.open")}
+            </legend>
+            {(
+              [
+                ["archive", t("web.resources.action.markPrivate")],
+                ["delete", t("web.collections.deletion.deleteChoice")],
+                ["move", t("web.collections.deletion.moveChoice")],
+              ] as const
+            ).map(([value, label]) => (
+              <label
+                className="flex items-start gap-3 border border-border p-3 text-sm"
+                key={value}
+              >
+                <input
+                  checked={choice === value}
+                  className="mt-0.5 size-4"
+                  disabled={submitting}
+                  name="collection-deletion-choice"
+                  onChange={() => {
+                    setChoice(value);
+                    setConfirmed(false);
+                  }}
+                  type="radio"
+                  value={value}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </fieldset>
+          <p className="m-0 text-sm text-muted-foreground">
+            {t("web.collections.directory.itemCount", { count: itemCount })}
+          </p>
+          {choice === "move" ? (
+            destinations.length ? (
+              <div className="grid gap-3">
+                <CollectionSelector
+                  addLabel={t("web.action.addCollection")}
+                  collections={destinations}
+                  label={t("web.collections.deletion.destination")}
+                  onChange={setDestinationId}
+                  placeholder={t("web.collections.select.placeholder")}
+                  selectedId={destinationId}
+                />
+                {destination ? (
+                  <p className="m-0 text-sm text-muted-foreground">
+                    {t("web.collections.deletion.moveSummary", {
+                      count: itemCount,
+                      destination: destination.name,
+                    })}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="m-0 text-sm text-muted-foreground">
+                {t("web.collections.deletion.noDestination")}
+              </p>
+            )
+          ) : null}
+          {destructive ? (
+            <label className="flex items-start gap-3 text-sm">
+              <input
+                checked={confirmed}
+                className="mt-0.5 size-4"
+                disabled={submitting}
+                onChange={(event) => setConfirmed(event.target.checked)}
+                type="checkbox"
+              />
+              <span>{t("web.erasure.self.confirm")}</span>
+            </label>
+          ) : null}
+          {failed ? (
+            <p aria-live="polite" className="m-0 text-sm text-destructive">
+              {t("error.generic")}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              disabled={submitting}
+              onClick={() => dialog.current?.close()}
+              type="button"
+              variant="outline"
+            >
+              {t("action.cancel")}
+            </Button>
+            <Button
+              disabled={
+                submitting ||
+                (destructive && !confirmed) ||
+                (choice === "move" && destinationId === null)
+              }
+              type="submit"
+              variant={destructive ? "destructive" : "default"}
+            >
+              {choice === "archive"
+                ? t("web.resources.action.markPrivate")
+                : choice === "move"
+                  ? t("web.collections.deletion.moveAction")
+                  : t("web.resources.action.permanentlyDelete")}
+            </Button>
+          </div>
+        </form>
+      </dialog>
+    </section>
   );
 }
 

@@ -25,6 +25,13 @@ import {
   sql,
 } from "drizzle-orm";
 import { type Actor, hasPermission } from "../authorization.js";
+import { type AuditService, createAuditService } from "../db/audit/index.js";
+import {
+  loadResourceAuditContext,
+  resourceAudit,
+  resourceAuditEvents,
+  writeResourceAudit,
+} from "../db/audit/resources.js";
 import { signImages } from "../images/sign-images.js";
 import { hashLogIdentifier, loggedMutation } from "../logging.js";
 import { lockTarget } from "../storage/image-records.js";
@@ -35,187 +42,482 @@ import {
   queueObjectDeletions,
 } from "../storage/object-lifecycle.js";
 
+/** Input for creating a resource and its initial version. */
 export type CreateResourceInput = {
+  /** User creating the resource. */
   actor: Actor;
+  /** Category names assigned to the resource. */
   categories: string[];
+  /** Resource description. */
   description: string;
+  /** Files in the initial version. */
   files: UploadInput[];
+  /** Resource gallery images. */
   images: UploadInput[];
+  /** Resource name. */
   name: string;
 };
 
+/** Input for editing resource metadata and gallery images. */
 export type UpdateResourceInput = {
+  /** User editing the resource. */
   actor: Actor;
+  /** Category names assigned to the resource. */
   categories: string[];
+  /** Resource description. */
   description: string;
+  /** New gallery images. */
   images: UploadInput[];
+  /** Resource name. */
   name: string;
+  /** Existing gallery image identifiers to retain. */
   retainedImageIds: number[];
+  /** Resource identifier. */
   resourceId: number;
+  /** Required staff reason for a cross-owner edit. */
+  reason?: string;
 };
 
+/** Actor viewing a resource. */
 export type ResourceViewer = Actor;
 
+/** Input for uploading a new resource version. */
 export type UploadResourceVersionInput = {
+  /** User uploading the version. */
   actor: Actor;
+  /** Files in the new version. */
   files: UploadInput[];
+  /** Resource identifier. */
   resourceId: number;
+  /** Required staff reason for a cross-owner upload. */
+  reason?: string;
 };
 
+/** Resource version returned to clients. */
 export type ResourceVersionDetail = {
+  /** Version creation time. */
   createdAt: Date;
+  /** Recorded download count. */
   downloadCount: number;
+  /** Files attached to the version. */
   files: ResourceFileDetail[];
+  /** Version identifier. */
   id: number;
+  /** Sequential version number. */
   version: number;
 };
 
+/** Resource file returned to clients. */
 export type ResourceFileDetail = {
+  /** File media type. */
   contentType: string;
+  /** Original file name. */
   fileName: string;
+  /** File identifier. */
   id: number;
+  /** File size in bytes. */
   size: number;
 };
 
+/** Resource image returned to clients. */
 export type ResourceImageDetail = {
+  /** Image media type. */
   contentType: string;
+  /** Original image file name. */
   fileName: string;
+  /** Image identifier. */
   id: number;
+  /** Gallery position. */
   position: number;
+  /** Image size in bytes. */
   size: number;
+  /** Signed image URL. */
   url: string;
 };
 
+/** Full resource detail returned to clients. */
 export type ResourceDetail = {
-  categories: { id: number; name: string; slug: string }[];
+  /** Assigned categories. */
+  categories: {
+    /** Category identifier. */
+    id: number;
+    /** Category name. */
+    name: string;
+    /** Category slug. */
+    slug: string;
+  }[];
+  /** Resource creation time. */
   createdAt: Date;
+  /** Latest resource version. */
   currentVersion: ResourceVersionDetail;
+  /** Resource description. */
   description: string;
+  /** Download count across versions. */
   downloadCount: number;
+  /** Resource identifier. */
   id: number;
+  /** Gallery images. */
   images: ResourceImageDetail[];
+  /** Whether staff made the resource private. */
   isAdminPrivate: boolean;
+  /** Whether the resource is private. */
   isPrivate: boolean;
+  /** Resource name. */
   name: string;
+  /** Staff privacy reason. */
   privateReason: string | null;
+  /** Time the resource was made private. */
   privatedAt: Date | null;
+  /** Clerk identifier of the uploader. */
   uploaderClerkId: string;
+  /** Public uploader username. */
   uploaderUsername: string;
+  /** Earlier resource versions. */
   versions: ResourceVersionDetail[];
 };
 
+/** Resource directory response. */
 export type ResourceDirectory = {
-  categories: { id: number; name: string; slug: string }[];
+  /** Available categories. */
+  categories: {
+    /** Category identifier. */
+    id: number;
+    /** Category name. */
+    name: string;
+    /** Category slug. */
+    slug: string;
+  }[];
+  /** Unknown requested category slugs. */
   invalidFilters: string[];
+  /** Matching resources. */
   resources: ResourceDirectoryItem[];
 };
 
+/** Resource summary returned in directory listings. */
 export type ResourceDirectoryItem = {
-  categories: { id: number; name: string; slug: string }[];
-  createdAt: Date;
-  currentVersion: {
-    fileCount: number;
-    fileId: number;
-    fileName: string;
+  /** Assigned categories. */
+  categories: {
+    /** Category identifier. */
     id: number;
+    /** Category name. */
+    name: string;
+    /** Category slug. */
+    slug: string;
+  }[];
+  /** Resource creation time. */
+  createdAt: Date;
+  /** Latest version summary. */
+  currentVersion: {
+    /** Number of files in the version. */
+    fileCount: number;
+    /** First file identifier. */
+    fileId: number;
+    /** First file name. */
+    fileName: string;
+    /** Version identifier. */
+    id: number;
+    /** Sequential version number. */
     version: number;
   };
+  /** Download count across versions. */
   downloadCount: number;
+  /** Signed cover image URL. */
   coverImageUrl: string | null;
+  /** Resource identifier. */
   id: number;
+  /** Whether the resource is private. */
   isPrivate: boolean;
+  /** Resource name. */
   name: string;
+  /** Staff privacy reason. */
   privateReason: string | null;
+  /** Clerk identifier of the uploader. */
   uploaderClerkId: string;
+  /** Public uploader username. */
   uploaderUsername: string;
 };
 
+/** Resource notification shown to staff. */
 export type ResourceNotificationItem = {
+  /** Current category names. */
   categories: string[];
+  /** Category associated with the notification. */
   categoryName: string | null;
+  /** Notification creation time. */
   createdAt: Date;
+  /** Notification identifier. */
   id: number;
+  /** Whether the resource is private. */
   isPrivate: boolean;
+  /** Notification read time. */
   readAt: Date | null;
+  /** Username of the staff reader. */
   readByUsername: string | null;
+  /** Resource identifier. */
   resourceId: number;
+  /** Resource name. */
   resourceName: string;
+  /** Notification type. */
   type: (typeof schema.resourceNotificationTypes)[number];
+  /** Public uploader username. */
   uploaderUsername: string;
 };
 
+/** Soft-deleted resource returned in trash listings. */
 export type ResourceTrashItem = {
+  /** Deletion time. */
   deletedAt: Date;
+  /** Username of the deleting actor. */
   deletedByUsername: string;
+  /** Role used for deletion. */
   deletedByRole: (typeof schema.resourceDeletionRoles)[number];
+  /** Resource identifier. */
   id: number;
+  /** Whether the resource is private. */
   isPrivate: boolean;
+  /** Resource name. */
   name: string;
+  /** Public uploader username. */
   uploaderUsername: string;
 };
 
+/** Resource catalog operations. */
 export type ResourcesService = {
-  addVersion(
-    input: UploadResourceVersionInput,
-  ): Promise<{ id: number; version: number }>;
-  create(input: CreateResourceInput): Promise<{ id: number }>;
+  /**
+   * Adds a resource version.
+   *
+   * @param input - Version upload input.
+   * @returns Created version identity.
+   */
+  addVersion(input: UploadResourceVersionInput): Promise<{
+    /** Version identifier. */
+    id: number;
+    /** Sequential version number. */
+    version: number;
+  }>;
+  /**
+   * Creates a resource.
+   *
+   * @param input - Resource creation input.
+   * @returns Created resource identity.
+   */
+  create(input: CreateResourceInput): Promise<{
+    /** Resource identifier. */
+    id: number;
+  }>;
+  /**
+   * Downloads a resource file.
+   *
+   * @param resourceId - Resource identifier.
+   * @param fileId - File identifier.
+   * @param viewer - Optional viewer.
+   * @returns Signed file URL when visible.
+   */
   downloadFile(
     resourceId: number,
     fileId: number,
     viewer?: ResourceViewer,
   ): Promise<string | null>;
+  /**
+   * Downloads a resource version archive.
+   *
+   * @param resourceId - Resource identifier.
+   * @param versionId - Version identifier.
+   * @param viewer - Optional viewer.
+   * @returns Signed archive URL when visible.
+   */
   downloadVersion(
     resourceId: number,
     versionId: number,
     viewer?: ResourceViewer,
   ): Promise<string | null>;
+  /**
+   * Gets resource details.
+   *
+   * @param resourceId - Resource identifier.
+   * @param viewer - Optional viewer.
+   * @returns Resource details when visible.
+   */
   getDetail(
     resourceId: number,
     viewer?: ResourceViewer,
   ): Promise<ResourceDetail | null>;
+  /**
+   * Lists the resource directory.
+   *
+   * @param categorySlugs - Category filters.
+   * @param viewer - Optional viewer.
+   * @returns Filtered resource directory.
+   */
   listDirectory(
     categorySlugs?: string[],
     viewer?: ResourceViewer,
   ): Promise<ResourceDirectory>;
+  /**
+   * Lists soft-deleted resources visible to staff.
+   *
+   * @returns Soft-deleted resources visible to staff.
+   */
   listAdminTrash(): Promise<ResourceTrashItem[]>;
+  /**
+   * Lists resource notifications visible to staff.
+   *
+   * @returns Resource notifications visible to staff.
+   */
   listNotifications(): Promise<ResourceNotificationItem[]>;
+  /**
+   * Lists resources owned by an account.
+   *
+   * @param uploaderClerkId - Owner Clerk identifier.
+   * @returns Owned resource summaries.
+   */
   listOwned(uploaderClerkId: string): Promise<
     {
+      /** Resource identifier. */
       id: number;
+      /** Whether the resource is private. */
       isPrivate: boolean;
+      /** Resource name. */
       name: string;
+      /** Staff privacy reason. */
       privateReason: string | null;
+      /** Last update time. */
       updatedAt: Date;
+      /** Latest version number. */
       version: number;
     }[]
   >;
+  /**
+   * Lists owner-deleted resources.
+   *
+   * @param uploaderClerkId - Owner Clerk identifier.
+   * @returns Owner trash items.
+   */
   listOwnerTrash(uploaderClerkId: string): Promise<ResourceTrashItem[]>;
-  listCategories(
-    search?: string,
-  ): Promise<{ id: number; name: string; slug: string }[]>;
+  /**
+   * Lists resource categories.
+   *
+   * @param search - Optional category search.
+   * @returns Matching categories.
+   */
+  listCategories(search?: string): Promise<
+    {
+      /** Category identifier. */
+      id: number;
+      /** Category name. */
+      name: string;
+      /** Category slug. */
+      slug: string;
+    }[]
+  >;
+  /**
+   * Marks a resource notification read.
+   *
+   * @param notificationId - Notification identifier.
+   * @param actorClerkId - Reader Clerk identifier.
+   * @returns Completion after updating the notification.
+   */
   markNotificationRead(
     notificationId: number,
     actorClerkId: string,
   ): Promise<void>;
+  /**
+   * Makes a resource private as staff.
+   *
+   * @param input - Actor, reason, and resource identity.
+   * @returns Completion after moderation.
+   */
   markPrivate(input: {
-    actorClerkId: string;
+    /** Staff actor. */
+    actor: Actor;
+    /** Moderation reason. */
     reason: string;
+    /** Resource identifier. */
     resourceId: number;
   }): Promise<void>;
-  permanentlyDelete(input: { actor: Actor; resourceId: number }): Promise<void>;
+  /**
+   * Permanently purges a soft-deleted resource.
+   *
+   * @param input - Actor, reason, and resource identity.
+   * @returns Completion after deletion is queued.
+   */
+  permanentlyDelete(input: {
+    /** Staff actor. */
+    actor: Actor;
+    /** Purge reason. */
+    reason: string;
+    /** Resource identifier. */
+    resourceId: number;
+  }): Promise<void>;
+  /**
+   * Changes resource visibility.
+   *
+   * @param input - Visibility change input.
+   * @returns Completion after the update.
+   */
   setVisibility(input: {
+    /** User changing visibility. */
     actor: Actor;
+    /** Whether the resource should be public. */
     isPublic: boolean;
+    /** Required staff reason for a cross-owner change. */
+    reason?: string;
+    /** Resource identifier. */
     resourceId: number;
   }): Promise<void>;
-  restore(input: { actor: Actor; resourceId: number }): Promise<void>;
-  softDelete(input: {
+  /**
+   * Restores a soft-deleted resource.
+   *
+   * @param input - Restore input.
+   * @returns Completion after restoration.
+   */
+  restore(input: {
+    /** User restoring the resource. */
     actor: Actor;
+    /** Required staff reason for a cross-owner restore. */
+    reason?: string;
+    /** Resource identifier. */
     resourceId: number;
-  }): Promise<{ deletedByRole: ResourceTrashItem["deletedByRole"] }>;
-  update(input: UpdateResourceInput): Promise<{ id: number }>;
+  }): Promise<void>;
+  /**
+   * Soft-deletes a resource.
+   *
+   * @param input - Deletion input.
+   * @returns Recorded deletion role.
+   */
+  softDelete(input: {
+    /** User deleting the resource. */
+    actor: Actor;
+    /** Required staff reason for a cross-owner deletion. */
+    reason?: string;
+    /** Resource identifier. */
+    resourceId: number;
+  }): Promise<{
+    /** Role recorded for the deletion. */
+    deletedByRole: ResourceTrashItem["deletedByRole"];
+  }>;
+  /**
+   * Updates resource metadata and images.
+   *
+   * @param input - Resource update input.
+   * @returns Updated resource identity.
+   */
+  update(input: UpdateResourceInput): Promise<{
+    /** Resource identifier. */
+    id: number;
+  }>;
 };
 
+/**
+ * Creates the resource service.
+ *
+ * @param db - Application database.
+ * @param storage - Resource object storage.
+ * @param logger - Application logger.
+ * @param signUrl - Signs a resource object path for access.
+ * @param audit - Optional audit service for resource mutations.
+ * @returns The configured resource service.
+ */
 export function createResourcesService(
   db: Database,
   storage: UploadStorage,
@@ -223,8 +525,15 @@ export function createResourcesService(
   signUrl: (objectPath: string) => Promise<string> = async () => {
     throw new Error("Resource URL signing is not configured.");
   },
+  audit?: AuditService,
 ): ResourcesService {
   return {
+    /**
+     * Adds a resource version.
+     *
+     * @param input - Version upload input.
+     * @returns Created version identity.
+     */
     async addVersion(input) {
       return await loggedMutation(
         logger,
@@ -236,7 +545,8 @@ export function createResourcesService(
             logger,
             input,
             { type: "resource", id: input.resourceId },
-            { operation: "version" },
+            { operation: "version", reason: input.reason },
+            audit,
           );
           const version = await db
             .select({
@@ -263,6 +573,12 @@ export function createResourcesService(
         },
       );
     },
+    /**
+     * Creates a resource.
+     *
+     * @param input - Resource creation input.
+     * @returns Created resource identity.
+     */
     async create(input) {
       return await loggedMutation(
         logger,
@@ -280,6 +596,7 @@ export function createResourcesService(
               description: input.description,
               categories: input.categories,
             },
+            audit,
           );
           return { id: result.resourceId };
         },
@@ -293,6 +610,14 @@ export function createResourcesService(
         },
       );
     },
+    /**
+     * Downloads a resource file.
+     *
+     * @param resourceId - Resource identifier.
+     * @param fileId - File identifier.
+     * @param viewer - Optional viewer.
+     * @returns Signed file URL when visible.
+     */
     async downloadFile(resourceId, fileId, viewer) {
       return await logger.operation(
         loggerMessages.resources.download,
@@ -330,6 +655,14 @@ export function createResourcesService(
         { attributes: { fileId, resourceId } },
       );
     },
+    /**
+     * Downloads a resource version archive.
+     *
+     * @param resourceId - Resource identifier.
+     * @param versionId - Version identifier.
+     * @param viewer - Optional viewer.
+     * @returns Signed archive URL when visible.
+     */
     async downloadVersion(resourceId, versionId, viewer) {
       return await logger.operation(
         loggerMessages.resources.download,
@@ -383,6 +716,13 @@ export function createResourcesService(
         { attributes: { resourceId, versionId } },
       );
     },
+    /**
+     * Gets resource detail.
+     *
+     * @param resourceId - Resource identifier.
+     * @param viewer - Optional viewer.
+     * @returns Resource detail when visible.
+     */
     async getDetail(resourceId, viewer) {
       return await logger.operation(
         loggerMessages.resources.getDetail,
@@ -543,14 +883,24 @@ export function createResourcesService(
         { attributes: { resourceId } },
       );
     },
+    /**
+     * Lists resources visible in the public directory.
+     *
+     * @param categorySlugs - Category filters to apply.
+     * @param viewer - Optional requesting user.
+     * @returns The filtered directory resources and categories.
+     */
     async listDirectory(categorySlugs = [], viewer) {
       return await logger.operation(
         loggerMessages.resources.listDirectory,
         async () => {
           const filters = normalizeCategorySlugs(categorySlugs);
           const categoryResult = await db.execute<{
+            /** Category identifier. */
             id: number;
+            /** Category name. */
             name: string;
+            /** Category slug. */
             slug: string;
           }>(sql`
             select id, name, slug
@@ -668,12 +1018,12 @@ export function createResourcesService(
                 async ({ coverImageObjectPath, ...resource }) => ({
                   ...resource,
                   coverImageUrl: coverImageObjectPath
-                    ? (
+                    ? ((
                         await signImages(
                           [{ objectPath: coverImageObjectPath, url: "" }],
                           signUrl,
                         )
-                      )[0]!.url
+                      ).at(0)?.url ?? null)
                     : null,
                 }),
               ),
@@ -683,6 +1033,12 @@ export function createResourcesService(
         { attributes: { categoryCount: categorySlugs.length } },
       );
     },
+    /**
+     * Lists resources owned by an account.
+     *
+     * @param uploaderClerkId - Owner Clerk identifier.
+     * @returns Owned resource summaries.
+     */
     async listOwned(uploaderClerkId) {
       return await logger.operation(
         loggerMessages.resources.listOwned,
@@ -690,11 +1046,17 @@ export function createResourcesService(
           const owner = uploaderClerkId.trim();
           if (!owner) throw new Error("uploaderClerkId is required.");
           const result = await db.execute<{
+            /** Resource identifier. */
             id: number;
+            /** Whether the resource is private. */
             isPrivate: boolean;
+            /** Resource name. */
             name: string;
+            /** Staff privacy reason. */
             privateReason: string | null;
+            /** Last update time. */
             updatedAt: Date;
+            /** Latest version number. */
             version: number;
           }>(sql`
             select resources.id, resources.name, resources.is_private as "isPrivate",
@@ -722,12 +1084,23 @@ export function createResourcesService(
         },
       );
     },
+    /**
+     * Lists soft-deleted resources visible to staff.
+     *
+     * @returns Soft-deleted resources visible to staff.
+     */
     async listAdminTrash() {
       return await logger.operation(
         loggerMessages.resources.listAdminTrash,
         async () => await listTrash(db, sql`true`),
       );
     },
+    /**
+     * Lists owner-deleted resources.
+     *
+     * @param uploaderClerkId - Owner Clerk identifier.
+     * @returns Owner trash items.
+     */
     async listOwnerTrash(uploaderClerkId) {
       return await logger.operation(
         loggerMessages.resources.listOwnerTrash,
@@ -748,6 +1121,11 @@ export function createResourcesService(
         },
       );
     },
+    /**
+     * Lists resource notifications visible to staff.
+     *
+     * @returns Resource notifications visible to staff.
+     */
     async listNotifications() {
       return await logger.operation(
         loggerMessages.resources.listNotifications,
@@ -795,6 +1173,12 @@ export function createResourcesService(
         },
       );
     },
+    /**
+     * Lists resource categories.
+     *
+     * @param search - Optional category search.
+     * @returns Matching categories.
+     */
     async listCategories(search = "") {
       return await logger.operation(
         loggerMessages.resources.listCategories,
@@ -818,6 +1202,13 @@ export function createResourcesService(
         { attributes: { hasSearch: Boolean(search.trim()) } },
       );
     },
+    /**
+     * Marks a resource notification read.
+     *
+     * @param notificationId - Notification identifier.
+     * @param actorClerkId - Reader Clerk identifier.
+     * @returns Completion after updating the notification.
+     */
     async markNotificationRead(notificationId, actorClerkId) {
       await logger.operation(
         loggerMessages.resources.markNotificationRead,
@@ -839,35 +1230,76 @@ export function createResourcesService(
         },
       );
     },
+    /**
+     * Makes a resource private as staff.
+     *
+     * @param input - Actor, reason, and resource identity.
+     * @returns Completion after moderation.
+     */
     async markPrivate(input) {
       await logger.operation(
         loggerMessages.resources.markPrivate,
         async () => {
           assertPositiveInteger(input.resourceId, "resourceId");
-          const actorClerkId = input.actorClerkId.trim();
+          const actorClerkId = input.actor.clerkId.trim();
           const reason = input.reason.trim();
           if (!actorClerkId || !reason || reason.length > 1000) {
             throw new Error("Private resource metadata is invalid.");
           }
-          await db.execute(sql`
-            update resources
-            set is_private = true, private_reason = ${reason},
-              privated_at = now(), privated_by_clerk_id = ${actorClerkId},
-              updated_at = now()
-            where id = ${input.resourceId}
-              and privated_by_clerk_id is null
-              and deleted_at is null
-            returning id
-          `);
+          await withResourceAuditTransaction(db, audit, async (tx) => {
+            const context = audit
+              ? await loadResourceAuditContext(
+                  tx,
+                  input.actor,
+                  input.resourceId,
+                )
+              : undefined;
+            const result = await tx.execute<{
+              /** Resource identifier. */
+              id: number;
+            }>(sql`
+              update resources
+              set is_private = true, private_reason = ${reason},
+                privated_at = now(), privated_by_clerk_id = ${actorClerkId},
+                updated_at = now()
+              where id = ${input.resourceId}
+                and privated_by_clerk_id is null
+                and deleted_at is null
+              returning id
+            `);
+            if (!result.rows[0]) throw new Error("Resource is unavailable.");
+            if (audit && context) {
+              const after = await loadResourceAuditContext(
+                tx,
+                input.actor,
+                input.resourceId,
+              );
+              await writeResourceAudit(audit, tx, {
+                actor: input.actor,
+                after: after.state,
+                before: context.state,
+                context,
+                definition: resourceAudit.visibilityChanged,
+                reason,
+                targetId: input.resourceId,
+              });
+            }
+          });
         },
         {
           attributes: {
-            actorClerkIdHash: hashLogIdentifier(input.actorClerkId),
+            actorClerkIdHash: hashLogIdentifier(input.actor.clerkId),
             resourceId: input.resourceId,
           },
         },
       );
     },
+    /**
+     * Permanently purges a soft-deleted resource.
+     *
+     * @param input - Actor, reason, and resource identity.
+     * @returns Completion after deletion is queued.
+     */
     async permanentlyDelete(input) {
       await loggedMutation(
         logger,
@@ -875,12 +1307,25 @@ export function createResourcesService(
         async () => {
           assertPositiveInteger(input.resourceId, "resourceId");
           const actorClerkId = input.actor.clerkId.trim();
-          if (!actorClerkId || !hasPermission(input.actor, "resources.purge")) {
+          const reason = input.reason.trim();
+          if (
+            !actorClerkId ||
+            !reason ||
+            reason.length > 1000 ||
+            !hasPermission(input.actor, "resources.purge")
+          ) {
             throw new Error("Resource permanent deletion requires an admin.");
           }
 
           const paths = await db.transaction(async (tx) => {
             await lockTarget(tx, { type: "resource", id: input.resourceId });
+            const context = audit
+              ? await loadResourceAuditContext(
+                  tx,
+                  input.actor,
+                  input.resourceId,
+                )
+              : undefined;
             const objects = await tx.execute<{ objectPath: string | null }>(sql`
             select stored_objects.object_path as "objectPath"
             from resources
@@ -921,7 +1366,10 @@ export function createResourcesService(
               ),
             );
 
-            const deleted = await tx.execute<{ id: number }>(sql`
+            const deleted = await tx.execute<{
+              /** Resource identifier. */
+              id: number;
+            }>(sql`
             delete from resources
             where id = ${input.resourceId} and deleted_at is not null
             returning id
@@ -930,6 +1378,17 @@ export function createResourcesService(
               throw new Error(
                 "Resource permanent deletion could not be completed.",
               );
+            }
+            if (audit && context) {
+              await writeResourceAudit(audit, tx, {
+                actor: input.actor,
+                before: context.state,
+                context,
+                definition: resourceAudit.purged,
+                permission: "resources.purge",
+                reason,
+                targetId: input.resourceId,
+              });
             }
             return objects.rows.flatMap(({ objectPath }) =>
               objectPath ? [objectPath] : [],
@@ -945,6 +1404,12 @@ export function createResourcesService(
         },
       );
     },
+    /**
+     * Changes resource visibility.
+     *
+     * @param input - Visibility change input.
+     * @returns Completion after the update.
+     */
     async setVisibility(input) {
       await logger.operation(
         loggerMessages.resources.update,
@@ -953,21 +1418,49 @@ export function createResourcesService(
           const actorClerkId = input.actor.clerkId.trim();
           if (!actorClerkId) throw new Error("actorClerkId is required.");
           const canManage = hasPermission(input.actor, "resources.manage");
-          const result = await db.execute<{ id: number }>(sql`
-            update resources
-            set is_private = ${!input.isPublic}, private_reason = null,
-              privated_at = null, privated_by_clerk_id = null,
-              updated_at = now()
-            where id = ${input.resourceId}
-              and (uploader_clerk_id = ${actorClerkId} or ${canManage})
-              and (${canManage} or privated_by_clerk_id is null)
-              and (${input.isPublic} or uploader_clerk_id = ${actorClerkId})
-              and deleted_at is null
-            returning id
-          `);
-          if (!result.rows[0]) {
-            throw new Error("Resource visibility update is not allowed.");
-          }
+          await withResourceAuditTransaction(db, audit, async (tx) => {
+            const context = audit
+              ? await loadResourceAuditContext(
+                  tx,
+                  input.actor,
+                  input.resourceId,
+                )
+              : undefined;
+            const result = await tx.execute<{
+              /** Resource identifier. */
+              id: number;
+            }>(sql`
+              update resources
+              set is_private = ${!input.isPublic}, private_reason = null,
+                privated_at = null, privated_by_clerk_id = null,
+                updated_at = now()
+              where id = ${input.resourceId}
+                and (uploader_clerk_id = ${actorClerkId} or ${canManage})
+                and (${canManage} or privated_by_clerk_id is null)
+                and (${input.isPublic} or uploader_clerk_id = ${actorClerkId})
+                and deleted_at is null
+              returning id
+            `);
+            if (!result.rows[0]) {
+              throw new Error("Resource visibility update is not allowed.");
+            }
+            if (audit && context) {
+              const after = await loadResourceAuditContext(
+                tx,
+                input.actor,
+                input.resourceId,
+              );
+              await writeResourceAudit(audit, tx, {
+                actor: input.actor,
+                after: after.state,
+                before: context.state,
+                context,
+                definition: resourceAudit.visibilityChanged,
+                reason: input.reason,
+                targetId: input.resourceId,
+              });
+            }
+          });
         },
         {
           attributes: {
@@ -978,6 +1471,12 @@ export function createResourcesService(
         },
       );
     },
+    /**
+     * Restores a soft-deleted resource.
+     *
+     * @param input - Restore input.
+     * @returns Completion after restoration.
+     */
     async restore(input) {
       await logger.operation(
         loggerMessages.resources.restore,
@@ -986,22 +1485,50 @@ export function createResourcesService(
           const actorClerkId = input.actor.clerkId.trim();
           if (!actorClerkId) throw new Error("actorClerkId is required.");
           const canManage = hasPermission(input.actor, "resources.manage");
-          const result = await db.execute<{ id: number }>(sql`
-            update resources
-            set deleted_at = null, deleted_by_clerk_id = null,
-              deleted_by_role = null, updated_at = now()
-            where id = ${input.resourceId}
-              and deleted_at is not null
-              and (${canManage} or (
-                uploader_clerk_id = ${actorClerkId}
-                and deleted_by_clerk_id = ${actorClerkId}
-                and deleted_by_role = 'owner'
-              ))
-            returning id
-          `);
-          if (!result.rows[0]) {
-            throw new Error("Resource restoration is not allowed.");
-          }
+          await withResourceAuditTransaction(db, audit, async (tx) => {
+            const context = audit
+              ? await loadResourceAuditContext(
+                  tx,
+                  input.actor,
+                  input.resourceId,
+                )
+              : undefined;
+            const result = await tx.execute<{
+              /** Resource identifier. */
+              id: number;
+            }>(sql`
+              update resources
+              set deleted_at = null, deleted_by_clerk_id = null,
+                deleted_by_role = null, updated_at = now()
+              where id = ${input.resourceId}
+                and deleted_at is not null
+                and (${canManage} or (
+                  uploader_clerk_id = ${actorClerkId}
+                  and deleted_by_clerk_id = ${actorClerkId}
+                  and deleted_by_role = 'owner'
+                ))
+              returning id
+            `);
+            if (!result.rows[0]) {
+              throw new Error("Resource restoration is not allowed.");
+            }
+            if (audit && context) {
+              const after = await loadResourceAuditContext(
+                tx,
+                input.actor,
+                input.resourceId,
+              );
+              await writeResourceAudit(audit, tx, {
+                actor: input.actor,
+                after: after.state,
+                before: context.state,
+                context,
+                definition: resourceAudit.restored,
+                reason: input.reason,
+                targetId: input.resourceId,
+              });
+            }
+          });
         },
         {
           attributes: {
@@ -1011,6 +1538,12 @@ export function createResourcesService(
         },
       );
     },
+    /**
+     * Soft-deletes a resource.
+     *
+     * @param input - Deletion input.
+     * @returns Recorded deletion role.
+     */
     async softDelete(input) {
       return await logger.operation(
         loggerMessages.resources.softDelete,
@@ -1019,24 +1552,50 @@ export function createResourcesService(
           const actorClerkId = input.actor.clerkId.trim();
           if (!actorClerkId) throw new Error("actorClerkId is required.");
           const canManage = hasPermission(input.actor, "resources.manage");
-          const result = await db.execute<{
-            deletedByRole: ResourceTrashItem["deletedByRole"];
-          }>(sql`
-            update resources
-            set deleted_at = now(), deleted_by_clerk_id = ${actorClerkId},
-              deleted_by_role = case
-                when uploader_clerk_id = ${actorClerkId} then 'owner'
-                else 'admin'
-              end,
-              updated_at = now()
-            where id = ${input.resourceId}
-              and deleted_at is null
-              and (uploader_clerk_id = ${actorClerkId} or ${canManage})
-            returning deleted_by_role as "deletedByRole"
-          `);
-          const deleted = result.rows[0];
-          if (!deleted) throw new Error("Resource deletion is not allowed.");
-          return deleted;
+          return await withResourceAuditTransaction(db, audit, async (tx) => {
+            const context = audit
+              ? await loadResourceAuditContext(
+                  tx,
+                  input.actor,
+                  input.resourceId,
+                )
+              : undefined;
+            const result = await tx.execute<{
+              /** Role recorded for the deletion. */
+              deletedByRole: ResourceTrashItem["deletedByRole"];
+            }>(sql`
+              update resources
+              set deleted_at = now(), deleted_by_clerk_id = ${actorClerkId},
+                deleted_by_role = case
+                  when uploader_clerk_id = ${actorClerkId} then 'owner'
+                  else 'admin'
+                end,
+                updated_at = now()
+              where id = ${input.resourceId}
+                and deleted_at is null
+                and (uploader_clerk_id = ${actorClerkId} or ${canManage})
+              returning deleted_by_role as "deletedByRole"
+            `);
+            const deleted = result.rows[0];
+            if (!deleted) throw new Error("Resource deletion is not allowed.");
+            if (audit && context) {
+              const after = await loadResourceAuditContext(
+                tx,
+                input.actor,
+                input.resourceId,
+              );
+              await writeResourceAudit(audit, tx, {
+                actor: input.actor,
+                after: after.state,
+                before: context.state,
+                context,
+                definition: resourceAudit.softDeleted,
+                reason: input.reason,
+                targetId: input.resourceId,
+              });
+            }
+            return deleted;
+          });
         },
         {
           attributes: {
@@ -1046,6 +1605,12 @@ export function createResourcesService(
         },
       );
     },
+    /**
+     * Updates resource metadata and images.
+     *
+     * @param input - Resource update input.
+     * @returns Updated resource identity.
+     */
     async update(input) {
       return await loggedMutation(
         logger,
@@ -1069,6 +1634,13 @@ export function createResourcesService(
               )
               .limit(1);
             if (!ownedResource) throw new Error("Resource owner is required.");
+            const before = audit
+              ? await loadResourceAuditContext(
+                  tx,
+                  normalized.actor,
+                  normalized.resourceId,
+                )
+              : undefined;
             const currentImages = await tx
               .select({
                 id: schema.resourceImages.id,
@@ -1110,6 +1682,22 @@ export function createResourcesService(
                   .map(({ objectPath }) => objectPath),
               );
               await queueObjectDeletions(tx, removedPaths);
+              if (audit && before) {
+                const after = await loadResourceAuditContext(
+                  tx,
+                  normalized.actor,
+                  normalized.resourceId,
+                );
+                await writeResourceAudit(audit, tx, {
+                  actor: normalized.actor,
+                  after: after.state,
+                  before: before.state,
+                  context: before,
+                  definition: resourceAudit.updated,
+                  reason: normalized.reason,
+                  targetId: normalized.resourceId,
+                });
+              }
               return updated;
             } catch (error) {
               await deleteUploadedFiles(storage, images);
@@ -1132,6 +1720,14 @@ export function createResourcesService(
   };
 }
 
+/**
+ * Creates a resource service from storage configuration.
+ *
+ * @param db - Application database.
+ * @param config - Upload storage configuration.
+ * @param logger - Application logger.
+ * @returns Configured resource service.
+ */
 export function createConfiguredResourcesService(
   db: Database,
   config: UploadStorageConfig,
@@ -1141,17 +1737,45 @@ export function createConfiguredResourcesService(
     db,
     createUploadStorage(config),
     logger,
+    /**
+     * Signs a resource object path.
+     *
+     * @param objectPath - Resource object path.
+     * @returns Signed resource URL.
+     */
     async (objectPath) => await signResourceUrl({ ...config, objectPath }),
+    createAuditService(logger, resourceAuditEvents, db),
   );
 }
 
+/**
+ * Persists normalized resource metadata and gallery changes.
+ *
+ * @param db - Caller-owned transaction.
+ * @param input - Normalized update input.
+ * @param images - Uploaded gallery images.
+ * @returns Updated resource identity.
+ * @throws When the resource cannot be updated.
+ * @rejects When the resource cannot be updated.
+ */
 async function persistResourceUpdate(
   db: Pick<Database, "execute">,
   input: ReturnType<typeof normalizeUpdateInput>,
   images: UploadResult[],
-): Promise<{ id: number }> {
+): Promise<{
+  /** Resource identifier. */
+  id: number;
+}> {
   const categoryValues = sql.join(
-    input.categories.map(({ name, slug }) => sql`(${name}, ${slug})`),
+    input.categories.map(
+      /**
+       * Serializes a category row.
+       *
+       * @param category - Normalized category.
+       * @returns SQL category tuple.
+       */
+      ({ name, slug }) => sql`(${name}, ${slug})`,
+    ),
     sql`, `,
   );
   const retainedImages = JSON.stringify(
@@ -1160,7 +1784,10 @@ async function persistResourceUpdate(
   const newImages = JSON.stringify(
     images.map((image, position) => ({ ...image, position })),
   );
-  const result = await db.execute<{ id: number }>(sql`
+  const result = await db.execute<{
+    /** Resource identifier. */
+    id: number;
+  }>(sql`
     with input_categories(name, slug) as (values ${categoryValues}),
     updated_resource as (
       update resources
@@ -1503,15 +2130,67 @@ export function canViewResource(
   );
 }
 
+/**
+ * Resource mutation callback.
+ *
+ * @template T - Callback result type.
+ */
+type ResourceAuditCallback<T> = {
+  /**
+   * Runs a resource mutation.
+   *
+   * @param transaction - Caller-owned transaction.
+   * @returns Callback result.
+   */
+  (transaction: Parameters<AuditService["write"]>[0]): Promise<T>;
+};
+
+/**
+ * Uses a transaction when audit writes are enabled.
+ *
+ * @template T - Callback result type.
+ * @param db - Application database.
+ * @param audit - Optional audit service.
+ * @param callback - Mutation callback.
+ * @returns Callback result.
+ */
+async function withResourceAuditTransaction<T>(
+  db: Database,
+  audit: AuditService | undefined,
+  callback: ResourceAuditCallback<T>,
+): Promise<T> {
+  return audit ? await db.transaction(callback) : await callback(db);
+}
+
+/**
+ * Uploads buffered resource inputs through the session service.
+ *
+ * @param db - Application database.
+ * @param storage - Upload storage.
+ * @param logger - Application logger.
+ * @param input - Resource or version upload input.
+ * @param target - Resource upload target.
+ * @param payload - Resource session payload.
+ * @param audit - Optional audit service.
+ * @returns Completed resource upload identity.
+ * @throws When an upload target or result is missing.
+ * @rejects When an upload target or result is missing.
+ */
 async function uploadBufferedSession(
   db: Database,
   storage: UploadStorage,
   logger: Logger,
   input: CreateResourceInput | UploadResourceVersionInput,
-  target: { type: "resource"; id?: number },
+  target: {
+    /** Resource target type. */
+    type: "resource";
+    /** Existing resource identifier for version uploads. */
+    id?: number;
+  },
   payload: Record<string, unknown>,
+  audit?: AuditService,
 ) {
-  const service = createStorageService({ db, storage, logger });
+  const service = createStorageService({ audit, db, storage, logger });
   const actor = input.actor;
   const inputs = [
     ...input.files.map((file) => ({ ...file, kind: "file" as const })),

@@ -4,6 +4,7 @@ import {
   parseFeedbackInput,
   parseFeedbackListInput,
   parseFeedbackTitleInput,
+  parsePlanFeedbackInput,
 } from "./feedback";
 
 describe("feedback input", () => {
@@ -88,6 +89,36 @@ describe("admin feedback input", () => {
     ).toThrow();
     expect(() =>
       parseAdminFeedbackListInput({ statuses: ["requested"] }, "archive"),
+    ).toThrow();
+  });
+
+  it("validates Linear planning input", () => {
+    expect(
+      parsePlanFeedbackInput({
+        assignToMe: false,
+        clientUuid: "11111111-1111-4111-8111-111111111111",
+        feedbackId: 42,
+        kind: "issue",
+        labelIds: ["22222222-2222-4222-8222-222222222222"],
+        leadProject: false,
+      }),
+    ).toEqual({
+      assignToMe: false,
+      clientUuid: "11111111-1111-4111-8111-111111111111",
+      feedbackId: 42,
+      kind: "issue",
+      labelIds: ["22222222-2222-4222-8222-222222222222"],
+      leadProject: false,
+    });
+    expect(() =>
+      parsePlanFeedbackInput({
+        assignToMe: false,
+        clientUuid: "not-a-uuid",
+        feedbackId: 42,
+        kind: "existing",
+        labelIds: [],
+        leadProject: false,
+      }),
     ).toThrow();
   });
 });

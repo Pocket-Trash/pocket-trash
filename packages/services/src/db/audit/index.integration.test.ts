@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -5,12 +6,14 @@ import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
 import {
   type AuditEventDefinition,
   AuditEventValidationError,
+  AuditExportDeletionError,
+  AuditExportInProgressError,
   AuditPayloadTooLargeError,
   createAuditService,
 } from "./index.js";
@@ -42,7 +45,12 @@ describe("audit service", () => {
       createLogger({
         app: "test",
         environment: "test",
-        transports: [{ log() {} }],
+        transports: [
+          {
+            /** Discards test log entries. */
+            log() {},
+          },
+        ],
       }),
       [profileUpdated, largeEvent],
     );
@@ -188,6 +196,360 @@ describe("audit service", () => {
       await client.close();
     }
   }, 30_000);
+
+  it("authorizes, filters, and keyset-paginates audit events", async () => {
+    const client = new PGlite();
+    await migrate(client);
+    const db = drizzle(client, { schema }) as unknown as Database;
+    const service = createAuditService(
+      createLogger({
+        app: "test",
+        environment: "test",
+        transports: [
+          {
+            /** Discards test log entries. */
+            log() {},
+          },
+        ],
+      }),
+      [profileUpdated, largeEvent],
+      db,
+    );
+
+    try {
+      const [actor] = await db
+        .insert(schema.user)
+        .values({ clerkId: "audit_reader", username: "Ada" })
+        .returning();
+      if (!actor) throw new Error("Audit user was not created.");
+      const startedAt = new Date("2026-09-01T00:00:00.000Z");
+      await db.insert(schema.auditEvent).values(
+        Array.from({ length: 51 }, (_, index) => ({
+          action: "test.profile_updated",
+          afterState: { index },
+          actorRole: "admin" as const,
+          actorUserId: actor.id,
+          actorUsername: actor.username,
+          authorizationType: "permission" as const,
+          occurredAt: new Date(startedAt.getTime() + index * 1_000),
+          permission: "audit.read" as const,
+          recordedAt: new Date(startedAt.getTime() + index * 1_000),
+          targetId: `profile-${index}`,
+          targetType: "test.profile",
+        })),
+      );
+
+      await expect(
+        service.list({ actor: { clerkId: "user", role: "user" } }),
+      ).rejects.toThrow("Audit events do not exist.");
+
+      const input = {
+        action: "test.profile_updated",
+        actor: { clerkId: "admin", role: "admin" as const },
+        actorUserId: actor.id,
+        recordedFrom: startedAt,
+        targetType: "test.profile",
+      };
+      const first = await service.list(input);
+      expect(first).toMatchObject({
+        coverageStartAt: startedAt,
+        coveredDomains: ["audit", "test"],
+      });
+      expect(first.items).toHaveLength(50);
+      expect(first.items[0]?.targetId).toBe("profile-50");
+      expect(first.nextCursor).toEqual({
+        id: first.items[49]?.id,
+        recordedAt: first.items[49]?.recordedAt,
+      });
+      if (!first.nextCursor) throw new Error("Next cursor is missing.");
+
+      const second = await service.list({
+        ...input,
+        cursor: first.nextCursor,
+      });
+      expect(second.items.map(({ targetId }) => targetId)).toEqual([
+        "profile-0",
+      ]);
+      expect(second.nextCursor).toBeNull();
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("streams bounded exports, records completion, and redacts the ledger actor", async () => {
+    const client = new PGlite();
+    await migrate(client);
+    const db = drizzle(client, { schema }) as unknown as Database;
+    const service = createAuditService(
+      createLogger({
+        app: "test",
+        environment: "test",
+        transports: [
+          {
+            /** Discards test log entries. */
+            log() {},
+          },
+        ],
+      }),
+      [profileUpdated, largeEvent],
+      db,
+    );
+
+    try {
+      const [actor] = await db
+        .insert(schema.user)
+        .values({ clerkId: "audit_exporter", username: "Ada" })
+        .returning();
+      if (!actor) throw new Error("Audit user was not created.");
+      const now = Date.now();
+      const old = new Date(now - 61 * 24 * 60 * 60 * 1000);
+      await client.query(
+        `insert into audit_event (
+          action, after_state, actor_role, actor_user_id, actor_username,
+          authorization_type, occurred_at, permission, recorded_at, target_id,
+          target_type
+        ) select
+          'test.profile_updated', jsonb_build_object('index', i), 'admin', $1,
+          $2, 'permission', $3::timestamptz + i * interval '1 second',
+          'audit.read', $3::timestamptz + i * interval '1 second',
+          'profile-' || i, 'test.profile'
+        from generate_series(0, 10000) as series(i)`,
+        [actor.id, actor.username, old.toISOString()],
+      );
+      await db.insert(schema.auditEvent).values({
+        action: "test.profile_updated",
+        afterState: { recent: true },
+        actorRole: "admin",
+        actorUserId: actor.id,
+        actorUsername: actor.username,
+        authorizationType: "permission",
+        occurredAt: new Date(now - 24 * 60 * 60 * 1000),
+        permission: "audit.read",
+        recordedAt: new Date(now - 24 * 60 * 60 * 1000),
+        targetId: "recent",
+        targetType: "test.profile",
+      });
+      const exportActor = {
+        clerkId: actor.clerkId,
+        role: "admin" as const,
+      };
+
+      await expect(
+        service.createExport({
+          actor: { clerkId: "user", role: "user" },
+          reason: "Incident review",
+        }),
+      ).rejects.toThrow("Audit export does not exist.");
+      const created = await service.createExport({
+        actor: exportActor,
+        reason: "Incident review",
+      });
+      expect(created).toMatchObject({
+        completedAt: null,
+        eventCount: 10_000,
+        reason: "Incident review",
+        sha256: null,
+      });
+      await expect(
+        service.createExport({
+          actor: exportActor,
+          reason: "Another export",
+        }),
+      ).rejects.toBeInstanceOf(AuditExportInProgressError);
+
+      const canceled = await service.downloadExport({
+        actor: exportActor,
+        exportId: created.id,
+      });
+      const canceledReader = canceled.body.getReader();
+      await canceledReader.read();
+      await canceledReader.cancel();
+      await expect(service.getActiveExport(exportActor)).resolves.toMatchObject(
+        {
+          completedAt: null,
+          sha256: null,
+        },
+      );
+      const deleteActor = {
+        clerkId: actor.clerkId,
+        role: "system_admin" as const,
+      };
+      await expect(
+        service.deleteExport({
+          actor: exportActor,
+          confirmed: true,
+          exportId: created.id,
+        }),
+      ).rejects.toThrow("Audit export does not exist.");
+      await expect(
+        service.deleteExport({
+          actor: deleteActor,
+          confirmed: false,
+          exportId: created.id,
+        }),
+      ).rejects.toBeInstanceOf(AuditExportDeletionError);
+      await expect(
+        service.deleteExport({
+          actor: deleteActor,
+          confirmed: true,
+          exportId: created.id,
+        }),
+      ).rejects.toBeInstanceOf(AuditExportDeletionError);
+
+      const download = await service.downloadExport({
+        actor: exportActor,
+        exportId: created.id,
+      });
+      const json = await new Response(download.body).text();
+      const parsed = JSON.parse(json) as {
+        /** Exported audit events. */
+        events: Array<{
+          /** Exported target identifier. */
+          targetId: string;
+        }>;
+        /** Export range metadata. */
+        export: {
+          /** Number of exported events. */
+          count: number;
+          /** Export ledger identifier. */
+          id: string;
+        };
+      };
+      expect(parsed.export).toEqual({
+        count: 10_000,
+        createdAt: expect.any(String),
+        cutoffAt: created.cutoffAt.toISOString(),
+        highWaterEventId: expect.any(Number),
+        id: created.id,
+      });
+      expect(parsed.events).toHaveLength(10_000);
+      expect(parsed.events[0]?.targetId).toBe("profile-0");
+      expect(parsed.events.at(-1)?.targetId).toBe("profile-9999");
+      expect(
+        parsed.events.some(({ targetId }) => targetId === "profile-10000"),
+      ).toBe(false);
+      expect(parsed.events.some(({ targetId }) => targetId === "recent")).toBe(
+        false,
+      );
+
+      const active = await service.getActiveExport(exportActor);
+      expect(active).toMatchObject({
+        completedAt: expect.any(Date),
+        sha256: createHash("sha256").update(json).digest("hex"),
+      });
+      const repeat = await service.downloadExport({
+        actor: exportActor,
+        exportId: created.id,
+      });
+      await expect(new Response(repeat.body).text()).resolves.toBe(json);
+      await expect(
+        db
+          .select()
+          .from(schema.auditEvent)
+          .where(eq(schema.auditEvent.action, "audit.export.completed")),
+      ).resolves.toHaveLength(2);
+
+      await db.transaction(
+        async (transaction) =>
+          await service.redactAccount(transaction, actor.id),
+      );
+      await expect(
+        db
+          .select()
+          .from(schema.auditExport)
+          .where(eq(schema.auditExport.id, created.id)),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          reason: "[erased]",
+          requestedByUserId: null,
+          requestedByUsername: "Deleted user",
+        }),
+      ]);
+
+      const [overlap] = await db
+        .insert(schema.auditEvent)
+        .values({
+          action: "test.profile_updated",
+          afterState: { overlap: true },
+          actorRole: "admin",
+          actorUserId: actor.id,
+          actorUsername: actor.username,
+          authorizationType: "permission",
+          occurredAt: new Date(old.getTime() + 500),
+          permission: "audit.read",
+          recordedAt: new Date(old.getTime() + 500),
+          targetId: "overlap",
+          targetType: "test.profile",
+        })
+        .returning();
+      if (!overlap) throw new Error("Overlap event was not created.");
+      await expect(
+        service.deleteExport({
+          actor: deleteActor,
+          confirmed: true,
+          exportId: created.id,
+        }),
+      ).rejects.toBeInstanceOf(AuditExportDeletionError);
+      await db.transaction(async (transaction) => {
+        await transaction.execute(
+          sql`select set_config('pocket_trash.audit_export_deletion', ${created.id}, true)`,
+        );
+        await transaction
+          .delete(schema.auditEvent)
+          .where(eq(schema.auditEvent.id, overlap.id));
+      });
+
+      await service.deleteExport({
+        actor: deleteActor,
+        confirmed: true,
+        exportId: created.id,
+      });
+      await expect(service.getActiveExport(deleteActor)).resolves.toBeNull();
+      await expect(
+        db
+          .select()
+          .from(schema.auditEvent)
+          .where(eq(schema.auditEvent.targetId, "profile-0")),
+      ).resolves.toHaveLength(0);
+      await expect(
+        db
+          .select()
+          .from(schema.auditEvent)
+          .where(eq(schema.auditEvent.targetId, "profile-10000")),
+      ).resolves.toHaveLength(1);
+      await expect(
+        db
+          .select()
+          .from(schema.auditEvent)
+          .where(eq(schema.auditEvent.action, "audit.export.deleted")),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          actorRole: "system_admin",
+          authorizationType: "permission",
+          metadata: {
+            checksum: active?.sha256,
+            confirmed: true,
+            count: 10_000,
+            cutoff: created.cutoffAt.toISOString(),
+            exportId: created.id,
+            highWaterEventId: created.highWaterEventId,
+            highWaterRecordedAt: created.highWaterRecordedAt.toISOString(),
+          },
+          permission: "audit.delete",
+          targetId: created.id,
+        }),
+      ]);
+      await expect(
+        service.deleteExport({
+          actor: deleteActor,
+          confirmed: true,
+          exportId: created.id,
+        }),
+      ).rejects.toBeInstanceOf(AuditExportDeletionError);
+    } finally {
+      await client.close();
+    }
+  }, 60_000);
 });
 
 async function migrate(client: PGlite) {

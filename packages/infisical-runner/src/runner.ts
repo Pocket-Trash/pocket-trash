@@ -8,26 +8,48 @@ import {
   defaultEnvironmentSlug,
 } from "./config.js";
 
+/** An actionable runner usage, configuration, or prerequisite failure. */
 export class RunnerError extends Error {
+  /** The stable error name exposed to callers. */
   override name = "RunnerError";
 }
 
+/** Parsed runner arguments preceding and following the `--` separator. */
 export type ParsedCliArguments = {
+  /** The application whose secret policy is requested. */
   app: string;
+  /** The application command whose secret policy is requested. */
   command: string;
+  /** The executable and arguments run with injected secrets. */
   commandArgs: string[];
 };
 
+/** Inputs required to execute a command through Infisical. */
 export type InfisicalRunRequest = ParsedCliArguments & {
+  /** An explicit Infisical project identifier, when configured. */
   infisicalProjectId?: string;
+  /** The absolute monorepo root used for configuration and helper paths. */
   repoRoot: string;
+  /** Whether to expose informational provider logs. */
   verbose?: boolean;
 };
 
+/**
+ * Resolves the monorepo root relative to this package.
+ *
+ * @returns The absolute monorepo root path.
+ */
 export function getRepoRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 }
 
+/**
+ * Splits runner arguments from the wrapped command.
+ *
+ * @param argv - Arguments after the runner executable and script path.
+ * @returns The application, policy command, and wrapped command arguments.
+ * @throws When the arguments do not match `<app> <command> -- <command...>`.
+ */
 export function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
   const separatorIndex = argv.indexOf("--");
 
@@ -56,6 +78,14 @@ export function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
   };
 }
 
+/**
+ * Looks up the secret policy for an application command.
+ *
+ * @param app - The configured application name.
+ * @param command - The configured application command.
+ * @returns The command's secret-injection policy.
+ * @throws When the application command has no configured policy.
+ */
 export function getCommandSecretConfig(
   app: string,
   command: string,
@@ -72,6 +102,14 @@ export function getCommandSecretConfig(
   return commandConfig;
 }
 
+/**
+ * Resolves the Infisical environment for an application command.
+ *
+ * @param app - The configured application name.
+ * @param command - The configured application command.
+ * @returns The command-specific or default environment slug.
+ * @throws When the application command has no configured policy.
+ */
 export function getCommandEnvironmentSlug(
   app: string,
   command: string,
@@ -82,10 +120,22 @@ export function getCommandEnvironmentSlug(
   );
 }
 
+/**
+ * Tests whether an Infisical path contains a server-only segment.
+ *
+ * @param secretPath - The Infisical secret path to inspect.
+ * @returns Whether the path targets `server` secrets.
+ */
 export function isServerSecretPath(secretPath: string): boolean {
   return secretPath.endsWith("/server") || secretPath.includes("/server/");
 }
 
+/**
+ * Returns configured secret paths once each while preserving order.
+ *
+ * @param config - The command's secret-injection policy.
+ * @returns A non-empty list of unique Infisical paths.
+ */
 export function getSecretPaths(
   config: CommandSecretConfig,
 ): [string, ...string[]] {
@@ -96,6 +146,14 @@ export function getSecretPaths(
   ];
 }
 
+/**
+ * Enforces the command's server-secret injection policy.
+ *
+ * @param app - The configured application name.
+ * @param command - The configured application command.
+ * @param config - The command's secret-injection policy.
+ * @throws When a client command requests a server-only path.
+ */
 export function validateSecretPaths(
   app: string,
   command: string,
@@ -112,6 +170,13 @@ export function validateSecretPaths(
   }
 }
 
+/**
+ * Builds the nested Infisical CLI arguments for a wrapped command.
+ *
+ * @param request - The command and secret-injection request.
+ * @returns Arguments for the `infisical` executable.
+ * @throws When the command policy is absent or violates path restrictions.
+ */
 export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
   const config = getCommandSecretConfig(request.app, request.command);
   validateSecretPaths(request.app, request.command, config);
@@ -120,6 +185,12 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
     request.command,
   );
 
+  /**
+   * Builds one Infisical `run` layer for a secret path.
+   *
+   * @param secretPath - The Infisical path injected by this layer.
+   * @returns Arguments ending at the wrapped-command separator.
+   */
   const runArgsForPath = (secretPath: string): string[] => [
     "run",
     ...(request.verbose
@@ -169,6 +240,12 @@ export function buildInfisicalRunArgs(request: InfisicalRunRequest): string[] {
   return [...args, ...innerCommand];
 }
 
+/**
+ * Tests whether the repository contains supported Infisical project metadata.
+ *
+ * @param repoRoot - The absolute monorepo root.
+ * @returns Whether an Infisical project config file exists.
+ */
 export function hasInfisicalProjectConfig(repoRoot: string): boolean {
   return (
     existsSync(join(repoRoot, "infisical.json")) ||
@@ -176,6 +253,11 @@ export function hasInfisicalProjectConfig(repoRoot: string): boolean {
   );
 }
 
+/**
+ * Verifies that the Infisical CLI can be started.
+ *
+ * @throws When the Infisical executable is unavailable.
+ */
 export function assertInfisicalCliAvailable(): void {
   const result = spawnSync("infisical", ["--version"], {
     stdio: "ignore",
@@ -196,6 +278,12 @@ export function assertInfisicalCliAvailable(): void {
   }
 }
 
+/**
+ * Verifies that the repository contains Infisical project metadata.
+ *
+ * @param repoRoot - The absolute monorepo root.
+ * @throws When no supported project config file exists.
+ */
 export function assertInfisicalProjectConfig(repoRoot: string): void {
   if (hasInfisicalProjectConfig(repoRoot)) {
     return;
@@ -213,6 +301,12 @@ export function assertInfisicalProjectConfig(repoRoot: string): void {
   );
 }
 
+/**
+ * Converts Infisical authentication output into an actionable runner error.
+ *
+ * @param output - Combined standard output and error from the CLI.
+ * @returns A sign-in-specific or generic authentication error.
+ */
 export function getInfisicalAuthCheckError(output: string): RunnerError {
   if (
     output.includes("couldn't find your logged in details") ||
@@ -237,6 +331,13 @@ export function getInfisicalAuthCheckError(output: string): RunnerError {
   );
 }
 
+/**
+ * Verifies that Infisical can read the requested environment.
+ *
+ * @param repoRoot - The absolute monorepo root used as the CLI working directory.
+ * @param environmentSlug - The Infisical environment to check.
+ * @throws When the authentication check exits unsuccessfully.
+ */
 export function assertInfisicalAuthenticated(
   repoRoot: string,
   environmentSlug = defaultEnvironmentSlug,
@@ -271,6 +372,13 @@ export function assertInfisicalAuthenticated(
   throw getInfisicalAuthCheckError(output);
 }
 
+/**
+ * Runs a command with its configured Infisical secrets and inherited terminal I/O.
+ *
+ * @param request - The command and secret-injection request.
+ * @returns The wrapped process exit code, or one when it exits by signal.
+ * @rejects When prerequisites fail or the Infisical child process cannot start.
+ */
 export async function runInfisicalCommand(
   request: InfisicalRunRequest,
 ): Promise<number> {

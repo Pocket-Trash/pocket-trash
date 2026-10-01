@@ -41,11 +41,14 @@ import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as HelpSlugRouteImport } from './routes/help.$slug'
 import { Route as FeedbackNewRouteImport } from './routes/feedback.new'
 import { Route as FeedbackMyRequestsRouteImport } from './routes/feedback.my-requests'
+import { Route as FeedbackCompletedRouteImport } from './routes/feedback.completed'
 import { Route as CollectionsAddRouteImport } from './routes/collections.add'
 import { Route as CollectionsUserIdRouteImport } from './routes/collections.$userId'
 import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminAccountErasureRouteImport } from './routes/admin.account-erasure'
 import { Route as AdminTrashIndexRouteImport } from './routes/admin.trash.index'
+import { Route as AdminSettingsIndexRouteImport } from './routes/admin.settings.index'
 import { Route as AdminFeedbackIndexRouteImport } from './routes/admin.feedback.index'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
 import { Route as UserResourcesTrashRouteImport } from './routes/user.resources_.trash'
@@ -63,6 +66,7 @@ import { Route as AdminNotificationsFeedbackRouteImport } from './routes/admin.n
 import { Route as AdminFeedbackRequestsRouteImport } from './routes/admin.feedback.requests'
 import { Route as AdminFeedbackPlannedRouteImport } from './routes/admin.feedback.planned'
 import { Route as AdminFeedbackArchiveRouteImport } from './routes/admin.feedback.archive'
+import { Route as AdminAuditExportRouteImport } from './routes/admin.audit.export'
 import { Route as UserCollectionsCollectionIdEditRouteImport } from './routes/user.collections_.$collectionId_.edit'
 import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId_.versions.new'
 import { Route as ProductsProductTypeSlugProductSlugEditRouteImport } from './routes/products.$productTypeSlug.$productSlug_.edit'
@@ -228,6 +232,11 @@ const FeedbackMyRequestsRoute = FeedbackMyRequestsRouteImport.update({
   path: '/my-requests',
   getParentRoute: () => FeedbackRoute,
 } as any)
+const FeedbackCompletedRoute = FeedbackCompletedRouteImport.update({
+  id: '/completed',
+  path: '/completed',
+  getParentRoute: () => FeedbackRoute,
+} as any)
 const CollectionsAddRoute = CollectionsAddRouteImport.update({
   id: '/collections/add',
   path: '/collections/add',
@@ -243,6 +252,11 @@ const AutmogPenIdRoute = AutmogPenIdRouteImport.update({
   path: '/$penId',
   getParentRoute: () => AutmogRoute,
 } as any)
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAccountErasureRoute = AdminAccountErasureRouteImport.update({
   id: '/account-erasure',
   path: '/account-erasure',
@@ -251,6 +265,11 @@ const AdminAccountErasureRoute = AdminAccountErasureRouteImport.update({
 const AdminTrashIndexRoute = AdminTrashIndexRouteImport.update({
   id: '/trash/',
   path: '/trash/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsIndexRoute = AdminSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminFeedbackIndexRoute = AdminFeedbackIndexRouteImport.update({
@@ -346,6 +365,11 @@ const AdminFeedbackArchiveRoute = AdminFeedbackArchiveRouteImport.update({
   path: '/feedback/archive',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAuditExportRoute = AdminAuditExportRouteImport.update({
+  id: '/export',
+  path: '/export',
+  getParentRoute: () => AdminAuditRoute,
+} as any)
 const UserCollectionsCollectionIdEditRoute =
   UserCollectionsCollectionIdEditRouteImport.update({
     id: '/collections_/$collectionId_/edit',
@@ -385,9 +409,11 @@ export interface FileRoutesByFullPath {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
   '/admin/account-erasure': typeof AdminAccountErasureRoute
+  '/admin/audit': typeof AdminAuditRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/feedback/completed': typeof FeedbackCompletedRoute
   '/feedback/my-requests': typeof FeedbackMyRequestsRoute
   '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
@@ -408,6 +434,7 @@ export interface FileRoutesByFullPath {
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
+  '/admin/audit/export': typeof AdminAuditExportRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
@@ -425,6 +452,7 @@ export interface FileRoutesByFullPath {
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/admin/feedback/': typeof AdminFeedbackIndexRoute
+  '/admin/settings/': typeof AdminSettingsIndexRoute
   '/admin/trash/': typeof AdminTrashIndexRoute
   '/collections/$userId/$collectionId/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
@@ -441,9 +469,11 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/account-erasure': typeof AdminAccountErasureRoute
+  '/admin/audit': typeof AdminAuditRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/feedback/completed': typeof FeedbackCompletedRoute
   '/feedback/my-requests': typeof FeedbackMyRequestsRoute
   '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
@@ -464,6 +494,7 @@ export interface FileRoutesByTo {
   '/products': typeof ProductsIndexRoute
   '/resources': typeof ResourcesIndexRoute
   '/user': typeof UserIndexRoute
+  '/admin/audit/export': typeof AdminAuditExportRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
@@ -481,6 +512,7 @@ export interface FileRoutesByTo {
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/admin/feedback': typeof AdminFeedbackIndexRoute
+  '/admin/settings': typeof AdminSettingsIndexRoute
   '/admin/trash': typeof AdminTrashIndexRoute
   '/collections/$userId/$collectionId/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
@@ -502,9 +534,11 @@ export interface FileRoutesById {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
   '/admin/account-erasure': typeof AdminAccountErasureRoute
+  '/admin/audit': typeof AdminAuditRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/feedback/completed': typeof FeedbackCompletedRoute
   '/feedback/my-requests': typeof FeedbackMyRequestsRoute
   '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
@@ -525,6 +559,7 @@ export interface FileRoutesById {
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
+  '/admin/audit/export': typeof AdminAuditExportRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
@@ -542,6 +577,7 @@ export interface FileRoutesById {
   '/user/resources_/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/admin/feedback/': typeof AdminFeedbackIndexRoute
+  '/admin/settings/': typeof AdminSettingsIndexRoute
   '/admin/trash/': typeof AdminTrashIndexRoute
   '/collections_/$userId/$collectionId_/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug_/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
@@ -564,9 +600,11 @@ export interface FileRouteTypes {
     | '/terms-of-service'
     | '/user'
     | '/admin/account-erasure'
+    | '/admin/audit'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/feedback/completed'
     | '/feedback/my-requests'
     | '/feedback/new'
     | '/help/$slug'
@@ -587,6 +625,7 @@ export interface FileRouteTypes {
     | '/products/'
     | '/resources/'
     | '/user/'
+    | '/admin/audit/export'
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
@@ -604,6 +643,7 @@ export interface FileRouteTypes {
     | '/user/resources/trash'
     | '/user/settings/beta-features'
     | '/admin/feedback/'
+    | '/admin/settings/'
     | '/admin/trash/'
     | '/collections/$userId/$collectionId/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug/edit'
@@ -620,9 +660,11 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms-of-service'
     | '/admin/account-erasure'
+    | '/admin/audit'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/feedback/completed'
     | '/feedback/my-requests'
     | '/feedback/new'
     | '/help/$slug'
@@ -643,6 +685,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/resources'
     | '/user'
+    | '/admin/audit/export'
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
@@ -660,6 +703,7 @@ export interface FileRouteTypes {
     | '/user/resources/trash'
     | '/user/settings/beta-features'
     | '/admin/feedback'
+    | '/admin/settings'
     | '/admin/trash'
     | '/collections/$userId/$collectionId/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug/edit'
@@ -680,9 +724,11 @@ export interface FileRouteTypes {
     | '/terms-of-service'
     | '/user'
     | '/admin/account-erasure'
+    | '/admin/audit'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/feedback/completed'
     | '/feedback/my-requests'
     | '/feedback/new'
     | '/help/$slug'
@@ -703,6 +749,7 @@ export interface FileRouteTypes {
     | '/products/'
     | '/resources/'
     | '/user/'
+    | '/admin/audit/export'
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
@@ -720,6 +767,7 @@ export interface FileRouteTypes {
     | '/user/resources_/trash'
     | '/user/settings/beta-features'
     | '/admin/feedback/'
+    | '/admin/settings/'
     | '/admin/trash/'
     | '/collections_/$userId/$collectionId_/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug_/edit'
@@ -983,6 +1031,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FeedbackMyRequestsRouteImport
       parentRoute: typeof FeedbackRoute
     }
+    '/feedback/completed': {
+      id: '/feedback/completed'
+      path: '/completed'
+      fullPath: '/feedback/completed'
+      preLoaderRoute: typeof FeedbackCompletedRouteImport
+      parentRoute: typeof FeedbackRoute
+    }
     '/collections/add': {
       id: '/collections/add'
       path: '/collections/add'
@@ -1004,6 +1059,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AutmogPenIdRouteImport
       parentRoute: typeof AutmogRoute
     }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/account-erasure': {
       id: '/admin/account-erasure'
       path: '/account-erasure'
@@ -1016,6 +1078,13 @@ declare module '@tanstack/react-router' {
       path: '/trash'
       fullPath: '/admin/trash/'
       preLoaderRoute: typeof AdminTrashIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings/': {
+      id: '/admin/settings/'
+      path: '/settings'
+      fullPath: '/admin/settings/'
+      preLoaderRoute: typeof AdminSettingsIndexRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/feedback/': {
@@ -1137,6 +1206,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFeedbackArchiveRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/audit/export': {
+      id: '/admin/audit/export'
+      path: '/export'
+      fullPath: '/admin/audit/export'
+      preLoaderRoute: typeof AdminAuditExportRouteImport
+      parentRoute: typeof AdminAuditRoute
+    }
     '/user/collections_/$collectionId_/edit': {
       id: '/user/collections_/$collectionId_/edit'
       path: '/collections/$collectionId/edit'
@@ -1168,8 +1244,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminAuditRouteChildren {
+  AdminAuditExportRoute: typeof AdminAuditExportRoute
+}
+
+const AdminAuditRouteChildren: AdminAuditRouteChildren = {
+  AdminAuditExportRoute: AdminAuditExportRoute,
+}
+
+const AdminAuditRouteWithChildren = AdminAuditRoute._addFileChildren(
+  AdminAuditRouteChildren,
+)
+
 interface AdminRouteChildren {
   AdminAccountErasureRoute: typeof AdminAccountErasureRoute
+  AdminAuditRoute: typeof AdminAuditRouteWithChildren
   AdminIndexRoute: typeof AdminIndexRoute
   AdminFeedbackArchiveRoute: typeof AdminFeedbackArchiveRoute
   AdminFeedbackPlannedRoute: typeof AdminFeedbackPlannedRoute
@@ -1180,11 +1269,13 @@ interface AdminRouteChildren {
   AdminTrashCatalogImagesRoute: typeof AdminTrashCatalogImagesRoute
   AdminTrashResourcesRoute: typeof AdminTrashResourcesRoute
   AdminFeedbackIndexRoute: typeof AdminFeedbackIndexRoute
+  AdminSettingsIndexRoute: typeof AdminSettingsIndexRoute
   AdminTrashIndexRoute: typeof AdminTrashIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAccountErasureRoute: AdminAccountErasureRoute,
+  AdminAuditRoute: AdminAuditRouteWithChildren,
   AdminIndexRoute: AdminIndexRoute,
   AdminFeedbackArchiveRoute: AdminFeedbackArchiveRoute,
   AdminFeedbackPlannedRoute: AdminFeedbackPlannedRoute,
@@ -1195,6 +1286,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminTrashCatalogImagesRoute: AdminTrashCatalogImagesRoute,
   AdminTrashResourcesRoute: AdminTrashResourcesRoute,
   AdminFeedbackIndexRoute: AdminFeedbackIndexRoute,
+  AdminSettingsIndexRoute: AdminSettingsIndexRoute,
   AdminTrashIndexRoute: AdminTrashIndexRoute,
 }
 
@@ -1212,12 +1304,14 @@ const AutmogRouteWithChildren =
   AutmogRoute._addFileChildren(AutmogRouteChildren)
 
 interface FeedbackRouteChildren {
+  FeedbackCompletedRoute: typeof FeedbackCompletedRoute
   FeedbackMyRequestsRoute: typeof FeedbackMyRequestsRoute
   FeedbackNewRoute: typeof FeedbackNewRoute
   FeedbackIndexRoute: typeof FeedbackIndexRoute
 }
 
 const FeedbackRouteChildren: FeedbackRouteChildren = {
+  FeedbackCompletedRoute: FeedbackCompletedRoute,
   FeedbackMyRequestsRoute: FeedbackMyRequestsRoute,
   FeedbackNewRoute: FeedbackNewRoute,
   FeedbackIndexRoute: FeedbackIndexRoute,

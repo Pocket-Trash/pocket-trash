@@ -289,6 +289,19 @@ function ResourceEditForm({ detail }: { detail: ResourceDetail }) {
         selected={selectedCategories}
       />
 
+      {!detail.isOwner ? (
+        <label className="grid gap-2 text-sm font-medium">
+          {t("web.resources.moderation.reasonLabel")}
+          <textarea
+            className="min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            maxLength={1000}
+            name="reason"
+            placeholder={t("web.resources.moderation.reasonPlaceholder")}
+            required
+          />
+        </label>
+      ) : null}
+
       <Button disabled={submitting} type="submit">
         {t("web.resources.action.saveChanges")}
       </Button>
@@ -321,6 +334,7 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
   const { locale } = useLocale();
   const navigate = useNavigate();
   const [files, setFiles] = useState<File[]>([]);
+  const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
   const t = (
@@ -356,6 +370,7 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
               }
             },
             operation: "version",
+            reason: reason || undefined,
             resourceId: detail.id,
           });
           toast.success(
@@ -375,6 +390,19 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
         }
       }}
     >
+      {!detail.isOwner ? (
+        <label className="grid gap-2 text-sm font-medium">
+          {t("web.resources.moderation.reasonLabel")}
+          <textarea
+            className="min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            maxLength={1000}
+            onChange={(event) => setReason(event.currentTarget.value)}
+            placeholder={t("web.resources.moderation.reasonPlaceholder")}
+            required
+            value={reason}
+          />
+        </label>
+      ) : null}
       <ResourceFileInput
         browseLabel={t("web.resources.upload.browseFiles")}
         description={t("web.resources.upload.fileHelp", {
