@@ -12,7 +12,7 @@ test("regular users can open account and settings", async ({
   await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
 
   await page.goto("/user/settings");
-  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Dimensions" })).toBeVisible();
 });
 
 test("regular users receive not found for admin routes", async ({
@@ -32,7 +32,9 @@ test("admins can open the admin route", async ({ page, signInAs }) => {
   await page.goto("/admin");
 
   await expect(
-    page.getByRole("heading", { name: "Admin Panel" }),
+    page.getByRole("main", {
+      name: "Manage Pocket Trash administration.",
+    }),
   ).toBeVisible();
 });
 
