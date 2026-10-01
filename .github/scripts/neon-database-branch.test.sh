@@ -19,7 +19,7 @@ for argument in "$@"; do
   fi
   previous="$argument"
 done
-if [[ "${CURL_SCENARIO:-}" == "mutation" ]]; then
+if [[ "${CURL_SCENARIO:-}" == "database-change" ]]; then
   case "$url" in
     */branches\?*)
       if [[ -f "$CURL_STATE_FILE" ]]; then
@@ -64,21 +64,20 @@ PATH="$test_dir:$PATH" \
 grep -Fx 'database_url=postgresql://user@ep-test-pooler.example.test/db' "$output_file" > /dev/null
 grep -Fx 'migration_database_url=postgresql://user@ep-test.example.test/db' "$output_file" > /dev/null
 
-mutation_output_file="$test_dir/mutation-output"
-mutation_state_file="$test_dir/mutation-state"
+database_change_output_file="$test_dir/database-change-output"
+database_change_state_file="$test_dir/database-change-state"
 PATH="$test_dir:$PATH" \
-  CURL_SCENARIO=mutation \
-  CURL_STATE_FILE="$mutation_state_file" \
+  CURL_SCENARIO=database-change \
+  CURL_STATE_FILE="$database_change_state_file" \
   NEON_API_BASE="https://neon.example.test" \
   NEON_API_KEY="test-key" \
   NEON_PROJECT_ID="test-project" \
   NEON_DATABASE_NAME="test-database" \
   NEON_DATABASE_USER="test-user" \
-  DB_CHANGING=false \
-  E2E_MUTATION=true \
+  DB_CHANGING=true \
   PR_NUMBER=42 \
-  GITHUB_OUTPUT="$mutation_output_file" \
+  GITHUB_OUTPUT="$database_change_output_file" \
   bash "$script_dir/neon-database-branch.sh" prepare-preview > /dev/null
 
-grep -Fx 'isolated=true' "$mutation_output_file" > /dev/null
-grep -Fx 'branch_name=preview-pr-42' "$mutation_output_file" > /dev/null
+grep -Fx 'isolated=true' "$database_change_output_file" > /dev/null
+grep -Fx 'branch_name=preview-pr-42' "$database_change_output_file" > /dev/null
