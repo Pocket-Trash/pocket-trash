@@ -9,11 +9,13 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./theme.css": "./theme.css"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:ci": "tsc -p tsconfig.json",
+    "generate:theme": "node scripts/generate-theme.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests --exclude \"dist/**\"",
     "test:ci": "vitest run --passWithNoTests --exclude \"dist/**\"",
@@ -21,6 +23,7 @@
     "test:watch:no-infisical": "vitest --passWithNoTests --exclude \"dist/**\""
   },
   "dependencies": {
+    "@tanstack/highlight": "^1.0.0",
     "rehype-parse": "^9.0.1",
     "rehype-remark": "^10.0.1",
     "rehype-sanitize": "^6.0.0",
@@ -29,9 +32,12 @@
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
     "remark-stringify": "^11.0.0",
-    "unified": "^11.0.5"
+    "unified": "^11.0.5",
+    "unist-util-visit": "^5.1.0"
   },
   "devDependencies": {
-    "@package/tsconfig": "workspace:*"
+    "@package/tsconfig": "workspace:*",
+    "@types/hast": "^3.0.5",
+    "@types/mdast": "^4.0.4"
   }
 }
