@@ -23,26 +23,71 @@ import {
   type TmpImageUploadJobCandidate,
 } from "./images.js";
 
+/**
+ * Canonical maker values used to ensure the Grimsmo maker row.
+ */
 const grimsmoMaker = {
   name: "Grimsmo",
   rootUrl: "https://grimsmoknives.com",
 };
 
+/**
+ * Scraper source identifiers keyed by Grimsmo knife family.
+ */
 const grimsmoKnifeSources = {
   fjell: scraperSources.grimsmoFjell,
   norseman: scraperSources.grimsmoNorseman,
   rask: scraperSources.grimsmoRask,
 } satisfies Record<GrimsmoKnifeType, GrimsmoSourceName>;
 
+/**
+ * Outcome of synchronizing one normalized Grimsmo variation.
+ */
 export type GrimsmoSyncResult = {
+  /**
+   * Whether the variation came from the archive source collection.
+   */
   archived: boolean;
+  /**
+   * Whether synchronization inserted a new source record.
+   */
   created: boolean;
-  deleteImageJobs: { imageId: number }[];
+  /**
+   * Image deletion jobs produced by synchronization.
+   */
+  deleteImageJobs: {
+    /**
+     * Database identifier for the temporary image.
+     */
+    imageId: number;
+  }[];
+  /**
+   * Image upload jobs produced by synchronization.
+   */
   uploadImageJobs: TmpImageUploadJobCandidate[];
+  /**
+   * Whether synchronization changed normalized details.
+   */
   updated: boolean;
+  /**
+   * Whether synchronization saved a previous-state version.
+   */
   versioned: boolean;
 };
 
+/**
+ * Loads persisted Grimsmo synchronization hashes for selected handles.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param source - Scraper source identifier.
+ *
+ * @param sourceHandles - Source handles to load from persisted state.
+ *
+ * @returns Persisted variation hash state for matching handles.
+ *
+ * @rejects When loading persisted synchronization state fails.
+ */
 export async function getGrimsmoVariationSyncState(
   db: Database,
   source: GrimsmoSourceName,
@@ -103,6 +148,17 @@ export async function getGrimsmoVariationSyncState(
     );
 }
 
+/**
+ * Upserts one Saga variation and synchronizes versions and images.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param item - Normalized source item to persist or identify.
+ *
+ * @returns Creation, archive, update, version, and image-job outcomes.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 export async function syncGrimsmoPenVariation(
   db: Database,
   item: NormalizedGrimsmoPenVariation,
@@ -261,6 +317,17 @@ export async function syncGrimsmoPenVariation(
   };
 }
 
+/**
+ * Upserts one Grimsmo knife variation and synchronizes versions and images.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param item - Normalized source item to persist or identify.
+ *
+ * @returns Creation, archive, update, version, and image-job outcomes.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 export async function syncGrimsmoKnifeVariation(
   db: Database,
   item: NormalizedGrimsmoKnifeVariation,
@@ -416,10 +483,27 @@ export async function syncGrimsmoKnifeVariation(
   };
 }
 
+/**
+ * Archives missing inventory pen variations after a complete batch.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param input - Complete pen-variation snapshot and expected Grimsmo source.
+ *
+ * @returns Number of pen variations newly archived.
+ *
+ * @rejects When the source is not a pen source or reconciliation persistence fails.
+ */
 export async function reconcileGrimsmoPenVariationBatch(
   db: Database,
   input: {
+    /**
+     * Normalized pen variations observed in the complete source snapshot.
+     */
     items: readonly NormalizedGrimsmoPenVariation[];
+    /**
+     * Scraper source identifier for the record or job.
+     */
     source: GrimsmoSourceName;
   },
 ) {
@@ -442,10 +526,27 @@ export async function reconcileGrimsmoPenVariationBatch(
   return archiveMissingPenVariations(db, pen.id, inventoryHandles);
 }
 
+/**
+ * Archives missing inventory knife variations after a complete batch.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param input - Complete knife-variation snapshot and expected Grimsmo source.
+ *
+ * @returns Number of knife variations newly archived.
+ *
+ * @rejects When the source is not a knife source or reconciliation persistence fails.
+ */
 export async function reconcileGrimsmoKnifeVariationBatch(
   db: Database,
   input: {
+    /**
+     * Normalized knife variations observed in the complete source snapshot.
+     */
     items: readonly NormalizedGrimsmoKnifeVariation[];
+    /**
+     * Scraper source identifier for the record or job.
+     */
     source: GrimsmoSourceName;
   },
 ) {
@@ -472,6 +573,15 @@ export async function reconcileGrimsmoKnifeVariationBatch(
   return archiveMissingKnifeVariations(db, knife.id, inventoryHandles);
 }
 
+/**
+ * Returns the canonical Grimsmo maker, inserting it when absent.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @returns The canonical Grimsmo maker row.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 async function ensureGrimsmoMaker(db: Database) {
   const [maker] = await db
     .insert(schema.maker)
@@ -490,6 +600,17 @@ async function ensureGrimsmoMaker(db: Database) {
   return row;
 }
 
+/**
+ * Loads a maker by its canonical root URL.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param rootUrl - Canonical maker root URL.
+ *
+ * @returns The matching maker row, or `undefined`.
+ *
+ * @rejects When querying the maker fails.
+ */
 async function getMakerByRootUrl(db: Database, rootUrl: string) {
   const [maker] = await db
     .select()
@@ -500,6 +621,17 @@ async function getMakerByRootUrl(db: Database, rootUrl: string) {
   return maker;
 }
 
+/**
+ * Returns the stable Saga product, inserting or updating it as needed.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param product - Normalized Grimsmo parent product.
+ *
+ * @returns The ensured Saga product row.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 async function ensureGrimsmoPen(
   db: Database,
   product: NormalizedGrimsmoProduct,
@@ -573,6 +705,19 @@ async function ensureGrimsmoPen(
   return pen;
 }
 
+/**
+ * Returns the stable Grimsmo knife product, inserting or updating it as needed.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param product - Normalized Grimsmo parent product.
+ *
+ * @param knifeType - Grimsmo knife family represented by the product.
+ *
+ * @returns The ensured Grimsmo knife product row.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 async function ensureGrimsmoKnife(
   db: Database,
   product: NormalizedGrimsmoProduct,
@@ -651,6 +796,19 @@ async function ensureGrimsmoKnife(
   return knife;
 }
 
+/**
+ * Archives active pen variations absent from current inventory handles.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param penId - Database identifier for the parent Saga pen.
+ *
+ * @param inventorySourceHandles - Variation handles present in current inventory.
+ *
+ * @returns Number of pen variations newly marked archived.
+ *
+ * @rejects When updating missing pen variations fails.
+ */
 async function archiveMissingPenVariations(
   db: Database,
   penId: number,
@@ -682,6 +840,19 @@ async function archiveMissingPenVariations(
   return archived.length;
 }
 
+/**
+ * Archives active knife variations absent from current inventory handles.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param knifeId - Database identifier for the parent knife.
+ *
+ * @param inventorySourceHandles - Variation handles present in current inventory.
+ *
+ * @returns Number of knife variations newly marked archived.
+ *
+ * @rejects When updating missing knife variations fails.
+ */
 async function archiveMissingKnifeVariations(
   db: Database,
   knifeId: number,
@@ -713,6 +884,13 @@ async function archiveMissingKnifeVariations(
   return archived.length;
 }
 
+/**
+ * Projects a normalized Grimsmo product into persisted normalized data.
+ *
+ * @param product - Normalized Grimsmo parent product.
+ *
+ * @returns Persistable normalized parent-product data.
+ */
 function getProductNormalizedData(
   product: NormalizedGrimsmoProduct,
 ): GrimsmoProductNormalizedData {
@@ -723,10 +901,24 @@ function getProductNormalizedData(
   };
 }
 
+/**
+ * Hashes persisted Grimsmo parent-product normalized data.
+ *
+ * @param data - Persisted parent-product normalized data to hash.
+ *
+ * @returns Deterministic normalized-data hash.
+ */
 function hashProductNormalizedData(data: GrimsmoProductNormalizedData) {
   return hashObject(data);
 }
 
+/**
+ * Projects a normalized pen variation into persisted normalized data.
+ *
+ * @param item - Normalized source item to persist or identify.
+ *
+ * @returns Persistable normalized pen variation data.
+ */
 function getPenVariationNormalizedData(
   item: NormalizedGrimsmoPenVariation,
 ): GrimsmoPenVariationNormalizedData {
@@ -759,6 +951,13 @@ function getPenVariationNormalizedData(
   };
 }
 
+/**
+ * Projects a normalized knife variation into persisted normalized data.
+ *
+ * @param item - Normalized source item to persist or identify.
+ *
+ * @returns Persistable normalized knife variation data.
+ */
 function getKnifeVariationNormalizedData(
   item: NormalizedGrimsmoKnifeVariation,
 ): GrimsmoKnifeVariationNormalizedData {
@@ -790,13 +989,34 @@ function getKnifeVariationNormalizedData(
   };
 }
 
+/**
+ * Summarizes which Grimsmo variation fields changed.
+ *
+ * @param existing - Persisted state to compare.
+ *
+ * @param next - Normalized state proposed for persistence.
+ *
+ * @returns Stable change-reason label for the differing fields.
+ */
 function getVariationChangeReason(
   existing: {
+    /**
+     * Stable hash of normalized non-image details.
+     */
     detailsHash: string;
+    /**
+     * Stable hash of source image identity and ordering.
+     */
     imageSetHash: string;
   },
   next: {
+    /**
+     * Stable hash of normalized non-image details.
+     */
     detailsHash: string;
+    /**
+     * Stable hash of source image identity and ordering.
+     */
     imageSetHash: string;
   },
 ) {
@@ -814,22 +1034,59 @@ function getVariationChangeReason(
   return "images";
 }
 
+/**
+ * Checks whether persisted Grimsmo variation state differs from normalized input.
+ *
+ * @param options - Dependencies and controls for the operation.
+ *
+ * @returns Whether any persisted comparison field differs.
+ */
 export function shouldUpdateGrimsmoVariation({
   existing,
   next,
 }: {
+  /**
+   * Persisted state compared with normalized input.
+   */
   existing:
     | {
+        /**
+         * Timestamp when the record was archived, or `null` while active.
+         */
         archivedAt: Date | null;
+        /**
+         * Stable hash of normalized non-image details.
+         */
         detailsHash: string;
+        /**
+         * Stable hash of source image identity and ordering.
+         */
         imageSetHash: string;
+        /**
+         * Collection that supplied the Grimsmo variation.
+         */
         sourceCollection: string;
       }
     | undefined;
+  /**
+   * Normalized state proposed for persistence.
+   */
   next: {
+    /**
+     * Timestamp when the record was archived, or `null` while active.
+     */
     archivedAt: Date | null;
+    /**
+     * Stable hash of normalized non-image details.
+     */
     detailsHash: string;
+    /**
+     * Stable hash of source image identity and ordering.
+     */
     imageSetHash: string;
+    /**
+     * Collection that supplied the Grimsmo variation.
+     */
     sourceCollection: string;
   };
 }) {
