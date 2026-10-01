@@ -109,6 +109,11 @@ describe("resource upload sessions", () => {
       description: "Description",
       fetch: fetchMock,
       files: [stl],
+      /**
+       * Supplies authentication for the upload request.
+       *
+       * @returns A test authentication token.
+       */
       getToken: async () => "token",
       isPrivate: true,
       name: "Tool",
@@ -199,6 +204,11 @@ describe("resource upload sessions", () => {
         description: "Description",
         fetch: fetchMock,
         files,
+        /**
+         * Supplies authentication for the upload request.
+         *
+         * @returns A test authentication token.
+         */
         getToken: async () => "token",
         images: [preview],
         name: "Tool",
@@ -243,10 +253,28 @@ describe("resource upload sessions", () => {
     await uploadResourceSession({
       fetch: fetchMock,
       files: [stl],
+      /**
+       * Supplies authentication for the upload request.
+       *
+       * @returns A test authentication token.
+       */
       getToken: async () => "token",
+      /**
+       * Records progress percentages reported by the transport.
+       *
+       * @param _fileName - File whose progress changed.
+       * @param percent - Upload completion percentage.
+       * @returns The number of recorded progress updates.
+       */
       onProgress: (_fileName, percent) => progress.push(percent),
       operation: "version",
       resourceId: 1000,
+      /**
+       * Simulates a successful transfer with two measured progress updates.
+       *
+       * @param request - Upload request whose listener receives progress.
+       * @returns A successful empty upload response.
+       */
       uploadFile: async ({ onProgress }) => {
         onProgress(25);
         onProgress(75);
@@ -290,6 +318,11 @@ describe("resource upload sessions", () => {
       uploadResourceSession({
         fetch: fetchMock,
         files: [stl],
+        /**
+         * Supplies authentication for the upload request.
+         *
+         * @returns A test authentication token.
+         */
         getToken: async () => "token",
         operation: "version",
         resourceId: 1001,
@@ -328,6 +361,11 @@ function file(name: string, size: number, type = "application/octet-stream") {
     name,
     size,
     type,
+    /**
+     * Reads zero-filled bytes matching the fixture's declared size.
+     *
+     * @returns A buffer containing the fixture bytes.
+     */
     arrayBuffer: async () => new Uint8Array(size).buffer,
   } as File;
 }

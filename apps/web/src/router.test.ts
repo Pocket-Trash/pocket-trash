@@ -21,6 +21,7 @@ describe("resource management routes", () => {
   it("keeps the document shell outside the root route boundary", () => {
     const rootRoute = getRouter().routesById.__root__;
     const options = rootRoute.options as typeof rootRoute.options & {
+      /** Optional document shell exposed by the root route. */
       shellComponent?: unknown;
     };
 

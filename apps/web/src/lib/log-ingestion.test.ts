@@ -2,6 +2,11 @@ import type { Logger } from "@package/logger";
 import { describe, expect, it, vi } from "vitest";
 import { handleLogIngestionRequest } from "./log-ingestion";
 
+/**
+ * Creates a logger spy that runs operations and creates independent child spies.
+ *
+ * @returns A logger fixture with successful no-op flushing.
+ */
 function createTestLogger(): Logger {
   return {
     child: vi.fn(() => createTestLogger()),
