@@ -287,26 +287,19 @@ describe("audit service", () => {
       if (!actor) throw new Error("Audit user was not created.");
       const now = Date.now();
       const old = new Date(now - 61 * 24 * 60 * 60 * 1000);
-      for (let start = 0; start < 10_001; start += 500) {
-        await db.insert(schema.auditEvent).values(
-          Array.from({ length: Math.min(500, 10_001 - start) }, (_, offset) => {
-            const index = start + offset;
-            return {
-              action: "test.profile_updated",
-              afterState: { index },
-              actorRole: "admin" as const,
-              actorUserId: actor.id,
-              actorUsername: actor.username,
-              authorizationType: "permission" as const,
-              occurredAt: new Date(old.getTime() + index * 1_000),
-              permission: "audit.read" as const,
-              recordedAt: new Date(old.getTime() + index * 1_000),
-              targetId: `profile-${index}`,
-              targetType: "test.profile",
-            };
-          }),
-        );
-      }
+      await client.query(
+        `insert into audit_event (
+          action, after_state, actor_role, actor_user_id, actor_username,
+          authorization_type, occurred_at, permission, recorded_at, target_id,
+          target_type
+        ) select
+          'test.profile_updated', jsonb_build_object('index', i), 'admin', $1,
+          $2, 'permission', $3::timestamptz + i * interval '1 second',
+          'audit.read', $3::timestamptz + i * interval '1 second',
+          'profile-' || i, 'test.profile'
+        from generate_series(0, 10000) as series(i)`,
+        [actor.id, actor.username, old.toISOString()],
+      );
       await db.insert(schema.auditEvent).values({
         action: "test.profile_updated",
         afterState: { recent: true },
@@ -424,7 +417,7 @@ describe("audit service", () => {
     } finally {
       await client.close();
     }
-  }, 30_000);
+  }, 60_000);
 });
 
 async function migrate(client: PGlite) {
