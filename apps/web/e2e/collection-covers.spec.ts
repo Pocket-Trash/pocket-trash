@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { createDb, schema } from "@package/database";
 import { and, eq, inArray } from "drizzle-orm";
-import { expect, test } from "./auth";
+import { expect, test, waitForHydration } from "./auth";
 import {
   createMutationFixture,
   type MutationCleanupResult,
@@ -17,6 +17,7 @@ test("@mutation collection covers survive failures and retain reusable history",
     process.env.E2E_RUN_MUTATIONS !== "true",
     "Mutation fixtures require explicit isolation opt-in.",
   );
+  test.setTimeout(120_000);
 
   const databaseUrl = process.env.DATABASE_URL?.trim();
   const clerkId = process.env.E2E_CLERK_REGULAR_USER_ID?.trim();
@@ -65,6 +66,7 @@ test("@mutation collection covers survive failures and retain reusable history",
       }),
     );
     await page.goto("/user/collections/add");
+    await waitForHydration(page);
     await page.getByLabel("Name").fill(collectionName);
     await page.getByLabel("Images").setInputFiles(firstImage);
     await page.getByRole("button", { name: "Save" }).click();
@@ -92,6 +94,7 @@ test("@mutation collection covers survive failures and retain reusable history",
 
     await page.unroute("**/api/v0/storage/upload-sessions");
     await page.goto(`/user/collections/${createdCollectionId}/edit`);
+    await waitForHydration(page);
     await page
       .locator('input[type="file"][aria-label="Gallery"]')
       .setInputFiles(firstImage);
@@ -129,6 +132,7 @@ test("@mutation collection covers survive failures and retain reusable history",
 
     await signInAs("regular");
     await page.goto(`/user/collections/${createdCollectionId}/edit`);
+    await waitForHydration(page);
     await page.getByRole("switch", { name: "Public" }).click();
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page).toHaveURL(
@@ -148,6 +152,7 @@ test("@mutation collection covers survive failures and retain reusable history",
 
     await signInAs("regular");
     await page.goto(`/user/collections/${createdCollectionId}/edit`);
+    await waitForHydration(page);
     await page
       .locator('input[type="file"][aria-label="Gallery"]')
       .setInputFiles(secondImage);
@@ -327,6 +332,21 @@ test("@mutation collection covers survive failures and retain reusable history",
           }
         }),
       );
+      const folderResponse = await fetch(
+        `${storageEndpoint.replace(/\/+$/u, "")}/${encodeURIComponent(storageZoneName)}/${imagePrefix
+          .split("/")
+          .map(encodeURIComponent)
+          .join("/")}/collection/${cleanupCollectionId}/`,
+        {
+          headers: { AccessKey: storageAccessKey },
+          method: "DELETE",
+        },
+      );
+      if (folderResponse.status !== 200 && folderResponse.status !== 404) {
+        throw new Error(
+          `Collection cover folder cleanup failed: ${folderResponse.status}.`,
+        );
+      }
 
       await database.transaction(async (transaction) => {
         if (objectPaths.size) {

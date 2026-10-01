@@ -1,5 +1,5 @@
 import { clerk } from "@clerk/testing/playwright";
-import { test as base } from "playwright/test";
+import { test as base, expect, type Page } from "playwright/test";
 
 /** Supported Pocket Trash test-user roles. */
 export type TestUserRole = "admin" | "disposable" | "editor" | "regular";
@@ -44,7 +44,17 @@ export const test = base.extend<AuthFixtures>({
   },
 });
 
-export { expect } from "playwright/test";
+export { expect };
+
+/**
+ * Waits until the client application can handle browser interactions.
+ *
+ * @param page - Server-rendered application page.
+ * @returns When React hydration completes.
+ */
+export async function waitForHydration(page: Page) {
+  await expect(page.locator("html")).toHaveAttribute("data-hydrated", "true");
+}
 
 /**
  * Reads one non-empty E2E environment variable.

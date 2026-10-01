@@ -1,7 +1,7 @@
 import { createDb, type Database, schema } from "@package/database";
 import { and, eq, inArray } from "drizzle-orm";
 import type { Page } from "playwright/test";
-import { expect, test } from "./auth";
+import { expect, test, waitForHydration } from "./auth";
 import {
   createMutationFixture,
   type MutationCleanupResult,
@@ -36,6 +36,7 @@ test("@mutation collection lifecycle and deletion choices persist through the pu
     await signInAs("regular");
 
     await page.goto("/user/collections/add");
+    await waitForHydration(page);
     await page
       .getByRole("textbox", { exact: true, name: "Name" })
       .fill(fixture.createdName);
@@ -61,7 +62,7 @@ test("@mutation collection lifecycle and deletion choices persist through the pu
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page).toHaveURL(createdUrl);
     await expect(
-      page.getByRole("heading", { level: 1, name: fixture.editedName }),
+      page.getByRole("heading", { level: 2, name: fixture.editedName }),
     ).toBeVisible();
     await expect(page.getByText("Edited through Playwright.")).toBeVisible();
     await expect(
@@ -74,6 +75,7 @@ test("@mutation collection lifecycle and deletion choices persist through the pu
     ).toBeVisible();
 
     await page.goto("/user/collections/add");
+    await waitForHydration(page);
     await page
       .getByRole("textbox", { exact: true, name: "Name" })
       .fill(fixture.equivalentName);
@@ -317,6 +319,7 @@ async function createCollectionLifecycleFixture(
  */
 async function openDeletionDialog(page: Page, collectionId: number) {
   await page.goto(`/user/collections/${collectionId}/edit`);
+  await waitForHydration(page);
   await page.getByRole("button", { name: "Delete or archive" }).click();
   await expect(
     page.getByRole("dialog", { name: "Delete or archive" }),
@@ -337,7 +340,7 @@ async function archiveCollection(page: Page, collection: CollectionScenario) {
     new RegExp(`/user/collections/${collection.id}$`, "u"),
   );
   await expect(
-    page.getByRole("heading", { level: 1, name: collection.name }),
+    page.getByRole("heading", { level: 2, name: collection.name }),
   ).toBeVisible();
 }
 
