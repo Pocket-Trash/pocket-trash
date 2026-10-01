@@ -11,6 +11,8 @@
   "include": [
     ".storybook/**/*.ts",
     "__mocks__/**/*.js",
+    "e2e",
+    "playwright.config.ts",
     "src",
     "vite.config.ts",
     "vitest.config.ts"

@@ -56,6 +56,7 @@ jobs:
       pull-requests: write
     env:
       CI_JOB_NAME: Preview
+      E2E_MUTATION: "true"
       PR_NUMBER: ${{ github.event.pull_request.number }}
 
     steps:
@@ -86,37 +87,24 @@ jobs:
           env-slug: preview
           secret-path: /apps/api
 
+      - name: Fetch web E2E secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: preview
+          secret-path: /apps/web
+
       - name: Detect database changes
         id: db_changes
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-
-          changed_files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
-          database=false
-
-          if grep -Eq '^(packages/database/src/schema/|packages/database/drizzle/|packages/database/drizzle\.config\.ts$)' <<< "$changed_files"; then
-            database=true
-          fi
-
-          echo "database=$database" >> "$GITHUB_OUTPUT"
-          {
-            echo "changed_files<<EOF"
-            printf '%s\n' "$changed_files"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-          source .github/scripts/ci-log.sh
-          emit_ci_log info "ci.database.preview.changeDetection.completed" "$(jq -n \
-            --argjson database "$database" \
-            --arg changed_files "$changed_files" \
-            '{
-              databaseChanged: $database,
-              changedFiles: ($changed_files | split("\n") | map(select(. != "")))
-            }')"
+        run: bash .github/scripts/detect-database-changes.sh
 
       - name: Sync db-change label
         uses: actions/github-script@v8
@@ -222,7 +210,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "$DB_CHANGING" == "true" ]]; then
+          if [[ "$DB_CHANGING" == "true" || "$E2E_MUTATION" == "true" ]]; then
             resource_folder_prefix="resources/preview/pr-${PR_NUMBER}"
             image_folder_prefix="images/preview/pr-${PR_NUMBER}"
           else
@@ -374,7 +362,7 @@ jobs:
         run: bash .github/scripts/neon-database-branch.sh prepare-preview
 
       - name: Configure Vercel branch database override
-        if: steps.db.outputs.can_deploy == 'true' && steps.db_changes.outputs.database == 'true'
+        if: steps.db.outputs.can_deploy == 'true' && steps.db.outputs.isolated == 'true'
         id: vercel
         shell: bash
         env:
@@ -383,7 +371,7 @@ jobs:
         run: bash .github/scripts/vercel-branch-database-url.sh set
 
       - name: Remove stale Vercel branch database override
-        if: steps.db.outputs.can_deploy == 'true' && steps.db_changes.outputs.database != 'true'
+        if: steps.db.outputs.can_deploy == 'true' && steps.db.outputs.isolated != 'true'
         id: vercel_cleanup
         shell: bash
         env:
@@ -395,12 +383,12 @@ jobs:
         shell: bash
         env:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
-          DB_CHANGING: ${{ steps.db_changes.outputs.database }}
+          ISOLATED: ${{ steps.db.outputs.isolated }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
-          if [[ "$DB_CHANGING" == "true" ]]; then
+          if [[ "$ISOLATED" == "true" ]]; then
             export BUNNY_IMAGE_FOLDER_PREFIX="images/preview/pr-${PR_NUMBER}"
           else
             export BUNNY_IMAGE_FOLDER_PREFIX="images/preview"
@@ -413,12 +401,12 @@ jobs:
         shell: bash
         env:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
-          DB_CHANGING: ${{ steps.db_changes.outputs.database }}
+          ISOLATED: ${{ steps.db.outputs.isolated }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
-          if [[ "$DB_CHANGING" == "true" ]]; then
+          if [[ "$ISOLATED" == "true" ]]; then
             export BUNNY_RESOURCE_FOLDER_PREFIX="resources/preview/pr-${PR_NUMBER}"
           else
             export BUNNY_RESOURCE_FOLDER_PREFIX="resources/preview"
@@ -476,14 +464,14 @@ jobs:
         shell: bash
         env:
           DATABASE_URL: ${{ steps.db.outputs.database_url }}
-          DB_CHANGING: ${{ steps.db_changes.outputs.database }}
+          ISOLATED: ${{ steps.db.outputs.isolated }}
           LOG_DEPLOYMENT_ID: pr-${{ github.event.pull_request.number }}
           PREVIEW_ALIAS: pr-${{ github.event.pull_request.number }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
-          if [[ "$DB_CHANGING" == "true" ]]; then
+          if [[ "$ISOLATED" == "true" ]]; then
             resource_folder_prefix="resources/preview/pr-${PR_NUMBER}"
             image_folder_prefix="images/preview/pr-${PR_NUMBER}"
           else
@@ -561,11 +549,44 @@ jobs:
           REPOSITORY_ID: ${{ github.event.repository.id }}
         run: bash .github/scripts/vercel-branch-database-url.sh deploy-preview
 
+      - name: Install Playwright Chromium
+        if: steps.db.outputs.can_deploy == 'true'
+        run: pnpm --filter @app/web exec playwright install --with-deps chromium
+
+      - name: Run safe E2E smoke tests
+        if: steps.db.outputs.can_deploy == 'true'
+        env:
+          E2E_BASE_URL: ${{ steps.vercel_preview.outputs.web_preview_url }}
+        run: pnpm --filter @app/web test:e2e:ci
+
+      - name: Run isolated E2E mutation fixture
+        if: steps.db.outputs.can_deploy == 'true' && steps.db.outputs.isolated == 'true'
+        env:
+          BUNNY_IMAGE_FOLDER_PREFIX: images/preview/pr-${{ github.event.pull_request.number }}
+          BUNNY_RESOURCE_FOLDER_PREFIX: resources/preview/pr-${{ github.event.pull_request.number }}
+          DATABASE_URL: ${{ steps.db.outputs.database_url }}
+          E2E_BASE_URL: ${{ steps.vercel_preview.outputs.web_preview_url }}
+          E2E_DATABASE_BRANCH: ${{ steps.db.outputs.branch_name }}
+          E2E_PR_NUMBER: ${{ github.event.pull_request.number }}
+          E2E_RUN_MUTATIONS: "true"
+          E2E_VERCEL_DEPLOYMENT_ID: ${{ steps.vercel_preview.outputs.deployment_id }}
+        run: pnpm --filter @app/web exec playwright test --grep @mutation
+
+      - name: Upload failed Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: ignore
+          name: playwright-report-${{ github.event.pull_request.number }}
+          path: apps/web/playwright-report
+          retention-days: 7
+
       - name: Configure Railway scraper preview database and cron
         if: steps.db.outputs.can_deploy == 'true'
         shell: bash
         env:
           DB_CHANGING: ${{ steps.db_changes.outputs.database }}
+          ISOLATED: ${{ steps.db.outputs.isolated }}
           DATABASE_URL: ${{ steps.db.outputs.database_url }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
@@ -574,11 +595,14 @@ jobs:
           printf '::add-mask::%s\n' "$DATABASE_URL"
 
           railway_environment="pocket-trash-pr-${PR_NUMBER}"
-          if [[ "$DB_CHANGING" == "true" ]]; then
+          if [[ "$ISOLATED" == "true" ]]; then
             image_folder_prefix="images/preview/pr-${PR_NUMBER}"
-            scraper_cron_enabled="true"
           else
             image_folder_prefix="images/preview"
+          fi
+          if [[ "$DB_CHANGING" == "true" ]]; then
+            scraper_cron_enabled="true"
+          else
             scraper_cron_enabled="false"
           fi
           redis_url_reference='$'"{{${RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME}.REDIS_PUBLIC_URL}}"
@@ -746,7 +770,7 @@ jobs:
           permission-pull-requests: write
 
       - name: Comment on blocked DB preview
-        if: steps.db_changes.outputs.database == 'true' && steps.db.outputs.can_deploy != 'true'
+        if: steps.db.outputs.isolated == 'true' && steps.db.outputs.can_deploy != 'true'
         uses: actions/github-script@v8
         env:
           BRANCH_COUNT: ${{ steps.db.outputs.branch_count }}
@@ -804,11 +828,12 @@ jobs:
             }
 
       - name: Comment on ready DB preview
-        if: steps.db_changes.outputs.database == 'true' && steps.db.outputs.can_deploy == 'true'
+        if: steps.db.outputs.isolated == 'true' && steps.db.outputs.can_deploy == 'true'
         uses: actions/github-script@v8
         env:
           BRANCH_NAME: ${{ steps.db.outputs.branch_name }}
           BRANCH_URL: ${{ steps.db.outputs.branch_url }}
+          DB_CHANGING: ${{ steps.db_changes.outputs.database }}
           PARENT_BRANCH: ${{ steps.db.outputs.parent_branch }}
           WEB_PREVIEW_URL: ${{ steps.vercel_preview.outputs.web_preview_url }}
         with:
@@ -819,6 +844,9 @@ jobs:
             const webPreview = webPreviewUrl
               ? `[Preview](${webPreviewUrl})`
               : "Vercel preview URL not available to this workflow yet; the branch-specific env var is set for the next preview deployment.";
+            const migrationStatus = process.env.DB_CHANGING === "true"
+              ? "Committed Drizzle migrations applied"
+              : "Development schema inherited";
             const body = [
               marker,
               "DB-isolated preview is ready for this pull request.",
@@ -827,10 +855,10 @@ jobs:
               "| --- | --- |",
               `| Neon branch | [\`${process.env.BRANCH_NAME}\`](${process.env.BRANCH_URL}) |`,
               `| Parent branch | \`${process.env.PARENT_BRANCH}\` |`,
-              "| Migration status | Committed Drizzle migrations applied |",
+              `| Migration status | ${migrationStatus} |`,
               `| Web preview | ${webPreview} |`,
               "",
-              "The `preview-pr-*` branch and branch-specific Vercel `DATABASE_URL` and `BUNNY_IMAGE_FOLDER_PREFIX` are deleted when the PR closes or no longer contains DB changes.",
+              "The `preview-pr-*` branch and branch-specific Vercel `DATABASE_URL`, `BUNNY_IMAGE_FOLDER_PREFIX`, and `BUNNY_RESOURCE_FOLDER_PREFIX` are deleted when the PR closes.",
             ].join("\n");
 
             const { owner, repo } = context.repo;
@@ -860,7 +888,7 @@ jobs:
             }
 
       - name: Cleanup failed DB preview resources
-        if: ${{ always() && steps.db_changes.outputs.database == 'true' && steps.db.outputs.branch_created == 'true' && (failure() || cancelled()) }}
+        if: ${{ always() && steps.db.outputs.isolated == 'true' && steps.db.outputs.branch_created == 'true' && (failure() || cancelled()) }}
         shell: bash
         env:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
@@ -893,12 +921,25 @@ jobs:
     name: Development API
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.target == 'development')
     runs-on: ubuntu-latest
+    outputs:
+      database_changed: ${{ steps.db_changes.outputs.database }}
     permissions:
       contents: read
       id-token: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect database changes
+        id: db_changes
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: bash .github/scripts/detect-database-changes.sh
 
       - name: Fetch deployment secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
@@ -1000,6 +1041,16 @@ jobs:
           curl --fail --retry 5 --retry-all-errors --retry-delay 2 \
             --silent --show-error "https://dev-api.pocket-trash.app/api/v0/health" | \
             jq -e '.ok == true and .service == "api"' >/dev/null
+
+  refresh-preview:
+    name: Refresh shared preview
+    needs: development-api
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.development-api.outputs.database_changed == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/preview-refresh.yml
+    secrets: inherit
 
   preview-webhook-cleanup:
     name: Preview Webhook Cleanup

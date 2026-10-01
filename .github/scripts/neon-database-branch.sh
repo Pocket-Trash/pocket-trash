@@ -265,6 +265,16 @@ prepare_preview() {
   require_env PR_NUMBER
   require_env DB_CHANGING
 
+  local e2e_mutation="${E2E_MUTATION:-false}"
+  if [[ "$DB_CHANGING" != "true" && "$DB_CHANGING" != "false" ]]; then
+    echo "DB_CHANGING must be true or false." >&2
+    exit 1
+  fi
+  if [[ "$e2e_mutation" != "true" && "$e2e_mutation" != "false" ]]; then
+    echo "E2E_MUTATION must be true or false." >&2
+    exit 1
+  fi
+
   if ! [[ "$MAX_NEON_BRANCHES" =~ ^[0-9]+$ ]]; then
     echo "MAX_NEON_BRANCHES must be a non-negative integer." >&2
     exit 1
@@ -306,7 +316,7 @@ prepare_preview() {
   write_output preview_branch_id "$preview_branch_id"
   write_output branch_created false
 
-  if [[ "$DB_CHANGING" != "true" ]]; then
+  if [[ "$DB_CHANGING" != "true" && "$e2e_mutation" != "true" ]]; then
     emit_ci_log info "ci.database.preview.noPrBranch.needed" "$(jq -n \
       --arg pr_number "$PR_NUMBER" \
       --arg target_branch "$target_branch" \

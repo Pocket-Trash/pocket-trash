@@ -28,6 +28,9 @@ const htmlToMarkdownProcessor = unified()
 /** Parses raw HTML fragments so unsupported markup can retain its text. */
 const htmlFragmentParser = unified().use(rehypeParse, { fragment: true });
 
+/** Parses Markdown source for syntax-aware source transformations. */
+const markdownSourceParser = unified().use(remarkParse);
+
 /** Highlights trusted fences with only the Markdown language registered. */
 const markdownHighlighter = createHighlighter({
   languages: [markdownLanguage],
@@ -135,6 +138,39 @@ export function htmlToMarkdown(html: string | null | undefined): string | null {
   const markdown = String(htmlToMarkdownProcessor.processSync(html)).trim();
 
   return markdown.length > 0 ? markdown : null;
+}
+
+/**
+ * Replaces fenced and indented code blocks with their readable contents.
+ *
+ * @param markdown - Markdown source that may contain code blocks.
+ * @returns Markdown with code-block delimiters and indentation removed.
+ */
+export function downgradeMarkdownCodeBlocks(markdown: string): string {
+  const replacements: Array<{
+    /** End offset of the parsed code block. */
+    end: number;
+    /** Start offset of the parsed code block. */
+    start: number;
+    /** Readable code-block contents. */
+    value: string;
+  }> = [];
+
+  visit(markdownSourceParser.parse(markdown), "code", (node: Code) => {
+    const start = node.position?.start.offset;
+    const end = node.position?.end.offset;
+    if (typeof start === "number" && typeof end === "number") {
+      replacements.push({ end, start, value: node.value });
+    }
+  });
+
+  return replacements
+    .sort((left, right) => right.start - left.start)
+    .reduce(
+      (source, replacement) =>
+        `${source.slice(0, replacement.start)}${replacement.value}${source.slice(replacement.end)}`,
+      markdown,
+    );
 }
 
 /**
