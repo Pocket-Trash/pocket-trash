@@ -41,7 +41,8 @@ type ToggleGroupSingleProps = ToggleGroupBaseProps & {
    */
   type?: "single";
   /**
-   * Current controlled selection. An empty or omitted string means no selection.
+   * Current controlled selection. An empty string means no selection; omission
+   * leaves the group uncontrolled.
    */
   value?: string;
 };
@@ -66,7 +67,8 @@ type ToggleGroupMultipleProps = ToggleGroupBaseProps & {
    */
   type: "multiple";
   /**
-   * Current controlled selection. An empty or omitted array means no selection.
+   * Current controlled selection. An empty array means no selection; omission
+   * leaves the group uncontrolled.
    */
   value?: string[];
 };

@@ -32,7 +32,7 @@ type RemoveLabelBuilder = (name: string) => string;
  * @param props.ariaLabel - Accessible label for the combobox input and trigger.
  * @param props.items - Options available for selection.
  * @param props.onValueChange - Callback invoked with the selection, or `null` when cleared.
- * @param props.placeholder - Prompt shown when the combobox has no selection.
+ * @param props.placeholder - Text shown in the empty search input and when no options match.
  * @param props.removeLabel - Prefix combined with the selected option name for the optional removal control.
  * @param props.showSelectedPill - Whether to allow a selection pill when `removeLabel` is truthy, `value` is non-null, and `value.id` is not `"default"`.
  * @param props.value - Currently selected option, or `null` when none is selected.
@@ -62,7 +62,7 @@ export function CatalogCombobox({
    */
   onValueChange: (value: ComboboxOption | null) => void;
   /**
-   * Prompt shown when the combobox has no selection.
+   * Text shown in the empty search input and when no options match.
    */
   placeholder: string;
   /**
@@ -125,7 +125,7 @@ export function CatalogCombobox({
  * @param props.items - Options available for selection.
  * @param props.onInputValueChange - Callback invoked when the search text changes.
  * @param props.onValueChange - Callback invoked with the selected options, or an empty array when none are selected.
- * @param props.placeholder - Prompt shown when the combobox has no selection.
+ * @param props.placeholder - Text shown in the empty search input and used as the fallback message when no options match.
  * @param props.removeDisabled - Whether selected options cannot be removed.
  * @param props.removeLabel - String prefix combined with the selected option name, or a builder returning the complete accessible label.
  * @param props.value - Currently selected options; an empty array means none are selected.
@@ -183,7 +183,8 @@ export function CatalogMultiCombobox({
    */
   onValueChange: (value: ComboboxOption[]) => void;
   /**
-   * Prompt shown when the combobox has no selection.
+   * Text shown in the empty search input and used as the fallback message when
+   * no options match.
    */
   placeholder: string;
   /**
@@ -252,7 +253,7 @@ export function CatalogMultiCombobox({
  *
  * @param props - Combobox control properties.
  * @param props.ariaLabel - Accessible label for the combobox input and trigger.
- * @param props.placeholder - Prompt shown when the combobox has no selection.
+ * @param props.placeholder - Prompt shown when the search input is empty.
  * @returns The rendered combobox control UI.
  */
 function ComboboxControl({
@@ -264,7 +265,7 @@ function ComboboxControl({
    */
   ariaLabel: string;
   /**
-   * Prompt shown when the combobox has no selection.
+   * Prompt shown when the search input is empty.
    */
   placeholder: string;
 }) {
@@ -289,7 +290,7 @@ function ComboboxControl({
  * Renders the portal-hosted catalog combobox option list.
  *
  * @param props - Combobox options properties.
- * @param props.placeholder - Prompt shown when the combobox has no selection.
+ * @param props.placeholder - Fallback message shown when no options match and `emptyLabel` is omitted.
  * @param props.emptyLabel - Message shown when no combobox options match.
  * @returns The rendered combobox options UI.
  */
@@ -302,7 +303,7 @@ function ComboboxOptions({
    */
   emptyLabel?: string;
   /**
-   * Prompt shown when the combobox has no selection.
+   * Fallback message shown when no options match and `emptyLabel` is omitted.
    */
   placeholder: string;
 }) {

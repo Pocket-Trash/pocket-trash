@@ -774,7 +774,7 @@ function SidebarMenuButton({
  *
  * @param props - Sidebar menu action properties.
  * @param props.className - Additional CSS classes.
- * @param props.showOnHover - Whether to hide the menu action until its item is hovered.
+ * @param props.showOnHover - Whether, at the `md` breakpoint and above, to hide the action until its item is hovered, contains focus, or the action is open.
  * @returns The rendered sidebar menu action UI.
  */
 function SidebarMenuAction({
@@ -783,7 +783,9 @@ function SidebarMenuAction({
   ...props
 }: React.ComponentProps<"button"> & {
   /**
-   * Whether to hide the menu action until its item is hovered.
+   * Whether, at the `md` breakpoint and above, to hide the action until its item
+   * is hovered, contains focus, or the action is open. Smaller viewports keep it
+   * visible.
    *
    * @default false
    */
