@@ -20,6 +20,7 @@ import {
   slugPattern,
 } from "./catalog";
 import { getResourceViewer } from "./resources";
+import { countWords } from "./text";
 
 /**
  * Localization key used for missing required catalog input.
@@ -277,10 +278,7 @@ export const collectionWriteSchema = z.object({
     .string()
     .trim()
     .nullable()
-    .refine(
-      (value) => !value || value.split(/\s+/u).length <= 200,
-      requiredMessage,
-    )
+    .refine((value) => !value || countWords(value) <= 200, requiredMessage)
     .transform((value) => value || null),
   isPrivate: z.boolean(),
   name: z.string().trim().min(2, requiredMessage).max(80, requiredMessage),

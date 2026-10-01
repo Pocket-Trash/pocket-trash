@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { countWords } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import { useOptionalLocale } from "@/providers/locale-provider";
 import type {
@@ -796,8 +797,7 @@ function safeMarkdown(value: string): string {
  */
 function countValue(value: string, type: MarkdownCounter["type"]): number {
   if (type === "characters") return value.length;
-  const trimmed = value.trim();
-  return trimmed ? trimmed.split(/\s+/u).length : 0;
+  return countWords(value);
 }
 
 /**
