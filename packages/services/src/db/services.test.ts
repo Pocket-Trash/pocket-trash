@@ -15,8 +15,19 @@ import { hashLogIdentifier } from "../logging.js";
 import { createUserSettingsService } from "./user-settings/index.js";
 import { createUsersService } from "./users/index.js";
 
+/**
+ * Creates a test logger that captures emitted events.
+ *
+ * @param events - Mutable event collection populated by the transport.
+ * @returns Test logger backed by the capture transport.
+ */
 function captureLogger(events: LogEvent[]) {
   const transport: LogTransport = {
+    /**
+     * Captures one emitted log event.
+     *
+     * @param event - Structured event emitted by the logger.
+     */
     log(event) {
       events.push(event);
     },
@@ -29,20 +40,39 @@ function captureLogger(events: LogEvent[]) {
   });
 }
 
+/**
+ * Creates a programmable database mock for service tests.
+ *
+ * @param input - Queued query results and optional settings state.
+ * @returns Database mock with captured mutation values and settings access.
+ */
 function createDbMock(input: {
+  /** Rows returned by successive insert operations. */
   insertRows?: unknown[][];
+  /** Rows returned by successive select operations. */
   selectRows?: unknown[][];
+  /** Mutable user-settings row used by conflict updates. */
   settingsRow?: UserSettings;
+  /** Rows returned by successive update operations. */
   updateRows?: unknown[][];
 }): Database & {
+  /** Conflict-update field sets captured by the mock. */
   conflictSets: unknown[];
+  /**
+   * Returns the mock's current settings row.
+   *
+   * @returns Current settings row, or `undefined` when absent.
+   */
   getSettingsRow(): UserSettings | undefined;
+  /** Values passed to insert operations. */
   insertValues: unknown[];
 } {
   const insertRows = [...(input.insertRows ?? [])];
   const selectRows = [...(input.selectRows ?? [])];
   const updateRows = [...(input.updateRows ?? [])];
+  /** Conflict-update field sets captured by the mock. */
   const conflictSets: unknown[] = [];
+  /** Values passed to insert operations. */
   const insertValues: unknown[] = [];
   let settingsRow = input.settingsRow;
 
@@ -55,25 +85,31 @@ function createDbMock(input: {
           onConflictDoNothing: vi.fn(() => ({
             returning: vi.fn().mockResolvedValue(insertRows.shift() ?? []),
           })),
-          onConflictDoUpdate: vi.fn((config: { set: unknown }) => {
-            conflictSets.push(config.set);
+          onConflictDoUpdate: vi.fn(
+            (config: {
+              /** Fields supplied to the conflict update. */
+              set: unknown;
+            }) => {
+              conflictSets.push(config.set);
 
-            return {
-              returning: vi.fn(() => {
-                if (table === schema.userSettings && settingsRow) {
-                  for (const key of Object.keys(
-                    config.set as Record<string, unknown>,
-                  )) {
-                    settingsRow = { ...settingsRow, [key]: value[key] };
+              return {
+                /** Returns the updated settings row or the next queued insert result. */
+                returning: vi.fn(() => {
+                  if (table === schema.userSettings && settingsRow) {
+                    for (const key of Object.keys(
+                      config.set as Record<string, unknown>,
+                    )) {
+                      settingsRow = { ...settingsRow, [key]: value[key] };
+                    }
+
+                    return Promise.resolve([settingsRow]);
                   }
 
-                  return Promise.resolve([settingsRow]);
-                }
-
-                return Promise.resolve(insertRows.shift() ?? []);
-              }),
-            };
-          }),
+                  return Promise.resolve(insertRows.shift() ?? []);
+                }),
+              };
+            },
+          ),
         };
       }),
     })),
@@ -97,6 +133,11 @@ function createDbMock(input: {
 
   return Object.assign(db, {
     conflictSets,
+    /**
+     * Returns the mock's current settings row.
+     *
+     * @returns Current settings row, or `undefined` when absent.
+     */
     getSettingsRow: () => settingsRow,
     insertValues,
   });

@@ -6,6 +6,7 @@ import { setTimeout } from "node:timers";
 import { URL } from "node:url";
 import pg from "pg";
 
+/** Unique Docker container name for the isolated storage integration test. */
 const container = `pocket-trash-storage-test-${randomUUID()}`;
 try {
   execFileSync(

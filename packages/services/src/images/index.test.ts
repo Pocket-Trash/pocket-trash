@@ -8,8 +8,19 @@ import { describe, expect, it } from "vitest";
 import { hashLogIdentifier } from "../logging.js";
 import { createImagesService } from "./index.js";
 
+/**
+ * Creates a test logger that captures emitted events.
+ *
+ * @param events - Mutable event collection populated by the transport.
+ * @returns Test logger backed by the capture transport.
+ */
 function captureLogger(events: LogEvent[]) {
   const transport: LogTransport = {
+    /**
+     * Captures one emitted log event.
+     *
+     * @param event - Structured event emitted by the logger.
+     */
     log(event) {
       events.push(event);
     },
