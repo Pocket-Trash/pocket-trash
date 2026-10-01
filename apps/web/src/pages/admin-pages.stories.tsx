@@ -12,6 +12,7 @@ import { AdminNotificationsIndexPage } from "./admin-notifications-index-page";
 import { AdminSettingsPage } from "./admin-settings-page";
 import { AdminTrashIndexPage } from "./admin-trash-index-page";
 
+/** Unread feedback notification shared by the stories. */
 const unread = {
   createdAt: new Date("2026-09-29T12:00:00Z"),
   feedbackId: 1000,
@@ -22,6 +23,7 @@ const unread = {
   title: "Saved searches",
   type: "submitted" as const,
 };
+/** Completed feedback notification shared by the stories. */
 const completed = {
   ...unread,
   id: 1002,
@@ -29,7 +31,9 @@ const completed = {
   type: "completed" as const,
 };
 
+/** Admin page Storybook configuration. */
 const meta = {
+  /** Configures administrator mocks before each story. */
   beforeEach: () => {
     mockStoryRole("admin");
     mocked(useReverification).mockImplementation((action) => action as never);
@@ -52,9 +56,17 @@ const meta = {
 } satisfies Meta<typeof AdminIndexPage>;
 
 export default meta;
+/** A story for an admin page. */
 type Story = StoryObj<typeof meta>;
 
+/** Administrator hub navigation story. */
 export const Hub: Story = {
+  /**
+   * Verifies administrator hub links.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas }) => {
     const main = within(
       canvas.getByRole("main", {
@@ -95,8 +107,20 @@ export const Hub: Story = {
   },
 };
 
+/** Editor hub navigation story. */
 export const EditorHub: Story = {
+  /**
+   * Configures the editor role for this story.
+   *
+   * @returns Nothing.
+   */
   beforeEach: () => mockStoryRole("editor"),
+  /**
+   * Verifies editor-specific hub links.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas }) => {
     const main = within(
       canvas.getByRole("main", {
@@ -120,8 +144,20 @@ export const EditorHub: Story = {
   },
 };
 
+/** Admin notifications hub story. */
 export const NotificationsHub: Story = {
+  /**
+   * Renders the notifications hub.
+   *
+   * @returns The notifications hub page.
+   */
   render: () => <AdminNotificationsIndexPage />,
+  /**
+   * Verifies notification navigation links.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas }) => {
     const sidebar = within(
       canvas.getByRole("navigation", { name: "Admin Panel" }),
@@ -135,8 +171,20 @@ export const NotificationsHub: Story = {
   },
 };
 
+/** Admin trash hub story. */
 export const TrashHub: Story = {
+  /**
+   * Renders the trash hub.
+   *
+   * @returns The trash hub page.
+   */
   render: () => <AdminTrashIndexPage />,
+  /**
+   * Verifies trash navigation links.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas }) => {
     const sidebar = within(
       canvas.getByRole("navigation", { name: "Admin Panel" }),
@@ -150,8 +198,20 @@ export const TrashHub: Story = {
   },
 };
 
+/** Disconnected admin settings story. */
 export const Settings: Story = {
+  /**
+   * Renders admin settings.
+   *
+   * @returns The settings page.
+   */
   render: () => <AdminSettingsPage />,
+  /**
+   * Verifies disconnected Linear controls.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas, canvasElement }) => {
     await expect(canvas.getByText("Admin settings")).toBeVisible();
     await expect(
@@ -163,9 +223,17 @@ export const Settings: Story = {
   },
 };
 
+/** Connected admin settings story. */
 export const ConnectedSettings: Story = {
+  /** Configures a connected Linear account for the story. */
   beforeEach: () => {
+    /** Mock connected Linear account. */
     const linear = {
+      /**
+       * Returns the connected account identifier.
+       *
+       * @returns The connected account identifier.
+       */
       accountIdentifier: () => "ada@example.com",
       approvedScopes: "read write",
       destroy: fn(async () => undefined),
@@ -182,7 +250,18 @@ export const ConnectedSettings: Story = {
       },
     } as unknown as ReturnType<typeof useUser>);
   },
+  /**
+   * Renders connected admin settings.
+   *
+   * @returns The settings page.
+   */
   render: () => <AdminSettingsPage />,
+  /**
+   * Verifies connected Linear controls.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas }) => {
     await expect(
       canvas.getByText("Connected as ada@example.com"),
@@ -196,12 +275,25 @@ export const ConnectedSettings: Story = {
   },
 };
 
+/** Populated feedback notifications story. */
 export const FeedbackNotifications: Story = {
+  /**
+   * Renders populated feedback notifications.
+   *
+   * @returns The feedback notifications page.
+   */
   render: () => (
     <AdminFeedbackNotificationsPage
       initialNotifications={[unread, completed]}
     />
   ),
+  /**
+   * Exercises accepting a feedback notification.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   * @rejects When the accept action is missing.
+   */
   play: async ({ canvas, userEvent }) => {
     const breadcrumbs = within(
       within(canvas.getByRole("banner")).getByRole("navigation"),
@@ -225,6 +317,12 @@ export const FeedbackNotifications: Story = {
   },
 };
 
+/** Empty feedback notifications story. */
 export const EmptyNotifications: Story = {
+  /**
+   * Renders an empty feedback notifications page.
+   *
+   * @returns The empty notifications page.
+   */
   render: () => <AdminFeedbackNotificationsPage initialNotifications={[]} />,
 };

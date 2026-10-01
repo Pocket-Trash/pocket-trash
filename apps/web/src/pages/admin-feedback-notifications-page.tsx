@@ -16,23 +16,42 @@ import {
 } from "@/lib/feedback";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Feedback notification displayed to administrators. */
 type Notification = Awaited<
   ReturnType<typeof listFeedbackNotifications>
 >[number];
 
+/** Renders feedback notifications and read-state controls.
+ *
+ * @param props - Notification page properties.
+ * @param props.initialNotifications - Notifications loaded for the initial render.
+ * @returns The feedback notification administration page.
+ */
 export function AdminFeedbackNotificationsPage({
   initialNotifications,
 }: {
+  /** Notifications loaded for the initial render. */
   initialNotifications: Notification[];
 }) {
   const { locale } = useLocale();
   const [notifications, setNotifications] = useState(initialNotifications);
   const [acceptingId, setAcceptingId] = useState<number>();
+  /** Formats feedback notification copy for the active locale.
+   *
+   * @param key - Translation key to format.
+   * @param params - Values interpolated into the translation.
+   * @returns Localized notification copy.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
 
+  /** Marks a feedback notification read and refreshes the list.
+   *
+   * @param notificationId - Notification identifier to accept.
+   * @returns Completion after the notification list is refreshed or an error is shown.
+   */
   async function accept(notificationId: number) {
     setAcceptingId(notificationId);
     try {
@@ -126,6 +145,12 @@ export function AdminFeedbackNotificationsPage({
   );
 }
 
+/** Formats a notification timestamp for the active locale.
+ *
+ * @param value - Timestamp to format.
+ * @param locale - Locale controlling date and time formatting.
+ * @returns The localized medium-date and short-time label.
+ */
 function formatDate(value: Date, locale: SupportedLocale) {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",

@@ -4,6 +4,7 @@ import { expect, within } from "storybook/test";
 import { mockStoryRole, StoryProviders } from "../../.storybook/story-fixtures";
 import { AdminAuditPage } from "./admin-audit-page";
 
+/** Populated audit page data shared by the stories. */
 const page = {
   coverageStartAt: new Date("2026-09-01T12:00:00Z"),
   coveredDomains: ["collection", "product"],
@@ -35,7 +36,13 @@ const page = {
   },
 } satisfies AuditEventPage;
 
+/** Admin audit page Storybook configuration. */
 const meta = {
+  /**
+   * Configures the administrator role for each story.
+   *
+   * @returns Nothing.
+   */
   beforeEach: () => mockStoryRole("admin"),
   component: AdminAuditPage,
   decorators: [
@@ -50,6 +57,7 @@ const meta = {
 } satisfies Meta<typeof AdminAuditPage>;
 
 export default meta;
+/** A story for the admin audit page. */
 type Story = StoryObj<typeof meta>;
 
 /** Populated audit log with filtering and event details. */

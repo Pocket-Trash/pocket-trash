@@ -7,10 +7,19 @@ import { ImageOff, PackageX } from "lucide-react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Renders trash-management destinations available to the administrator.
+ *
+ * @returns The permission-filtered admin trash page.
+ */
 export function AdminTrashIndexPage() {
   const { sessionClaims, userId } = useAuth();
   const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
   const { locale } = useLocale();
+  /** Formats trash navigation copy for the active locale.
+   *
+   * @param key - Translation key to format.
+   * @returns Localized trash copy.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const links = [
     ...(hasPermission(actor, "resources.manage")
