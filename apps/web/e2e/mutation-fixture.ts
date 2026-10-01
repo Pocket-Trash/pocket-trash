@@ -14,16 +14,28 @@ export type MutationCleanupResult = {
 
 /** Isolated mutation fixture created for one Playwright test. */
 export type MutationFixture = {
+  /** Spinner-button product name created for browser selection. */
+  buttonProductName: string;
   /** Spinner-button product identifier created for downstream collection tests. */
   buttonProductId: number;
-  /** Database collection identifier created for this run. */
-  collectionId: number;
+  /** Database collection identifier created for this run, when requested. */
+  collectionId: number | null;
+  /** Unique collection names reserved for browser-created rows. */
+  collectionNames: [string, string];
+  /** Finish name created for browser selection. */
+  finishName: string;
   /** Material identifier created for downstream collection tests. */
   materialId: number;
+  /** Material name created for browser selection. */
+  materialName: string;
   /** Bunny object path created for this run. */
   objectPath: string;
   /** Spinner product identifier created for downstream collection tests. */
   spinnerProductId: number;
+  /** Spinner product name created for browser selection. */
+  spinnerProductName: string;
+  /** Spinner product slug created for browser navigation. */
+  spinnerProductSlug: string;
   /**
    * Removes and verifies every created row and object.
    *
@@ -35,10 +47,17 @@ export type MutationFixture = {
 /**
  * Creates uniquely named database rows and one Bunny object after safety checks.
  *
+ * @param root0 - Fixture setup options.
+ * @param root0.createCollection - Whether setup should create the first collection.
  * @returns The created identifiers and their cleanup operation.
  * @rejects When isolation is unsafe or fixture setup fails.
  */
-export async function createMutationFixture(): Promise<MutationFixture> {
+export async function createMutationFixture({
+  createCollection = true,
+}: {
+  /** Whether setup should create the first collection. */
+  createCollection?: boolean;
+} = {}): Promise<MutationFixture> {
   const isolation = assertMutationIsolation(process.env);
   const database = createDb({
     databaseUrl: requiredEnvironment("DATABASE_URL"),
@@ -50,6 +69,15 @@ export async function createMutationFixture(): Promise<MutationFixture> {
     zoneName: requiredEnvironment("BUNNY_STORAGE_ZONE_NAME"),
   };
   const runId = `e2e-${crypto.randomUUID()}`;
+  const buttonProductName = `${runId} button`;
+  const collectionNames: [string, string] = [
+    `${runId} first`,
+    `${runId} second`,
+  ];
+  const finishName = `${runId} finish`;
+  const materialName = `${runId} material`;
+  const spinnerProductName = `${runId} spinner`;
+  const spinnerProductSlug = `${runId}-spinner`;
   const bytes = new TextEncoder().encode(runId);
   const objectPath = `${isolation.resourcePrefix}/e2e/${runId}.txt`;
   const [owner] = await database
@@ -59,6 +87,16 @@ export async function createMutationFixture(): Promise<MutationFixture> {
     .limit(1);
   if (!owner)
     throw new Error("The regular E2E user is missing from the database.");
+  if (!createCollection) {
+    const [existingCollection] = await database
+      .select({ id: schema.userCollection.id })
+      .from(schema.userCollection)
+      .where(eq(schema.userCollection.ownerId, owner.id))
+      .limit(1);
+    if (existingCollection) {
+      throw new Error("The regular E2E user must start without collections.");
+    }
+  }
 
   const databaseFixture = await database.transaction(async (transaction) => {
     const createdProductTypes = await transaction
@@ -87,22 +125,28 @@ export async function createMutationFixture(): Promise<MutationFixture> {
       .returning({ id: schema.maker.id });
     const [material] = await transaction
       .insert(schema.material)
-      .values({ name: runId, slug: runId })
+      .values({ name: materialName, slug: `${runId}-material` })
       .returning({ id: schema.material.id });
-    if (!maker || !material) throw new Error("Failed to seed E2E lookups.");
+    const [finish] = await transaction
+      .insert(schema.finish)
+      .values({ name: finishName, slug: `${runId}-finish` })
+      .returning({ id: schema.finish.id });
+    if (!maker || !material || !finish) {
+      throw new Error("Failed to seed E2E lookups.");
+    }
 
     const products = await transaction
       .insert(schema.product)
       .values([
         {
           makerId: maker.id,
-          name: `${runId} spinner`,
+          name: spinnerProductName,
           productTypeId: spinnerType.id,
-          slug: `${runId}-spinner`,
+          slug: spinnerProductSlug,
         },
         {
           makerId: maker.id,
-          name: `${runId} button`,
+          name: buttonProductName,
           productTypeId: buttonType.id,
           slug: `${runId}-button`,
         },
@@ -127,24 +171,44 @@ export async function createMutationFixture(): Promise<MutationFixture> {
       { materialId: material.id, productId: spinner.id },
       { materialId: material.id, productId: button.id },
     ]);
+    const finishOptions = await transaction
+      .insert(schema.finishOption)
+      .values([
+        { position: 0, productId: spinner.id },
+        { position: 0, productId: button.id },
+      ])
+      .returning({ id: schema.finishOption.id });
+    await transaction.insert(schema.finishOptionFinish).values(
+      finishOptions.map(({ id }) => ({
+        finishId: finish.id,
+        finishOptionId: id,
+        position: 0,
+      })),
+    );
 
-    const [collection] = await transaction
-      .insert(schema.userCollection)
-      .values({
-        isPrivate: true,
-        name: runId,
-        normalizedName: runId,
-        ownerId: owner.id,
-      })
-      .returning({ id: schema.userCollection.id });
-    if (!collection) {
+    const collection = createCollection
+      ? (
+          await transaction
+            .insert(schema.userCollection)
+            .values({
+              isPrivate: true,
+              name: collectionNames[0],
+              normalizedName: collectionNames[0],
+              ownerId: owner.id,
+            })
+            .returning({ id: schema.userCollection.id })
+        )[0]
+      : null;
+    if (createCollection && !collection) {
       throw new Error("Failed to create the E2E fixture collection.");
     }
 
     return {
       buttonProductId: button.id,
-      collectionId: collection.id,
+      collectionId: collection?.id ?? null,
+      collectionNames,
       createdProductTypeIds: createdProductTypes.map(({ id }) => id),
+      finishId: finish.id,
       makerId: maker.id,
       materialId: material.id,
       spinnerProductId: spinner.id,
@@ -166,11 +230,17 @@ export async function createMutationFixture(): Promise<MutationFixture> {
   }
 
   return {
+    buttonProductName,
     buttonProductId: databaseFixture.buttonProductId,
     collectionId: databaseFixture.collectionId,
+    collectionNames,
+    finishName,
     materialId: databaseFixture.materialId,
+    materialName,
     objectPath,
     spinnerProductId: databaseFixture.spinnerProductId,
+    spinnerProductName,
+    spinnerProductSlug,
     /**
      * Removes the fixture and reports whether every resource was deleted.
      *
@@ -236,10 +306,14 @@ async function requestBunny(
 type DatabaseFixture = {
   /** Spinner-button product identifier. */
   buttonProductId: number;
-  /** Collection identifier. */
-  collectionId: number;
+  /** Collection identifier created directly by setup, when requested. */
+  collectionId: number | null;
+  /** Collection names that browser setup may persist. */
+  collectionNames: [string, string];
   /** Product-type identifiers inserted because canonical rows were missing. */
   createdProductTypeIds: number[];
+  /** Finish identifier. */
+  finishId: number;
   /** Maker identifier. */
   makerId: number;
   /** Material identifier. */
@@ -262,15 +336,23 @@ async function cleanupDatabaseFixture(
   fixture: DatabaseFixture,
 ) {
   return database.transaction(async (transaction) => {
-    const deletedCollections = await transaction
+    await transaction
       .delete(schema.userCollection)
       .where(
         and(
-          eq(schema.userCollection.id, fixture.collectionId),
           eq(schema.userCollection.ownerId, ownerId),
+          inArray(schema.userCollection.name, fixture.collectionNames),
         ),
-      )
-      .returning({ id: schema.userCollection.id });
+      );
+    const remainingCollections = await transaction
+      .select({ id: schema.userCollection.id })
+      .from(schema.userCollection)
+      .where(
+        and(
+          eq(schema.userCollection.ownerId, ownerId),
+          inArray(schema.userCollection.name, fixture.collectionNames),
+        ),
+      );
     const deletedProducts = await transaction
       .delete(schema.product)
       .where(
@@ -284,6 +366,10 @@ async function cleanupDatabaseFixture(
       .delete(schema.material)
       .where(eq(schema.material.id, fixture.materialId))
       .returning({ id: schema.material.id });
+    const deletedFinishes = await transaction
+      .delete(schema.finish)
+      .where(eq(schema.finish.id, fixture.finishId))
+      .returning({ id: schema.finish.id });
     const deletedMakers = await transaction
       .delete(schema.maker)
       .where(eq(schema.maker.id, fixture.makerId))
@@ -299,9 +385,10 @@ async function cleanupDatabaseFixture(
       catalogDeleted:
         deletedProducts.length === 2 &&
         deletedMaterials.length === 1 &&
+        deletedFinishes.length === 1 &&
         deletedMakers.length === 1 &&
         deletedProductTypes.length === fixture.createdProductTypeIds.length,
-      collectionDeleted: deletedCollections.length === 1,
+      collectionDeleted: remainingCollections.length === 0,
     };
   });
 }
