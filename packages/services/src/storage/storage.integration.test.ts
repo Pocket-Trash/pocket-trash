@@ -19,6 +19,7 @@ import { createResourcesService } from "../resources/index.js";
 import { selectCollectionCover } from "./image-records.js";
 import { createStorageService } from "./index.js";
 
+/** PostgreSQL URL enabling the opt-in storage integration suite. */
 const url = process.env.STORAGE_TEST_DATABASE_URL;
 describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
   const pool = new pg.Pool({ connectionString: url });
@@ -32,6 +33,14 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     cdnBaseUrl: "https://cdn.test",
     folderPrefix: "resources/dev",
     imageFolderPrefix: "images/dev",
+    /**
+     * Emulates Bunny object writes and deletes in memory.
+     *
+     * @param input - Storage API request URL.
+     * @param init - Request method and body.
+     * @returns Successful creation or deletion response.
+     * @rejects When the request URL is invalid or the test enables a simulated deletion failure.
+     */
     fetch: async (input, init) => {
       const path = decodeURIComponent(new URL(String(input)).pathname).replace(
         /^\/zone\//u,
@@ -55,6 +64,11 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     environment: "test",
     transports: [
       {
+        /**
+         * Captures a structured log event for assertions.
+         *
+         * @param event - Storage event emitted by the service.
+         */
         log(event) {
           events.push(event);
         },
@@ -110,6 +124,16 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
   afterAll(async () => {
     await pool.end();
   });
+  /**
+   * Builds one upload-manifest entry with its computed digest.
+   *
+   * @param bytes - File contents used for size and digest metadata.
+   * @param kind - Whether the upload is an image or resource file.
+   * @param name - Original filename.
+   * @param type - Declared content type.
+   * @returns Upload manifest entry matching the supplied bytes.
+   * @rejects When hashing fails.
+   */
   async function manifest(
     bytes: Uint8Array,
     kind: "image" | "file",
@@ -124,10 +148,26 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       sha256: await sha256(bytes),
     };
   }
+  /**
+   * Uploads every reserved session file from a filename-to-bytes map.
+   *
+   * @param session - Reserved session and its upload descriptors.
+   * @param bytes - File contents keyed by original filename.
+   * @rejects When bytes are missing or a service upload fails.
+   */
   async function put(
     session: {
+      /** Upload session UUID. */
       id: string;
-      uploads: Array<{ id: string; fileName: string; contentType: string }>;
+      /** Files reserved by the session. */
+      uploads: Array<{
+        /** Reserved upload file UUID. */
+        id: string;
+        /** Original filename used to find test bytes. */
+        fileName: string;
+        /** Content type sent with the upload request. */
+        contentType: string;
+      }>;
     },
     bytes: Record<string, Uint8Array>,
   ) {
@@ -350,6 +390,12 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       "select id from resource_categories where slug = 'merge-action-category'",
     );
     expect(category.rowCount).toBe(1);
+    /**
+     * Counts persisted resource notifications for retry assertions.
+     *
+     * @returns Current resource-notification row count.
+     * @rejects When the count query fails.
+     */
     const notifications = async () =>
       Number(
         (
