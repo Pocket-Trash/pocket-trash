@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requirePermission = vi.hoisted(() => vi.fn());
 const createExport = vi.hoisted(() => vi.fn());
+const deleteExport = vi.hoisted(() => vi.fn());
 const downloadExport = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/authorization", () => ({
@@ -11,7 +12,7 @@ vi.mock("@/lib/authorization", () => ({
 vi.mock("@/lib/services", () => ({
   s: {
     db: {
-      audit: { createExport, downloadExport },
+      audit: { createExport, deleteExport, downloadExport },
     },
   },
 }));
@@ -77,6 +78,32 @@ describe("audit export route", () => {
       actor,
       exportId: "export-123",
     });
+  });
+
+  it("requires deletion permission and an explicit confirmation", async () => {
+    const systemActor = {
+      clerkId: "system-admin-123",
+      role: "system_admin",
+    } as const;
+    requirePermission.mockResolvedValueOnce(systemActor);
+    deleteExport.mockResolvedValueOnce(undefined);
+
+    const response = await handleAuditExportRequest(
+      request({
+        confirmed: "true",
+        exportId: "export-123",
+        intent: "delete",
+      }),
+    );
+
+    expect(requirePermission).toHaveBeenCalledWith("audit.delete");
+    expect(deleteExport).toHaveBeenCalledWith({
+      actor: systemActor,
+      confirmed: true,
+      exportId: "export-123",
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/admin/audit");
   });
 });
 

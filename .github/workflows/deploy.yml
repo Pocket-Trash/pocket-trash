@@ -528,17 +528,24 @@ jobs:
           set -euo pipefail
 
           pnpm exec tsx src/scripts/reconcile-clerk-users.ts
-          target_url="${PREVIEW_URL}/api/v0/webhooks/clerk"
+          clerk_target_url="${PREVIEW_URL}/api/v0/webhooks/clerk"
+          linear_target_url="${PREVIEW_URL}/api/v0/webhooks/linear"
           pnpm exec wrangler kv key put "target:preview:${PR_NUMBER}" "enabled" \
             --binding CLERK_WEBHOOK_TARGETS \
             --env development \
             --remote \
-            --metadata "$(jq -cn --arg url "$target_url" '{kind:"preview", url:$url}')"
+            --metadata "$(jq -cn --arg url "$clerk_target_url" '{kind:"preview", url:$url}')"
+          pnpm exec wrangler kv key put "linear-target:preview:${PR_NUMBER}" "enabled" \
+            --binding CLERK_WEBHOOK_TARGETS \
+            --env development \
+            --remote \
+            --metadata "$(jq -cn --arg url "$linear_target_url" '{kind:"preview", url:$url}')"
 
           {
-            echo "### Clerk webhook forwarding"
+            echo "### Webhook forwarding"
             echo ""
-            echo "Registered \`target:preview:${PR_NUMBER}\` → ${target_url}"
+            echo "Registered \`target:preview:${PR_NUMBER}\` → ${clerk_target_url}"
+            echo "Registered \`linear-target:preview:${PR_NUMBER}\` → ${linear_target_url}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Deploy Vercel preview from Git
@@ -1033,6 +1040,10 @@ jobs:
         run: |
           set -euo pipefail
           pnpm exec wrangler kv key delete "target:preview:${{ github.event.pull_request.number }}" \
+            --binding CLERK_WEBHOOK_TARGETS \
+            --env development \
+            --remote
+          pnpm exec wrangler kv key delete "linear-target:preview:${{ github.event.pull_request.number }}" \
             --binding CLERK_WEBHOOK_TARGETS \
             --env development \
             --remote

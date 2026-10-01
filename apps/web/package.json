@@ -12,8 +12,6 @@
     "start:ci": "node .output/server/index.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "check": "biome check .",
-    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx ../../packages/infisical-runner/src/cli.ts web test -- vitest run --project=unit --passWithNoTests",
     "test:ci": "vitest run --project=unit --passWithNoTests",
@@ -32,7 +30,7 @@
     "@package/logger": "workspace:*",
     "@package/markdown": "workspace:*",
     "@package/services": "workspace:*",
-    "@pocket-trash/localizations": "^0.18.0",
+    "@pocket-trash/localizations": "^0.20.0",
     "@t3-oss/env-core": "^0.13.11",
     "@tailwindcss/vite": "^4.3.2",
     "@tanstack/react-form": "^1.33.5",
@@ -53,7 +51,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@package/eslint": "workspace:*",
     "@package/tsconfig": "workspace:*",
     "@storybook/addon-a11y": "10.6.0",
     "@storybook/addon-vitest": "10.6.0",

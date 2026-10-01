@@ -48,6 +48,12 @@ const listener = spawn(
   ],
   { cwd: repoRoot, stdio: ["ignore", "pipe", "inherit"] },
 );
+/** Cloudflare quick tunnel for local Linear webhook delivery. */
+const tunnel = spawn(
+  "cloudflared",
+  ["tunnel", "--url", "http://localhost:4006", "--no-autoupdate"],
+  { cwd: repoRoot, stdio: ["ignore", "pipe", "pipe"] },
+);
 /** Environment passed to the web process after removing tooling credentials. */
 const webEnv = { ...process.env };
 delete webEnv.APP_ID;
@@ -60,16 +66,69 @@ const web = spawn("pnpm", ["dev:web"], {
   env: webEnv,
   stdio: "inherit",
 });
-/** Remote KV key advertising this developer's local relay. */
-const key = `target:local:${initials}`;
-/** Whether the remote relay registration must be removed during shutdown. */
-let registered = false;
+/** KV target keys registered by this process. */
+const registeredKeys = new Set();
 /** Whether coordinated shutdown has already begun. */
 let stopping = false;
 
-/** Registers the relay URL and terminates both children if registration fails. */
+/** Registers webhook URLs and terminates local services if registration fails. */
 try {
-  const relayUrl = await waitForRelayUrl(listener);
+  const [clerkRelayUrl, tunnelUrl] = await Promise.all([
+    waitForClerkRelayUrl(listener),
+    waitForCloudflareTunnelUrl(tunnel),
+  ]);
+  await registerTarget(
+    `target:local:${initials}`,
+    clerkRelayUrl,
+    registeredKeys,
+  );
+  await registerTarget(
+    `linear-target:local:${initials}`,
+    `${tunnelUrl}/api/v0/webhooks/linear/${initials.toLowerCase()}`,
+    registeredKeys,
+  );
+} catch (error) {
+  listener.kill("SIGTERM");
+  tunnel.kill("SIGTERM");
+  web.kill("SIGTERM");
+  await removeTargets(registeredKeys);
+  throw error;
+}
+
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => void stop(signal));
+}
+listener.on("exit", () => void stop());
+tunnel.on("exit", () => void stop());
+web.on("exit", () => void stop());
+await new Promise(() => {});
+
+/**
+ * Stops local services and removes registered webhook targets.
+ *
+ * @param {NodeJS.Signals} [signal] - Termination signal.
+ * @returns A promise that resolves immediately for duplicate calls; the first call exits after cleanup.
+ */
+async function stop(signal) {
+  if (stopping) return;
+  stopping = true;
+  listener.kill(signal ?? "SIGTERM");
+  tunnel.kill(signal ?? "SIGTERM");
+  web.kill(signal ?? "SIGTERM");
+  await removeTargets(registeredKeys);
+  process.exit(signal ? 128 : 0);
+}
+
+/**
+ * Registers one expiring local webhook target.
+ *
+ * @param {string} key - KV target key.
+ * @param {string} url - Public target URL.
+ * @param {Set<string>} registeredKeys - Successfully registered keys.
+ * @returns {Promise<void>} Completion of target registration.
+ * @rejects When Wrangler cannot register the target.
+ */
+async function registerTarget(key, url, registeredKeys) {
   await wrangler([
     "kv",
     "key",
@@ -84,36 +143,20 @@ try {
     "--ttl",
     "86400",
     "--metadata",
-    JSON.stringify({ kind: "local", url: relayUrl }),
+    JSON.stringify({ kind: "local", url }),
   ]);
-  registered = true;
-  process.stderr.write(`Registered ${key} -> ${relayUrl}\n`);
-} catch (error) {
-  listener.kill("SIGTERM");
-  web.kill("SIGTERM");
-  throw error;
+  registeredKeys.add(key);
+  process.stderr.write(`Registered ${key} -> ${url}\n`);
 }
-
-/** Installs coordinated shutdown for supported termination signals. */
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, () => void stop(signal));
-}
-listener.on("exit", () => void stop());
-web.on("exit", () => void stop());
-await new Promise(() => {});
 
 /**
- * Stops child processes, removes the relay registration, and exits.
+ * Removes successfully registered webhook targets.
  *
- * @param signal - Termination signal that initiated shutdown, when present.
- * @returns A promise that resolves immediately for duplicate calls; the first call exits the process.
+ * @param {Set<string>} registeredKeys - Keys to remove.
+ * @returns Completion of best-effort cleanup; per-key failures are logged.
  */
-async function stop(signal) {
-  if (stopping) return;
-  stopping = true;
-  listener.kill(signal ?? "SIGTERM");
-  web.kill(signal ?? "SIGTERM");
-  if (registered) {
+async function removeTargets(registeredKeys) {
+  for (const key of registeredKeys) {
     try {
       await wrangler([
         "kv",
@@ -130,7 +173,6 @@ async function stop(signal) {
       process.stderr.write(`Failed to remove ${key}: ${String(error)}\n`);
     }
   }
-  process.exit(signal ? 128 : 0);
 }
 
 /**
@@ -156,13 +198,13 @@ function readInitials(paths) {
 }
 
 /**
- * Waits for the Clerk listener to announce its relay URL.
+ * Waits for the Clerk listener's public relay URL.
  *
  * @param child - Clerk listener child process with piped standard output.
  * @returns A promise for the ready relay URL.
  * @rejects When the child fails or exits before readiness.
  */
-function waitForRelayUrl(child) {
+function waitForClerkRelayUrl(child) {
   return new Promise((resolve, reject) => {
     let buffer = "";
     child.stdout.setEncoding("utf8");
@@ -185,6 +227,45 @@ function waitForRelayUrl(child) {
     child.once("error", reject);
     child.once("exit", (code) =>
       reject(new Error(`Clerk webhook listener exited with code ${code}.`)),
+    );
+  });
+}
+
+/**
+ * Waits for a Cloudflare quick tunnel URL.
+ *
+ * @param {import("node:child_process").ChildProcess} child - Tunnel process.
+ * @returns {Promise<string>} Public Cloudflare tunnel URL.
+ * @rejects When the tunnel fails or exits before readiness.
+ */
+function waitForCloudflareTunnelUrl(child) {
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+    /**
+     * Reads tunnel output until its public URL appears.
+     *
+     * @param {string} chunk - Tunnel output chunk.
+     * @returns {void} Nothing.
+     */
+    const read = (chunk) => {
+      buffer += chunk;
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        process.stderr.write(`${line}\n`);
+        const url = line.match(
+          /https:\/\/[a-z0-9-]+\.trycloudflare\.com/u,
+        )?.[0];
+        if (url) resolve(url);
+      }
+    };
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", read);
+    child.stderr.on("data", read);
+    child.once("error", reject);
+    child.once("exit", (code) =>
+      reject(new Error(`Cloudflare tunnel exited with code ${code}.`)),
     );
   });
 }

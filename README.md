@@ -161,9 +161,10 @@ Infisical.
 | `pnpm build:ci` | Builds all apps and packages through Turborepo with environment variables already provided. |
 | `pnpm figjam read` | Reads the configured FigJam/Figma file into `.figjam/cache`; run through `infisical run --env=dev --path=/local/figma -- pnpm figjam read`. |
 | `pnpm figjam serve-outbox` | Serves validated `.figjam/outbox` payloads to the private local FigJam plugin bridge. |
-| `pnpm lint` | Runs Biome linting project-wide, then package-level lint tasks. |
-| `pnpm format` | Formats supported files with Biome. |
-| `pnpm check` | Runs Biome format/lint/import checks with fixes, then package-level checks. |
+| `pnpm lint` | Runs centralized ESLint across the repository, then checks complete JSDoc on changed declarations. |
+| `pnpm lint:jsdoc` | Checks complete JSDoc on declarations changed from the staged diff or CI merge base. |
+| `pnpm format` | Runs Biome formatting and import organization with Biome linting disabled. |
+| `pnpm check` | Runs the same Biome formatting and import-organization pass as `pnpm format`. |
 | `pnpm typecheck` | Runs TypeScript typechecking across packages and apps. |
 | `pnpm test` | Checks local Infisical CLI auth, then runs app tests with Infisical Development secrets and package tests without secrets. |
 | `pnpm test:ci` | Runs local/unit tests without Infisical for CI. |

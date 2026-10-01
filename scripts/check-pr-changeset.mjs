@@ -83,19 +83,28 @@ function parseChangesetEntries(filePath) {
 }
 
 /**
- * Finds the highest release bump targeting a workspace package.
+ * Selects the highest valid bump for base or PR-added workspace packages.
  *
- * @param files - Changeset filenames and optional contents.
- * @param workspacePackageNames - Package names eligible for release.
- * @returns The highest bump, or `null` when none targets the workspace.
+ * @param files - Changed Changeset files and their contents.
+ * @param workspacePackageNames - Package names present on the base branch.
+ * @param pullRequestPackageNames - Package names introduced by the PR.
+ * @returns The highest bump, or `null` when no valid entry exists.
  */
-function getHighestChangesetBump(files, workspacePackageNames) {
+function getHighestChangesetBump(
+  files,
+  workspacePackageNames,
+  pullRequestPackageNames = new Set(),
+) {
   let bump = null;
+  const knownPackageNames = new Set([
+    ...workspacePackageNames,
+    ...pullRequestPackageNames,
+  ]);
 
   for (const file of files) {
     for (const entry of parseChangesetContent(file.content ?? "")) {
       if (
-        workspacePackageNames.has(entry.packageName) &&
+        knownPackageNames.has(entry.packageName) &&
         (!bump || bumpPriority.indexOf(entry.bump) > bumpPriority.indexOf(bump))
       ) {
         bump = entry.bump;
@@ -133,9 +142,9 @@ function validateChangesetEntries(file, entries, workspacePackageNames) {
 }
 
 /**
- * Validates that the current pull request includes an applicable Changeset.
+ * Validates the PR or local diff and reports its Changeset bump.
  *
- * @returns A promise that settles after successful validation.
+ * @returns A promise that settles after a valid Changeset is found.
  * @rejects When GitHub, Git, file access, or Changeset validation fails.
  */
 async function main() {
@@ -144,8 +153,12 @@ async function main() {
   );
 
   if (process.env.PR_NUMBER) {
-    const files = await getPullRequestChangesetFiles();
-    const bump = getHighestChangesetBump(files, workspacePackageNames);
+    const { changesets, packageNames } = await getPullRequestFiles();
+    const bump = getHighestChangesetBump(
+      changesets,
+      workspacePackageNames,
+      packageNames,
+    );
 
     if (process.env.GITHUB_OUTPUT) {
       await appendFile(
@@ -203,12 +216,12 @@ async function main() {
 }
 
 /**
- * Loads active Changeset files from the GitHub pull-request files API.
+ * Fetches changed Changesets and workspace package names from the PR API.
  *
- * @returns Pull-request Changeset filenames and contents.
- * @rejects When required environment variables or GitHub requests fail.
+ * @returns Changed Changesets and package names introduced by the PR.
+ * @rejects When required environment values or GitHub responses are invalid.
  */
-async function getPullRequestChangesetFiles() {
+async function getPullRequestFiles() {
   const token = requiredEnv("GITHUB_TOKEN");
   const repository = requiredEnv("GITHUB_REPOSITORY");
   const pullNumber = requiredEnv("PR_NUMBER");
@@ -218,7 +231,8 @@ async function getPullRequestChangesetFiles() {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
   };
-  const files = [];
+  const changesets = [];
+  const packageNames = new Set();
 
   for (let page = 1; ; page += 1) {
     const url = `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}/files?per_page=100&page=${page}`;
@@ -233,21 +247,34 @@ async function getPullRequestChangesetFiles() {
     if (!pageFiles.length) break;
 
     for (const file of pageFiles) {
-      if (
+      const isChangeset =
         file.filename.startsWith(`${changesetDirectory}/`) &&
         file.filename.endsWith(".md") &&
         file.filename !== `${changesetDirectory}/README.md` &&
-        file.status !== "removed"
-      ) {
-        files.push({
-          filename: file.filename,
-          content: await fetchRaw(file.contents_url, headers),
-        });
+        file.status !== "removed";
+      const isWorkspaceManifest =
+        /^(?:apps|packages)\/[^/]+\/package\.json$/.test(file.filename) &&
+        file.status !== "removed";
+
+      if (isChangeset || isWorkspaceManifest) {
+        const content = await fetchRaw(file.contents_url, headers);
+
+        if (isChangeset) {
+          changesets.push({
+            content,
+            filename: file.filename,
+          });
+        }
+
+        if (isWorkspaceManifest) {
+          const packageName = JSON.parse(content).name;
+          if (typeof packageName === "string") packageNames.add(packageName);
+        }
       }
     }
   }
 
-  return files;
+  return { changesets, packageNames };
 }
 
 /**

@@ -22,8 +22,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:ci": "tsc -p tsconfig.json",
-    "check": "biome check .",
-    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests --exclude \"dist/**\"",
     "test:ci": "vitest run --passWithNoTests --exclude \"dist/**\"",
@@ -42,7 +40,6 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
-    "@package/eslint": "workspace:*",
     "@package/tsconfig": "workspace:*",
     "@types/pg": "^8.23.1",
     "pg": "^8.23.0"

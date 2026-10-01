@@ -1,5 +1,6 @@
 import { createGitHubDiscordNotifierEnv } from "./env.schema.js";
 
+/** Validated notifier configuration loaded from the current process environment. */
 export const githubDiscordNotifierEnv = createGitHubDiscordNotifierEnv({
   DISCORD_GITHUB_WEBHOOK_URL: process.env.DISCORD_GITHUB_WEBHOOK_URL,
   GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME,

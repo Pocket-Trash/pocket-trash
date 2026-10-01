@@ -34,6 +34,7 @@ describe("admin audit route", () => {
     listAdminAuditEvents.mockResolvedValueOnce({ items: [] });
     getAdminAuditExport.mockResolvedValueOnce({
       activeExport: null,
+      canDelete: false,
       canExport: true,
     });
     await loader({ deps: search } as never);

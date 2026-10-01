@@ -113,13 +113,16 @@ export type ClerkWebhookRuntime = {
 
 /** Runtime capable of handling Linear webhook requests. */
 export type LinearWebhookRuntime = {
+  /** Expected initials for a local webhook target. */
+  expectedInitials?: string;
   /**
    * Handles a Linear webhook request.
    *
    * @param request - Incoming webhook request.
+   * @param targetKind - Webhook target environment.
    * @returns The webhook response.
    */
-  handle(request: Request): Promise<Response>;
+  handle(request: Request, targetKind: "local" | "primary"): Promise<Response>;
 };
 
 export type UploadRuntime = {
@@ -229,7 +232,19 @@ export function createApp(dependencies: AppDependencies = {}) {
       dependencies,
       context.env,
     );
-    return await runtime.handle(context.req.raw);
+    return await runtime.handle(context.req.raw, "primary");
+  });
+
+  api.post("/webhooks/linear/:initials", async (context) => {
+    const runtime = await requireLinearWebhookRuntime(
+      dependencies,
+      context.env,
+    );
+    const initials = context.req.param("initials").toUpperCase();
+    if (!runtime.expectedInitials || initials !== runtime.expectedInitials) {
+      return context.body(null, 404);
+    }
+    return await runtime.handle(context.req.raw, "local");
   });
 
   api.openAPIRegistry.registerPath({

@@ -6,8 +6,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:ci": "tsc -p tsconfig.json",
-    "check": "biome check .",
-    "lint": "eslint .",
     "notify": "tsx src/cli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --exclude \"dist/**\"",
@@ -16,7 +14,6 @@
     "test:watch:no-infisical": "vitest --exclude \"dist/**\""
   },
   "devDependencies": {
-    "@package/eslint": "workspace:*",
     "@package/tsconfig": "workspace:*"
   },
   "dependencies": {

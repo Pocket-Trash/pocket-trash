@@ -86,6 +86,7 @@ export const loggerMessages = {
       addSpinner: "database.collections.addSpinner",
       addSpinnerButton: "database.collections.addSpinnerButton",
       create: "database.collections.create",
+      delete: "database.collections.delete",
       update: "database.collections.update",
       updateItem: "database.collections.updateItem",
     },
@@ -246,6 +247,7 @@ export const loggerMessages = {
   },
 } as const;
 
+/** Stable values shared by logger applications and the log proxy protocol. */
 export const loggerValues = {
   apps: {
     api: "api",

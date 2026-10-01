@@ -3,6 +3,12 @@ import { sendDiscordNotification } from "./discord.js";
 import { githubDiscordNotifierEnv as env } from "./env.js";
 import { formatGitHubNotification } from "./format.js";
 
+/**
+ * Reads the GitHub event, formats any supported notification, and posts it.
+ *
+ * @returns Process exit code after delivery or an intentional no-op.
+ * @rejects When the event file, JSON payload, formatting, or delivery fails.
+ */
 async function main(): Promise<number> {
   const event = JSON.parse(
     await readFile(env.GITHUB_EVENT_PATH, "utf8"),

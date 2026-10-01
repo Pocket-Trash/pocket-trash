@@ -6,12 +6,13 @@ import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
 import {
   type AuditEventDefinition,
   AuditEventValidationError,
+  AuditExportDeletionError,
   AuditExportInProgressError,
   AuditPayloadTooLargeError,
   createAuditService,
@@ -369,6 +370,31 @@ describe("audit service", () => {
           sha256: null,
         },
       );
+      const deleteActor = {
+        clerkId: actor.clerkId,
+        role: "system_admin" as const,
+      };
+      await expect(
+        service.deleteExport({
+          actor: exportActor,
+          confirmed: true,
+          exportId: created.id,
+        }),
+      ).rejects.toThrow("Audit export does not exist.");
+      await expect(
+        service.deleteExport({
+          actor: deleteActor,
+          confirmed: false,
+          exportId: created.id,
+        }),
+      ).rejects.toBeInstanceOf(AuditExportDeletionError);
+      await expect(
+        service.deleteExport({
+          actor: deleteActor,
+          confirmed: true,
+          exportId: created.id,
+        }),
+      ).rejects.toBeInstanceOf(AuditExportDeletionError);
 
       const download = await service.downloadExport({
         actor: exportActor,
@@ -439,6 +465,87 @@ describe("audit service", () => {
           requestedByUsername: "Deleted user",
         }),
       ]);
+
+      const [overlap] = await db
+        .insert(schema.auditEvent)
+        .values({
+          action: "test.profile_updated",
+          afterState: { overlap: true },
+          actorRole: "admin",
+          actorUserId: actor.id,
+          actorUsername: actor.username,
+          authorizationType: "permission",
+          occurredAt: new Date(old.getTime() + 500),
+          permission: "audit.read",
+          recordedAt: new Date(old.getTime() + 500),
+          targetId: "overlap",
+          targetType: "test.profile",
+        })
+        .returning();
+      if (!overlap) throw new Error("Overlap event was not created.");
+      await expect(
+        service.deleteExport({
+          actor: deleteActor,
+          confirmed: true,
+          exportId: created.id,
+        }),
+      ).rejects.toBeInstanceOf(AuditExportDeletionError);
+      await db.transaction(async (transaction) => {
+        await transaction.execute(
+          sql`select set_config('pocket_trash.audit_export_deletion', ${created.id}, true)`,
+        );
+        await transaction
+          .delete(schema.auditEvent)
+          .where(eq(schema.auditEvent.id, overlap.id));
+      });
+
+      await service.deleteExport({
+        actor: deleteActor,
+        confirmed: true,
+        exportId: created.id,
+      });
+      await expect(service.getActiveExport(deleteActor)).resolves.toBeNull();
+      await expect(
+        db
+          .select()
+          .from(schema.auditEvent)
+          .where(eq(schema.auditEvent.targetId, "profile-0")),
+      ).resolves.toHaveLength(0);
+      await expect(
+        db
+          .select()
+          .from(schema.auditEvent)
+          .where(eq(schema.auditEvent.targetId, "profile-10000")),
+      ).resolves.toHaveLength(1);
+      await expect(
+        db
+          .select()
+          .from(schema.auditEvent)
+          .where(eq(schema.auditEvent.action, "audit.export.deleted")),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          actorRole: "system_admin",
+          authorizationType: "permission",
+          metadata: {
+            checksum: active?.sha256,
+            confirmed: true,
+            count: 10_000,
+            cutoff: created.cutoffAt.toISOString(),
+            exportId: created.id,
+            highWaterEventId: created.highWaterEventId,
+            highWaterRecordedAt: created.highWaterRecordedAt.toISOString(),
+          },
+          permission: "audit.delete",
+          targetId: created.id,
+        }),
+      ]);
+      await expect(
+        service.deleteExport({
+          actor: deleteActor,
+          confirmed: true,
+          exportId: created.id,
+        }),
+      ).rejects.toBeInstanceOf(AuditExportDeletionError);
     } finally {
       await client.close();
     }

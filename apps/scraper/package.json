@@ -15,8 +15,6 @@
     "scrape": "node dist/cli.js scrape",
     "scrape:autmog": "node dist/cli.js scrape:autmog",
     "process:queue": "node dist/cli.js process:queue",
-    "check": "biome check .",
-    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:ci": "vitest run",
@@ -38,7 +36,6 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
-    "@package/eslint": "workspace:*",
     "@package/tsconfig": "workspace:*",
     "tsx": "latest"
   }
