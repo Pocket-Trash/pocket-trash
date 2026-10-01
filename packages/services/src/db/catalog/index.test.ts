@@ -10,11 +10,26 @@ import {
   normalizeCollectionName,
 } from "./index.js";
 
+/**
+ * Creates a test actor.
+ *
+ * @param clerkId - Clerk user identifier for the test actor.
+ * @param role - Permission role assigned to the actor.
+ * @returns Test actor identity.
+ */
 const actor = (
   clerkId: string,
   role: "user" | "admin" | "system_admin" = "user",
 ) => ({ clerkId, role }) as const;
 
+/**
+ * Creates a representative catalog lookup through the requested service method.
+ *
+ * @param service - Catalog service under test.
+ * @param kind - Lookup kind to create.
+ * @returns Promise for the created lookup.
+ * @rejects When the selected catalog creation fails.
+ */
 function createLookup(
   service: ReturnType<typeof createCatalogService>,
   kind: "color" | "finish" | "maker" | "material",
@@ -59,17 +74,60 @@ describe("collection name normalization", () => {
   });
 });
 
+/**
+ * Creates catalog service test doubles with queued query results.
+ *
+ * @param returningRows - Queued rows returned by write statements.
+ * @param selectRows - Queued rows returned by select statements.
+ * @param spinnerUpdateError - Optional failure injected into spinner updates.
+ * @returns Test service, captured writes, and query controls.
+ */
 function setup(
   returningRows: unknown[][],
   selectRows: unknown[][],
   spinnerUpdateError?: unknown,
 ) {
-  const updates: Array<{ table: unknown; value: unknown }> = [];
-  const writes: Array<{ table: unknown; value: unknown }> = [];
+  const updates: Array<{
+    /**
+     * Table passed to the query builder.
+     */
+    table: unknown;
+    /**
+     * Values written by the query builder.
+     */
+    value: unknown;
+  }> = [];
+  const writes: Array<{
+    /**
+     * Table passed to the query builder.
+     */
+    table: unknown;
+    /**
+     * Values written by the query builder.
+     */
+    value: unknown;
+  }> = [];
+  /**
+   * Creates a chainable Drizzle query stub.
+   *
+   * @returns Chainable query stub.
+   */
   const query = () => {
+    /**
+     * Returns and removes the next queued select result.
+     *
+     * @returns Next queued select result.
+     */
     const take = async () => selectRows.shift() ?? [];
     const chain: Record<string, unknown> = {
       // biome-ignore lint/suspicious/noThenProperty: Drizzle queries are awaitable thenables.
+      /**
+       * Delegates awaitable query resolution to the next result.
+       *
+       * @param resolve - Callback receiving the next queued rows.
+       * @param reject - Callback receiving a query-stub failure.
+       * @returns Promise produced by the queued result.
+       */
       then: (
         resolve: (value: unknown[]) => unknown,
         reject: (reason: unknown) => unknown,
@@ -88,6 +146,12 @@ function setup(
     chain.limit = vi.fn(take);
     return chain;
   };
+  /**
+   * Creates a tracked update-query stub.
+   *
+   * @param table - Schema table targeted by the update.
+   * @returns Tracked update-query stub.
+   */
   const update = (table: unknown) => ({
     set: vi.fn((value: unknown) => {
       updates.push({ table, value });
@@ -1232,6 +1296,11 @@ describe("catalog image operation logging", () => {
       environment: "test",
       transports: [
         {
+          /**
+           * Captures a structured log event for assertions.
+           *
+           * @param event - Event.
+           */
           log(event) {
             events.push(event);
           },

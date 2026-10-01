@@ -2,12 +2,35 @@ import { sql } from "drizzle-orm";
 import { type resourcePayload, slugify } from "./resource-payload.js";
 import type { StorageDb } from "./types.js";
 
-type UploadCompletion = { resourceId: number; version: number };
+/** Identifies the resource version completed by an upload session. */
+type UploadCompletion = {
+  /** Resource receiving the uploaded files. */
+  resourceId: number;
+  /** Sequential version number created by the session. */
+  version: number;
+};
+
+/**
+ * Atomically creates a resource from a ready upload session.
+ *
+ * @param db - Application database.
+ * @param sessionId - Upload session UUID.
+ * @param uploaderClerkId - Clerk identifier that owns the session.
+ * @param payload - Validated resource metadata persisted with the uploaded files.
+ * @returns Created resource version, or `undefined` when the session is not completable.
+ * @rejects When category locking or resource persistence fails.
+ */
 export async function completeResource(
   db: StorageDb,
   sessionId: string,
   uploaderClerkId: string,
-  payload: Extract<ReturnType<typeof resourcePayload>, { operation: "create" }>,
+  payload: Extract<
+    ReturnType<typeof resourcePayload>,
+    {
+      /** Resource creation operation required by this completion path. */
+      operation: "create";
+    }
+  >,
 ): Promise<UploadCompletion | undefined> {
   const categories = [
     ...new Map(
@@ -136,6 +159,15 @@ export async function completeResource(
   return result.rows[0];
 }
 
+/**
+ * Atomically creates a new version from a ready upload session.
+ *
+ * @param db - Application database.
+ * @param sessionId - Upload session UUID.
+ * @param uploaderClerkId - Clerk identifier that owns the session.
+ * @returns Created resource version, or `undefined` when the session is not completable.
+ * @rejects When version persistence fails.
+ */
 export async function completeVersion(
   db: StorageDb,
   sessionId: string,

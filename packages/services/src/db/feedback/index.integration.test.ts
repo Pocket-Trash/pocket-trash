@@ -947,6 +947,12 @@ describe("feedback lifecycle", () => {
   }, 30_000);
 });
 
+/**
+ * Applies database migrations to the integration-test database.
+ *
+ * @param client - In-memory Postgres client to migrate.
+ * @rejects When migration files cannot be read or executed.
+ */
 async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
     new URL("../../../../database/drizzle", import.meta.url),

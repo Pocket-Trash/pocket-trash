@@ -34,13 +34,25 @@ import {
 } from "../audit/products.js";
 import type { UsersService } from "../users/index.js";
 
+/**
+ * Error raised for collection button already installed.
+ */
 export class CollectionButtonAlreadyInstalledError extends Error {
+  /**
+   * Creates the error reported when a button is already assigned elsewhere.
+   */
   constructor() {
     super("Collection button is already installed on another spinner.");
     this.name = "CollectionButtonAlreadyInstalledError";
   }
 }
 
+/**
+ * Returns the violated PostgreSQL unique-constraint name.
+ *
+ * @param error - Candidate error.
+ * @returns Constraint name, or `undefined` for other errors.
+ */
 function uniqueConstraint(error: unknown): string | undefined {
   const databaseError =
     error instanceof Error && error.cause !== undefined ? error.cause : error;
@@ -57,6 +69,9 @@ function uniqueConstraint(error: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Catalog name conflict messages.
+ */
 const catalogNameConflictMessages: Record<string, string> = {
   color_name_case_insensitive_unique: "Color name already exists.",
   finish_name_case_insensitive_unique: "Finish name already exists.",
@@ -64,163 +79,609 @@ const catalogNameConflictMessages: Record<string, string> = {
   materials_name_case_insensitive_unique: "Material name already exists.",
 };
 
+/**
+ * Maps catalog name conflict.
+ *
+ * @param error - Candidate error.
+ * @returns Never returns.
+ * @throws The mapped name-conflict error, or the original error when unmatched.
+ */
 function mapCatalogNameConflict(error: unknown): never {
   const message = catalogNameConflictMessages[uniqueConstraint(error) ?? ""];
   if (message) throw new Error(message);
   throw error;
 }
 
+/**
+ * Product category supported by the spinner catalog.
+ */
 export type CatalogProductType = "spinner" | "spinner-button";
 /** Durable review state for a catalog product. */
 export type ProductApprovalStatus = "approved" | "pending" | "rejected";
 /** Administrative transition accepted by the product approval workflow. */
 export type ProductApprovalAction = "approve" | "reject" | "reverse";
 
-export type CatalogLookup = { id: number; name: string; slug: string };
+/**
+ * Shared identity and routing fields for catalog reference data.
+ */
+export type CatalogLookup = {
+  /**
+   * Database identifier.
+   */
+  id: number;
+  /**
+   * Display name.
+   */
+  name: string;
+  /**
+   * URL-safe identifier.
+   */
+  slug: string;
+};
 
-export type CatalogColor = CatalogLookup & { hex: string };
+/**
+ * Catalog color lookup with its hexadecimal display value.
+ */
+export type CatalogColor = CatalogLookup & {
+  /**
+   * Hexadecimal color value.
+   */
+  hex: string;
+};
 
+/**
+ * Finish option with its effect, colors, and finish layers.
+ */
 export type CatalogFinishOption = {
+  /**
+   * Visual effect applied across the option, or `null` for none.
+   */
   colorEffect: CatalogLookup | null;
+  /**
+   * Ordered colors in the option.
+   */
   colors: CatalogColor[];
+  /**
+   * Ordered surface finishes in the option.
+   */
   finishes: CatalogLookup[];
+  /**
+   * Finish-option database identifier.
+   */
   id: number;
 };
 
+/**
+ * Authenticated actor whose permissions control catalog visibility.
+ */
 export type CatalogViewer = Actor;
 
+/**
+ * Stored catalog image metadata, ordering, and soft-deletion state.
+ */
 export type CatalogImage = {
+  /**
+   * Content type.
+   */
   contentType: string;
+  /**
+   * Created timestamp.
+   */
   createdAt: Date;
+  /**
+   * Deleted timestamp.
+   */
   deletedAt: Date | null;
+  /**
+   * Deleted by Clerk user identifier.
+   */
   deletedByClerkId: string | null;
+  /**
+   * Deleted by role.
+   */
   deletedByRole: "admin" | "owner" | null;
+  /**
+   * File name.
+   */
   fileName: string;
+  /**
+   * Image database identifier.
+   */
   id: number;
+  /**
+   * Object path.
+   */
   objectPath: string;
+  /**
+   * Display order position.
+   */
   position: number;
+  /**
+   * File size in bytes.
+   */
   size: number;
+  /**
+   * Public image URL.
+   */
   url: string;
 };
 
+/**
+ * Entity kinds that can own catalog images.
+ */
 export type CatalogImageTargetType =
   | "collection"
   | "collection_item"
   | "product";
+/**
+ * Soft-deleted image with ownership and target context for restoration.
+ */
 export type CatalogImageTrashItem = CatalogImage & {
+  /**
+   * Owner Clerk user identifier.
+   */
   ownerClerkId: string | null;
+  /**
+   * Target identifier.
+   */
   targetId: number;
+  /**
+   * Target name.
+   */
   targetName: string;
+  /**
+   * Target type.
+   */
   targetType: CatalogImageTargetType;
 };
 
+/**
+ * Ordered finish option submitted during a product write.
+ */
 export type ProductWriteFinishOption = {
+  /**
+   * Color effect identifier.
+   */
   colorEffectId: number | null;
+  /**
+   * Color identifiers.
+   */
   colorIds: number[];
+  /**
+   * Finish identifiers.
+   */
   finishIds: number[];
 };
 
-/** Catalog product returned to authorized viewers. */
+/**
+ * Fully hydrated catalog product returned to callers.
+ */
 export type CatalogProduct = {
-  /** Durable product review state. */
+  /**
+   * Durable product review state.
+   */
   approvalStatus: ProductApprovalStatus;
+  /**
+   * Bearing model or designation, or `null` when unspecified.
+   */
   bearing: string | null;
+  /**
+   * Button diameter in millimetres.
+   */
   buttonDiameterMm: string | null;
+  /**
+   * Compatible button identifier.
+   */
   compatibleButtonId: number | null;
+  /**
+   * Compatible button name.
+   */
   compatibleButtonName: string | null;
+  /**
+   * Whether the viewer may administer the record.
+   */
   canAdminister: boolean;
+  /**
+   * Whether the viewer may edit the record.
+   */
   canEdit: boolean;
+  /**
+   * Created timestamp.
+   */
   createdAt: Date;
+  /**
+   * Product description, or `null` when absent.
+   */
   description: string | null;
+  /**
+   * Diameter in millimetres.
+   */
   diameterMm: string | null;
+  /**
+   * Configured finish choices with their colors and effects.
+   */
   finishOptions: CatalogFinishOption[];
+  /**
+   * Number of attached images.
+   */
   imageCount: number;
+  /**
+   * Images ordered for display.
+   */
   images: CatalogImage[];
+  /**
+   * Database identifier.
+   */
   id: number;
+  /**
+   * Length in millimetres.
+   */
   lengthMm: string | null;
+  /**
+   * Maker identifier.
+   */
   makerId: number;
+  /**
+   * Maker name.
+   */
   makerName: string;
+  /**
+   * Maker product URL.
+   */
   makerProductUrl: string | null;
+  /**
+   * Whether the maker product URL has passed validation.
+   */
   makerProductUrlValid: boolean;
+  /**
+   * Maker URL.
+   */
   makerUrl: string | null;
-  materials: Array<{ id: number; name: string; slug: string }>;
+  /**
+   * Materials assigned to the product.
+   */
+  materials: Array<{
+    /**
+     * Database identifier.
+     */
+    id: number;
+    /**
+     * Display name.
+     */
+    name: string;
+    /**
+     * URL-safe identifier.
+     */
+    slug: string;
+  }>;
+  /**
+   * Display name.
+   */
   name: string;
+  /**
+   * Owner Clerk user identifier.
+   */
   ownerClerkId: string | null;
+  /**
+   * Whether the record is private.
+   */
   isPrivate: boolean;
+  /**
+   * Whether staff forced the record private.
+   */
   isAdminPrivate: boolean;
+  /**
+   * Whether the viewer owns the record.
+   */
   isOwner?: boolean;
+  /**
+   * Product type identifier.
+   */
   productTypeId: number;
+  /**
+   * Product type name.
+   */
   productTypeName: string;
+  /**
+   * Product type slug.
+   */
   productTypeSlug: string;
+  /**
+   * URL-safe identifier.
+   */
   slug: string;
+  /**
+   * Spin diameter in millimetres.
+   */
   spinDiameterMm: string | null;
+  /**
+   * Thickness in millimetres.
+   */
   thicknessMm: string | null;
+  /**
+   * Thickness with button in millimetres.
+   */
   thicknessWithButtonMm: string | null;
+  /**
+   * Updated timestamp.
+   */
   updatedAt: Date;
+  /**
+   * Weight in grams.
+   */
   weightG: string | null;
+  /**
+   * Width in millimetres.
+   */
   widthMm: string | null;
 };
 
+/**
+ * Validated fields accepted when creating or updating a catalog product.
+ */
 export type ProductWriteInput = {
+  /**
+   * Authenticated actor.
+   */
   actor: Actor;
+  /**
+   * Optional description.
+   */
   description?: string | null;
+  /**
+   * Maker identifier.
+   */
   makerId: number;
+  /**
+   * Maker product URL.
+   */
   makerProductUrl?: string | null;
+  /**
+   * Finish options.
+   */
   finishOptions: ProductWriteFinishOption[];
+  /**
+   * Material identifiers.
+   */
   materialIds: number[];
+  /**
+   * Display name.
+   */
   name: string;
+  /**
+   * Product type slug.
+   */
   productTypeSlug: CatalogProductType;
+  /**
+   * Administrative reason for the operation.
+   */
   reason?: string;
+  /**
+   * URL-safe identifier.
+   */
   slug: string;
+  /**
+   * Product measurements and compatibility fields.
+   */
   specs: {
+    /**
+     * Bearing.
+     */
     bearing?: string | null;
+    /**
+     * Button diameter in millimetres.
+     */
     buttonDiameterMm?: string | null;
+    /**
+     * Compatible button identifier.
+     */
     compatibleButtonId?: number | null;
+    /**
+     * Diameter in millimetres.
+     */
     diameterMm?: string | null;
+    /**
+     * Length in millimetres.
+     */
     lengthMm?: string | null;
+    /**
+     * Spin diameter in millimetres.
+     */
     spinDiameterMm?: string | null;
+    /**
+     * Thickness in millimetres.
+     */
     thicknessMm?: string | null;
+    /**
+     * Thickness with button in millimetres.
+     */
     thicknessWithButtonMm?: string | null;
+    /**
+     * Weight in grams.
+     */
     weightG?: string | null;
+    /**
+     * Width in millimetres.
+     */
     widthMm?: string | null;
   };
 };
 
-/** Authorized catalog product and lookup operations. */
+/**
+ * Catalog reads and audited mutations exposed to application callers.
+ */
 export type CatalogService = {
+  /**
+   * Attaches images.
+   *
+   * @param input - Target, uploaded files, and authenticated actor.
+   * @returns Completion after the images are attached.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   attachImages(input: {
+    /**
+     * Image-owning catalog entity.
+     */
     target: UploadTarget;
+    /**
+     * Uploaded image files.
+     */
     files: UploadedFile[];
+    /**
+     * Authenticated actor.
+     */
     actor: UploadActor;
+    /**
+     * Administrative reason for the operation.
+     */
     reason?: string;
   }): Promise<void>;
+  /**
+   * Selects collection cover.
+   *
+   * @param input - Collection, selected image, and authenticated actor.
+   * @returns Completion after the cover selection is stored.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   selectCollectionCover(input: {
+    /**
+     * Collection identifier.
+     */
     collectionId: number;
+    /**
+     * Image identifier.
+     */
     imageId: number | null;
+    /**
+     * Authenticated actor.
+     */
     actor: UploadActor;
+    /**
+     * Administrative reason for the operation.
+     */
     reason?: string;
   }): Promise<void>;
+  /**
+   * Creates color.
+   *
+   * @param input - Color name, slug, hex value, and authenticated actor.
+   * @returns Created color.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   createColor(input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Hexadecimal color value.
+     */
     hex: string;
+    /**
+     * Display name.
+     */
     name: string;
+    /**
+     * URL-safe identifier.
+     */
     slug: string;
   }): Promise<CatalogColor>;
+  /**
+   * Creates finish.
+   *
+   * @param input - Finish name, slug, and authenticated actor.
+   * @returns Created finish.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   createFinish(input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Display name.
+     */
     name: string;
+    /**
+     * URL-safe identifier.
+     */
     slug: string;
   }): Promise<CatalogLookup>;
+  /**
+   * Creates maker.
+   *
+   * @param input - Maker name, optional root URL, and authenticated actor.
+   * @returns Created maker.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   createMaker(input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Display name.
+     */
     name: string;
+    /**
+     * Root URL.
+     */
     rootUrl: string | null;
-  }): Promise<{ id: number; name: string; rootUrl: string | null }>;
-  createMaterial(input: {
-    actor: Actor;
+  }): Promise<{
+    /**
+     * Database identifier.
+     */
+    id: number;
+    /**
+     * Display name.
+     */
     name: string;
+    /**
+     * Root URL.
+     */
+    rootUrl: string | null;
+  }>;
+  /**
+   * Creates material.
+   *
+   * @param input - Material name, slug, and authenticated actor.
+   * @returns Created material.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
+  createMaterial(input: {
+    /**
+     * Authenticated actor.
+     */
+    actor: Actor;
+    /**
+     * Display name.
+     */
+    name: string;
+    /**
+     * URL-safe identifier.
+     */
     slug: string;
-  }): Promise<{ id: number; name: string; slug: string }>;
+  }): Promise<{
+    /**
+     * Database identifier.
+     */
+    id: number;
+    /**
+     * Display name.
+     */
+    name: string;
+    /**
+     * URL-safe identifier.
+     */
+    slug: string;
+  }>;
+  /**
+   * Creates product.
+   *
+   * @param input - Product fields, finish options, and authenticated actor.
+   * @returns Created product.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   createProduct(input: ProductWriteInput): Promise<CatalogProduct>;
   /**
    * Applies one authorized product approval transition.
@@ -239,162 +700,656 @@ export type CatalogService = {
     /** Nonblank reason for the decision. */
     reason: string;
   }): Promise<ProductApprovalStatus>;
+  /**
+   * Returns product.
+   *
+   * @param productTypeSlug - Product type slug.
+   * @param productSlug - Product slug.
+   * @param viewer - Optional catalog viewer.
+   * @returns Matching product, when available.
+   * @rejects When product data cannot be queried.
+   */
   getProduct(
     productTypeSlug: string,
     productSlug: string,
     viewer?: CatalogViewer,
   ): Promise<CatalogProduct | null>;
+  /**
+   * Lists color effects.
+   *
+   * @returns Matching color effects.
+   * @rejects When the database query or operation logging fails.
+   */
   listColorEffects(): Promise<CatalogLookup[]>;
+  /**
+   * Lists colors.
+   *
+   * @returns Matching colors.
+   * @rejects When the database query or operation logging fails.
+   */
   listColors(): Promise<CatalogColor[]>;
+  /**
+   * Lists finishes.
+   *
+   * @returns Matching finishes.
+   * @rejects When the database query or operation logging fails.
+   */
   listFinishes(): Promise<CatalogLookup[]>;
+  /**
+   * Lists makers.
+   *
+   * @returns Matching makers.
+   * @rejects When the database query fails.
+   */
   listMakers(): Promise<
-    Array<{ id: number; name: string; rootUrl: string | null }>
+    Array<{
+      /**
+       * Database identifier.
+       */
+      id: number;
+      /**
+       * Display name.
+       */
+      name: string;
+      /**
+       * Root URL.
+       */
+      rootUrl: string | null;
+    }>
   >;
-  listMaterials(): Promise<Array<{ id: number; name: string; slug: string }>>;
+  /**
+   * Lists materials.
+   *
+   * @returns Matching materials.
+   * @rejects When the database query fails.
+   */
+  listMaterials(): Promise<
+    Array<{
+      /**
+       * Database identifier.
+       */
+      id: number;
+      /**
+       * Display name.
+       */
+      name: string;
+      /**
+       * URL-safe identifier.
+       */
+      slug: string;
+    }>
+  >;
+  /**
+   * Lists products.
+   *
+   * @param productTypeSlug - Product type slug.
+   * @param viewer - Optional catalog viewer.
+   * @returns Matching products.
+   * @rejects When product data cannot be queried.
+   */
   listProducts(
     productTypeSlug?: string,
     viewer?: CatalogViewer,
   ): Promise<CatalogProduct[]>;
+  /**
+   * Lists product types.
+   *
+   * @returns Matching product types.
+   * @rejects When the database query fails.
+   */
   listProductTypes(): Promise<
-    Array<{ id: number; name: string; slug: string }>
+    Array<{
+      /**
+       * Database identifier.
+       */
+      id: number;
+      /**
+       * Display name.
+       */
+      name: string;
+      /**
+       * URL-safe identifier.
+       */
+      slug: string;
+    }>
   >;
+  /**
+   * Lists slugs.
+   *
+   * @param productTypeSlug - Product type slug.
+   * @param exceptProductId - Except product identifier.
+   * @returns Matching slugs.
+   * @rejects When the database query fails.
+   */
   listSlugs(
     productTypeSlug: string,
     exceptProductId?: number,
   ): Promise<string[]>;
-  listImageTrash(input: { actor: Actor }): Promise<CatalogImageTrashItem[]>;
+  /**
+   * Lists image trash.
+   *
+   * @param input - Actor whose visible deleted images should be listed.
+   * @returns Matching image trash.
+   * @rejects When the database query fails.
+   */
+  listImageTrash(input: {
+    /**
+     * Authenticated actor.
+     */
+    actor: Actor;
+  }): Promise<CatalogImageTrashItem[]>;
+  /**
+   * Restores image.
+   *
+   * @param input - Actor, deleted image, target type, and optional moderation reason.
+   * @returns Completion after the image is restored.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   restoreImage(input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Image identifier.
+     */
     imageId: number;
+    /**
+     * Administrative reason for the operation.
+     */
     reason?: string;
+    /**
+     * Target type.
+     */
     targetType: CatalogImageTargetType;
   }): Promise<void>;
+  /**
+   * Soft-deletes image.
+   *
+   * @param input - Actor, image, target type, and optional moderation reason.
+   * @returns Completion after the image is moved to trash.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   softDeleteImage(input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Image identifier.
+     */
     imageId: number;
+    /**
+     * Administrative reason for the operation.
+     */
     reason?: string;
+    /**
+     * Target type.
+     */
     targetType: CatalogImageTargetType;
   }): Promise<void>;
+  /**
+   * Sets product visibility.
+   *
+   * @param input - Product visibility update and actor context.
+   * @returns Completion after product visibility is stored.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   setVisibility(input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Whether the record is private.
+     */
     isPrivate: boolean;
+    /**
+     * Product identifier.
+     */
     productId: number;
+    /**
+     * Administrative reason for the operation.
+     */
     reason?: string;
   }): Promise<void>;
+  /**
+   * Sets maker product URL validity.
+   *
+   * @param input - Product, validity decision, actor, and optional moderation reason.
+   * @returns Completion after URL validity is stored.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   setMakerProductUrlValidity(input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Whether the maker product URL is considered valid.
+     */
     makerProductUrlValid: boolean;
+    /**
+     * Product identifier.
+     */
     productId: number;
+    /**
+     * Administrative reason for the operation.
+     */
     reason?: string;
   }): Promise<void>;
+  /**
+   * Updates product.
+   *
+   * @param input - Product identifier and replacement catalog fields.
+   * @returns Updated product.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   updateProduct(
-    input: ProductWriteInput & { productId: number },
+    input: ProductWriteInput & {
+      /**
+       * Product identifier.
+       */
+      productId: number;
+    },
   ): Promise<CatalogProduct>;
 };
 
+/**
+ * Owned collection item with its product snapshot and visibility state.
+ */
 export type UserCollectionItem = {
+  /**
+   * Effective bearing after applying the collection-item override.
+   */
   bearing: string | null;
+  /**
+   * Bearing override.
+   */
   bearingOverride: string | null;
+  /**
+   * Whether the viewer may administer the record.
+   */
   canAdminister: boolean;
+  /**
+   * Whether the viewer may edit the record.
+   */
   canEdit: boolean;
+  /**
+   * Collection is private.
+   */
   collectionIsPrivate: boolean;
+  /**
+   * Collection identifier.
+   */
   collectionId: number;
+  /**
+   * Collection name.
+   */
   collectionName: string;
+  /**
+   * Collection item identifier.
+   */
   collectionItemId: number;
+  /**
+   * Display name.
+   */
   displayName: string;
+  /**
+   * Effective description after applying the collection-item override.
+   */
   description: string | null;
+  /**
+   * Description override.
+   */
   descriptionOverride: string | null;
+  /**
+   * Finish option.
+   */
   finishOption: CatalogFinishOption | null;
+  /**
+   * Number of attached images.
+   */
   imageCount: number;
+  /**
+   * Images ordered for display.
+   */
   images: CatalogImage[];
+  /**
+   * Whether the record is private.
+   */
   isPrivate: boolean;
+  /**
+   * Whether staff forced the record private.
+   */
   isAdminPrivate: boolean;
+  /**
+   * Whether the viewer owns the record.
+   */
   isOwner?: boolean;
+  /**
+   * Installed button identifier.
+   */
   installedButtonId: number | null;
+  /**
+   * Maker identifier.
+   */
   makerId: number;
+  /**
+   * Maker name.
+   */
   makerName: string;
+  /**
+   * Maker URL.
+   */
   makerUrl: string | null;
+  /**
+   * Selected material, or `null` when none is assigned.
+   */
   material: CatalogLookup | null;
+  /**
+   * Display name.
+   */
   name: string;
+  /**
+   * Owner Clerk user identifier.
+   */
   ownerClerkId: string;
+  /**
+   * Owner username.
+   */
   ownerUsername: string | null;
+  /**
+   * Owner database user identifier.
+   */
   ownerUserId: number;
+  /**
+   * Product identifier.
+   */
   productId: number;
+  /**
+   * Product slug.
+   */
   productSlug: string;
+  /**
+   * Product type name.
+   */
   productTypeName: string;
+  /**
+   * Product type slug.
+   */
   productTypeSlug: CatalogProductType;
+  /**
+   * Source product finish option identifier.
+   */
   sourceProductFinishOptionId: number | null;
+  /**
+   * Product images.
+   */
   productImages: CatalogImage[];
 };
 
+/**
+ * Public owner identity and aggregate collection counts.
+ */
 export type PublicCollectionOwner = {
+  /**
+   * Visible collections owned by the user.
+   */
   collections: UserCollectionSummary[];
+  /**
+   * Number of visible collection items.
+   */
   itemCount: number;
+  /**
+   * Visible collection items owned by the user.
+   */
   items: UserCollectionItem[];
+  /**
+   * User identifier.
+   */
   userId: number;
+  /**
+   * Username.
+   */
   username: string;
 };
 
+/**
+ * Collection metadata and counts visible to the current viewer.
+ */
 export type UserCollectionSummary = {
+  /**
+   * Whether the viewer may administer the record.
+   */
   canAdminister?: boolean;
+  /**
+   * Whether the viewer may edit the record.
+   */
   canEdit?: boolean;
+  /**
+   * Cover image.
+   */
   coverImage: CatalogImage | null;
+  /**
+   * Cover images.
+   */
   coverImages: CatalogImage[];
+  /**
+   * Created timestamp.
+   */
   createdAt: Date;
+  /**
+   * Optional description.
+   */
   description: string | null;
+  /**
+   * Database identifier.
+   */
   id: number;
+  /**
+   * Whether staff forced the record private.
+   */
   isAdminPrivate: boolean;
+  /**
+   * Whether the viewer owns the record.
+   */
   isOwner?: boolean;
+  /**
+   * Whether the record is private.
+   */
   isPrivate: boolean;
+  /**
+   * Number of visible collection items.
+   */
   itemCount: number;
+  /**
+   * Display name.
+   */
   name: string;
+  /**
+   * Owner database user identifier.
+   */
   ownerUserId: number;
+  /**
+   * Updated timestamp.
+   */
   updatedAt: Date;
 };
 
+/**
+ * Editable collection name, description, and visibility.
+ */
 export type CollectionWriteInput = {
+  /**
+   * Optional description.
+   */
   description: string | null;
+  /**
+   * Whether the record is private.
+   */
   isPrivate: boolean;
+  /**
+   * Display name.
+   */
   name: string;
+  /**
+   * Administrative reason for the operation.
+   */
   reason?: string;
 };
 
 /** Database operations for user collections and their catalog items. */
 export type CollectionsService = {
+  /**
+   * Adds a spinner and optional button to a collection.
+   *
+   * @param input - Collection, spinner, optional button, overrides, and actor.
+   * @returns Identifiers of the created spinner and optional button items.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   addSpinner(input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Bearing.
+     */
     bearing?: string | null;
+    /**
+     * Button custom finish.
+     */
     buttonCustomFinish: ProductWriteFinishOption | null;
+    /**
+     * Button finish option identifier.
+     */
     buttonFinishOptionId: number | null;
+    /**
+     * Button material identifier.
+     */
     buttonMaterialId: number | null;
+    /**
+     * Button product identifier.
+     */
     buttonProductId: number | null;
+    /**
+     * Spinner finish option identifier.
+     */
     spinnerFinishOptionId: number | null;
+    /**
+     * Spinner custom finish.
+     */
     spinnerCustomFinish: ProductWriteFinishOption | null;
+    /**
+     * Spinner material identifier.
+     */
     spinnerMaterialId: number;
+    /**
+     * Spinner product identifier.
+     */
     spinnerProductId: number;
+    /**
+     * Collection identifier.
+     */
     collectionId?: number | null;
+    /**
+     * Display name.
+     */
     displayName: string;
+    /**
+     * Optional description.
+     */
     description?: string | null;
+    /**
+     * New collection.
+     */
     newCollection?: CollectionWriteInput | null;
-  }): Promise<{ buttonItemId: number | null; spinnerItemId: number }>;
+  }): Promise<{
+    /**
+     * Button item identifier.
+     */
+    buttonItemId: number | null;
+    /**
+     * Spinner item identifier.
+     */
+    spinnerItemId: number;
+  }>;
+  /**
+   * Adds a spinner button to a collection.
+   *
+   * @param input - Collection item, button product, overrides, and actor.
+   * @returns Identifier of the created button item.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   addSpinnerButton(input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Custom finish.
+     */
     customFinish: ProductWriteFinishOption | null;
+    /**
+     * Finish option identifier.
+     */
     finishOptionId: number | null;
+    /**
+     * Material identifier.
+     */
     materialId: number;
+    /**
+     * Product identifier.
+     */
     productId: number;
+    /**
+     * Collection identifier.
+     */
     collectionId?: number | null;
+    /**
+     * Display name.
+     */
     displayName: string;
+    /**
+     * Optional description.
+     */
     description?: string | null;
+    /**
+     * New collection.
+     */
     newCollection?: CollectionWriteInput | null;
   }): Promise<number>;
+  /**
+   * Creates collection.
+   *
+   * @param input - Collection values and authenticated actor.
+   * @returns Created collection.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   createCollection(
     input: CollectionWriteInput & {
+      /**
+       * Authenticated actor.
+       */
       actor: Actor;
     },
   ): Promise<UserCollectionSummary>;
+  /**
+   * Counts owned products.
+   *
+   * @param input - Actor and candidate product identifiers.
+   * @returns Owned-item counts keyed by requested product identifier.
+   * @rejects When the required catalog data cannot be queried.
+   */
   countOwnedProducts(input: {
+    /**
+     * Actor Clerk user identifier.
+     */
     actorClerkId: string;
+    /**
+     * Product identifiers.
+     */
     productIds: number[];
   }): Promise<Record<number, number>>;
   /**
@@ -402,6 +1357,7 @@ export type CollectionsService = {
    *
    * @param input - Authorized deletion request.
    * @returns Completion after the transaction commits.
+   * @rejects When authorization, persistence, audit writing, or operation logging fails.
    */
   deleteCollection(input: {
     /** Actor requesting deletion. */
@@ -413,12 +1369,14 @@ export type CollectionsService = {
     /** Required moderation reason when acting for another user. */
     reason?: string;
   }): Promise<void>;
+
   /**
    * Loads valid deletion destinations and the affected item count.
    *
    * @param actor - Actor requesting the deletion choices.
    * @param collectionId - Collection being considered for deletion.
    * @returns Deletion context, or null when the collection is inaccessible.
+   * @rejects When the user lookup or database query fails.
    */
   getDeletionContext(
     actor: Actor,
@@ -429,66 +1387,257 @@ export type CollectionsService = {
     /** Number of items affected by deletion. */
     itemCount: number;
   } | null>;
+  /**
+   * Returns owned item.
+   *
+   * @param actor - Authenticated actor.
+   * @param collectionItemId - Collection item identifier.
+   * @returns Matching owned item, when available.
+   * @rejects When the database query fails.
+   */
   getOwnedItem(
     actor: Actor,
     collectionItemId: number,
   ): Promise<UserCollectionItem | null>;
+  /**
+   * Returns default collection name.
+   *
+   * @param actorClerkId - Actor clerk identifier.
+   * @returns Default collection name synthesized from the owner's username.
+   * @rejects When the user profile is incomplete or the database query fails.
+   */
   getDefaultCollectionName(actorClerkId: string): Promise<string>;
+  /**
+   * Returns owned collection.
+   *
+   * @param actor - Authenticated actor.
+   * @param collectionId - Collection identifier.
+   * @returns Matching owned collection, when available.
+   * @rejects When the user lookup or database query fails.
+   */
   getOwnedCollection(
     actor: Actor,
     collectionId: number,
   ): Promise<UserCollectionSummary | null>;
+  /**
+   * Returns public collection.
+   *
+   * @param input - Owner, collection, and optional viewer context.
+   * @returns Matching public collection, when available.
+   * @rejects When the database query fails.
+   */
   getPublicCollection(input: {
+    /**
+     * Collection identifier.
+     */
     collectionId: number;
+    /**
+     * Owner database user identifier.
+     */
     ownerUserId: number;
+    /**
+     * Optional viewer used to apply visibility rules.
+     */
     viewer?: CatalogViewer;
   }): Promise<UserCollectionSummary | null>;
+  /**
+   * Returns public item.
+   *
+   * @param input - Owner, collection item, collection, and optional viewer context.
+   * @returns Matching public item, when available.
+   * @rejects When the required catalog data cannot be queried.
+   */
   getPublicItem(input: {
+    /**
+     * Collection item identifier.
+     */
     collectionItemId: number;
+    /**
+     * Collection identifier.
+     */
     collectionId: number;
+    /**
+     * Owner database user identifier.
+     */
     ownerUserId: number;
+    /**
+     * Optional viewer used to apply visibility rules.
+     */
     viewer?: CatalogViewer;
   }): Promise<UserCollectionItem | null>;
+  /**
+   * Lists collection items owned by the actor.
+   *
+   * @param actor - Authenticated actor.
+   * @param collectionId - Collection identifier.
+   * @returns Owned collection items visible to the actor.
+   * @rejects When the required catalog data cannot be queried.
+   */
   listOwned(actor: Actor, collectionId?: number): Promise<UserCollectionItem[]>;
+  /**
+   * Lists owned collections.
+   *
+   * @param actor - Authenticated actor.
+   * @returns Matching owned collections.
+   * @rejects When the required catalog data cannot be queried.
+   */
   listOwnedCollections(actor: Actor): Promise<UserCollectionSummary[]>;
+  /**
+   * Lists product items.
+   *
+   * @param productId - Product identifier.
+   * @param viewer - Optional catalog viewer.
+   * @returns Matching product items.
+   * @rejects When the required catalog data cannot be queried.
+   */
   listProductItems(
     productId: number,
     viewer?: CatalogViewer,
   ): Promise<UserCollectionItem[]>;
+  /**
+   * Lists owners with public collections or items.
+   *
+   * @param viewer - Optional catalog viewer.
+   * @returns Matching owners.
+   * @rejects When the required catalog data cannot be queried.
+   */
   listOwners(viewer?: CatalogViewer): Promise<PublicCollectionOwner[]>;
+  /**
+   * Sets collection visibility.
+   *
+   * @param input - Collection, visibility state, actor, and optional moderation reason.
+   * @returns Completion after collection visibility is stored.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   setCollectionVisibility(input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Collection identifier.
+     */
     collectionId: number;
+    /**
+     * Whether the record is private.
+     */
     isPrivate: boolean;
+    /**
+     * Administrative reason for the operation.
+     */
     reason?: string;
   }): Promise<void>;
+  /**
+   * Sets item visibility.
+   *
+   * @param input - Collection item, visibility state, actor, and optional moderation reason.
+   * @returns Completion after item visibility is stored.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   setItemVisibility(input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Collection item identifier.
+     */
     collectionItemId: number;
+    /**
+     * Whether the record is private.
+     */
     isPrivate: boolean;
+    /**
+     * Administrative reason for the operation.
+     */
     reason?: string;
   }): Promise<void>;
+  /**
+   * Updates item.
+   *
+   * @param input - Collection item, editable overrides, and authenticated actor.
+   * @returns Completion after the collection item is updated.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   updateItem(input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Bearing.
+     */
     bearing?: string | null;
+    /**
+     * Collection identifier.
+     */
     collectionId?: number;
+    /**
+     * Collection item identifier.
+     */
     collectionItemId: number;
+    /**
+     * Custom finish.
+     */
     customFinish: ProductWriteFinishOption | null;
+    /**
+     * Finish option identifier.
+     */
     finishOptionId: number | null;
+    /**
+     * Display name.
+     */
     displayName: string;
+    /**
+     * Optional description.
+     */
     description?: string | null;
+    /**
+     * Installed button.
+     */
     installedButton?: {
+      /**
+       * Collection item identifier.
+       */
       collectionItemId: number;
+      /**
+       * Custom finish.
+       */
       customFinish: ProductWriteFinishOption | null;
+      /**
+       * Finish option identifier.
+       */
       finishOptionId: number | null;
+      /**
+       * Material identifier.
+       */
       materialId: number;
     } | null;
+    /**
+     * Material identifier.
+     */
     materialId: number;
+    /**
+     * Administrative reason for the operation.
+     */
     reason?: string;
   }): Promise<void>;
+  /**
+   * Updates collection.
+   *
+   * @param input - Collection identifier, replacement values, and authenticated actor.
+   * @returns Updated collection.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
   updateCollection(
     input: CollectionWriteInput & {
+      /**
+       * Authenticated actor.
+       */
       actor: Actor;
+      /**
+       * Collection identifier.
+       */
       collectionId: number;
     },
   ): Promise<UserCollectionSummary>;
@@ -510,6 +1659,12 @@ export function createCatalogService(
   audit?: AuditService,
 ): CatalogService {
   return {
+    /**
+     * Attaches images.
+     *
+     * @param input - Target, uploaded files, and authenticated actor.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async attachImages(input) {
       const collectionDependencies = requireCollectionAudit(
         users,
@@ -580,6 +1735,12 @@ export function createCatalogService(
         actorAttributes(input.actor.clerkId),
       );
     },
+    /**
+     * Selects collection cover.
+     *
+     * @param input - Collection, selected image, and authenticated actor.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async selectCollectionCover(input) {
       const dependencies = requireCollectionAudit(users, audit, "collection");
       if (!dependencies) throw new Error("Collection audit is not configured.");
@@ -622,6 +1783,13 @@ export function createCatalogService(
         actorAttributes(input.actor.clerkId),
       );
     },
+    /**
+     * Creates color.
+     *
+     * @param input - Color name, slug, hex value, and authenticated actor.
+     * @returns Created color.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async createColor(input) {
       if (!hasPermission(input.actor, "products.manage"))
         throw new Error("Product does not exist.");
@@ -667,6 +1835,13 @@ export function createCatalogService(
         actorAttributes(input.actor.clerkId, { slug: input.slug }),
       );
     },
+    /**
+     * Creates finish.
+     *
+     * @param input - Finish name, slug, and authenticated actor.
+     * @returns Created finish.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async createFinish(input) {
       if (!hasPermission(input.actor, "products.manage"))
         throw new Error("Product does not exist.");
@@ -711,6 +1886,13 @@ export function createCatalogService(
         actorAttributes(input.actor.clerkId, { slug: input.slug }),
       );
     },
+    /**
+     * Creates maker.
+     *
+     * @param input - Maker name, optional root URL, and authenticated actor.
+     * @returns Created maker.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async createMaker(input) {
       if (!hasPermission(input.actor, "products.manage"))
         throw new Error("Product does not exist.");
@@ -755,6 +1937,13 @@ export function createCatalogService(
         actorAttributes(input.actor.clerkId),
       );
     },
+    /**
+     * Creates material.
+     *
+     * @param input - Material name, slug, and authenticated actor.
+     * @returns Created material.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async createMaterial(input) {
       if (!hasPermission(input.actor, "products.manage"))
         throw new Error("Product does not exist.");
@@ -802,6 +1991,13 @@ export function createCatalogService(
         actorAttributes(input.actor.clerkId, { slug: input.slug }),
       );
     },
+    /**
+     * Creates product.
+     *
+     * @param input - Product fields, finish options, and authenticated actor.
+     * @returns Created product.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async createProduct(input) {
       const dependencies = requireProductAudit(users, audit);
       const actorUser = dependencies
@@ -902,6 +2098,15 @@ export function createCatalogService(
         productAttributes(input),
       );
     },
+    /**
+     * Returns product.
+     *
+     * @param productTypeSlug - Product type slug.
+     * @param productSlug - Product slug.
+     * @param viewer - Optional catalog viewer.
+     * @returns Matching product, when available.
+     * @rejects When product data cannot be queried.
+     */
     async getProduct(productTypeSlug, productSlug, viewer) {
       const products = await queryProducts(
         db,
@@ -955,6 +2160,12 @@ export function createCatalogService(
         actorAttributes(input.actor.clerkId, { productId: input.productId }),
       );
     },
+    /**
+     * Lists makers.
+     *
+     * @returns Matching makers.
+     * @rejects When the database query fails.
+     */
     async listMakers() {
       return await db
         .select({
@@ -965,6 +2176,12 @@ export function createCatalogService(
         .from(schema.maker)
         .orderBy(asc(schema.maker.name));
     },
+    /**
+     * Lists color effects.
+     *
+     * @returns Matching color effects.
+     * @rejects When the database query or operation logging fails.
+     */
     async listColorEffects() {
       return await logger.operation(
         loggerMessages.database.catalog.listColorEffects,
@@ -979,6 +2196,12 @@ export function createCatalogService(
             .orderBy(asc(schema.colorEffect.name)),
       );
     },
+    /**
+     * Lists colors.
+     *
+     * @returns Matching colors.
+     * @rejects When the database query or operation logging fails.
+     */
     async listColors() {
       return await logger.operation(
         loggerMessages.database.catalog.listColors,
@@ -994,6 +2217,12 @@ export function createCatalogService(
             .orderBy(asc(schema.color.name)),
       );
     },
+    /**
+     * Lists finishes.
+     *
+     * @returns Matching finishes.
+     * @rejects When the database query or operation logging fails.
+     */
     async listFinishes() {
       return await logger.operation(
         loggerMessages.database.catalog.listFinishes,
@@ -1008,6 +2237,12 @@ export function createCatalogService(
             .orderBy(asc(schema.finish.name)),
       );
     },
+    /**
+     * Lists materials.
+     *
+     * @returns Matching materials.
+     * @rejects When the database query fails.
+     */
     async listMaterials() {
       return await db
         .select({
@@ -1018,9 +2253,23 @@ export function createCatalogService(
         .from(schema.material)
         .orderBy(asc(schema.material.name));
     },
+    /**
+     * Lists products.
+     *
+     * @param productTypeSlug - Product type slug.
+     * @param viewer - Optional catalog viewer.
+     * @returns Matching products.
+     * @rejects When product data cannot be queried.
+     */
     async listProducts(productTypeSlug, viewer) {
       return await queryProducts(db, productTypeSlug, undefined, viewer);
     },
+    /**
+     * Lists product types.
+     *
+     * @returns Matching product types.
+     * @rejects When the database query fails.
+     */
     async listProductTypes() {
       return await db
         .select({
@@ -1031,6 +2280,14 @@ export function createCatalogService(
         .from(schema.productType)
         .orderBy(asc(schema.productType.name));
     },
+    /**
+     * Lists slugs.
+     *
+     * @param productTypeSlug - Product type slug.
+     * @param exceptProductId - Except product identifier.
+     * @returns Matching slugs.
+     * @rejects When the database query fails.
+     */
     async listSlugs(productTypeSlug, exceptProductId) {
       const conditions = [eq(schema.productType.slug, productTypeSlug)];
       if (exceptProductId !== undefined) {
@@ -1046,9 +2303,22 @@ export function createCatalogService(
         .where(and(...conditions));
       return rows.map(({ slug }) => slug);
     },
+    /**
+     * Lists image trash.
+     *
+     * @param input - Actor whose visible deleted images should be listed.
+     * @returns Matching image trash.
+     * @rejects When the database query fails.
+     */
     async listImageTrash(input) {
       return await listCatalogImageTrash(db, input);
     },
+    /**
+     * Restores image.
+     *
+     * @param input - Actor, deleted image, target type, and optional moderation reason.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async restoreImage(input) {
       if (input.targetType === "product") {
         const dependencies = requireProductAudit(users, audit);
@@ -1103,6 +2373,12 @@ export function createCatalogService(
         });
       });
     },
+    /**
+     * Sets product visibility.
+     *
+     * @param input - Product visibility update and actor context.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async setVisibility(input) {
       const dependencies = requireProductAudit(users, audit);
       const actorUser = dependencies
@@ -1170,6 +2446,12 @@ export function createCatalogService(
         }
       });
     },
+    /**
+     * Sets maker product URL validity.
+     *
+     * @param input - Product, validity decision, actor, and optional moderation reason.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async setMakerProductUrlValidity(input) {
       if (!hasPermission(input.actor, "products.manage"))
         throw new Error("Product does not exist.");
@@ -1228,6 +2510,12 @@ export function createCatalogService(
         },
       );
     },
+    /**
+     * Soft-deletes image.
+     *
+     * @param input - Actor, image, target type, and optional moderation reason.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async softDeleteImage(input) {
       if (input.targetType === "product") {
         const dependencies = requireProductAudit(users, audit);
@@ -1282,6 +2570,13 @@ export function createCatalogService(
         });
       });
     },
+    /**
+     * Updates product.
+     *
+     * @param input - Product identifier and replacement catalog fields.
+     * @returns Updated product.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async updateProduct(input) {
       const dependencies = requireProductAudit(users, audit);
       const actorUser = dependencies
@@ -1445,6 +2740,13 @@ export function createCollectionsService(
   logger: Logger,
 ): CollectionsService {
   return {
+    /**
+     * Creates collection.
+     *
+     * @param input - Collection values and authenticated actor.
+     * @returns Created collection.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async createCollection(input) {
       return await logger.operation(
         loggerMessages.database.collections.create,
@@ -1481,6 +2783,13 @@ export function createCollectionsService(
         actorAttributes(input.actor.clerkId),
       );
     },
+    /**
+     * Adds a spinner and optional button to a collection.
+     *
+     * @param input - Collection, spinner, optional button, overrides, and actor.
+     * @returns Identifiers of the created spinner and optional button items.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async addSpinner(input) {
       return await logger.operation(
         loggerMessages.database.collections.addSpinner,
@@ -1624,6 +2933,13 @@ export function createCollectionsService(
         }),
       );
     },
+    /**
+     * Adds a spinner button to a collection.
+     *
+     * @param input - Collection item, button product, overrides, and actor.
+     * @returns Identifier of the created button item.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async addSpinnerButton(input) {
       return await logger.operation(
         loggerMessages.database.collections.addSpinnerButton,
@@ -1699,7 +3015,15 @@ export function createCollectionsService(
         actorAttributes(input.actor.clerkId, { productId: input.productId }),
       );
     },
-    async countOwnedProducts({ actorClerkId, productIds }) {
+    /**
+     * Counts owned products.
+     *
+     * @param input - Actor and product identifiers to count.
+     * @returns Owned-item counts keyed by requested product identifier.
+     * @rejects When the user lookup or database query fails.
+     */
+    async countOwnedProducts(input) {
+      const { actorClerkId, productIds } = input;
       if (!productIds.length) return {};
       const owner = await users.getByClerkId(actorClerkId);
       if (!owner) return {};
@@ -1742,7 +3066,7 @@ export function createCollectionsService(
      *
      * @param input - Authorized deletion request.
      * @returns Completion after the transaction commits.
-     * @throws When the source or destination is inaccessible.
+     * @rejects When a collection is inaccessible or persistence, audit writing, or operation logging fails.
      */
     async deleteCollection(input) {
       await logger.operation(
@@ -1864,6 +3188,7 @@ export function createCollectionsService(
      * @param actor - Actor requesting the deletion choices.
      * @param collectionId - Collection being considered for deletion.
      * @returns Deletion context, or null when the collection is inaccessible.
+     * @rejects When the user lookup or database query fails.
      */
     async getDeletionContext(actor, collectionId) {
       const canManage = hasPermission(actor, "collections.manage");
@@ -1894,6 +3219,14 @@ export function createCollectionsService(
         itemCount: Number(itemCountRows[0]?.itemCount ?? 0),
       };
     },
+    /**
+     * Returns owned item.
+     *
+     * @param actor - Authenticated actor.
+     * @param collectionItemId - Collection item identifier.
+     * @returns Matching owned item, when available.
+     * @rejects When the database query fails.
+     */
     async getOwnedItem(actor, collectionItemId) {
       const canManage = hasPermission(actor, "collections.manage");
       return (
@@ -1911,6 +3244,13 @@ export function createCollectionsService(
         )[0] ?? null
       );
     },
+    /**
+     * Returns default collection name.
+     *
+     * @param actorClerkId - Actor clerk identifier.
+     * @returns Default collection name synthesized from the owner's username.
+     * @rejects When the user profile is incomplete or the database query fails.
+     */
     async getDefaultCollectionName(actorClerkId) {
       const [owner] = await db
         .select({ username: schema.user.username })
@@ -1922,6 +3262,14 @@ export function createCollectionsService(
       }
       return `${owner.username}'s Collection`;
     },
+    /**
+     * Returns owned collection.
+     *
+     * @param actor - Authenticated actor.
+     * @param collectionId - Collection identifier.
+     * @returns Matching owned collection, when available.
+     * @rejects When the user lookup or database query fails.
+     */
     async getOwnedCollection(actor, collectionId) {
       const canManage = hasPermission(actor, "collections.manage");
       const owner = await users.getByClerkId(actor.clerkId);
@@ -1938,7 +3286,15 @@ export function createCollectionsService(
         )[0] ?? null
       );
     },
-    async getPublicCollection({ collectionId, ownerUserId, viewer }) {
+    /**
+     * Returns public collection.
+     *
+     * @param input - Public collection lookup and optional viewer.
+     * @returns Matching public collection, when available.
+     * @rejects When the database query fails.
+     */
+    async getPublicCollection(input) {
+      const { collectionId, ownerUserId, viewer } = input;
       return (
         (
           await queryCollections(db, {
@@ -1951,12 +3307,15 @@ export function createCollectionsService(
         )[0] ?? null
       );
     },
-    async getPublicItem({
-      collectionId,
-      collectionItemId,
-      ownerUserId,
-      viewer,
-    }) {
+    /**
+     * Returns public item.
+     *
+     * @param input - Public collection-item lookup.
+     * @returns Matching public item, when available.
+     * @rejects When the required catalog data cannot be queried.
+     */
+    async getPublicItem(input) {
+      const { collectionId, collectionItemId, ownerUserId, viewer } = input;
       return (
         (
           await queryOwnedItems(db, undefined, collectionItemId, {
@@ -1969,6 +3328,14 @@ export function createCollectionsService(
         )[0] ?? null
       );
     },
+    /**
+     * Lists collection items owned by the actor.
+     *
+     * @param actor - Authenticated actor.
+     * @param collectionId - Collection identifier.
+     * @returns Owned collection items visible to the actor.
+     * @rejects When the required catalog data cannot be queried.
+     */
     async listOwned(actor, collectionId) {
       return await queryOwnedItems(db, actor.clerkId, undefined, {
         collectionId,
@@ -1977,6 +3344,13 @@ export function createCollectionsService(
         viewerCanManage: hasPermission(actor, "collections.manage"),
       });
     },
+    /**
+     * Lists owned collections.
+     *
+     * @param actor - Authenticated actor.
+     * @returns Matching owned collections.
+     * @rejects When the required catalog data cannot be queried.
+     */
     async listOwnedCollections(actor) {
       const owner = await users.getByClerkId(actor.clerkId);
       if (!owner) return [];
@@ -1987,6 +3361,14 @@ export function createCollectionsService(
         viewerCanManage: hasPermission(actor, "collections.manage"),
       });
     },
+    /**
+     * Lists product items.
+     *
+     * @param productId - Product identifier.
+     * @param viewer - Optional catalog viewer.
+     * @returns Matching product items.
+     * @rejects When the required catalog data cannot be queried.
+     */
     async listProductItems(productId, viewer) {
       return await queryOwnedItems(db, undefined, undefined, {
         productId,
@@ -1995,6 +3377,13 @@ export function createCollectionsService(
         viewerCanManage: hasPermission(viewer, "collections.manage"),
       });
     },
+    /**
+     * Lists owners with public collections or items.
+     *
+     * @param viewer - Optional catalog viewer.
+     * @returns Matching owners.
+     * @rejects When the required catalog data cannot be queried.
+     */
     async listOwners(viewer) {
       const [items, collections] = await Promise.all([
         queryOwnedItems(db, undefined, undefined, {
@@ -2037,6 +3426,12 @@ export function createCollectionsService(
         })
         .sort((left, right) => left.username.localeCompare(right.username));
     },
+    /**
+     * Sets collection visibility.
+     *
+     * @param input - Collection, visibility state, actor, and optional moderation reason.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async setCollectionVisibility(input) {
       const canManage = hasPermission(input.actor, "collections.manage");
       const actorUser = await users.getByClerkId(input.actor.clerkId);
@@ -2097,6 +3492,13 @@ export function createCollectionsService(
         });
       });
     },
+    /**
+     * Updates collection.
+     *
+     * @param input - Collection identifier, replacement values, and authenticated actor.
+     * @returns Updated collection.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async updateCollection(input) {
       return await logger.operation(
         loggerMessages.database.collections.update,
@@ -2196,6 +3598,12 @@ export function createCollectionsService(
         }),
       );
     },
+    /**
+     * Sets item visibility.
+     *
+     * @param input - Collection item, visibility state, actor, and optional moderation reason.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async setItemVisibility(input) {
       const canManage = hasPermission(input.actor, "collections.manage");
       const actorUser = await users.getByClerkId(input.actor.clerkId);
@@ -2248,6 +3656,12 @@ export function createCollectionsService(
         });
       });
     },
+    /**
+     * Updates item.
+     *
+     * @param input - Collection item, editable overrides, and authenticated actor.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
     async updateItem(input) {
       await logger.operation(
         loggerMessages.database.collections.updateItem,
@@ -2493,10 +3907,23 @@ export function createCollectionsService(
   };
 }
 
+/**
+ * Loads ownership context for a collection image target.
+ *
+ * @param db - Application database.
+ * @param target - Collection or collection-item upload target to resolve.
+ * @returns Collection ownership context, or `null` when the target is unavailable.
+ * @rejects When the database query fails.
+ */
 async function collectionImageTargetContext(
   db: Pick<Database, "select">,
   target: UploadTarget,
-): Promise<{ ownerUserId: number } | null> {
+): Promise<{
+  /**
+   * Owner database user identifier.
+   */
+  ownerUserId: number;
+} | null> {
   if (target.type === "collection") {
     const [row] = await db
       .select({ ownerUserId: schema.userCollection.ownerId })
@@ -2516,6 +3943,14 @@ async function collectionImageTargetContext(
   return null;
 }
 
+/**
+ * Loads ownership context for a product image target.
+ *
+ * @param db - Application database.
+ * @param target - Product upload target to resolve.
+ * @returns Product ownership context, or `null` when the target is unavailable.
+ * @rejects When the database query fails.
+ */
 async function productImageTargetContext(
   db: Pick<Database, "select">,
   target: UploadTarget,
@@ -2533,6 +3968,14 @@ async function productImageTargetContext(
   return row ?? null;
 }
 
+/**
+ * Loads audit-safe state for a collection image target.
+ *
+ * @param db - Application database.
+ * @param target - Collection image target whose state is being audited.
+ * @returns Audit-safe collection image state.
+ * @rejects When the database query fails.
+ */
 async function collectionImageState(
   db: Pick<Database, "select">,
   target: UploadTarget,
@@ -2567,6 +4010,14 @@ async function collectionImageState(
   return {};
 }
 
+/**
+ * Loads ownership and state for a collection-item image.
+ *
+ * @param db - Application database.
+ * @param imageId - Image identifier.
+ * @returns Collection-item image context, or `null` when unavailable.
+ * @rejects When the database query fails.
+ */
 async function collectionItemImageContext(
   db: Pick<Database, "select">,
   imageId: number,
@@ -2586,6 +4037,14 @@ async function collectionItemImageContext(
   return row ?? null;
 }
 
+/**
+ * Loads ownership and state for a product image.
+ *
+ * @param db - Application database.
+ * @param imageId - Image identifier.
+ * @returns Product image context, or `null` when unavailable.
+ * @rejects When the database query fails.
+ */
 async function productImageContext(
   db: Pick<Database, "select">,
   imageId: number,
@@ -2607,6 +4066,15 @@ async function productImageContext(
   return row ?? null;
 }
 
+/**
+ * Requires collection audit.
+ *
+ * @param users - User service.
+ * @param audit - Audit service.
+ * @param targetType - Target type.
+ * @returns Configured audit dependencies, or `null` for non-collection targets.
+ * @throws When collection auditing is only partially configured or unavailable.
+ */
 function requireCollectionAudit(
   users: UsersService | undefined,
   audit: AuditService | undefined,
@@ -2617,6 +4085,14 @@ function requireCollectionAudit(
   return { audit, users };
 }
 
+/**
+ * Requires product audit.
+ *
+ * @param users - User service.
+ * @param audit - Audit service.
+ * @returns Configured audit dependencies, or `null` when auditing is disabled.
+ * @throws When product auditing is only partially configured.
+ */
 function requireProductAudit(
   users: UsersService | undefined,
   audit: AuditService | undefined,
@@ -2626,6 +4102,12 @@ function requireProductAudit(
   return { audit, users };
 }
 
+/**
+ * Selects the product fields allowed in audit payloads.
+ *
+ * @param product - Product.
+ * @returns Audit-safe product state.
+ */
 function productAuditState(product: CatalogProduct): AuditJsonObject {
   return {
     bearing: product.bearing,
@@ -2659,10 +4141,24 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
   };
 }
 
+/**
+ * Raises the shared hidden-product error.
+ *
+ * @returns Never returns.
+ * @throws The shared hidden-product error.
+ */
 function failProductLoad(): never {
   throw new Error("Failed to load product audit state.");
 }
 
+/**
+ * Builds a case-insensitive collection-name key.
+ *
+ * Trims whitespace, removes diacritics and punctuation, and lowercases letters.
+ *
+ * @param name - Display name to convert into a comparison key.
+ * @returns Normalized collection name.
+ */
 export function normalizeCollectionName(name: string) {
   return name
     .trim()
@@ -2672,6 +4168,13 @@ export function normalizeCollectionName(name: string) {
     .replace(/[^\p{L}\p{N}]/gu, "");
 }
 
+/**
+ * Validates and normalizes collection values.
+ *
+ * @param input - Raw collection name, description, and visibility.
+ * @returns Trimmed collection values and a normalized name.
+ * @throws When the name or description violates collection constraints.
+ */
 function validatedCollectionValues(input: CollectionWriteInput) {
   const name = input.name.trim();
   const nameLength = [...name].length;
@@ -2687,6 +4190,15 @@ function validatedCollectionValues(input: CollectionWriteInput) {
   return { description, name, normalizedName };
 }
 
+/**
+ * Creates a user collection within the caller transaction.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param ownerId - Owner identifier.
+ * @param input - Validated collection fields to insert.
+ * @returns Identifier of the created collection.
+ * @rejects When collection values are invalid or insertion fails.
+ */
 async function insertCollection(
   tx: CatalogTransaction,
   ownerId: number,
@@ -2704,11 +4216,28 @@ async function insertCollection(
   return collection.id;
 }
 
+/**
+ * Resolves collection for write.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param input - Existing or new collection choice and owner identifier.
+ * @returns Existing collection identifier or one created in the transaction.
+ * @rejects When choices conflict, a selection is inaccessible, a default is ambiguous, a profile is incomplete, or persistence fails.
+ */
 async function resolveCollectionForWrite(
   tx: CatalogTransaction,
   input: {
+    /**
+     * Collection identifier.
+     */
     collectionId: number | null;
+    /**
+     * New collection.
+     */
     newCollection: CollectionWriteInput | null;
+    /**
+     * Owner identifier.
+     */
     ownerId: number;
   },
 ) {
@@ -2764,6 +4293,13 @@ async function resolveCollectionForWrite(
   };
 }
 
+/**
+ * Updates a collection modification timestamp.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param collectionId - Collection identifier.
+ * @rejects When the database update fails.
+ */
 async function touchCollection(tx: CatalogTransaction, collectionId: number) {
   await tx
     .update(schema.userCollection)
@@ -2771,14 +4307,40 @@ async function touchCollection(tx: CatalogTransaction, collectionId: number) {
     .where(eq(schema.userCollection.id, collectionId));
 }
 
+/**
+ * Lists collections visible to the requested viewer.
+ *
+ * @param db - Application database.
+ * @param options - Collection identity, owner, privacy, and viewer filters.
+ * @returns Collections visible to the viewer.
+ * @rejects When the database query fails.
+ */
 async function queryCollections(
   db: Database,
   options: {
+    /**
+     * Collection identifier.
+     */
     collectionId?: number;
+    /**
+     * Include private.
+     */
     includePrivate?: boolean;
+    /**
+     * Owner database user identifier.
+     */
     ownerUserId?: number;
+    /**
+     * Public only.
+     */
     publicOnly?: boolean;
+    /**
+     * Viewer Clerk user identifier.
+     */
     viewerClerkId?: string;
+    /**
+     * Viewer can manage.
+     */
     viewerCanManage?: boolean;
   } = {},
 ): Promise<UserCollectionSummary[]> {
@@ -2908,13 +4470,35 @@ async function queryCollections(
   }));
 }
 
+/**
+ * Updates collection item snapshot.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param input - Item identifier and replacement product snapshot.
+ * @rejects When validation or the database update fails.
+ */
 async function updateCollectionItemSnapshot(
   tx: CatalogTransaction,
   input: {
+    /**
+     * Collection item identifier.
+     */
     collectionItemId: number;
+    /**
+     * Custom finish.
+     */
     customFinish: ProductWriteFinishOption | null;
+    /**
+     * Finish option identifier.
+     */
     finishOptionId: number | null;
+    /**
+     * Material identifier.
+     */
     materialId: number;
+    /**
+     * Product identifier.
+     */
     productId: number;
   },
 ) {
@@ -2953,6 +4537,7 @@ async function updateCollectionItemSnapshot(
  * @param productSlug - Optional product slug filter.
  * @param viewer - Optional viewer controlling private and review visibility.
  * @returns Visible catalog products in display order.
+ * @rejects When the database query fails.
  */
 async function queryProducts(
   db: Database,
@@ -3123,6 +4708,14 @@ async function queryProducts(
   return result;
 }
 
+/**
+ * Loads product images.
+ *
+ * @param db - Application database.
+ * @param products - Products.
+ * @param viewer - Optional catalog viewer.
+ * @rejects When the required catalog data cannot be queried.
+ */
 async function loadProductImages(
   db: Database,
   products: CatalogProduct[],
@@ -3173,6 +4766,13 @@ async function loadProductImages(
   }
 }
 
+/**
+ * Loads finish options.
+ *
+ * @param db - Application database.
+ * @param products - Products.
+ * @rejects When the required catalog data cannot be queried.
+ */
 async function loadFinishOptions(db: Database, products: CatalogProduct[]) {
   if (!products.length) return;
 
@@ -3212,12 +4812,32 @@ async function loadFinishOptions(db: Database, products: CatalogProduct[]) {
   }
 }
 
+/**
+ * Loads finish option components.
+ *
+ * @param db - Application database.
+ * @param options - Finish-option identities and effects to hydrate.
+ * @returns Matching finish option components, when available.
+ * @rejects When the required catalog data cannot be queried.
+ */
 async function loadFinishOptionComponents(
   db: Database,
   options: Array<{
+    /**
+     * Color effect identifier.
+     */
     colorEffectId: number | null;
+    /**
+     * Color effect name.
+     */
     colorEffectName: string | null;
+    /**
+     * Color effect slug.
+     */
     colorEffectSlug: string | null;
+    /**
+     * Database identifier.
+     */
     id: number;
   }>,
 ): Promise<Map<number, CatalogFinishOption>> {
@@ -3286,18 +4906,40 @@ async function loadFinishOptionComponents(
  * @param collectionItemId - Optional collection item identifier.
  * @param options - Visibility, owner, collection, and product filters.
  * @returns Matching collection items with effective product data.
+ * @rejects When the database query fails.
  */
 async function queryOwnedItems(
   db: Database,
   actorClerkId?: string,
   collectionItemId?: number,
   options: {
+    /**
+     * Collection identifier.
+     */
     collectionId?: number;
+    /**
+     * Include private.
+     */
     includePrivate?: boolean;
+    /**
+     * Owner database user identifier.
+     */
     ownerUserId?: number;
+    /**
+     * Product identifier.
+     */
     productId?: number;
+    /**
+     * Public only.
+     */
     publicOnly?: boolean;
+    /**
+     * Viewer Clerk user identifier.
+     */
     viewerClerkId?: string;
+    /**
+     * Viewer can manage.
+     */
     viewerCanManage?: boolean;
   } = {},
 ): Promise<UserCollectionItem[]> {
@@ -3489,6 +5131,15 @@ async function queryOwnedItems(
   return items;
 }
 
+/**
+ * Loads collection images.
+ *
+ * @param db - Application database.
+ * @param items - Items.
+ * @param viewerClerkId - Viewer clerk identifier.
+ * @param includePrivate - Include private.
+ * @rejects When the required catalog data cannot be queried.
+ */
 async function loadCollectionImages(
   db: Database,
   items: UserCollectionItem[],
@@ -3561,26 +5212,83 @@ async function loadCollectionImages(
   }
 }
 
+/**
+ * Maps a stored image row to its catalog representation.
+ *
+ * @param row - Row.
+ * @returns Catalog image representation.
+ */
 function toCatalogImage(row: {
+  /**
+   * Content type.
+   */
   contentType: string;
+  /**
+   * Created timestamp.
+   */
   createdAt: Date;
+  /**
+   * Deleted timestamp.
+   */
   deletedAt: Date | null;
+  /**
+   * Deleted by Clerk user identifier.
+   */
   deletedByClerkId: string | null;
+  /**
+   * Deleted by role.
+   */
   deletedByRole: "admin" | "owner" | null;
+  /**
+   * File name.
+   */
   fileName: string;
+  /**
+   * Database identifier.
+   */
   id: number;
+  /**
+   * Object path.
+   */
   objectPath: string;
+  /**
+   * Display order position.
+   */
   position: number;
+  /**
+   * File size in bytes.
+   */
   size: number;
+  /**
+   * Public image URL.
+   */
   url: string;
 }): CatalogImage {
   return row;
 }
 
+/**
+ * Builds privacy and moderation fields for a visibility update.
+ *
+ * @param input - Visibility, actor ownership, moderation state, and reason.
+ * @returns Visibility, ownership, and moderation fields to persist.
+ */
 function privacyUpdate(input: {
+  /**
+   * Actor Clerk user identifier.
+   */
   actorClerkId: string;
+  /**
+   * Actor is moderating.
+   */
   actorIsModerating: boolean;
+  /**
+   * Whether the record is private.
+   */
   isPrivate: boolean;
+  /**
+   * Administrative reason for the operation.
+   */
   reason?: string;
 }) {
   return input.isPrivate
@@ -3600,11 +5308,28 @@ function privacyUpdate(input: {
       };
 }
 
+/**
+ * Soft-deletes catalog image.
+ *
+ * @param db - Application database.
+ * @param input - Actor, image identifier, and image target type.
+ * @returns `true` after deletion, or `false` when the image was already deleted.
+ * @rejects When authorization or a database query or update fails.
+ */
 async function softDeleteCatalogImage(
   db: Pick<Database, "select" | "update">,
   input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Image identifier.
+     */
     imageId: number;
+    /**
+     * Target type.
+     */
     targetType: CatalogImageTargetType;
   },
 ) {
@@ -3668,11 +5393,27 @@ async function softDeleteCatalogImage(
   return true;
 }
 
+/**
+ * Restores catalog image.
+ *
+ * @param db - Application database.
+ * @param input - Actor, image identifier, and image target type.
+ * @rejects When authorization or a database query or update fails.
+ */
 async function restoreCatalogImage(
   db: Pick<Database, "select" | "update">,
   input: {
+    /**
+     * Authenticated actor.
+     */
     actor: Actor;
+    /**
+     * Image identifier.
+     */
     imageId: number;
+    /**
+     * Target type.
+     */
     targetType: CatalogImageTargetType;
   },
 ) {
@@ -3728,11 +5469,28 @@ async function restoreCatalogImage(
     .where(eq(schema.collectionItemImage.id, input.imageId));
 }
 
+/**
+ * Verifies that an actor may restore a deleted image.
+ *
+ * @param image - Image.
+ * @param actor - Authenticated actor.
+ * @param permission - Permission.
+ * @throws When the image is missing or inaccessible to the actor.
+ */
 function assertCanRestoreImage(
   image:
     | {
+        /**
+         * Deleted by Clerk user identifier.
+         */
         deletedByClerkId: string | null;
+        /**
+         * Deleted by role.
+         */
         deletedByRole: "admin" | "owner" | null;
+        /**
+         * Owner Clerk user identifier.
+         */
         ownerClerkId: string | null;
       }
     | undefined,
@@ -3752,9 +5510,22 @@ function assertCanRestoreImage(
   }
 }
 
+/**
+ * Lists catalog image trash.
+ *
+ * @param db - Application database.
+ * @param input - Actor whose visible deleted images should be returned.
+ * @returns Matching catalog image trash.
+ * @rejects When the required catalog data cannot be queried.
+ */
 async function listCatalogImageTrash(
   db: Database,
-  input: { actor: Actor },
+  input: {
+    /**
+     * Authenticated actor.
+     */
+    actor: Actor;
+  },
 ): Promise<CatalogImageTrashItem[]> {
   const { actor } = input;
   const [products, collectionItems] = await Promise.all([
@@ -3857,8 +5628,19 @@ async function listCatalogImageTrash(
   );
 }
 
+/**
+ * Caller-owned database transaction used for atomic catalog writes.
+ */
 type CatalogTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
+/**
+ * Validates product material.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param productId - Product identifier.
+ * @param materialId - Material identifier.
+ * @rejects When the material is not assigned to the product or the query fails.
+ */
 async function assertProductMaterial(
   tx: CatalogTransaction,
   productId: number,
@@ -3877,6 +5659,15 @@ async function assertProductMaterial(
   if (!row) throw new Error("Material is not available for this product.");
 }
 
+/**
+ * Copies a product finish option onto a collection item.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param productId - Product identifier.
+ * @param sourceFinishOptionId - Source finish option identifier.
+ * @param collectionItemId - Collection item identifier.
+ * @rejects When the source option is missing or the database write fails.
+ */
 async function copyProductFinishOption(
   tx: CatalogTransaction,
   productId: number,
@@ -3943,12 +5734,31 @@ async function copyProductFinishOption(
   }
 }
 
+/**
+ * Creates collection finish option.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param input - Collection item and source or custom finish values.
+ * @rejects When the finish values are invalid or the database write fails.
+ */
 async function createCollectionFinishOption(
   tx: CatalogTransaction,
   input: {
+    /**
+     * Collection item identifier.
+     */
     collectionItemId: number;
+    /**
+     * Custom finish.
+     */
     customFinish: ProductWriteFinishOption | null;
+    /**
+     * Product finish option identifier.
+     */
     productFinishOptionId: number | null;
+    /**
+     * Product identifier.
+     */
     productId: number;
   },
 ) {
@@ -3999,6 +5809,14 @@ async function createCollectionFinishOption(
   }
 }
 
+/**
+ * Replaces every finish option assigned to a product.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param productId - Product identifier.
+ * @param options - Replacement finish definitions in display order.
+ * @rejects When an option is invalid or a database write fails.
+ */
 async function replaceProductFinishOptions(
   tx: CatalogTransaction,
   productId: number,
@@ -4038,6 +5856,13 @@ async function replaceProductFinishOptions(
   }
 }
 
+/**
+ * Validates finish options.
+ *
+ * @param db - Application database.
+ * @param options - Finish definitions whose references and structure are checked.
+ * @rejects When an option is invalid or the reference query fails.
+ */
 async function validateFinishOptions(
   db: Pick<Database, "select">,
   options: ProductWriteFinishOption[],
@@ -4061,6 +5886,13 @@ async function validateFinishOptions(
   assertValidFinishOptions(options, effects);
 }
 
+/**
+ * Validates finish-option structure and referenced color effects.
+ *
+ * @param options - Finish definitions to validate for completeness and uniqueness.
+ * @param effects - Referenced effects with the slugs that govern color rules.
+ * @throws When an option is incomplete or incompatible with its color effect.
+ */
 export function assertValidFinishOptions(
   options: ProductWriteFinishOption[],
   effects: Array<Pick<CatalogLookup, "id" | "slug">>,
@@ -4107,6 +5939,12 @@ export function assertValidFinishOptions(
   }
 }
 
+/**
+ * Selects spinner-specific product specifications.
+ *
+ * @param specs - Product specifications to map into spinner columns.
+ * @returns Spinner specification columns.
+ */
 function spinnerSpecs(specs: ProductWriteInput["specs"]) {
   return {
     ...(specs.bearing !== undefined
@@ -4125,14 +5963,32 @@ function spinnerSpecs(specs: ProductWriteInput["specs"]) {
   };
 }
 
+/**
+ * Trims optional text and collapses blank input to `null`.
+ *
+ * @param value - Optional text to normalize.
+ * @returns Trimmed text, or `null` when absent or blank.
+ */
 function normalizeOptionalText(value: string | null | undefined) {
   return value?.trim() || null;
 }
 
+/**
+ * Trims an optional URL and removes trailing slashes.
+ *
+ * @param value - Optional URL to normalize.
+ * @returns URL without trailing slashes, or `null` when absent or blank.
+ */
 function normalizeOptionalUrl(value: string | null | undefined) {
   return value?.trim().replace(/\/+$/, "") || null;
 }
 
+/**
+ * Collapses an absent or whitespace-only description to `null`.
+ *
+ * @param value - Optional description to inspect.
+ * @returns The original nonblank description, otherwise `null`.
+ */
 function normalizeOptionalDescription(value: string | null | undefined) {
   return value?.trim() ? value : null;
 }
@@ -4155,6 +6011,12 @@ function nextProductApprovalStatus(
   throw new Error("Product approval transition is invalid.");
 }
 
+/**
+ * Selects spinner-button product specifications.
+ *
+ * @param specs - Product specifications to map into spinner-button columns.
+ * @returns Spinner-button specification columns.
+ */
 function buttonSpecs(specs: ProductWriteInput["specs"]) {
   return {
     diameterMm: specs.diameterMm ?? null,
@@ -4163,6 +6025,13 @@ function buttonSpecs(specs: ProductWriteInput["specs"]) {
   };
 }
 
+/**
+ * Adds a hashed actor identifier to log attributes.
+ *
+ * @param actorClerkId - Actor clerk identifier.
+ * @param attributes - Safe fields to attach to the operation log.
+ * @returns Log attributes containing the hashed actor identifier.
+ */
 function actorAttributes(
   actorClerkId: string,
   attributes: Record<string, unknown> = {},
@@ -4175,6 +6044,12 @@ function actorAttributes(
   };
 }
 
+/**
+ * Builds structured log attributes for a product mutation.
+ *
+ * @param input - Product fields used to build safe operation-log attributes.
+ * @returns Structured product-mutation log attributes.
+ */
 function productAttributes(input: ProductWriteInput) {
   return actorAttributes(input.actor.clerkId, {
     finishOptionCount: input.finishOptions.length,
