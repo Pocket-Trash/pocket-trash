@@ -1,10 +1,15 @@
-import type { CatalogProduct, UserCollectionItem } from "@package/services";
+import type {
+  CatalogProduct,
+  UserCollectionItem,
+  UserCollectionSummary,
+} from "@package/services";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
   CollectionAddPage,
   CollectionEditPage,
+  CollectionFormPage,
   CollectionProductFields,
   collectionEditSubmissionMode,
   FinishOptionsEditor,
@@ -45,6 +50,38 @@ const emptyCatalogOptions = {
   productTypes: [],
   spinnerButtons: [],
 };
+
+describe("collection deletion choices", () => {
+  it("renders all outcomes with the affected item count", () => {
+    const collection: UserCollectionSummary = {
+      canAdminister: false,
+      canEdit: true,
+      coverImage: null,
+      coverImages: [],
+      createdAt: new Date(0),
+      description: null,
+      id: 1000,
+      isAdminPrivate: false,
+      isOwner: true,
+      isPrivate: false,
+      itemCount: 2,
+      name: "Source",
+      ownerUserId: 1000,
+      updatedAt: new Date(0),
+    };
+    const html = renderToStaticMarkup(
+      createElement(CollectionFormPage, {
+        collection,
+        deletion: { destinations: [], itemCount: 2 },
+      }),
+    );
+
+    expect(html).toContain('value="archive"');
+    expect(html).toContain('value="delete"');
+    expect(html).toContain('value="move"');
+    expect(html).toContain("Collection items: 2");
+  });
+});
 
 describe("finish option editor", () => {
   it("renders removable components and accessible ordering controls", () => {

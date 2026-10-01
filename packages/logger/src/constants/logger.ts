@@ -86,6 +86,7 @@ export const loggerMessages = {
       addSpinner: "database.collections.addSpinner",
       addSpinnerButton: "database.collections.addSpinnerButton",
       create: "database.collections.create",
+      delete: "database.collections.delete",
       update: "database.collections.update",
       updateItem: "database.collections.updateItem",
     },
