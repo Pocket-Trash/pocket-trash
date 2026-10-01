@@ -11,7 +11,7 @@ export const Route = createFileRoute("/resources/$resourceId_/versions/new")({
   /**
    * Requires authentication before entering the resource-version upload route.
    *
-   * @rejects When an unauthenticated visitor is redirected to sign in.
+   * @rejects When authentication cannot be checked or an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     const { isAuthenticated } = await getAuthState();

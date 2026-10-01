@@ -8,7 +8,7 @@ export const Route = createFileRoute("/admin")({
   /**
    * Requires administrator access before entering the route tree.
    *
-   * @rejects When the current user lacks administrator access.
+   * @rejects When authorization cannot be checked or the current user lacks administrator access.
    */
   beforeLoad: async () => {
     if (!(await hasAdminAccess())) throw notFound();

@@ -31,7 +31,7 @@ export const Route = createFileRoute("/collections/add")({
   /**
    * Requires authentication before entering the collections add route.
    *
-   * @rejects When an unauthenticated visitor is redirected to sign in.
+   * @rejects When authentication cannot be checked or an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     if (!(await getAuthState()).isAuthenticated) {

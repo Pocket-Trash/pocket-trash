@@ -9,7 +9,7 @@ export const Route = createFileRoute("/admin/trash/catalog-images")({
   /**
    * Requires catalog administration access before entering the route.
    *
-   * @rejects When the current user lacks catalog administration access.
+   * @rejects When authorization cannot be checked or the current user lacks catalog administration access.
    */
   beforeLoad: async () => {
     if (!(await isCatalogAdmin())) throw redirect({ to: "/" });

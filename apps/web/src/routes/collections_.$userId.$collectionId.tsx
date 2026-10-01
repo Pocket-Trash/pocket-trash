@@ -10,24 +10,24 @@ import { CollectionPage } from "@/pages/catalog-pages";
 export const Route = createFileRoute("/collections_/$userId/$collectionId")({
   params: {
     /**
-     * Parses serialized route parameters into typed identifiers.
+     * Converts the public collection identifiers from the URL to numbers.
      *
      * @param context - Route callback context.
      * @param context.collectionId - Collection identifier.
      * @param context.userId - User identifier.
-     * @returns Typed route parameters.
+     * @returns The numeric user and collection identifiers.
      */
     parse: ({ collectionId, userId }) => ({
       collectionId: Number(collectionId),
       userId: Number(userId),
     }),
     /**
-     * Serializes typed route identifiers for URL generation.
+     * Serializes the numeric public collection identifiers for URL generation.
      *
      * @param context - Route callback context.
      * @param context.collectionId - Collection identifier.
      * @param context.userId - User identifier.
-     * @returns Serialized route parameters.
+     * @returns The user and collection identifiers serialized for the URL.
      */
     stringify: ({ collectionId, userId }) => ({
       collectionId: String(collectionId),

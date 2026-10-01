@@ -9,7 +9,7 @@ export const Route = createFileRoute("/sign-in/$")({
   /**
    * Redirects authenticated visitors away from the sign-in route.
    *
-   * @rejects When an authenticated visitor is redirected home.
+   * @rejects When authentication cannot be checked or an authenticated visitor is redirected home.
    */
   beforeLoad: async () => {
     const { isAuthenticated } = await getAuthState();

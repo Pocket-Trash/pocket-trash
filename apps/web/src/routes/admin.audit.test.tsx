@@ -1,19 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Hoisted can read audit test mock.
+ * Controls whether audit route tests authorize the current actor.
  */
 const canReadAudit = vi.hoisted(() => vi.fn());
 /**
- * Hoisted get admin audit export test mock.
+ * Supplies export state to audit route tests.
  */
 const getAdminAuditExport = vi.hoisted(() => vi.fn());
 /**
- * Hoisted get audit delivery failures test mock.
+ * Supplies delivery failures to audit route tests.
  */
 const getAuditDeliveryFailures = vi.hoisted(() => vi.fn());
 /**
- * Hoisted list admin audit events test mock.
+ * Supplies filtered audit events to audit route tests.
  */
 const listAdminAuditEvents = vi.hoisted(() => vi.fn());
 

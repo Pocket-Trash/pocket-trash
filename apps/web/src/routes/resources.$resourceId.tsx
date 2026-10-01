@@ -4,17 +4,17 @@ import { getResourceDetail } from "@/lib/resources";
 import { ResourceDetailPage } from "@/pages/resource-detail-page";
 
 /**
- * Shows one publicly readable resource.
+ * Shows one resource visible to the current viewer.
  */
 export const Route = createFileRoute("/resources/$resourceId")({
   component: ResourceRoute,
   /**
-   * Loads a public resource detail from its identifier.
+   * Loads a viewer-visible resource detail from its identifier.
    *
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
-   * @returns The publicly readable resource detail.
-   * @rejects When the public resource cannot be loaded.
+   * @returns The resource detail visible to the current viewer.
+   * @rejects When the visible resource cannot be loaded.
    */
   loader: async ({ params }) => {
     const detail = await getResourceDetail({

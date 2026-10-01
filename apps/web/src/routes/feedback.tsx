@@ -8,7 +8,7 @@ export const Route = createFileRoute("/feedback")({
   /**
    * Requires authentication before entering the feedback route.
    *
-   * @rejects When an unauthenticated visitor is redirected to sign in.
+   * @rejects When authentication cannot be checked or an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     if (!(await getAuthState()).isAuthenticated) {

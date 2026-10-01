@@ -3,12 +3,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { listCompletedFeedback } from "@/lib/feedback";
 import { CompletedFeedbackPage } from "@/pages/feedback-pages";
 
-/** Completed feedback route definition. */
+/** Shows completed feedback to authenticated users. */
 export const Route = createFileRoute("/feedback/completed")({
   /**
-   * Loads completed feedback.
+   * Loads the first page of completed feedback.
    *
-   * @returns Completed feedback loader data.
+   * @returns The first page of completed feedback.
+   * @rejects When completed feedback cannot be loaded.
    */
   loader: async () =>
     await listCompletedFeedback({ data: { offset: 0, search: "" } }),

@@ -10,7 +10,7 @@ export const Route = createFileRoute("/products/add")({
   /**
    * Requires authentication before entering the products add route.
    *
-   * @rejects When an unauthenticated visitor is redirected to sign in.
+   * @rejects When authentication cannot be checked or an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     if (!(await getAuthState()).isAuthenticated) {

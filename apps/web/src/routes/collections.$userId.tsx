@@ -8,19 +8,19 @@ import { PublicCollectionPage } from "@/pages/catalog-pages";
 export const Route = createFileRoute("/collections/$userId")({
   params: {
     /**
-     * Parses serialized route parameters into typed identifiers.
+     * Converts the user identifier from the URL to a number.
      *
      * @param context - Route callback context.
      * @param context.userId - User identifier.
-     * @returns Typed route parameters.
+     * @returns The numeric user identifier.
      */
     parse: ({ userId }) => ({ userId: Number(userId) }),
     /**
-     * Serializes typed route identifiers for URL generation.
+     * Serializes the numeric user identifier for URL generation.
      *
      * @param context - Route callback context.
      * @param context.userId - User identifier.
-     * @returns Serialized route parameters.
+     * @returns The user identifier serialized for the URL.
      */
     stringify: ({ userId }) => ({ userId: String(userId) }),
   },

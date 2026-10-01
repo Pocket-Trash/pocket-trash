@@ -9,21 +9,21 @@ import { CollectionEditPage } from "@/pages/catalog-form-pages";
 export const Route = createFileRoute("/collections/edit/$collectionItemId")({
   params: {
     /**
-     * Parses serialized route parameters into typed identifiers.
+     * Converts the collection-item identifier from the URL to a number.
      *
      * @param context - Route callback context.
      * @param context.collectionItemId - Collection item identifier.
-     * @returns Typed route parameters.
+     * @returns The numeric collection-item identifier.
      */
     parse: ({ collectionItemId }) => ({
       collectionItemId: Number(collectionItemId),
     }),
     /**
-     * Serializes typed route identifiers for URL generation.
+     * Serializes the numeric collection-item identifier for URL generation.
      *
      * @param context - Route callback context.
      * @param context.collectionItemId - Collection item identifier.
-     * @returns Serialized route parameters.
+     * @returns The collection-item identifier serialized for the URL.
      */
     stringify: ({ collectionItemId }) => ({
       collectionItemId: String(collectionItemId),
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/collections/edit/$collectionItemId")({
   /**
    * Requires authentication before entering the collection-item edit route.
    *
-   * @rejects When an unauthenticated visitor is redirected to sign in.
+   * @rejects When authentication cannot be checked or an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     if (!(await getAuthState()).isAuthenticated) {

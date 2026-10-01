@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AccountErasedPage } from "@/pages/account-erasure-pages";
 
 /**
- * Shows confirmation after an account erasure finishes.
+ * Shows the account-erasure confirmation page.
  */
 export const Route = createFileRoute("/account-erased")({
   component: AccountErasedPage,

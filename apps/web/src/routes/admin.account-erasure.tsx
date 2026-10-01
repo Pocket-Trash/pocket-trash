@@ -10,7 +10,7 @@ export const Route = createFileRoute("/admin/account-erasure")({
   /**
    * Requires account-erasure administration access before entering the route.
    *
-   * @rejects When the current user lacks account-erasure administration access.
+   * @rejects When authorization cannot be checked or the current user lacks account-erasure administration access.
    */
   beforeLoad: async () => {
     if (!(await canEraseAccounts())) throw notFound();

@@ -4,7 +4,7 @@ import { listActiveFeedback } from "@/lib/feedback";
 import { FeedbackBoardPage } from "@/pages/feedback-pages";
 
 /**
- * Shows the active public feedback board.
+ * Shows the active feedback board to authenticated users.
  */
 export const Route = createFileRoute("/feedback/")({
   /**

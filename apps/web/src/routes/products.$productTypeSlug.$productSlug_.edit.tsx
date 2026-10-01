@@ -12,10 +12,10 @@ export const Route = createFileRoute(
 )({
   params: {
     /**
-     * Parses serialized route parameters into typed identifiers.
+     * Validates the editable product type and product slugs.
      *
      * @param params - Serialized route parameters.
-     * @returns Typed route parameters.
+     * @returns The validated product type and product slugs.
      * @throws When either slug has an invalid format.
      */
     parse: (params) => {
@@ -31,7 +31,7 @@ export const Route = createFileRoute(
   /**
    * Requires authentication before entering the product edit route.
    *
-   * @rejects When an unauthenticated visitor is redirected to sign in.
+   * @rejects When authentication cannot be checked or an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     if (!(await getAuthState()).isAuthenticated) {

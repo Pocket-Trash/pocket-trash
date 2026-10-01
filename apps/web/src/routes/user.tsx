@@ -8,7 +8,7 @@ export const Route = createFileRoute("/user")({
   /**
    * Requires authentication before entering the user route.
    *
-   * @rejects When an unauthenticated visitor is redirected to sign in.
+   * @rejects When authentication cannot be checked or an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     const { isAuthenticated } = await getAuthState();

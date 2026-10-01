@@ -10,7 +10,7 @@ export const Route = createFileRoute("/admin/trash/resources")({
   /**
    * Requires resource administration access before entering the route.
    *
-   * @rejects When the current user lacks resource administration access.
+   * @rejects When authorization cannot be checked or the current user lacks resource administration access.
    */
   beforeLoad: async () => {
     if (!(await canManageResources())) throw notFound();

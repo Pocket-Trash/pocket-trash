@@ -11,7 +11,7 @@ export const Route = createFileRoute("/notifications")({
   /**
    * Requires feedback or resource administration access before entering the route.
    *
-   * @rejects When the current user lacks both feedback and resource administration access.
+   * @rejects When authorization cannot be checked or the current user lacks both feedback and resource administration access.
    */
   beforeLoad: async () => {
     const [mayManageFeedback, mayManageResources] = await Promise.all([

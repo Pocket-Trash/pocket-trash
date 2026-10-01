@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Hoisted has admin access test mock.
+ * Controls whether admin route tests authorize the current actor.
  */
 const hasAdminAccess = vi.hoisted(() => vi.fn());
 

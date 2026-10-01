@@ -9,7 +9,7 @@ export const Route = createFileRoute("/admin/settings/feature-flags")({
   /**
    * Requires feature-flag administration access before entering the route.
    *
-   * @rejects When the current user lacks feature-flag administration access.
+   * @rejects When authorization cannot be checked or the current user lacks feature-flag administration access.
    */
   beforeLoad: async () => {
     if (!(await canManageFeatureFlags())) {

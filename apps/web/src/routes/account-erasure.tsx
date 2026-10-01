@@ -4,13 +4,13 @@ import { getSelfErasureStatus } from "@/lib/account-erasure";
 import { AccountErasureStatusPage } from "@/pages/account-erasure-pages";
 
 /**
- * Shows the current user's active account-erasure status.
+ * Shows the current user's account-erasure status.
  */
 export const Route = createFileRoute("/account-erasure")({
   /**
-   * Loads the active erasure status and redirects signed-out or unavailable requests.
+   * Loads the current erasure status and redirects signed-out or unavailable requests.
    *
-   * @returns The active erasure status.
+   * @returns The current erasure status.
    * @rejects When erasure status cannot be loaded or navigation redirects to the applicable account page.
    */
   loader: async () => {

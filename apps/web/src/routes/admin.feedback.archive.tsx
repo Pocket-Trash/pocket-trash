@@ -14,7 +14,7 @@ export const Route = createFileRoute("/admin/feedback/archive")({
   /**
    * Requires feedback administration access before entering the route.
    *
-   * @rejects When the current user lacks feedback administration access.
+   * @rejects When authorization cannot be checked or the current user lacks feedback administration access.
    */
   beforeLoad: async () => {
     if (!(await canManageFeedback())) throw notFound();

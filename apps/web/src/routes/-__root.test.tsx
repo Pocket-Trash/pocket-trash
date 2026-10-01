@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Hoisted root-route dependency mocks.
+ * Controls settings responses and warning logs for root-route tests.
  */
 const mocks = vi.hoisted(() => ({
   getSettings: vi.fn(),

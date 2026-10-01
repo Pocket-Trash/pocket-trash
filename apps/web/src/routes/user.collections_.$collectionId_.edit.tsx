@@ -5,23 +5,23 @@ import {
 } from "@/lib/catalog-api";
 import { CollectionFormPage } from "@/pages/catalog-form-pages";
 
-/** Route configuration for editing a collection. */
+/** Provides collection editing for the current user. */
 export const Route = createFileRoute("/user/collections_/$collectionId_/edit")({
   params: {
     /**
-     * Parses serialized route parameters into typed identifiers.
+     * Converts the editable collection identifier from the URL to a number.
      *
      * @param context - Route callback context.
      * @param context.collectionId - Collection identifier.
-     * @returns Typed route parameters.
+     * @returns The numeric collection identifier.
      */
     parse: ({ collectionId }) => ({ collectionId: Number(collectionId) }),
     /**
-     * Serializes typed route identifiers for URL generation.
+     * Serializes the numeric collection identifier for URL generation.
      *
      * @param context - Route callback context.
      * @param context.collectionId - Collection identifier.
-     * @returns Serialized route parameters.
+     * @returns The collection identifier serialized for the URL.
      */
     stringify: ({ collectionId }) => ({ collectionId: String(collectionId) }),
   },

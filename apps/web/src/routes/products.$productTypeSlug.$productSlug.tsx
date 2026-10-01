@@ -10,10 +10,10 @@ export const Route = createFileRoute("/products/$productTypeSlug/$productSlug")(
   {
     params: {
       /**
-       * Parses serialized route parameters into typed identifiers.
+       * Validates the product type and product slugs.
        *
        * @param params - Serialized route parameters.
-       * @returns Typed route parameters.
+       * @returns The validated product type and product slugs.
        * @throws When either slug has an invalid format.
        */
       parse: (params) => {
