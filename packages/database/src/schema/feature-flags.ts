@@ -11,15 +11,18 @@ import {
 import { featureFlagAudiences, featureFlagOverrideSources } from "./enums.js";
 import { user } from "./users.js";
 
+/** PostgreSQL enum for supported feature-flag audiences. */
 export const featureFlagAudienceEnum = pgEnum(
   "feature_flag_audience",
   featureFlagAudiences,
 );
+/** PostgreSQL enum for supported feature-flag override sources. */
 export const featureFlagOverrideSourceEnum = pgEnum(
   "feature_flag_override_source",
   featureFlagOverrideSources,
 );
 
+/** Feature-flag defaults and audience targeting rules. */
 export const featureFlags = pgTable("feature_flags", {
   id: uuid("id").defaultRandom().primaryKey(),
   slug: text("slug").notNull().unique(),
@@ -39,6 +42,7 @@ export const featureFlags = pgTable("feature_flags", {
   updatedByClerkId: text("updated_by_clerk_id"),
 });
 
+/** Per-user feature-flag decisions with provenance. */
 export const featureFlagUserOverrides = pgTable(
   "feature_flag_user_overrides",
   {
@@ -69,9 +73,13 @@ export const featureFlagUserOverrides = pgTable(
   ],
 );
 
+/** Stored feature flag row. */
 export type FeatureFlag = typeof featureFlags.$inferSelect;
+/** Values accepted when creating a feature flag row. */
 export type NewFeatureFlag = typeof featureFlags.$inferInsert;
+/** Stored feature flag user override row. */
 export type FeatureFlagUserOverride =
   typeof featureFlagUserOverrides.$inferSelect;
+/** Values accepted when creating a feature flag user override row. */
 export type NewFeatureFlagUserOverride =
   typeof featureFlagUserOverrides.$inferInsert;
