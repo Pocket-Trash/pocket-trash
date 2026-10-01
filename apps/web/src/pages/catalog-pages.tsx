@@ -169,6 +169,12 @@ export function ProductsPage({
   );
 }
 
+/**
+ * Renders a catalog product and its matching collection items.
+ *
+ * @param props - Product detail data and related collection items.
+ * @returns The catalog product detail page.
+ */
 export function ProductDetailPage({
   collectionItems = [],
   product,
@@ -284,7 +290,7 @@ export function ProductDetailPage({
         />
         {product.description ? (
           <MarkdownContent
-            className="rounded-xl border border-border bg-card p-6 text-card-foreground"
+            className="rounded-xl border border-border bg-card p-6 text-[13.5px] leading-[1.6] text-card-foreground"
             markdown={product.description}
           />
         ) : null}
@@ -814,6 +820,12 @@ export function ProductGrid({ products }: { products: CatalogProduct[] }) {
   );
 }
 
+/**
+ * Renders one collection item with its effective product details.
+ *
+ * @param props - Collection item data and its installed button, when present.
+ * @returns The collection item detail page.
+ */
 export function CollectionItemDetailPage({
   installedButton = null,
   item,
@@ -935,7 +947,7 @@ export function CollectionItemDetailPage({
         </dl>
         {item.description ? (
           <MarkdownContent
-            className="rounded-xl border border-border bg-card p-6 text-card-foreground"
+            className="rounded-xl border border-border bg-card p-6 text-[13.5px] leading-[1.6] text-card-foreground"
             markdown={item.description}
           />
         ) : null}

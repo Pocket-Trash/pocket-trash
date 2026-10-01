@@ -12,16 +12,26 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { parse } from "yaml";
 
+/** Parsed deployment workflow under test. */
+const deployWorkflow = parse(
+  readFileSync(
+    new URL("../.github/workflows/deploy.yml", import.meta.url),
+    "utf8",
+  ),
+);
+/** Parsed reusable preview-refresh workflow under test. */
+const refreshWorkflow = parse(
+  readFileSync(
+    new URL("../.github/workflows/preview-refresh.yml", import.meta.url),
+    "utf8",
+  ),
+);
+
 test("database detection ignores base-only and package changes", (context) => {
-  const workflow = parse(
-    readFileSync(
-      new URL("../.github/workflows/deploy.yml", import.meta.url),
-      "utf8",
-    ),
-  );
-  const script = workflow.jobs.preview.steps
-    .find((step) => step.id === "db_changes")
-    .run.split("source .github/scripts/ci-log.sh")[0];
+  const script = readFileSync(
+    new URL("../.github/scripts/detect-database-changes.sh", import.meta.url),
+    "utf8",
+  ).split("source .github/scripts/ci-log.sh")[0];
   const directory = mkdtempSync(join(tmpdir(), "database-detection-"));
   context.after(() => rmSync(directory, { recursive: true, force: true }));
   /**
@@ -85,4 +95,21 @@ test("database detection ignores base-only and package changes", (context) => {
       path,
     );
   }
+});
+
+test("schema-changing main deploys refresh preview after development", () => {
+  const development = deployWorkflow.jobs["development-api"];
+  const refresh = deployWorkflow.jobs["refresh-preview"];
+
+  assert.equal(
+    development.outputs.database_changed,
+    "${{ steps.db_changes.outputs.database }}",
+  );
+  assert.equal(refresh.needs, "development-api");
+  assert.match(
+    refresh.if,
+    /needs\.development-api\.outputs\.database_changed == 'true'/,
+  );
+  assert.equal(refresh.uses, "./.github/workflows/preview-refresh.yml");
+  assert.ok(Object.hasOwn(refreshWorkflow.on, "workflow_call"));
 });
