@@ -15,24 +15,57 @@ import { Input } from "@/components/ui/input";
 import { getImageUploadGuidance } from "@/lib/help-content";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Editable collection metadata submitted by the collection form.
+ */
 export type CollectionFormValue = {
+  /**
+   * Optional collection description entered by the user.
+   */
   description: string;
+  /**
+   * Whether access to the collection is restricted.
+   */
   isPrivate: boolean;
+  /**
+   * Collection name.
+   */
   name: string;
 };
 
+/**
+ * Pagination behavior used by the cover-history table.
+ */
 const managerPaginationFeatures = tableFeatures({
   rowPaginationFeature,
   paginatedRowModel: createPaginatedRowModel(),
 });
+/**
+ * Column builder for cover-history images.
+ */
 const managerColumnHelper = createColumnHelper<
   typeof managerPaginationFeatures,
   CatalogImage
 >();
+/**
+ * Minimal columns required to paginate cover-history images.
+ */
 const managerColumns = managerColumnHelper.columns([
   managerColumnHelper.accessor("id", { header: "id" }),
 ]);
 
+/**
+ * Renders a controlled collection-details form with optional image selection.
+ *
+ * @param props - Collection form properties.
+ * @param props.copy - Localized form labels and guidance.
+ * @param props.disabled - Whether interaction is disabled.
+ * @param props.error - Optional submission error shown above the submit button.
+ * @param props.includeImages - Whether to include the collection image picker.
+ * @param props.initialValue - Initial metadata, defaulting to a blank private collection.
+ * @param props.onSubmit - Receives the current metadata and selected image files.
+ * @returns The collection form UI.
+ */
 export function CollectionForm({
   copy,
   disabled = false,
@@ -41,23 +74,82 @@ export function CollectionForm({
   initialValue,
   onSubmit,
 }: {
+  /**
+   * Localized form labels and guidance.
+   */
   copy: {
+    /**
+     * Label for browsing image files.
+     */
     browse: string;
+    /**
+     * Label for the cover-image field.
+     */
     cover: string;
+    /**
+     * Label for the collection description.
+     */
     description: string;
+    /**
+     * Placeholder for the collection description.
+     */
     descriptionPlaceholder: string;
+    /**
+     * Guidance shown with the image picker.
+     */
     imageHelp: string;
+    /**
+     * Description of accepted image formats.
+     */
     imageTypes: string;
+    /**
+     * Label for the collection name.
+     */
     name: string;
+    /**
+     * Placeholder for the collection name.
+     */
     namePlaceholder: string;
+    /**
+     * Label for the public-visibility switch.
+     */
     public: string;
+    /**
+     * Accessible label for removing a selected file.
+     */
     removeFile: string;
+    /**
+     * Submit-button label.
+     */
     submit: string;
   };
+  /**
+   * Whether interaction is disabled.
+   *
+   * @default false
+   */
   disabled?: boolean;
+  /**
+   * Optional submission error shown above the submit button.
+   */
   error?: string | null;
+  /**
+   * Whether to include the collection image picker.
+   *
+   * @default true
+   */
   includeImages?: boolean;
+  /**
+   * Initial metadata, defaulting to a blank private collection.
+   */
   initialValue?: CollectionFormValue;
+  /**
+   * Submits the current metadata and selected image files.
+   *
+   * @param value - Current collection metadata.
+   * @param images - Image files selected for upload.
+   * @returns Callback completion.
+   */
   onSubmit(value: CollectionFormValue, images: File[]): void | Promise<void>;
 }) {
   const { locale } = useLocale();
@@ -147,6 +239,18 @@ export function CollectionForm({
   );
 }
 
+/**
+ * Renders the current collection cover and paginated cover history controls.
+ *
+ * @param props - Collection cover manager properties.
+ * @param props.collection - Collection whose cover images can be managed.
+ * @param props.copy - Localized labels, confirmations, and pagination text.
+ * @param props.disabled - Whether interaction is disabled.
+ * @param props.onClear - Clears the current cover after confirmation.
+ * @param props.onDelete - Deletes a cover image after confirmation.
+ * @param props.onSelect - Selects a historical image as the current cover.
+ * @returns The collection cover manager UI.
+ */
 export function CollectionCoverManager({
   collection,
   copy,
@@ -155,22 +259,84 @@ export function CollectionCoverManager({
   onDelete,
   onSelect,
 }: {
+  /**
+   * Collection whose cover images can be managed.
+   */
   collection: UserCollectionSummary;
+  /**
+   * Localized labels, confirmations, and pagination text.
+   */
   copy: {
+    /**
+     * Label for clearing the current cover.
+     */
     clear: string;
+    /**
+     * Confirmation prompt shown before clearing the current cover.
+     */
     clearConfirmation: string;
+    /**
+     * Heading for the current cover.
+     */
     current: string;
+    /**
+     * Label for deleting an image.
+     */
     delete: string;
+    /**
+     * Confirmation prompt shown before deleting an image.
+     */
     deleteConfirmation: string;
+    /**
+     * Heading and navigation label for cover history.
+     */
     history: string;
+    /**
+     * Accessible label for the next history page.
+     */
     nextPage: string;
+    /**
+     * Formats the visible page position.
+     *
+     * @param page - Current one-based page number.
+     * @param pageCount - Total number of pages.
+     * @returns Localized pagination status text.
+     */
     pageStatus(page: number, pageCount: number): string;
+    /**
+     * Accessible label for the previous history page.
+     */
     previousPage: string;
+    /**
+     * Label for selecting a historical cover.
+     */
     select: string;
   };
+  /**
+   * Whether interaction is disabled.
+   *
+   * @default false
+   */
   disabled?: boolean;
+  /**
+   * Clears the current collection cover.
+   *
+   * @returns Callback completion.
+   */
   onClear(): void | Promise<void>;
+  /**
+   * Deletes a collection cover image.
+   *
+   * @param image - Image selected for deletion.
+   * @returns Callback completion.
+   */
   onDelete(image: CatalogImage): void | Promise<void>;
+  /**
+   * Makes a historical image the current collection cover.
+   *
+   * @param image - Image selected as the cover.
+   * @returns Callback completion.
+   */
   onSelect(image: CatalogImage): void | Promise<void>;
 }) {
   const current = collection.coverImage;
@@ -312,22 +478,67 @@ export function CollectionCoverManager({
   );
 }
 
+/**
+ * Renders a batch image uploader that clears successful submissions.
+ *
+ * @param props - Collection image uploader properties.
+ * @param props.copy - Localized uploader labels and guidance.
+ * @param props.disabled - Whether interaction is disabled.
+ * @param props.error - Optional upload error shown above the submit button.
+ * @param props.onUpload - Uploads the selected files and reports whether to clear them.
+ * @returns The collection image uploader UI.
+ */
 export function CollectionImageUploader({
   copy,
   disabled = false,
   error,
   onUpload,
 }: {
+  /**
+   * Localized uploader labels and guidance.
+   */
   copy: {
+    /**
+     * Label for browsing image files.
+     */
     browse: string;
+    /**
+     * Guidance shown with the image picker.
+     */
     imageHelp: string;
+    /**
+     * Description of accepted image formats.
+     */
     imageTypes: string;
+    /**
+     * Label for the image picker.
+     */
     label: string;
+    /**
+     * Accessible label for removing a selected file.
+     */
     removeFile: string;
+    /**
+     * Upload-button label.
+     */
     submit: string;
   };
+  /**
+   * Whether interaction is disabled.
+   *
+   * @default false
+   */
   disabled?: boolean;
+  /**
+   * Optional upload error shown above the submit button.
+   */
   error?: string | null;
+  /**
+   * Uploads a batch of selected collection images.
+   *
+   * @param files - Image files selected for upload.
+   * @returns Whether the uploader should clear the selected files.
+   */
   onUpload(files: File[]): Promise<boolean>;
 }) {
   const { locale } = useLocale();
