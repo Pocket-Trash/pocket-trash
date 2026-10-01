@@ -84,7 +84,7 @@ export const featureFlagAuditEvents = Object.values(
  * @param transaction - Caller-owned source transaction.
  * @param input - Actor, optional target owner, and allowlisted state.
  * @returns Completion after the event is stored.
- * @rejects When the actor lacks feature-flag management permission.
+ * @rejects When authorization, validation, serialization, persistence, or operation logging fails.
  */
 export async function writeFeatureFlagAudit(
   audit: AuditService,

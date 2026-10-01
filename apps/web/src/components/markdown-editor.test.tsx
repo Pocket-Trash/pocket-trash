@@ -205,6 +205,89 @@ describe("MarkdownEditor", () => {
     expect(textarea?.value).toBe("one\ntwo");
   });
 
+  it("wraps selected Source text in a safe link and restores focus", async () => {
+    await act(() =>
+      root.render(
+        <MarkdownEditor defaultValue="Pocket Trash" label="Description" />,
+      ),
+    );
+    clickButton(container, "Source");
+    const textarea = container.querySelector("textarea");
+    act(() => textarea?.setSelectionRange(0, 12));
+    clickButton(container, "Link");
+
+    const url = [...container.querySelectorAll("input")].find(
+      (input) => input.labels?.[0]?.textContent === "URL",
+    );
+    act(() => {
+      if (!url) return;
+      setInputValue(url, "https://pocket-trash.app");
+      url.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    clickButton(container, "Insert link");
+
+    expect(textarea?.value).toBe("[Pocket Trash](https://pocket-trash.app)");
+    expect(textarea?.selectionStart).toBe(1);
+    expect(textarea?.selectionEnd).toBe(13);
+    expect(document.activeElement).toBe(textarea);
+  });
+
+  it("removes only an exact Source link selection", async () => {
+    await act(() =>
+      root.render(
+        <MarkdownEditor
+          defaultValue="[Pocket Trash](/about) nearby"
+          label="Description"
+        />,
+      ),
+    );
+    clickButton(container, "Source");
+    const textarea = container.querySelector("textarea");
+    act(() => textarea?.setSelectionRange(0, 22));
+    clickButton(container, "Link");
+    clickButton(container, "Remove link");
+
+    expect(textarea?.value).toBe("Pocket Trash nearby");
+    expect(textarea?.selectionStart).toBe(0);
+    expect(textarea?.selectionEnd).toBe(12);
+  });
+
+  it("rejects unsafe Source link destinations", async () => {
+    await act(() =>
+      root.render(
+        <MarkdownEditor defaultValue="Email us" label="Description" />,
+      ),
+    );
+    clickButton(container, "Source");
+    const textarea = container.querySelector("textarea");
+    act(() => textarea?.setSelectionRange(0, 8));
+    clickButton(container, "Link");
+    const url = [...container.querySelectorAll("input")].find(
+      (input) => input.labels?.[0]?.textContent === "URL",
+    );
+    act(() => {
+      if (!url) return;
+      setInputValue(url, "mailto:test@example.com");
+      url.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    clickButton(container, "Insert link");
+
+    expect(container.textContent).toContain(
+      "Enter a relative, HTTP, or HTTPS URL.",
+    );
+    expect(textarea?.value).toBe("Email us");
+  });
+
+  it("inserts a three-column Source table with one body row", async () => {
+    await act(() => root.render(<MarkdownEditor label="Description" />));
+    clickButton(container, "Source");
+    clickButton(container, "Table");
+
+    expect(container.querySelector("textarea")?.value).toBe(
+      "|  |  |  |\n| --- | --- | --- |\n|  |  |  |",
+    );
+  });
+
   it("marks only over-limit content invalid", async () => {
     await act(() =>
       root.render(
@@ -232,6 +315,37 @@ describe("MarkdownEditor", () => {
     expect(textarea?.getAttribute("aria-invalid")).toBe("true");
     expect(container.textContent).toContain("1 over limit");
   });
+
+  it("announces counter transitions without announcing every edit", async () => {
+    await act(() =>
+      root.render(
+        <MarkdownEditor
+          counter={{ limit: 5, type: "characters", warningAt: 4 }}
+          defaultValue="1"
+          label="Description"
+        />,
+      ),
+    );
+    clickButton(container, "Source");
+    const textarea = container.querySelector("textarea");
+    const status = container.querySelector('[role="status"]');
+    expect(status?.textContent).toContain("1 / 5");
+
+    act(() => {
+      if (!textarea) return;
+      setTextareaValue(textarea, "12");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(status?.textContent).toContain("1 / 5");
+
+    act(() => {
+      if (!textarea) return;
+      setTextareaValue(textarea, "1234");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(status?.textContent).toContain("4 / 5");
+    expect(status?.textContent).toContain("approaching limit");
+  });
 });
 
 /**
@@ -246,4 +360,34 @@ function setTextareaValue(textarea: HTMLTextAreaElement, value: string) {
     HTMLTextAreaElement.prototype,
     "value",
   )?.set?.call(textarea, value);
+}
+
+/**
+ * Updates a controlled input through its native value setter.
+ *
+ * @param input - Input to update.
+ * @param value - New input value.
+ * @returns Nothing.
+ */
+function setInputValue(input: HTMLInputElement, value: string) {
+  Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  )?.set?.call(input, value);
+}
+
+/**
+ * Clicks a button by visible text or accessible label.
+ *
+ * @param container - Rendered test container.
+ * @param name - Visible text or accessible label.
+ * @returns Nothing.
+ */
+function clickButton(container: HTMLElement, name: string) {
+  const button = [...container.querySelectorAll("button")].find(
+    (candidate) =>
+      candidate.textContent === name ||
+      candidate.getAttribute("aria-label") === name,
+  );
+  act(() => button?.click());
 }

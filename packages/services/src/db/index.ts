@@ -26,13 +26,21 @@ import {
 } from "./user-settings/index.js";
 import { createUsersService, type UsersService } from "./users/index.js";
 
+/** Database-backed domain services sharing one database client and logger. */
 export type DbServices = {
+  /** Audit event and export service. */
   audit: AuditService;
+  /** Catalog product service. */
   catalog: CatalogService;
+  /** User collection service. */
   collections: CollectionsService;
+  /** Account-erasure workflow service. */
   erasure: ErasureService;
+  /** Product-feedback service. */
   feedback: FeedbackService;
+  /** User settings service. */
   userSettings: UserSettingsService;
+  /** Application user service. */
   users: UsersService;
 };
 

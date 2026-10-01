@@ -115,6 +115,11 @@ function createFlagUpdateDbMock(flag: FeatureFlag) {
 
   return {
     db,
+    /**
+     * Returns fields passed to the feature-flag update.
+     *
+     * @returns Captured update fields, or `null` before an update.
+     */
     getUpdateValues: () => updateValues,
     update,
   };

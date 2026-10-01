@@ -161,7 +161,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Collection page story. */
 export const Collection: Story = {
+  /**
+   * Renders the collection page story.
+   * @returns A collection page fixture.
+   */
   render: () => (
     <CollectionPage
       collection={collection}
@@ -172,19 +177,51 @@ export const Collection: Story = {
   ),
 };
 
+/** Collection item page story. */
 export const CollectionItem: Story = {
+  /**
+   * Renders the collection item story.
+   * @returns A collection item fixture.
+   */
   render: () => (
     <CollectionItemDetailPage installedButton={installedButton} item={item} />
   ),
 };
 
-export const Home: Story = { render: () => <HomePage /> };
-
-export const Help: Story = {
-  render: () => <HelpIndexPage guideTitle={imageGuide.metadata.title} />,
+/** Home page story. */
+export const Home: Story = {
+  /**
+   * Renders the home page story.
+   * @returns The home page.
+   */
+  render: () => <HomePage />,
 };
 
+/** Help index page story. */
+export const Help: Story = {
+  /**
+   * Renders the help index story.
+   * @returns Every published help topic.
+   */
+  render: () => (
+    <HelpIndexPage
+      documents={[
+        "how-to-use-markdown",
+        "image-size-and-resolution-guide",
+      ].flatMap((slug) => {
+        const document = getHelpDocument("en-US", slug);
+        return document ? [document] : [];
+      })}
+    />
+  ),
+};
+
+/** Help topic page story. */
 export const HelpTopic: Story = {
+  /**
+   * Renders the help topic story.
+   * @returns The image guide fixture.
+   */
   render: () => (
     <HelpTopicPage
       dateLabel={formatTranslation("web.help.datePublished")}
@@ -195,27 +232,52 @@ export const HelpTopic: Story = {
   ),
 };
 
+/** Product detail page story. */
 export const ProductDetail: Story = {
+  /**
+   * Renders the product detail story.
+   * @returns A product detail fixture.
+   */
   render: () => (
     <ProductDetailPage collectionItems={[item]} product={product} />
   ),
 };
 
+/** Product index page story. */
 export const Products: Story = {
+  /**
+   * Renders the product index story.
+   * @returns The product index fixture.
+   */
   render: () => <ProductsPage onFiltersChange={fn()} products={[product]} />,
 };
 
+/** Public collection page story. */
 export const PublicCollection: Story = {
+  /**
+   * Renders the public collection story.
+   * @returns A public collection fixture.
+   */
   render: () => <PublicCollectionPage owner={owner} />,
 };
 
+/** Public collections page story. */
 export const PublicCollections: Story = {
+  /**
+   * Renders the public collections story.
+   * @returns Public collection fixtures.
+   */
   render: () => (
     <PublicCollectionsPage onFiltersChange={fn()} owners={[owner]} />
   ),
 };
 
+/** User collections page story. */
 export const UserCollections: Story = {
+  /**
+   * Renders the user collections story.
+   * @returns User collection fixtures.
+   */
   render: () => (
     <UserCollectionsPage
       collections={[collection]}
@@ -225,7 +287,14 @@ export const UserCollections: Story = {
   ),
 };
 
-export const User: Story = { render: () => <UserIndexPage hasFeedback /> };
+/** User index page story. */
+export const User: Story = {
+  /**
+   * Renders the user index story.
+   * @returns The user index fixture.
+   */
+  render: () => <UserIndexPage hasFeedback />,
+};
 
 function image(id: number, fileName: string, path: string): CatalogImage {
   return {

@@ -7,6 +7,9 @@ import {
   seedMakers,
   seedMaterials,
   seedProductTypes,
+  seedUserSettings,
+  seedUsers,
+  seedUsersAndSettings,
 } from "../scripts/seed.js";
 import type { createDb } from "../src/client.js";
 import {
@@ -16,6 +19,8 @@ import {
   maker,
   material,
   productType,
+  user,
+  userSettings,
 } from "../src/schema/index.js";
 
 /**
@@ -192,6 +197,40 @@ describe("catalog seed", () => {
     expect(state.colorEffects.get("fade")?.name).toBe("Fade");
     expect(state.materials.get("bronze")?.name).toBe("Bronze");
     expect(state.makers.get("autmog")?.rootUrl).toBe("https://www.autmog.com");
-    expect(state.makers.get("kap edc")?.rootUrl).toBeNull();
+    expect(state.makers.get("kap edc")?.rootUrl).toBe("https://www.kapedc.com");
+  });
+});
+
+describe("user seed", () => {
+  it("upserts every approved user and configured preference", async () => {
+    const insertedUsers: unknown[] = [];
+    const insertedSettings: unknown[] = [];
+    const selectedUsers = seedUsers.map(({ clerkId }, index) => ({
+      clerkId,
+      id: index + 1000,
+    }));
+    const db = {
+      insert: vi.fn((table: unknown) => ({
+        values: vi.fn((value: unknown) => {
+          (table === user ? insertedUsers : insertedSettings).push(value);
+          return { onConflictDoUpdate: vi.fn(async () => undefined) };
+        }),
+      })),
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => selectedUsers),
+        })),
+      })),
+    } as unknown as ReturnType<typeof createDb>;
+
+    await seedUsersAndSettings(db);
+
+    expect(insertedUsers).toEqual(seedUsers);
+    expect(insertedSettings).toEqual([
+      { ...seedUserSettings[0].values, userId: 1000 },
+      { ...seedUserSettings[1].values, userId: 1002 },
+    ]);
+    expect(db.insert).toHaveBeenCalledWith(user);
+    expect(db.insert).toHaveBeenCalledWith(userSettings);
   });
 });

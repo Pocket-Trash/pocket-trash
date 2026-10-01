@@ -6,6 +6,7 @@ import {
   rootCtx,
   serializerCtx,
 } from "@milkdown/core";
+import { clipboard } from "@milkdown/plugin-clipboard";
 import { history } from "@milkdown/plugin-history";
 import {
   blockContainerTypes,
@@ -66,6 +67,7 @@ import {
   wrapInOrderedListInputRule,
 } from "@milkdown/preset-commonmark";
 import {
+  insertTableCommand,
   keepTableAlignPlugin,
   remarkGFMPlugin,
   strikethroughAttr,
@@ -76,13 +78,31 @@ import {
   tableEditingPlugin,
   tableHeaderRowSchema,
   tableHeaderSchema,
+  tablePasteRule,
   tableRowSchema,
   tableSchema,
   toggleStrikethroughCommand,
 } from "@milkdown/preset-gfm";
 import { textblockTypeInputRule } from "@milkdown/prose/inputrules";
-import { $inputRule, callCommand } from "@milkdown/utils";
-import { downgradeMarkdownCodeBlocks } from "@package/markdown";
+import { keymap } from "@milkdown/prose/keymap";
+import type { MarkType } from "@milkdown/prose/model";
+import {
+  type EditorState,
+  TextSelection,
+  type Transaction,
+} from "@milkdown/prose/state";
+import { addRowAfter, goToNextCell, isInTable } from "@milkdown/prose/tables";
+import {
+  $inputRule,
+  $prose,
+  callCommand,
+  markdownToSlice,
+} from "@milkdown/utils";
+import {
+  htmlToMarkdown,
+  isSafeMarkdownLink,
+  markdownToHtml,
+} from "@package/markdown";
 import * as React from "react";
 import "@milkdown/prose/view/style/prosemirror.css";
 
@@ -95,9 +115,29 @@ export type MarkdownVisualFormat =
   | "heading3"
   | "horizontalRule"
   | "italic"
+  | "link"
   | "orderedList"
   | "strikethrough"
+  | "table"
   | "unorderedList";
+
+/** Link content at the current visual selection. */
+export type MarkdownLinkSelection = Readonly<{
+  /** Existing safe link destination, when selected inside a link. */
+  url?: string;
+  /** Selected or linked display text. */
+  text: string;
+}>;
+
+/** Contiguous document range covered by one link destination. */
+type LinkRange = {
+  /** First document position in the link. */
+  from: number;
+  /** Document position immediately after the link. */
+  to: number;
+  /** Link destination shared by the range. */
+  url: string;
+};
 
 /** Imperative visual editor operations. */
 export type MarkdownVisualEditorHandle = Readonly<{
@@ -109,6 +149,21 @@ export type MarkdownVisualEditorHandle = Readonly<{
    * @param format - Supported format to apply to the selection.
    */
   format(format: MarkdownVisualFormat): void;
+  /**
+   * Reads link content at the current selection.
+   *
+   * @returns Selected text and any existing link destination.
+   */
+  getLinkSelection(): MarkdownLinkSelection;
+  /** Removes the link at the saved selection and restores focus. */
+  removeLink(): void;
+  /**
+   * Inserts or updates a link at the saved selection.
+   *
+   * @param text - Display text for an empty selection.
+   * @param url - Validated link destination.
+   */
+  setLink(text: string, url: string): void;
 }>;
 
 /** Properties for the restricted visual Markdown editor. */
@@ -129,6 +184,12 @@ export type MarkdownVisualEditorProps = Readonly<{
   onChange(value: string): void;
   /** Reports visual editor initialization failure. */
   onError(): void;
+  /**
+   * Publishes active toolbar formats after selection changes.
+   *
+   * @param formats - Formats active at the current selection.
+   */
+  onSelectionChange(formats: readonly MarkdownVisualFormat[]): void;
   /**
    * Publishes successful initialization.
    *
@@ -152,6 +213,32 @@ const limitedHeadingInputRule = $inputRule((ctx) =>
       level: match.groups?.hashes?.length ?? 1,
     }),
   ),
+);
+
+/** Table Tab navigation that appends one row at the final cell. */
+const tableNavigation = $prose(() =>
+  keymap({
+    "Shift-Tab": goToNextCell(-1),
+    /**
+     * Moves forward or appends a final table row.
+     *
+     * @param state - Current editor state.
+     * @param dispatch - Optional transaction dispatcher.
+     * @returns Whether table navigation handled the key.
+     */
+    Tab: (state, dispatch) => {
+      if (!isInTable(state)) return false;
+      if (goToNextCell(1)(state, dispatch)) return true;
+      if (!dispatch) return true;
+      return addRowAfter(state, (transaction) => {
+        const nextState = state.apply(transaction);
+        goToNextCell(1)(nextState, (navigation) =>
+          transaction.setSelection(navigation.selection),
+        );
+        dispatch(transaction);
+      });
+    },
+  }),
 );
 
 /** Minimal Milkdown schema and behavior allowed by the product editor. */
@@ -196,6 +283,9 @@ const restrictedMarkdown = [
   syncListOrderPlugin,
   keepTableAlignPlugin,
   tableEditingPlugin,
+  insertTableCommand,
+  tableNavigation,
+  tablePasteRule,
   turnIntoTextCommand,
   wrapInBlockquoteCommand,
   wrapInHeadingCommand,
@@ -227,6 +317,7 @@ const restrictedMarkdown = [
   strongKeymap,
   strikethroughKeymap,
   history,
+  clipboard,
 ].flat();
 
 /**
@@ -260,9 +351,18 @@ export function MarkdownVisualEditor(props: MarkdownVisualEditorProps) {
            */
           dispatchTransaction(transaction) {
             const view = ctx.get(editorViewCtx);
-            const state = view.state.apply(transaction);
+            const result = view.state.applyTransaction(transaction);
+            let state = result.state;
+            const sanitized = sanitizeLinks(state, linkSchema.type(ctx));
+            if (sanitized) state = state.apply(sanitized);
             view.updateState(state);
-            propsRef.current.onChange(ctx.get(serializerCtx)(state.doc));
+            propsRef.current.onSelectionChange(activeFormats(state));
+            if (
+              result.transactions.some((applied) => applied.docChanged) ||
+              sanitized?.docChanged
+            ) {
+              propsRef.current.onChange(ctx.get(serializerCtx)(state.doc));
+            }
           },
           /**
            * Reports visual editability.
@@ -272,16 +372,31 @@ export function MarkdownVisualEditor(props: MarkdownVisualEditorProps) {
           editable: () =>
             !propsRef.current.disabled && !propsRef.current.readOnly,
           /**
-           * Inserts pasted input as readable plain text.
+           * Prevents dropped files from becoming editor content.
+           *
+           * @param _view - Active editor view.
+           * @param event - Drop event to inspect.
+           * @returns Whether a dropped file was blocked.
+           */
+          handleDrop: (_view, event) =>
+            Boolean(event.dataTransfer?.files.length),
+          /**
+           * Normalizes plain Markdown paste through the restricted schema.
            *
            * @param view - Active editor view.
-           * @param event - Clipboard event.
+           * @param event - Clipboard event to inspect.
            * @returns Whether the paste was handled.
            */
-          handlePaste(view, event) {
-            const pasted = event.clipboardData?.getData("text/plain");
-            if (!pasted) return false;
-            view.dispatch(view.state.tr.insertText(pasteText(pasted)));
+          handlePaste: (view, event) => {
+            const data = event.clipboardData;
+            if (data?.files.length) return true;
+            if (!data || data.getData("text/html")) return false;
+            const text = data.getData("text/plain");
+            if (!text) return false;
+            const safe = htmlToMarkdown(markdownToHtml(text)) ?? "";
+            view.dispatch(
+              view.state.tr.replaceSelection(markdownToSlice(safe)(ctx)),
+            );
             return true;
           },
         });
@@ -294,6 +409,12 @@ export function MarkdownVisualEditor(props: MarkdownVisualEditorProps) {
       .then(() => {
         if (canceled) return;
         createdRef.current = true;
+        editor.action((ctx) => {
+          const view = ctx.get(editorViewCtx);
+          const sanitized = sanitizeLinks(view.state, linkSchema.type(ctx));
+          if (sanitized) view.dispatch(sanitized);
+          propsRef.current.onSelectionChange(activeFormats(view.state));
+        });
         propsRef.current.onReady({
           /**
            * Focuses the initialized visual editor.
@@ -309,6 +430,29 @@ export function MarkdownVisualEditor(props: MarkdownVisualEditorProps) {
            * @returns Nothing.
            */
           format: (format) => runFormat(editorRef.current, format),
+          /**
+           * Reads selected text and an existing link destination.
+           *
+           * @returns Current link selection metadata.
+           */
+          getLinkSelection: () =>
+            editorRef.current?.action((ctx) =>
+              currentLink(ctx.get(editorViewCtx).state, linkSchema.type(ctx)),
+            ) ?? { text: "" },
+          /**
+           * Removes the selected link.
+           *
+           * @returns Nothing.
+           */
+          removeLink: () => updateLink(editorRef.current, "", ""),
+          /**
+           * Inserts or updates the selected link.
+           *
+           * @param text - Link display text.
+           * @param url - Validated destination.
+           * @returns Nothing.
+           */
+          setLink: (text, url) => updateLink(editorRef.current, text, url),
         });
       })
       .catch(() => {
@@ -402,6 +546,9 @@ function runFormat(editor: Editor | null, format: MarkdownVisualFormat) {
     case "strikethrough":
       editor.action(callCommand(toggleStrikethroughCommand.key));
       break;
+    case "table":
+      editor.action(callCommand(insertTableCommand.key, { col: 3, row: 2 }));
+      break;
     case "unorderedList":
       editor.action(callCommand(wrapInBulletListCommand.key));
       break;
@@ -410,11 +557,155 @@ function runFormat(editor: Editor | null, format: MarkdownVisualFormat) {
 }
 
 /**
- * Downgrades pasted code blocks to readable text.
+ * Removes link marks whose destinations are outside the product allowlist.
  *
- * @param value - Plain clipboard text.
- * @returns Text safe for insertion into the restricted schema.
+ * @param state - Editor state to sanitize.
+ * @param linkType - Restricted link mark type.
+ * @returns A sanitizing transaction, or null when no links change.
  */
-function pasteText(value: string): string {
-  return downgradeMarkdownCodeBlocks(value);
+function sanitizeLinks(
+  state: EditorState,
+  linkType: MarkType,
+): Transaction | null {
+  const transaction = state.tr;
+  let changed = false;
+  state.doc.descendants((node, position) => {
+    if (!node.isText) return;
+    for (const mark of node.marks) {
+      if (mark.type !== linkType || isSafeMarkdownLink(mark.attrs.href))
+        continue;
+      transaction.removeMark(position, position + node.nodeSize, mark);
+      changed = true;
+    }
+  });
+  return changed ? transaction : null;
+}
+
+/**
+ * Reads toolbar formats active at the current visual selection.
+ *
+ * @param state - Current editor state.
+ * @returns Active toolbar formats.
+ */
+function activeFormats(state: EditorState): readonly MarkdownVisualFormat[] {
+  const formats: MarkdownVisualFormat[] = [];
+  const { $from, from, empty, to } = state.selection;
+  /**
+   * Reports whether one named mark covers the current selection.
+   *
+   * @param name - ProseMirror mark name.
+   * @returns Whether the mark covers the current selection.
+   */
+  const markActive = (name: string) => {
+    const type = state.schema.marks[name];
+    return Boolean(
+      type &&
+        (empty
+          ? type.isInSet($from.marks())
+          : state.doc.rangeHasMark(from, to, type)),
+    );
+  };
+  if (markActive("strong")) formats.push("bold");
+  if (markActive("emphasis")) formats.push("italic");
+  if (markActive("link")) formats.push("link");
+  if (markActive("strike_through")) formats.push("strikethrough");
+
+  for (let depth = $from.depth; depth >= 0; depth -= 1) {
+    const node = $from.node(depth);
+    if (node.type.name === "heading" && node.attrs.level <= 3) {
+      formats.push(`heading${node.attrs.level}` as MarkdownVisualFormat);
+    } else if (node.type.name === "blockquote") formats.push("blockquote");
+    else if (node.type.name === "bullet_list") formats.push("unorderedList");
+    else if (node.type.name === "ordered_list") formats.push("orderedList");
+    else if (node.type.name === "table") formats.push("table");
+  }
+  return formats;
+}
+
+/**
+ * Reads selected text and any link covering the visual selection.
+ *
+ * @param state - Current editor state.
+ * @param linkType - Restricted link mark type.
+ * @returns Current selection text and optional destination.
+ */
+function currentLink(
+  state: EditorState,
+  linkType: MarkType,
+): MarkdownLinkSelection {
+  const range = linkRange(state, linkType);
+  if (range) {
+    return {
+      text: state.doc.textBetween(range.from, range.to),
+      url: range.url,
+    };
+  }
+  const { from, to } = state.selection;
+  return { text: state.doc.textBetween(from, to, " ") };
+}
+
+/**
+ * Inserts, updates, or removes a link and restores the visual selection.
+ *
+ * @param editor - Active Milkdown editor.
+ * @param text - Link display text for an empty selection.
+ * @param url - Validated destination, or empty when removing.
+ * @returns Nothing.
+ */
+function updateLink(editor: Editor | null, text: string, url: string) {
+  editor?.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    const linkType = linkSchema.type(ctx);
+    const existing = linkRange(view.state, linkType);
+    const { from, to } = view.state.selection;
+    const transaction = view.state.tr;
+    const start = existing?.from ?? from;
+    let end = existing?.to ?? to;
+
+    if (existing) transaction.removeMark(start, end, linkType);
+    if (!existing && from === to && text) {
+      transaction.insertText(text, from, to);
+      end = from + text.length;
+    }
+    if (url && end > start) {
+      transaction.addMark(start, end, linkType.create({ href: url }));
+    }
+    transaction.setSelection(
+      TextSelection.between(
+        transaction.doc.resolve(start),
+        transaction.doc.resolve(end),
+      ),
+    );
+    view.dispatch(transaction.scrollIntoView());
+    view.focus();
+  });
+}
+
+/**
+ * Finds the contiguous link range touching the current selection.
+ *
+ * @param state - Current editor state.
+ * @param linkType - Restricted link mark type.
+ * @returns The matching contiguous link range, when present.
+ */
+function linkRange(state: EditorState, linkType: MarkType) {
+  const { from, to } = state.selection;
+  const ranges: LinkRange[] = [];
+  state.doc.descendants((node, position) => {
+    if (!node.isText) return;
+    const mark = linkType.isInSet(node.marks);
+    if (!mark) return;
+    const end = position + node.nodeSize;
+    const previous = ranges.at(-1);
+    if (previous?.to === position && previous.url === mark.attrs.href) {
+      previous.to = end;
+    } else {
+      ranges.push({ from: position, to: end, url: mark.attrs.href });
+    }
+  });
+  return ranges.find((range) =>
+    from === to
+      ? from >= range.from && from <= range.to
+      : from < range.to && to > range.from,
+  );
 }

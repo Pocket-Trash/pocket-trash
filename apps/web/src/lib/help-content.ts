@@ -2,6 +2,7 @@ import {
   formatTranslation,
   type SupportedLocale,
 } from "@pocket-trash/localizations";
+import englishMarkdownGuide from "@pocket-trash/localizations/help/en-US/how-to-use-markdown.mdx?raw";
 import englishGuide from "@pocket-trash/localizations/help/en-US/image-size-and-resolution-guide.mdx?raw";
 import spanishGuide from "@pocket-trash/localizations/help/es-MX/image-size-and-resolution-guide.mdx?raw";
 
@@ -15,7 +16,9 @@ export type HelpDocument = {
   slug: string;
 };
 
+/** Raw localized help documents compiled into the web bundle as text. */
 const rawDocuments = {
+  "/help/en-US/how-to-use-markdown.mdx": englishMarkdownGuide,
   "/help/en-US/image-size-and-resolution-guide.mdx": englishGuide,
   "/help/es-MX/image-size-and-resolution-guide.mdx": spanishGuide,
 };
@@ -40,6 +43,18 @@ export function getHelpDocument(
   slug: string,
 ): HelpDocument | undefined {
   return documents.get(`${locale}/${slug}`) ?? documents.get(`en-US/${slug}`);
+}
+
+/**
+ * Lists help topics in their English source order with locale fallbacks.
+ *
+ * @param locale - Preferred locale for each topic.
+ * @returns Every published help document.
+ */
+export function getHelpDocuments(locale: SupportedLocale): HelpDocument[] {
+  return [...documents.entries()]
+    .filter(([key]) => key.startsWith("en-US/"))
+    .map(([, document]) => getHelpDocument(locale, document.slug) ?? document);
 }
 
 export function getImageUploadGuidance(locale: SupportedLocale) {

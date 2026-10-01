@@ -24,6 +24,98 @@
 
 
 
+
+## 0.6.0
+
+### Minor Changes
+
+* Record transactional audit events for collection, item, cover, and image mutations, including required reasons for staff actions on another owner's collection. (@app/api, @app/web, @package/services)
+* Record transactional audit events for product, product-image, catalog lookup, and maker URL-validity mutations, including required reasons for cross-owner staff actions. (@app/web, @package/services)
+* Delete Clerk accounts last, resume erasure from deletion webhooks, and report provider orphans without exposing user identifiers. (@app/api, @app/web, @package/logger, @package/services)
+* Add collection image galleries, batch uploads, cover management, and automatic cover replacement. (@app/web, @package/services)
+* Add authenticated feedback submission, personal request tracking, and admin moderation. (@app/web, @package/database, @package/logger, @package/services)
+* Connect admin Linear accounts and plan approved feedback as retry-safe issues or projects. (@app/web, @package/logger, @package/services)
+* Add the durable complete-erasure request service and account guard. (@app/api, @app/web, @package/database, @package/logger, @package/services)
+* Add grouped admin navigation, notification hubs, and feedback administration. (@app/web, @package/logger, @package/services)
+* Add the permission-gated, filtered, keyset-paginated admin audit log. (@app/web, @package/services)
+* Add atomic collection archive, move-and-delete, and permanent deletion choices with authorization and storage cleanup. (@app/web, @package/logger, @package/services)
+* Add permission-gated user ban management with resumable Clerk reconciliation. (@app/web, @package/database, @package/services)
+* Add verified self-service and admin account-erasure actions and status pages. (@app/web, @package/database, @package/services)
+* Erase account-owned upload objects from Bunny Storage and its CDN with durable exact-key retries. (@app/api, @package/database, @package/services, @package/storage)
+* Add product source details and collection item description and bearing overrides. (@app/web, @package/database, @package/logger, @package/services)
+* Publish the English Terms of Service at the public route. (@app/web)
+* Add bounded audit-log exports. (@package/database, @package/services, @app/web)
+* Add global route error recovery with safe diagnostics. (@app/web, @package/logger)
+* Publish the English Privacy Policy at the public privacy route. (@app/web)
+* Add protected deletion for completed audit-log exports. (@package/database, @package/services, @app/web)
+* Add feedback request, active, and archive administration. (@app/web, @package/database, @package/logger, @package/services)
+* Erase account-linked database records while preserving shared data without attribution. (@package/database, @package/services)
+* Add the reusable visual and Source Markdown editor and shared code-block downgrade helper. (@app/web, @package/markdown)
+* Support AVIF image uploads across catalog and resource workflows. (@app/api, @app/scraper, @app/web, @package/services, @package/storage)
+* Add code-owned staff roles and exact capability checks across API, web, and service authorization. (@app/api, @app/web, @package/services)
+* Add the append-only audit event schema, shared audit writer, and account-erasure redaction support. (@package/database, @package/logger, @package/services)
+* Synchronize feedback lifecycle states with Linear. (@app/api, @app/web, @package/database, @package/logger, @package/services)
+* Unify uploads and safe cleanup through shared storage sessions, preserve originals up to 25 MiB, and optimize image delivery with Bunny Dynamic Images.
+  Require an explicit valid scraper image folder prefix at startup and remove the production namespace fallback.
+  Log storage mutations and cleanup retries, queue physical deletion after database commit, and consolidate storage configuration and app import boundaries.
+  Use localizations v0.9.0 for upload size labels and shared upload errors, and correct resource image help to 25 MiB.
+  Include storage target and file types, file and cleanup counts, and hashed file identifiers in operation logs. (@app/api, @app/web, @app/scraper, @package/database, @package/services, @package/storage, @package/logger, @package/eslint)
+* Forward Linear webhooks to preview and local environments. (@app/api)
+* Add feedback discovery, voting, duplicate suggestions, and complete request history. (@app/web, @package/logger, @package/services)
+
+### Patch Changes
+
+* Audit feedback and feature-flag administration. (@app/web, @package/services)
+* Add a localized site-wide footer and public contact, privacy, and terms placeholders. (@app/web)
+* Download complete resource versions and count downloads per version. (@app/web, @package/database, @package/storage, @package/services)
+* Centralize Biome formatting and ESLint rules in the shared lint package. (@app/web)
+* Remove legacy Pocket Trash skill version checks and install the current skills on demand. (@app/web)
+* Document FigJam tooling contracts. (@package/figjam)
+* Document database tooling, seed data, runtime contracts, and migration-test fixtures. (@package/database)
+* Prevent collection buttons from being installed on multiple spinners. (@package/database, @package/services)
+* Deploy and validate the secrets required for complete account erasure. (@app/api)
+* Run database migrations through direct Neon connections while keeping deployed application traffic pooled. (@package/database)
+* Load the approved v1.1 Privacy Policy and Terms of Service (@app/web)
+* Cover spinner-only form fields and fix API preview deployments. (@app/api, @app/web)
+* Enforce complete JSDoc on changed declarations. (@package/eslint)
+* Audit resource mutations with staff reasons and erasure-safe state snapshots. (@package/services, @app/web)
+* Document scraper database and queue contracts. (@app/scraper)
+* Document Autmog and Grimsmo source integration contracts. (@app/scraper)
+* Classify new resource categories without PostgreSQL system columns. (@package/services)
+* Block account-linked writes after complete erasure begins and verify every retryable workflow step converges. (@package/database, @package/services)
+* Ignore the local `.linear.toml` linear-cli config. (pocket-trash.app)
+* Keep Neon preview databases isolated from production user data and avoid printing masked secrets outside GitHub Actions. (@app/api)
+* Add guarded Playwright E2E foundations and isolated PR preview fixtures. (@package/infisical-runner, @app/web)
+* Document scraper shell, scheduling, Shopify, and utility contracts. (@app/scraper)
+* Reject non-positive spinner measurements in PostgreSQL. (@package/database)
+* Document GitHub Discord notifier contracts. (@package/github-discord-notifier)
+* Document repository tooling and FigJam plugin contracts. (@package/figjam)
+* Prevent concurrent active scraper runs per source and job type. (@package/database, @app/scraper)
+* Update Pocket Trash skills to v0.4.0. (@app/web)
+* Audit account-erasure requests and terminal transitions. (@app/web, @package/services)
+* Document the owner collection-item index evaluation. (@package/database)
+* Record the verified non-production lineage of every Neon development and preview branch. (@app/api)
+* Record verified provider deletion guarantees in erasure receipts and operational guidance. (@app/api)
+* Inject personal database secrets when running database seeds. (@package/infisical-runner)
+* Refresh the shared preview database after schema-changing development deployments. (@app/api)
+* Render user Markdown through a restricted safe subset and enable sanitized Markdown code highlighting only for trusted help content. (@app/web, @package/markdown)
+* Document service foundation contracts. (@package/services)
+* Enforce valid verification provenance for account erasure requests. (@package/database)
+* Document feature-flag contracts. (@package/feature-flags)
+* Prevent case-only duplicate catalog names. (@package/database, @package/services)
+* Reject unknown feedback values in PostgreSQL. (@package/database)
+* Document database schema tables, relations, enums, and normalized scraper contracts. (@package/database)
+* Document Infisical runner contracts. (@package/infisical-runner)
+* Keep pull request release labels synchronized with their Changesets. (@package/eslint)
+* Updated agent skills (@app/web)
+* Document storage contracts. (@package/storage)
+* Document logger contracts and live-test behavior. (@package/logger)
+* Apply design-system typography to catalog detail descriptions. (@app/web)
+* Uploaded static image URLs (@app/web)
+* Seed shared non-production databases after migrations. (@package/database, @app/api)
+* Document the shared erasure HMAC secret configuration for web and API environments. (@app/api, @app/web)
+* Document Markdown conversion contracts. (@package/markdown)
+
 ## 0.5.1
 
 ### Patch Changes
