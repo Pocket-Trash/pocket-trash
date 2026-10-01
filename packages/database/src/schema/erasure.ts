@@ -11,19 +11,23 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+/** Actors allowed to initiate an erasure request. */
 export const erasureInitiators = ["self", "admin"] as const;
+/** Durable lifecycle states for an erasure request. */
 export const erasureStatuses = [
   "pending",
   "running",
   "completed",
   "needs_attention",
 ] as const;
+/** Supported provenance methods for verified erasure requests. */
 export const erasureVerificationMethods = [
   "clerk_reverification",
   "authenticated_request",
   "verified_email",
   "clerk_webhook",
 ] as const;
+/** Ordered operation names in the erasure workflow. */
 export const erasureStepNames = [
   "quiesce",
   "snapshot",
@@ -34,22 +38,35 @@ export const erasureStepNames = [
   "verify",
 ] as const;
 
+/** Supported value for erasure initiator. */
 export type ErasureInitiator = (typeof erasureInitiators)[number];
+/** Supported value for erasure status. */
 export type ErasureStatus = (typeof erasureStatuses)[number];
+/** Supported value for erasure verification method. */
 export type ErasureVerificationMethod =
   (typeof erasureVerificationMethods)[number];
+/** Supported value for erasure step name. */
 export type ErasureStepName = (typeof erasureStepNames)[number];
+/** Temporary legal or operational reason that prevents deleting retained data. */
 export type ErasureRetentionException = {
+  /** Stable code identifying the retention exception. */
   code: string;
+  /** ISO timestamp when the retention exception expires. */
   expiresAt: string;
 };
+/** Durable completion state and retention exceptions for one erasure step. */
 export type ErasureStepResult = {
+  /** ISO timestamp when the step completed. */
   completedAt?: string;
+  /** Retention exceptions that remain after the step. */
   exceptions?: ErasureRetentionException[];
+  /** Current durable state of the operation step. */
   status: "pending" | "completed";
 };
+/** Durable results keyed by every erasure workflow step. */
 export type ErasureStepResults = Record<ErasureStepName, ErasureStepResult>;
 
+/** Durable idempotent account-erasure requests and progress receipts. */
 export const erasureRequest = pgTable(
   "erasure_request",
   {
@@ -139,5 +156,7 @@ export const erasureRequest = pgTable(
   ],
 );
 
+/** Stored erasure-request row. */
 export type ErasureRequest = typeof erasureRequest.$inferSelect;
+/** Values accepted when creating an erasure-request row. */
 export type NewErasureRequest = typeof erasureRequest.$inferInsert;

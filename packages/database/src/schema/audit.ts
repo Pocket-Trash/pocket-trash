@@ -12,15 +12,24 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+/** JSON value accepted in an audit payload. */
 export type AuditJson =
   | boolean
   | null
   | number
   | string
   | AuditJson[]
-  | { [key: string]: AuditJson };
-export type AuditJsonObject = { [key: string]: AuditJson };
+  | {
+      /** JSON values keyed by audit field name. */
+      [key: string]: AuditJson;
+    };
+/** String-keyed JSON object accepted in an audit payload. */
+export type AuditJsonObject = {
+  /** JSON values keyed by audit field name. */
+  [key: string]: AuditJson;
+};
 
+/** Append-only audit events, except for account-erasure redaction and retention deletion. */
 export const auditEvent = pgTable(
   "audit_event",
   {
@@ -116,7 +125,9 @@ export const auditEvent = pgTable(
   ],
 );
 
+/** Stored audit event row. */
 export type AuditEvent = typeof auditEvent.$inferSelect;
+/** Values accepted when creating an audit-event row. */
 export type NewAuditEvent = typeof auditEvent.$inferInsert;
 
 /** Durable ranges and completion state for bounded audit exports. */

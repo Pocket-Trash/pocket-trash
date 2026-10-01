@@ -15,24 +15,50 @@ import {
 import { createScraperLogger } from "./lib/logger.js";
 import type { ScraperSourceName } from "./scraper-types.js";
 
+/**
+ * Scraper command parsed from process arguments.
+ */
 type ScraperCommand =
   | {
+      /**
+       * Railway cron command discriminator.
+       */
       type: "cron:run";
     }
   | {
+      /**
+       * Dead-letter queue command discriminator.
+       */
       type: "process:dead-letter";
     }
   | {
+      /**
+       * Queue-processing command discriminator.
+       */
       type: "process:queue";
     }
   | {
+      /**
+       * Scraper source to enqueue.
+       */
       source: ScraperSourceName;
+      /**
+       * Single-source scrape command discriminator.
+       */
       type: "scrape";
     }
   | {
+      /**
+       * All-source scrape command discriminator.
+       */
       type: "scrape:all";
     };
 
+/**
+ * Runs the requested scraper CLI command and flushes acquired resources.
+ *
+ * @rejects When environment validation, resource setup, or the command fails.
+ */
 async function main() {
   let logger: Logger | undefined;
   let command: ScraperCommand | undefined;
@@ -120,6 +146,13 @@ async function main() {
   }
 }
 
+/**
+ * Parses supported scraper CLI arguments, tolerating the package-runner separator.
+ *
+ * @param args - Command arguments without the Node executable and script path.
+ * @returns The normalized scraper command.
+ * @throws When the command or scraper source is unsupported.
+ */
 export function parseCommand(args: string[]): ScraperCommand {
   const normalizedArgs = args.filter((arg) => arg !== "--");
   const [command, sourceArg] = normalizedArgs;
@@ -163,6 +196,12 @@ export function parseCommand(args: string[]): ScraperCommand {
   );
 }
 
+/**
+ * Formats a parsed command for structured diagnostic logging.
+ *
+ * @param command - Parsed scraper command.
+ * @returns The command name, including its source when applicable.
+ */
 function formatCommand(command: ScraperCommand): string {
   if (
     command.type === "cron:run" ||
@@ -176,6 +215,12 @@ function formatCommand(command: ScraperCommand): string {
   return `${command.type}:${command.source}`;
 }
 
+/**
+ * Summarizes a Redis environment value without exposing URL credentials.
+ *
+ * @param value - Raw Redis environment value.
+ * @returns Presence, length, reference syntax, and a credential-redacted value.
+ */
 export function formatRedisEnvDebugValue(value: string | undefined) {
   if (value === undefined) {
     return {
@@ -191,6 +236,12 @@ export function formatRedisEnvDebugValue(value: string | undefined) {
   };
 }
 
+/**
+ * Redacts username and password fields from a URL-like value.
+ *
+ * @param value - Potential URL.
+ * @returns A serialized URL with redacted credentials, or the original non-URL value.
+ */
 function redactUrlCredentials(value: string): string {
   try {
     const url = new URL(value);
@@ -206,6 +257,12 @@ function redactUrlCredentials(value: string): string {
   }
 }
 
+/**
+ * Checks whether a value names a configured scraper source.
+ *
+ * @param value - Candidate source name.
+ * @returns Whether the value is a supported scraper source key.
+ */
 function isScraperSourceKey(
   value: string | undefined,
 ): value is ScraperSourceName {

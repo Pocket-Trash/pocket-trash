@@ -11,6 +11,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+/** Supported product-feedback categories. */
 export const feedbackCategories = [
   "product_type",
   "feature",
@@ -18,6 +19,7 @@ export const feedbackCategories = [
   "bug",
 ] as const;
 
+/** Durable lifecycle states for feedback requests. */
 export const feedbackStatuses = [
   "pending",
   "requested",
@@ -29,9 +31,12 @@ export const feedbackStatuses = [
   "canceled",
 ] as const;
 
+/** Lifecycle events that create feedback notifications. */
 export const feedbackNotificationTypes = ["submitted", "completed"] as const;
 
+/** Supported feedback category value. */
 export type FeedbackCategory = (typeof feedbackCategories)[number];
+/** Supported feedback status value. */
 export type FeedbackStatus = (typeof feedbackStatuses)[number];
 
 /** Feedback request records and Linear lifecycle metadata. */
@@ -97,6 +102,7 @@ export const feedback = pgTable(
   ],
 );
 
+/** Unique user votes attached to feedback requests. */
 export const feedbackVotes = pgTable(
   "feedback_votes",
   {
@@ -115,6 +121,7 @@ export const feedbackVotes = pgTable(
   ],
 );
 
+/** User notifications emitted by feedback lifecycle changes. */
 export const feedbackNotifications = pgTable(
   "feedback_notifications",
   {

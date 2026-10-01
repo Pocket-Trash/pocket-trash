@@ -55,12 +55,14 @@ import { uploadFile, uploadSession } from "./uploads.js";
 import { userSettings } from "./user-settings.js";
 import { user } from "./users.js";
 
+/** Connects an application user to owned collections, items, and settings. */
 export const usersRelations = relations(user, ({ many, one }) => ({
   collections: many(userCollection),
   collectionItems: many(collectionItem),
   settings: one(userSettings),
 }));
 
+/** Connects a user collection to its owner, images, and items. */
 export const userCollectionRelations = relations(
   userCollection,
   ({ many, one }) => ({
@@ -73,6 +75,7 @@ export const userCollectionRelations = relations(
   }),
 );
 
+/** Connects user settings to their application user. */
 export const userSettingsRelations = relations(userSettings, ({ one }) => ({
   user: one(user, {
     fields: [userSettings.userId],
@@ -80,6 +83,7 @@ export const userSettingsRelations = relations(userSettings, ({ one }) => ({
   }),
 }));
 
+/** Connects a resource to its categories, images, notifications, and versions. */
 export const resourcesRelations = relations(resources, ({ many }) => ({
   categories: many(resourcesToCategories),
   images: many(resourceImages),
@@ -87,6 +91,7 @@ export const resourcesRelations = relations(resources, ({ many }) => ({
   versions: many(resourceVersions),
 }));
 
+/** Connects a resource image to its resource. */
 export const resourceImagesRelations = relations(resourceImages, ({ one }) => ({
   resource: one(resources, {
     fields: [resourceImages.resourceId],
@@ -94,6 +99,7 @@ export const resourceImagesRelations = relations(resourceImages, ({ one }) => ({
   }),
 }));
 
+/** Connects a resource version to its resource, downloads, and files. */
 export const resourceVersionsRelations = relations(
   resourceVersions,
   ({ many, one }) => ({
@@ -106,6 +112,7 @@ export const resourceVersionsRelations = relations(
   }),
 );
 
+/** Connects a collection image to its collection. */
 export const collectionImageRelations = relations(
   collectionImage,
   ({ one }) => ({
@@ -116,6 +123,7 @@ export const collectionImageRelations = relations(
   }),
 );
 
+/** Connects a resource file to its immutable resource version. */
 export const resourceFilesRelations = relations(resourceFiles, ({ one }) => ({
   version: one(resourceVersions, {
     fields: [resourceFiles.versionId],
@@ -123,6 +131,7 @@ export const resourceFilesRelations = relations(resourceFiles, ({ one }) => ({
   }),
 }));
 
+/** Connects a resource category to assignments and category notifications. */
 export const resourceCategoriesRelations = relations(
   resourceCategories,
   ({ many }) => ({
@@ -131,6 +140,7 @@ export const resourceCategoriesRelations = relations(
   }),
 );
 
+/** Connects a resource notification to its resource and optional category subjects. */
 export const resourceNotificationsRelations = relations(
   resourceNotifications,
   ({ one }) => ({
@@ -145,6 +155,7 @@ export const resourceNotificationsRelations = relations(
   }),
 );
 
+/** Connects each resource-category assignment to its resource and category. */
 export const resourcesToCategoriesRelations = relations(
   resourcesToCategories,
   ({ one }) => ({
@@ -159,6 +170,7 @@ export const resourcesToCategoriesRelations = relations(
   }),
 );
 
+/** Connects a resource download to the downloaded version. */
 export const resourceDownloadsRelations = relations(
   resourceDownloads,
   ({ one }) => ({
@@ -169,10 +181,12 @@ export const resourceDownloadsRelations = relations(
   }),
 );
 
+/** Connects a feature flag to its per-user overrides. */
 export const featureFlagsRelations = relations(featureFlags, ({ many }) => ({
   userOverrides: many(featureFlagUserOverrides),
 }));
 
+/** Connects a feature-flag override to its flag and user. */
 export const featureFlagUserOverridesRelations = relations(
   featureFlagUserOverrides,
   ({ one }) => ({
@@ -187,6 +201,7 @@ export const featureFlagUserOverridesRelations = relations(
   }),
 );
 
+/** Connects a maker to catalog products and staged Autmog, Grimsmo pen, and Grimsmo knife records. */
 export const makersRelations = relations(maker, ({ many }) => ({
   autmogPens: many(tmpAutmogPens),
   grimsmoKnives: many(tmpGrimsmoKnives),
@@ -194,23 +209,28 @@ export const makersRelations = relations(maker, ({ many }) => ({
   products: many(product),
 }));
 
+/** Connects a material to catalog products, collection items, and staged Autmog pens. */
 export const materialsRelations = relations(material, ({ many }) => ({
   autmogPens: many(tmpAutmogPenMaterials),
   collectionItems: many(collectionItem),
   products: many(productMaterial),
 }));
 
+/** Connects a mechanism to staged Autmog pens. */
 export const mechanismsRelations = relations(mechanism, ({ many }) => ({
   autmogPens: many(tmpAutmogPens),
 }));
 
+/** Connects a product type to catalog products and staged product assignments. */
 export const productTypesRelations = relations(productType, ({ many }) => ({
   catalogProducts: many(product),
   products: many(tmpProductProductTypes),
 }));
 
+/** Scraper-run relation metadata reserved for query composition. */
 export const scraperRunsRelations = relations(scraperRuns, () => ({}));
 
+/** Connects a collection item to its collection, owner, trade users, catalog details, images, finish, and spinner data. */
 export const collectionItemRelations = relations(
   collectionItem,
   ({ many, one }) => ({
@@ -247,6 +267,7 @@ export const collectionItemRelations = relations(
   }),
 );
 
+/** Connects a collection-item image to its item. */
 export const collectionItemImageRelations = relations(
   collectionItemImage,
   ({ one }) => ({
@@ -257,6 +278,7 @@ export const collectionItemImageRelations = relations(
   }),
 );
 
+/** Connects a catalog product to its maker, type, finishes, images, materials, and spinner data. */
 export const productRelations = relations(product, ({ many, one }) => ({
   finishOptions: many(finishOption),
   images: many(productImage),
@@ -279,6 +301,7 @@ export const productRelations = relations(product, ({ many, one }) => ({
   }),
 }));
 
+/** Connects a product image to its catalog product. */
 export const productImageRelations = relations(productImage, ({ one }) => ({
   product: one(product, {
     fields: [productImage.productId],
@@ -286,6 +309,7 @@ export const productImageRelations = relations(productImage, ({ one }) => ({
   }),
 }));
 
+/** Connects each product-material assignment to its product and material. */
 export const productMaterialRelations = relations(
   productMaterial,
   ({ one }) => ({
@@ -300,18 +324,22 @@ export const productMaterialRelations = relations(
   }),
 );
 
+/** Connects a finish to the finish options that include it. */
 export const finishesRelations = relations(finish, ({ many }) => ({
   options: many(finishOptionFinish),
 }));
 
+/** Connects a color to the finish options that include it. */
 export const colorsRelations = relations(color, ({ many }) => ({
   options: many(finishOptionColor),
 }));
 
+/** Connects a color effect to finish options that use it. */
 export const colorEffectsRelations = relations(colorEffect, ({ many }) => ({
   options: many(finishOption),
 }));
 
+/** Connects a finish option to its product or item, source and derived options, color effect, colors, and finishes. */
 export const finishOptionRelations = relations(
   finishOption,
   ({ many, one }) => ({
@@ -340,6 +368,7 @@ export const finishOptionRelations = relations(
   }),
 );
 
+/** Connects each finish-option assignment to its option and finish. */
 export const finishOptionFinishRelations = relations(
   finishOptionFinish,
   ({ one }) => ({
@@ -354,6 +383,7 @@ export const finishOptionFinishRelations = relations(
   }),
 );
 
+/** Connects each finish-option color assignment to its option and color. */
 export const finishOptionColorRelations = relations(
   finishOptionColor,
   ({ one }) => ({
@@ -368,6 +398,7 @@ export const finishOptionColorRelations = relations(
   }),
 );
 
+/** Connects product spinner measurements to their catalog product. */
 export const productSpinnerRelations = relations(productSpinner, ({ one }) => ({
   product: one(product, {
     fields: [productSpinner.id],
@@ -375,6 +406,7 @@ export const productSpinnerRelations = relations(productSpinner, ({ one }) => ({
   }),
 }));
 
+/** Connects product spinner-button measurements to their catalog product. */
 export const productSpinnerButtonRelations = relations(
   productSpinnerButton,
   ({ one }) => ({
@@ -385,6 +417,7 @@ export const productSpinnerButtonRelations = relations(
   }),
 );
 
+/** Connects a collection spinner to its item, catalog spinner, and installed button. */
 export const collectionSpinnerRelations = relations(
   collectionSpinner,
   ({ one }) => ({
@@ -403,6 +436,7 @@ export const collectionSpinnerRelations = relations(
   }),
 );
 
+/** Connects a collection spinner button to its item and catalog button. */
 export const collectionSpinnerButtonRelations = relations(
   collectionSpinnerButton,
   ({ one }) => ({
@@ -417,6 +451,7 @@ export const collectionSpinnerButtonRelations = relations(
   }),
 );
 
+/** Connects a staged Autmog pen to its maker, materials, mechanism, product, and versions. */
 export const tmpAutmogPensRelations = relations(
   tmpAutmogPens,
   ({ many, one }) => ({
@@ -437,6 +472,7 @@ export const tmpAutmogPensRelations = relations(
   }),
 );
 
+/** Connects each staged Autmog pen-material assignment to its pen and material. */
 export const tmpAutmogPenMaterialsRelations = relations(
   tmpAutmogPenMaterials,
   ({ one }) => ({
@@ -451,6 +487,7 @@ export const tmpAutmogPenMaterialsRelations = relations(
   }),
 );
 
+/** Connects a staged product to source-specific details, images, product types, and variations. */
 export const tmpProductsRelations = relations(tmpProducts, ({ many, one }) => ({
   autmogPen: one(tmpAutmogPens, {
     fields: [tmpProducts.id],
@@ -469,6 +506,7 @@ export const tmpProductsRelations = relations(tmpProducts, ({ many, one }) => ({
   variations: many(tmpProductVariations),
 }));
 
+/** Connects a staged product variation to its product, images, and source-specific details. */
 export const tmpProductVariationsRelations = relations(
   tmpProductVariations,
   ({ many, one }) => ({
@@ -488,6 +526,7 @@ export const tmpProductVariationsRelations = relations(
   }),
 );
 
+/** Connects each staged product-type assignment to its product and type. */
 export const tmpProductProductTypesRelations = relations(
   tmpProductProductTypes,
   ({ one }) => ({
@@ -502,6 +541,7 @@ export const tmpProductProductTypesRelations = relations(
   }),
 );
 
+/** Connects a staged image to its product and optional variation. */
 export const tmpImagesRelations = relations(tmpImages, ({ one }) => ({
   product: one(tmpProducts, {
     fields: [tmpImages.productId],
@@ -513,6 +553,7 @@ export const tmpImagesRelations = relations(tmpImages, ({ one }) => ({
   }),
 }));
 
+/** Connects an Autmog pen snapshot to its staged pen. */
 export const tmpAutmogPenVersionsRelations = relations(
   tmpAutmogPenVersions,
   ({ one }) => ({
@@ -523,6 +564,7 @@ export const tmpAutmogPenVersionsRelations = relations(
   }),
 );
 
+/** Connects a staged Grimsmo pen to its maker, product, variations, and versions. */
 export const tmpGrimsmoPensRelations = relations(
   tmpGrimsmoPens,
   ({ many, one }) => ({
@@ -539,6 +581,7 @@ export const tmpGrimsmoPensRelations = relations(
   }),
 );
 
+/** Connects a staged Grimsmo pen variation to its pen, normalized variation, and versions. */
 export const tmpGrimsmoPenVariationsRelations = relations(
   tmpGrimsmoPenVariations,
   ({ many, one }) => ({
@@ -554,6 +597,7 @@ export const tmpGrimsmoPenVariationsRelations = relations(
   }),
 );
 
+/** Connects a Grimsmo pen snapshot to its staged pen. */
 export const tmpGrimsmoPenVersionsRelations = relations(
   tmpGrimsmoPenVersions,
   ({ one }) => ({
@@ -564,6 +608,7 @@ export const tmpGrimsmoPenVersionsRelations = relations(
   }),
 );
 
+/** Connects a Grimsmo pen-variation snapshot to its staged variation. */
 export const tmpGrimsmoPenVariationVersionsRelations = relations(
   tmpGrimsmoPenVariationVersions,
   ({ one }) => ({
@@ -574,6 +619,7 @@ export const tmpGrimsmoPenVariationVersionsRelations = relations(
   }),
 );
 
+/** Connects a staged Grimsmo knife to its maker, product, variations, and versions. */
 export const tmpGrimsmoKnivesRelations = relations(
   tmpGrimsmoKnives,
   ({ many, one }) => ({
@@ -590,6 +636,7 @@ export const tmpGrimsmoKnivesRelations = relations(
   }),
 );
 
+/** Connects a staged Grimsmo knife variation to its knife, normalized variation, and versions. */
 export const tmpGrimsmoKnifeVariationsRelations = relations(
   tmpGrimsmoKnifeVariations,
   ({ many, one }) => ({
@@ -605,6 +652,7 @@ export const tmpGrimsmoKnifeVariationsRelations = relations(
   }),
 );
 
+/** Connects a Grimsmo knife snapshot to its staged knife. */
 export const tmpGrimsmoKnifeVersionsRelations = relations(
   tmpGrimsmoKnifeVersions,
   ({ one }) => ({
@@ -615,6 +663,7 @@ export const tmpGrimsmoKnifeVersionsRelations = relations(
   }),
 );
 
+/** Connects a Grimsmo knife-variation snapshot to its staged variation. */
 export const tmpGrimsmoKnifeVariationVersionsRelations = relations(
   tmpGrimsmoKnifeVariationVersions,
   ({ one }) => ({
@@ -625,9 +674,11 @@ export const tmpGrimsmoKnifeVariationVersionsRelations = relations(
   }),
 );
 
+/** Connects an upload session to its files. */
 export const uploadSessionRelations = relations(uploadSession, ({ many }) => ({
   files: many(uploadFile),
 }));
+/** Connects an upload file to its session. */
 export const uploadFileRelations = relations(uploadFile, ({ one }) => ({
   session: one(uploadSession, {
     fields: [uploadFile.sessionId],

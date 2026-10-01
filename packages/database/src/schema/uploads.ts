@@ -12,13 +12,16 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+/** Entity types that can own an upload session. */
 export const uploadTargetTypes = [
   "product",
   "collection",
   "collection_item",
   "resource",
 ] as const;
+/** Supported file roles within an upload session. */
 export const uploadFileKinds = ["image", "file"] as const;
+/** Authenticated upload reservations with expiry and completion state. */
 export const uploadSession = pgTable(
   "upload_session",
   {
@@ -58,6 +61,7 @@ export const uploadSession = pgTable(
       .where(sql`${t.targetType} = 'resource' and ${t.completedAt} is null`),
   ],
 );
+/** Declared files and reserved object paths within upload sessions. */
 export const uploadFile = pgTable(
   "upload_file",
   {
@@ -91,6 +95,7 @@ export const uploadFile = pgTable(
   ],
 );
 
+/** Durable post-commit queue of storage objects awaiting deletion. */
 export const storageObjectDeletion = pgTable(
   "storage_object_deletion",
   {
