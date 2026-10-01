@@ -10,7 +10,9 @@ import {
   type UploadStorage,
 } from "../index.js";
 
+/** Stable digest used by upload storage fixtures. */
 const hash = await sha256(new Uint8Array([1, 2, 3]));
+/** Complete Bunny configuration used by upload storage tests. */
 const config = {
   accessKey: "storage-key",
   apiKey: "account-key",
@@ -34,6 +36,11 @@ describe("resource storage", () => {
     const archive = createUncompressedZip(
       files.map(({ bytes, fileName }) => ({
         fileName,
+        /**
+         * Opens the fixture body stream.
+         *
+         * @returns A stream over the fixture bytes.
+         */
         open: async () => new Blob([bytes]).stream(),
         size: bytes.byteLength,
       })),
@@ -146,6 +153,11 @@ describe("resource storage", () => {
 
   it("creates a server-owned target and streams a fixed-length body", async () => {
     const body = new ReadableStream({
+      /**
+       * Enqueues the fixed upload fixture.
+       *
+       * @param controller - Stream controller receiving fixture bytes.
+       */
       start(controller) {
         controller.enqueue(new Uint8Array([1, 2, 3]));
         controller.close();
@@ -455,6 +467,13 @@ describe("resource storage", () => {
   });
 });
 
+/**
+ * Normalizes a Fetch input into a URL for assertions.
+ *
+ * @param input - Fetch URL, request, or URL object.
+ * @returns Parsed request URL.
+ * @throws When a string or request URL is invalid.
+ */
 function toUrl(input: Parameters<typeof fetch>[0]): URL {
   if (typeof input === "string") {
     return new URL(input);
@@ -495,6 +514,16 @@ async function putFile(
   });
   return target;
 }
+
+/**
+ * Uploads a resource image in storage tests.
+ *
+ * @param storage - Upload storage under test.
+ * @param input - Image metadata and bytes.
+ * @param resourceId - Target resource identifier.
+ * @returns The created image target.
+ * @rejects When hashing, image validation, or storage upload fails.
+ */
 async function putImage(
   storage: UploadStorage,
   input: UploadInput,
