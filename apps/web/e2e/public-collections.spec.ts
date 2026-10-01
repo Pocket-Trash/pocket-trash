@@ -266,6 +266,10 @@ type PublicPrivacyFixture = {
 async function createPublicPrivacyFixture(
   mutation: MutationFixture,
 ): Promise<PublicPrivacyFixture> {
+  const collectionId = mutation.collectionId;
+  if (collectionId === null) {
+    throw new Error("The public privacy fixture collection is missing.");
+  }
   const database = createDb({
     databaseUrl: requiredEnvironment("DATABASE_URL"),
   });
@@ -278,7 +282,7 @@ async function createPublicPrivacyFixture(
   const [privateCollection] = await database
     .select({ id: schema.userCollection.id, name: schema.userCollection.name })
     .from(schema.userCollection)
-    .where(eq(schema.userCollection.id, mutation.collectionId))
+    .where(eq(schema.userCollection.id, collectionId))
     .limit(1);
   if (!owner || !privateCollection) {
     throw new Error("The public privacy fixture dependencies are missing.");

@@ -2,4 +2,4 @@
 "@app/web": patch
 ---
 
-Restrict isolated Neon preview branches to database-changing pull requests.
+Restrict isolated Neon preview branches and keep collection privacy fixtures type-safe.
