@@ -27,19 +27,31 @@ import {
 } from "@/lib/feedback-shared";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Active feedback item returned by the server. */
 type ActiveFeedback = Awaited<ReturnType<typeof listActiveFeedback>>[number];
 /** Completed feedback item returned by the server. */
 type CompletedFeedback = Awaited<
   ReturnType<typeof listCompletedFeedback>
 >[number];
+/** One page of feedback submitted by the current user. */
 type MyFeedbackPageData = Awaited<ReturnType<typeof listMyFeedback>>;
+/** Feedback item submitted by the current user. */
 type MyFeedback = MyFeedbackPageData["items"][number];
+/** Values collected by the feedback submission form. */
 type FeedbackFormInput = {
+  /** Selected feedback category, or an empty string before selection. */
   category: string;
+  /** Detailed feedback description. */
   description: string;
+  /** Short feedback title. */
   title: string;
 };
 
+/**
+ * Renders the duplicate-aware feedback submission flow.
+ *
+ * @returns The feedback submission page.
+ */
 export function SubmitFeedbackPage() {
   const { locale } = useLocale();
   const formRef = useRef<HTMLFormElement>(null);
@@ -48,6 +60,11 @@ export function SubmitFeedbackPage() {
   const [submitting, setSubmitting] = useState(false);
   const t = useFeedbackCopy();
 
+  /**
+   * Submits feedback and navigates to the user's request history on success.
+   *
+   * @param data - Validated feedback form values.
+   */
   async function save(data: FeedbackFormInput) {
     const result = await submitFeedback({ data });
     if (!result.ok) {
@@ -191,6 +208,7 @@ export function SubmitFeedbackPage() {
 export function FeedbackBoardPage({
   initialItems,
 }: {
+  /** Active feedback items loaded for the first render. */
   initialItems: ActiveFeedback[];
 }) {
   const [error, setError] = useState(false);
@@ -410,9 +428,16 @@ export function CompletedFeedbackPage({
   );
 }
 
+/**
+ * Renders the current user's searchable, paginated feedback history.
+ *
+ * @param root0 - Initial feedback page.
+ * @returns The user's feedback history page.
+ */
 export function MyFeedbackPage({
   initialPage,
 }: {
+  /** Feedback page loaded for the first render. */
   initialPage: MyFeedbackPageData;
 }) {
   const [error, setError] = useState(false);
@@ -422,6 +447,11 @@ export function MyFeedbackPage({
   const [search, setSearch] = useState("");
   const t = useFeedbackCopy();
 
+  /**
+   * Loads one page of the current user's feedback using the active search.
+   *
+   * @param nextOffset - Zero-based result offset to request.
+   */
   async function load(nextOffset: number) {
     setError(false);
     setLoading(true);
@@ -530,13 +560,26 @@ export function MyFeedbackPage({
   );
 }
 
+/**
+ * Renders an active feedback card with details and voting controls.
+ *
+ * @param root0 - Feedback request properties.
+ * @returns The interactive feedback request.
+ */
 function FeedbackRequest({
   item,
   onVote,
   voteLabel,
 }: {
+  /** Active feedback item to display. */
   item: ActiveFeedback;
+  /**
+   * Receives the persisted vote state after a vote change.
+   *
+   * @param hasVoted - Persisted vote state.
+   */
   onVote: (hasVoted: boolean) => void;
+  /** Optional label for adding a vote. */
   voteLabel?: string;
 }) {
   const dialogId = useId();
@@ -587,6 +630,12 @@ function FeedbackRequest({
   );
 }
 
+/**
+ * Reads feedback values from a submission form.
+ *
+ * @param form - Feedback form element.
+ * @returns Normalized string values for submission.
+ */
 function feedbackFormInput(form: HTMLFormElement): FeedbackFormInput {
   const data = new FormData(form);
   return {
@@ -596,13 +645,26 @@ function feedbackFormInput(form: HTMLFormElement): FeedbackFormInput {
   };
 }
 
+/**
+ * Renders a feedback vote toggle unless the vote is permanent.
+ *
+ * @param root0 - Vote-control properties.
+ * @returns The vote control, or nothing for a permanent vote.
+ */
 function VoteButton({
   item,
   label,
   onChanged,
 }: {
+  /** Feedback item whose vote is being changed. */
   item: ActiveFeedback;
+  /** Optional label for adding a vote. */
   label?: string;
+  /**
+   * Receives the persisted vote state.
+   *
+   * @param hasVoted - Persisted vote state.
+   */
   onChanged: (hasVoted: boolean) => void;
 }) {
   const [saving, setSaving] = useState(false);
@@ -636,6 +698,15 @@ function VoteButton({
   );
 }
 
+/**
+ * Applies a persisted vote state to one feedback item.
+ *
+ * @template T - Active feedback item shape retained in the result.
+ * @param items - Feedback items to update.
+ * @param feedbackId - Identifier of the changed feedback item.
+ * @param hasVoted - Persisted vote state.
+ * @returns A new list with the matching vote state and count updated.
+ */
 function updateVote<T extends ActiveFeedback>(
   items: T[],
   feedbackId: number,
@@ -651,6 +722,13 @@ function updateVote<T extends ActiveFeedback>(
   });
 }
 
+/**
+ * Sorts active feedback by workflow state, votes, recency, and identifier.
+ *
+ * @param items - Active feedback items.
+ * @returns A sorted copy of the items.
+ * @throws When an item has a status outside the active workflow states.
+ */
 function sortActiveFeedback(items: ActiveFeedback[]) {
   const statusOrder = { in_progress: 0, planned: 1, requested: 2 } as const;
   return [...items].sort((left, right) => {
@@ -667,6 +745,13 @@ function sortActiveFeedback(items: ActiveFeedback[]) {
   });
 }
 
+/**
+ * Narrows a server feedback status to an active board status.
+ *
+ * @param status - Server feedback status.
+ * @returns The active status.
+ * @throws When the status is not visible on the active board.
+ */
 function visibleActiveStatus(status: ActiveFeedback["status"]) {
   if (
     status === "requested" ||
@@ -678,6 +763,13 @@ function visibleActiveStatus(status: ActiveFeedback["status"]) {
   throw new Error(`Unexpected active feedback status: ${status}`);
 }
 
+/**
+ * Narrows a server feedback status to a user-visible status.
+ *
+ * @param status - Server feedback status.
+ * @returns The user-visible status.
+ * @throws When the status must remain hidden from submitters.
+ */
 function visibleFeedbackStatus(status: MyFeedback["status"]) {
   if (
     status === "pending" ||
@@ -691,13 +783,22 @@ function visibleFeedbackStatus(status: MyFeedback["status"]) {
   throw new Error(`Unexpected visible feedback status: ${status}`);
 }
 
+/**
+ * Renders the feedback category selector.
+ *
+ * @param root0 - Category field properties.
+ * @returns The localized category field.
+ */
 function CategoryField({
   defaultValue = "",
   disabled,
   id,
 }: {
+  /** Initially selected category. */
   defaultValue?: FeedbackCategory | "";
+  /** Whether category selection is unavailable. */
   disabled: boolean;
+  /** Select element identifier. */
   id: string;
 }) {
   const t = useFeedbackCopy();
@@ -721,15 +822,25 @@ function CategoryField({
   );
 }
 
+/**
+ * Renders a labeled feedback form field with optional help text.
+ *
+ * @param root0 - Field properties.
+ * @returns The labeled form field.
+ */
 function Field({
   children,
   description,
   htmlFor,
   label,
 }: {
+  /** Form control rendered by the field. */
   children: React.ReactNode;
+  /** Optional help text. */
   description?: string;
+  /** Identifier of the labeled form control. */
   htmlFor: string;
+  /** Visible field label. */
   label: string;
 }) {
   return (
@@ -748,7 +859,18 @@ function Field({
   );
 }
 
-function EmptyState({ children }: { children: React.ReactNode }) {
+/**
+ * Renders an empty-state message for a feedback list.
+ *
+ * @param root0 - Empty-state properties.
+ * @returns The empty-state message.
+ */
+function EmptyState({
+  children,
+}: {
+  /** Empty-state message content. */
+  children: React.ReactNode;
+}) {
   return (
     <p className="m-0 rounded-lg border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
       {children}
@@ -756,6 +878,11 @@ function EmptyState({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Returns a formatter bound to the current feedback locale.
+ *
+ * @returns The localized feedback-copy formatter.
+ */
 function useFeedbackCopy() {
   const { locale } = useLocale();
   return (key: TranslationKey, params: Record<string, number | string> = {}) =>

@@ -18,8 +18,29 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@tanstack/react-router", () => ({
+  /**
+   * Returns the router invalidation fixture.
+   *
+   * @returns The router invalidation fixture.
+   */
   useRouter: () => ({ invalidate: mocks.invalidate }),
-  useRouterState: ({ select }: { select: (state: unknown) => unknown }) =>
+  /**
+   * Applies a route-state selector to the fixture state.
+   *
+   * @param root0 - Router-state hook options.
+   * @returns The selected fixture value.
+   */
+  useRouterState: ({
+    select,
+  }: {
+    /**
+     * Selects a value from the route-state fixture.
+     *
+     * @param state - Route state supplied by the hook.
+     * @returns The selected fixture value.
+     */
+    select: (state: unknown) => unknown;
+  }) =>
     select({
       location: { pathname: mocks.pathname },
       matches: [
@@ -38,11 +59,19 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns the configured active locale fixture.
+   *
+   * @returns The active locale, or `null` when unconfigured.
+   */
   useOptionalLocale: () => mocks.activeLocale,
 }));
 
 (
-  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+  globalThis as {
+    /** Enables React act-environment checks for this suite. */
+    IS_REACT_ACT_ENVIRONMENT?: boolean;
+  }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe("RouteErrorPage", () => {
@@ -101,7 +130,14 @@ describe("RouteErrorPage", () => {
   });
 
   it("disables Retry while invalidating and restores it on failure", async () => {
-    let rejectRetry: (error: Error) => void = () => {};
+    /**
+     * Rejects the pending router invalidation fixture.
+     *
+     * @param error - Rejection reason.
+     */
+    let rejectRetry: (error: Error) => void = (error) => {
+      void error;
+    };
     const onRetry = vi.fn(
       () =>
         new Promise<void>((_resolve, reject) => {

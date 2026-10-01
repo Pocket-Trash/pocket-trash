@@ -3,6 +3,11 @@ import { expect, it, vi } from "vitest";
 import { NotFoundPage } from "./not-found-page";
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns the English locale fixture.
+   *
+   * @returns The English locale fixture.
+   */
   useLocale: () => ({ locale: "en-US" }),
 }));
 

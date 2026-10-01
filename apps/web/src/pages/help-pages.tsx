@@ -20,6 +20,12 @@ export function HelpIndexPage({
   documents: HelpDocument[];
 }) {
   const { locale } = useLocale();
+  /**
+   * Formats localized help-index copy.
+   *
+   * @param key - Translation key.
+   * @returns The localized message.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   return (
@@ -52,15 +58,26 @@ export function HelpIndexPage({
   );
 }
 
+/**
+ * Renders a dated help topic from trusted Markdown.
+ *
+ * @param root0 - Help document and localized labels.
+ * @returns The help topic page.
+ * @throws When the document has neither a published nor modified date.
+ */
 export function HelpTopicPage({
   dateLabel,
   dateModifiedLabel,
   document,
   helpTitle,
 }: {
+  /** Label for the original publication date. */
   dateLabel: string;
+  /** Label for the most recent modification date. */
   dateModifiedLabel: string;
+  /** Parsed help document to render. */
   document: HelpDocument;
+  /** Localized help-index title used by the breadcrumb. */
   helpTitle: string;
 }) {
   const modified = document.metadata.dateModified;
@@ -93,7 +110,9 @@ function HelpArticle({
   document,
   includeMain = true,
 }: {
+  /** Parsed help document to render. */
   document: HelpDocument;
+  /** Whether the article supplies its own main landmark. */
   includeMain?: boolean;
 }) {
   const content = (
