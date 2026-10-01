@@ -2006,60 +2006,64 @@ export function CollectionAddPage({
             </Button>
           </div>
         </dialog>
-        <Field label={t("web.catalog.field.productType")}>
-          <CatalogCombobox
-            ariaLabel={t("web.catalog.field.productType")}
-            items={options.productTypes}
-            onValueChange={(value) => {
-              setType(value);
-              setProduct(null);
-              setDisplayName("");
-              setDescription("");
-              setBearing("");
-              setMaterial(null);
-              setFinish(null);
-              setCustomFinish(emptyFinishOption());
-              setButton(null);
-              setButtonMaterial(null);
-              setButtonFinish(null);
-              setButtonCustomFinish(emptyFinishOption());
-              setDuplicateCounts({});
-              setFormError(null);
-            }}
-            placeholder={t("web.catalog.selectProductType")}
-            value={type}
-          />
-        </Field>
+        {!initialProduct ? (
+          <>
+            <Field label={t("web.catalog.field.productType")}>
+              <CatalogCombobox
+                ariaLabel={t("web.catalog.field.productType")}
+                items={options.productTypes}
+                onValueChange={(value) => {
+                  setType(value);
+                  setProduct(null);
+                  setDisplayName("");
+                  setDescription("");
+                  setBearing("");
+                  setMaterial(null);
+                  setFinish(null);
+                  setCustomFinish(emptyFinishOption());
+                  setButton(null);
+                  setButtonMaterial(null);
+                  setButtonFinish(null);
+                  setButtonCustomFinish(emptyFinishOption());
+                  setDuplicateCounts({});
+                  setFormError(null);
+                }}
+                placeholder={t("web.catalog.selectProductType")}
+                value={type}
+              />
+            </Field>
+            <div className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
+              {matchingProducts.map((candidate) => (
+                <Button
+                  className="h-auto justify-start p-5 text-left"
+                  key={candidate.id}
+                  onClick={() => {
+                    setProduct(candidate);
+                    setDisplayName(candidate.name);
+                    setDescription("");
+                    setBearing("");
+                    setMaterial(null);
+                    setFinish(null);
+                    setCustomFinish(emptyFinishOption());
+                    setButton(null);
+                    setButtonMaterial(null);
+                    setButtonFinish(null);
+                    setButtonCustomFinish(emptyFinishOption());
+                    setDuplicateCounts({});
+                    setFormError(null);
+                  }}
+                  type="button"
+                  variant={candidate.id === product?.id ? "default" : "outline"}
+                >
+                  {candidate.name}
+                </Button>
+              ))}
+            </div>
+          </>
+        ) : null}
         {slug && !productTypeIsSupported(slug) ? (
           <Notice>{t("web.catalog.notImplemented")}</Notice>
         ) : null}
-        <div className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
-          {matchingProducts.map((candidate) => (
-            <Button
-              className="h-auto justify-start p-5 text-left"
-              key={candidate.id}
-              onClick={() => {
-                setProduct(candidate);
-                setDisplayName(candidate.name);
-                setDescription("");
-                setBearing("");
-                setMaterial(null);
-                setFinish(null);
-                setCustomFinish(emptyFinishOption());
-                setButton(null);
-                setButtonMaterial(null);
-                setButtonFinish(null);
-                setButtonCustomFinish(emptyFinishOption());
-                setDuplicateCounts({});
-                setFormError(null);
-              }}
-              type="button"
-              variant={candidate.id === product?.id ? "default" : "outline"}
-            >
-              {candidate.name}
-            </Button>
-          ))}
-        </div>
         {product ? (
           <CollectionProductFields
             customFinish={customFinish}
