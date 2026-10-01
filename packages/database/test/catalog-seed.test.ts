@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  isSeedImageInTargetPrefix,
+  loadKapedcSeedData,
+  materialSlugForTerm,
   seedCatalog,
   seedColorEffects,
   seedColors,
@@ -177,6 +180,21 @@ function createSeedDb() {
 }
 
 describe("catalog seed", () => {
+  it("recognizes images already copied into the target environment", () => {
+    expect(
+      isSeedImageInTargetPrefix(
+        "images/preview/products/1000/image.jpg",
+        "images/preview",
+      ),
+    ).toBe(true);
+    expect(
+      isSeedImageInTargetPrefix(
+        "images/preview/products/1000/image.jpg",
+        "images/preview/pr-158",
+      ),
+    ).toBe(false);
+  });
+
   it("is idempotent and preserves the planned values", async () => {
     const state = createSeedDb();
 
@@ -198,6 +216,29 @@ describe("catalog seed", () => {
     expect(state.materials.get("bronze")?.name).toBe("Bronze");
     expect(state.makers.get("autmog")?.rootUrl).toBe("https://www.autmog.com");
     expect(state.makers.get("kap edc")?.rootUrl).toBe("https://www.kapedc.com");
+  });
+
+  it("contains every approved KAP product and primary image", async () => {
+    const snapshot = await loadKapedcSeedData();
+
+    expect(snapshot.products).toHaveLength(71);
+    expect(
+      snapshot.products.filter(({ type }) => type === "spinner"),
+    ).toHaveLength(59);
+    expect(
+      snapshot.products.filter(({ type }) => type === "spinner-button"),
+    ).toHaveLength(12);
+    expect(
+      snapshot.products.filter(({ slug }) => slug.includes("katla")),
+    ).toHaveLength(2);
+    expect(
+      snapshot.products.every(({ image }) => image.sha256.length === 64),
+    ).toBe(true);
+    expect(
+      snapshot.products
+        .flatMap(({ materialTerms }) => materialTerms)
+        .every((term) => materialSlugForTerm(term).length > 0),
+    ).toBe(true);
   });
 });
 
