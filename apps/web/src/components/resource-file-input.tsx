@@ -19,7 +19,7 @@ const acceptedResourceFiles = Object.keys(resourceMimeTypesByExtension).join(
  * @param props - Resource file input properties.
  * @param props.browseLabel - Label for opening the native file browser.
  * @param props.description - Guidance associated with the input.
- * @param props.disabled - Whether interaction is disabled.
+ * @param props.disabled - Whether browsing and dropping additions is disabled; existing files remain removable.
  * @param props.fileTypes - Human-readable supported file types.
  * @param props.files - Current selected files.
  * @param props.id - Native input ID.
@@ -48,7 +48,7 @@ export function ResourceFileInput({
    */
   description: string;
   /**
-   * Whether interaction is disabled.
+   * Whether browsing and dropping additions is disabled; existing files remain removable.
    */
   disabled?: boolean;
   /**
@@ -102,6 +102,7 @@ export function ResourceFileInput({
 
 /**
  * Renders a native file input with drag-and-drop, selection display, and optional aspect-ratio guidance.
+ * Mismatch guidance appears only when the expected ratio, warning, help URL, and help label are all provided.
  *
  * @param props - File drop input properties.
  * @param props.accept - Native file-picker accept value.
@@ -111,7 +112,7 @@ export function ResourceFileInput({
  * @param props.aspectRatioWarning - Warning shown when a selected image differs from the expected ratio.
  * @param props.browseLabel - Label for opening the native file browser.
  * @param props.description - Guidance associated with the input.
- * @param props.disabled - Whether interaction is disabled.
+ * @param props.disabled - Whether browsing and dropping additions is disabled; existing files remain removable.
  * @param props.fileTypes - Human-readable supported file types.
  * @param props.files - Current selected files.
  * @param props.id - Native input ID and description-ID prefix.
@@ -169,7 +170,7 @@ export function FileDropInput({
    */
   description: string;
   /**
-   * Whether interaction is disabled.
+   * Whether browsing and dropping additions is disabled; existing files remain removable.
    */
   disabled?: boolean;
   /**
@@ -360,7 +361,7 @@ export function FileDropInput({
  *
  * @param file - Browser file to inspect.
  * @param expectedRatio - Expected width-to-height ratio.
- * @returns Whether the readable image differs beyond the configured tolerance.
+ * @returns Whether the readable image differs by more than the fixed `0.01` tolerance.
  */
 export async function imageHasDifferentAspectRatio(
   file: File,

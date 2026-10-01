@@ -38,6 +38,7 @@ const cardClassName =
 
 /**
  * Renders a downloadable directory card or a linked owned-resource card.
+ * Directory downloads use an archive for two or more files; archive failures disable retries until remount and link to details, while single-file failures remain retryable.
  *
  * @param props - Resource card properties.
  * @param props.mode - Directory mode shows actions; owned mode links the entire card and shows visibility.

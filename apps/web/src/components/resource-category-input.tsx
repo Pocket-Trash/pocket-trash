@@ -11,13 +11,13 @@ import { listResourceCategories } from "@/lib/resources";
 type Category = Awaited<ReturnType<typeof listResourceCategories>>[number];
 
 /**
- * Renders a searchable category picker capped at ten case-insensitive unique names.
- * Searches are debounced by 150 ms, failures produce no options, and unmatched text becomes a selectable category.
+ * Renders a searchable category picker that emits at most ten case-insensitive unique names.
+ * Searches are debounced by 150 ms; failures clear fetched results, while a nonblank unmatched query remains selectable as a custom category.
  *
  * @param props - Resource category input properties.
  * @param props.disabled - Whether interaction is disabled.
  * @param props.label - Visible field label.
- * @param props.noResultsLabel - Message shown when search returns no categories.
+ * @param props.noResultsLabel - Message shown when there are no selectable options.
  * @param props.onChange - Receives the normalized selected category names.
  * @param props.placeholder - Prompt shown when the combobox has no selection.
  * @param props.removeLabel - Builds an accessible removal label for a category.
@@ -42,7 +42,7 @@ export function ResourceCategoryInput({
    */
   label: string;
   /**
-   * Message shown when search returns no categories.
+   * Message shown when there are no selectable options.
    */
   noResultsLabel: string;
   /**

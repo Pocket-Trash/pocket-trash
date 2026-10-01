@@ -74,8 +74,15 @@ export function PublicResourceSwitch({
 
 /**
  * Renders owner and staff resource visibility controls with moderation-reason flows.
+ * Owners cannot change staff-forced privacy without administrative access, and staff changes to another user's resource require a nonblank reason.
  *
  * @param props - Resource visibility state and permissions.
+ * @param props.canAdminister - Whether the viewer may moderate another user's resource.
+ * @param props.isAdminPrivate - Whether staff forced the resource private.
+ * @param props.isOwner - Whether the viewer owns the resource.
+ * @param props.isPrivate - Initial private-resource state.
+ * @param props.name - Resource name shown in moderation feedback.
+ * @param props.resourceId - Resource identifier sent to visibility mutations.
  * @returns The resource visibility control.
  * @throws {Error} When rendered outside `LocaleProvider`.
  */
@@ -133,10 +140,9 @@ export function ResourceVisibilityToggle({
 
   /**
    * Applies a visibility change or opens the staff moderation dialog.
-   *
-   * @param nextPublic - Whether the resource should be public.
    * Mutation failures are reported by toast and do not reject the returned promise.
    *
+   * @param nextPublic - Whether the resource should be public.
    * @returns A promise that resolves after the change is handled or canceled.
    */
   async function updateVisibility(nextPublic: boolean) {
@@ -170,6 +176,8 @@ export function ResourceVisibilityToggle({
   /**
    * Marks the resource private with the entered staff reason.
    * Missing reasons and mutation failures are reported by toast.
+   *
+   * @returns A promise that resolves after validation or mutation handling.
    */
   async function submitAdminPrivate() {
     if (!reason.trim()) {
