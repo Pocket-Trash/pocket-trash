@@ -65,11 +65,13 @@ export type FeedbackPage = {
   items: FeedbackListItem[];
 };
 
+/** Feedback item shown in admin lists. */
 export type AdminFeedbackItem = {
   category: FeedbackCategory | null;
   createdAt: Date;
   description: string;
   id: number;
+  /** Linked Linear entity identifier. */
   linearClientUuid: string | null;
   status: FeedbackStatus;
   submitterUsername: string | null;
@@ -171,7 +173,12 @@ export type LinearFeedbackSyncResult = "ignored" | "not_found" | "updated";
 
 /** Feedback persistence and lifecycle operations. */
 export type FeedbackService = {
-  /** Approves a feedback request for planning. */
+  /**
+   * Approves a feedback request for planning.
+   *
+   * @param feedbackId - Feedback identifier.
+   * @returns Completion of the update.
+   */
   approve(feedbackId: number): Promise<void>;
   /**
    * Marks a linked feedback plan as completed.
@@ -209,7 +216,12 @@ export type FeedbackService = {
    * @returns The linked Linear identifier, when eligible.
    */
   getLinearSyncTarget(feedbackId: number): Promise<string | undefined>;
-  /** Checks whether a submitter has visible feedback. */
+  /**
+   * Checks whether a submitter has visible feedback.
+   *
+   * @param submitterClerkId - Submitter's Clerk identifier.
+   * @returns Whether visible feedback exists.
+   */
   hasMine(submitterClerkId: string): Promise<boolean>;
   /**
    * Lists active feedback visible to a user.
@@ -222,11 +234,21 @@ export type FeedbackService = {
     viewerClerkId: string,
     search?: string,
   ): Promise<FeedbackListItem[]>;
-  /** Lists active feedback for administration. */
+  /**
+   * Lists active feedback for administration.
+   *
+   * @param options - Search, sorting, and pagination options.
+   * @returns The matching active feedback page.
+   */
   listAdminActive(
     options?: ListAdminFeedbackOptions,
   ): Promise<AdminFeedbackPage>;
-  /** Lists archived feedback for administration. */
+  /**
+   * Lists archived feedback for administration.
+   *
+   * @param options - Search, sorting, and pagination options.
+   * @returns The matching archived feedback page.
+   */
   listArchive(options?: ListAdminFeedbackOptions): Promise<AdminFeedbackPage>;
   /**
    * Lists completed feedback for public discovery.
