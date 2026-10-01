@@ -1,5 +1,5 @@
 import type { Page } from "playwright/test";
-import { expect, test } from "./auth";
+import { expect, test, waitForHydration } from "./auth";
 import {
   createMutationFixture,
   type MutationCleanupResult,
@@ -22,14 +22,13 @@ test("@mutation collection selection and linked-item moves use the public UI", a
   try {
     await signInAs("regular");
     const productUrl = `/products/spinner/${fixture.spinnerProductSlug}`;
-    const documentRoot = page.locator("html");
     const addToCollectionUrl = new RegExp(
       `/collections/add\\?product=${fixture.spinnerProductId}$`,
       "u",
     );
 
     await page.goto(productUrl);
-    await expect(documentRoot).toHaveAttribute("data-hydrated", "true");
+    await waitForHydration(page);
     await page.getByRole("link", { name: "Add to collection" }).click();
     await expect(page).toHaveURL(addToCollectionUrl);
     await expect(page.locator("main input").first()).toHaveValue(
@@ -48,7 +47,7 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     ).toHaveCount(0);
 
     await page.goto(productUrl);
-    await expect(documentRoot).toHaveAttribute("data-hydrated", "true");
+    await waitForHydration(page);
     await page.getByRole("link", { name: "Add to collection" }).click();
     await stageCollection(page, fixture.collectionNames[0]);
     await expect(
@@ -86,7 +85,7 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     ).toHaveCount(1);
 
     await page.goto(`/collections/add?product=${fixture.spinnerProductId}`);
-    await expect(documentRoot).toHaveAttribute("data-hydrated", "true");
+    await waitForHydration(page);
     await expect(
       page
         .getByRole("combobox", { name: "Collection" })
@@ -106,7 +105,7 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     const secondCollectionUrl = page.url();
 
     await page.goto(`/collections/add?product=${fixture.spinnerProductId}`);
-    await expect(documentRoot).toHaveAttribute("data-hydrated", "true");
+    await waitForHydration(page);
     const collectionInput = page
       .getByRole("combobox", { name: "Collection" })
       .and(page.locator("input"));
@@ -122,13 +121,22 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     ).toBeVisible();
 
     await page.goto(firstCollectionUrl);
-    await expect(documentRoot).toHaveAttribute("data-hydrated", "true");
+    await waitForHydration(page);
     await page
       .getByRole("link", { exact: true, name: fixture.spinnerProductName })
       .click();
     await expect(page).toHaveURL(/\/collections\/\d+\/\d+\/\d+$/u);
-    await page.getByRole("link", { name: "Edit" }).click();
+    await expect(page.locator('span[aria-current="page"]')).toHaveText(
+      fixture.spinnerProductName,
+    );
+    await page
+      .getByRole("link", { name: "Edit" })
+      .and(page.locator('a[href^="/collections/edit/"]'))
+      .click();
     await expect(page).toHaveURL(/\/collections\/edit\/\d+$/u);
+    await expect(
+      page.getByRole("combobox", { name: "Collection" }),
+    ).toBeVisible();
     await selectOption(page, "Collection", fixture.collectionNames[1]);
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page).toHaveURL(secondCollectionUrl);
