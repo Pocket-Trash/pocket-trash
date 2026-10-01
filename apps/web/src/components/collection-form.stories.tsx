@@ -3,6 +3,9 @@ import { expect, fn } from "storybook/test";
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { CollectionForm } from "./collection-form";
 
+/**
+ * Localized labels shared by the collection form stories.
+ */
 const copy = {
   browse: "Browse",
   cover: "Images",
@@ -17,6 +20,9 @@ const copy = {
   submit: "Save",
 };
 
+/**
+ * Configures Storybook coverage for the collection form examples.
+ */
 const meta = {
   component: CollectionForm,
   args: { copy, onSubmit: fn() },
@@ -31,10 +37,19 @@ const meta = {
 } satisfies Meta<typeof CollectionForm>;
 
 export default meta;
+/**
+ * Storybook story contract for the collection form examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Defines the new private collection form story.
+ */
 export const NewPrivate: Story = {};
 
+/**
+ * Defines the edit public collection form story.
+ */
 export const EditPublic: Story = {
   args: {
     initialValue: {
@@ -45,7 +60,18 @@ export const EditPublic: Story = {
   },
 };
 
+/**
+ * Defines the submit collection form story.
+ */
 export const Submit: Story = {
+  /**
+   * Exercises the collection form story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.args - Current Storybook story arguments.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.userEvent - Storybook interaction driver.
+   */
   play: async ({ args, canvas, userEvent }) => {
     await userEvent.type(
       canvas.getByRole("textbox", { name: "Name" }),
@@ -56,7 +82,18 @@ export const Submit: Story = {
   },
 };
 
+/**
+ * Defines the multiple images collection form story.
+ */
 export const MultipleImages: Story = {
+  /**
+   * Exercises the collection form story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.args - Current Storybook story arguments.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.userEvent - Storybook interaction driver.
+   */
   play: async ({ args, canvas, userEvent }) => {
     const images = [
       new File(["one"], "one.png", { type: "image/png" }),

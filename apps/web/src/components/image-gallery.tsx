@@ -2,8 +2,30 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
-export type GalleryImage = { fileName: string; id: number; url: string };
+/**
+ * Image metadata required by gallery thumbnails and lightboxes.
+ */
+export type GalleryImage = {
+  /** File name announced by thumbnail controls. */
+  fileName: string;
+  /** Stable image identifier. */
+  id: number;
+  /** Image source URL. */
+  url: string;
+};
 
+/**
+ * Renders non-empty image groups as thumbnails backed by one shared lightbox.
+ *
+ * @param props - Image gallery properties.
+ * @param props.alt - Alternative text shared by the images.
+ * @param props.closeLabel - Accessible label for closing the lightbox.
+ * @param props.groups - Ordered image groups; empty groups are omitted.
+ * @param props.label - Fallback group label and thumbnail label prefix.
+ * @param props.nextLabel - Accessible label for the next-image control.
+ * @param props.previousLabel - Accessible label for the previous-image control.
+ * @returns The grouped gallery UI, or `null` when every group is empty.
+ */
 export function ImageGallery({
   alt,
   closeLabel,
@@ -12,11 +34,34 @@ export function ImageGallery({
   nextLabel,
   previousLabel,
 }: {
+  /**
+   * Alternative text shared by the images.
+   */
   alt: string;
+  /**
+   * Accessible label for closing the lightbox.
+   */
   closeLabel: string;
-  groups: Array<{ images: GalleryImage[]; label?: string }>;
+  /**
+   * Ordered image groups; empty groups are omitted.
+   */
+  groups: Array<{
+    /** Images displayed in this group. */
+    images: GalleryImage[];
+    /** Optional group heading and accessible label. */
+    label?: string;
+  }>;
+  /**
+   * Fallback group label and thumbnail label prefix.
+   */
   label: string;
+  /**
+   * Accessible label for the next-image control.
+   */
   nextLabel: string;
+  /**
+   * Accessible label for the previous-image control.
+   */
   previousLabel: string;
 }) {
   const images = groups.flatMap((group) => group.images);
@@ -63,6 +108,17 @@ export function ImageGallery({
   );
 }
 
+/**
+ * Renders a gallery thumbnail button for opening an image.
+ *
+ * @param props - Image button properties.
+ * @param props.alt - Alternative text for the thumbnail image.
+ * @param props.className - Additional CSS classes.
+ * @param props.image - Image displayed by the thumbnail.
+ * @param props.label - Accessible label prefix paired with the file name.
+ * @param props.onClick - Opens the selected image.
+ * @returns The image thumbnail button.
+ */
 export function ImageButton({
   alt,
   className = "",
@@ -70,10 +126,25 @@ export function ImageButton({
   label,
   onClick,
 }: {
+  /**
+   * Alternative text for the thumbnail image.
+   */
   alt: string;
+  /**
+   * Additional CSS classes.
+   *
+   * @default ""
+   */
   className?: string;
+  /**
+   * Image displayed by the thumbnail.
+   */
   image: GalleryImage;
+  /**
+   * Accessible label prefix paired with the file name.
+   */
   label: string;
+  /** Opens the selected image. */
   onClick(): void;
 }) {
   return (
@@ -93,6 +164,19 @@ export function ImageButton({
   );
 }
 
+/**
+ * Renders caller-provided launchers and, when images exist, a modal lightbox with adjacent wraparound navigation.
+ *
+ * @param props - Image lightbox properties.
+ * @param props.alt - Alternative text shared by lightbox images.
+ * @param props.children - Renders image launchers with a guarded selection callback.
+ * @param props.closeLabel - Accessible label for closing the lightbox.
+ * @param props.images - Ordered images available in the lightbox; an empty array omits the dialog and makes selection inert.
+ * @param props.label - Accessible label for the modal dialog.
+ * @param props.nextLabel - Accessible label for the next-image control.
+ * @param props.previousLabel - Accessible label for the previous-image control.
+ * @returns The launcher content and, when images exist, the lightbox dialog.
+ */
 export function ImageLightbox({
   alt,
   children,
@@ -102,25 +186,60 @@ export function ImageLightbox({
   nextLabel,
   previousLabel,
 }: {
+  /**
+   * Alternative text shared by lightbox images.
+   */
   alt: string;
+  /**
+   * Renders image launchers with the lightbox selection callback.
+   *
+   * @param select - Opens an existing image index and ignores invalid indexes.
+   * @returns Launcher content rendered before the dialog.
+   */
   children(select: (index: number) => void): ReactNode;
+  /**
+   * Accessible label for closing the lightbox.
+   */
   closeLabel: string;
+  /**
+   * Ordered images available in the lightbox; an empty array omits the dialog and makes selection inert.
+   */
   images: GalleryImage[];
+  /**
+   * Accessible label for the modal dialog.
+   */
   label: string;
+  /**
+   * Accessible label for the next-image control.
+   */
   nextLabel: string;
+  /**
+   * Accessible label for the previous-image control.
+   */
   previousLabel: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  /**
+   * Opens the lightbox at an existing image index.
+   *
+   * @param index - Zero-based image index; invalid indexes are ignored.
+   */
   const select = (index: number) => {
     if (!images[index]) return;
     setSelectedIndex(index);
     dialogRef.current?.showModal();
   };
-  const cycle = (offset: number) =>
+  /**
+   * Moves to the adjacent image and wraps at either end.
+   *
+   * @param offset - Adjacent movement: `-1` for previous or `1` for next.
+   */
+  const cycle = (offset: number) => {
     setSelectedIndex(
       (index) => (index + offset + images.length) % images.length,
     );
+  };
 
   return (
     <>
