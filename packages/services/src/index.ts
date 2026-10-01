@@ -45,6 +45,7 @@ export type {
   CatalogViewer,
   CollectionsService,
   CreateAuditExportInput,
+  DeleteAuditExportInput,
   DownloadAuditExportInput,
   ErasureOperationRequest,
   ErasureOperationResult,
@@ -76,6 +77,7 @@ export type {
 export {
   AccountErasureInProgressError,
   AuditEventValidationError,
+  AuditExportDeletionError,
   AuditExportEmptyError,
   AuditExportInProgressError,
   AuditPayloadTooLargeError,

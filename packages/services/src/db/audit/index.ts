@@ -14,6 +14,7 @@ import {
   eq,
   gt,
   gte,
+  inArray,
   isNull,
   lt,
   lte,
@@ -43,9 +44,10 @@ const namePattern = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/u;
 const targetIdPattern = /^\S(?:.*\S)?$/u;
 const roles = ["user", "editor", "admin", "system_admin", "system"] as const;
 
+/** Database operations available while writing audit events. */
 type AuditTransaction = Pick<
   Database,
-  "execute" | "insert" | "select" | "update"
+  "delete" | "execute" | "insert" | "select" | "update"
 >;
 
 export type AuditPayload =
@@ -121,6 +123,13 @@ export type AuditService = {
    */
   createExport(input: CreateAuditExportInput): Promise<AuditExportView>;
   /**
+   * Deletes the exact completed range represented by an export ledger.
+   *
+   * @param input - Authorized and confirmed deletion request.
+   * @returns Completion after the range is deleted and audited.
+   */
+  deleteExport(input: DeleteAuditExportInput): Promise<void>;
+  /**
    * Streams an existing audit export.
    *
    * @param input - Authorized download request.
@@ -176,6 +185,16 @@ export type DownloadAuditExportInput = {
   /** Actor downloading the export. */
   actor: Actor;
   /** Reserved export identifier. */
+  exportId: string;
+};
+
+/** Input for deleting a completed audit-export range. */
+export type DeleteAuditExportInput = {
+  /** Actor deleting the exported events. */
+  actor: Actor;
+  /** Explicit operator attestation that the export was downloaded. */
+  confirmed: boolean;
+  /** Completed export identifier. */
   exportId: string;
 };
 
@@ -247,6 +266,8 @@ export class AuditEventValidationError extends Error {}
 export class AuditExportEmptyError extends Error {}
 /** Raised when an unconsumed export already exists. */
 export class AuditExportInProgressError extends Error {}
+/** Raised when an exported range cannot be deleted safely. */
+export class AuditExportDeletionError extends Error {}
 /** Raised when an audit payload exceeds its storage limit. */
 export class AuditPayloadTooLargeError extends Error {}
 
@@ -284,6 +305,46 @@ const auditExportCompleted = {
   }),
 } satisfies AuditEventDefinition<AuditExportCompletedData>;
 
+/** Payload recorded after an exported range is deleted. */
+type AuditExportDeletedData = {
+  /** Operator attestation recorded with the deletion. */
+  confirmed: true;
+  /** SHA-256 checksum of the downloaded export. */
+  checksum: string;
+  /** Number of deleted events. */
+  count: number;
+  /** Eligibility cutoff captured for the export. */
+  cutoff: string;
+  /** Export ledger identifier. */
+  exportId: string;
+  /** Last event identifier in the deleted range. */
+  highWaterEventId: number;
+  /** Last recorded timestamp in the deleted range. */
+  highWaterRecordedAt: string;
+};
+
+/** Audit-event definition for completed export-range deletion. */
+const auditExportDeleted = {
+  action: "audit.export.deleted",
+  targetType: "audit.export",
+  /**
+   * Serializes export deletion metadata.
+   *
+   * @param data - Deleted export metadata.
+   * @returns Audit metadata payload.
+   */
+  serialize: (data: AuditExportDeletedData) => ({ metadata: data }),
+  /**
+   * Preserves deletion metadata when an associated account is erased.
+   *
+   * @param payload - Stored audit payload.
+   * @returns Redacted metadata payload.
+   */
+  redact: (payload: StoredAuditPayload) => ({
+    metadata: payload.metadata ?? { redacted: true },
+  }),
+} satisfies AuditEventDefinition<AuditExportDeletedData>;
+
 /**
  * Creates the shared audit service.
  *
@@ -302,6 +363,7 @@ export function createAuditService(
   for (const definition of [
     ...definitions,
     auditExportCompleted as AuditEventDefinition<never>,
+    auditExportDeleted as AuditEventDefinition<never>,
   ]) {
     const key = definitionKey(definition);
     if (registered.has(key)) {
@@ -421,6 +483,120 @@ export function createAuditService(
           .returning();
         if (!created) throw new Error("Failed to create audit export.");
         return exportView(created);
+      });
+    },
+
+    /**
+     * Deletes one completed and verified export range.
+     *
+     * @param input - Authorized, confirmed deletion request.
+     * @returns Completion after the range is deleted.
+     * @rejects When authorization or export verification fails.
+     */
+    async deleteExport(input) {
+      assertPermission(input.actor, "audit.delete");
+      if (!database) throw new Error("Audit exports are not configured.");
+      if (input.confirmed !== true) throw new AuditExportDeletionError();
+      const exportId = requiredUuid(input.exportId);
+
+      await database.transaction(async (transaction) => {
+        await transaction.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended('audit-export', 0))`,
+        );
+        const [record] = await transaction
+          .select()
+          .from(schema.auditExport)
+          .where(eq(schema.auditExport.id, exportId))
+          .limit(1)
+          .for("update");
+        if (
+          !record ||
+          record.consumedAt ||
+          !record.completedAt ||
+          !record.sha256 ||
+          record.cutoffAt.getTime() > Date.now() - EXPORT_MINIMUM_AGE_MS ||
+          record.highWaterRecordedAt >= record.cutoffAt
+        ) {
+          throw new AuditExportDeletionError();
+        }
+
+        const events = await transaction
+          .select({
+            id: schema.auditEvent.id,
+            recordedAt: schema.auditEvent.recordedAt,
+          })
+          .from(schema.auditEvent)
+          .where(exportRangeCondition(record))
+          .orderBy(asc(schema.auditEvent.recordedAt), asc(schema.auditEvent.id))
+          .limit(MAX_EXPORT_EVENTS + 1)
+          .for("update");
+        const highWater = events.at(-1);
+        if (
+          events.length !== record.eventCount ||
+          highWater?.id !== record.highWaterEventId ||
+          highWater.recordedAt.getTime() !==
+            record.highWaterRecordedAt.getTime()
+        ) {
+          throw new AuditExportDeletionError();
+        }
+
+        const [actor] = await transaction
+          .select({ id: schema.user.id, username: schema.user.username })
+          .from(schema.user)
+          .where(eq(schema.user.clerkId, input.actor.clerkId))
+          .limit(1);
+        if (!actor) throw new AuditExportDeletionError();
+
+        await transaction.execute(
+          sql`select set_config('pocket_trash.audit_export_deletion', ${record.id}, true)`,
+        );
+        const deleted = await transaction
+          .delete(schema.auditEvent)
+          .where(
+            inArray(
+              schema.auditEvent.id,
+              events.map(({ id }) => id),
+            ),
+          )
+          .returning({ id: schema.auditEvent.id });
+        if (deleted.length !== record.eventCount) {
+          throw new AuditExportDeletionError();
+        }
+
+        const consumedAt = new Date();
+        const [consumed] = await transaction
+          .update(schema.auditExport)
+          .set({ consumedAt })
+          .where(
+            and(
+              eq(schema.auditExport.id, record.id),
+              isNull(schema.auditExport.consumedAt),
+            ),
+          )
+          .returning({ id: schema.auditExport.id });
+        if (!consumed) throw new AuditExportDeletionError();
+
+        await write(transaction, {
+          actor: {
+            role: input.actor.role,
+            userId: actor.id,
+            username: actor.username,
+          },
+          authorization: { permission: "audit.delete", type: "permission" },
+          data: {
+            checksum: record.sha256,
+            confirmed: true,
+            count: record.eventCount,
+            cutoff: record.cutoffAt.toISOString(),
+            exportId: record.id,
+            highWaterEventId: record.highWaterEventId,
+            highWaterRecordedAt: record.highWaterRecordedAt.toISOString(),
+          },
+          definition: auditExportDeleted,
+          occurredAt: consumedAt,
+          reason: record.reason,
+          targetId: record.id,
+        });
       });
     },
 
@@ -720,14 +896,7 @@ async function* exportChunks(database: Database, record: AuditExport) {
       .from(schema.auditEvent)
       .where(
         and(
-          lt(schema.auditEvent.recordedAt, record.cutoffAt),
-          or(
-            lt(schema.auditEvent.recordedAt, record.highWaterRecordedAt),
-            and(
-              eq(schema.auditEvent.recordedAt, record.highWaterRecordedAt),
-              lte(schema.auditEvent.id, record.highWaterEventId),
-            ),
-          ),
+          exportRangeCondition(record),
           cursor
             ? or(
                 gt(schema.auditEvent.recordedAt, cursor.recordedAt),
@@ -754,6 +923,25 @@ async function* exportChunks(database: Database, record: AuditExport) {
     throw new Error("Audit export range changed before completion.");
   }
   yield "]}";
+}
+
+/**
+ * Selects the exact event boundary reserved by an export ledger.
+ *
+ * @param record - Reserved export ledger row.
+ * @returns SQL condition for the reserved range.
+ */
+function exportRangeCondition(record: AuditExport) {
+  return and(
+    lt(schema.auditEvent.recordedAt, record.cutoffAt),
+    or(
+      lt(schema.auditEvent.recordedAt, record.highWaterRecordedAt),
+      and(
+        eq(schema.auditEvent.recordedAt, record.highWaterRecordedAt),
+        lte(schema.auditEvent.id, record.highWaterEventId),
+      ),
+    ),
+  );
 }
 
 /**
