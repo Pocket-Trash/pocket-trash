@@ -32,10 +32,22 @@ import {
 } from "@/lib/upload-sessions";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Renders the resource creation and upload form.
+ *
+ * @returns The resource upload page.
+ */
 export function ResourceUploadPage() {
   const { getToken } = useAuth();
   const { locale } = useLocale();
   const navigate = useNavigate();
+  /**
+   * Formats localized resource upload copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -84,10 +96,22 @@ export function ResourceUploadPage() {
                 images: imageFiles,
                 isPrivate: !isPublic,
                 name: String(formData.get("name") ?? ""),
+                /**
+                 * Reports file upload progress.
+                 *
+                 * @param filename - File currently uploading.
+                 * @param percent - Completed percentage.
+                 * @returns Nothing.
+                 */
                 onProgress: (filename, percent) =>
                   setUploadStatus(
                     t("web.resources.upload.progress", { filename, percent }),
                   ),
+                /**
+                 * Reports upload workflow stage changes.
+                 *
+                 * @param stage - Current upload stage.
+                 */
                 onStage: (stage) => {
                   if (stage === "complete") {
                     setUploadStatus(t("web.resources.upload.finalizing"));
@@ -214,15 +238,29 @@ export function ResourceUploadPage() {
   );
 }
 
+/**
+ * Renders one labeled resource upload field.
+ *
+ * @param props - Upload field properties.
+ * @param props.children - Field control.
+ * @param props.description - Optional supporting description.
+ * @param props.htmlFor - Identifier of the labeled control.
+ * @param props.label - Visible field label.
+ * @returns The labeled upload field.
+ */
 function Field({
   children,
   description,
   htmlFor,
   label,
 }: {
+  /** Field control. */
   children: React.ReactNode;
+  /** Optional supporting description. */
   description?: string;
+  /** Identifier of the labeled control. */
   htmlFor: string;
+  /** Visible field label. */
   label: string;
 }) {
   return (

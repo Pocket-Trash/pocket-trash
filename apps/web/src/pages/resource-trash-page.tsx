@@ -14,11 +14,20 @@ import type { listAdminResourceTrash } from "@/lib/resources";
 import { permanentlyDeleteResource, restoreResource } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
+/** A recoverable resource trash item. */
 type TrashItem = Awaited<ReturnType<typeof listAdminResourceTrash>>[number];
 
+/**
+ * Renders the signed-in owner's resource trash.
+ *
+ * @param props - Owner resource trash properties.
+ * @param props.initialResources - Recoverable resources shown initially.
+ * @returns The owner resource trash page.
+ */
 export function OwnerResourceTrashPage({
   initialResources,
 }: {
+  /** Recoverable resources shown initially. */
   initialResources: TrashItem[];
 }) {
   const { locale } = useLocale();
@@ -37,9 +46,17 @@ export function OwnerResourceTrashPage({
   );
 }
 
+/**
+ * Renders administrative resource trash controls.
+ *
+ * @param props - Admin resource trash properties.
+ * @param props.initialResources - Recoverable resources shown initially.
+ * @returns The admin resource trash page.
+ */
 export function AdminResourceTrashPage({
   initialResources,
 }: {
+  /** Recoverable resources shown initially. */
   initialResources: TrashItem[];
 }) {
   const { locale } = useLocale();
@@ -75,6 +92,11 @@ export function AdminResourceTrashPage({
  * Renders recoverable resources for an owner or administrator.
  *
  * @param props - Trash contents and display permissions.
+ * @param props.emptyKey - Localization key for the empty state.
+ * @param props.initialResources - Recoverable resources shown initially.
+ * @param props.locale - Locale used for copy and dates.
+ * @param props.showPermanentDelete - Whether permanent deletion is available.
+ * @param props.showActor - Whether deletion attribution is shown.
  * @returns The resource trash list.
  */
 function ResourceTrashList({
@@ -84,14 +106,26 @@ function ResourceTrashList({
   showPermanentDelete,
   showActor,
 }: {
+  /** Localization key for the empty state. */
   emptyKey: TranslationKey;
+  /** Recoverable resources shown initially. */
   initialResources: TrashItem[];
+  /** Locale used for copy and dates. */
   locale: SupportedLocale;
+  /** Whether permanent deletion is available. */
   showPermanentDelete: boolean;
+  /** Whether deletion attribution is shown. */
   showActor: boolean;
 }) {
   const [resources, setResources] = useState(initialResources);
   const [restoringId, setRestoringId] = useState<number>();
+  /**
+   * Formats localized resource trash copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -211,6 +245,9 @@ function ResourceTrashList({
  * Renders the permanent deletion confirmation flow.
  *
  * @param props - Resource, callback, and localized copy.
+ * @param props.onDeleted - Removes the deleted resource from parent state.
+ * @param props.resource - Resource to delete permanently.
+ * @param props.t - Resource translation formatter.
  * @returns The permanent deletion button and dialog.
  */
 function PermanentDeleteButton({
@@ -218,8 +255,17 @@ function PermanentDeleteButton({
   resource,
   t,
 }: {
+  /** Removes the deleted resource from parent state. */
   onDeleted(): void;
+  /** Resource to delete permanently. */
   resource: TrashItem;
+  /**
+   * Formats localized resource copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   t: (key: TranslationKey, params?: Record<string, number | string>) => string;
 }) {
   const [deleting, setDeleting] = useState(false);
@@ -311,6 +357,13 @@ function PermanentDeleteButton({
   );
 }
 
+/**
+ * Formats a resource deletion date and time.
+ *
+ * @param value - Date to format.
+ * @param locale - Locale used for formatting.
+ * @returns The localized date and time.
+ */
 function formatDate(value: Date, locale: SupportedLocale) {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",

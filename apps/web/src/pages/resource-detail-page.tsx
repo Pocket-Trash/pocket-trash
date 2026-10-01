@@ -28,11 +28,24 @@ import {
 } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Resource detail returned by the resource service. */
 type ResourceDetail = NonNullable<
   Awaited<ReturnType<typeof getResourceDetail>>
 >;
 
-export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
+/**
+ * Renders resource metadata, images, files, and version history.
+ *
+ * @param props - Resource detail page properties.
+ * @param props.detail - Resource detail to display.
+ * @returns The resource detail page.
+ */
+export function ResourceDetailPage({
+  detail,
+}: {
+  /** Resource detail to display. */
+  detail: ResourceDetail;
+}) {
   const { locale } = useLocale();
   const navigate = useNavigate();
   const [downloadingFileId, setDownloadingFileId] = useState<number>();
@@ -44,11 +57,24 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
   const [deleteReason, setDeleteReason] = useState("");
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  /**
+   * Formats localized resource copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
 
+  /**
+   * Starts a download for one resource file.
+   *
+   * @param file - Resource file to download.
+   * @returns A promise that resolves after navigation or failure handling.
+   */
   async function startDownload(
     file: ResourceDetail["currentVersion"]["files"][number],
   ) {
@@ -69,6 +95,12 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
     }
   }
 
+  /**
+   * Starts an archive download for one resource version.
+   *
+   * @param version - Resource version to download.
+   * @returns A promise that resolves after navigation or failure handling.
+   */
   async function startVersionDownload(
     version: ResourceDetail["versions"][number],
   ) {
@@ -342,6 +374,24 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
   );
 }
 
+/**
+ * Renders one resource version and its downloadable files.
+ *
+ * @param props - Resource version card properties.
+ * @param props.archiveDownloading - Whether the version archive is downloading.
+ * @param props.archiveFailed - Whether the archive download failed.
+ * @param props.canEdit - Whether edit actions are available.
+ * @param props.collapsible - Whether the file list can collapse.
+ * @param props.downloadingFileId - File currently downloading.
+ * @param props.locale - Locale used for dates and sizes.
+ * @param props.onDownload - Starts a file download.
+ * @param props.onDownloadVersion - Starts a version archive download.
+ * @param props.resourceId - Resource identifier used by edit links.
+ * @param props.t - Resource translation formatter.
+ * @param props.title - Optional version card label.
+ * @param props.version - Resource version to display.
+ * @returns The resource version card.
+ */
 function VersionCard({
   archiveDownloading,
   archiveFailed,
@@ -356,17 +406,43 @@ function VersionCard({
   title,
   version,
 }: {
+  /** Whether the version archive is downloading. */
   archiveDownloading: boolean;
+  /** Whether the archive download failed. */
   archiveFailed: boolean;
+  /** Whether edit actions are available. */
   canEdit: boolean;
+  /** Whether the file list can collapse. */
   collapsible?: boolean;
+  /** File currently downloading. */
   downloadingFileId?: number;
+  /** Locale used for dates and sizes. */
   locale: SupportedLocale;
+  /**
+   * Starts a file download.
+   *
+   * @param file - Resource file to download.
+   */
   onDownload: (file: ResourceDetail["currentVersion"]["files"][number]) => void;
+  /**
+   * Starts a version archive download.
+   *
+   * @param version - Resource version to download.
+   */
   onDownloadVersion: (version: ResourceDetail["versions"][number]) => void;
+  /** Resource identifier used by edit links. */
   resourceId: number;
+  /**
+   * Formats localized resource copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   t: (key: TranslationKey, params?: Record<string, number | string>) => string;
+  /** Optional version card label. */
   title?: string;
+  /** Resource version to display. */
   version: ResourceDetail["versions"][number];
 }) {
   const [expanded, setExpanded] = useState(!collapsible);
@@ -440,6 +516,19 @@ function VersionCard({
   );
 }
 
+/**
+ * Renders metadata and download controls for one resource file.
+ *
+ * @param props - Resource file download properties.
+ * @param props.canEdit - Whether edit actions are available.
+ * @param props.downloading - Whether this file is downloading.
+ * @param props.file - Resource file to display.
+ * @param props.locale - Locale used to format file size.
+ * @param props.onDownload - Starts a file download.
+ * @param props.resourceId - Resource identifier used by edit links.
+ * @param props.t - Resource translation formatter.
+ * @returns The resource file row.
+ */
 function ResourceFileDownload({
   canEdit,
   downloading,
@@ -449,12 +538,29 @@ function ResourceFileDownload({
   resourceId,
   t,
 }: {
+  /** Whether edit actions are available. */
   canEdit: boolean;
+  /** Whether this file is downloading. */
   downloading: boolean;
+  /** Resource file to display. */
   file: ResourceDetail["currentVersion"]["files"][number];
+  /** Locale used to format file size. */
   locale: SupportedLocale;
+  /**
+   * Starts a file download.
+   *
+   * @param file - Resource file to download.
+   */
   onDownload: (file: ResourceDetail["currentVersion"]["files"][number]) => void;
+  /** Resource identifier used by edit links. */
   resourceId: number;
+  /**
+   * Formats localized resource copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   t: (key: TranslationKey, params?: Record<string, number | string>) => string;
 }) {
   return (
@@ -497,7 +603,19 @@ function ResourceFileDownload({
   );
 }
 
-function DetailRow({ label }: { label: string }) {
+/**
+ * Renders one resource detail-list label.
+ *
+ * @param props - Detail row properties.
+ * @param props.label - Detail text.
+ * @returns The detail-list row.
+ */
+function DetailRow({
+  label,
+}: {
+  /** Detail text. */
+  label: string;
+}) {
   return (
     <div>
       <dt className="sr-only">{label}</dt>
@@ -506,12 +624,26 @@ function DetailRow({ label }: { label: string }) {
   );
 }
 
+/**
+ * Formats a resource date for the current locale.
+ *
+ * @param value - Date to format.
+ * @param locale - Locale used for formatting.
+ * @returns The localized date.
+ */
 function formatDate(value: Date, locale: SupportedLocale) {
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
     new Date(value),
   );
 }
 
+/**
+ * Formats a byte count with an appropriate localized unit.
+ *
+ * @param bytes - File size in bytes.
+ * @param locale - Locale used for formatting.
+ * @returns The localized file size.
+ */
 function formatFileSize(bytes: number, locale: SupportedLocale) {
   const units = ["byte", "kilobyte", "megabyte"] as const;
   const exponent = Math.min(
@@ -526,6 +658,14 @@ function formatFileSize(bytes: number, locale: SupportedLocale) {
   }).format(bytes / 1024 ** exponent);
 }
 
+/**
+ * Advances an image index with wraparound.
+ *
+ * @param current - Current image index.
+ * @param direction - Direction to move.
+ * @param imageCount - Number of available images.
+ * @returns The next valid image index.
+ */
 export function cycleImageIndex(
   current: number,
   direction: -1 | 1,
