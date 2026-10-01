@@ -1,7 +1,10 @@
 import * as React from "react";
 
+/** Visual viewport measurements needed to calculate keyboard overlap. */
 type ViewportMetrics = {
+  /** Visual viewport height in CSS pixels. */
   height: number;
+  /** Visual viewport offset from the layout viewport top in CSS pixels. */
   offsetTop: number;
 };
 
@@ -17,6 +20,10 @@ type ViewportMetrics = {
  * The keyboard fills the gap between the bottom of the visual viewport
  * (`offsetTop + height`) and the bottom of the layout viewport, so a fixed
  * element can add this value to its `bottom` to sit flush on the keyboard tray.
+ *
+ * @param layoutHeight - Layout viewport height in CSS pixels.
+ * @param viewport - Current visual viewport height and top offset.
+ * @returns Non-negative keyboard overlap in CSS pixels.
  */
 export function keyboardInsetFromViewport(
   layoutHeight: number,
@@ -31,6 +38,9 @@ export function keyboardInsetFromViewport(
  * the server, in browsers without VisualViewport, and whenever the keyboard is
  * closed. Listeners only attach while `enabled` is true so we don't do viewport
  * bookkeeping when nothing is docked to the keyboard.
+ *
+ * @param enabled - Whether viewport listeners should be active.
+ * @returns Current keyboard overlap in CSS pixels.
  */
 export function useKeyboardInset(enabled: boolean) {
   const [inset, setInset] = React.useState(0);
@@ -43,6 +53,7 @@ export function useKeyboardInset(enabled: boolean) {
       return;
     }
 
+    /** Recalculates keyboard overlap from the current visual viewport. */
     const update = () => {
       setInset(
         keyboardInsetFromViewport(window.innerHeight, {

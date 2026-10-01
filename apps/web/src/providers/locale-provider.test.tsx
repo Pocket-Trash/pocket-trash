@@ -6,13 +6,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { localeStorageKey } from "@/lib/locale";
 import { AuthenticatedLocaleSync, LocaleProvider } from "./locale-provider";
 
+/** Locale API mocks shared by synchronization tests. */
 const api = vi.hoisted(() => ({
   fetch: vi.fn(),
   update: vi.fn(),
 }));
+/** Toast notification mock used to assert failed synchronization. */
 const notifications = vi.hoisted(() => ({ error: vi.fn() }));
 
 vi.mock("@clerk/tanstack-react-start", () => ({
+  /**
+   * Returns a loaded, signed-in Clerk session for provider tests.
+   *
+   * @returns Authenticated session state.
+   */
   useAuth: () => ({ isLoaded: true, isSignedIn: true }),
 }));
 
