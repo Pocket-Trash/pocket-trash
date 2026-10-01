@@ -4,8 +4,16 @@ import { parseCatalogFilterSearch } from "@/lib/catalog-filters";
 import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { UserCollectionsPage } from "@/pages/catalog-pages";
 
+/**
+ * Defines the `/user/collections` route and its data lifecycle.
+ */
 export const Route = createFileRoute("/user/collections")({
   validateSearch: parseCatalogFilterSearch,
+  /**
+   * Loads the current user's collection items and collection choices.
+   *
+   * @returns The route's loader data.
+   */
   loader: async () => {
     const [items, collections] = await Promise.all([
       getUserCollection(),
@@ -16,6 +24,11 @@ export const Route = createFileRoute("/user/collections")({
   component: UserCollectionsRoute,
 });
 
+/**
+ * Renders the user collections route content.
+ *
+ * @returns The rendered route UI.
+ */
 function UserCollectionsRoute() {
   const navigate = useNavigate();
   const [filters, setFilters] = useCatalogFilters(

@@ -8,7 +8,21 @@ import { CollectionFormPage } from "@/pages/catalog-form-pages";
 /** Route configuration for editing a collection. */
 export const Route = createFileRoute("/user/collections_/$collectionId_/edit")({
   params: {
+    /**
+     * Parses serialized route parameters into typed identifiers.
+     *
+     * @param context - Route callback context.
+     * @param context.collectionId - Collection identifier.
+     * @returns Typed route parameters.
+     */
     parse: ({ collectionId }) => ({ collectionId: Number(collectionId) }),
+    /**
+     * Serializes typed route identifiers for URL generation.
+     *
+     * @param context - Route callback context.
+     * @param context.collectionId - Collection identifier.
+     * @returns Serialized route parameters.
+     */
     stringify: ({ collectionId }) => ({ collectionId: String(collectionId) }),
   },
   /**

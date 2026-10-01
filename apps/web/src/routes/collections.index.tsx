@@ -4,12 +4,25 @@ import { parseCatalogFilterSearch } from "@/lib/catalog-filters";
 import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { PublicCollectionsPage } from "@/pages/catalog-pages";
 
+/**
+ * Defines the `/collections/` route and its data lifecycle.
+ */
 export const Route = createFileRoute("/collections/")({
   validateSearch: parseCatalogFilterSearch,
+  /**
+   * Loads users who expose public collections.
+   *
+   * @returns The route's loader data.
+   */
   loader: () => getPublicCollectionOwners(),
   component: CollectionsRoute,
 });
 
+/**
+ * Renders the collections route content.
+ *
+ * @returns The rendered route UI.
+ */
 function CollectionsRoute() {
   const navigate = useNavigate();
   const [filters, setFilters] = useCatalogFilters(

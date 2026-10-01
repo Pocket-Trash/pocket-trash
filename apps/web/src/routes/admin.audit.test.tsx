@@ -1,8 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+/**
+ * Hoisted can read audit test mock.
+ */
 const canReadAudit = vi.hoisted(() => vi.fn());
+/**
+ * Hoisted get admin audit export test mock.
+ */
 const getAdminAuditExport = vi.hoisted(() => vi.fn());
+/**
+ * Hoisted get audit delivery failures test mock.
+ */
 const getAuditDeliveryFailures = vi.hoisted(() => vi.fn());
+/**
+ * Hoisted list admin audit events test mock.
+ */
 const listAdminAuditEvents = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/audit", () => ({
@@ -10,9 +22,22 @@ vi.mock("@/lib/audit", () => ({
   getAdminAuditExport,
   getAuditDeliveryFailures,
   listAdminAuditEvents,
+  /**
+   * Returns audit search input unchanged for route tests.
+   *
+   * @param value - Candidate audit search state.
+   * @returns The same search state.
+   */
   parseAuditSearch: (value: unknown) => value,
 }));
-vi.mock("@/pages/admin-audit-page", () => ({ AdminAuditPage: () => null }));
+vi.mock("@/pages/admin-audit-page", () => ({
+  /**
+   * Renders an empty audit-page test double.
+   *
+   * @returns No rendered output.
+   */
+  AdminAuditPage: () => null,
+}));
 
 import { Route } from "./admin.audit";
 

@@ -4,12 +4,38 @@ import { parseCatalogFilterSearch } from "@/lib/catalog-filters";
 import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { CollectionPage } from "@/pages/catalog-pages";
 
+/**
+ * Defines the `/user/collections_/$collectionId` route and its data lifecycle.
+ */
 export const Route = createFileRoute("/user/collections_/$collectionId")({
   params: {
+    /**
+     * Parses serialized route parameters into typed identifiers.
+     *
+     * @param context - Route callback context.
+     * @param context.collectionId - Collection identifier.
+     * @returns Typed route parameters.
+     */
     parse: ({ collectionId }) => ({ collectionId: Number(collectionId) }),
+    /**
+     * Serializes typed route identifiers for URL generation.
+     *
+     * @param context - Route callback context.
+     * @param context.collectionId - Collection identifier.
+     * @returns Serialized route parameters.
+     */
     stringify: ({ collectionId }) => ({ collectionId: String(collectionId) }),
   },
   validateSearch: parseCatalogFilterSearch,
+  /**
+   * Loads one of the current user's collections and its items.
+   *
+   * @param context - Route callback context.
+   * @param context.params - Parsed route parameters.
+   * @returns The route's loader data.
+   * @throws When the requested route data is unavailable or access is denied.
+   * @rejects When the requested route data is unavailable or access is denied.
+   */
   loader: async ({ params }) => {
     if (
       !Number.isSafeInteger(params.collectionId) ||
@@ -24,6 +50,11 @@ export const Route = createFileRoute("/user/collections_/$collectionId")({
   component: UserCollectionRoute,
 });
 
+/**
+ * Renders the user collection route content.
+ *
+ * @returns The rendered route UI.
+ */
 function UserCollectionRoute() {
   const navigate = useNavigate();
   const data = Route.useLoaderData();

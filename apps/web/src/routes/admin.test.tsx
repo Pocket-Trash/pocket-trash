@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+/**
+ * Hoisted has admin access test mock.
+ */
 const hasAdminAccess = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/authorization", () => ({ hasAdminAccess }));

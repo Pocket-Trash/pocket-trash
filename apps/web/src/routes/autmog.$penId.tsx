@@ -5,13 +5,45 @@ import { decodePenParam, penParam } from "@/lib/pen-links";
 import { absoluteUrl } from "@/lib/site-url";
 import { ArchivePage } from "@/pages/archive-page";
 
+/**
+ * Defines the `/autmog/$penId` route and its data lifecycle.
+ */
 export const Route = createFileRoute("/autmog/$penId")({
-  validateSearch: (search: Record<string, unknown>): { img?: number } => {
+  /**
+   * Normalizes search parameters accepted by the route.
+   *
+   * @param search - Untrusted URL search parameters.
+   * @returns Normalized route search state.
+   */
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    /**
+     * Optional image index selected from the archive.
+     */
+    img?: number;
+  } => {
     const raw = search.img;
     const n = typeof raw === "number" ? raw : Number(raw);
     return Number.isFinite(n) && n > 1 ? { img: Math.floor(n) } : {};
   },
+  /**
+   * Selects normalized search state that invalidates the route loader.
+   *
+   * @param context - Route callback context.
+   * @param context.search - Validated route search state.
+   * @returns Normalized loader dependencies.
+   */
   loaderDeps: ({ search }) => ({ img: search.img }),
+  /**
+   * Resolves a legacy pen identifier, canonicalizes its URL, and loads archive data.
+   *
+   * @param context - Route callback context.
+   * @param context.params - Parsed route parameters.
+   * @param context.deps - Normalized loader dependencies.
+   * @returns The route's loader data.
+   * @throws When the requested route data is unavailable or access is denied.
+   */
   loader: ({ params, deps }) => {
     const product = decodePenParam(params.penId);
     if (!product) throw notFound();
@@ -39,6 +71,13 @@ export const Route = createFileRoute("/autmog/$penId")({
       title: product.title,
     };
   },
+  /**
+   * Builds document metadata for the resolved archive entry.
+   *
+   * @param context - Route callback context.
+   * @param context.loaderData - Resolved route loader data.
+   * @returns Metadata emitted for the route.
+   */
   head: ({ loaderData }) => {
     if (!loaderData) return {};
     const { title, description, imageUrl, imageAlt, pageUrl } = loaderData;
@@ -65,6 +104,12 @@ export const Route = createFileRoute("/autmog/$penId")({
   component: ArchivePage,
 });
 
+/**
+ * Builds archive metadata text from the resolved pen product.
+ *
+ * @param product - Resolved pen product.
+ * @returns The archive metadata description.
+ */
 function buildDescription(product: PenProduct): string {
   const specs = [
     product.sizes.length ? product.sizes.join(" / ") : null,
