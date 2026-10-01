@@ -64,6 +64,14 @@ export const listActiveFeedback = createServerFn({ method: "GET" })
     return await s.db.feedback.listActive(viewer.clerkId, data.search);
   });
 
+export const listCompletedFeedback = createServerFn({ method: "GET" })
+  .validator(parseFeedbackListInput)
+  .handler(async ({ data }) => {
+    const viewer = await requireResourceUploader();
+    const { s } = await import("@/lib/services");
+    return await s.db.feedback.listCompleted(viewer.clerkId, data.search);
+  });
+
 export const listMyFeedback = createServerFn({ method: "GET" })
   .validator(parseFeedbackListInput)
   .handler(async ({ data }) => {
@@ -269,6 +277,39 @@ export const planFeedback = createServerFn({ method: "POST" })
     } catch {
       return {
         error: "web.feedback.admin.plan.failure" as const,
+        ok: false as const,
+      };
+    }
+  });
+
+export const syncFeedbackStatus = createServerFn({ method: "POST" })
+  .validator(parseFeedbackId)
+  .handler(async ({ data }) => {
+    const actor = await requireFeedbackAdmin();
+    let token: string;
+    try {
+      token = await getLinearToken(actor.clerkId);
+      const { getLinearPlanningOptions } = await import("@/lib/linear");
+      await getLinearPlanningOptions(token);
+    } catch {
+      return {
+        error: "web.feedback.admin.sync.connectionRequired" as const,
+        ok: false as const,
+      };
+    }
+
+    const { s } = await import("@/lib/services");
+    try {
+      const target = await s.db.feedback.getLinearSyncTarget(data.feedbackId);
+      if (!target) throw new Error("Feedback is not linked to Linear.");
+      const { getLinearFeedbackStatus } = await import("@/lib/linear");
+      await s.db.feedback.syncLinearStatus(
+        await getLinearFeedbackStatus(token, target),
+      );
+      return { ok: true as const };
+    } catch {
+      return {
+        error: "web.feedback.admin.sync.failure" as const,
         ok: false as const,
       };
     }

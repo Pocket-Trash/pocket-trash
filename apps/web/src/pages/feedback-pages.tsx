@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import {
   findDuplicateFeedback,
   listActiveFeedback,
+  listCompletedFeedback,
   listMyFeedback,
   submitFeedback,
   toggleFeedbackVote,
@@ -27,6 +28,9 @@ import {
 import { useLocale } from "@/providers/locale-provider";
 
 type ActiveFeedback = Awaited<ReturnType<typeof listActiveFeedback>>[number];
+type CompletedFeedback = Awaited<
+  ReturnType<typeof listCompletedFeedback>
+>[number];
 type MyFeedbackPageData = Awaited<ReturnType<typeof listMyFeedback>>;
 type MyFeedback = MyFeedbackPageData["items"][number];
 type FeedbackFormInput = {
@@ -203,10 +207,19 @@ export function FeedbackBoardPage({
   return (
     <AppShell
       headerActions={
-        <Button nativeButton={false} render={<Link to="/feedback/new" />}>
-          <Plus aria-hidden="true" />
-          {t("web.feedback.new.title")}
-        </Button>
+        <>
+          <Button
+            nativeButton={false}
+            render={<Link to="/feedback/completed" />}
+            variant="outline"
+          >
+            {t("web.feedback.status.completed")}
+          </Button>
+          <Button nativeButton={false} render={<Link to="/feedback/new" />}>
+            <Plus aria-hidden="true" />
+            {t("web.feedback.new.title")}
+          </Button>
+        </>
       }
       title={t("web.feedback.title")}
     >
@@ -276,6 +289,98 @@ export function FeedbackBoardPage({
             </section>
           );
         })}
+      </main>
+    </AppShell>
+  );
+}
+
+export function CompletedFeedbackPage({
+  initialItems,
+}: {
+  initialItems: CompletedFeedback[];
+}) {
+  const [error, setError] = useState(false);
+  const [items, setItems] = useState(initialItems);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const t = useFeedbackCopy();
+
+  async function load() {
+    setError(false);
+    setLoading(true);
+    try {
+      setItems(await listCompletedFeedback({ data: { offset: 0, search } }));
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <AppShell
+      headerActions={
+        <>
+          <Button
+            nativeButton={false}
+            render={<Link to="/feedback" />}
+            variant="outline"
+          >
+            {t("web.feedback.title")}
+          </Button>
+          <Button nativeButton={false} render={<Link to="/feedback/new" />}>
+            <Plus aria-hidden="true" />
+            {t("web.feedback.new.title")}
+          </Button>
+        </>
+      }
+      title={t("web.feedback.status.completed")}
+    >
+      <main
+        aria-busy={loading}
+        className="mx-auto grid w-full max-w-4xl gap-4 px-4 py-6 md:px-6"
+      >
+        <search>
+          <form
+            className="flex gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void load();
+            }}
+          >
+            <label className="sr-only" htmlFor="completed-feedback-search">
+              {t("web.feedback.board.searchLabel")}
+            </label>
+            <Input
+              id="completed-feedback-search"
+              maxLength={120}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t("web.feedback.board.searchPlaceholder")}
+              type="search"
+              value={search}
+            />
+            <Button disabled={loading} type="submit" variant="outline">
+              <Search aria-hidden="true" />
+              {t("web.action.search")}
+            </Button>
+          </form>
+        </search>
+        {loading ? (
+          <p aria-live="polite" className="m-0 text-sm text-muted-foreground">
+            {t("web.feedback.board.loading")}
+          </p>
+        ) : null}
+        {error ? (
+          <p className="m-0 text-sm text-destructive" role="alert">
+            {t("web.feedback.board.error")}
+          </p>
+        ) : null}
+        {!loading && !error && items.length === 0 ? (
+          <EmptyState>{t("web.feedback.board.empty")}</EmptyState>
+        ) : null}
+        {items.map((item) => (
+          <FeedbackCard key={item.id} {...item} status="completed" />
+        ))}
       </main>
     </AppShell>
   );

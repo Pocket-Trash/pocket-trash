@@ -6,6 +6,7 @@ export type VisibleFeedbackStatus = Exclude<
   FeedbackListItem["status"],
   "canceled" | "denied" | "merged"
 >;
+type FeedbackStatus = FeedbackListItem["status"];
 
 export const feedbackCategories: FeedbackCategory[] = [
   "product_type",
@@ -21,7 +22,7 @@ export function feedbackCategoryKey(
   return `web.feedback.category.${category}`;
 }
 
-export function feedbackStatus(status: VisibleFeedbackStatus): {
+export function feedbackStatus(status: FeedbackStatus): {
   icon: string;
   key: TranslationKey;
 } {
@@ -40,5 +41,14 @@ export function feedbackStatus(status: VisibleFeedbackStatus): {
       key: "web.feedback.status.inProgress",
     };
   }
-  return { icon: "status-done.svg", key: "web.feedback.status.completed" };
+  if (status === "completed" || status === "merged") {
+    return {
+      icon: "status-done.svg",
+      key: `web.feedback.status.${status}`,
+    };
+  }
+  return {
+    icon: "status-canceled.svg",
+    key: `web.feedback.status.${status}`,
+  };
 }

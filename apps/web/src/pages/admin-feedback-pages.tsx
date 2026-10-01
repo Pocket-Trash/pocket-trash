@@ -30,9 +30,14 @@ import {
   listPendingFeedback,
   mergePendingFeedback,
   planFeedback,
+  syncFeedbackStatus,
   updateAdminFeedback,
 } from "@/lib/feedback";
-import { feedbackCategories, feedbackCategoryKey } from "@/lib/feedback-shared";
+import {
+  feedbackCategories,
+  feedbackCategoryKey,
+  feedbackStatus,
+} from "@/lib/feedback-shared";
 import { useLocale } from "@/providers/locale-provider";
 
 type Scope = "allActive" | "archive" | "pending" | "planned";
@@ -115,6 +120,7 @@ function AdminFeedbackPage({
   const [selected, setSelected] = useState<Item>();
   const [sort, setSort] = useState<Sort[]>([]);
   const [status, setStatus] = useState<ArchiveStatus | "">("");
+  const [syncingId, setSyncingId] = useState<number>();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const loadRequestRef = useRef(0);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -246,15 +252,70 @@ function AdminFeedbackPage({
       ]);
     }
     const statusColumn = columnHelper.accessor("status", {
-      cell: ({ row }) => t(statusKey(row.original.status)),
+      cell: ({ row }) => {
+        const details = feedbackStatus(row.original.status);
+        return (
+          <span className="flex items-center gap-2">
+            <img
+              alt=""
+              aria-hidden="true"
+              className="size-4"
+              src={`https://cdn.pocket-trash.app/assets/static/icons/${details.icon}`}
+            />
+            {t(details.key)}
+          </span>
+        );
+      },
       header: () => (
         <SortButton field="status" onChange={changeSort} sort={sort}>
           {t("web.feedback.admin.table.status")}
         </SortButton>
       ),
     });
+    const syncColumn = columnHelper.display({
+      cell: ({ row }) =>
+        row.original.linearClientUuid &&
+        !["merged", "denied"].includes(row.original.status) ? (
+          <Button
+            disabled={syncingId === row.original.id}
+            onClick={async () => {
+              setSyncingId(row.original.id);
+              try {
+                const result = await syncFeedbackStatus({
+                  data: { feedbackId: row.original.id },
+                });
+                if (!result.ok) {
+                  toast.error(t(result.error));
+                  return;
+                }
+                toast.success(t("web.feedback.admin.sync.success"));
+                await load(offset);
+              } catch {
+                toast.error(t("web.feedback.admin.sync.failure"));
+              } finally {
+                setSyncingId(undefined);
+              }
+            }}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {t("web.feedback.admin.sync.action")}
+          </Button>
+        ) : null,
+      header: () => (
+        <span className="sr-only">{t("web.feedback.admin.sync.action")}</span>
+      ),
+      id: "sync",
+    });
     if (scope === "archive") {
-      return columnHelper.columns([title, statusColumn, category, submitter]);
+      return columnHelper.columns([
+        title,
+        statusColumn,
+        category,
+        submitter,
+        syncColumn,
+      ]);
     }
     return columnHelper.columns([
       title,
@@ -280,8 +341,9 @@ function AdminFeedbackPage({
         ),
         id: "updated",
       }),
+      syncColumn,
     ]);
-  }, [locale, scope, search, sort, status, t]);
+  }, [locale, offset, scope, search, sort, status, syncingId, t]);
   const table = useTable({ columns, data: page.items, features });
   const copyScope =
     scope === "pending"

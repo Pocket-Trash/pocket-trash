@@ -41,6 +41,7 @@ import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as HelpSlugRouteImport } from './routes/help.$slug'
 import { Route as FeedbackNewRouteImport } from './routes/feedback.new'
 import { Route as FeedbackMyRequestsRouteImport } from './routes/feedback.my-requests'
+import { Route as FeedbackCompletedRouteImport } from './routes/feedback.completed'
 import { Route as CollectionsAddRouteImport } from './routes/collections.add'
 import { Route as CollectionsUserIdRouteImport } from './routes/collections.$userId'
 import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
@@ -230,6 +231,11 @@ const FeedbackMyRequestsRoute = FeedbackMyRequestsRouteImport.update({
   path: '/my-requests',
   getParentRoute: () => FeedbackRoute,
 } as any)
+const FeedbackCompletedRoute = FeedbackCompletedRouteImport.update({
+  id: '/completed',
+  path: '/completed',
+  getParentRoute: () => FeedbackRoute,
+} as any)
 const CollectionsAddRoute = CollectionsAddRouteImport.update({
   id: '/collections/add',
   path: '/collections/add',
@@ -401,6 +407,7 @@ export interface FileRoutesByFullPath {
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/feedback/completed': typeof FeedbackCompletedRoute
   '/feedback/my-requests': typeof FeedbackMyRequestsRoute
   '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
@@ -459,6 +466,7 @@ export interface FileRoutesByTo {
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/feedback/completed': typeof FeedbackCompletedRoute
   '/feedback/my-requests': typeof FeedbackMyRequestsRoute
   '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
@@ -522,6 +530,7 @@ export interface FileRoutesById {
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/feedback/completed': typeof FeedbackCompletedRoute
   '/feedback/my-requests': typeof FeedbackMyRequestsRoute
   '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
@@ -586,6 +595,7 @@ export interface FileRouteTypes {
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/feedback/completed'
     | '/feedback/my-requests'
     | '/feedback/new'
     | '/help/$slug'
@@ -644,6 +654,7 @@ export interface FileRouteTypes {
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/feedback/completed'
     | '/feedback/my-requests'
     | '/feedback/new'
     | '/help/$slug'
@@ -706,6 +717,7 @@ export interface FileRouteTypes {
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/feedback/completed'
     | '/feedback/my-requests'
     | '/feedback/new'
     | '/help/$slug'
@@ -1007,6 +1019,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FeedbackMyRequestsRouteImport
       parentRoute: typeof FeedbackRoute
     }
+    '/feedback/completed': {
+      id: '/feedback/completed'
+      path: '/completed'
+      fullPath: '/feedback/completed'
+      preLoaderRoute: typeof FeedbackCompletedRouteImport
+      parentRoute: typeof FeedbackRoute
+    }
     '/collections/add': {
       id: '/collections/add'
       path: '/collections/add'
@@ -1254,12 +1273,14 @@ const AutmogRouteWithChildren =
   AutmogRoute._addFileChildren(AutmogRouteChildren)
 
 interface FeedbackRouteChildren {
+  FeedbackCompletedRoute: typeof FeedbackCompletedRoute
   FeedbackMyRequestsRoute: typeof FeedbackMyRequestsRoute
   FeedbackNewRoute: typeof FeedbackNewRoute
   FeedbackIndexRoute: typeof FeedbackIndexRoute
 }
 
 const FeedbackRouteChildren: FeedbackRouteChildren = {
+  FeedbackCompletedRoute: FeedbackCompletedRoute,
   FeedbackMyRequestsRoute: FeedbackMyRequestsRoute,
   FeedbackNewRoute: FeedbackNewRoute,
   FeedbackIndexRoute: FeedbackIndexRoute,

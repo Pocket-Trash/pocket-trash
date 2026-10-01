@@ -29,6 +29,22 @@ const projectMutationSchema = z.object({
     success: z.boolean(),
   }),
 });
+const issueStatusSchema = z.object({
+  issue: z.object({
+    archivedAt: z.string().nullable(),
+    id: z.string(),
+    state: z.object({ type: z.string() }),
+    updatedAt: z.string(),
+  }),
+});
+const projectStatusSchema = z.object({
+  project: z.object({
+    archivedAt: z.string().nullable(),
+    id: z.string(),
+    status: z.object({ type: z.string() }),
+    updatedAt: z.string(),
+  }),
+});
 
 export type LinearPlanningOptions = {
   issueStateId: string;
@@ -185,6 +201,51 @@ export async function linearEntityExists(
     // Neither entity exists under the reserved UUID.
   }
   return false;
+}
+
+export async function getLinearFeedbackStatus(
+  token: string,
+  id: string,
+  request: typeof fetch = fetch,
+) {
+  try {
+    const { issue } = await linearGraphql(
+      token,
+      `query FeedbackIssueStatus($id: String!) {
+        issue(id: $id) { id updatedAt archivedAt state { type } }
+      }`,
+      { id },
+      issueStatusSchema,
+      request,
+    );
+    return linearSyncInput(issue, "issue", issue.state.type);
+  } catch {
+    const { project } = await linearGraphql(
+      token,
+      `query FeedbackProjectStatus($id: String!) {
+        project(id: $id) { id updatedAt archivedAt status { type } }
+      }`,
+      { id },
+      projectStatusSchema,
+      request,
+    );
+    return linearSyncInput(project, "project", project.status.type);
+  }
+}
+
+function linearSyncInput(
+  entity: { archivedAt: string | null; id: string; updatedAt: string },
+  entityType: "issue" | "project",
+  stateType: string,
+) {
+  return {
+    action: "sync" as const,
+    archived: Boolean(entity.archivedAt),
+    entityType,
+    entityUuid: entity.id,
+    occurredAt: new Date(entity.updatedAt),
+    stateType,
+  };
 }
 
 async function linearGraphql<T>(

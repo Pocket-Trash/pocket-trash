@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createLinearIssue,
+  getLinearFeedbackStatus,
   getLinearPlanningOptions,
   LINEAR_ENGINEERING_TEAM_ID,
   LINEAR_FEATURE_REQUESTS_PROJECT_ID,
@@ -76,6 +77,34 @@ describe("Linear feedback planning", () => {
     await expect(
       getLinearPlanningOptions("secret", request),
     ).rejects.toBeInstanceOf(LinearApiError);
+  });
+
+  it("reads an issue lifecycle state by its reserved UUID", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        issue: {
+          archivedAt: null,
+          id: "11111111-1111-4111-8111-111111111111",
+          state: { type: "started" },
+          updatedAt: "2026-09-30T20:00:00.000Z",
+        },
+      }),
+    );
+
+    await expect(
+      getLinearFeedbackStatus(
+        "secret",
+        "11111111-1111-4111-8111-111111111111",
+        request,
+      ),
+    ).resolves.toEqual({
+      action: "sync",
+      archived: false,
+      entityType: "issue",
+      entityUuid: "11111111-1111-4111-8111-111111111111",
+      occurredAt: new Date("2026-09-30T20:00:00.000Z"),
+      stateType: "started",
+    });
   });
 });
 

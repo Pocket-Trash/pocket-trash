@@ -9,6 +9,7 @@ import {
   listFeedbackMergeTargets,
   listPendingFeedback,
   planFeedback,
+  syncFeedbackStatus,
   updateAdminFeedback,
 } from "@/lib/feedback";
 import { mockStoryRole, StoryProviders } from "../../.storybook/story-fixtures";
@@ -69,6 +70,7 @@ const meta = {
       viewerName: "Ada",
     });
     mocked(planFeedback).mockResolvedValue({ ok: true });
+    mocked(syncFeedbackStatus).mockResolvedValue({ ok: true });
   },
   component: AdminFeedbackRequestsPage,
   decorators: [
@@ -279,6 +281,31 @@ export const Planning: Story = {
           labelIds: ["feature-label"],
           leadProject: false,
         },
+      }),
+    );
+  },
+};
+
+export const Synchronization: Story = {
+  render: () => (
+    <AdminActiveFeedbackPage
+      initialPage={{
+        hasNext: false,
+        items: [
+          {
+            ...request,
+            linearClientUuid: "11111111-1111-4111-8111-111111111111",
+            status: "planned",
+          },
+        ],
+      }}
+    />
+  ),
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "Sync" }));
+    await waitFor(() =>
+      expect(mocked(syncFeedbackStatus)).toHaveBeenCalledWith({
+        data: { feedbackId: request.id },
       }),
     );
   },

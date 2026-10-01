@@ -1,10 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect, within } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
-import { FeedbackBoardPage, MyFeedbackPage } from "./feedback-pages";
+import {
+  CompletedFeedbackPage,
+  FeedbackBoardPage,
+  MyFeedbackPage,
+} from "./feedback-pages";
 
 const requested = {
   category: "feature" as const,
+  completedAt: null,
   createdAt: new Date("2026-09-28T12:00:00Z"),
   description: "Let people save searches they use often.",
   hasPermanentVote: false,
@@ -100,4 +105,23 @@ export const MyRequests: Story = {
       }}
     />
   ),
+};
+
+export const Completed: Story = {
+  render: () => (
+    <CompletedFeedbackPage
+      initialItems={[
+        {
+          ...requested,
+          completedAt: new Date("2026-09-30T12:00:00Z"),
+          status: "completed",
+        },
+      ]}
+    />
+  ),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText("Saved searches")).toBeVisible();
+    await expect(canvas.queryByText("Upvote")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("Remove vote")).not.toBeInTheDocument();
+  },
 };
