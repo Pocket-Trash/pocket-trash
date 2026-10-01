@@ -55,13 +55,14 @@ describe("buildInfisicalRunArgs", () => {
    * Builds the expected quiet `run` layer for a secret path.
    *
    * @param path - The Infisical secret path.
+   * @param environment - Infisical environment to read.
    * @returns The expected CLI argument prefix.
    */
-  const quietRunArgs = (path: string) => [
+  const quietRunArgs = (path: string, environment = "dev") => [
     "run",
     ...quietArgs,
     "--project-config-dir=/repo",
-    "--env=dev",
+    `--env=${environment}`,
     `--path=${path}`,
     "--",
   ];
@@ -166,12 +167,12 @@ describe("buildInfisicalRunArgs", () => {
     ]);
   });
 
-  it("builds web commands from the web target path", () => {
+  it("builds the web build command with local database secrets", () => {
     expect(
       buildInfisicalRunArgs({
         app: "web",
         command: "build",
-        commandArgs: ["vite", "build"],
+        commandArgs: ["playwright", "test"],
         repoRoot: "/repo",
       }),
     ).toEqual([
@@ -182,9 +183,20 @@ describe("buildInfisicalRunArgs", () => {
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
       expect.stringContaining("databaseUrlUserOverride"),
       "--",
-      "vite",
-      "build",
+      "playwright",
+      "test",
     ]);
+  });
+
+  it("builds local E2E args with preview web secrets only", () => {
+    expect(
+      buildInfisicalRunArgs({
+        app: "web",
+        command: "test:e2e",
+        commandArgs: ["playwright", "test"],
+        repoRoot: "/repo",
+      }),
+    ).toEqual([...quietRunArgs("/apps/web", "preview"), "playwright", "test"]);
   });
 
   it("loads local Clerk IDs for the webhook listener", () => {

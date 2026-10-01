@@ -67,6 +67,16 @@ Vercel builds do not read `/apps/web` from Infisical.
 | `VITE_API_URL` | Client | API origin used for resource upload sessions. |
 | `SITE_URL` | Server | Public site origin when needed. |
 
+### End-to-end tests
+
+The Playwright suite reads `E2E_BASE_URL`, `E2E_CLERK_REGULAR_USER_EMAIL`,
+`E2E_CLERK_REGULAR_USER_ID`, `E2E_CLERK_EDITOR_USER_EMAIL`, and
+`E2E_CLERK_ADMIN_USER_EMAIL`. `E2E_CLERK_DISPOSABLE_USER_EMAIL` reserves an
+account for erasure coverage. CI also supplies `E2E_PR_NUMBER`,
+`E2E_DATABASE_BRANCH`, and `E2E_RUN_MUTATIONS` for the isolated mutation
+fixture. See [End-to-End Testing](./e2e-testing.md) for commands and safety
+checks.
+
 ### Local Database Override
 
 The Infisical `dev` value for `DATABASE_URL` is the shared default and points to

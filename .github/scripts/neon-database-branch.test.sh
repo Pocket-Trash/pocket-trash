@@ -11,6 +11,36 @@ cat > "$test_dir/curl" <<'EOF'
 set -euo pipefail
 
 url="${*: -1}"
+method=GET
+previous=""
+for argument in "$@"; do
+  if [[ "$previous" == "--request" ]]; then
+    method="$argument"
+  fi
+  previous="$argument"
+done
+if [[ "${CURL_SCENARIO:-}" == "mutation" ]]; then
+  case "$url" in
+    */branches\?*)
+      if [[ -f "$CURL_STATE_FILE" ]]; then
+        printf '{"branches":[{"id":"br_development","name":"development","current_state":"ready"},{"id":"br_preview","name":"preview","current_state":"ready"},{"id":"br_target","name":"preview-pr-42","current_state":"ready"}]}'
+      else
+        printf '{"branches":[{"id":"br_development","name":"development","current_state":"ready"},{"id":"br_preview","name":"preview","current_state":"ready"}]}'
+      fi
+      ;;
+    */branches)
+      [[ "$method" == "POST" ]]
+      touch "$CURL_STATE_FILE"
+      printf '{}'
+      ;;
+    *branch_id=br_target*pooled=true*) printf '{"uri":"postgresql://user@ep-target-pooler.example.test/db"}' ;;
+    *branch_id=br_target*pooled=false*) printf '{"uri":"postgresql://user@ep-target.example.test/db"}' ;;
+    */branches/br_target*) printf '{}' ;;
+    *) exit 1 ;;
+  esac
+  exit
+fi
+
 case "$url" in
   */branches*) printf '{"branches":[{"id":"br_test","name":"development"}]}' ;;
   *pooled=true*) printf '{"uri":"postgresql://user@ep-test-pooler.example.test/db"}' ;;
@@ -33,3 +63,22 @@ PATH="$test_dir:$PATH" \
 
 grep -Fx 'database_url=postgresql://user@ep-test-pooler.example.test/db' "$output_file" > /dev/null
 grep -Fx 'migration_database_url=postgresql://user@ep-test.example.test/db' "$output_file" > /dev/null
+
+mutation_output_file="$test_dir/mutation-output"
+mutation_state_file="$test_dir/mutation-state"
+PATH="$test_dir:$PATH" \
+  CURL_SCENARIO=mutation \
+  CURL_STATE_FILE="$mutation_state_file" \
+  NEON_API_BASE="https://neon.example.test" \
+  NEON_API_KEY="test-key" \
+  NEON_PROJECT_ID="test-project" \
+  NEON_DATABASE_NAME="test-database" \
+  NEON_DATABASE_USER="test-user" \
+  DB_CHANGING=false \
+  E2E_MUTATION=true \
+  PR_NUMBER=42 \
+  GITHUB_OUTPUT="$mutation_output_file" \
+  bash "$script_dir/neon-database-branch.sh" prepare-preview > /dev/null
+
+grep -Fx 'isolated=true' "$mutation_output_file" > /dev/null
+grep -Fx 'branch_name=preview-pr-42' "$mutation_output_file" > /dev/null

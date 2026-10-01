@@ -235,9 +235,8 @@ with misleading type errors when the PR contains database schema changes.
 The Deploy workflow configures this handoff after it prepares the Neon preview
 database:
 
-- DB-changing PRs use the isolated `preview-pr-<number>` branch after committed
-  migrations are applied.
-- Non-DB-changing PRs use the shared `preview` branch.
+- Every PR preview uses the isolated `preview-pr-<number>` branch.
+- DB-changing PRs apply committed migrations before deployment.
 - The selected `DATABASE_URL` is upserted into the Railway scraper preview
   service through the Railway CLI.
 

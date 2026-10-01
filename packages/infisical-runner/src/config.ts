@@ -145,6 +145,11 @@ export const commandSecrets = {
       databaseUrlUserOverride: true,
       paths: [webSecretPath, databaseLocalSecretPath],
     },
+    "test:e2e": {
+      allowServerSecrets: true,
+      environmentSlug: "preview",
+      paths: [webSecretPath],
+    },
     "test:watch": {
       allowServerSecrets: true,
       databaseUrlUserOverride: true,

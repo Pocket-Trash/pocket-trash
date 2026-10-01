@@ -25,9 +25,8 @@ Use the Storage Zone password, not the Bunny account API key, as
 | Shared preview | `resources/preview` | `resources/preview` |
 | Isolated preview | `resources/preview/pr-<number>` | `resources/preview/pr-<number>` |
 
-The PR deploy workflow selects shared or isolated preview storage alongside the
-database namespace. The close workflow deletes only the matching isolated PR
-prefix.
+The PR deploy workflow selects the isolated preview namespace before it runs
+Playwright. The close workflow deletes only the matching isolated PR prefix.
 
 ## Upload sessions
 
