@@ -1,11 +1,13 @@
 import { clerk } from "@clerk/testing/playwright";
-import { test as base } from "playwright/test";
+import { test as base, expect, type Page } from "playwright/test";
 
 /** Supported Pocket Trash test-user roles. */
 export type TestUserRole = "admin" | "disposable" | "editor" | "regular";
 
 /** Clerk authentication operations exposed to E2E tests. */
 type AuthFixtures = {
+  /** Opens protected Vercel previews without forwarding bypass headers. */
+  vercelPreviewAccess: void;
   /**
    * Signs a fresh browser context in as one configured development user.
    *
@@ -25,6 +27,26 @@ const emailVariables: Record<TestUserRole, string> = {
 
 /** Playwright test with fresh Clerk role sessions and no shared auth state. */
 export const test = base.extend<AuthFixtures>({
+  vercelPreviewAccess: [
+    async ({ baseURL, context }, use) => {
+      const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
+      if (
+        secret &&
+        baseURL &&
+        new URL(baseURL).hostname.endsWith(".vercel.app")
+      ) {
+        await context.request.get(baseURL, {
+          failOnStatusCode: true,
+          headers: {
+            "x-vercel-protection-bypass": secret,
+            "x-vercel-set-bypass-cookie": "true",
+          },
+        });
+      }
+      await use();
+    },
+    { auto: true },
+  ],
   /**
    * Supplies a role-based Clerk sign-in operation to each fresh test context.
    *
@@ -36,6 +58,7 @@ export const test = base.extend<AuthFixtures>({
   signInAs: async ({ page }, use) => {
     await use(async (role) => {
       await page.goto("/");
+      await clerk.signOut({ page });
       await clerk.signIn({
         emailAddress: requiredEnvironment(emailVariables[role]),
         page,
@@ -44,7 +67,17 @@ export const test = base.extend<AuthFixtures>({
   },
 });
 
-export { expect } from "playwright/test";
+export { expect };
+
+/**
+ * Waits until the client application can handle browser interactions.
+ *
+ * @param page - Server-rendered application page.
+ * @returns When React hydration completes.
+ */
+export async function waitForHydration(page: Page) {
+  await expect(page.locator("html")).toHaveAttribute("data-hydrated", "true");
+}
 
 /**
  * Reads one non-empty E2E environment variable.

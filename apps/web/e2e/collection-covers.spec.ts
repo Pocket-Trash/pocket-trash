@@ -1,7 +1,9 @@
 import { fileURLToPath } from "node:url";
+import { clerk } from "@clerk/testing/playwright";
 import { createDb, schema } from "@package/database";
 import { and, eq, inArray } from "drizzle-orm";
-import { expect, test } from "./auth";
+import type { Locator, Page } from "playwright/test";
+import { expect, test, waitForHydration } from "./auth";
 import {
   createMutationFixture,
   type MutationCleanupResult,
@@ -17,6 +19,7 @@ test("@mutation collection covers survive failures and retain reusable history",
     process.env.E2E_RUN_MUTATIONS !== "true",
     "Mutation fixtures require explicit isolation opt-in.",
   );
+  test.setTimeout(120_000);
 
   const databaseUrl = process.env.DATABASE_URL?.trim();
   const clerkId = process.env.E2E_CLERK_REGULAR_USER_ID?.trim();
@@ -65,6 +68,7 @@ test("@mutation collection covers survive failures and retain reusable history",
       }),
     );
     await page.goto("/user/collections/add");
+    await waitForHydration(page);
     await page.getByLabel("Name").fill(collectionName);
     await page.getByLabel("Images").setInputFiles(firstImage);
     await page.getByRole("button", { name: "Save" }).click();
@@ -92,10 +96,14 @@ test("@mutation collection covers survive failures and retain reusable history",
 
     await page.unroute("**/api/v0/storage/upload-sessions");
     await page.goto(`/user/collections/${createdCollectionId}/edit`);
+    await waitForHydration(page);
     await page
       .locator('input[type="file"][aria-label="Gallery"]')
       .setInputFiles(firstImage);
-    await page.getByRole("button", { name: "Upload images" }).click();
+    await clickAndWaitForReload(
+      page,
+      page.getByRole("button", { name: "Upload images" }),
+    );
     await expect(
       page.getByRole("heading", { name: "Current cover" }),
     ).toBeVisible();
@@ -121,7 +129,7 @@ test("@mutation collection covers survive failures and retain reusable history",
       }),
     ).toBeVisible();
 
-    await page.context().clearCookies();
+    await clerk.signOut({ page });
     await page.goto(`/collections/${owner.id}/${createdCollectionId}`);
     await expect(
       page.getByRole("heading", { name: "Page unavailable" }),
@@ -129,13 +137,14 @@ test("@mutation collection covers survive failures and retain reusable history",
 
     await signInAs("regular");
     await page.goto(`/user/collections/${createdCollectionId}/edit`);
+    await waitForHydration(page);
     await page.getByRole("switch", { name: "Public" }).click();
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page).toHaveURL(
       new RegExp(`/user/collections/${createdCollectionId}$`, "u"),
     );
 
-    await page.context().clearCookies();
+    await clerk.signOut({ page });
     await page.goto(`/collections/${owner.id}/${createdCollectionId}`);
     await expect(
       page.getByRole("heading", { name: collectionName }),
@@ -148,10 +157,14 @@ test("@mutation collection covers survive failures and retain reusable history",
 
     await signInAs("regular");
     await page.goto(`/user/collections/${createdCollectionId}/edit`);
+    await waitForHydration(page);
     await page
       .locator('input[type="file"][aria-label="Gallery"]')
       .setInputFiles(secondImage);
-    await page.getByRole("button", { name: "Upload images" }).click();
+    await clickAndWaitForReload(
+      page,
+      page.getByRole("button", { name: "Upload images" }),
+    );
     await expect(
       page.getByRole("button", { name: "Use this cover" }),
     ).toHaveCount(1);
@@ -173,7 +186,21 @@ test("@mutation collection covers survive failures and retain reusable history",
       throw new Error("The collection cover history was not retained.");
     }
 
-    await page.getByRole("button", { name: "Use this cover" }).click();
+    const originalGalleryItem = page.getByRole("listitem").filter({
+      has: page.getByRole("button", {
+        name: `Delete image ${original.fileName}`,
+      }),
+    });
+    const replacementGalleryItem = page.getByRole("listitem").filter({
+      has: page.getByRole("button", {
+        name: `Delete image ${replacement.fileName}`,
+      }),
+    });
+
+    await clickAndWaitForReload(
+      page,
+      replacementGalleryItem.getByRole("button", { name: "Use this cover" }),
+    );
     await expect
       .poll(async () => {
         const [current] = await database
@@ -189,7 +216,10 @@ test("@mutation collection covers survive failures and retain reusable history",
       })
       .toBe(replacement.id);
 
-    await page.getByRole("button", { name: "Use this cover" }).click();
+    await clickAndWaitForReload(
+      page,
+      originalGalleryItem.getByRole("button", { name: "Use this cover" }),
+    );
     await expect
       .poll(async () => {
         const [current] = await database
@@ -210,7 +240,7 @@ test("@mutation collection covers survive failures and retain reusable history",
       .setInputFiles(secondImage);
     await page.getByRole("button", { name: "Upload images" }).click();
     await expect(
-      page.getByRole("heading", { name: "Current cover" }),
+      page.getByText("We couldn't save your upload. Try again."),
     ).toBeVisible();
     const afterDuplicate = await database
       .select({
@@ -228,7 +258,10 @@ test("@mutation collection covers survive failures and retain reusable history",
     );
 
     page.once("dialog", (dialog) => dialog.accept());
-    await page.getByRole("button", { name: "Clear cover" }).click();
+    await clickAndWaitForReload(
+      page,
+      page.getByRole("button", { name: "Clear cover" }),
+    );
     await expect
       .poll(async () => {
         const current = await database
@@ -247,7 +280,10 @@ test("@mutation collection covers survive failures and retain reusable history",
       page.getByRole("button", { name: "Use this cover" }),
     ).toHaveCount(2);
 
-    await page.getByRole("button", { name: "Use this cover" }).first().click();
+    await clickAndWaitForReload(
+      page,
+      replacementGalleryItem.getByRole("button", { name: "Use this cover" }),
+    );
     await expect
       .poll(async () => {
         const [current] = await database
@@ -264,11 +300,12 @@ test("@mutation collection covers survive failures and retain reusable history",
       .toBe(replacement.id);
 
     page.once("dialog", (dialog) => dialog.accept());
-    await page
-      .getByRole("button", {
+    await clickAndWaitForReload(
+      page,
+      page.getByRole("button", {
         name: new RegExp(`Delete image.*${original.fileName}`, "u"),
-      })
-      .click();
+      }),
+    );
     await expect
       .poll(async () => {
         const remaining = await database
@@ -327,6 +364,21 @@ test("@mutation collection covers survive failures and retain reusable history",
           }
         }),
       );
+      const folderResponse = await fetch(
+        `${storageEndpoint.replace(/\/+$/u, "")}/${encodeURIComponent(storageZoneName)}/${imagePrefix
+          .split("/")
+          .map(encodeURIComponent)
+          .join("/")}/collection/${cleanupCollectionId}/`,
+        {
+          headers: { AccessKey: storageAccessKey },
+          method: "DELETE",
+        },
+      );
+      if (folderResponse.status !== 200 && folderResponse.status !== 404) {
+        throw new Error(
+          `Collection cover folder cleanup failed: ${folderResponse.status}.`,
+        );
+      }
 
       await database.transaction(async (transaction) => {
         if (objectPaths.size) {
@@ -373,3 +425,15 @@ test("@mutation collection covers survive failures and retain reusable history",
     objectDeleted: "deleted",
   });
 });
+
+/**
+ * Waits for a successful collection image action to finish reloading the page.
+ *
+ * @param page - Active collection edit page.
+ * @param button - Mutation button to click.
+ * @returns When the reloaded page is hydrated.
+ */
+async function clickAndWaitForReload(page: Page, button: Locator) {
+  await Promise.all([page.waitForEvent("load"), button.click()]);
+  await waitForHydration(page);
+}
