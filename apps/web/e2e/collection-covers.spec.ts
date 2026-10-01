@@ -238,12 +238,9 @@ test("@mutation collection covers survive failures and retain reusable history",
     await page
       .locator('input[type="file"][aria-label="Gallery"]')
       .setInputFiles(secondImage);
-    await clickAndWaitForReload(
-      page,
-      page.getByRole("button", { name: "Upload images" }),
-    );
+    await page.getByRole("button", { name: "Upload images" }).click();
     await expect(
-      page.getByRole("heading", { name: "Current cover" }),
+      page.getByText("We couldn't save your upload. Try again."),
     ).toBeVisible();
     const afterDuplicate = await database
       .select({
