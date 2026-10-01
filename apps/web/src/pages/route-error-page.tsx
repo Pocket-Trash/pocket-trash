@@ -16,17 +16,37 @@ import { logger } from "@/lib/logger";
 import type { UserSettingsState } from "@/lib/user-settings";
 import { useOptionalLocale } from "@/providers/locale-provider";
 
+/** Root loader data used to recover the saved locale. */
 type RootLoaderData = {
+  /** Current user settings, when the root loader resolved them. */
   settingsState?: UserSettingsState | null;
 };
 
+/**
+ * Logs a route failure and renders its localized recovery UI.
+ *
+ * @param root0 - Router error-component properties.
+ * @returns The route error boundary page.
+ */
 export function RouteErrorPage({ error }: ErrorComponentProps) {
   const router = useRouter();
   const activeLocale = useOptionalLocale();
   const pathname = useRouterState({
+    /**
+     * Selects the current route pathname.
+     *
+     * @param state - Router state.
+     * @returns The active pathname.
+     */
     select: (state) => state.location.pathname,
   });
   const rootLocale = useRouterState({
+    /**
+     * Selects the saved locale from root loader data.
+     *
+     * @param state - Router state.
+     * @returns The saved locale, or `null` when unavailable.
+     */
     select: (state) => {
       const rootData = state.matches.find(
         (match) => match.routeId === "__root__",
@@ -53,6 +73,13 @@ export function RouteErrorPage({ error }: ErrorComponentProps) {
   );
 }
 
+/**
+ * Resolves the locale used when rendering a route error.
+ *
+ * @param activeLocale - Locale from the mounted provider.
+ * @param rootLocale - Locale from root loader settings.
+ * @returns The first available locale, falling back to the default locale.
+ */
 export function resolveRouteErrorLocale(
   activeLocale: SupportedLocale | null,
   rootLocale: SupportedLocale | null,
@@ -60,6 +87,12 @@ export function resolveRouteErrorLocale(
   return activeLocale ?? rootLocale ?? DEFAULT_LOCALE;
 }
 
+/**
+ * Renders route-error recovery actions and optional development diagnostics.
+ *
+ * @param root0 - Error details and retry behavior.
+ * @returns The route-error view.
+ */
 export function RouteErrorView({
   development,
   error,
@@ -67,19 +100,35 @@ export function RouteErrorView({
   onRetry,
   pathname,
 }: {
+  /** Whether technical diagnostics are visible. */
   development: boolean;
+  /** Failure caught by the router boundary. */
   error: unknown;
+  /** Locale used for recovery copy. */
   locale: SupportedLocale;
+  /**
+   * Invalidates the router to retry failed loaders and rendering.
+   *
+   * @returns The router invalidation result.
+   */
   onRetry: () => Promise<unknown>;
+  /** Failed route pathname. */
   pathname: string;
 }) {
   const [copyStatus, setCopyStatus] = React.useState<
     "copied" | "failed" | null
   >(null);
   const [retrying, setRetrying] = React.useState(false);
+  /**
+   * Formats localized route-error copy.
+   *
+   * @param key - Translation key.
+   * @returns The localized message.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const details = formatErrorDetails(pathname, error);
 
+  /** Retries the failed route while maintaining the busy state. */
   const retry = async () => {
     setRetrying(true);
     try {
@@ -91,6 +140,7 @@ export function RouteErrorView({
     }
   };
 
+  /** Copies sanitized development diagnostics to the clipboard. */
   const copyDetails = async () => {
     try {
       await navigator.clipboard.writeText(details);
@@ -163,6 +213,13 @@ export function RouteErrorView({
   );
 }
 
+/**
+ * Serializes safe route diagnostics without query or hash values.
+ *
+ * @param pathname - Failed route location.
+ * @param error - Failure caught by the route boundary.
+ * @returns Pretty-printed diagnostic JSON.
+ */
 function formatErrorDetails(pathname: string, error: unknown) {
   const serialized = serializeError(error);
   return JSON.stringify(

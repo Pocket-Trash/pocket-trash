@@ -22,6 +22,7 @@ const requested = {
   voteCount: 8,
 };
 
+/** Storybook metadata for user-facing feedback pages. */
 const meta = {
   beforeEach: mockStoryAuth,
   decorators: [
@@ -36,9 +37,16 @@ const meta = {
 } satisfies Meta;
 
 export default meta;
+/** Feedback-page story shape. */
 type Story = StoryObj<typeof meta>;
 
+/** Active feedback board with representative request states. */
 export const ActiveBoard: Story = {
+  /**
+   * Renders the active feedback board fixture.
+   *
+   * @returns The populated feedback board.
+   */
   render: () => (
     <FeedbackBoardPage
       initialItems={[
@@ -48,6 +56,11 @@ export const ActiveBoard: Story = {
       ]}
     />
   ),
+  /**
+   * Verifies the request details dialog and focus restoration.
+   *
+   * @param root0 - Story interaction context.
+   */
   play: async ({ canvas, canvasElement, userEvent }) => {
     const opener = canvas.getByRole("button", {
       name: "View details for Saved searches",
@@ -70,12 +83,23 @@ export const ActiveBoard: Story = {
   },
 };
 
+/** Feedback whose permanent submitter vote cannot be removed. */
 export const PermanentVoteHidden: Story = {
+  /**
+   * Renders a request with a permanent vote.
+   *
+   * @returns The permanent-vote board fixture.
+   */
   render: () => (
     <FeedbackBoardPage
       initialItems={[{ ...requested, hasPermanentVote: true, hasVoted: true }]}
     />
   ),
+  /**
+   * Verifies permanent-vote controls remain hidden.
+   *
+   * @param root0 - Story interaction context.
+   */
   play: async ({ canvas }) => {
     await expect(
       canvas.queryByText("Your submission vote is permanent."),
@@ -86,7 +110,13 @@ export const PermanentVoteHidden: Story = {
   },
 };
 
+/** Empty active feedback board. */
 export const EmptyBoard: Story = {
+  /**
+   * Renders an empty feedback board.
+   *
+   * @returns The empty feedback board fixture.
+   */
   render: () => <FeedbackBoardPage initialItems={[]} />,
 };
 

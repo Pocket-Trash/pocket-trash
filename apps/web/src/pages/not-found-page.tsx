@@ -5,8 +5,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Renders the localized fallback for an unknown route.
+ *
+ * @returns The not-found page.
+ */
 export function NotFoundPage() {
   const { locale } = useLocale();
+  /**
+   * Formats localized not-found copy.
+   *
+   * @param key - Translation key.
+   * @returns The localized message.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   return (

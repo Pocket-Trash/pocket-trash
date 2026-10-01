@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/button";
 import { requestSelfErasure } from "@/lib/account-erasure";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Renders the confirmed, reverified account-deletion flow.
+ *
+ * @returns The account-deletion section and confirmation dialog.
+ */
 export function DeleteAccountSection() {
   const dialog = useRef<HTMLDialogElement>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -17,6 +22,12 @@ export function DeleteAccountSection() {
   const { locale } = useLocale();
   const navigate = useNavigate();
   const startErasure = useReverification(requestSelfErasure);
+  /**
+   * Formats localized account-deletion copy.
+   *
+   * @param key - Translation key.
+   * @returns The localized message.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   return (
