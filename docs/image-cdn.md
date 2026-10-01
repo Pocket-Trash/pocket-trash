@@ -82,14 +82,13 @@ Bunny CDN caches served files and Optimizer transformations.
 
 ## CI Behavior
 
-The API deploy workflow selects the preview image prefix from the same DB-change
-detection that selects the database branch:
+The API deploy workflow assigns an isolated preview image prefix before it runs
+Playwright:
 
-- DB-changing PRs get `BUNNY_IMAGE_FOLDER_PREFIX=images/preview/pr-<number>`.
-- PRs without DB changes get `BUNNY_IMAGE_FOLDER_PREFIX=images/preview`.
+- PR previews get `BUNNY_IMAGE_FOLDER_PREFIX=images/preview/pr-<number>`.
 - DB-changing PR scraper previews set `SCRAPER_CRON_ENABLED=true` because they
-  have an isolated Neon branch. PRs without DB changes set
-  `SCRAPER_CRON_ENABLED=false` because they share the preview database.
+  need schema-aware scraping. PRs without DB changes set
+  `SCRAPER_CRON_ENABLED=false`.
 
 The cleanup workflow removes branch-specific Vercel `BUNNY_IMAGE_FOLDER_PREFIX` when
 the PR closes. Isolated PR image folders under `/images/preview/pr-<number>` are

@@ -202,35 +202,33 @@ for production:
 | Branch | Lifetime | Parent | Purpose |
 | --- | --- | --- | --- |
 | `production` | permanent | root | Production data and schema. |
-| `preview` | permanent | `development` | Shared non-production data for previews that do not change DB schema. |
+| `preview` | permanent | `development` | Shared non-production baseline for preview refreshes. |
 | `development` | permanent | root | Shared non-production database for local development. |
 | Developer-specific | permanent | `development` | Optional personal local work branch selected through `.env.local`. |
-| `preview-pr-<number>` | ephemeral | `development` | Isolated non-production PR database, created only for DB-changing PRs. |
+| `preview-pr-<number>` | ephemeral | `development` | Isolated non-production database for each PR preview. |
 
 Local development uses `development` unless repository-root `.env.local` or
 `.env` selects a personal Infisical secret with `URL_INITIALS`. Before opening
 or updating a PR with schema changes, generate committed migrations with
 `pnpm db:generate`.
 
-PR branches are disposable, but DB-changing PR updates reuse the existing
+PR branches are disposable, but PR updates reuse the existing
 `preview-pr-<number>` branch when it already exists. The Deploy workflow creates
 the branch from non-production `development` when missing, so production user data
 never enters preview databases. Isolated PR branches get a
 Neon expiration timestamp, defaulting to 14 days and configurable with
 `NEON_PREVIEW_BRANCH_EXPIRES_DAYS`. Reused PR branches have that expiration
-refreshed on each DB-changing deploy. It then runs committed migrations against
-the branch and sets a branch-specific Vercel Preview `DATABASE_URL` for the web
-preview branch. The same selected `DATABASE_URL` is also pushed into the Railway
+refreshed on each deploy. The workflow runs committed migrations when the PR
+changes the schema and sets a branch-specific Vercel Preview `DATABASE_URL` for
+the web preview branch. The same selected `DATABASE_URL` is also pushed into the Railway
 scraper preview environment so scraper cron executions use the same database
 branch as the web preview. See [Image CDN](./image-cdn.md) for the matching
 preview image folder namespace.
 
-When a PR has no DB changes, the workflow uses the shared `preview` branch and
-removes stale `preview-pr-*` branches and stale Vercel branch database
-overrides. The Railway scraper preview environment is updated to the selected
-shared `preview` `DATABASE_URL` in that case. The close workflow remains the
-primary cleanup path; Neon branch expiration is the backup path when a close
-event or cleanup run is missed.
+PRs without schema changes still use an isolated branch so Playwright mutation
+fixtures cannot write to the shared preview database. The close workflow is the
+primary cleanup path; Neon branch expiration is the backup when a close event
+or cleanup run is missed.
 
 ENG-69 operational status: this repo change adds the backup expiration path, but
 `preview-pr-63` was not deleted from this worktree. The blocker is that Neon

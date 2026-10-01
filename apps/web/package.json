@@ -13,6 +13,8 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:e2e": "tsx ../../packages/infisical-runner/src/cli.ts web test:e2e -- playwright test --grep-invert @mutation",
+    "test:e2e:ci": "playwright test --grep-invert @mutation",
     "test": "tsx ../../packages/infisical-runner/src/cli.ts web test -- vitest run --project=unit --passWithNoTests",
     "test:ci": "vitest run --project=unit --passWithNoTests",
     "test-storybook": "vitest run --project=storybook",
@@ -57,6 +59,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@clerk/testing": "2.2.41",
+    "@package/database": "workspace:*",
     "@package/tsconfig": "workspace:*",
     "@storybook/addon-a11y": "10.6.0",
     "@storybook/addon-vitest": "10.6.0",
@@ -67,6 +71,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "@vitest/browser-playwright": "4.1.10",
     "@vitest/coverage-v8": "4.1.10",
+    "drizzle-orm": "latest",
     "playwright": "1.63.0",
     "storybook": "10.6.0",
     "vite": "latest",

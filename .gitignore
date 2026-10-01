@@ -11,6 +11,9 @@ build/
 .turbo/
 coverage/
 storybook-static/
+playwright-report/
+test-results/
+apps/web/e2e/.auth/
 
 # Logs
 *.log

@@ -15,7 +15,7 @@ export default mergeConfig(
         {
           extends: true,
           test: {
-            include: ["src/**/*.test.{ts,tsx}"],
+            include: ["e2e/**/*.test.ts", "src/**/*.test.{ts,tsx}"],
             name: "unit",
           },
         },
