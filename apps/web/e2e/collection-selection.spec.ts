@@ -22,12 +22,14 @@ test("@mutation collection selection and linked-item moves use the public UI", a
   try {
     await signInAs("regular");
     const productUrl = `/products/spinner/${fixture.spinnerProductSlug}`;
+    const documentRoot = page.locator("html");
     const addToCollectionUrl = new RegExp(
       `/collections/add\\?product=${fixture.spinnerProductId}$`,
       "u",
     );
 
     await page.goto(productUrl);
+    await expect(documentRoot).toHaveAttribute("data-hydrated", "true");
     await page.getByRole("link", { name: "Add to collection" }).click();
     await expect(page).toHaveURL(addToCollectionUrl);
     await expect(page.locator("main input").first()).toHaveValue(
@@ -46,6 +48,7 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     ).toHaveCount(0);
 
     await page.goto(productUrl);
+    await expect(documentRoot).toHaveAttribute("data-hydrated", "true");
     await page.getByRole("link", { name: "Add to collection" }).click();
     await stageCollection(page, fixture.collectionNames[0]);
     await expect(
@@ -82,9 +85,8 @@ test("@mutation collection selection and linked-item moves use the public UI", a
       }),
     ).toHaveCount(1);
 
-    await page.goto(productUrl);
-    await page.getByRole("link", { name: "Add to collection" }).click();
-    await expect(page).toHaveURL(addToCollectionUrl);
+    await page.goto(`/collections/add?product=${fixture.spinnerProductId}`);
+    await expect(documentRoot).toHaveAttribute("data-hydrated", "true");
     await expect(
       page
         .getByRole("combobox", { name: "Collection" })
@@ -103,9 +105,8 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     await expect(page).toHaveURL(/\/user\/collections\/\d+$/u);
     const secondCollectionUrl = page.url();
 
-    await page.goto(productUrl);
-    await page.getByRole("link", { name: "Add to collection" }).click();
-    await expect(page).toHaveURL(addToCollectionUrl);
+    await page.goto(`/collections/add?product=${fixture.spinnerProductId}`);
+    await expect(documentRoot).toHaveAttribute("data-hydrated", "true");
     const collectionInput = page
       .getByRole("combobox", { name: "Collection" })
       .and(page.locator("input"));
@@ -121,6 +122,7 @@ test("@mutation collection selection and linked-item moves use the public UI", a
     ).toBeVisible();
 
     await page.goto(firstCollectionUrl);
+    await expect(documentRoot).toHaveAttribute("data-hydrated", "true");
     await page
       .getByRole("link", { exact: true, name: fixture.spinnerProductName })
       .click();
@@ -176,10 +178,8 @@ test("@mutation collection selection and linked-item moves use the public UI", a
  */
 async function stageCollection(page: Page, name: string) {
   const dialog = page.getByRole("dialog");
-  await expect(async () => {
-    await page.getByRole("button", { name: "Add new collection" }).click();
-    await expect(dialog).toBeVisible();
-  }).toPass({ timeout: 5_000 });
+  await page.getByRole("button", { name: "Add new collection" }).click();
+  await expect(dialog).toBeVisible();
   await dialog.getByRole("textbox", { exact: true, name: "Name" }).fill(name);
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).not.toBeVisible();
