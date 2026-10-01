@@ -1,5 +1,10 @@
 import { createScraperEnv } from "./env.schema.js";
 
+/**
+ * Reads supported scraper environment variables from the current process.
+ *
+ * @returns An unvalidated runtime-environment snapshot.
+ */
 export function readProcessScraperRuntimeEnv() {
   return {
     APP_ENV: process.env.APP_ENV,
@@ -49,4 +54,7 @@ export function readProcessScraperRuntimeEnv() {
   };
 }
 
+/**
+ * Validated environment for the scraper HTTP server.
+ */
 export const scraperEnv = createScraperEnv(readProcessScraperRuntimeEnv());
