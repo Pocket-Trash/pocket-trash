@@ -400,6 +400,9 @@ importers:
 
   packages/markdown:
     dependencies:
+      '@tanstack/highlight':
+        specifier: ^1.0.0
+        version: 1.0.0
       rehype-parse:
         specifier: ^9.0.1
         version: 9.0.1
@@ -427,10 +430,19 @@ importers:
       unified:
         specifier: ^11.0.5
         version: 11.0.5
+      unist-util-visit:
+        specifier: ^5.1.0
+        version: 5.1.0
     devDependencies:
       '@package/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@types/hast':
+        specifier: ^3.0.5
+        version: 3.0.5
+      '@types/mdast':
+        specifier: ^4.0.4
+        version: 4.0.4
 
   packages/services:
     dependencies:
@@ -3610,6 +3622,10 @@ packages:
 
   '@tanstack/form-core@1.33.5':
     resolution: {integrity: sha512-3dfx9MBP0aq5sXKteikG629X9oviptrQj0IFRk9YGcb+lB7Kv5x8S17oOSk1wUWgjQZ4xVJEMbKwOAODymocgA==}
+
+  '@tanstack/highlight@1.0.0':
+    resolution: {integrity: sha512-nrg2iZSQUZlDZGTPKh/CNlg6Orm3vFHIaIi/9DqPC1rUpfe/M6rD2iokrckWTc2Z5jYDz185BK76GUh9VIjQRw==}
+    engines: {node: '>=18'}
 
   '@tanstack/history@1.162.0':
     resolution: {integrity: sha512-79pf/RkhteYZTRgcR4F9kbk84P2N8rugQJswxfIqovlbRiT3yI7eBE+5QorIrZaOKktsgzRlXh1l/du/xpl4iA==}
@@ -11531,6 +11547,8 @@ snapshots:
       '@tanstack/devtools-event-client': 0.4.4
       '@tanstack/pacer-lite': 0.1.1
       '@tanstack/store': 0.11.1
+
+  '@tanstack/highlight@1.0.0': {}
 
   '@tanstack/history@1.162.0': {}
 

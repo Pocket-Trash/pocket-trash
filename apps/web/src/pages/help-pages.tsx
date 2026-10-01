@@ -70,6 +70,12 @@ export function HelpTopicPage({
   );
 }
 
+/**
+ * Renders trusted help Markdown with its repository-owned capabilities.
+ *
+ * @param props - Help document and wrapper choice.
+ * @returns The rendered help article.
+ */
 function HelpArticle({
   document,
   includeMain = true,
@@ -77,7 +83,9 @@ function HelpArticle({
   document: HelpDocument;
   includeMain?: boolean;
 }) {
-  const content = <MarkdownContent markdown={document.body} />;
+  const content = (
+    <MarkdownContent markdown={document.body} trustedCodeBlocks />
+  );
 
   return includeMain ? (
     <main className="mx-auto w-full max-w-3xl p-6">{content}</main>
