@@ -7,8 +7,16 @@ import {
   getDatabaseUrlOverride,
 } from "./database-url-override.js";
 
+/** Temporary directories removed after each database override test. */
 const temporaryDirectories: string[] = [];
 
+/**
+ * Creates a temporary environment file for a database override test.
+ *
+ * @param contents - Environment file contents.
+ * @returns The temporary file path.
+ * @throws When the temporary directory or file cannot be created.
+ */
 function createEnvFile(contents: string): string {
   const directory = mkdtempSync(join(tmpdir(), "database-url-override-"));
   temporaryDirectories.push(directory);

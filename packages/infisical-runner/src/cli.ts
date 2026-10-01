@@ -5,6 +5,7 @@ import {
   runInfisicalCommand,
 } from "./runner.js";
 
+/** Writes runner usage and examples to standard output. */
 function printHelp(): void {
   console.log(
     [
@@ -18,6 +19,13 @@ function printHelp(): void {
   );
 }
 
+/**
+ * Parses CLI input and runs the requested command through Infisical.
+ *
+ * @param argv - Arguments after the runner executable and script path.
+ * @returns The wrapped command exit code, or zero after printing help.
+ * @rejects When arguments, prerequisites, or child-process startup fail.
+ */
 async function main(argv: readonly string[]): Promise<number> {
   if (argv.includes("--help") || argv.includes("-h")) {
     printHelp();
@@ -34,6 +42,7 @@ async function main(argv: readonly string[]): Promise<number> {
   });
 }
 
+/** Handles actionable runner failures at the CLI boundary. */
 try {
   process.exitCode = await main(process.argv.slice(2));
 } catch (error) {

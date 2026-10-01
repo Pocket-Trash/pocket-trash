@@ -6,6 +6,7 @@ import {
   RunnerError,
 } from "./runner.js";
 
+/** Reports actionable Infisical prerequisite failures to the caller. */
 try {
   const repoRoot = getRepoRoot();
 
