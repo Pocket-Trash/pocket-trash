@@ -3,8 +3,19 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { getResourceDetail } from "@/lib/resources";
 import { ResourceDetailPage } from "@/pages/resource-detail-page";
 
+/**
+ * Shows one resource visible to the current viewer.
+ */
 export const Route = createFileRoute("/resources/$resourceId")({
   component: ResourceRoute,
+  /**
+   * Loads a viewer-visible resource detail from its identifier.
+   *
+   * @param context - Route callback context.
+   * @param context.params - Parsed route parameters.
+   * @returns The resource detail visible to the current viewer.
+   * @rejects When the visible resource cannot be loaded.
+   */
   loader: async ({ params }) => {
     const detail = await getResourceDetail({
       data: { resourceId: Number(params.resourceId) },
@@ -12,6 +23,13 @@ export const Route = createFileRoute("/resources/$resourceId")({
     if (!detail) throw notFound();
     return detail;
   },
+  /**
+   * Builds document metadata for the loaded resource.
+   *
+   * @param context - Route callback context.
+   * @param context.loaderData - Resolved route loader data.
+   * @returns Metadata emitted for the route.
+   */
   head: ({ loaderData }) => ({
     meta: [
       {
@@ -23,6 +41,11 @@ export const Route = createFileRoute("/resources/$resourceId")({
   }),
 });
 
+/**
+ * Renders the resource route content.
+ *
+ * @returns The rendered route UI.
+ */
 function ResourceRoute() {
   return <ResourceDetailPage detail={Route.useLoaderData()} />;
 }

@@ -19,8 +19,16 @@ import {
 import { AppProviders } from "@/providers/app-providers";
 import "../styles.css";
 
+/**
+ * Provides the shared document shell, settings bootstrap, providers, and application chrome.
+ */
 export const Route = createRootRoute({
   component: RootContent,
+  /**
+   * Loads optional user settings, theme bootstrap state, and the current copyright year.
+   *
+   * @returns Copyright year, optional settings state, and resolved theme bootstrap state.
+   */
   loader: async () => {
     const settingsState = await getCurrentUserSettingsState().catch(
       async (error) => {
@@ -47,6 +55,11 @@ export const Route = createRootRoute({
       themeBootstrap: resolveServerThemeBootstrap(settingsState),
     };
   },
+  /**
+   * Builds document metadata for the application root route.
+   *
+   * @returns Metadata emitted for the route.
+   */
   head: () => ({
     links: [
       {
@@ -99,7 +112,21 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
 });
 
-function RootDocument({ children }: { children?: React.ReactNode }) {
+/**
+ * Renders the HTML document shell around application content.
+ *
+ * @param props - Document shell properties.
+ * @param props.children - Nested application content.
+ * @returns The rendered route UI.
+ */
+function RootDocument({
+  children,
+}: {
+  /**
+   * Nested application content.
+   */
+  children?: React.ReactNode;
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -121,6 +148,11 @@ function RootDocument({ children }: { children?: React.ReactNode }) {
   );
 }
 
+/**
+ * Renders application providers, routed content, and the shared footer.
+ *
+ * @returns The rendered route UI.
+ */
 function RootContent() {
   const loaderData = Route.useLoaderData();
   const themeBootstrap = loaderData.themeBootstrap;
@@ -144,6 +176,13 @@ function RootContent() {
   );
 }
 
+/**
+ * Builds the inline script that applies locale and theme state before hydration.
+ *
+ * @param themeBootstrap - Server-resolved theme bootstrap state.
+ * @param settingsState - Resolved user settings, or `null` when unavailable.
+ * @returns Executable bootstrap source.
+ */
 function bootstrapScript(
   themeBootstrap: ThemeBootstrapState,
   settingsState: UserSettingsState | null,
