@@ -151,40 +151,44 @@ export const markFeedbackNotificationRead = createServerFn({ method: "POST" })
     );
   });
 
+/** Updates editable feedback as an authorized administrator. */
 export const updateAdminFeedback = createServerFn({ method: "POST" })
   .validator(parseAdminFeedbackInput)
   .handler(async ({ data }) => {
-    await requireFeedbackAdmin();
+    const actor = await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
-    await s.db.feedback.updateAdmin(data);
+    await s.db.feedback.updateAdmin({ ...data, actor });
   });
 
+/** Merges pending feedback into an active request. */
 export const mergePendingFeedback = createServerFn({ method: "POST" })
   .validator(parseMergeFeedbackInput)
   .handler(async ({ data }) => {
-    await requireFeedbackAdmin();
+    const actor = await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
-    await s.db.feedback.mergePending(data.feedbackId, data.targetId);
+    await s.db.feedback.mergePending({ ...data, actor });
   });
 
+/** Approves categorized feedback for planning. */
 export const approveFeedback = createServerFn({ method: "POST" })
   .validator(parseFeedbackId)
   .handler(async ({ data }) => {
-    await requireFeedbackAdmin();
+    const actor = await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
-    await s.db.feedback.approve(data.feedbackId);
+    await s.db.feedback.approve({ ...data, actor });
   });
 
+/** Denies eligible feedback or reports required plan recovery. */
 export const denyFeedback = createServerFn({ method: "POST" })
   .validator(parseFeedbackId)
   .handler(async ({ data }) => {
-    await requireFeedbackAdmin();
+    const actor = await requireFeedbackAdmin();
     const { s } = await import("@/lib/services");
     const { FeedbackPlanRecoveryRequiredError } = await import(
       "@package/services"
     );
     try {
-      await s.db.feedback.deny(data.feedbackId);
+      await s.db.feedback.deny({ ...data, actor });
       return { ok: true as const };
     } catch (error) {
       if (error instanceof FeedbackPlanRecoveryRequiredError) {
