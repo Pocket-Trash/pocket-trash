@@ -8,7 +8,7 @@ import remarkRehype from "remark-rehype";
 import remarkStringify from "remark-stringify";
 import { unified } from "unified";
 
-/** Converts HTML fragments to trimmed GitHub Flavored Markdown. */
+/** Converts HTML fragments to GitHub Flavored Markdown. */
 const htmlToMarkdownProcessor = unified()
   .use(rehypeParse, { fragment: true })
   .use(rehypeRemark)
