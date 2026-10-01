@@ -1,8 +1,8 @@
 import { reverificationError } from "@clerk/shared/authorization-errors";
 import { auth as clerkAuth } from "@clerk/tanstack-react-start/server";
-import { hasPermission } from "@package/services/authorization";
+import { type Actor, hasPermission } from "@package/services/authorization";
 import { createServerFn } from "@tanstack/react-start";
-import { getActor, requirePermission } from "@/lib/authorization";
+import { getActor, requireActor, requirePermission } from "@/lib/authorization";
 import { localizedServerError } from "@/lib/server-errors";
 
 export type ErasureStatusView = {
@@ -21,6 +21,7 @@ export type ErasureTarget = {
   name: string;
 };
 
+/** Creates a strictly reverified self-service erasure request. */
 export const requestSelfErasure = createServerFn({ method: "POST" })
   .validator(parseSelfErasureInput)
   .handler(async () => {
@@ -33,12 +34,12 @@ export const requestSelfErasure = createServerFn({ method: "POST" })
     const { s } = await import("@/lib/services");
     return statusView(
       await s.db.erasure.create({
+        actor: await requireActor(),
         initiator: "self",
         subjectHmac: await subjectHmac(clerkId),
         targetClerkId: clerkId,
         verificationMethod: "clerk_reverification",
         verifiedAt: new Date(),
-        verifiedByClerkId: clerkId,
       }),
     );
   });
@@ -71,24 +72,25 @@ export const findErasureTarget = createServerFn({ method: "GET" })
     return await findClerkUserByEmail(data.email);
   });
 
+/** Creates an administrator-verified account-erasure request. */
 export const requestAdminErasure = createServerFn({ method: "POST" })
   .validator(parseAdminErasureInput)
   .handler(async ({ data }): Promise<AdminErasureStatusView> => {
-    const adminClerkId = await requireAdmin();
+    const actor = await requireAdmin();
     const target = await findClerkUserByEmail(data.email);
-    if (!target || target.clerkId !== data.targetClerkId) {
+    if (target?.clerkId !== data.targetClerkId) {
       throw localizedServerError("error.generic");
     }
 
     const { s } = await import("@/lib/services");
     const request = await s.db.erasure.create({
+      actor,
       initiator: "admin",
       subjectHmac: await subjectHmac(target.clerkId),
       targetClerkId: target.clerkId,
       verificationMethod: data.verificationMethod,
       verificationReference: data.verificationReference,
       verifiedAt: new Date(),
-      verifiedByClerkId: adminClerkId,
     });
     return {
       ...statusView(request),
@@ -112,12 +114,16 @@ export const getAdminErasureStatus = createServerFn({ method: "GET" })
       : null;
   });
 
+/** Retries an erasure request that needs administrator attention. */
 export const retryAdminErasure = createServerFn({ method: "POST" })
   .validator(parseRequestInput)
   .handler(async ({ data }): Promise<AdminErasureStatusView> => {
-    await requireAdmin();
+    const actor = await requireAdmin();
     const { s } = await import("@/lib/services");
-    const request = await s.db.erasure.retry({ requestId: data.requestId });
+    const request = await s.db.erasure.retry({
+      actor,
+      requestId: data.requestId,
+    });
     const adminRequest = await s.db.erasure.getForAdmin(request.id);
     return {
       ...statusView(request),
@@ -207,8 +213,14 @@ function requireSignedInUser(state: {
   return state.userId;
 }
 
-async function requireAdmin(): Promise<string> {
-  return (await requirePermission("accounts.erase")).clerkId;
+/**
+ * Requires an actor authorized to erase accounts.
+ *
+ * @returns The normalized administrator actor.
+ * @rejects When the current actor lacks account-erasure permission.
+ */
+async function requireAdmin(): Promise<Actor> {
+  return await requirePermission("accounts.erase");
 }
 
 async function findClerkUserByEmail(

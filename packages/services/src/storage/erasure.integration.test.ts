@@ -38,12 +38,12 @@ describe("account storage erasure", () => {
       const survivor = "surviving_owner";
       const paths = await fixtures(client, target, survivor);
       const request = await createErasureService(db, logger).create({
+        actor: { clerkId: target, role: "user" },
         initiator: "self",
         subjectHmac: "a".repeat(64),
         targetClerkId: target,
         verificationMethod: "clerk_reverification",
         verifiedAt: new Date(),
-        verifiedByClerkId: target,
       });
 
       await service.snapshotErasureTargets(request.id, target);

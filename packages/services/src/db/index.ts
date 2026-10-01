@@ -1,6 +1,7 @@
 import type { Database } from "@package/database";
 import type { Logger } from "@package/logger";
 import { collectionAuditEvents } from "./audit/collections.js";
+import { accountErasureAuditEvents } from "./audit/erasure.js";
 import { type AuditService, createAuditService } from "./audit/index.js";
 import { productAuditEvents } from "./audit/products.js";
 import { resourceAuditEvents } from "./audit/resources.js";
@@ -42,7 +43,12 @@ export type DbServices = {
 export function createDbServices(db: Database, logger: Logger): DbServices {
   const audit = createAuditService(
     logger,
-    [...collectionAuditEvents, ...productAuditEvents, ...resourceAuditEvents],
+    [
+      ...accountErasureAuditEvents,
+      ...collectionAuditEvents,
+      ...productAuditEvents,
+      ...resourceAuditEvents,
+    ],
     db,
   );
   const users = createUsersService(db, logger);
@@ -102,11 +108,13 @@ export type {
 export { CollectionButtonAlreadyInstalledError } from "./catalog/index.js";
 export type {
   ApprovedErasureExceptionCode,
+  CreateErasureRequestInput,
   ErasureOperationRequest,
   ErasureOperationResult,
   ErasureOperations,
   ErasureReceipt,
   ErasureService,
+  RetryErasureRequestInput,
 } from "./erasure/index.js";
 export {
   AccountErasureInProgressError,
