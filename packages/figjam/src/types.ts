@@ -4,7 +4,10 @@ export const payloadSchemaVersion = "figjam-bridge/v1";
 /** Actor that originated a FigJam bridge payload. */
 export type AgentName = "codex" | "claude" | "user" | "system";
 
-/** Operation the FigJam plugin can apply to a board. */
+/**
+ * Operation the FigJam plugin can apply to a board.
+ * Operations run in payload order; unresolved connector endpoints are skipped.
+ */
 export type FigjamOperation =
   | {
       /** Section height in pixels. */
@@ -37,27 +40,59 @@ export type FigjamOperation =
       y: number;
     }
   | {
-      /** Optional six-digit hex fill color or `none`. */
+      /**
+       * Optional six-digit hex fill color; `none` removes the fill.
+       *
+       * @default #ffffff
+       */
       fill?: string;
-      /** Optional text size in pixels. */
+      /**
+       * Optional text size in pixels.
+       *
+       * @default 12
+       */
       fontSize?: number;
       /** Shape height in pixels. */
       height: number;
       /** Payload-unique operation identifier. */
       id: string;
-      /** Optional corner radius in pixels. */
+      /**
+       * Optional corner radius in pixels.
+       *
+       * @default 8
+       */
       radius?: number;
-      /** Optional six-digit hex stroke color or `none`. */
+      /**
+       * Optional six-digit hex stroke color.
+       *
+       * @default #d4d4d4
+       */
       stroke?: string;
       /** Optional text rendered inside the shape. */
       text?: string;
-      /** Optional horizontal text alignment. */
+      /**
+       * Optional horizontal text alignment.
+       *
+       * @default left
+       */
       textAlign?: "center" | "left";
-      /** Optional six-digit hex text color or `none`. */
+      /**
+       * Optional six-digit hex text color.
+       *
+       * @default #171717
+       */
       textColor?: string;
-      /** Optional inner text padding in pixels. */
+      /**
+       * Optional inner text padding in pixels.
+       *
+       * @default 10
+       */
       textPadding?: number;
-      /** Optional text placement inside the shape. */
+      /**
+       * Optional text placement inside the shape.
+       *
+       * @default top-left
+       */
       textPosition?: "center" | "top-left";
       /** Shape operation discriminator. */
       type: "shape";
@@ -97,7 +132,7 @@ export type FigjamOperation =
 export type FigjamPayload = {
   /** Figma file key receiving the operations. */
   fileKey: string;
-  /** Ordered operations for the FigJam plugin to apply. */
+  /** Ordered operations; connectors may reference only earlier created nodes. */
   operations: FigjamOperation[];
   /** Identifier used to track and acknowledge the payload. */
   payloadId: string;

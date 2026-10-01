@@ -135,7 +135,7 @@ function shouldIncludeNode(
  * Formats one Figma comment as a single Markdown list item.
  *
  * @param comment - Comment fields returned by Figma.
- * @returns Markdown list item with author, timestamp, and normalized text.
+ * @returns Markdown list item with author, optional timestamp, and normalized text.
  */
 function formatComment(comment: FigmaComment): string {
   const author = comment.user?.handle ?? "Unknown";
