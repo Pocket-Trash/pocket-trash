@@ -55,7 +55,7 @@ type Story = StoryObj<typeof meta>;
 /** Populated audit log with filtering and event details. */
 const Populated: Story = {
   args: {
-    exportState: { activeExport: null, canExport: false },
+    exportState: { activeExport: null, canDelete: false, canExport: false },
     page,
     search: {},
   },
@@ -84,7 +84,7 @@ const Populated: Story = {
 /** Empty filtered audit-log state. */
 const Empty: Story = {
   args: {
-    exportState: { activeExport: null, canExport: false },
+    exportState: { activeExport: null, canDelete: false, canExport: false },
     page: { ...page, items: [], nextCursor: null },
     search: { action: "missing.action" },
   },
@@ -105,7 +105,7 @@ const Empty: Story = {
 /** Audit-log state with a new export available. */
 const ExportAvailable: Story = {
   args: {
-    exportState: { activeExport: null, canExport: true },
+    exportState: { activeExport: null, canDelete: false, canExport: true },
     page,
     search: {},
   },
@@ -137,6 +137,7 @@ const ExportReady: Story = {
         reason: "Incident review",
         sha256: "a".repeat(64),
       },
+      canDelete: true,
       canExport: true,
     },
     page,
@@ -150,9 +151,17 @@ const ExportReady: Story = {
    */
   play: async (context) => {
     const { canvas } = context;
-    await expect(canvas.getByText(/125 events through/)).toBeVisible();
+    await expect(
+      canvas.getByText(/Oldest 125 events recorded before/),
+    ).toBeVisible();
     await expect(canvas.getByText(/Incident review/)).toBeVisible();
     await expect(canvas.getByText(/a{64}/)).toBeVisible();
+    await expect(
+      canvas.getByLabelText("I confirm I have downloaded these logs."),
+    ).toBeRequired();
+    await expect(
+      canvas.getByRole("button", { name: "Delete exported logs" }),
+    ).toBeVisible();
   },
 };
 

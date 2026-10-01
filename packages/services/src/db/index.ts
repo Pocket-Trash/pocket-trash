@@ -61,11 +61,13 @@ export type {
   AuditService,
   AuditWriteInput,
   CreateAuditExportInput,
+  DeleteAuditExportInput,
   DownloadAuditExportInput,
   ListAuditEventsInput,
 } from "./audit/index.js";
 export {
   AuditEventValidationError,
+  AuditExportDeletionError,
   AuditExportEmptyError,
   AuditExportInProgressError,
   AuditPayloadTooLargeError,

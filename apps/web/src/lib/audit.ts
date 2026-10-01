@@ -19,6 +19,8 @@ export type AuditSearch = {
 export type AuditExportState = {
   /** The unconsumed export range, when one exists. */
   activeExport: AuditExportView | null;
+  /** Whether the current actor may delete a completed export range. */
+  canDelete: boolean;
   /** Whether the current actor may create or download exports. */
   canExport: boolean;
 };
@@ -52,11 +54,16 @@ const getAdminAuditExport = createServerFn({ method: "GET" }).handler(
   async () => {
     const actor = await requirePermission("audit.read");
     if (!hasPermission(actor, "audit.export")) {
-      return { activeExport: null, canExport: false } as const;
+      return {
+        activeExport: null,
+        canDelete: false,
+        canExport: false,
+      } as const;
     }
     const { s } = await import("@/lib/services");
     return {
       activeExport: await s.db.audit.getActiveExport(actor),
+      canDelete: hasPermission(actor, "audit.delete"),
       canExport: true,
     } as const;
   },
@@ -72,8 +79,22 @@ export { getAdminAuditExport };
  */
 export async function handleAuditExportRequest(request: Request) {
   try {
-    const actor = await requirePermission("audit.export");
     const form = await request.formData();
+    if (formString(form.get("intent")) === "delete") {
+      const actor = await requirePermission("audit.delete");
+      const { s } = await import("@/lib/services");
+      await s.db.audit.deleteExport({
+        actor,
+        confirmed: formString(form.get("confirmed")) === "true",
+        exportId: formString(form.get("exportId")),
+      });
+      return new Response(null, {
+        headers: { Location: "/admin/audit" },
+        status: 303,
+      });
+    }
+
+    const actor = await requirePermission("audit.export");
     const exportId = formString(form.get("exportId"));
     const { s } = await import("@/lib/services");
     const record = exportId

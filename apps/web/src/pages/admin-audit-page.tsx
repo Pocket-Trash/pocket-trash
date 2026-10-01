@@ -77,6 +77,7 @@ export function AdminAuditPage({
                     count: new Intl.NumberFormat(locale).format(
                       exportState.activeExport.eventCount,
                     ),
+                    cutoff: dateTime.format(exportState.activeExport.cutoffAt),
                     date: dateTime.format(
                       exportState.activeExport.highWaterRecordedAt,
                     ),
@@ -101,6 +102,41 @@ export function AdminAuditPage({
                     {t("web.admin.audit.exportAction")}
                   </button>
                 </form>
+                {exportState.canDelete &&
+                exportState.activeExport.completedAt &&
+                exportState.activeExport.sha256 ? (
+                  <form
+                    action="/admin/audit/export"
+                    className="grid gap-3 border-t border-border pt-3"
+                    method="post"
+                  >
+                    <input
+                      name="exportId"
+                      type="hidden"
+                      value={exportState.activeExport.id}
+                    />
+                    <input name="intent" type="hidden" value="delete" />
+                    <label className="flex items-start gap-3 text-sm">
+                      <input
+                        className="mt-0.5 size-4"
+                        name="confirmed"
+                        required
+                        type="checkbox"
+                        value="true"
+                      />
+                      <span>{t("web.admin.audit.deleteConfirmation")}</span>
+                    </label>
+                    <button
+                      className={cn(
+                        buttonVariants({ variant: "destructive" }),
+                        "w-fit",
+                      )}
+                      type="submit"
+                    >
+                      {t("web.admin.audit.deleteAction")}
+                    </button>
+                  </form>
+                ) : null}
               </div>
             ) : (
               <form
