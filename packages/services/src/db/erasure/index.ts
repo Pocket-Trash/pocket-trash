@@ -10,7 +10,17 @@ import { schema } from "@package/database";
 import type { Logger } from "@package/logger";
 import { loggerMessages } from "@package/logger";
 import { and, asc, eq, inArray, lte, or, sql } from "drizzle-orm";
-import { type AuditService, createAuditService } from "../audit/index.js";
+import { type Actor, hasPermission } from "../../authorization.js";
+import {
+  type AccountErasureAuditData,
+  accountErasureAudit,
+  accountErasureAuditEvents,
+} from "../audit/erasure.js";
+import {
+  type AuditEventDefinition,
+  type AuditService,
+  createAuditService,
+} from "../audit/index.js";
 import {
   DatabaseErasureVerificationError,
   eraseAccountDatabaseData,
@@ -69,6 +79,39 @@ export type ErasureOperations = Record<
 
 export type ErasureService = ReturnType<typeof createErasureService>;
 
+/** Human-initiated account-erasure request input. */
+export type CreateErasureRequestInput = {
+  /** Normalized human actor creating the request. */
+  actor: Actor;
+  /** Whether the account owner or an administrator initiated the request. */
+  initiator: ErasureInitiator;
+  /** Non-reversible subject lookup digest. */
+  subjectHmac: string;
+  /** Clerk identifier of the account being erased. */
+  targetClerkId: string;
+  /** Verification channel used before request creation. */
+  verificationMethod: ErasureVerificationMethod;
+  /** Opaque administrator verification evidence. */
+  verificationReference?: string;
+  /** Time at which the human actor was verified. */
+  verifiedAt: Date;
+};
+
+/** Administrator retry input for an account-erasure request. */
+export type RetryErasureRequestInput = {
+  /** Normalized administrator retrying the request. */
+  actor: Actor;
+  /** Approved retention exception attached to the pending step. */
+  exception?: {
+    /** Approved exception code. */
+    code: ApprovedErasureExceptionCode;
+    /** Time at which the retained data must expire. */
+    expiresAt: Date;
+  };
+  /** Erasure request identifier. */
+  requestId: string;
+};
+
 export class AccountErasureInProgressError extends Error {
   constructor() {
     super("Account erasure is in progress.");
@@ -115,11 +158,23 @@ export async function createErasureSubjectHmac(
     .join("");
 }
 
+/**
+ * Creates the durable account-erasure service.
+ *
+ * @param db - Database containing erasure requests and audit events.
+ * @param logger - Structured operation logger.
+ * @param now - Clock used for retry and retention state.
+ * @param audit - Shared audit writer and account redactor.
+ * @returns Account-erasure service.
+ */
 export function createErasureService(
   db: Database,
   logger: Logger,
   now: () => Date = () => new Date(),
-  audit: Pick<AuditService, "redactAccount"> = createAuditService(logger),
+  audit: Pick<AuditService, "redactAccount" | "write"> = createAuditService(
+    logger,
+    accountErasureAuditEvents,
+  ),
 ) {
   return {
     async assertAccountActive(clerkId: string): Promise<void> {
@@ -172,15 +227,14 @@ export function createErasureService(
       });
     },
 
-    async create(input: {
-      initiator: ErasureInitiator;
-      subjectHmac: string;
-      targetClerkId: string;
-      verificationMethod: ErasureVerificationMethod;
-      verificationReference?: string;
-      verifiedAt: Date;
-      verifiedByClerkId: string;
-    }): Promise<ErasureReceipt> {
+    /**
+     * Creates one deduplicated and audited erasure request.
+     *
+     * @param input - Verified human request and subject digest.
+     * @returns Safe erasure receipt.
+     * @rejects When authorization, verification, or persistence fails.
+     */
+    async create(input: CreateErasureRequestInput): Promise<ErasureReceipt> {
       const values = normalizeCreateInput(input);
       const createdAt = now();
       const request = await logger.operation(
@@ -190,34 +244,62 @@ export function createErasureService(
             await tx.execute(
               sql`select pg_advisory_xact_lock(hashtextextended(${`account-erasure:${values.targetClerkId}`}, 0))`,
             );
-            const [inserted] = await tx
-              .insert(schema.erasureRequest)
-              .values({
-                ...values,
-                createdAt,
-                nextAttemptAt: createdAt,
-                stepResults: initialStepResults(createdAt),
-                updatedAt: createdAt,
-              })
-              .onConflictDoNothing({
-                target: schema.erasureRequest.subjectHmac,
-              })
-              .returning();
-            if (inserted) return inserted;
-
             const [existing] = await tx
               .select()
               .from(schema.erasureRequest)
               .where(eq(schema.erasureRequest.subjectHmac, values.subjectHmac))
               .limit(1);
-            if (!existing) throw new Error("Failed to create erasure request.");
-            if (
-              existing.targetClerkId &&
-              existing.targetClerkId !== values.targetClerkId
-            ) {
-              throw new Error("Erasure request subject mismatch.");
+            if (existing) {
+              if (
+                existing.targetClerkId &&
+                existing.targetClerkId !== values.targetClerkId
+              ) {
+                throw new Error("Erasure request subject mismatch.");
+              }
+              return existing;
             }
-            return existing;
+
+            const requestId = crypto.randomUUID();
+            const [actorUser, ownerUser] = await Promise.all([
+              loadAuditUser(tx, input.actor.clerkId, true),
+              loadAuditUser(tx, values.targetClerkId, false),
+            ]);
+            await audit.write(tx, {
+              actor: {
+                role: input.actor.role,
+                userId: actorUser?.id ?? null,
+                username: actorUser?.username ?? null,
+              },
+              authorization:
+                values.initiator === "admin"
+                  ? { permission: "accounts.erase", type: "permission" }
+                  : { type: "owner" },
+              data: {
+                attempts: 0,
+                exceptionCount: 0,
+                initiator: values.initiator,
+                status: "pending",
+                verificationMethod: values.verificationMethod,
+              },
+              definition: accountErasureAudit.requested,
+              occurredAt: createdAt,
+              ownerUserId: ownerUser?.id ?? null,
+              requestId,
+              targetId: requestId,
+            });
+            const [inserted] = await tx
+              .insert(schema.erasureRequest)
+              .values({
+                ...values,
+                createdAt,
+                id: requestId,
+                nextAttemptAt: createdAt,
+                stepResults: initialStepResults(createdAt),
+                updatedAt: createdAt,
+              })
+              .returning();
+            if (!inserted) throw new Error("Failed to create erasure request.");
+            return inserted;
           }),
         { attributes: { initiator: values.initiator } },
       );
@@ -239,8 +321,16 @@ export function createErasureService(
       }
     },
 
+    /**
+     * Finds one safe erasure receipt for its subject.
+     *
+     * @param input - Request identifier and subject digest.
+     * @returns Matching safe receipt, or null when absent.
+     */
     async getReceipt(input: {
+      /** Erasure request identifier. */
       id: string;
+      /** Non-reversible subject lookup digest. */
       subjectHmac: string;
     }): Promise<ErasureReceipt | null> {
       const [request] = await db
@@ -259,10 +349,24 @@ export function createErasureService(
       return request ? receipt(request) : null;
     },
 
+    /**
+     * Reconciles a verified Clerk deletion webhook.
+     *
+     * @param input - Subject digest and deleted Clerk identity.
+     * @returns Request identifier and whether deletion was unexpected.
+     * @rejects When reconciliation or audit persistence fails.
+     */
     async handleClerkDeletion(input: {
+      /** Non-reversible subject lookup digest. */
       subjectHmac: string;
+      /** Deleted Clerk user identifier. */
       targetClerkId: string;
-    }): Promise<{ requestId: string; unexpected: boolean }> {
+    }): Promise<{
+      /** Erasure request identifier. */
+      requestId: string;
+      /** Whether no verified erasure request preceded the deletion. */
+      unexpected: boolean;
+    }> {
       const subjectHmac = normalizeSubjectHmac(input.subjectHmac);
       const targetClerkId = requiredValue(input.targetClerkId, "Subject");
       const handledAt = now();
@@ -326,7 +430,21 @@ export function createErasureService(
           })
           .onConflictDoNothing({ target: schema.erasureRequest.subjectHmac })
           .returning({ id: schema.erasureRequest.id });
-        if (created) return { requestId: created.id, unexpected: true };
+        if (created) {
+          await writeSystemAudit(audit, tx, {
+            data: {
+              attempts: 0,
+              errorCode: "unexpected_clerk_deletion",
+              exceptionCount: 0,
+              initiationEventId: null,
+              status: "needs_attention",
+            },
+            definition: accountErasureAudit.needsAttention,
+            occurredAt: handledAt,
+            requestId: created.id,
+          });
+          return { requestId: created.id, unexpected: true };
+        }
 
         const [concurrent] = await tx
           .select({ id: schema.erasureRequest.id })
@@ -350,6 +468,13 @@ export function createErasureService(
       return result;
     },
 
+    /**
+     * Processes the oldest due erasure request through its next steps.
+     *
+     * @param operations - Idempotent external erasure operations.
+     * @returns Whether a due request was claimed.
+     * @rejects When durable state or audit persistence fails.
+     */
     async processDue(operations: ErasureOperations): Promise<boolean> {
       const claimedAt = now();
       const request = await claimDueRequest(db, claimedAt);
@@ -376,7 +501,7 @@ export function createErasureService(
             ...(exceptions.length > 0 ? { exceptions } : {}),
           };
           if (step === "verify") {
-            await completeRequest(db, request, completedAt);
+            await completeRequest(db, audit, request, completedAt);
             logger.info(loggerMessages.database.erasure.completed, {
               attributes: { requestId: request.id },
             });
@@ -394,7 +519,7 @@ export function createErasureService(
             })
             .where(eq(schema.erasureRequest.id, request.id));
         } catch (error) {
-          const state = await recordFailure(db, request, error, now());
+          const state = await recordFailure(db, audit, request, error, now());
           logger[state === "needs_attention" ? "error" : "warn"](
             loggerMessages.database.erasure.stepFailed,
             {
@@ -426,13 +551,17 @@ export function createErasureService(
       return deleted.length;
     },
 
-    async retry(input: {
-      exception?: {
-        code: ApprovedErasureExceptionCode;
-        expiresAt: Date;
-      };
-      requestId: string;
-    }): Promise<ErasureReceipt> {
+    /**
+     * Retries an erasure request that needs administrator attention.
+     *
+     * @param input - Authorized retry and optional retention exception.
+     * @returns Updated safe erasure receipt.
+     * @rejects When authorization, state, or persistence is invalid.
+     */
+    async retry(input: RetryErasureRequestInput): Promise<ErasureReceipt> {
+      if (!hasPermission(input.actor, "accounts.erase")) {
+        throw new Error("Erasure request is not awaiting attention.");
+      }
       const retriedAt = now();
       const request = await db.transaction(async (tx) => {
         const [current] = await tx
@@ -450,6 +579,10 @@ export function createErasureService(
         );
         if (!pendingStep)
           throw new Error("Erasure request has no pending step.");
+        const [actorUser, initiationEventId] = await Promise.all([
+          loadAuditUser(tx, input.actor.clerkId, true),
+          findInitiationEventId(tx, current.id),
+        ]);
         if (input.exception) {
           const [exception] = validateExceptions(
             [
@@ -484,6 +617,27 @@ export function createErasureService(
           .where(eq(schema.erasureRequest.id, current.id))
           .returning();
         if (!updated) throw new Error("Failed to retry erasure request.");
+        await audit.write(tx, {
+          actor: {
+            role: input.actor.role,
+            userId: actorUser?.id ?? null,
+            username: actorUser?.username ?? null,
+          },
+          authorization: {
+            permission: "accounts.erase",
+            type: "permission",
+          },
+          data: {
+            attempts: current.attempts,
+            exceptionCount: countExceptions(current.stepResults),
+            initiationEventId,
+            status: "pending",
+          },
+          definition: accountErasureAudit.retried,
+          occurredAt: retriedAt,
+          requestId: current.id,
+          targetId: current.id,
+        });
         return updated;
       });
       return receipt(request);
@@ -525,8 +679,18 @@ async function claimDueRequest(
   });
 }
 
+/**
+ * Completes an erasure request and records its system audit event atomically.
+ *
+ * @param db - Erasure database.
+ * @param audit - Shared audit writer.
+ * @param request - Claimed request with completed steps.
+ * @param completedAt - Terminal completion time.
+ * @returns Completion after the source transaction commits.
+ */
 async function completeRequest(
   db: Database,
+  audit: Pick<AuditService, "write">,
   request: ErasureRequest,
   completedAt: Date,
 ) {
@@ -538,25 +702,49 @@ async function completeRequest(
   const expiresAt = new Date(
     Math.max(completedAt.getTime() + RECEIPT_MS, ...exceptionExpiries),
   );
-  await db
-    .update(schema.erasureRequest)
-    .set({
-      completedAt,
-      errorCode: null,
-      expiresAt,
-      nextAttemptAt: null,
-      status: "completed",
-      stepResults: request.stepResults,
-      targetClerkId: null,
-      updatedAt: completedAt,
-      verifiedByClerkId:
-        request.initiator === "self" ? null : request.verifiedByClerkId,
-    })
-    .where(eq(schema.erasureRequest.id, request.id));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(schema.erasureRequest)
+      .set({
+        completedAt,
+        errorCode: null,
+        expiresAt,
+        nextAttemptAt: null,
+        status: "completed",
+        stepResults: request.stepResults,
+        targetClerkId: null,
+        updatedAt: completedAt,
+        verifiedByClerkId:
+          request.initiator === "self" ? null : request.verifiedByClerkId,
+      })
+      .where(eq(schema.erasureRequest.id, request.id));
+    await writeSystemAudit(audit, tx, {
+      data: {
+        attempts: request.attempts,
+        exceptionCount: countExceptions(request.stepResults),
+        initiationEventId: await findInitiationEventId(tx, request.id),
+        status: "completed",
+      },
+      definition: accountErasureAudit.completed,
+      occurredAt: completedAt,
+      requestId: request.id,
+    });
+  });
 }
 
+/**
+ * Records a retryable or terminal erasure failure atomically.
+ *
+ * @param db - Erasure database.
+ * @param audit - Shared audit writer.
+ * @param request - Claimed request and current step results.
+ * @param error - Operation failure.
+ * @param failedAt - Failure time.
+ * @returns Durable request state after failure classification.
+ */
 async function recordFailure(
   db: Database,
+  audit: Pick<AuditService, "write">,
   request: ErasureRequest,
   error: unknown,
   failedAt: Date,
@@ -569,40 +757,57 @@ async function recordFailure(
     60 * 60 * 1000,
     5 * 60 * 1000 * 2 ** Math.max(0, request.attempts - 1),
   );
-  await db
-    .update(schema.erasureRequest)
-    .set({
-      errorCode: operationErrorCode(error),
-      nextAttemptAt: needsAttention
-        ? null
-        : new Date(failedAt.getTime() + backoffMs),
-      status: needsAttention ? "needs_attention" : "running",
-      stepResults: request.stepResults,
-      updatedAt: failedAt,
-    })
-    .where(eq(schema.erasureRequest.id, request.id));
+  const errorCode = operationErrorCode(error);
+  await db.transaction(async (tx) => {
+    await tx
+      .update(schema.erasureRequest)
+      .set({
+        errorCode,
+        nextAttemptAt: needsAttention
+          ? null
+          : new Date(failedAt.getTime() + backoffMs),
+        status: needsAttention ? "needs_attention" : "running",
+        stepResults: request.stepResults,
+        updatedAt: failedAt,
+      })
+      .where(eq(schema.erasureRequest.id, request.id));
+    if (needsAttention) {
+      await writeSystemAudit(audit, tx, {
+        data: {
+          attempts: request.attempts,
+          errorCode,
+          exceptionCount: countExceptions(request.stepResults),
+          initiationEventId: await findInitiationEventId(tx, request.id),
+          status: "needs_attention",
+        },
+        definition: accountErasureAudit.needsAttention,
+        occurredAt: failedAt,
+        requestId: request.id,
+      });
+    }
+  });
   return needsAttention ? "needs_attention" : "running";
 }
 
-function normalizeCreateInput(input: {
-  initiator: ErasureInitiator;
-  subjectHmac: string;
-  targetClerkId: string;
-  verificationMethod: ErasureVerificationMethod;
-  verificationReference?: string;
-  verifiedAt: Date;
-  verifiedByClerkId: string;
-}) {
+/**
+ * Validates human authorization and verification evidence.
+ *
+ * @param input - Candidate erasure request input.
+ * @returns Normalized values safe for request persistence.
+ * @throws When authorization or verification evidence is invalid.
+ */
+function normalizeCreateInput(input: CreateErasureRequestInput) {
   const verificationReference = input.verificationReference?.trim();
   if (!(["self", "admin"] as const).includes(input.initiator)) {
     throw new Error("Invalid erasure initiator.");
   }
-  const verifiedByClerkId = requiredValue(input.verifiedByClerkId, "Verifier");
+  const verifiedByClerkId = requiredValue(input.actor.clerkId, "Verifier");
   if (Number.isNaN(input.verifiedAt.getTime())) {
     throw new Error("Verification timestamp is invalid.");
   }
   if (input.initiator === "admin") {
     if (
+      !hasPermission(input.actor, "accounts.erase") ||
       !verificationReference ||
       !verificationReferencePattern.test(verificationReference) ||
       !(["authenticated_request", "verified_email"] as const).includes(
@@ -612,6 +817,7 @@ function normalizeCreateInput(input: {
       throw new Error("Admin verification evidence is required.");
     }
   } else if (
+    input.actor.clerkId !== input.targetClerkId.trim() ||
     verificationReference ||
     input.verificationMethod !== "clerk_reverification" ||
     verifiedByClerkId !== input.targetClerkId.trim()
@@ -707,6 +913,100 @@ function receipt(request: ErasureRequest): ErasureReceipt {
 }
 
 type ErasureTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+/**
+ * Loads an internal audit identity by Clerk identifier.
+ *
+ * @param transaction - Caller-owned erasure transaction.
+ * @param clerkId - Clerk identifier to resolve.
+ * @param required - Whether a missing identity must reject the operation.
+ * @returns Internal audit identity, or null when optional and absent.
+ * @rejects When a required identity does not exist.
+ */
+async function loadAuditUser(
+  transaction: ErasureTransaction,
+  clerkId: string,
+  required: boolean,
+) {
+  const [user] = await transaction
+    .select({ id: schema.user.id, username: schema.user.username })
+    .from(schema.user)
+    .where(eq(schema.user.clerkId, clerkId))
+    .limit(1);
+  if (!user && required) throw new Error("Audit actor is missing.");
+  return user ?? null;
+}
+
+/**
+ * Finds the request's human initiation audit event.
+ *
+ * @param transaction - Caller-owned erasure transaction.
+ * @param requestId - Erasure request identifier.
+ * @returns Initiation event identifier, or null for a legacy request.
+ */
+async function findInitiationEventId(
+  transaction: ErasureTransaction,
+  requestId: string,
+): Promise<number | null> {
+  const [event] = await transaction
+    .select({ id: schema.auditEvent.id })
+    .from(schema.auditEvent)
+    .where(
+      and(
+        eq(schema.auditEvent.action, accountErasureAudit.requested.action),
+        eq(schema.auditEvent.targetType, "account.erasure"),
+        eq(schema.auditEvent.targetId, requestId),
+      ),
+    )
+    .limit(1);
+  return event?.id ?? null;
+}
+
+/**
+ * Counts approved retention exceptions across all erasure steps.
+ *
+ * @param stepResults - Durable erasure step results.
+ * @returns Total approved exception count.
+ */
+function countExceptions(stepResults: ErasureStepResults): number {
+  return Object.values(stepResults).reduce(
+    (total, step) => total + (step.exceptions?.length ?? 0),
+    0,
+  );
+}
+
+/**
+ * Writes a system-authored erasure transition in the source transaction.
+ *
+ * @param audit - Shared audit writer.
+ * @param transaction - Caller-owned erasure transaction.
+ * @param input - Safe transition data and event definition.
+ * @returns Completion after the event is stored.
+ */
+async function writeSystemAudit(
+  audit: Pick<AuditService, "write">,
+  transaction: ErasureTransaction,
+  input: {
+    /** Safe erasure state and counts. */
+    data: AccountErasureAuditData;
+    /** Registered erasure event definition. */
+    definition: AuditEventDefinition<AccountErasureAuditData>;
+    /** Time at which the transition occurred. */
+    occurredAt: Date;
+    /** Erasure request identifier. */
+    requestId: string;
+  },
+): Promise<void> {
+  await audit.write(transaction, {
+    actor: { role: "system", userId: null, username: null },
+    authorization: { type: "system" },
+    data: input.data,
+    definition: input.definition,
+    occurredAt: input.occurredAt,
+    requestId: input.requestId,
+    targetId: input.requestId,
+  });
+}
 
 async function hideAccountContent(
   tx: ErasureTransaction,

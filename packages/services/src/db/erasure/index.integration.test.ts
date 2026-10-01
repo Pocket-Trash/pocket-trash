@@ -38,23 +38,25 @@ describe("complete erasure service", () => {
       clerkId,
       "test-erasure-hmac-secret-at-least-32-characters",
     );
+    const actor = { clerkId, role: "user" as const };
 
     try {
+      await db.insert(schema.user).values({ clerkId, username: "private" });
       const first = await service.create({
+        actor,
         initiator: "self",
         subjectHmac,
         targetClerkId: clerkId,
         verificationMethod: "clerk_reverification",
         verifiedAt: currentTime,
-        verifiedByClerkId: clerkId,
       });
       const duplicate = await service.create({
+        actor,
         initiator: "self",
         subjectHmac,
         targetClerkId: clerkId,
         verificationMethod: "clerk_reverification",
         verifiedAt: currentTime,
-        verifiedByClerkId: clerkId,
       });
       expect(duplicate.id).toBe(first.id);
       expect(JSON.stringify(first)).not.toContain(clerkId);
@@ -142,6 +144,41 @@ describe("complete erasure service", () => {
         targetClerkId: null,
         verifiedByClerkId: null,
       });
+      const auditEvents = await db
+        .select()
+        .from(schema.auditEvent)
+        .where(eq(schema.auditEvent.targetId, first.id));
+      const initiation = auditEvents.find(
+        ({ action }) => action === "account.erasure.requested",
+      );
+      expect(initiation).toMatchObject({
+        actorRole: "user",
+        authorizationType: "owner",
+        metadata: {
+          attempts: 0,
+          exceptionCount: 0,
+          initiator: "self",
+          status: "pending",
+          verificationMethod: "clerk_reverification",
+        },
+        requestId: first.id,
+      });
+      expect(
+        auditEvents.find(
+          ({ action }) => action === "account.erasure.completed",
+        ),
+      ).toMatchObject({
+        actorRole: "system",
+        authorizationType: "system",
+        metadata: {
+          attempts: 2,
+          exceptionCount: 1,
+          initiationEventId: initiation?.id,
+          status: "completed",
+        },
+        requestId: first.id,
+      });
+      expect(JSON.stringify(auditEvents)).not.toContain(subjectHmac);
       expect(JSON.stringify(events)).not.toContain(clerkId);
       expect(await service.processDue(operations)).toBe(false);
 
@@ -177,13 +214,14 @@ describe("complete erasure service", () => {
     try {
       for (const [index, failedStep] of steps.entries()) {
         const targetClerkId = `retry_${failedStep}`;
+        await db.insert(schema.user).values({ clerkId: targetClerkId });
         const request = await service.create({
+          actor: { clerkId: targetClerkId, role: "user" },
           initiator: "self",
           subjectHmac: (index + 1).toString(16).repeat(64),
           targetClerkId,
           verificationMethod: "clerk_reverification",
           verifiedAt: currentTime,
-          verifiedByClerkId: targetClerkId,
         });
         let failed = false;
         const operations = Object.fromEntries(
@@ -289,6 +327,25 @@ describe("complete erasure service", () => {
         verificationReference: "clerk_webhook",
       });
       expect(receipt?.stepResults.inaccessible.status).toBe("completed");
+      await expect(
+        db
+          .select()
+          .from(schema.auditEvent)
+          .where(eq(schema.auditEvent.targetId, handled.requestId)),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          action: "account.erasure.needs_attention",
+          actorRole: "system",
+          authorizationType: "system",
+          metadata: {
+            attempts: 0,
+            errorCode: "unexpected_clerk_deletion",
+            exceptionCount: 0,
+            initiationEventId: null,
+            status: "needs_attention",
+          },
+        }),
+      ]);
       expect(
         await db
           .select({ isPrivate: schema.userCollection.isPrivate })
@@ -352,13 +409,14 @@ describe("complete erasure service", () => {
     ) as unknown as ErasureOperations;
 
     try {
+      await db.insert(schema.user).values({ clerkId: "provider_failure_user" });
       const request = await service.create({
+        actor: { clerkId: "provider_failure_user", role: "user" },
         initiator: "self",
         subjectHmac,
         targetClerkId: "provider_failure_user",
         verificationMethod: "clerk_reverification",
         verifiedAt: currentTime,
-        verifiedByClerkId: "provider_failure_user",
       });
       await service.processDue(operations);
       expect(events.at(-1)).toMatchObject({
@@ -381,6 +439,28 @@ describe("complete erasure service", () => {
           state: "needs_attention",
         },
         level: "error",
+      });
+      const auditEvents = await db
+        .select()
+        .from(schema.auditEvent)
+        .where(eq(schema.auditEvent.targetId, request.id));
+      const initiation = auditEvents.find(
+        ({ action }) => action === "account.erasure.requested",
+      );
+      expect(
+        auditEvents.find(
+          ({ action }) => action === "account.erasure.needs_attention",
+        ),
+      ).toMatchObject({
+        actorRole: "system",
+        authorizationType: "system",
+        metadata: {
+          attempts: 2,
+          errorCode: "clerk_delete_failed",
+          exceptionCount: 0,
+          initiationEventId: initiation?.id,
+          status: "needs_attention",
+        },
       });
     } finally {
       await client.close();
@@ -422,14 +502,19 @@ describe("complete erasure service", () => {
     ) as unknown as ErasureOperations;
 
     try {
+      const actor = { clerkId: "admin_123", role: "system_admin" as const };
+      await db.insert(schema.user).values([
+        { clerkId: actor.clerkId, username: "administrator" },
+        { clerkId: "admin_target", username: "target" },
+      ]);
       const created = await service.create({
+        actor,
         initiator: "admin",
         subjectHmac,
         targetClerkId: "admin_target",
         verificationMethod: "verified_email",
         verificationReference: "privacy_ticket_123",
         verifiedAt: currentTime,
-        verifiedByClerkId: "admin_123",
       });
       await expect(service.getForAdmin(created.id)).resolves.toMatchObject({
         verificationMethod: "verified_email",
@@ -443,6 +528,7 @@ describe("complete erasure service", () => {
       ).toMatchObject({ status: "needs_attention" });
 
       await service.retry({
+        actor,
         exception: {
           code: "neon_history_6_hours",
           expiresAt: new Date(currentTime.getTime() + 6 * 60 * 60 * 1000),
@@ -456,7 +542,7 @@ describe("complete erasure service", () => {
 
       snapshotFails = false;
       currentTime = new Date(currentTime.getTime() + 60_000);
-      await service.retry({ requestId: created.id });
+      await service.retry({ actor, requestId: created.id });
       await service.processDue(operations);
       const completed = await service.getReceipt({
         id: created.id,
@@ -469,6 +555,24 @@ describe("complete erasure service", () => {
           expiresAt: "2026-09-29T20:00:00.000Z",
         },
       ]);
+      const auditEvents = await db
+        .select()
+        .from(schema.auditEvent)
+        .where(eq(schema.auditEvent.targetId, created.id));
+      expect(
+        auditEvents.filter(
+          ({ action }) => action === "account.erasure.retried",
+        ),
+      ).toHaveLength(2);
+      expect(
+        auditEvents.find(({ action }) => action === "account.erasure.retried"),
+      ).toMatchObject({
+        actorRole: "system_admin",
+        actorUsername: "administrator",
+        authorizationType: "permission",
+        permission: "accounts.erase",
+      });
+      expect(JSON.stringify(auditEvents)).not.toContain("privacy_ticket_123");
     } finally {
       await client.close();
     }

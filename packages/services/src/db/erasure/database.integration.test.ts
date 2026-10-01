@@ -7,13 +7,15 @@ import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
 import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
+import { accountErasureAuditEvents } from "../audit/erasure.js";
 import {
   type AuditEventDefinition,
   createAuditService,
 } from "../audit/index.js";
 import { createErasureService, createErasureSubjectHmac } from "./index.js";
 
-const erasureAuditEvents = [
+/** Audit definitions used to seed erasure-redaction fixtures. */
+const fixtureAuditEvents = [
   {
     action: "test.owner_updated",
     targetType: "test.owner",
@@ -44,7 +46,10 @@ describe("account database erasure", () => {
       db,
       logger,
       undefined,
-      createAuditService(logger, erasureAuditEvents),
+      createAuditService(logger, [
+        ...accountErasureAuditEvents,
+        ...fixtureAuditEvents,
+      ]),
     );
     const subjectHmac = await createErasureSubjectHmac(
       targetClerkId,
@@ -52,13 +57,13 @@ describe("account database erasure", () => {
     );
 
     try {
-      await service.create({
+      const request = await service.create({
+        actor: { clerkId: targetClerkId, role: "user" },
         initiator: "self",
         subjectHmac,
         targetClerkId,
         verificationMethod: "clerk_reverification",
         verifiedAt: new Date(),
-        verifiedByClerkId: targetClerkId,
       });
       await expect(
         client.exec(`
@@ -113,6 +118,16 @@ describe("account database erasure", () => {
         `,
         ),
       ).toEqual({ products: 1, resources: 1, users: 1 });
+      expect(
+        await row(
+          client,
+          `
+          select actor_user_id is not null as "actorRetained",
+            owner_user_id is not null as "ownerRetained"
+          from audit_event where action = 'account.erasure.requested'
+        `,
+        ),
+      ).toEqual({ actorRetained: true, ownerRetained: true });
       await client.exec("drop rule erasure_test_block on product");
 
       await stage("concurrent erasure", async () => {
@@ -267,11 +282,33 @@ describe("account database erasure", () => {
         ),
       ).toEqual({
         actorLinks: 1,
-        deletedActors: 1,
-        events: 2,
+        deletedActors: 2,
+        events: 3,
         ownerLinks: 0,
         redactedPayloads: 2,
         redactedReasons: 2,
+      });
+      expect(
+        await row(
+          client,
+          `
+          select actor_user_id as "actorUserId", actor_username as "actorUsername",
+            owner_user_id as "ownerUserId", metadata, request_id as "requestId"
+          from audit_event where action = 'account.erasure.requested'
+        `,
+        ),
+      ).toEqual({
+        actorUserId: null,
+        actorUsername: "Deleted user",
+        metadata: {
+          attempts: 0,
+          exceptionCount: 0,
+          initiator: "self",
+          status: "pending",
+          verificationMethod: "clerk_reverification",
+        },
+        ownerUserId: null,
+        requestId: request.id,
       });
       expect(
         await row(
