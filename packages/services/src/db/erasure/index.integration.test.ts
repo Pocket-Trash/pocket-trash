@@ -76,26 +76,35 @@ describe("complete erasure service", () => {
           "verify",
         ].map((step) => [
           step,
-          vi.fn(async ({ targetClerkId }: { targetClerkId: string | null }) => {
-            order.push(`${step}:${targetClerkId ?? "removed"}`);
-            if (step === "snapshot" && failSnapshot) {
-              failSnapshot = false;
-              throw new ErasureOperationError("storage_unavailable");
-            }
-            if (step === "providers") {
-              return {
-                exceptions: [
-                  {
-                    code: "axiom_30_days",
-                    expiresAt: new Date(
-                      currentTime.getTime() + 29 * 24 * 60 * 60 * 1000,
-                    ).toISOString(),
-                  },
-                ],
-              };
-            }
-            return undefined;
-          }),
+          vi.fn(
+            async ({
+              targetClerkId,
+            }: {
+              /**
+               * Target Clerk user identifier.
+               */
+              targetClerkId: string | null;
+            }) => {
+              order.push(`${step}:${targetClerkId ?? "removed"}`);
+              if (step === "snapshot" && failSnapshot) {
+                failSnapshot = false;
+                throw new ErasureOperationError("storage_unavailable");
+              }
+              if (step === "providers") {
+                return {
+                  exceptions: [
+                    {
+                      code: "axiom_30_days",
+                      expiresAt: new Date(
+                        currentTime.getTime() + 29 * 24 * 60 * 60 * 1000,
+                      ).toISOString(),
+                    },
+                  ],
+                };
+              }
+              return undefined;
+            },
+          ),
         ]),
       ) as unknown as ErasureOperations;
 
@@ -579,8 +588,19 @@ describe("complete erasure service", () => {
   }, 30_000);
 });
 
+/**
+ * Creates an in-memory logger for integration assertions.
+ *
+ * @param events - Array that receives captured structured log events.
+ * @returns Logger that appends structured events to the supplied array.
+ */
 function captureLogger(events: LogEvent[]) {
   const transport: LogTransport = {
+    /**
+     * Captures a structured log event for assertions.
+     *
+     * @param event - Structured log event captured for assertions.
+     */
     log(event) {
       events.push(event);
     },
@@ -592,6 +612,12 @@ function captureLogger(events: LogEvent[]) {
   });
 }
 
+/**
+ * Applies database migrations to the integration-test database.
+ *
+ * @param client - In-memory Postgres client to migrate.
+ * @rejects When migration files cannot be read or executed.
+ */
 async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
     new URL("../../../../database/drizzle", import.meta.url),

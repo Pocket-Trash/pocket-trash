@@ -19,13 +19,33 @@ const fixtureAuditEvents = [
   {
     action: "test.owner_updated",
     targetType: "test.owner",
+    /**
+     * Serializes audit data in an integration-test double.
+     *
+     * @returns Serialized audit value.
+     */
     serialize: () => ({ metadata: {} }),
+    /**
+     * Redacts audit data in an integration-test double.
+     *
+     * @returns Redacted audit value.
+     */
     redact: () => ({ metadata: { redacted: true } }),
   },
   {
     action: "test.admin_updated",
     targetType: "test.owner",
+    /**
+     * Serializes audit data in an integration-test double.
+     *
+     * @returns Serialized audit value.
+     */
     serialize: () => ({ metadata: {} }),
+    /**
+     * Redacts audit data in an integration-test double.
+     *
+     * @returns Redacted audit value.
+     */
     redact: () => ({ metadata: { redacted: true } }),
   },
 ] satisfies readonly AuditEventDefinition<never>[];
@@ -40,7 +60,12 @@ describe("account database erasure", () => {
     const logger = createLogger({
       app: "api",
       environment: "test",
-      transports: [{ log() {} }],
+      transports: [
+        {
+          /** Discards structured log events during this integration test. */
+          log() {},
+        },
+      ],
     });
     const service = createErasureService(
       db,
@@ -331,10 +356,26 @@ describe("account database erasure", () => {
   }, 30_000);
 });
 
+/**
+ * Returns the first count row from a test query.
+ *
+ * @param client - In-memory Postgres client.
+ * @param query - Count query to execute.
+ * @returns First returned count row.
+ * @rejects When the query fails.
+ */
 async function counts(client: PGlite, query: string) {
   return await row(client, query);
 }
 
+/**
+ * Runs a database-erasure test stage with contextual failure reporting.
+ *
+ * @param name - Stage name included in failures.
+ * @param operation - Asynchronous stage to run.
+ * @returns Completion after the stage succeeds.
+ * @rejects When the stage fails, with the original error preserved as its cause.
+ */
 async function stage(name: string, operation: () => Promise<void>) {
   try {
     await operation();
@@ -345,11 +386,25 @@ async function stage(name: string, operation: () => Promise<void>) {
   }
 }
 
+/**
+ * Returns the first row from a test query.
+ *
+ * @param client - In-memory Postgres client.
+ * @param query - Query to execute.
+ * @returns First returned row, or `undefined` when empty.
+ * @rejects When the query fails.
+ */
 async function row(client: PGlite, query: string) {
   const result = await client.query<Record<string, unknown>>(query);
   return result.rows[0];
 }
 
+/**
+ * Applies database migrations to the integration-test database.
+ *
+ * @param client - In-memory Postgres client to migrate.
+ * @rejects When migration files cannot be read or executed.
+ */
 async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
     new URL("../../../../database/drizzle", import.meta.url),
@@ -371,6 +426,7 @@ async function migrate(client: PGlite) {
  *
  * @param client - In-memory PostgreSQL client.
  * @returns Completion after fixture insertion.
+ * @rejects When fixture insertion fails.
  */
 async function seedInventory(client: PGlite) {
   await client.exec(`

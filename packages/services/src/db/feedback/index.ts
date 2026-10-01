@@ -24,14 +24,17 @@ import { hashLogIdentifier } from "../../logging.js";
 import { feedbackAudit, writeFeedbackAudit } from "../audit/feedback.js";
 import type { AuditService } from "../audit/index.js";
 
+/** Feedback states processed by active-list, limit, and synchronization flows. */
 const activeStatuses: (typeof schema.feedbackStatuses)[number][] = [
   "pending",
   "requested",
   "planned",
   "in_progress",
 ];
+/** Terminal states excluded from a submitter's personal feedback list. */
 const hiddenFromSubmitterStatuses: (typeof schema.feedbackStatuses)[number][] =
   ["merged", "denied", "canceled"];
+/** States in which administrators may still edit feedback details. */
 const editableStatuses: (typeof schema.feedbackStatuses)[number][] = [
   "pending",
   "requested",
@@ -39,6 +42,7 @@ const editableStatuses: (typeof schema.feedbackStatuses)[number][] = [
   "in_progress",
   "completed",
 ];
+/** States visible in public discovery and voting views. */
 const publicStatuses: (typeof schema.feedbackStatuses)[number][] = [
   "requested",
   "planned",
@@ -50,6 +54,7 @@ const syncableStatuses: (typeof schema.feedbackStatuses)[number][] = [
   "completed",
   "canceled",
 ];
+/** Non-active states accepted by administrative archive filters. */
 export const adminFeedbackArchiveStatuses = schema.feedbackStatuses.filter(
   (status) => !activeStatuses.includes(status),
 );
@@ -59,36 +64,93 @@ export type FeedbackListItem = Omit<
   typeof schema.feedback.$inferSelect,
   "linearClientUuid" | "linearUpdatedAt" | "submitterClerkId"
 > & {
+  /**
+   * Whether the current vote is the submitter's non-removable vote.
+   */
   hasPermanentVote: boolean;
+  /**
+   * Whether the current viewer has voted for this feedback.
+   */
   hasVoted: boolean;
+  /**
+   * Total votes, including the submitter's permanent vote.
+   */
   voteCount: number;
 };
 
+/**
+ * Paginated feedback items and whether another page exists.
+ */
 export type FeedbackPage = {
+  /**
+   * Whether another page is available after these items.
+   */
   hasNext: boolean;
+  /**
+   * Feedback items ordered by most recent update, then identifier.
+   */
   items: FeedbackListItem[];
 };
 
 /** Feedback item shown in admin lists. */
 export type AdminFeedbackItem = {
+  /**
+   * Feedback category, or `null` when uncategorized.
+   */
   category: FeedbackCategory | null;
+  /**
+   * Created timestamp.
+   */
   createdAt: Date;
+  /**
+   * Feedback description supplied by the submitter.
+   */
   description: string;
+  /**
+   * Database identifier.
+   */
   id: number;
-  /** Linked Linear entity identifier. */
+  /** Linked Linear entity identifier, or `null` before planning is reserved. */
   linearClientUuid: string | null;
+  /**
+   * Current feedback workflow status.
+   */
   status: FeedbackStatus;
+  /**
+   * Submitter username, or `null` when the identity is unavailable.
+   */
   submitterUsername: string | null;
+  /**
+   * Feedback title.
+   */
   title: string;
+  /**
+   * Updated timestamp.
+   */
   updatedAt: Date;
+  /**
+   * Total votes, including the submitter's permanent vote.
+   */
   voteCount: number;
 };
 
+/**
+ * Paginated administrative feedback results.
+ */
 export type AdminFeedbackPage = {
+  /**
+   * Whether another administrative page is available.
+   */
   hasNext: boolean;
+  /**
+   * Administrative feedback items in the requested order.
+   */
   items: AdminFeedbackItem[];
 };
 
+/**
+ * Feedback field available for administrative sorting.
+ */
 export type AdminFeedbackSortField =
   | "category"
   | "status"
@@ -98,43 +160,121 @@ export type AdminFeedbackSortField =
   | "updated"
   | "votes";
 
+/**
+ * One ordered administrative feedback sort criterion.
+ */
 export type AdminFeedbackSort = {
+  /**
+   * Ascending or descending order.
+   */
   direction: "asc" | "desc";
+  /**
+   * Feedback field used for this sort criterion.
+   */
   field: AdminFeedbackSortField;
 };
 
+/**
+ * Pagination, search, status, and sorting filters for the admin list.
+ */
 export type ListAdminFeedbackOptions = {
+  /**
+   * Zero-based pagination offset.
+   */
   offset?: number;
+  /**
+   * Optional case-insensitive text search.
+   */
   search?: string;
+  /**
+   * Ordered sort criteria applied before pagination.
+   */
   sort?: AdminFeedbackSort[];
+  /**
+   * Workflow statuses included in the results.
+   */
   statuses?: FeedbackStatus[];
 };
 
+/**
+ * Minimal active-feedback record shown as a merge destination.
+ */
 export type FeedbackMergeTarget = Pick<
   AdminFeedbackItem,
   "id" | "status" | "title"
 >;
 
+/**
+ * Feedback lifecycle notification shown in the administrative inbox.
+ */
 export type FeedbackNotificationItem = {
+  /**
+   * Created timestamp.
+   */
   createdAt: Date;
+  /**
+   * Feedback identifier.
+   */
   feedbackId: number;
+  /**
+   * Database identifier.
+   */
   id: number;
+  /**
+   * Read timestamp, or `null` while unread.
+   */
   readAt: Date | null;
+  /**
+   * Reader username, or `null` while unread or when the identity is unavailable.
+   */
   readByUsername: string | null;
+  /**
+   * Submitter username, or `null` when the identity is unavailable.
+   */
   submitterUsername: string | null;
+  /**
+   * Feedback title shown in the notification.
+   */
   title: string;
+  /**
+   * Feedback lifecycle event that created the notification.
+   */
   type: (typeof schema.feedbackNotificationTypes)[number];
 };
 
+/**
+ * Pagination and search filters for a submitter's requests.
+ */
 export type ListMyFeedbackOptions = {
+  /**
+   * Zero-based pagination offset.
+   */
   offset?: number;
+  /**
+   * Optional case-insensitive text search.
+   */
   search?: string;
 };
 
+/**
+ * New feedback request and submitter identity.
+ */
 export type SubmitFeedbackInput = {
+  /**
+   * Optional category selected by the submitter.
+   */
   category?: FeedbackCategory;
+  /**
+   * Feedback description supplied by the submitter.
+   */
   description: string;
+  /**
+   * Submitter Clerk user identifier.
+   */
   submitterClerkId: string;
+  /**
+   * Feedback title used for display and duplicate detection.
+   */
   title: string;
 };
 
@@ -206,25 +346,28 @@ export type FeedbackService = {
    * Approves a feedback request for planning.
    *
    * @param input - Authorized feedback decision.
-   * @returns Completion of the update.
+   * @returns Completion after the request becomes eligible for planning.
+   * @rejects When authorization, validation, state, persistence, audit, or operation logging fails.
    */
   approve(input: FeedbackAdminActionInput): Promise<void>;
   /**
-   * Marks a linked feedback plan as completed.
+   * Finalizes a Linear planning reservation by marking feedback planned.
    *
    * @param feedbackId - Feedback identifier.
    * @param linearClientUuid - Linked Linear entity identifier.
-   * @returns Completion of the update.
+   * @returns Completion after the feedback is marked planned.
+   * @rejects When validation, state, persistence, or operation logging fails.
    */
   completeLinearPlan(
     feedbackId: number,
     linearClientUuid: string,
   ): Promise<void>;
   /**
-   * Denies a pending feedback request.
+   * Denies a pending or requested feedback item.
    *
    * @param input - Authorized feedback decision.
-   * @returns Completion of the update.
+   * @returns Completion after denial and its audit event commit.
+   * @rejects When authorization, validation, state, persistence, audit, or operation logging fails.
    */
   deny(input: FeedbackAdminActionInput): Promise<void>;
   /**
@@ -233,6 +376,7 @@ export type FeedbackService = {
    * @param viewerClerkId - Requesting Clerk user identifier.
    * @param title - Proposed feedback title.
    * @returns Up to five possible duplicate requests.
+   * @rejects When validation, persistence, or operation logging fails.
    */
   findDuplicates(
     viewerClerkId: string,
@@ -243,6 +387,7 @@ export type FeedbackService = {
    *
    * @param feedbackId - Feedback identifier.
    * @returns The linked Linear identifier, when eligible.
+   * @rejects When validation, persistence, or operation logging fails.
    */
   getLinearSyncTarget(feedbackId: number): Promise<string | undefined>;
   /**
@@ -250,6 +395,7 @@ export type FeedbackService = {
    *
    * @param submitterClerkId - Submitter's Clerk identifier.
    * @returns Whether visible feedback exists.
+   * @rejects When validation, persistence, or operation logging fails.
    */
   hasMine(submitterClerkId: string): Promise<boolean>;
   /**
@@ -258,6 +404,7 @@ export type FeedbackService = {
    * @param viewerClerkId - Requesting Clerk user identifier.
    * @param search - Optional search text.
    * @returns Active feedback matching the search.
+   * @rejects When validation, persistence, or operation logging fails.
    */
   listActive(
     viewerClerkId: string,
@@ -268,6 +415,7 @@ export type FeedbackService = {
    *
    * @param options - Search, sorting, and pagination options.
    * @returns The matching active feedback page.
+   * @rejects When filters, persistence, or operation logging fails.
    */
   listAdminActive(
     options?: ListAdminFeedbackOptions,
@@ -277,6 +425,7 @@ export type FeedbackService = {
    *
    * @param options - Search, sorting, and pagination options.
    * @returns The matching archived feedback page.
+   * @rejects When filters, persistence, or operation logging fails.
    */
   listArchive(options?: ListAdminFeedbackOptions): Promise<AdminFeedbackPage>;
   /**
@@ -285,20 +434,56 @@ export type FeedbackService = {
    * @param viewerClerkId - Requesting Clerk user identifier.
    * @param search - Optional search text.
    * @returns Completed feedback ordered by completion date.
+   * @rejects When validation, persistence, or operation logging fails.
    */
   listCompleted(
     viewerClerkId: string,
     search?: string,
   ): Promise<FeedbackListItem[]>;
+  /**
+   * Lists active feedback eligible as merge destinations.
+   *
+   * @returns Eligible merge targets ordered for selection.
+   * @rejects When persistence or operation logging fails.
+   */
   listMergeTargets(): Promise<FeedbackMergeTarget[]>;
+  /**
+   * Lists feedback submitted by one Clerk user.
+   *
+   * @param submitterClerkId - Submitter clerk identifier.
+   * @param options - Pagination and search filters.
+   * @returns Paginated feedback visible to the submitter.
+   * @rejects When validation, persistence, or operation logging fails.
+   */
   listMine(
     submitterClerkId: string,
     options?: ListMyFeedbackOptions,
   ): Promise<FeedbackPage>;
+  /**
+   * Lists recorded feedback lifecycle notifications.
+   *
+   * @returns Notifications ordered newest first.
+   * @rejects When persistence or operation logging fails.
+   */
   listNotifications(): Promise<FeedbackNotificationItem[]>;
+  /**
+   * Lists pending feedback for administrative review.
+   *
+   * @param options - Pagination, search, status, and sort filters.
+   * @returns Paginated pending feedback.
+   * @rejects When filters, persistence, or operation logging fails.
+   */
   listPending(
     options?: ListAdminFeedbackOptions | number,
   ): Promise<AdminFeedbackPage>;
+  /**
+   * Marks an unread feedback notification as read by a Clerk user.
+   *
+   * @param notificationId - Notification identifier.
+   * @param actorClerkId - Actor Clerk identifier.
+   * @returns Completion after the notification is marked read.
+   * @rejects When validation, persistence, or operation logging fails.
+   */
   markNotificationRead(
     notificationId: number,
     actorClerkId: string,
@@ -308,12 +493,28 @@ export type FeedbackService = {
    *
    * @param input - Authorized source and destination identifiers.
    * @returns Completion of the transactional merge.
+   * @rejects When authorization, validation, state, persistence, audit, or operation logging fails.
    */
   mergePending(input: MergePendingFeedbackInput): Promise<void>;
+  /**
+   * Reserves an idempotent Linear planning operation.
+   *
+   * @param feedbackId - Feedback identifier.
+   * @param linearClientUuid - Linear client UUID.
+   * @returns Existing or newly created planning reservation.
+   * @rejects When validation, state, persistence, or operation logging fails.
+   */
   reserveLinearPlan(
     feedbackId: number,
     linearClientUuid: string,
   ): Promise<FeedbackPlanReservation>;
+  /**
+   * Creates a pending feedback request and permanent submitter vote.
+   *
+   * @param input - Feedback fields and submitter identity.
+   * @returns Created feedback request.
+   * @rejects When validation, submission limits, persistence, or operation logging fails.
+   */
   submit(
     input: SubmitFeedbackInput,
   ): Promise<typeof schema.feedback.$inferSelect>;
@@ -321,18 +522,44 @@ export type FeedbackService = {
    * Applies one Linear lifecycle event transactionally.
    *
    * @param input - Normalized Linear lifecycle event.
-   * @returns The synchronization result.
+   * @returns Whether the event was ignored, unmatched, or applied.
+   * @rejects When validation, persistence, or operation logging fails.
    */
   syncLinearStatus(
     input: LinearFeedbackSyncInput,
   ): Promise<LinearFeedbackSyncResult>;
+  /**
+   * Adds or removes the actor's feedback vote.
+   *
+   * @param feedbackId - Feedback identifier.
+   * @param voterClerkId - Voter clerk identifier.
+   * @returns Whether the actor has a vote after the operation.
+   * @rejects When validation, state, persistence, or operation logging fails.
+   */
   toggleVote(feedbackId: number, voterClerkId: string): Promise<boolean>;
+  /**
+   * Edits administratively editable feedback fields.
+   *
+   * @param input - Authorized editable feedback fields.
+   * @returns Completion after the field update and audit event commit.
+   * @rejects When authorization, validation, state, persistence, audit, or operation logging fails.
+   */
   updateAdmin(input: UpdateAdminFeedbackInput): Promise<void>;
+  /**
+   * Updates a submitter-owned pending feedback request.
+   *
+   * @param input - Feedback identifier and submitter-editable fields.
+   * @returns Completion after the pending request is stored.
+   * @rejects When validation, state, persistence, or operation logging fails.
+   */
   updatePending(input: UpdatePendingFeedbackInput): Promise<void>;
 };
 
+/** Rejects submission after a user reaches the active-feedback limit. */
 export class FeedbackSubmissionLimitError extends Error {}
+/** Rejects a feedback operation when its row or current state is ineligible. */
 export class FeedbackStateError extends Error {}
+/** Rejects denial when a reserved Linear plan requires manual recovery. */
 export class FeedbackPlanRecoveryRequiredError extends Error {}
 
 /**
@@ -354,7 +581,7 @@ export function createFeedbackService(
      *
      * @param input - Authorized feedback decision.
      * @returns Completion after the mutation and audit event commit.
-     * @rejects When authorization, state, or audit persistence fails.
+     * @rejects When authorization, validation, state, persistence, audit, or operation logging fails.
      */
     async approve(input) {
       await logger.operation(
@@ -397,6 +624,13 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Finalizes a Linear planning reservation by marking feedback planned.
+     *
+     * @param feedbackId - Feedback identifier.
+     * @param linearClientUuid - Linear client UUID.
+     * @rejects When validation, state, persistence, or operation logging fails.
+     */
     async completeLinearPlan(feedbackId, linearClientUuid) {
       await logger.operation(
         loggerMessages.database.feedback.completeLinearPlan,
@@ -436,11 +670,11 @@ export function createFeedbackService(
     },
 
     /**
-     * Denies eligible feedback.
+     * Denies pending or requested feedback.
      *
      * @param input - Authorized feedback decision.
-     * @returns A promise that resolves after denial.
-     * @rejects When authorization, state, or audit persistence fails.
+     * @returns Completion after denial and its audit event commit.
+     * @rejects When authorization, validation, state, persistence, audit, or operation logging fails.
      */
     async deny(input) {
       await logger.operation(
@@ -498,6 +732,7 @@ export function createFeedbackService(
      * @param viewerClerkId - Requesting Clerk user identifier.
      * @param title - Proposed feedback title.
      * @returns Up to five possible duplicate requests.
+     * @rejects When validation, persistence, or operation logging fails.
      */
     async findDuplicates(viewerClerkId, title) {
       return await logger.operation(
@@ -539,6 +774,7 @@ export function createFeedbackService(
      *
      * @param feedbackId - Feedback identifier.
      * @returns The linked Linear identifier, when eligible.
+     * @rejects When validation, persistence, or operation logging fails.
      */
     async getLinearSyncTarget(feedbackId) {
       return await logger.operation(
@@ -565,6 +801,7 @@ export function createFeedbackService(
      *
      * @param submitterClerkId - Submitter's Clerk identifier.
      * @returns Whether visible feedback exists.
+     * @rejects When validation, persistence, or operation logging fails.
      */
     async hasMine(submitterClerkId) {
       return await logger.operation(
@@ -593,6 +830,7 @@ export function createFeedbackService(
      * @param viewerClerkId - Requesting Clerk user identifier.
      * @param search - Optional search text.
      * @returns Active feedback grouped by lifecycle status.
+     * @rejects When validation, persistence, or operation logging fails.
      */
     async listActive(viewerClerkId, search) {
       return await logger.operation(
@@ -627,6 +865,13 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Lists active feedback for administration.
+     *
+     * @param options - Pagination, search, status, and sort filters.
+     * @returns Paginated active feedback.
+     * @rejects When filters, persistence, or operation logging fails.
+     */
     async listAdminActive(options = {}) {
       return await logger.operation(
         loggerMessages.database.feedback.listAdminActive,
@@ -634,6 +879,13 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Lists archived feedback for administration.
+     *
+     * @param options - Pagination, search, status, and sort filters.
+     * @returns Paginated archived feedback.
+     * @rejects When filters, persistence, or operation logging fails.
+     */
     async listArchive(options = {}) {
       return await logger.operation(
         loggerMessages.database.feedback.listArchive,
@@ -647,6 +899,7 @@ export function createFeedbackService(
      * @param viewerClerkId - Requesting Clerk user identifier.
      * @param search - Optional search text.
      * @returns Completed feedback ordered by completion date.
+     * @rejects When validation, persistence, or operation logging fails.
      */
     async listCompleted(viewerClerkId, search) {
       return await logger.operation(
@@ -675,6 +928,12 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Lists active feedback eligible as merge destinations.
+     *
+     * @returns Eligible merge targets ordered for selection.
+     * @rejects When persistence or operation logging fails.
+     */
     async listMergeTargets() {
       return await logger.operation(
         loggerMessages.database.feedback.listMergeTargets,
@@ -691,6 +950,14 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Lists feedback submitted by one Clerk user.
+     *
+     * @param submitterClerkId - Submitter clerk identifier.
+     * @param options - Pagination and search filters.
+     * @returns Paginated feedback visible to the submitter.
+     * @rejects When validation, persistence, or operation logging fails.
+     */
     async listMine(submitterClerkId, options = {}) {
       return await logger.operation(
         loggerMessages.database.feedback.listMine,
@@ -719,6 +986,12 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Lists recorded feedback lifecycle notifications.
+     *
+     * @returns Notifications ordered newest first.
+     * @rejects When persistence or operation logging fails.
+     */
     async listNotifications() {
       return await logger.operation(
         loggerMessages.database.feedback.listNotifications,
@@ -748,6 +1021,13 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Lists pending feedback for administrative review.
+     *
+     * @param options - Pagination, search, status, and sort filters.
+     * @returns Paginated pending feedback.
+     * @rejects When filters, persistence, or operation logging fails.
+     */
     async listPending(options = {}) {
       return await logger.operation(
         loggerMessages.database.feedback.listPending,
@@ -760,6 +1040,13 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Marks an unread feedback notification as read by a Clerk user.
+     *
+     * @param notificationId - Notification identifier.
+     * @param actorClerkId - Actor Clerk identifier.
+     * @rejects When validation, persistence, or operation logging fails.
+     */
     async markNotificationRead(notificationId, actorClerkId) {
       await logger.operation(
         loggerMessages.database.feedback.markNotificationRead,
@@ -782,6 +1069,14 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Reserves an idempotent Linear planning operation.
+     *
+     * @param feedbackId - Feedback identifier.
+     * @param linearClientUuid - Linear client uuid.
+     * @returns Existing or newly created planning reservation.
+     * @rejects When validation, state, persistence, or operation logging fails.
+     */
     async reserveLinearPlan(feedbackId, linearClientUuid) {
       return await logger.operation(
         loggerMessages.database.feedback.reserveLinearPlan,
@@ -820,7 +1115,7 @@ export function createFeedbackService(
      *
      * @param input - Authorized source and destination identifiers.
      * @returns Completion after the merge and audit event commit.
-     * @rejects When authorization, state, or audit persistence fails.
+     * @rejects When authorization, validation, state, persistence, audit, or operation logging fails.
      */
     async mergePending(input) {
       await logger.operation(
@@ -891,6 +1186,7 @@ export function createFeedbackService(
      *
      * @param input - New feedback details.
      * @returns The created feedback record.
+     * @rejects When validation, submission limits, persistence, or operation logging fails.
      */
     async submit(input) {
       return await logger.operation(
@@ -957,7 +1253,8 @@ export function createFeedbackService(
      * Applies one Linear lifecycle event transactionally.
      *
      * @param input - Normalized Linear lifecycle event.
-     * @returns The synchronization result.
+     * @returns Whether the event was ignored, unmatched, or applied.
+     * @rejects When validation, persistence, or operation logging fails.
      */
     async syncLinearStatus(input) {
       return await logger.operation(
@@ -1021,6 +1318,14 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Adds or removes the actor's feedback vote.
+     *
+     * @param feedbackId - Feedback identifier.
+     * @param voterClerkId - Voter clerk identifier.
+     * @returns Whether the actor has a vote after the operation.
+     * @rejects When validation, state, persistence, or operation logging fails.
+     */
     async toggleVote(feedbackId, voterClerkId) {
       return await logger.operation(
         loggerMessages.database.feedback.toggleVote,
@@ -1078,7 +1383,7 @@ export function createFeedbackService(
      *
      * @param input - Authorized editable feedback fields.
      * @returns Completion after the mutation and audit event commit.
-     * @rejects When authorization, state, or audit persistence fails.
+     * @rejects When authorization, validation, state, persistence, audit, or operation logging fails.
      */
     async updateAdmin(input) {
       await logger.operation(
@@ -1128,6 +1433,12 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Updates a submitter-owned pending feedback request.
+     *
+     * @param input - Feedback identifier and submitter-editable fields.
+     * @rejects When validation, state, persistence, or operation logging fails.
+     */
     async updatePending(input) {
       await logger.operation(
         loggerMessages.database.feedback.updatePending,
@@ -1159,7 +1470,6 @@ type FeedbackAuditState = {
  * Rejects feedback administration by an actor without its permission.
  *
  * @param actor - Actor requesting an administrative mutation.
- * @returns Nothing after authorization succeeds.
  * @throws When the actor lacks feedback management permission.
  */
 function assertFeedbackAdmin(actor: Actor): void {
@@ -1174,7 +1484,7 @@ function assertFeedbackAdmin(actor: Actor): void {
  * @param transaction - Caller-owned source transaction.
  * @param feedbackId - Feedback identifier.
  * @returns Current feedback state and internal owner identifier.
- * @rejects When the feedback or submitter identity is missing.
+ * @rejects When persistence fails or the feedback or submitter identity is missing.
  */
 async function loadFeedbackAuditState(
   transaction: Parameters<AuditService["write"]>[0],
@@ -1249,7 +1559,7 @@ function feedbackAuditState(
  * @param input - Submitter-owned editable feedback fields.
  * @param statuses - Lifecycle states eligible for the update.
  * @returns Completion after feedback is updated.
- * @rejects When input or feedback state is invalid.
+ * @rejects When input, feedback state, or persistence is invalid.
  */
 async function updateAdminFeedback(
   db: Database,
@@ -1283,6 +1593,7 @@ async function updateAdminFeedback(
  * @param scope - Feedback lifecycle scope.
  * @param options - Search, sorting, and pagination options.
  * @returns The matching feedback page.
+ * @rejects When filters or persistence fail.
  */
 async function listAdminFeedback(
   db: Database,
@@ -1564,6 +1875,11 @@ function linearFeedbackStatus(
   if (input.stateType === "canceled") return "canceled";
 }
 
+/**
+ * Builds the aggregate feedback vote-count expression.
+ *
+ * @returns SQL expression counting feedback votes.
+ */
 function feedbackVoteCount() {
   return sql<number>`(
     select count(*)::int from feedback_votes
@@ -1571,6 +1887,12 @@ function feedbackVoteCount() {
   )`;
 }
 
+/**
+ * Builds a case-insensitive feedback-text match condition.
+ *
+ * @param value - Search text matched against feedback title and description.
+ * @returns SQL condition matching feedback text.
+ */
 function feedbackContains(value: string) {
   return sql<boolean>`(
     strpos(lower(${schema.feedback.title}), lower(${value})) > 0
@@ -1578,6 +1900,12 @@ function feedbackContains(value: string) {
   )`;
 }
 
+/**
+ * Builds a whole-word feedback-text match condition.
+ *
+ * @param value - Lowercase word matched against tokenized feedback text.
+ * @returns SQL condition matching a whole word.
+ */
 function feedbackContainsWord(value: string) {
   return sql<boolean>`${value} = any(regexp_split_to_array(
     lower(${schema.feedback.title} || ' ' || ${schema.feedback.description}),
@@ -1585,12 +1913,26 @@ function feedbackContainsWord(value: string) {
   ))`;
 }
 
+/**
+ * Splits normalized duplicate-search text into unique words.
+ *
+ * @param value - Feedback title used to derive duplicate-search words.
+ * @returns Unique normalized search words.
+ * @throws When the trimmed title is empty or exceeds 120 characters.
+ */
 function duplicateWords(value: string) {
   const title = value.trim();
   if (!title || title.length > 120) throw new Error("Invalid feedback title.");
   return [...new Set(title.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])];
 }
 
+/**
+ * Normalizes an optional pagination offset.
+ *
+ * @param value - Optional requested pagination offset.
+ * @returns Nonnegative offset, defaulting to zero.
+ * @throws When the offset is negative or not a safe integer.
+ */
 function normalizedOffset(value: number | undefined) {
   const offset = value ?? 0;
   if (!Number.isSafeInteger(offset) || offset < 0) {
@@ -1599,24 +1941,51 @@ function normalizedOffset(value: number | undefined) {
   return offset;
 }
 
+/**
+ * Trims an optional feedback search term.
+ *
+ * @param value - Optional feedback search text.
+ * @returns Nonempty trimmed search words.
+ * @throws When the search exceeds 120 characters.
+ */
 function normalizedSearch(value: string | undefined) {
   const search = value?.trim() ?? "";
   if (search.length > 120) throw new Error("Invalid feedback search.");
   return search.split(/\s+/).filter(Boolean);
 }
 
+/**
+ * Trims and validates a Clerk user identifier.
+ *
+ * @param value - Submitter Clerk user identifier.
+ * @returns Trimmed Clerk user identifier.
+ * @throws When the identifier is blank.
+ */
 function normalizedClerkId(value: string) {
   const clerkId = value.trim();
   if (!clerkId) throw new Error("submitterClerkId is required.");
   return clerkId;
 }
 
+/**
+ * Requires a positive integer.
+ *
+ * @param value - Candidate identifier or count.
+ * @param name - Field name included in the validation error.
+ * @throws When the value is not a positive safe integer.
+ */
 function assertPositiveInteger(value: number, name: string) {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive integer.`);
   }
 }
 
+/**
+ * Validates a UUID.
+ *
+ * @param value - Candidate Linear client UUID.
+ * @throws When the value is not a supported UUID.
+ */
 function assertUuid(value: string) {
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(

@@ -3,23 +3,71 @@ import { schema } from "@package/database";
 import { eq, inArray, sql } from "drizzle-orm";
 import type { AuditService } from "../audit/index.js";
 
+/**
+ * Account-owned database identifiers collected before deletion.
+ */
 type ErasureTargets = {
+  /**
+   * Audit actor event identifiers.
+   */
   auditActorEventIds: Array<number | string>;
+  /**
+   * Audit owner event identifiers.
+   */
   auditOwnerEventIds: Array<number | string>;
+  /**
+   * Collection identifiers.
+   */
   collectionIds: Array<number | string>;
+  /**
+   * Collection image identifiers.
+   */
   collectionImageIds: Array<number | string>;
+  /**
+   * Collection item identifiers.
+   */
   collectionItemIds: Array<number | string>;
+  /**
+   * Collection item image identifiers.
+   */
   collectionItemImageIds: Array<number | string>;
+  /**
+   * Resource file identifiers.
+   */
   resourceFileIds: Array<number | string>;
+  /**
+   * Resource identifiers.
+   */
   resourceIds: Array<number | string>;
+  /**
+   * Resource image identifiers.
+   */
   resourceImageIds: Array<number | string>;
+  /**
+   * Resource version identifiers.
+   */
   resourceVersionIds: Array<number | string>;
+  /**
+   * Upload file identifiers.
+   */
   uploadFileIds: string[];
+  /**
+   * Upload session identifiers.
+   */
   uploadSessionIds: string[];
 };
 
+/**
+ * Remaining-record count for one post-erasure database location.
+ */
 type VerificationFinding = {
+  /**
+   * Database location that was verified.
+   */
   location: string;
+  /**
+   * Number of records still referencing the erased account.
+   */
   remaining: number | string;
 };
 
@@ -30,6 +78,7 @@ type VerificationFinding = {
  * @param targetClerkId - Clerk identifier of the account to erase.
  * @param audit - Audit service used for retained-record redaction.
  * @returns Completion after the erasure transaction commits.
+ * @rejects When target capture, redaction, deletion, or verification fails.
  */
 export async function eraseAccountDatabaseData(
   db: Database,
@@ -253,15 +302,28 @@ export async function eraseAccountDatabaseData(
   });
 }
 
+/** Reports database locations that still reference an erased account. */
 export class DatabaseErasureVerificationError extends Error {
+  /** Stable machine-readable classification for erasure workflow handling. */
   readonly code = "database_verification_failed";
 
+  /**
+   * Creates a verification error for database locations that still contain data.
+   *
+   * @param locations - Database locations that failed verification.
+   */
   constructor(readonly locations: string[]) {
     super("Database erasure verification failed.");
     this.name = "DatabaseErasureVerificationError";
   }
 }
 
+/**
+ * Converts identifier values to numbers.
+ *
+ * @param values - Numeric or string identifiers returned by Postgres.
+ * @returns Numeric identifiers, including non-finite results for invalid input.
+ */
 function numericIds(values: Array<number | string>): number[] {
   return values.map((value) => Number(value));
 }
