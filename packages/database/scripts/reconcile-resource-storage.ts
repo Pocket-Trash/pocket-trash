@@ -1,38 +1,71 @@
 import { type NeonQueryFunction, neon } from "@neondatabase/serverless";
 
+/**
+ * Database record that points to a Bunny-hosted resource object.
+ *
+ * @internal
+ */
 export type StoredObject = {
+  /** Neon branch containing the reference. */
   branchName: string;
+  /** Query function for the branch database. */
   database: NeonQueryFunction<false, false>;
+  /** Primary key of the referencing row. */
   id: number;
+  /** Current Bunny object path stored in the row. */
   objectPath: string;
+  /** Resource identifier that owns the object. */
   resourceId: number;
+  /** Current or legacy table shape containing the reference. */
   table: "archive" | "image" | "legacy-image" | "legacy-resource" | "resource";
 };
 
+/** Relevant object metadata returned by the Bunny Storage API. */
 type BunnyObject = {
+  /** Whether the entry represents a directory. */
   IsDirectory?: boolean;
+  /** Object or directory name relative to the listed folder. */
   ObjectName?: string;
 };
 
+/** Neon branch identity returned by the Neon API. */
 type NeonBranch = {
+  /** Neon branch identifier. */
   id: string;
+  /** Human-readable Neon branch name. */
   name: string;
 };
 
+/** One Bunny object move and all database references it satisfies. */
 type ObjectMove = {
+  /** Canonical destination object path. */
   destination: string;
+  /** Database records updated after the object moves. */
   records: StoredObject[];
+  /** Existing Bunny object path. */
   source: string;
 };
 
+/** Credentials and endpoint used for Bunny Storage requests. */
 type BunnyConfig = {
+  /** Bunny Storage API access key. */
   accessKey: string;
+  /** Bunny Storage API endpoint without a trailing slash. */
   endpoint: string;
+  /** Bunny storage-zone name. */
   zoneName: string;
 };
 
+/** Top-level Bunny folder containing resource objects. */
 const resourceRoot = "resources";
 
+/**
+ * Maps a non-production Neon branch to its canonical Bunny resource prefix.
+ *
+ * @param branchName - Neon branch name.
+ * @returns The branch prefix, or `undefined` for production.
+ * @internal
+ */
 export function branchResourcePrefix(branchName: string): string | undefined {
   if (branchName === "production") return undefined;
   if (branchName === "preview") return `${resourceRoot}/preview`;
@@ -44,6 +77,16 @@ export function branchResourcePrefix(branchName: string): string | undefined {
   return `${resourceRoot}/dev`;
 }
 
+/**
+ * Builds the canonical Bunny path for a referenced resource object.
+ *
+ * @param branchName - Neon branch containing the reference.
+ * @param resourceId - Resource identifier that owns the object.
+ * @param objectPath - Existing Bunny object path.
+ * @returns The canonical branch-scoped object path.
+ * @throws When the branch is production or the object path has no safe filename.
+ * @internal
+ */
 export function destinationPath(
   branchName: string,
   resourceId: number,
@@ -66,6 +109,11 @@ export function destinationPath(
   return `${prefix}/${resourceId}/${version ? `${version}/` : ""}${baseName(objectPath)}`;
 }
 
+/**
+ * Plans non-production storage reconciliation and applies it only with `--apply`.
+ *
+ * @rejects When configuration, Neon, database, or Bunny operations fail.
+ */
 async function main(): Promise<void> {
   const apply = process.argv.includes("--apply");
   const bunnyConfig = {
@@ -141,16 +189,34 @@ async function main(): Promise<void> {
   console.log("Resource storage reconciliation complete.");
 }
 
+/**
+ * Lists every branch in the configured Neon project.
+ *
+ * @returns Neon branch identities sorted by the API.
+ * @rejects When configuration is missing, the request fails, or Neon returns an
+ * invalid branch payload.
+ */
 async function listNeonBranches(): Promise<NeonBranch[]> {
   const response = await neonRequest(
     `/projects/${encodeURIComponent(required("NEON_PROJECT_ID"))}/branches?limit=10000&sort_by=name&sort_order=asc`,
   );
-  const result = (await response.json()) as { branches?: NeonBranch[] };
+  const result = (await response.json()) as {
+    /** Branches returned by Neon. */
+    branches?: NeonBranch[];
+  };
   if (!Array.isArray(result.branches))
     throw new Error("Neon branch response was invalid.");
   return result.branches;
 }
 
+/**
+ * Requests a pooled connection URL for a Neon branch.
+ *
+ * @param branchId - Neon branch identifier.
+ * @returns The branch database connection URL.
+ * @rejects When configuration is missing, the request fails, or Neon omits the
+ * connection URI.
+ */
 async function getBranchDatabaseUrl(branchId: string): Promise<string> {
   const query = new URLSearchParams({
     branch_id: branchId,
@@ -161,11 +227,22 @@ async function getBranchDatabaseUrl(branchId: string): Promise<string> {
   const response = await neonRequest(
     `/projects/${encodeURIComponent(required("NEON_PROJECT_ID"))}/connection_uri?${query.toString()}`,
   );
-  const result = (await response.json()) as { uri?: string };
+  const result = (await response.json()) as {
+    /** Pooled branch connection URI returned by Neon. */
+    uri?: string;
+  };
   if (!result.uri) throw new Error(`Neon returned no URI for ${branchId}.`);
   return result.uri;
 }
 
+/**
+ * Sends an authenticated request to the configured Neon API.
+ *
+ * @param path - API path including its leading slash.
+ * @returns The successful HTTP response.
+ * @rejects When the API key is missing, Neon returns a non-success status, or
+ * the request fails.
+ */
 async function neonRequest(path: string): Promise<Response> {
   const baseUrl = trimTrailingSlash(
     process.env.NEON_API_BASE?.trim() || "https://console.neon.tech/api/v2",
@@ -178,6 +255,14 @@ async function neonRequest(path: string): Promise<Response> {
   return response;
 }
 
+/**
+ * Checks whether a public table exists in a branch database.
+ *
+ * @param database - Branch query function.
+ * @param tableName - Unqualified public table name.
+ * @returns Whether PostgreSQL resolves the table name.
+ * @rejects When the database query fails.
+ */
 async function tableExists(
   database: NeonQueryFunction<false, false>,
   tableName: string,
@@ -188,6 +273,15 @@ async function tableExists(
   return rows[0]?.exists === true;
 }
 
+/**
+ * Checks whether a column exists on a public table.
+ *
+ * @param database - Branch query function.
+ * @param tableName - Unqualified public table name.
+ * @param columnName - Column name to locate.
+ * @returns Whether the information schema contains the column.
+ * @rejects When the database query fails.
+ */
 async function columnExists(
   database: NeonQueryFunction<false, false>,
   tableName: string,
@@ -205,6 +299,14 @@ async function columnExists(
   return rows[0]?.exists === true;
 }
 
+/**
+ * Collects current and legacy resource-object references from a branch.
+ *
+ * @param branchName - Neon branch name attached to collected records.
+ * @param database - Branch query function.
+ * @returns All supported storage references present in the branch schema.
+ * @rejects When a database query fails or a reference contains invalid identifiers.
+ */
 async function getStoredObjects(
   branchName: string,
   database: NeonQueryFunction<false, false>,
@@ -280,6 +382,16 @@ async function getStoredObjects(
   return records;
 }
 
+/**
+ * Converts a database row into a validated storage reference.
+ *
+ * @param branchName - Neon branch containing the row.
+ * @param database - Query function for the branch database.
+ * @param row - Raw query result containing IDs and an object path.
+ * @param table - Row shape that produced the reference.
+ * @returns A normalized storage reference.
+ * @throws When either identifier is not a safe integer.
+ */
 function storedObject(
   branchName: string,
   database: NeonQueryFunction<false, false>,
@@ -294,6 +406,14 @@ function storedObject(
   return { branchName, database, id, objectPath, resourceId, table };
 }
 
+/**
+ * Collects paths reserved by pending uploads or deletions.
+ *
+ * @param database - Branch query function.
+ * @returns Reserved object paths from every supported schema generation.
+ * @rejects When a database query fails.
+ * @internal
+ */
 export async function getPendingUploadPaths(
   database: NeonQueryFunction<false, false>,
 ): Promise<string[]> {
@@ -315,6 +435,15 @@ export async function getPendingUploadPaths(
   return paths;
 }
 
+/**
+ * Groups storage references into non-conflicting Bunny object moves.
+ *
+ * @param records - Stored object references to canonicalize.
+ * @returns Unique source-to-destination moves with their affected records.
+ * @throws When a record has no canonical destination or distinct source objects
+ * map to the same destination.
+ * @internal
+ */
 export function buildMoves(records: StoredObject[]): ObjectMove[] {
   const moves = new Map<string, ObjectMove>();
   const sourcesByDestination = new Map<string, string>();
@@ -351,6 +480,14 @@ export function buildMoves(records: StoredObject[]): ObjectMove[] {
   return [...moves.values()];
 }
 
+/**
+ * Updates one database reference after its Bunny object moves.
+ *
+ * @param record - Referencing database row.
+ * @param objectPath - New canonical Bunny object path.
+ * @param url - Public CDN URL for the moved object.
+ * @rejects When the database update fails.
+ */
 async function updateStoredObject(
   record: StoredObject,
   objectPath: string,
@@ -389,6 +526,15 @@ async function updateStoredObject(
   }
 }
 
+/**
+ * Copies a Bunny object to its canonical path when needed.
+ *
+ * @param source - Existing Bunny object path.
+ * @param destination - Canonical Bunny object path.
+ * @param config - Bunny request configuration.
+ * @rejects When neither source nor destination exists, the source has no body,
+ * or a Bunny request fails.
+ */
 async function moveObject(
   source: string,
   destination: string,
@@ -423,6 +569,15 @@ async function moveObject(
   );
 }
 
+/**
+ * Recursively lists files beneath a Bunny storage folder.
+ *
+ * @param folder - Bunny folder path without a trailing slash.
+ * @param config - Bunny request configuration.
+ * @returns File paths relative to the storage zone root.
+ * @rejects When a request fails or Bunny returns an invalid listing, including
+ * an unsafe object name.
+ */
 async function listFiles(
   folder: string,
   config: BunnyConfig,
@@ -444,6 +599,18 @@ async function listFiles(
   return files;
 }
 
+/**
+ * Sends an authenticated Bunny Storage request and validates its status.
+ *
+ * @param objectPath - Object path relative to the storage-zone root.
+ * @param method - HTTP method for the storage operation.
+ * @param expectedStatuses - Accepted response status codes.
+ * @param config - Bunny request configuration.
+ * @param body - Optional upload body.
+ * @param headers - Optional request headers merged with authentication.
+ * @returns The accepted HTTP response.
+ * @rejects When Bunny returns an unexpected status or the request fails.
+ */
 async function bunnyRequest(
   objectPath: string,
   method: "DELETE" | "GET" | "PUT",
@@ -452,7 +619,10 @@ async function bunnyRequest(
   body?: ReadableStream<Uint8Array>,
   headers?: HeadersInit,
 ): Promise<Response> {
-  const init: RequestInit & { duplex?: "half" } = {
+  const init: RequestInit & {
+    /** Node fetch streaming mode required when an upload body is present. */
+    duplex?: "half";
+  } = {
     body,
     headers: { AccessKey: config.accessKey, ...headers },
     method,
@@ -470,16 +640,36 @@ async function bunnyRequest(
   return response;
 }
 
+/**
+ * Percent-encodes each segment of a Bunny object path.
+ *
+ * @param objectPath - Slash-delimited object path.
+ * @returns The encoded path with separators preserved.
+ */
 function encodePath(objectPath: string): string {
   return objectPath.split("/").map(encodeURIComponent).join("/");
 }
 
+/**
+ * Extracts and validates the filename from an object path.
+ *
+ * @param objectPath - Slash-delimited Bunny object path.
+ * @returns The final safe path segment.
+ * @throws When the path has no filename or ends in an unsafe segment.
+ */
 function baseName(objectPath: string): string {
   const name = objectPath.split("/").at(-1);
   if (!name) throw new Error(`Object path has no filename: ${objectPath}`);
   return safeName(name);
 }
 
+/**
+ * Validates a Bunny object name as one safe path segment.
+ *
+ * @param name - Object or directory name.
+ * @returns The unchanged safe name.
+ * @throws When the name is empty, traverses directories, or contains separators.
+ */
 function safeName(name: string): string {
   if (
     !name ||
@@ -493,12 +683,25 @@ function safeName(name: string): string {
   return name;
 }
 
+/**
+ * Reads a required environment variable.
+ *
+ * @param name - Environment variable name.
+ * @returns The trimmed non-empty value.
+ * @throws When the variable is missing or blank.
+ */
 function required(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is required.`);
   return value;
 }
 
+/**
+ * Removes every trailing slash from a URL or path.
+ *
+ * @param value - Value to normalize.
+ * @returns The value without trailing slashes.
+ */
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/u, "");
 }
