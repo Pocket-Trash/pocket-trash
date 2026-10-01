@@ -6,6 +6,7 @@ import {
   validatePayload,
 } from "./validation.js";
 
+/** Valid sticky-note payload used as the baseline for validation tests. */
 const payload = {
   fileKey: "board123",
   operations: [
