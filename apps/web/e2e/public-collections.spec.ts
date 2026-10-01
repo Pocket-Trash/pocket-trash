@@ -47,8 +47,11 @@ test("@mutation public collection browsing preserves effective privacy", async (
     ).toHaveCount(0);
 
     await page
-      .getByRole("link", {
-        name: new RegExp(fixture.publicCollection.name, "u"),
+      .getByRole("link")
+      .filter({
+        has: page.getByRole("heading", {
+          name: fixture.publicCollection.name,
+        }),
       })
       .click();
     await expect(page).toHaveURL(
@@ -82,7 +85,7 @@ test("@mutation public collection browsing preserves effective privacy", async (
         name: fixture.publicSpinner.name,
       })
       .click();
-    await expect(page.locator('[aria-current="page"]')).toHaveText(
+    await expect(page.locator('span[aria-current="page"]')).toHaveText(
       fixture.publicSpinner.name,
     );
     await expect(
@@ -200,7 +203,7 @@ test("@mutation admins can open private collection resources directly", async ({
     await page.goto(
       `/collections/${fixture.ownerId}/${fixture.privateCollection.id}/${fixture.privateCollectionItem.id}`,
     );
-    await expect(page.locator('[aria-current="page"]')).toHaveText(
+    await expect(page.locator('span[aria-current="page"]')).toHaveText(
       fixture.privateCollectionItem.name,
     );
     await expect(page.getByText("Delisted", { exact: true })).toBeVisible();

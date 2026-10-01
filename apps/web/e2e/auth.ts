@@ -36,6 +36,7 @@ export const test = base.extend<AuthFixtures>({
   signInAs: async ({ page }, use) => {
     await use(async (role) => {
       await page.goto("/");
+      await clerk.signOut({ page });
       await clerk.signIn({
         emailAddress: requiredEnvironment(emailVariables[role]),
         page,

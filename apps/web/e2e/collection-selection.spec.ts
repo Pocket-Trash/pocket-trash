@@ -126,8 +126,17 @@ test("@mutation collection selection and linked-item moves use the public UI", a
       .getByRole("link", { exact: true, name: fixture.spinnerProductName })
       .click();
     await expect(page).toHaveURL(/\/collections\/\d+\/\d+\/\d+$/u);
-    await page.getByRole("link", { name: "Edit" }).click();
-    await expect(page).toHaveURL(/\/user\/collections\/\d+\/edit$/u);
+    await expect(page.locator('span[aria-current="page"]')).toHaveText(
+      fixture.spinnerProductName,
+    );
+    await page
+      .getByRole("link", { name: "Edit" })
+      .and(page.locator('a[href^="/collections/edit/"]'))
+      .click();
+    await expect(page).toHaveURL(/\/collections\/edit\/\d+$/u);
+    await expect(
+      page.getByRole("combobox", { name: "Collection" }),
+    ).toBeVisible();
     await selectOption(page, "Collection", fixture.collectionNames[1]);
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page).toHaveURL(secondCollectionUrl);

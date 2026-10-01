@@ -80,7 +80,9 @@ test("@mutation collection lifecycle and deletion choices persist through the pu
       .getByRole("textbox", { exact: true, name: "Name" })
       .fill(fixture.equivalentName);
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("That name already exists.")).toBeVisible();
+    await expect(
+      page.getByText("We couldn't save this. Check the fields and try again."),
+    ).toBeVisible();
     await expect(page).toHaveURL(/\/user\/collections\/add$/u);
 
     await archiveCollection(page, fixture.archive);

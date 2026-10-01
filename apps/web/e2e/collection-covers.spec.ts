@@ -194,7 +194,14 @@ test("@mutation collection covers survive failures and retain reusable history",
       })
       .toBe(replacement.id);
 
-    await page.getByRole("button", { name: "Use this cover" }).click();
+    const originalGalleryItem = page.getByRole("listitem").filter({
+      has: page.getByRole("button", {
+        name: `Delete image ${original.fileName}`,
+      }),
+    });
+    await originalGalleryItem
+      .getByRole("button", { name: "Use this cover" })
+      .click();
     await expect
       .poll(async () => {
         const [current] = await database
