@@ -106,7 +106,7 @@ await new Promise(() => {});
  * Stops child processes, removes the relay registration, and exits.
  *
  * @param signal - Termination signal that initiated shutdown, when present.
- * @returns A promise that does not resolve because the process exits.
+ * @returns A promise that resolves immediately for duplicate calls; the first call exits the process.
  */
 async function stop(signal) {
   if (stopping) return;

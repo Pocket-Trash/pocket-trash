@@ -167,7 +167,7 @@ function parseChangeset(filePath) {
 }
 
 /**
- * Reads every pending Changeset in deterministic directory order.
+ * Reads every pending Changeset.
  *
  * @returns Parsed Changesets, or an empty array when the directory is absent.
  * @throws When directory or Changeset access fails.

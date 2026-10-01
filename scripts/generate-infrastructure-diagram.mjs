@@ -577,6 +577,7 @@ async function collectDetectionEdges(metadata, packages) {
  *
  * @param metadata - Infrastructure diagram metadata.
  * @returns Services indexed by identifier.
+ * @throws When `services` is not an array.
  */
 function createServiceMap(metadata) {
   return new Map(
@@ -647,6 +648,7 @@ function uniqueEdges(edges) {
  * @param environment - Environment metadata.
  * @param serviceMap - Services indexed by identifier.
  * @returns Generated Eraser lines.
+ * @throws When environment nodes or edges are not arrays.
  */
 function renderEnvironment(environment, serviceMap) {
   const output = [];

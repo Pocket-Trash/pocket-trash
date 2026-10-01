@@ -23,7 +23,7 @@ figma.ui.onmessage = async (message) => {
  *
  * @param payload - FigJam bridge payload from the plugin UI.
  * @returns Counts and identifiers for the applied payload.
- * @rejects When validation, font loading, or an operation fails.
+ * @rejects When validation, font loading, or an operation fails; completed operations are not rolled back.
  */
 async function applyPayload(payload) {
   validatePayloadShape(payload);
