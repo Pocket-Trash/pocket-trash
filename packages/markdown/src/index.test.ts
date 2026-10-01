@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { htmlToMarkdown, markdownToHtml } from "./index.js";
+import {
+  downgradeMarkdownCodeBlocks,
+  htmlToMarkdown,
+  markdownToHtml,
+} from "./index.js";
 
 describe("htmlToMarkdown", () => {
   it("converts Shopify-style HTML to markdown", () => {
@@ -21,6 +25,21 @@ describe("htmlToMarkdown", () => {
   it("returns null for empty input", () => {
     expect(htmlToMarkdown(null)).toBeNull();
     expect(htmlToMarkdown("")).toBeNull();
+  });
+});
+
+describe("downgradeMarkdownCodeBlocks", () => {
+  it("removes true fenced and indented code syntax", () => {
+    expect(
+      downgradeMarkdownCodeBlocks(
+        "before\n\n````markdown\n``` stays text\n````\n\n    indented\n\nafter",
+      ),
+    ).toBe("before\n\n``` stays text\n\nindented\n\nafter");
+  });
+
+  it("preserves supported nested-list indentation", () => {
+    const markdown = "- parent\n    - child";
+    expect(downgradeMarkdownCodeBlocks(markdown)).toBe(markdown);
   });
 });
 
