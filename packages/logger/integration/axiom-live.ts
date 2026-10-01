@@ -459,12 +459,12 @@ function optionalEnv(name: string): string | undefined {
 }
 
 /**
- * Reads an optional positive integer environment variable.
+ * Reads an optional positive base-10 integer prefix from an environment variable.
  *
  * @param name - Environment variable name.
  * @param fallback - Value used when the variable is absent or empty.
- * @returns The parsed positive integer or fallback.
- * @throws When the configured value is not a positive integer.
+ * @returns The parsed positive integer prefix or fallback.
+ * @throws When the configured value has no positive integer prefix.
  */
 function parseOptionalPositiveInteger(name: string, fallback: number): number {
   const value = process.env[name];
@@ -590,7 +590,7 @@ async function waitForRows(input: {
  *
  * @param input - Dataset credentials, run prefix, and query start time.
  * @returns Matching Axiom rows.
- * @rejects When the query request fails or Axiom returns an unsuccessful status.
+ * @rejects When the request, response status, JSON parsing, or tabular conversion fails.
  */
 async function queryAxiom(input: {
   /** Axiom dataset credentials and endpoint settings. */
@@ -652,7 +652,7 @@ function quoteAplString(value: string): string {
  *
  * @param body - Parsed Axiom tabular response.
  * @returns Row records keyed by field name, or an empty array without a table.
- * @throws When the response is not an object.
+ * @throws When the response is not an object or its table fields and columns are malformed.
  */
 function rowsFromTabular(body: unknown): QueryRow[] {
   assertRecord(body, "Axiom query response");

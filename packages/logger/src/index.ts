@@ -56,9 +56,9 @@ export type LogEvent = {
   level: LogLevel;
   /** Stable structured event name. */
   message: string;
-  /** Explicitly included and redacted source payload. */
+  /** Optional source payload carried by the event. */
   rawPayload?: unknown;
-  /** ISO timestamp for event creation. */
+  /** Timestamp supplied by the emitter or forwarding client. */
   timestamp: string;
 };
 
@@ -90,6 +90,8 @@ export type LogTransport = {
    * Waits for buffered transport work to finish.
    *
    * @returns Completion after buffered work is settled.
+   * @rejects When asynchronous buffer flushing fails.
+   * @throws When synchronous buffer flushing fails.
    */
   flush?: () => Promise<void> | void;
   /**
@@ -97,6 +99,8 @@ export type LogTransport = {
    *
    * @param event - Event to deliver.
    * @returns Completion after the event is accepted by the transport.
+   * @rejects When asynchronous delivery fails.
+   * @throws When synchronous delivery fails.
    */
   log: (event: LogEvent) => Promise<void> | void;
 };
@@ -148,6 +152,7 @@ export type Logger = {
    *
    * @param message - Stable structured event name.
    * @param data - Optional event fields.
+   * @throws When a transport's `log` method throws synchronously.
    */
   debug: (message: string, data?: LogData) => void;
   /**
@@ -155,6 +160,7 @@ export type Logger = {
    *
    * @param message - Stable structured event name.
    * @param data - Optional event fields.
+   * @throws When a transport's `log` method throws synchronously.
    */
   error: (message: string, data?: LogData) => void;
   /**
@@ -162,12 +168,14 @@ export type Logger = {
    *
    * @param message - Stable structured event name.
    * @param data - Optional event fields.
+   * @throws When a transport's `log` method throws synchronously.
    */
   fatal: (message: string, data?: LogData) => void;
   /**
    * Waits for pending events and transport buffers to settle.
    *
    * @returns Completion after pending transport work settles.
+   * @rejects When a transport's `flush` method fails.
    */
   flush: () => Promise<void>;
   /**
@@ -175,6 +183,7 @@ export type Logger = {
    *
    * @param event - Event identity and fields to preserve.
    * @param data - Optional server-side enrichment.
+   * @throws When a transport's `log` method throws synchronously.
    */
   forward: (event: LogEvent, data?: LogData) => void;
   /**
@@ -182,6 +191,7 @@ export type Logger = {
    *
    * @param message - Stable structured event name.
    * @param data - Optional event fields.
+   * @throws When a transport's `log` method throws synchronously.
    */
   info: (message: string, data?: LogData) => void;
   /**
@@ -192,7 +202,7 @@ export type Logger = {
    * @param action - Synchronous or asynchronous work to run.
    * @param data - Optional event fields shared by outcome events.
    * @returns The action result.
-   * @rejects When the action fails, after emitting a failure event.
+   * @rejects When the action fails or a transport throws during outcome emission.
    */
   operation: <T>(
     name: string,
@@ -204,6 +214,7 @@ export type Logger = {
    *
    * @param message - Stable structured event name.
    * @param data - Optional event fields.
+   * @throws When a transport's `log` method throws synchronously.
    */
   trace: (message: string, data?: LogData) => void;
   /**
@@ -211,6 +222,7 @@ export type Logger = {
    *
    * @param message - Stable structured event name.
    * @param data - Optional event fields.
+   * @throws When a transport's `log` method throws synchronously.
    */
   verbose: (message: string, data?: LogData) => void;
   /**
@@ -218,6 +230,7 @@ export type Logger = {
    *
    * @param message - Stable structured event name.
    * @param data - Optional event fields.
+   * @throws When a transport's `log` method throws synchronously.
    */
   warn: (message: string, data?: LogData) => void;
 };
@@ -406,7 +419,7 @@ export function normalizeConsoleTransportMode(
 
 /**
  * Recursively redacts sensitive fields and normalizes dates and errors.
- * Circular references become the string `[Circular]`.
+ * Repeated object references, including cycles, become `[Circular]` after their first occurrence.
  *
  * @param value - Structured value to sanitize.
  * @param extraKeys - Additional case-insensitive field names to redact.
@@ -483,8 +496,8 @@ export function createNoopLogger(config: Partial<LoggerConfig> = {}): Logger {
 }
 
 /**
- * Creates a structured logger that redacts fields before asynchronous delivery.
- * Transport failures are swallowed by emission and awaited flush work.
+ * Creates a structured logger that redacts fields before delivery.
+ * Asynchronous `log` rejections are swallowed; synchronous `log` throws escape emission and `flush` failures reject flushing.
  *
  * @param config - Logger identity, filtering, redaction, and transport settings.
  * @returns A structured logger.
@@ -500,6 +513,7 @@ export function createLogger(config: LoggerConfig): Logger {
    * Starts delivery to every transport and tracks pending work.
    *
    * @param event - Structured event to deliver.
+   * @throws When a transport's `log` method throws synchronously.
    */
   const send = (event: LogEvent): void => {
     for (const transport of transports) {
@@ -518,6 +532,7 @@ export function createLogger(config: LoggerConfig): Logger {
    * @param eventLevel - Severity assigned to the event.
    * @param message - Stable structured event name.
    * @param data - Optional event fields.
+   * @throws When a transport's `log` method throws synchronously.
    */
   const emit = (
     eventLevel: LogLevel,
@@ -577,6 +592,7 @@ export function createLogger(config: LoggerConfig): Logger {
    *
    * @param inputEvent - Client event whose top-level identity is preserved.
    * @param data - Optional server-side enrichment.
+   * @throws When a transport's `log` method throws synchronously.
    */
   const forward = (inputEvent: LogEvent, data?: LogData): void => {
     if (logLevelWeights[inputEvent.level] < logLevelWeights[level]) {
@@ -662,6 +678,7 @@ export function createLogger(config: LoggerConfig): Logger {
      *
      * @param message - Stable structured event name.
      * @param data - Optional event fields.
+     * @throws When a transport's `log` method throws synchronously.
      */
     debug(message, data) {
       emit("debug", message, data);
@@ -671,6 +688,7 @@ export function createLogger(config: LoggerConfig): Logger {
      *
      * @param message - Stable structured event name.
      * @param data - Optional event fields.
+     * @throws When a transport's `log` method throws synchronously.
      */
     error(message, data) {
       emit("error", message, data);
@@ -680,6 +698,7 @@ export function createLogger(config: LoggerConfig): Logger {
      *
      * @param message - Stable structured event name.
      * @param data - Optional event fields.
+     * @throws When a transport's `log` method throws synchronously.
      */
     fatal(message, data) {
       emit("fatal", message, data);
@@ -688,6 +707,7 @@ export function createLogger(config: LoggerConfig): Logger {
      * Waits for pending deliveries and transport buffers to settle.
      *
      * @returns Completion after all pending transport work settles.
+     * @rejects When a transport's `flush` method fails.
      */
     async flush() {
       await Promise.all([...pending]);
@@ -699,6 +719,7 @@ export function createLogger(config: LoggerConfig): Logger {
      *
      * @param message - Stable structured event name.
      * @param data - Optional event fields.
+     * @throws When a transport's `log` method throws synchronously.
      */
     info(message, data) {
       emit("info", message, data);
@@ -711,7 +732,7 @@ export function createLogger(config: LoggerConfig): Logger {
      * @param action - Synchronous or asynchronous work to run.
      * @param data - Optional event fields shared by outcome events.
      * @returns The action result.
-     * @rejects When the action fails, after emitting a failure event.
+     * @rejects When the action fails or a transport throws during outcome emission.
      */
     async operation(name, action, data) {
       const startedAt = Date.now();
@@ -747,6 +768,7 @@ export function createLogger(config: LoggerConfig): Logger {
      *
      * @param message - Stable structured event name.
      * @param data - Optional event fields.
+     * @throws When a transport's `log` method throws synchronously.
      */
     trace(message, data) {
       emit("trace", message, data);
@@ -756,6 +778,7 @@ export function createLogger(config: LoggerConfig): Logger {
      *
      * @param message - Stable structured event name.
      * @param data - Optional event fields.
+     * @throws When a transport's `log` method throws synchronously.
      */
     verbose(message, data) {
       emit("verbose", message, data);
@@ -765,6 +788,7 @@ export function createLogger(config: LoggerConfig): Logger {
      *
      * @param message - Stable structured event name.
      * @param data - Optional event fields.
+     * @throws When a transport's `log` method throws synchronously.
      */
     warn(message, data) {
       emit("warn", message, data);
@@ -791,6 +815,7 @@ export function createConsoleTransport(
      * Renders and writes an event at its matching console severity.
      *
      * @param event - Structured event to write.
+     * @throws When JSON serialization or the configured writer fails.
      */
     log(event) {
       const eventMode = event.console?.mode ?? mode;
