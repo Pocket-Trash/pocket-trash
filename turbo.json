@@ -94,12 +94,6 @@
       ],
       "outputs": ["dist/**", "build/**", ".output/**", ".vercel/output/**"]
     },
-    "lint": {
-      "outputs": []
-    },
-    "check": {
-      "outputs": []
-    },
     "typecheck": {
       "dependsOn": ["^build"],
       "outputs": []
