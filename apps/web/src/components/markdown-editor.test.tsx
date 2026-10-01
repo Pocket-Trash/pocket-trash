@@ -93,6 +93,97 @@ describe("MarkdownEditor", () => {
     expect(textarea?.selectionEnd).toBe(4);
   });
 
+  it("selects only content after wrapping a Source selection", async () => {
+    await act(() =>
+      root.render(
+        <MarkdownEditor defaultValue="bold plain" label="Description" />,
+      ),
+    );
+    const sourceMode = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Source",
+    );
+    act(() => sourceMode?.click());
+
+    const textarea = container.querySelector("textarea");
+    act(() => textarea?.setSelectionRange(0, 4));
+    const bold = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Bold"]',
+    );
+    act(() => bold?.click());
+
+    expect(textarea?.value).toBe("**bold** plain");
+    expect(textarea?.selectionStart).toBe(2);
+    expect(textarea?.selectionEnd).toBe(6);
+  });
+
+  it("keeps an empty Source selection between inserted markers", async () => {
+    await act(() => root.render(<MarkdownEditor label="Description" />));
+    const sourceMode = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Source",
+    );
+    act(() => sourceMode?.click());
+
+    const textarea = container.querySelector("textarea");
+    act(() => textarea?.setSelectionRange(0, 0));
+    const bold = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Bold"]',
+    );
+    act(() => bold?.click());
+
+    expect(textarea?.value).toBe("****");
+    expect(textarea?.selectionStart).toBe(2);
+    expect(textarea?.selectionEnd).toBe(2);
+  });
+
+  it("restores a partial-line selection after Source block formatting", async () => {
+    await act(() =>
+      root.render(
+        <MarkdownEditor
+          defaultValue={"one two\n\nthree"}
+          label="Description"
+        />,
+      ),
+    );
+    const sourceMode = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Source",
+    );
+    act(() => sourceMode?.click());
+
+    const textarea = container.querySelector("textarea");
+    act(() => textarea?.setSelectionRange(1, 3));
+    const quote = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Blockquote"]',
+    );
+    act(() => quote?.click());
+
+    expect(textarea?.value).toBe("> one two\n\nthree");
+    expect(textarea?.selectionStart).toBe(3);
+    expect(textarea?.selectionEnd).toBe(5);
+  });
+
+  it("does not format the next line at a Source selection boundary", async () => {
+    await act(() =>
+      root.render(
+        <MarkdownEditor defaultValue={"one\n\ntwo"} label="Description" />,
+      ),
+    );
+    const sourceMode = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Source",
+    );
+    act(() => sourceMode?.click());
+
+    const textarea = container.querySelector("textarea");
+    act(() => textarea?.setSelectionRange(0, 4));
+    const unorderedList = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Bulleted list"]',
+    );
+    act(() => unorderedList?.click());
+
+    expect(textarea?.value).toBe("- one\n\ntwo");
+    expect(textarea?.selectionStart).toBe(2);
+    expect(textarea?.selectionEnd).toBe(6);
+  });
+
   it("unwraps a numbered Source list with sequential markers", async () => {
     await act(() =>
       root.render(

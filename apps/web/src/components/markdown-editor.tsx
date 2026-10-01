@@ -117,6 +117,16 @@ type ToolbarAction = Readonly<{
   label: TranslationKey;
 }>;
 
+/** One prefix replacement used to restore a Source selection. */
+type SourceLineEdit = Readonly<{
+  /** Original source offset of the prefix. */
+  at: number;
+  /** Length of the inserted prefix. */
+  insertLength: number;
+  /** Length of the removed prefix. */
+  removeLength: number;
+}>;
+
 /** Formatting actions shared by Visual and Source modes. */
 const toolbarActions: readonly ToolbarAction[] = [
   {
@@ -597,7 +607,7 @@ function sourceEdit(
       selectionEnd,
       `${inlineMarker}${selected}${inlineMarker}`,
       inlineMarker.length,
-      inlineMarker.length + selected.length,
+      selected.length,
     );
   }
 
@@ -614,33 +624,69 @@ function sourceEdit(
   if (!prefix) return { selectionEnd, selectionStart, value };
 
   const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
+  const endsAfterNewline =
+    selectionEnd > selectionStart && value[selectionEnd - 1] === "\n";
   const nextLine = value.indexOf("\n", selectionEnd);
-  const lineEnd = nextLine === -1 ? value.length : nextLine;
+  const lineEnd = endsAfterNewline
+    ? selectionEnd - 1
+    : nextLine === -1
+      ? value.length
+      : nextLine;
   const selectedLines = value.slice(lineStart, lineEnd).split("\n");
   const exact = selectedLines.every((line) =>
     format === "orderedList" ? /^\d+\.\s/u.test(line) : line.startsWith(prefix),
   );
-  const replacement = selectedLines
-    .map((line, index) => {
-      if (exact) {
-        return format === "orderedList"
-          ? line.replace(/^\d+\.\s/u, "")
-          : line.slice(prefix.length);
-      }
-      if (format.startsWith("heading")) {
-        return `${prefix}${line.replace(/^#{1,3}\s/u, "")}`;
-      }
-      return `${format === "orderedList" ? `${index + 1}. ` : prefix}${line}`;
-    })
-    .join("\n");
-  return replaceSelection(
-    value,
-    lineStart,
-    lineEnd,
-    replacement,
-    selectionStart - lineStart,
-    replacement.length,
-  );
+  let lineOffset = lineStart;
+  const edits: SourceLineEdit[] = [];
+  const replacement = selectedLines.map((line, index) => {
+    const matchedPrefix = exact
+      ? format === "orderedList"
+        ? /^\d+\.\s/u.exec(line)?.[0]
+        : prefix
+      : format.startsWith("heading")
+        ? /^#{1,3}\s/u.exec(line)?.[0]
+        : undefined;
+    const insertedPrefix = exact
+      ? ""
+      : format === "orderedList"
+        ? `${index + 1}. `
+        : prefix;
+    const removeLength = matchedPrefix?.length ?? 0;
+    edits.push({
+      at: lineOffset,
+      insertLength: insertedPrefix.length,
+      removeLength,
+    });
+    lineOffset += line.length + 1;
+    return `${insertedPrefix}${line.slice(removeLength)}`;
+  });
+  return {
+    selectionEnd: mapSourceOffset(selectionEnd, edits),
+    selectionStart: mapSourceOffset(selectionStart, edits),
+    value: `${value.slice(0, lineStart)}${replacement.join("\n")}${value.slice(lineEnd)}`,
+  };
+}
+
+/**
+ * Maps an original Source offset across prefix replacements.
+ *
+ * @param offset - Original source offset.
+ * @param edits - Ordered prefix replacements.
+ * @returns The corresponding offset after the replacements.
+ */
+function mapSourceOffset(
+  offset: number,
+  edits: readonly SourceLineEdit[],
+): number {
+  let delta = 0;
+  for (const edit of edits) {
+    if (offset < edit.at) break;
+    if (offset < edit.at + edit.removeLength) {
+      return edit.at + delta + edit.insertLength;
+    }
+    delta += edit.insertLength - edit.removeLength;
+  }
+  return offset + delta;
 }
 
 /**

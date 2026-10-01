@@ -5,7 +5,8 @@ import {
   editorViewOptionsCtx,
   rootCtx,
   serializerCtx,
-} from "@milkdown/kit/core";
+} from "@milkdown/core";
+import { history } from "@milkdown/plugin-history";
 import {
   blockContainerTypes,
   blockquoteAttr,
@@ -63,7 +64,7 @@ import {
   wrapInHeadingCommand,
   wrapInOrderedListCommand,
   wrapInOrderedListInputRule,
-} from "@milkdown/kit/preset/commonmark";
+} from "@milkdown/preset-commonmark";
 import {
   keepTableAlignPlugin,
   remarkGFMPlugin,
@@ -78,12 +79,11 @@ import {
   tableRowSchema,
   tableSchema,
   toggleStrikethroughCommand,
-} from "@milkdown/kit/preset/gfm";
-import { textblockTypeInputRule } from "@milkdown/kit/prose/inputrules";
-import { $inputRule, callCommand } from "@milkdown/kit/utils";
-import { markdownToHtml } from "@package/markdown";
+} from "@milkdown/preset-gfm";
+import { textblockTypeInputRule } from "@milkdown/prose/inputrules";
+import { $inputRule, callCommand } from "@milkdown/utils";
 import * as React from "react";
-import "@milkdown/kit/prose/view/style/prosemirror.css";
+import "@milkdown/prose/view/style/prosemirror.css";
 
 /** Formats supported by the restricted visual editor. */
 export type MarkdownVisualFormat =
@@ -147,7 +147,9 @@ const limitedHeadingInputRule = $inputRule((ctx) =>
   textblockTypeInputRule(
     /^(?<hashes>#{1,3})\s$/,
     headingSchema.type(ctx),
-    (match) => ({ level: match.groups?.hashes?.length ?? 1 }),
+    (match: RegExpMatchArray) => ({
+      level: match.groups?.hashes?.length ?? 1,
+    }),
   ),
 );
 
@@ -223,6 +225,7 @@ const restrictedMarkdown = [
   emphasisKeymap,
   strongKeymap,
   strikethroughKeymap,
+  history,
 ].flat();
 
 /**
@@ -415,9 +418,16 @@ function pasteText(value: string): string {
   if (!/(?:^|\n)(?: {0,3}(?:`{3,}|~{3,})| {4}|\t)/u.test(value)) {
     return value;
   }
-  const document = new DOMParser().parseFromString(
-    markdownToHtml(value) ?? "",
-    "text/html",
-  );
-  return document.body.textContent ?? "";
+  let fence: "`" | "~" | undefined;
+  return value
+    .split("\n")
+    .flatMap((line) => {
+      const marker = /^ {0,3}(?<fence>`{3,}|~{3,})/u.exec(line)?.groups?.fence;
+      if (marker && (!fence || marker[0] === fence)) {
+        fence = fence ? undefined : (marker[0] as "`" | "~");
+        return [];
+      }
+      return [line.replace(/^(?: {4}|\t)/u, "")];
+    })
+    .join("\n");
 }

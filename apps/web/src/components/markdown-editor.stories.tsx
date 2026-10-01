@@ -126,9 +126,31 @@ export const PastedCodeIsReadableText: Story = {
       name: "Description",
     });
     await userEvent.click(editor);
-    await userEvent.paste("```markdown\n# Pasted text\n```");
+    await userEvent.paste("before\n\n```markdown\n# Pasted text\n```\n\nafter");
     await expect(editor).toHaveTextContent("# Pasted text");
+    await expect(editor.textContent).toBe("before\n\n# Pasted text\n\nafter");
     await expect(editor.querySelector("code")).toBeNull();
+  },
+};
+
+/** Visual undo and redo story. */
+export const VisualHistory: Story = {
+  /**
+   * Verifies visual edits can be undone and redone.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after assertions complete.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const editor = await canvas.findByRole("textbox", {
+      name: "Description",
+    });
+    await userEvent.type(editor, "Undo me");
+    await expect(editor).toHaveTextContent("Undo me");
+    await userEvent.keyboard("{Meta>}z{/Meta}");
+    await expect(editor).not.toHaveTextContent("Undo me");
+    await userEvent.keyboard("{Meta>}{Shift>}z{/Shift}{/Meta}");
+    await expect(editor).toHaveTextContent("Undo me");
   },
 };
 
