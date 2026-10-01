@@ -18,13 +18,16 @@ import {
 import { maker, material, productType } from "./scraper.js";
 import { user } from "./users.js";
 
+/** Roles allowed to soft-delete catalog images. */
 export const catalogDeletionRoles = ["owner", "admin"] as const;
+/** Catalog entity types that can own an image. */
 export const catalogImageTargetTypes = [
   "product",
   "collection",
   "collection_item",
 ] as const;
 
+/** Named collections owned by application users. */
 export const userCollection = pgTable(
   "user_collection",
   {
@@ -69,6 +72,7 @@ export const userCollection = pgTable(
   ],
 );
 
+/** Owned catalog items stored in user collections. */
 export const collectionItem = pgTable(
   "collection_item",
   {
@@ -130,6 +134,7 @@ export const collectionItem = pgTable(
   ],
 );
 
+/** Ordered images attached to a user collection. */
 export const collectionImage = pgTable(
   "collection_image",
   {
@@ -172,6 +177,7 @@ export const collectionImage = pgTable(
   ],
 );
 
+/** Canonical catalog products associated with a maker and classified by product type. */
 export const product = pgTable(
   "product",
   {
@@ -218,6 +224,7 @@ export const product = pgTable(
   ],
 );
 
+/** Ordered images attached to a catalog product. */
 export const productImage = pgTable(
   "product_image",
   {
@@ -267,6 +274,7 @@ export const productImage = pgTable(
   ],
 );
 
+/** Ordered images attached to one collection item. */
 export const collectionItemImage = pgTable(
   "collection_item_image",
   {
@@ -316,6 +324,7 @@ export const collectionItemImage = pgTable(
   ],
 );
 
+/** Material assignments for catalog products. */
 export const productMaterial = pgTable(
   "product_material",
   {
@@ -329,6 +338,11 @@ export const productMaterial = pgTable(
   (table) => [primaryKey({ columns: [table.productId, table.materialId] })],
 );
 
+/**
+ * Builds shared identity and timestamp columns for catalog lookup tables.
+ *
+ * @returns Drizzle column builders for a named, slugged lookup row.
+ */
 const lookupColumns = () => ({
   id: bigint("id", { mode: "number" })
     .primaryKey()
@@ -343,6 +357,7 @@ const lookupColumns = () => ({
     .notNull(),
 });
 
+/** Canonical catalog finishes. */
 export const finish = pgTable("finish", lookupColumns(), (table) => [
   uniqueIndex("finish_name_case_insensitive_unique").on(
     sql`lower(${table.name})`,
@@ -350,6 +365,7 @@ export const finish = pgTable("finish", lookupColumns(), (table) => [
   uniqueIndex("finish_slug_unique").on(table.slug),
 ]);
 
+/** Canonical catalog colors. */
 export const color = pgTable(
   "color",
   {
@@ -365,10 +381,12 @@ export const color = pgTable(
   ],
 );
 
+/** Canonical catalog color effects. */
 export const colorEffect = pgTable("color_effect", lookupColumns(), (table) => [
   uniqueIndex("color_effect_slug_unique").on(table.slug),
 ]);
 
+/** Named finish combinations for a catalog product or collection item. */
 export const finishOption = pgTable(
   "finish_option",
   {
@@ -407,6 +425,7 @@ export const finishOption = pgTable(
   ],
 );
 
+/** Finish membership in a finish option. */
 export const finishOptionFinish = pgTable(
   "finish_option_finish",
   {
@@ -428,6 +447,7 @@ export const finishOptionFinish = pgTable(
   ],
 );
 
+/** Color membership in a finish option. */
 export const finishOptionColor = pgTable(
   "finish_option_color",
   {
@@ -449,6 +469,7 @@ export const finishOptionColor = pgTable(
   ],
 );
 
+/** Spinner-specific measurements for catalog products. */
 export const productSpinner = pgTable(
   "product_spinner",
   {
@@ -487,6 +508,7 @@ export const productSpinner = pgTable(
   ],
 );
 
+/** Spinner-button measurements for catalog products. */
 export const productSpinnerButton = pgTable(
   "product_spinner_button",
   {
@@ -511,6 +533,7 @@ export const productSpinnerButton = pgTable(
   ],
 );
 
+/** Catalog spinner-button mappings selected for collection items. */
 export const collectionSpinnerButton = pgTable("collection_spinner_button", {
   id: bigint("id", { mode: "number" })
     .primaryKey()
@@ -522,6 +545,7 @@ export const collectionSpinnerButton = pgTable("collection_spinner_button", {
     .references(() => productSpinnerButton.id, { onDelete: "restrict" }),
 });
 
+/** Catalog spinner mappings and installed-button overrides for collection items. */
 export const collectionSpinner = pgTable(
   "collection_spinner",
   {
@@ -547,39 +571,73 @@ export const collectionSpinner = pgTable(
   ],
 );
 
+/** Stored collection item row. */
 export type CollectionItem = typeof collectionItem.$inferSelect;
+/** Values accepted when creating a collection item row. */
 export type NewCollectionItem = typeof collectionItem.$inferInsert;
+/** Stored collection image row. */
 export type CollectionImage = typeof collectionImage.$inferSelect;
+/** Values accepted when creating a collection image row. */
 export type NewCollectionImage = typeof collectionImage.$inferInsert;
+/** Stored user collection row. */
 export type UserCollection = typeof userCollection.$inferSelect;
+/** Values accepted when creating a user collection row. */
 export type NewUserCollection = typeof userCollection.$inferInsert;
+/** Stored product row. */
 export type Product = typeof product.$inferSelect;
+/** Values accepted when creating a product row. */
 export type NewProduct = typeof product.$inferInsert;
+/** Stored product image row. */
 export type ProductImage = typeof productImage.$inferSelect;
+/** Values accepted when creating a product image row. */
 export type NewProductImage = typeof productImage.$inferInsert;
+/** Stored collection item image row. */
 export type CollectionItemImage = typeof collectionItemImage.$inferSelect;
+/** Values accepted when creating a collection item image row. */
 export type NewCollectionItemImage = typeof collectionItemImage.$inferInsert;
+/** Stored product material row. */
 export type ProductMaterial = typeof productMaterial.$inferSelect;
+/** Values accepted when creating a product material row. */
 export type NewProductMaterial = typeof productMaterial.$inferInsert;
+/** Stored finish row. */
 export type Finish = typeof finish.$inferSelect;
+/** Values accepted when creating a finish row. */
 export type NewFinish = typeof finish.$inferInsert;
+/** Stored color row. */
 export type Color = typeof color.$inferSelect;
+/** Values accepted when creating a color row. */
 export type NewColor = typeof color.$inferInsert;
+/** Stored color effect row. */
 export type ColorEffect = typeof colorEffect.$inferSelect;
+/** Values accepted when creating a color effect row. */
 export type NewColorEffect = typeof colorEffect.$inferInsert;
+/** Stored finish option row. */
 export type FinishOption = typeof finishOption.$inferSelect;
+/** Values accepted when creating a finish option row. */
 export type NewFinishOption = typeof finishOption.$inferInsert;
+/** Stored finish option finish row. */
 export type FinishOptionFinish = typeof finishOptionFinish.$inferSelect;
+/** Values accepted when creating a finish option finish row. */
 export type NewFinishOptionFinish = typeof finishOptionFinish.$inferInsert;
+/** Stored finish option color row. */
 export type FinishOptionColor = typeof finishOptionColor.$inferSelect;
+/** Values accepted when creating a finish option color row. */
 export type NewFinishOptionColor = typeof finishOptionColor.$inferInsert;
+/** Stored product spinner row. */
 export type ProductSpinner = typeof productSpinner.$inferSelect;
+/** Values accepted when creating a product spinner row. */
 export type NewProductSpinner = typeof productSpinner.$inferInsert;
+/** Stored product spinner button row. */
 export type ProductSpinnerButton = typeof productSpinnerButton.$inferSelect;
+/** Values accepted when creating a product spinner button row. */
 export type NewProductSpinnerButton = typeof productSpinnerButton.$inferInsert;
+/** Stored collection spinner row. */
 export type CollectionSpinner = typeof collectionSpinner.$inferSelect;
+/** Values accepted when creating a collection spinner row. */
 export type NewCollectionSpinner = typeof collectionSpinner.$inferInsert;
+/** Stored collection spinner button row. */
 export type CollectionSpinnerButton =
   typeof collectionSpinnerButton.$inferSelect;
+/** Values accepted when creating a collection spinner button row. */
 export type NewCollectionSpinnerButton =
   typeof collectionSpinnerButton.$inferInsert;

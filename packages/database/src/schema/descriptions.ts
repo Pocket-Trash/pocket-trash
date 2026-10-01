@@ -1,11 +1,16 @@
+/** Human-readable documentation for one database table. */
 export type SchemaDescription = {
+  /** Documentation keyed by PostgreSQL column name. */
   columns?: Record<
     string,
     {
+      /** Human-readable column semantics. */
       description?: string;
+      /** Representative value shown in generated documentation. */
       example?: unknown;
     }
   >;
+  /** Human-readable table purpose. */
   description?: string;
 };
 
