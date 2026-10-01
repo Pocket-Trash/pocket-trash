@@ -3,6 +3,9 @@ import { expect } from "storybook/test";
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { ResourceCard, type ResourceCardItem } from "./resource-card";
 
+/**
+ * Public single-file resource shared by the card stories.
+ */
 const resource = {
   canEdit: false,
   categories: [{ id: 1, name: "3D printing", slug: "3d-printing" }],
@@ -24,6 +27,9 @@ const resource = {
   uploaderUsername: "roy",
 } satisfies ResourceCardItem;
 
+/**
+ * Configures Storybook coverage for the resource card examples.
+ */
 const meta = {
   args: { resource },
   component: ResourceCard,
@@ -40,9 +46,21 @@ const meta = {
 } satisfies Meta<typeof ResourceCard>;
 
 export default meta;
+/**
+ * Storybook story contract for the resource card examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Defines the directory resource card story.
+ */
 export const Directory: Story = {
+  /**
+   * Exercises the resource card story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   */
   play: async ({ canvas }) => {
     await expect(
       canvas.getByRole("heading", { name: "Spinner model" }),
@@ -53,10 +71,16 @@ export const Directory: Story = {
   },
 };
 
+/**
+ * Defines the editable resource card story.
+ */
 export const Editable: Story = {
   args: { resource: { ...resource, canEdit: true } },
 };
 
+/**
+ * Defines the multi file resource card story.
+ */
 export const MultiFile: Story = {
   args: {
     resource: {
@@ -64,6 +88,12 @@ export const MultiFile: Story = {
       currentVersion: { ...resource.currentVersion, fileCount: 2 },
     },
   },
+  /**
+   * Exercises the resource card story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   */
   play: async ({ canvas }) => {
     await expect(
       canvas.getByRole("button", { name: "Download" }),
@@ -71,6 +101,9 @@ export const MultiFile: Story = {
   },
 };
 
+/**
+ * Defines the private without cover resource card story.
+ */
 export const PrivateWithoutCover: Story = {
   args: {
     resource: {
@@ -83,6 +116,9 @@ export const PrivateWithoutCover: Story = {
   },
 };
 
+/**
+ * Defines the owned resource card story.
+ */
 export const Owned: Story = {
   args: { mode: "owned" },
 };

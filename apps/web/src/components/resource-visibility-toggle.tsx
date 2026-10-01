@@ -14,13 +14,36 @@ import {
 import { markResourcePrivate, setResourceVisibility } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Renders a localized switch for controlled public-resource state.
+ *
+ * @param props - Public resource switch properties.
+ * @param props.checked - Whether the resource is public.
+ * @param props.disabled - Whether interaction is disabled.
+ * @param props.onCheckedChange - Receives public-state changes.
+ * @returns The public-resource switch UI.
+ * @throws {Error} When rendered outside `LocaleProvider`.
+ */
 export function PublicResourceSwitch({
   checked,
   disabled = false,
   onCheckedChange,
 }: {
+  /**
+   * Whether the resource is public.
+   */
   checked: boolean;
+  /**
+   * Whether interaction is disabled.
+   *
+   * @default false
+   */
   disabled?: boolean;
+  /**
+   * Reports public-state changes.
+   *
+   * @param checked - Whether the resource should be public.
+   */
   onCheckedChange(checked: boolean): void;
 }) {
   const id = useId();
@@ -50,10 +73,11 @@ export function PublicResourceSwitch({
 }
 
 /**
- * Renders owner and staff resource visibility controls.
+ * Renders owner and staff resource visibility controls with moderation-reason flows.
  *
  * @param props - Resource visibility state and permissions.
  * @returns The resource visibility control.
+ * @throws {Error} When rendered outside `LocaleProvider`.
  */
 export function ResourceVisibilityToggle({
   canAdminister,
@@ -63,11 +87,29 @@ export function ResourceVisibilityToggle({
   name,
   resourceId,
 }: {
+  /**
+   * Whether the viewer may moderate another user's resource.
+   */
   canAdminister: boolean;
+  /**
+   * Whether staff forced the resource private.
+   */
   isAdminPrivate: boolean;
+  /**
+   * Whether the viewer owns the resource.
+   */
   isOwner: boolean;
+  /**
+   * Initial private-resource state.
+   */
   isPrivate: boolean;
+  /**
+   * Resource name shown in moderation feedback.
+   */
   name: string;
+  /**
+   * Resource identifier sent to visibility mutations.
+   */
   resourceId: number;
 }) {
   const { locale } = useLocale();
@@ -77,6 +119,13 @@ export function ResourceVisibilityToggle({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const locked = isAdminPrivate && isOwner && !canAdminister;
+  /**
+   * Formats visibility and moderation copy for the active locale.
+   *
+   * @param key - Resource translation key.
+   * @param params - Translation interpolation values.
+   * @returns Localized visibility or moderation text.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -86,7 +135,9 @@ export function ResourceVisibilityToggle({
    * Applies a visibility change or opens the staff moderation dialog.
    *
    * @param nextPublic - Whether the resource should be public.
-   * @returns A promise that resolves after the change is handled.
+   * Mutation failures are reported by toast and do not reject the returned promise.
+   *
+   * @returns A promise that resolves after the change is handled or canceled.
    */
   async function updateVisibility(nextPublic: boolean) {
     if (!nextPublic && canAdminister && !isOwner) {
@@ -116,6 +167,10 @@ export function ResourceVisibilityToggle({
     }
   }
 
+  /**
+   * Marks the resource private with the entered staff reason.
+   * Missing reasons and mutation failures are reported by toast.
+   */
   async function submitAdminPrivate() {
     if (!reason.trim()) {
       toast.error(t("web.resources.moderation.reasonRequired"));

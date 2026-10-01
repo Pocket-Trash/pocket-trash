@@ -6,10 +6,28 @@ import { Input } from "@/components/ui/input";
 import { appendResourceUploadFiles } from "@/lib/upload-sessions";
 import { cn } from "@/lib/utils";
 
+/**
+ * Comma-separated browser accept list derived from supported resource extensions.
+ */
 const acceptedResourceFiles = Object.keys(resourceMimeTypesByExtension).join(
   ",",
 );
 
+/**
+ * Renders a multi-file resource picker that appends additions and removes by index.
+ *
+ * @param props - Resource file input properties.
+ * @param props.browseLabel - Label for opening the native file browser.
+ * @param props.description - Guidance associated with the input.
+ * @param props.disabled - Whether interaction is disabled.
+ * @param props.fileTypes - Human-readable supported file types.
+ * @param props.files - Current selected files.
+ * @param props.id - Native input ID.
+ * @param props.label - Visible and accessible input label.
+ * @param props.onFilesChange - Receives the updated file list.
+ * @param props.removeFileLabel - Accessible label prefix for removing a file.
+ * @returns The resource file-picker UI.
+ */
 export function ResourceFileInput({
   browseLabel,
   description,
@@ -21,14 +39,43 @@ export function ResourceFileInput({
   onFilesChange,
   removeFileLabel,
 }: {
+  /**
+   * Label for opening the native file browser.
+   */
   browseLabel: string;
+  /**
+   * Guidance associated with the input.
+   */
   description: string;
+  /**
+   * Whether interaction is disabled.
+   */
   disabled?: boolean;
+  /**
+   * Human-readable supported file types.
+   */
   fileTypes: string;
+  /**
+   * Current selected files.
+   */
   files: File[];
+  /**
+   * Native input ID.
+   */
   id: string;
+  /**
+   * Visible and accessible input label.
+   */
   label: string;
+  /**
+   * Reports the updated resource file list.
+   *
+   * @param files - Current files with additions appended or one item removed.
+   */
   onFilesChange(files: File[]): void;
+  /**
+   * Accessible label prefix for removing a file.
+   */
   removeFileLabel: string;
 }) {
   return (
@@ -53,6 +100,28 @@ export function ResourceFileInput({
   );
 }
 
+/**
+ * Renders a native file input with drag-and-drop, selection display, and optional aspect-ratio guidance.
+ *
+ * @param props - File drop input properties.
+ * @param props.accept - Native file-picker accept value.
+ * @param props.aspectRatio - Expected width-to-height ratio used for guidance.
+ * @param props.aspectRatioHelpHref - Help URL shown with an aspect-ratio warning.
+ * @param props.aspectRatioHelpLabel - Accessible help-link label.
+ * @param props.aspectRatioWarning - Warning shown when a selected image differs from the expected ratio.
+ * @param props.browseLabel - Label for opening the native file browser.
+ * @param props.description - Guidance associated with the input.
+ * @param props.disabled - Whether interaction is disabled.
+ * @param props.fileTypes - Human-readable supported file types.
+ * @param props.files - Current selected files.
+ * @param props.id - Native input ID and description-ID prefix.
+ * @param props.label - Visible and accessible input label.
+ * @param props.multiple - Whether one interaction may add multiple files.
+ * @param props.onFilesChange - Receives newly selected files.
+ * @param props.onRemove - Receives the index of a file to remove.
+ * @param props.removeFileLabel - Accessible label prefix for removing a file.
+ * @returns The file drop-input UI.
+ */
 export function FileDropInput({
   accept,
   aspectRatio,
@@ -71,21 +140,75 @@ export function FileDropInput({
   onRemove,
   removeFileLabel,
 }: {
+  /**
+   * Native file-picker accept value.
+   */
   accept: string;
+  /**
+   * Expected width-to-height ratio used for guidance.
+   */
   aspectRatio?: number;
+  /**
+   * Help URL shown with an aspect-ratio warning.
+   */
   aspectRatioHelpHref?: string;
+  /**
+   * Accessible help-link label.
+   */
   aspectRatioHelpLabel?: string;
+  /**
+   * Warning shown when a selected image differs from the expected ratio.
+   */
   aspectRatioWarning?: string;
+  /**
+   * Label for opening the native file browser.
+   */
   browseLabel: string;
+  /**
+   * Guidance associated with the input.
+   */
   description: string;
+  /**
+   * Whether interaction is disabled.
+   */
   disabled?: boolean;
+  /**
+   * Human-readable supported file types.
+   */
   fileTypes: string;
+  /**
+   * Current selected files.
+   */
   files: File[];
+  /**
+   * Native input ID and description-ID prefix.
+   */
   id: string;
+  /**
+   * Visible and accessible input label.
+   */
   label: string;
+  /**
+   * Whether one interaction may add multiple files.
+   *
+   * @default false
+   */
   multiple?: boolean;
+  /**
+   * Reports files selected by browsing or dropping.
+   *
+   * @param files - All additions, or only the first addition in single-file mode.
+   */
   onFilesChange(files: File[]): void;
+  /**
+   * Requests removal of one selected file.
+   *
+   * @param index - Zero-based index in `files`.
+   */
   onRemove(index: number): void;
+  /**
+   * Accessible label prefix for removing a file.
+   */
   removeFileLabel: string;
 }) {
   const descriptionId = `${id}-description`;
@@ -110,6 +233,11 @@ export function FileDropInput({
     };
   }, [aspectRatio, files]);
 
+  /**
+   * Reports enabled file additions according to the single- or multi-file mode.
+   *
+   * @param additions - Files chosen through the browser or drop target.
+   */
   function addFiles(additions: Iterable<File>) {
     if (!disabled) {
       onFilesChange(multiple ? [...additions] : [...additions].slice(0, 1));
@@ -226,6 +354,14 @@ export function FileDropInput({
   );
 }
 
+/**
+ * Checks whether a readable image differs from an expected aspect ratio.
+ * Unreadable files are treated as matching so guidance never blocks selection.
+ *
+ * @param file - Browser file to inspect.
+ * @param expectedRatio - Expected width-to-height ratio.
+ * @returns Whether the readable image differs beyond the configured tolerance.
+ */
 export async function imageHasDifferentAspectRatio(
   file: File,
   expectedRatio: number,
@@ -233,7 +369,13 @@ export async function imageHasDifferentAspectRatio(
   const url = URL.createObjectURL(file);
   try {
     const { height, width } = await new Promise<{
+      /**
+       * Natural image height in pixels.
+       */
       height: number;
+      /**
+       * Natural image width in pixels.
+       */
       width: number;
     }>((resolve, reject) => {
       const image = new Image();
@@ -250,6 +392,14 @@ export async function imageHasDifferentAspectRatio(
   }
 }
 
+/**
+ * Tests a width and height against an expected aspect ratio with a 0.01 tolerance.
+ *
+ * @param width - Image width in pixels.
+ * @param height - Image height in pixels.
+ * @param expectedRatio - Expected width-to-height ratio.
+ * @returns Whether the absolute ratio difference exceeds `0.01`.
+ */
 export function aspectRatioDiffers(
   width: number,
   height: number,
