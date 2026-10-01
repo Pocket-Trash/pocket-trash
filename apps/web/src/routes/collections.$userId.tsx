@@ -12,7 +12,7 @@ export const Route = createFileRoute("/collections/$userId")({
      *
      * @param context - Route callback context.
      * @param context.userId - User identifier.
-     * @returns The numeric user identifier.
+     * @returns Route parameters containing the numeric user identifier.
      */
     parse: ({ userId }) => ({ userId: Number(userId) }),
     /**
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/collections/$userId")({
      *
      * @param context - Route callback context.
      * @param context.userId - User identifier.
-     * @returns The user identifier serialized for the URL.
+     * @returns Route parameters containing the user identifier serialized for the URL.
      */
     stringify: ({ userId }) => ({ userId: String(userId) }),
   },

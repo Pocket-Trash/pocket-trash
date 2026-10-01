@@ -13,7 +13,7 @@ export const Route = createFileRoute("/collections/edit/$collectionItemId")({
      *
      * @param context - Route callback context.
      * @param context.collectionItemId - Collection item identifier.
-     * @returns The numeric collection-item identifier.
+     * @returns Route parameters containing the numeric collection-item identifier.
      */
     parse: ({ collectionItemId }) => ({
       collectionItemId: Number(collectionItemId),
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/collections/edit/$collectionItemId")({
      *
      * @param context - Route callback context.
      * @param context.collectionItemId - Collection item identifier.
-     * @returns The collection-item identifier serialized for the URL.
+     * @returns Route parameters containing the collection-item identifier serialized for the URL.
      */
     stringify: ({ collectionItemId }) => ({
       collectionItemId: String(collectionItemId),

@@ -15,7 +15,7 @@ export const Route = createFileRoute(
      * Validates the editable product type and product slugs.
      *
      * @param params - Serialized route parameters.
-     * @returns The validated product type and product slugs.
+     * @returns Route parameters containing the validated product type and product slugs.
      * @throws When either slug has an invalid format.
      */
     parse: (params) => {
