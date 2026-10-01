@@ -179,7 +179,21 @@ test("@mutation collection covers survive failures and retain reusable history",
       throw new Error("The collection cover history was not retained.");
     }
 
-    await page.getByRole("button", { name: "Use this cover" }).click();
+    const originalGalleryItem = page.getByRole("listitem").filter({
+      has: page.getByRole("button", {
+        name: `Delete image ${original.fileName}`,
+      }),
+    });
+    const replacementGalleryItem = page.getByRole("listitem").filter({
+      has: page.getByRole("button", {
+        name: `Delete image ${replacement.fileName}`,
+      }),
+    });
+
+    await replacementGalleryItem
+      .getByRole("button", { name: "Use this cover" })
+      .click();
+    await expect(replacementGalleryItem).toHaveCount(0);
     await expect
       .poll(async () => {
         const [current] = await database
@@ -195,14 +209,10 @@ test("@mutation collection covers survive failures and retain reusable history",
       })
       .toBe(replacement.id);
 
-    const originalGalleryItem = page.getByRole("listitem").filter({
-      has: page.getByRole("button", {
-        name: `Delete image ${original.fileName}`,
-      }),
-    });
     await originalGalleryItem
       .getByRole("button", { name: "Use this cover" })
       .click();
+    await expect(originalGalleryItem).toHaveCount(0);
     await expect
       .poll(async () => {
         const [current] = await database
@@ -260,7 +270,10 @@ test("@mutation collection covers survive failures and retain reusable history",
       page.getByRole("button", { name: "Use this cover" }),
     ).toHaveCount(2);
 
-    await page.getByRole("button", { name: "Use this cover" }).first().click();
+    await replacementGalleryItem
+      .getByRole("button", { name: "Use this cover" })
+      .click();
+    await expect(replacementGalleryItem).toHaveCount(0);
     await expect
       .poll(async () => {
         const [current] = await database

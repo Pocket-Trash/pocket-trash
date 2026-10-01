@@ -358,11 +358,13 @@ async function archiveCollection(page: Page, collection: CollectionScenario) {
  * @returns When the destination is selected.
  */
 async function selectCollection(page: Page, name: string) {
-  await page
+  const input = page
     .getByRole("combobox", { name: "Destination collection" })
-    .and(page.locator("input"))
-    .click();
-  await page.getByRole("option", { exact: true, name }).click();
+    .and(page.locator("input"));
+  await input.fill(name);
+  await input.press("ArrowDown");
+  await input.press("Enter");
+  await expect(input).toHaveValue(name);
 }
 
 /**
