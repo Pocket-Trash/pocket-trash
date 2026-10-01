@@ -38,35 +38,45 @@ test("admins can open the admin route", async ({ page, signInAs }) => {
   ).toBeVisible();
 });
 
-test("@mutation regular user settings persist after reload", async ({
+test("@mutation regular user theme persists after reload", async ({
   page,
   signInAs,
 }) => {
   await signInAs("regular");
   await page.goto("/user/settings");
 
-  const millimeters = page.getByRole("button", { name: "Millimeters" });
-  const inches = page.getByRole("button", { name: "Inches" });
-  const startedInMillimeters =
-    (await millimeters.getAttribute("aria-pressed")) === "true";
-  const originalUnit = startedInMillimeters ? millimeters : inches;
-  const nextUnit = startedInMillimeters ? inches : millimeters;
+  const themeGroup = page.getByRole("group", { name: "Theme" });
+  const selectedTheme = themeGroup.locator('[aria-pressed="true"]');
+  await expect(selectedTheme).toHaveCount(1);
+  const originalThemeName = await selectedTheme.getAttribute("aria-label");
+  if (
+    originalThemeName !== "Dark" &&
+    originalThemeName !== "Light" &&
+    originalThemeName !== "System"
+  ) {
+    throw new Error("No active theme was found.");
+  }
+
+  const originalTheme = page.getByRole("button", { name: originalThemeName });
+  const nextTheme = page.getByRole("button", {
+    name: originalThemeName === "Dark" ? "Light" : "Dark",
+  });
   let changed = false;
 
   try {
-    await nextUnit.click();
-    await expect(nextUnit).toBeDisabled();
-    await expect(nextUnit).toBeEnabled();
+    await nextTheme.click();
+    await expect(nextTheme).toBeDisabled();
+    await expect(nextTheme).toBeEnabled();
     changed = true;
 
     await page.reload();
-    await expect(nextUnit).toHaveAttribute("aria-pressed", "true");
+    await expect(nextTheme).toHaveAttribute("aria-pressed", "true");
   } finally {
     if (changed) {
       await page.goto("/user/settings");
-      await originalUnit.click();
-      await expect(originalUnit).toBeDisabled();
-      await expect(originalUnit).toBeEnabled();
+      await originalTheme.click();
+      await expect(originalTheme).toBeDisabled();
+      await expect(originalTheme).toBeEnabled();
     }
   }
 });
