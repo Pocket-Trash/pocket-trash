@@ -295,10 +295,24 @@ describe("runGrimsmoProducer", () => {
   });
 });
 
+/**
+ * Creates a Shopify-style JSON response for source tests.
+ *
+ * @param products - Shopify products to encode in the response.
+ *
+ * @returns A response containing a Shopify products payload.
+ */
 function jsonResponse(products: ShopifyProduct[]) {
   return new Response(JSON.stringify({ products }));
 }
 
+/**
+ * Creates a representative Shopify product with selected overrides.
+ *
+ * @param overrides - Shopify fields that replace fixture defaults.
+ *
+ * @returns A complete Shopify product fixture.
+ */
 function createProduct(overrides: Partial<ShopifyProduct>): ShopifyProduct {
   return {
     available: true,

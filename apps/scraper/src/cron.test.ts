@@ -146,8 +146,19 @@ describe("Railway scraper cron", () => {
   });
 });
 
+/**
+ * Creates a logger transport that appends emitted events to a test array.
+ *
+ * @param events - Mutable event array used by assertions.
+ * @returns A configured scraper test logger.
+ */
 function captureLogger(events: LogEvent[]) {
   const transport: LogTransport = {
+    /**
+     * Captures one emitted log event.
+     *
+     * @param event - Structured event to append.
+     */
     log(event) {
       events.push(event);
     },
@@ -160,6 +171,11 @@ function captureLogger(events: LogEvent[]) {
   });
 }
 
+/**
+ * Creates minimal scraper resources for cron orchestration tests.
+ *
+ * @returns A test scraper job context.
+ */
 function createContext(): ScraperJobContext {
   return {
     close: vi.fn(),
@@ -178,6 +194,11 @@ function createContext(): ScraperJobContext {
   };
 }
 
+/**
+ * Creates the scheduling values required by cron tests.
+ *
+ * @returns A partial validated job environment.
+ */
 function createEnv(): ScraperJobEnv {
   return {
     SCRAPER_AUTMOG_INTERVAL_MINUTES: 60,

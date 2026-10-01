@@ -7,20 +7,47 @@ import {
   scraperSourceKeys,
 } from "./jobs.js";
 
+/**
+ * Captured failure from one task in a Railway cron run.
+ */
 type CronTaskFailure = {
+  /**
+   * Structured task context recorded with the failure.
+   */
   attributes: Record<string, unknown>;
+  /**
+   * Normalized task error.
+   */
   error: Error;
 };
 
+/**
+ * Runs every source producer followed by queue processing for Railway cron.
+ * Task failures are logged and accumulated so later tasks still run.
+ *
+ * @param options - Job dependencies and optional schedule time.
+ */
 export async function runRailwayCronJob({
   context,
   env,
   logger,
   now = new Date(),
 }: {
+  /**
+   * Shared scraper resources.
+   */
   context: ScraperJobContext;
+  /**
+   * Validated scraper job configuration.
+   */
   env: ScraperJobEnv;
+  /**
+   * Logger for run and task lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Scheduled time recorded in logs; defaults to the current time.
+   */
   now?: Date;
 }) {
   const startedAt = Date.now();
@@ -41,6 +68,11 @@ export async function runRailwayCronJob({
       },
       failures,
       logger,
+      /**
+       * Runs the producer for the current source.
+       *
+       * @returns A promise that settles after the source producer finishes.
+       */
       run: () => runSourceProducerJob({ context, env, logger, source }),
     });
   }
@@ -71,6 +103,12 @@ export async function runRailwayCronJob({
   });
 }
 
+/**
+ * Resolves whether Railway cron should run in the current environment.
+ *
+ * @param env - Application environment and optional explicit cron override.
+ * @returns The override when supplied; otherwise `false` only for previews.
+ */
 export function shouldRunRailwayCron(
   env: Pick<ScraperJobEnv, "APP_ENV" | "SCRAPER_CRON_ENABLED">,
 ): boolean {
@@ -81,15 +119,32 @@ export function shouldRunRailwayCron(
   return env.APP_ENV !== "preview";
 }
 
+/**
+ * Runs queue processing as one captured cron task.
+ *
+ * @param options - Shared resources, configuration, logger, and failure accumulator.
+ */
 async function runQueueProcessor({
   context,
   env,
   failures,
   logger,
 }: {
+  /**
+   * Shared scraper resources.
+   */
   context: ScraperJobContext;
+  /**
+   * Validated scraper job configuration.
+   */
   env: ScraperJobEnv;
+  /**
+   * Mutable failure accumulator for the cron run.
+   */
   failures: CronTaskFailure[];
+  /**
+   * Logger for task lifecycle events.
+   */
   logger: Logger;
 }) {
   await runCronTask({
@@ -98,19 +153,43 @@ async function runQueueProcessor({
     },
     failures,
     logger,
+    /**
+     * Runs one queue-processing pass.
+     *
+     * @returns A promise that settles after queue processing finishes.
+     */
     run: () => runQueueProcessorJob({ context, env, logger }),
   });
 }
 
+/**
+ * Runs and logs one cron task without aborting the remaining cron run on failure.
+ *
+ * @param options - Task callback, log attributes, logger, and failure accumulator.
+ */
 async function runCronTask({
   attributes,
   failures,
   logger,
   run,
 }: {
+  /**
+   * Structured context attached to task logs.
+   */
   attributes: Record<string, unknown>;
+  /**
+   * Mutable accumulator that receives normalized failures.
+   */
   failures: CronTaskFailure[];
+  /**
+   * Logger for task lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Executes the cron task.
+   *
+   * @returns A promise that settles when the task finishes.
+   */
   run: () => Promise<void>;
 }) {
   const startedAt = Date.now();
@@ -147,6 +226,12 @@ async function runCronTask({
   }
 }
 
+/**
+ * Formats a captured task failure for aggregate cron log attributes.
+ *
+ * @param options - Captured task attributes and error.
+ * @returns Selected task fields and a serializable error chain.
+ */
 function formatCronTaskFailure({ attributes, error }: CronTaskFailure) {
   return {
     command: getStringAttribute(attributes, "command"),
@@ -158,9 +243,24 @@ function formatCronTaskFailure({ attributes, error }: CronTaskFailure) {
   };
 }
 
+/**
+ * Converts an error and its causes into serializable log attributes.
+ *
+ * @param error - Error-like value to serialize.
+ * @returns Error name, message, and recursively formatted cause.
+ */
 function formatErrorForAttributes(error: unknown): {
+  /**
+   * Recursively formatted error cause.
+   */
   cause?: ReturnType<typeof formatErrorForAttributes>;
+  /**
+   * Error message.
+   */
   message: string;
+  /**
+   * Error class name.
+   */
   name: string;
 } {
   if (!(error instanceof Error)) {
@@ -179,6 +279,13 @@ function formatErrorForAttributes(error: unknown): {
   };
 }
 
+/**
+ * Reads a numeric field from structured task attributes.
+ *
+ * @param attributes - Structured task attributes.
+ * @param key - Field to read.
+ * @returns The numeric value, or `undefined` when the field is not numeric.
+ */
 function getNumberAttribute(
   attributes: Record<string, unknown>,
   key: string,
@@ -186,6 +293,13 @@ function getNumberAttribute(
   return typeof attributes[key] === "number" ? attributes[key] : undefined;
 }
 
+/**
+ * Reads a string field from structured task attributes.
+ *
+ * @param attributes - Structured task attributes.
+ * @param key - Field to read.
+ * @returns The string value, or `undefined` when the field is not text.
+ */
 function getStringAttribute(
   attributes: Record<string, unknown>,
   key: string,

@@ -1,53 +1,184 @@
 import { createEnv, type StandardSchemaV1 } from "@t3-oss/env-core";
 import { z } from "zod";
 
+/**
+ * Unvalidated scraper environment values read from the process.
+ */
 export type ScraperRuntimeEnv = {
+  /**
+   * Application environment name.
+   */
   APP_ENV?: string;
+  /**
+   * Axiom dataset used for scraper logs.
+   */
   AXIOM_DATASET?: string;
+  /**
+   * Optional Axiom edge-ingestion domain.
+   */
   AXIOM_EDGE_DOMAIN?: string;
+  /**
+   * Axiom ingestion token.
+   */
   AXIOM_TOKEN?: string;
+  /**
+   * Bunny Storage API access key.
+   */
   BUNNY_STORAGE_ACCESS_KEY?: string;
+  /**
+   * Bunny Storage HTTP endpoint URL.
+   */
   BUNNY_STORAGE_ENDPOINT?: string;
+  /**
+   * Bunny Storage zone name.
+   */
   BUNNY_STORAGE_ZONE_NAME?: string;
+  /**
+   * PostgreSQL connection URL.
+   */
   DATABASE_URL?: string;
+  /**
+   * Public Bunny CDN base URL.
+   */
   BUNNY_CDN_BASE_URL?: string;
+  /**
+   * Deployment-scoped Bunny image object prefix.
+   */
   BUNNY_IMAGE_FOLDER_PREFIX?: string;
+  /**
+   * Image storage provider selector.
+   */
   IMAGE_STORAGE_PROVIDER?: string;
+  /**
+   * Console logger mode.
+   */
   LOGGER?: string;
+  /**
+   * Deployment identifier attached to logs.
+   */
   LOG_DEPLOYMENT_ID?: string;
+  /**
+   * Runtime target attached to logs.
+   */
   LOG_DEPLOYMENT_TARGET?: string;
+  /**
+   * Minimum emitted log level.
+   */
   LOG_LEVEL?: string;
+  /**
+   * HTTP port before numeric coercion.
+   */
   PORT?: string;
+  /**
+   * Railway environment used as deployment metadata.
+   */
   RAILWAY_ENVIRONMENT_NAME?: string;
+  /**
+   * Legacy Railway Redis connection URL.
+   */
   REDIS?: string;
+  /**
+   * Preferred Redis connection URL.
+   */
   REDIS_URL?: string;
+  /**
+   * Autmog scheduling interval in minutes before numeric coercion.
+   */
   SCRAPER_AUTMOG_INTERVAL_MINUTES?: string;
+  /**
+   * Autmog startup delay in seconds before numeric coercion.
+   */
   SCRAPER_AUTMOG_START_DELAY_SECONDS?: string;
+  /**
+   * Dry-run flag encoded as `"true"` or `"false"`.
+   */
   SCRAPER_DRY_RUN?: string;
+  /**
+   * Optional HTTP proxy URL for Grimsmo requests.
+   */
   GRIMSMO_PROXY_URL?: string;
+  /**
+   * Grimsmo Fjell startup delay in seconds before numeric coercion.
+   */
   SCRAPER_GRIMSMO_FJELL_START_DELAY_SECONDS?: string;
+  /**
+   * Grimsmo scheduling interval in minutes before numeric coercion.
+   */
   SCRAPER_GRIMSMO_INTERVAL_MINUTES?: string;
+  /**
+   * Grimsmo Norseman startup delay in seconds before numeric coercion.
+   */
   SCRAPER_GRIMSMO_NORSEMAN_START_DELAY_SECONDS?: string;
+  /**
+   * Grimsmo Rask startup delay in seconds before numeric coercion.
+   */
   SCRAPER_GRIMSMO_RASK_START_DELAY_SECONDS?: string;
+  /**
+   * Grimsmo Saga startup delay in seconds before numeric coercion.
+   */
   SCRAPER_GRIMSMO_SAGA_START_DELAY_SECONDS?: string;
+  /**
+   * Maximum image jobs handled per queue batch before numeric coercion.
+   */
   SCRAPER_IMAGE_BATCH_SIZE?: string;
+  /**
+   * Maximum item jobs handled per queue batch before numeric coercion.
+   */
   SCRAPER_ITEM_BATCH_SIZE?: string;
+  /**
+   * Queue processor scheduling interval in minutes before numeric coercion.
+   */
   SCRAPER_QUEUE_PROCESSOR_INTERVAL_MINUTES?: string;
+  /**
+   * Queue processor startup delay in seconds before numeric coercion.
+   */
   SCRAPER_QUEUE_PROCESSOR_START_DELAY_SECONDS?: string;
+  /**
+   * Concurrent queue worker count before numeric coercion.
+   */
   SCRAPER_QUEUE_CONCURRENCY?: string;
+  /**
+   * Optional Railway cron flag encoded as `"true"` or `"false"`.
+   */
   SCRAPER_CRON_ENABLED?: string;
+  /**
+   * Scheduler flag encoded as `"true"` or `"false"`.
+   */
   SCRAPER_SCHEDULER_ENABLED?: string;
 };
 
+/**
+ * One environment validation problem exposed to CLI callers.
+ */
 export type ScraperEnvValidationIssue = {
+  /**
+   * Human-readable validation message.
+   */
   message: string;
+  /**
+   * Environment variable responsible for the issue, or `"unknown"`.
+   */
   variable: string;
 };
 
+/**
+ * Reports every invalid scraper environment variable.
+ */
 export class ScraperEnvValidationError extends Error {
+  /**
+   * Formatted validation issues.
+   */
   readonly issues: readonly ScraperEnvValidationIssue[];
+  /**
+   * Unique invalid environment variable names.
+   */
   readonly variables: readonly string[];
 
+  /**
+   * Creates an environment validation error from standard-schema issues.
+   *
+   * @param issues - Validation issues returned by the environment schema.
+   */
   constructor(issues: readonly StandardSchemaV1.Issue[]) {
     const validationIssues = issues.map(formatValidationIssue);
     const variables = [
@@ -64,6 +195,9 @@ export class ScraperEnvValidationError extends Error {
   }
 }
 
+/**
+ * Environment schema shared by the HTTP server and job commands.
+ */
 const scraperServerSchema = {
   BUNNY_IMAGE_FOLDER_PREFIX: z
     .string()
@@ -84,6 +218,9 @@ const scraperServerSchema = {
     .transform((value) => value === "true"),
 } as const;
 
+/**
+ * Required Redis or TLS Redis URL schema.
+ */
 const redisUrlSchema = z
   .string()
   .min(1)
@@ -92,10 +229,23 @@ const redisUrlSchema = z
     message: "Invalid Redis URL",
   });
 
+/**
+ * Validates environment values required by the scraper HTTP server.
+ *
+ * @param runtimeEnv - Unvalidated process environment values.
+ * @returns Coerced server configuration with defaults applied.
+ * @throws {ScraperEnvValidationError} When one or more environment values are invalid.
+ */
 export function createScraperEnv(runtimeEnv: ScraperRuntimeEnv) {
   return createEnv({
     emptyStringAsUndefined: true,
     isServer: true,
+    /**
+     * Converts schema failures into the scraper-specific validation error.
+     *
+     * @param issues - Standard-schema validation issues.
+     * @throws {ScraperEnvValidationError} Always, with formatted variable details.
+     */
     onValidationError(issues) {
       throw new ScraperEnvValidationError(issues);
     },
@@ -104,10 +254,23 @@ export function createScraperEnv(runtimeEnv: ScraperRuntimeEnv) {
   });
 }
 
+/**
+ * Validates the complete environment required by scraper jobs.
+ *
+ * @param runtimeEnv - Unvalidated process environment values.
+ * @returns Coerced job configuration with bounded scheduling defaults.
+ * @throws {ScraperEnvValidationError} When one or more environment values are invalid.
+ */
 export function createScraperJobEnv(runtimeEnv: ScraperRuntimeEnv) {
   return createEnv({
     emptyStringAsUndefined: true,
     isServer: true,
+    /**
+     * Converts schema failures into the scraper-specific validation error.
+     *
+     * @param issues - Standard-schema validation issues.
+     * @throws {ScraperEnvValidationError} Always, with formatted variable details.
+     */
     onValidationError(issues) {
       throw new ScraperEnvValidationError(issues);
     },
@@ -208,6 +371,12 @@ export function createScraperJobEnv(runtimeEnv: ScraperRuntimeEnv) {
   });
 }
 
+/**
+ * Maps supported runtime inputs to the exact environment schema keys.
+ *
+ * @param runtimeEnv - Unvalidated process environment values.
+ * @returns Strict runtime values, with the preferred valid Redis URL selected.
+ */
 function getScraperRuntimeEnvStrict(runtimeEnv: ScraperRuntimeEnv) {
   return {
     APP_ENV: runtimeEnv.APP_ENV,
@@ -255,6 +424,12 @@ function getScraperRuntimeEnvStrict(runtimeEnv: ScraperRuntimeEnv) {
   };
 }
 
+/**
+ * Selects a valid Redis URL while supporting Railway's legacy variable name.
+ *
+ * @param runtimeEnv - Runtime environment containing preferred and legacy Redis values.
+ * @returns The first valid URL, or the first supplied invalid value for schema reporting.
+ */
 function selectRedisUrl(runtimeEnv: ScraperRuntimeEnv): string | undefined {
   if (runtimeEnv.REDIS_URL && isRedisUrl(runtimeEnv.REDIS_URL)) {
     return runtimeEnv.REDIS_URL;
@@ -267,6 +442,12 @@ function selectRedisUrl(runtimeEnv: ScraperRuntimeEnv): string | undefined {
   return runtimeEnv.REDIS_URL ?? runtimeEnv.REDIS;
 }
 
+/**
+ * Checks whether a string is a Redis or TLS Redis URL.
+ *
+ * @param value - Candidate URL.
+ * @returns Whether the value parses with a `redis:` or `rediss:` protocol.
+ */
 function isRedisUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -276,6 +457,12 @@ function isRedisUrl(value: string): boolean {
   }
 }
 
+/**
+ * Converts a standard-schema issue to the scraper's public issue shape.
+ *
+ * @param issue - Standard-schema validation issue.
+ * @returns The issue message and owning environment variable.
+ */
 function formatValidationIssue(
   issue: StandardSchemaV1.Issue,
 ): ScraperEnvValidationIssue {
@@ -285,6 +472,12 @@ function formatValidationIssue(
   };
 }
 
+/**
+ * Extracts an environment variable name from a validation issue path.
+ *
+ * @param issue - Standard-schema validation issue.
+ * @returns The first path key, or `"unknown"` when no key exists.
+ */
 function getIssueVariable(issue: StandardSchemaV1.Issue): string {
   const [firstPathSegment] = issue.path ?? [];
 

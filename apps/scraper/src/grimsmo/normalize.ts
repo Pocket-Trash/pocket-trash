@@ -16,10 +16,22 @@ import {
   getGrimsmoSourceDefinition,
 } from "./source.js";
 
+/**
+ * Pattern that extracts a numbered Saga identifier.
+ */
 const sagaNumberPattern = /#\s*(\d+)/;
+/**
+ * Pattern that extracts a numbered Grimsmo knife identifier.
+ */
 const knifeNumberPattern = /#\s*(\d+)/;
+/**
+ * Pattern that extracts HTML list-item contents.
+ */
 const listItemPattern = /<li[^>]*>(.*?)<\/li>/gis;
 
+/**
+ * Ordered patterns that classify Saga description bullets.
+ */
 const bulletClassifiers = [
   ["book", /\bpocket book\b|\bbook included\b/i],
   ["foam", /\bfoam insert\b/i],
@@ -41,6 +53,9 @@ const bulletClassifiers = [
   ["body", /\bbody\b.*\b(tip|clip)\b|\b(tip|clip)\b.*\bbody\b/i],
 ] as const;
 
+/**
+ * Known Grimsmo finish labels and their source-text patterns.
+ */
 const bodyFinishes = [
   ["Stonewashed", /\bStonewash(?:ed)?\b/i],
   ["Blasted", /\bBlasted\b/i],
@@ -53,6 +68,9 @@ const bodyFinishes = [
   ["Plain", /^Titanium Body/i],
 ] as const;
 
+/**
+ * Known Grimsmo color labels and their source-text patterns.
+ */
 const colors = [
   ["Black", /\bBlack\b/i],
   ["Plum", /\bPlum\b/i],
@@ -70,6 +88,9 @@ const colors = [
   ["Rainbow", /\bRainbow\b/i],
 ] as const;
 
+/**
+ * Known Grimsmo material labels and their source-text patterns.
+ */
 const materials = [
   ["Titanium", /\bTitanium\b/i],
   ["Bronze", /\bBronze\b/i],
@@ -82,6 +103,9 @@ const materials = [
   ["M2 Stainless", /\bM2 Stainless\b/i],
 ] as const;
 
+/**
+ * Known Saga slider style labels and their source-text patterns.
+ */
 const sliderStyles = [
   ["Helix", /\bHelix\b/i],
   ["Crosshatch", /\bCrosshatch\b|\bCross[\s-]?hatch\b/i],
@@ -89,6 +113,9 @@ const sliderStyles = [
   ["Plain", /\bSlider\b/i],
 ] as const;
 
+/**
+ * Known pen refill labels and their source-text patterns.
+ */
 const refills = [
   ["Schmidt P900F", /SCHMIDT\s*P900F?|Schmidt\s*P900/i],
   ["Schmidt", /\bSchmidt\b/i],
@@ -99,6 +126,9 @@ const refills = [
   ["Pentel EnerGel", /\bPentel\s*EnerGel\b/i],
 ] as const;
 
+/**
+ * Known Grimsmo case labels and their source-text patterns.
+ */
 const cases = [
   ["Algonquin Green", /\bAlgonquin\b/i],
   ["Bisaro Black", /\bBisaro\b/i],
@@ -110,6 +140,9 @@ const cases = [
   ["Other Case", /carrying case/i],
 ] as const;
 
+/**
+ * Known button engraving labels and their source-text patterns.
+ */
 const engraving = [
   [
     "Grimsmo Logo",
@@ -121,6 +154,9 @@ const engraving = [
   ],
 ] as const;
 
+/**
+ * Known Saga tip-logo labels and their source-text patterns.
+ */
 const tipLogo = [
   ["Grimsmo Logo", /Grimsmo\s+Logos?\s+on\s+the\s+Tip/i],
   [
@@ -129,11 +165,17 @@ const tipLogo = [
   ],
 ] as const;
 
+/**
+ * Known Grimsmo pocket-book labels and their source-text patterns.
+ */
 const books = [
   ["Grimsmo V2 Pocket Book", /V2\s+Pocket\s+Book/i],
   ["Grimsmo Pocket Book", /Pocket\s+Book/i],
 ] as const;
 
+/**
+ * Known Grimsmo knife pattern labels and their source-text patterns.
+ */
 const knifePatterns = [
   ["Starburst", /\bStarburst\b/i],
   ["Streamline", /\bStreamline\b/i],
@@ -142,20 +184,42 @@ const knifePatterns = [
   ["Honeycomb", /\bHoneycomb\b/i],
 ] as const;
 
+/**
+ * Known blade steel labels and their source-text patterns.
+ */
 const bladeSteels = [
   ["RWL 34", /\bRWL\s*34\b/i],
   ["CPM 154", /\bCPM\s*154\b/i],
   ["AEB-L", /\bAEB-L\b/i],
 ] as const;
 
+/**
+ * Known Grimsmo knife mechanism labels and their source-text patterns.
+ */
 const mechanisms = [
   ["Button Lock", /\bButton Lock\b/i],
   ["Lock Bar Insert", /\bLock Bar Insert\b/i],
 ] as const;
 
+/**
+ * Normalizes a Shopify listing into a Grimsmo Saga variation.
+ *
+ * @param input - Source product and collection metadata to normalize.
+ *
+ * @returns The normalized Saga variation and stable content hashes.
+ */
 export function normalizeGrimsmoPenVariation(input: {
+  /**
+   * Collection that supplied the product.
+   */
   collectionKind: GrimsmoCollectionKind;
+  /**
+   * Shopify product payload supplied by the source.
+   */
   product: ShopifyProduct;
+  /**
+   * Grimsmo scraper source identifier.
+   */
   source: typeof scraperSources.grimsmoSaga;
 }): NormalizedGrimsmoPenVariation {
   const productDefinition = getGrimsmoSourceDefinition(input.source);
@@ -237,9 +301,27 @@ export function normalizeGrimsmoPenVariation(input: {
   };
 }
 
+/**
+ * Normalizes a Shopify listing into a Grimsmo knife variation.
+ *
+ * @param input - Source product and collection metadata to normalize.
+ *
+ * @returns The normalized knife variation and stable content hashes.
+ *
+ * @throws When the supplied source is not a knife source.
+ */
 export function normalizeGrimsmoKnifeVariation(input: {
+  /**
+   * Collection that supplied the product.
+   */
   collectionKind: GrimsmoCollectionKind;
+  /**
+   * Shopify product payload supplied by the source.
+   */
   product: ShopifyProduct;
+  /**
+   * Grimsmo scraper source identifier.
+   */
   source:
     | typeof scraperSources.grimsmoFjell
     | typeof scraperSources.grimsmoNorseman
@@ -320,6 +402,13 @@ export function normalizeGrimsmoKnifeVariation(input: {
   };
 }
 
+/**
+ * Extracts concise feature bullets from list markup or dash-separated text.
+ *
+ * @param bodyHtml - Shopify description markup to inspect.
+ *
+ * @returns Normalized feature bullets, or an empty array when none are usable.
+ */
 export function extractBullets(bodyHtml: string): string[] {
   if (!bodyHtml) {
     return [];
@@ -344,6 +433,13 @@ export function extractBullets(bodyHtml: string): string[] {
     );
 }
 
+/**
+ * Groups Saga description bullets by their first matching classifier.
+ *
+ * @param bullets - Description bullets to group.
+ *
+ * @returns Source bullets keyed by Saga feature category.
+ */
 function classifyBullets(bullets: readonly string[]) {
   const classified: Record<string, string[]> = {};
 
@@ -359,6 +455,13 @@ function classifyBullets(bullets: readonly string[]) {
   return classified;
 }
 
+/**
+ * Groups knife description bullets by inferred feature category.
+ *
+ * @param bullets - Description bullets to group.
+ *
+ * @returns Source bullets keyed by knife feature category.
+ */
 function classifyKnifeBullets(bullets: readonly string[]) {
   const classified: Record<string, string[]> = {};
 
@@ -372,6 +475,13 @@ function classifyKnifeBullets(bullets: readonly string[]) {
   return classified;
 }
 
+/**
+ * Classifies one knife feature bullet by ordered text patterns.
+ *
+ * @param bullet - Description bullet to classify.
+ *
+ * @returns The inferred category, falling back to `other`.
+ */
 function getKnifeBulletCategory(bullet: string): string {
   if (/carrying case|\bNanuk\b/i.test(bullet)) {
     return "case";
@@ -404,6 +514,13 @@ function getKnifeBulletCategory(bullet: string): string {
   return "other";
 }
 
+/**
+ * Normalizes source images while preserving source order and identity.
+ *
+ * @param product - Shopify product to normalize or inspect.
+ *
+ * @returns Normalized image records in Shopify order.
+ */
 function normalizeImages(
   product: ShopifyProduct,
 ): GrimsmoVariationImageRecord[] {
@@ -432,6 +549,13 @@ function normalizeImages(
   });
 }
 
+/**
+ * Hashes the source identity and ordering of normalized images.
+ *
+ * @param images - Normalized source images in display order.
+ *
+ * @returns A deterministic hash of the normalized image set.
+ */
 function getImageSetHash(images: readonly GrimsmoVariationImageRecord[]) {
   return hashObject(
     images.map((image) => ({
@@ -443,6 +567,13 @@ function getImageSetHash(images: readonly GrimsmoVariationImageRecord[]) {
   );
 }
 
+/**
+ * Normalizes Shopify variants for persisted Grimsmo listings.
+ *
+ * @param product - Shopify product to normalize or inspect.
+ *
+ * @returns Normalized variant records in Shopify order.
+ */
 function normalizeVariants(product: ShopifyProduct): unknown[] {
   return product.variants.map((variant) => ({
     available: variant.available ?? null,
@@ -452,12 +583,26 @@ function normalizeVariants(product: ShopifyProduct): unknown[] {
   }));
 }
 
+/**
+ * Parses all valid Shopify variant prices into integer cents.
+ *
+ * @param product - Shopify product to normalize or inspect.
+ *
+ * @returns Valid variant prices in integer cents.
+ */
 function getVariantPriceCents(product: ShopifyProduct): number[] {
   return product.variants
     .map((variant) => parsePriceCents(variant.price))
     .filter((price): price is number => price !== null);
 }
 
+/**
+ * Parses a Shopify price into rounded integer cents.
+ *
+ * @param value - Shopify price value to parse.
+ *
+ * @returns Rounded integer cents, or `null` for an absent or non-finite price.
+ */
 function parsePriceCents(value: string | number | null | undefined) {
   if (value === null || value === undefined) {
     return null;
@@ -469,6 +614,13 @@ function parsePriceCents(value: string | number | null | undefined) {
   return Number.isFinite(numberValue) ? Math.round(numberValue * 100) : null;
 }
 
+/**
+ * Resolves availability from the product flag or any available variant.
+ *
+ * @param product - Shopify product to normalize or inspect.
+ *
+ * @returns The source availability flag or variant-derived fallback.
+ */
 function getAvailableForSale(product: ShopifyProduct) {
   return (
     product.available ??
@@ -476,6 +628,13 @@ function getAvailableForSale(product: ShopifyProduct) {
   );
 }
 
+/**
+ * Builds the stable parent product shared by Grimsmo variations.
+ *
+ * @param definition - Grimsmo product-family metadata.
+ *
+ * @returns The normalized parent product and details hash.
+ */
 function normalizeGrimsmoProduct(
   definition: ReturnType<typeof getGrimsmoSourceDefinition>,
 ): NormalizedGrimsmoProduct {
@@ -491,10 +650,28 @@ function normalizeGrimsmoProduct(
   };
 }
 
+/**
+ * Extracts the first captured product number from source text.
+ *
+ * @param value - Product title or source text to inspect.
+ *
+ * @param pattern - Regular expression containing the product-number capture.
+ *
+ * @returns The captured number, or `null` when the pattern does not match.
+ */
 function extractNumber(value: string, pattern: RegExp): string | null {
   return value.match(pattern)?.[1] ?? null;
 }
 
+/**
+ * Joins all description bullets assigned to one feature category.
+ *
+ * @param bulletsByCategory - Feature bullets keyed by classifier category.
+ *
+ * @param category - Classifier category to read.
+ *
+ * @returns The category bullets joined with spaces.
+ */
 function getCategoryText(
   bulletsByCategory: Record<string, string[]>,
   category: string,
@@ -502,6 +679,15 @@ function getCategoryText(
   return (bulletsByCategory[category] ?? []).join(" ");
 }
 
+/**
+ * Returns the label for the first pattern that matches source text.
+ *
+ * @param value - Normalized source text to inspect.
+ *
+ * @param patterns - Ordered label and regular-expression pairs.
+ *
+ * @returns The first matching label, or `null`.
+ */
 function matchFirst(
   value: string,
   patterns: readonly (readonly [string, RegExp])[],
@@ -509,6 +695,15 @@ function matchFirst(
   return patterns.find(([, pattern]) => pattern.test(value))?.[0] ?? null;
 }
 
+/**
+ * Returns labels for every pattern that matches source text.
+ *
+ * @param value - Normalized source text to inspect.
+ *
+ * @param patterns - Ordered label and regular-expression pairs.
+ *
+ * @returns Every matching label in pattern order.
+ */
 function matchAll(
   value: string,
   patterns: readonly (readonly [string, RegExp])[],
@@ -518,6 +713,13 @@ function matchAll(
     .map(([label]) => label);
 }
 
+/**
+ * Converts a small HTML fragment into normalized plain text.
+ *
+ * @param value - HTML fragment to convert.
+ *
+ * @returns Whitespace-normalized plain text.
+ */
 function stripHtml(value: string): string {
   return normalizeWhitespace(
     value
