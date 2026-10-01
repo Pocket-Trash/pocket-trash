@@ -419,7 +419,7 @@ export function normalizeConsoleTransportMode(
 
 /**
  * Recursively redacts sensitive fields and normalizes dates and errors.
- * Repeated object references, including cycles, become `[Circular]` after their first occurrence.
+ * Repeated array and record references, including cycles, become `[Circular]` after their first occurrence.
  *
  * @param value - Structured value to sanitize.
  * @param extraKeys - Additional case-insensitive field names to redact.
@@ -1205,7 +1205,7 @@ function copyKnownFields(
 }
 
 /**
- * Recursively sanitizes a value while tracking circular object references.
+ * Recursively sanitizes a value while tracking visited arrays and records.
  *
  * @param value - Value to sanitize.
  * @param redactKeys - Normalized field names whose values must be replaced.
