@@ -2,12 +2,30 @@ import { RefreshCw } from "lucide-react";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Downward pull distance, in pixels, required to request a refresh.
+ */
 const TRIGGER_DISTANCE = 72; // px of pull needed to fire a refresh
+/**
+ * Maximum resisted pull distance, in pixels, shown by the indicator.
+ */
 const MAX_PULL = 96; // clamp so the indicator never runs away
 
+/**
+ * Content and controlled refresh state for the compact pull gesture.
+ */
 type PullToRefreshProps = {
+  /**
+   * Nested content.
+   */
   children: React.ReactNode;
+  /**
+   * Requests a refresh after a qualifying pull is released.
+   */
   onRefresh: () => void;
+  /**
+   * Whether a refresh is running and new pull gestures are disabled.
+   */
   refreshing: boolean;
 };
 
@@ -18,6 +36,12 @@ type PullToRefreshProps = {
  * spins while `refreshing`; it is hidden at `md`+ where the wrapper collapses to
  * `display: contents` and adds no box. Untested on a real touch device — verify
  * the feel on-device.
+ *
+ * @param props - Pull-to-refresh properties.
+ * @param props.children - Content wrapped by the compact gesture surface.
+ * @param props.onRefresh - Callback invoked after a qualifying pull is released.
+ * @param props.refreshing - Whether a refresh is running.
+ * @returns The responsive pull-to-refresh wrapper and indicator.
  */
 export function PullToRefresh({
   children,
@@ -27,6 +51,9 @@ export function PullToRefresh({
   const [pull, setPull] = React.useState(0);
   const startYRef = React.useRef<number | null>(null);
 
+  /**
+   * Clears the visible pull distance and recorded touch origin.
+   */
   const reset = () => {
     setPull(0);
     startYRef.current = null;

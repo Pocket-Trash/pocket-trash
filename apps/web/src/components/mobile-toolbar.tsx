@@ -28,21 +28,78 @@ import { useLocale } from "@/providers/locale-provider";
 
 // Height of the bar itself (excludes the safe-area padding below it). Kept in
 // sync with the reserved bottom padding in `app-shell.tsx`.
+/**
+ * Toolbar height excluding the device safe-area inset.
+ */
 const BAR_HEIGHT = "3.5rem";
 
+/**
+ * Controlled archive search, filtering, and sorting state for the mobile toolbar.
+ */
 type MobileToolbarProps = {
+  /**
+   * Selected values grouped by filter key.
+   */
   active: ActiveFilters;
+  /**
+   * Number shown on the filters button; non-positive values hide the badge.
+   */
   filterCount: number;
+  /**
+   * Any/all matching mode for each filter group.
+   */
   matchModes: MatchModes;
+  /**
+   * Clears every selected filter.
+   */
   onClearFilters: () => void;
+  /**
+   * Updates a filter group's matching mode.
+   *
+   * @param key - Filter group to update.
+   * @param mode - Next any/all matching mode.
+   */
   onMatchModeChange: (key: FilterKey, mode: MatchMode) => void;
+  /**
+   * Updates the controlled search query.
+   *
+   * @param query - Next search query.
+   */
   onQueryChange: (query: string) => void;
+  /**
+   * Updates the controlled sort key.
+   *
+   * @param sort - Next sort key.
+   */
   onSortChange: (sort: SortKey) => void;
+  /**
+   * Toggles one value in a filter group.
+   *
+   * @param key - Filter group to update.
+   * @param value - Filter value to toggle.
+   */
   onToggleFilter: (key: FilterKey, value: string) => void;
+  /**
+   * Products used to derive filter values and counts.
+   */
   products: PenProduct[];
+  /**
+   * Current controlled search query.
+   */
   query: string;
+  /**
+   * Current controlled sort key.
+   */
   sort: SortKey;
-  sortOptions: Array<{ label: string; value: SortKey }>;
+  /**
+   * Sort choices displayed in the sort sheet.
+   */
+  sortOptions: Array<{
+    /** Human-readable sort option label. */
+    label: string;
+    /** Sort key applied when the option is selected. */
+    value: SortKey;
+  }>;
 };
 
 /**
@@ -51,6 +108,22 @@ type MobileToolbarProps = {
  * are vaul bottom sheets (swipe-to-dismiss); Search expands a field docked
  * above the bar. Hidden above 880px, where the persistent sidebar and header
  * controls take over.
+ *
+ * @param props - Mobile toolbar properties.
+ * @param props.active - Selected values grouped by filter key.
+ * @param props.filterCount - Count displayed on the filters button.
+ * @param props.matchModes - Any/all mode for each filter group.
+ * @param props.onClearFilters - Callback that clears all filters.
+ * @param props.onMatchModeChange - Callback that changes a group's match mode.
+ * @param props.onQueryChange - Callback that updates the search query.
+ * @param props.onSortChange - Callback that updates the sort key.
+ * @param props.onToggleFilter - Callback that toggles a filter value.
+ * @param props.products - Products used to derive filter options.
+ * @param props.query - Current search query.
+ * @param props.sort - Current sort key.
+ * @param props.sortOptions - Sort choices shown in the sheet.
+ * @returns The compact archive toolbar and its transient controls.
+ * @throws {Error} When rendered outside `LocaleProvider`.
  */
 export function MobileToolbar({
   active,
@@ -67,6 +140,12 @@ export function MobileToolbar({
   sortOptions,
 }: MobileToolbarProps) {
   const { locale } = useLocale();
+  /**
+   * Formats an archive toolbar translation for the active locale.
+   *
+   * @param key - Translation key to format.
+   * @returns The localized toolbar text.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [sortOpen, setSortOpen] = React.useState(false);
@@ -211,13 +290,45 @@ export function MobileToolbar({
   );
 }
 
+/**
+ * Native button properties plus mobile-toolbar presentation data.
+ */
 type ToolbarButtonProps = React.ComponentProps<"button"> & {
+  /**
+   * Whether to use active-state styling.
+   */
   active?: boolean;
+  /**
+   * Numeric badge; zero and negative values are not rendered.
+   */
   badge?: number;
-  icon: React.ComponentType<{ className?: string }>;
+  /**
+   * Icon component rendered above the label.
+   */
+  icon: React.ComponentType<{
+    /**
+     * Additional CSS classes.
+     */
+    className?: string;
+  }>;
+  /**
+   * Visible button label.
+   */
   label: string;
 };
 
+/**
+ * Renders one labeled icon button in the mobile toolbar.
+ *
+ * @param props - Toolbar button properties.
+ * @param props.active - Whether to use active-state styling.
+ * @param props.badge - Numeric badge shown only when positive.
+ * @param props.className - Additional CSS classes.
+ * @param props.icon - Icon component rendered above the label.
+ * @param props.label - Visible button label.
+ * @param ref - Forwarded native button reference.
+ * @returns The labeled toolbar button.
+ */
 const ToolbarButton = React.forwardRef<HTMLButtonElement, ToolbarButtonProps>(
   ({ active, badge, className, icon: Icon, label, ...props }, ref) => (
     <button

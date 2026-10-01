@@ -16,15 +16,55 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Controlled state and actions for the archive filter sidebar.
+ */
 type FilterSidebarProps = {
+  /**
+   * Selected values grouped by filter key.
+   */
   active: ActiveFilters;
+  /**
+   * Any/all matching mode for each filter group.
+   */
   matchModes: MatchModes;
+  /**
+   * Clears every selected filter.
+   */
   onClear: () => void;
+  /**
+   * Updates a filter group's matching mode.
+   *
+   * @param key - Filter group to update.
+   * @param mode - Next any/all matching mode.
+   */
   onMatchModeChange: (key: FilterKey, mode: MatchMode) => void;
+  /**
+   * Toggles one value in a filter group.
+   *
+   * @param key - Filter group to update.
+   * @param value - Filter value to toggle.
+   */
   onToggleFilter: (key: FilterKey, value: string) => void;
+  /**
+   * Products used to derive available values and counts.
+   */
   products: PenProduct[];
 };
 
+/**
+ * Renders archive filter groups with match-mode and clear controls.
+ *
+ * @param props - Filter sidebar properties.
+ * @param props.active - Selected values grouped by filter key.
+ * @param props.matchModes - Any/all mode for each filter group.
+ * @param props.onClear - Callback that clears all filters.
+ * @param props.onMatchModeChange - Callback that changes a group's match mode.
+ * @param props.onToggleFilter - Callback that toggles a group value.
+ * @param props.products - Products used to derive values and counts.
+ * @returns The archive filter controls.
+ * @throws {Error} When rendered outside `LocaleProvider`.
+ */
 export function FilterSidebar({
   active,
   matchModes,
@@ -34,6 +74,13 @@ export function FilterSidebar({
   products,
 }: FilterSidebarProps) {
   const { locale } = useLocale();
+  /**
+   * Formats a filter translation for the active locale.
+   *
+   * @param key - Translation key to format.
+   * @param values - Placeholder values interpolated into the translation.
+   * @returns The localized filter text.
+   */
   const t = (
     key: TranslationKey,
     values: Readonly<Record<string, unknown>> = {},
