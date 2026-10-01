@@ -181,6 +181,9 @@ importers:
       '@milkdown/core':
         specifier: ^7.22.2
         version: 7.22.2
+      '@milkdown/plugin-clipboard':
+        specifier: ^7.22.2
+        version: 7.22.2
       '@milkdown/plugin-history':
         specifier: ^7.22.2
         version: 7.22.2
@@ -2060,6 +2063,9 @@ packages:
 
   '@milkdown/exception@7.22.2':
     resolution: {integrity: sha512-uS4Gx6xE/iTSKslverVWIWQ8RN5B+NXxP8BLSATnlwDKiYlgBYZYLbvSx632VM9j5Qsd5YuKRGt9k3dXe54EWw==}
+
+  '@milkdown/plugin-clipboard@7.22.2':
+    resolution: {integrity: sha512-6Zr5r7hURwZKvKi7ox+7lrET7ktRgxcBSvrB/XwmfxN69F8M+vILJFlW+ZZ2ezm3x81pu3kpAsvxZJN7d7ol2g==}
 
   '@milkdown/plugin-history@7.22.2':
     resolution: {integrity: sha512-30jM0TWWbG2gwd9QtbrXHfNi737sr6Q5O26eZqIPsmDVFAfqm+ZEd5cpJWngcQ3C5GflvWxyPC+xPEqY97B9AA==}
@@ -10150,6 +10156,15 @@ snapshots:
       '@milkdown/exception': 7.22.2
 
   '@milkdown/exception@7.22.2': {}
+
+  '@milkdown/plugin-clipboard@7.22.2':
+    dependencies:
+      '@milkdown/core': 7.22.2
+      '@milkdown/ctx': 7.22.2
+      '@milkdown/prose': 7.22.2
+      '@milkdown/utils': 7.22.2
+    transitivePeerDependencies:
+      - supports-color
 
   '@milkdown/plugin-history@7.22.2':
     dependencies:
