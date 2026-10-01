@@ -1,6 +1,9 @@
 import process from "node:process";
 import { defineConfig, devices } from "playwright/test";
 
+/** Credential for CI access to protected Vercel preview deployments. */
+const vercelBypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
+
 export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   globalSetup: "./e2e/global.setup.ts",
@@ -24,8 +27,14 @@ export default defineConfig({
     process.env.E2E_RUN_MUTATIONS === "true" ? undefined : /mutation\.spec\.ts/,
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:4005",
+    extraHTTPHeaders: vercelBypassSecret
+      ? {
+          "x-vercel-protection-bypass": vercelBypassSecret,
+          "x-vercel-set-bypass-cookie": "true",
+        }
+      : undefined,
     screenshot: "only-on-failure",
-    trace: "retain-on-failure",
+    trace: vercelBypassSecret ? "off" : "retain-on-failure",
   },
   workers: process.env.CI ? 1 : undefined,
 });

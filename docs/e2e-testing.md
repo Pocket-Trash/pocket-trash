@@ -15,6 +15,7 @@ Store these values in the Infisical `preview` environment under `/apps/web`:
 | `E2E_CLERK_EDITOR_USER_EMAIL` | Email for a development user with the `editor` role. |
 | `E2E_CLERK_ADMIN_USER_EMAIL` | Email for a development user with the `admin` role. |
 | `E2E_CLERK_DISPOSABLE_USER_EMAIL` | Email for a development user reserved for erasure tests. |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Vercel Protection Bypass for Automation secret. |
 
 The same path must contain development `CLERK_PUBLISHABLE_KEY` and
 `CLERK_SECRET_KEY` values. Clerk keys must start with `pk_test_` and `sk_test_`.
@@ -59,6 +60,7 @@ private collection, and one text object. Its cleanup removes every created row
 and object before the test exits. The PR-close workflow removes the full Neon
 branch and Bunny prefixes if a failed or canceled run leaves data behind.
 
-Playwright keeps screenshots on failure. Anonymous tests also keep traces on
-failure; authenticated and mutation tests disable traces because traces record
-network traffic. CI uploads the HTML report only when a test fails.
+Playwright keeps screenshots on failure. Anonymous tests keep traces only when
+no Vercel bypass credential is present; authenticated, mutation, and protected
+preview tests disable traces because traces record network traffic. CI uploads
+the HTML report only when a test fails.

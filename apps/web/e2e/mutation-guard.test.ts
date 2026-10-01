@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertMutationIsolation,
+  assertVercelPreviewAccess,
   verifyMutationTargets,
 } from "./mutation-guard";
 
@@ -55,6 +56,21 @@ const targetFetch: typeof fetch = async (input) => {
 };
 
 describe("mutation isolation guard", () => {
+  it("requires a bypass secret for protected Vercel previews", () => {
+    expect(() => assertVercelPreviewAccess(isolatedEnvironment)).toThrow(
+      "VERCEL_AUTOMATION_BYPASS_SECRET",
+    );
+    expect(() =>
+      assertVercelPreviewAccess({
+        ...isolatedEnvironment,
+        VERCEL_AUTOMATION_BYPASS_SECRET: "bypass_test_secret",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertVercelPreviewAccess({ E2E_BASE_URL: "http://127.0.0.1:4005" }),
+    ).not.toThrow();
+  });
+
   it("accepts the current PR preview and isolated resources", () => {
     expect(assertMutationIsolation(isolatedEnvironment)).toEqual({
       imagePrefix: "images/preview/pr-42",

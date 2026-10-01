@@ -1,4 +1,26 @@
 /**
+ * Requires the automation credential used to open protected Vercel previews.
+ *
+ * @param environment - Environment variables supplied to the E2E process.
+ * @returns Nothing.
+ * @throws When a Vercel preview has no automation bypass secret.
+ */
+export function assertVercelPreviewAccess(
+  environment: Record<string, string | undefined>,
+) {
+  const baseUrl = environment.E2E_BASE_URL?.trim();
+  if (
+    baseUrl &&
+    new URL(baseUrl).hostname.endsWith(".vercel.app") &&
+    !environment.VERCEL_AUTOMATION_BYPASS_SECRET?.trim()
+  ) {
+    throw new Error(
+      "VERCEL_AUTOMATION_BYPASS_SECRET is required for Vercel preview tests.",
+    );
+  }
+}
+
+/**
  * Verifies that a mutation run targets PR-isolated preview infrastructure.
  *
  * @param environment - Environment variables supplied to the E2E process.
