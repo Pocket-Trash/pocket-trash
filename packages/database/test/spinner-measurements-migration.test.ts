@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+/** Spinner measurement columns and their expected positive-value constraints. */
 const measurements = [
   ["product_spinner", "weight_g", "product_spinner_measurements_positive"],
   ["product_spinner", "length_mm", "product_spinner_measurements_positive"],
