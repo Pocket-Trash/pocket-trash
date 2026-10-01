@@ -3,14 +3,18 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
+/** Repository root used as the child-process working directory. */
 const repoRoot = new URL("..", import.meta.url).pathname;
+/** Expected Clerk application identifier injected by Infisical. */
 const clerkAppId = process.env.APP_ID?.trim();
+/** Expected Clerk development instance identifier injected by Infisical. */
 const clerkInstanceId = process.env.INS_ID?.trim();
 if (!clerkAppId || !clerkInstanceId) {
   throw new Error(
     "APP_ID and INS_ID are required from Infisical development /local/clerk.",
   );
 }
+/** Normalized developer initials used in the local relay key. */
 const initials = readInitials([
   join(repoRoot, ".env.local"),
   join(repoRoot, ".env"),
@@ -24,10 +28,13 @@ if (!initials) {
 
 await assertClerkLink();
 if (process.argv[2] === "--check-clerk-link") process.exit(0);
+/** Ephemeral credential authorizing the Clerk webhook listener. */
 const relayToken = JSON.parse(
   await run("clerk", ["webhooks", "token", "--json"]),
 ).token;
+/** Local API endpoint receiving relayed Clerk webhooks. */
 const forwardTo = `http://localhost:4006/api/v0/webhooks/clerk/${initials.toLowerCase()}`;
+/** Clerk webhook listener child process. */
 const listener = spawn(
   "clerk",
   [
@@ -47,11 +54,13 @@ const tunnel = spawn(
   ["tunnel", "--url", "http://localhost:4006", "--no-autoupdate"],
   { cwd: repoRoot, stdio: ["ignore", "pipe", "pipe"] },
 );
+/** Environment passed to the web process after removing tooling credentials. */
 const webEnv = { ...process.env };
 delete webEnv.APP_ID;
 delete webEnv.CLOUDFLARE_ACCOUNT_ID;
 delete webEnv.CLOUDFLARE_API_TOKEN;
 delete webEnv.INS_ID;
+/** Local web development server child process. */
 const web = spawn("pnpm", ["dev:web"], {
   cwd: repoRoot,
   env: webEnv,
@@ -59,8 +68,10 @@ const web = spawn("pnpm", ["dev:web"], {
 });
 /** KV target keys registered by this process. */
 const registeredKeys = new Set();
+/** Whether coordinated shutdown has already begun. */
 let stopping = false;
 
+/** Registers webhook URLs and terminates local services if registration fails. */
 try {
   const [clerkRelayUrl, tunnelUrl] = await Promise.all([
     waitForClerkRelayUrl(listener),
@@ -96,7 +107,7 @@ await new Promise(() => {});
  * Stops local services and removes registered webhook targets.
  *
  * @param {NodeJS.Signals} [signal] - Termination signal.
- * @returns {Promise<void>} Completion of target cleanup.
+ * @returns A promise that resolves immediately for duplicate calls; the first call exits after cleanup.
  */
 async function stop(signal) {
   if (stopping) return;
@@ -115,6 +126,7 @@ async function stop(signal) {
  * @param {string} url - Public target URL.
  * @param {Set<string>} registeredKeys - Successfully registered keys.
  * @returns {Promise<void>} Completion of target registration.
+ * @rejects When Wrangler cannot register the target.
  */
 async function registerTarget(key, url, registeredKeys) {
   await wrangler([
@@ -141,7 +153,7 @@ async function registerTarget(key, url, registeredKeys) {
  * Removes successfully registered webhook targets.
  *
  * @param {Set<string>} registeredKeys - Keys to remove.
- * @returns {Promise<void>} Completion of target cleanup.
+ * @returns Completion of best-effort cleanup; per-key failures are logged.
  */
 async function removeTargets(registeredKeys) {
   for (const key of registeredKeys) {
@@ -163,6 +175,13 @@ async function removeTargets(registeredKeys) {
   }
 }
 
+/**
+ * Reads the first configured developer initials selector.
+ *
+ * @param paths - Environment files in precedence order.
+ * @returns Normalized initials, or `undefined` when no selector exists.
+ * @throws When a file cannot be read or parsed, or initials are invalid.
+ */
 function readInitials(paths) {
   for (const path of paths) {
     if (!existsSync(path)) continue;
@@ -181,8 +200,9 @@ function readInitials(paths) {
 /**
  * Waits for the Clerk listener's public relay URL.
  *
- * @param {import("node:child_process").ChildProcess} child - Clerk listener.
- * @returns {Promise<string>} Public Clerk relay URL.
+ * @param child - Clerk listener child process with piped standard output.
+ * @returns A promise for the ready relay URL.
+ * @rejects When the child fails or exits before readiness.
  */
 function waitForClerkRelayUrl(child) {
   return new Promise((resolve, reject) => {
@@ -216,6 +236,7 @@ function waitForClerkRelayUrl(child) {
  *
  * @param {import("node:child_process").ChildProcess} child - Tunnel process.
  * @returns {Promise<string>} Public Cloudflare tunnel URL.
+ * @rejects When the tunnel fails or exits before readiness.
  */
 function waitForCloudflareTunnelUrl(child) {
   return new Promise((resolve, reject) => {
@@ -249,6 +270,13 @@ function waitForCloudflareTunnelUrl(child) {
   });
 }
 
+/**
+ * Runs Wrangler through the Infisical preview-secret policy.
+ *
+ * @param args - Wrangler arguments.
+ * @returns A promise for captured standard output.
+ * @rejects When the wrapped command fails.
+ */
 function wrangler(args) {
   return run("pnpm", [
     "exec",
@@ -266,6 +294,12 @@ function wrangler(args) {
   ]);
 }
 
+/**
+ * Verifies that Clerk CLI targets the configured application and instance.
+ *
+ * @returns A promise that settles after successful validation.
+ * @rejects When the CLI is unhealthy, unlinked, or linked elsewhere.
+ */
 async function assertClerkLink() {
   let diagnostics;
   try {
@@ -299,6 +333,14 @@ async function assertClerkLink() {
   }
 }
 
+/**
+ * Runs a command with captured standard output and inherited errors.
+ *
+ * @param command - Executable name or path.
+ * @param args - Command arguments.
+ * @returns A promise for captured standard output.
+ * @rejects When the process cannot start or exits unsuccessfully.
+ */
 function run(command, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {

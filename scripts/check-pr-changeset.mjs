@@ -5,15 +5,37 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { getWorkspacePackages } from "./workspace-packages.mjs";
 
+/** Repository directory containing Changeset files. */
 const changesetDirectory = ".changeset";
+/** Supported semantic release bump names. */
 const allowedBumps = new Set(["major", "minor", "patch"]);
+/** Release bumps ordered from lowest to highest impact. */
 const bumpPriority = ["patch", "minor", "major"];
+/** Absolute repository root used by local and CI checks. */
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
+/**
+ * Runs Git and returns trimmed standard output.
+ *
+ * @param args - Git arguments.
+ * @param cwd - Working directory for Git.
+ * @returns Trimmed standard output.
+ * @throws When Git exits unsuccessfully.
+ */
 function git(args, cwd = repoRoot) {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
 
+/**
+ * Lists files introduced or changed by a pull-request branch.
+ *
+ * @param options - Comparison inputs.
+ * @param options.baseSha - Base branch commit SHA.
+ * @param options.headSha - Pull-request head commit SHA.
+ * @param options.cwd - Repository directory for Git.
+ * @returns Changed repository-relative paths.
+ * @throws When SHAs are absent or Git fails.
+ */
 function getChangedFiles({
   baseSha = process.env.BASE_SHA,
   headSha = process.env.HEAD_SHA,
@@ -28,6 +50,12 @@ function getChangedFiles({
     .filter(Boolean);
 }
 
+/**
+ * Parses package bump entries from Changeset frontmatter.
+ *
+ * @param content - Complete Changeset Markdown content.
+ * @returns Parsed package names and bump levels.
+ */
 function parseChangesetContent(content) {
   const match = content.match(/^---\n([\s\S]*?)\n---/);
 
@@ -43,6 +71,13 @@ function parseChangesetContent(content) {
     .filter(Boolean);
 }
 
+/**
+ * Reads and parses a Changeset file.
+ *
+ * @param filePath - Changeset file path.
+ * @returns Parsed package names and bump levels.
+ * @throws When the file cannot be read.
+ */
 function parseChangesetEntries(filePath) {
   return parseChangesetContent(readFileSync(filePath, "utf8"));
 }
@@ -80,6 +115,14 @@ function getHighestChangesetBump(
   return bump;
 }
 
+/**
+ * Validates parsed entries from one Changeset.
+ *
+ * @param file - Repository-relative Changeset path used in errors.
+ * @param entries - Parsed package bump entries.
+ * @param workspacePackageNames - Known workspace package names.
+ * @throws When entries are absent, invalid, or target an unknown package.
+ */
 function validateChangesetEntries(file, entries, workspacePackageNames) {
   if (entries.length === 0) {
     throw new Error(`${file} must mark a package as major, minor, or patch.`);
@@ -101,8 +144,8 @@ function validateChangesetEntries(file, entries, workspacePackageNames) {
 /**
  * Validates the PR or local diff and reports its Changeset bump.
  *
- * @returns Resolves after a valid Changeset is found.
- * @rejects When the diff has no valid Changeset.
+ * @returns A promise that settles after a valid Changeset is found.
+ * @rejects When GitHub, Git, file access, or Changeset validation fails.
  */
 async function main() {
   const workspacePackageNames = new Set(
@@ -234,6 +277,14 @@ async function getPullRequestFiles() {
   return { changesets, packageNames };
 }
 
+/**
+ * Fetches a GitHub file as raw text.
+ *
+ * @param url - GitHub contents API URL.
+ * @param headers - Authenticated GitHub request headers.
+ * @returns The raw response body.
+ * @rejects When the GitHub request fails.
+ */
 async function fetchRaw(url, headers) {
   const response = await fetch(url, {
     headers: { ...headers, Accept: "application/vnd.github.raw" },
@@ -246,12 +297,27 @@ async function fetchRaw(url, headers) {
   return response.text();
 }
 
+/**
+ * Reads a required environment variable.
+ *
+ * @param name - Environment variable name.
+ * @returns The configured value.
+ * @throws When the variable is absent or empty.
+ */
 function requiredEnv(name) {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is required`);
   return value;
 }
 
+/**
+ * Appends content to a file without loading the promise API eagerly.
+ *
+ * @param path - Destination file path.
+ * @param content - Text to append.
+ * @returns A promise that settles after the write.
+ * @rejects When the file cannot be opened or written.
+ */
 async function appendFile(path, content) {
   const { appendFile } = await import("node:fs/promises");
   await appendFile(path, content);

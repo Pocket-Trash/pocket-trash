@@ -5,6 +5,7 @@ import {
   runCommand,
 } from "./scraper-redis.mjs";
 
+/** Reports local Redis or scraper development failures at the CLI boundary. */
 try {
   const redisUrl = getScraperRedisUrl();
 

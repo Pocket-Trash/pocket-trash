@@ -18,6 +18,13 @@ figma.ui.onmessage = async (message) => {
   }
 };
 
+/**
+ * Validates and applies a complete bridge payload to the current FigJam page.
+ *
+ * @param payload - FigJam bridge payload from the plugin UI.
+ * @returns Counts and identifiers for the applied payload.
+ * @rejects When validation, font loading, or an operation fails; completed operations are not rolled back.
+ */
 async function applyPayload(payload) {
   validatePayloadShape(payload);
 
@@ -49,6 +56,14 @@ async function applyPayload(payload) {
   };
 }
 
+/**
+ * Dispatches one bridge operation to its FigJam node creator.
+ *
+ * @param operation - Validated bridge operation.
+ * @param createdById - Previously created nodes indexed by operation ID.
+ * @returns The created node, or `undefined` when a connector cannot be made.
+ * @rejects When the operation is unsupported or creation fails.
+ */
 async function applyOperation(operation, createdById) {
   switch (operation.type) {
     case "section":
@@ -66,6 +81,13 @@ async function applyOperation(operation, createdById) {
   }
 }
 
+/**
+ * Creates and appends a FigJam section.
+ *
+ * @param operation - Section position, size, and title.
+ * @returns The created section node.
+ * @throws When section creation is unsupported or fails.
+ */
 function createSection(operation) {
   if (typeof figma.createSection !== "function") {
     throw new Error("This editor does not support section creation.");
@@ -80,6 +102,13 @@ function createSection(operation) {
   return section;
 }
 
+/**
+ * Creates and appends a FigJam sticky note.
+ *
+ * @param operation - Sticky position, text, and color.
+ * @returns The created sticky node.
+ * @throws When sticky creation is unsupported or fails.
+ */
 function createSticky(operation) {
   if (typeof figma.createSticky !== "function") {
     throw new Error("This editor does not support sticky creation.");
@@ -96,6 +125,13 @@ function createSticky(operation) {
   return sticky;
 }
 
+/**
+ * Creates and appends a styled rectangle shape with optional text.
+ *
+ * @param operation - Shape geometry, style, and text.
+ * @returns The created rectangle, group, or fallback shape.
+ * @rejects When shape or text creation fails.
+ */
 async function createShape(operation) {
   if (typeof figma.createRectangle !== "function") {
     return createFallbackShape(operation);
@@ -123,6 +159,13 @@ async function createShape(operation) {
   return rect;
 }
 
+/**
+ * Creates a FigJam native text shape when rectangles are unavailable.
+ *
+ * @param operation - Shape geometry and text.
+ * @returns The created fallback shape.
+ * @throws When native shape creation is unsupported or fails.
+ */
 function createFallbackShape(operation) {
   if (typeof figma.createShapeWithText !== "function") {
     throw new Error("This editor does not support shape creation.");
@@ -145,6 +188,14 @@ function createFallbackShape(operation) {
   return shape;
 }
 
+/**
+ * Connects two nodes created by earlier payload operations.
+ *
+ * @param operation - Connector endpoints and optional text.
+ * @param createdById - Created nodes indexed by operation ID.
+ * @returns The connector, or `undefined` when unsupported or endpoints are absent.
+ * @throws When connector creation fails.
+ */
 function createConnector(operation, createdById) {
   if (typeof figma.createConnector !== "function") {
     return undefined;
@@ -166,6 +217,13 @@ function createConnector(operation, createdById) {
   return connector;
 }
 
+/**
+ * Creates and appends a small text stamp.
+ *
+ * @param operation - Stamp position and text.
+ * @returns The created text node.
+ * @rejects When text creation fails.
+ */
 async function createStamp(operation) {
   const text = figma.createText();
   text.characters = operation.text;
@@ -176,6 +234,14 @@ async function createStamp(operation) {
   return text;
 }
 
+/**
+ * Adds provenance for an applied payload to the current page.
+ *
+ * @param payload - Applied bridge payload.
+ * @param createdCount - Number of operations that created nodes.
+ * @returns A promise that settles after the stamp is appended.
+ * @rejects When stamp creation fails.
+ */
 async function createAuditStamp(payload, createdCount) {
   const y = 40;
   const x = 40;
@@ -189,6 +255,13 @@ async function createAuditStamp(payload, createdCount) {
   });
 }
 
+/**
+ * Resizes a node using the best supported FigJam API.
+ *
+ * @param node - Node to resize.
+ * @param width - Target width.
+ * @param height - Target height.
+ */
 function resize(node, width, height) {
   if (typeof node.resizeWithoutConstraints === "function") {
     node.resizeWithoutConstraints(width, height);
@@ -200,6 +273,13 @@ function resize(node, width, height) {
   }
 }
 
+/**
+ * Creates positioned text for a rectangle shape.
+ *
+ * @param operation - Shape geometry and text styling.
+ * @returns The configured text node.
+ * @rejects When text creation or resizing fails.
+ */
 async function createShapeText(operation) {
   const text = figma.createText();
   const padding = operation.textPadding ?? 10;
@@ -226,11 +306,23 @@ async function createShapeText(operation) {
   return text;
 }
 
+/**
+ * Loads every font style used by payload operations.
+ *
+ * @returns A promise that settles when fonts are available.
+ * @rejects When Figma cannot load a required font.
+ */
 async function loadPayloadFonts() {
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
 }
 
+/**
+ * Converts an unknown caught value into a user-facing message.
+ *
+ * @param error - Caught failure value.
+ * @returns The available message or a generic fallback.
+ */
 function getErrorMessage(error) {
   if (error instanceof Error) {
     return error.message;
@@ -252,6 +344,12 @@ function getErrorMessage(error) {
   return "Unknown plugin error.";
 }
 
+/**
+ * Applies a supported semantic color to a sticky note.
+ *
+ * @param sticky - Sticky node to update.
+ * @param color - Optional semantic color name.
+ */
 function applyStickyColor(sticky, color) {
   const paint = stickyColorPaint(color);
   if (!paint || !("fills" in sticky)) {
@@ -261,6 +359,12 @@ function applyStickyColor(sticky, color) {
   sticky.fills = [paint];
 }
 
+/**
+ * Maps a sticky color name to a solid FigJam paint.
+ *
+ * @param color - Semantic sticky color name.
+ * @returns The paint, or `undefined` for the default color.
+ */
 function stickyColorPaint(color) {
   switch (color) {
     case "blue":
@@ -276,6 +380,12 @@ function stickyColorPaint(color) {
   }
 }
 
+/**
+ * Applies fill, stroke, and corner styling to a rectangle.
+ *
+ * @param rect - Rectangle node to style.
+ * @param operation - Shape styling options.
+ */
 function applyRectStyle(rect, operation) {
   rect.fills =
     operation.fill === "none" ? [] : [solidPaint(operation.fill ?? "#ffffff")];
@@ -287,6 +397,12 @@ function applyRectStyle(rect, operation) {
   }
 }
 
+/**
+ * Converts a six-digit hexadecimal color into a solid Figma paint.
+ *
+ * @param color - Hexadecimal color string.
+ * @returns A solid paint with normalized RGB channels.
+ */
 function solidPaint(color) {
   const hex = color.replace("#", "");
   return {
@@ -299,6 +415,12 @@ function solidPaint(color) {
   };
 }
 
+/**
+ * Validates the required top-level bridge payload shape.
+ *
+ * @param payload - Candidate plugin payload.
+ * @throws When the payload, schema version, file key, or operations are invalid.
+ */
 function validatePayloadShape(payload) {
   if (!payload || typeof payload !== "object") {
     throw new Error("Payload must be an object.");
