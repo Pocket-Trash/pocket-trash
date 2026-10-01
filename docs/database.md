@@ -7,7 +7,6 @@
 ```txt
 packages/database/
 ├── drizzle.config.ts
-├── eslint.config.mjs
 ├── package.json
 ├── tsconfig.json
 ├── drizzle/
