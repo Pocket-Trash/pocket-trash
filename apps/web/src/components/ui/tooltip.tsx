@@ -2,6 +2,13 @@ import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Provides tooltip timing configuration to nested tooltips.
+ *
+ * @param props - Tooltip provider properties.
+ * @param props.delay - Delay in milliseconds before a tooltip opens.
+ * @returns The rendered tooltip provider UI.
+ */
 function TooltipProvider({
   delay = 0,
   ...props
@@ -15,18 +22,41 @@ function TooltipProvider({
   );
 }
 
+/**
+ * Provides the tooltip interaction root.
+ *
+ * @param props - Tooltip properties.
+ * @returns The rendered tooltip UI.
+ */
 function Tooltip({
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
   return <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
 }
 
+/**
+ * Renders the control that opens the tooltip.
+ *
+ * @param props - Tooltip trigger properties.
+ * @returns The rendered tooltip trigger UI.
+ */
 function TooltipTrigger({
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
 }
 
+/**
+ * Renders the positioned tooltip panel.
+ *
+ * @param props - Tooltip content properties.
+ * @param props.align - Popup alignment relative to its trigger.
+ * @param props.className - Additional CSS classes.
+ * @param props.sideOffset - Distance in pixels, or a resolver returning pixels, between the tooltip and its trigger.
+ * @param props.side - Screen edge used to place the panel.
+ * @param props.children - Nested content.
+ * @returns The rendered tooltip content UI.
+ */
 function TooltipContent({
   align,
   className,

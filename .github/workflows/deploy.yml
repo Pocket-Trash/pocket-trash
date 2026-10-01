@@ -56,7 +56,6 @@ jobs:
       pull-requests: write
     env:
       CI_JOB_NAME: Preview
-      E2E_MUTATION: "true"
       PR_NUMBER: ${{ github.event.pull_request.number }}
 
     steps:
@@ -210,7 +209,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "$DB_CHANGING" == "true" || "$E2E_MUTATION" == "true" ]]; then
+          if [[ "$DB_CHANGING" == "true" ]]; then
             resource_folder_prefix="resources/preview/pr-${PR_NUMBER}"
             image_folder_prefix="images/preview/pr-${PR_NUMBER}"
           else
@@ -417,7 +416,7 @@ jobs:
           bash .github/scripts/vercel-branch-database-url.sh set-resource-folder-prefix
 
       - name: Run migrations on Neon PR branch
-        if: steps.db.outputs.can_deploy == 'true' && steps.db_changes.outputs.database == 'true'
+        if: steps.db.outputs.can_deploy == 'true' && steps.db.outputs.isolated == 'true'
         working-directory: packages/database
         env:
           DATABASE_URL: ${{ steps.db.outputs.migration_database_url }}

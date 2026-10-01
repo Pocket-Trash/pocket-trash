@@ -1,5 +1,10 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
+/**
+ * Renders a placeholder for an authentication page.
+ *
+ * @returns The rendered auth page skeleton UI.
+ */
 export function AuthPageSkeleton() {
   return (
     <div className="w-full max-w-100 rounded-lg border border-border bg-card p-6 shadow-sm">

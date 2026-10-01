@@ -1,7 +1,16 @@
 import type { PenProduct } from "./pen-data";
 
+/**
+ * Supported length and diameter display units.
+ */
 export type DimensionUnit = "in" | "mm";
+/**
+ * Supported weight display units.
+ */
 export type WeightUnit = "g" | "oz";
+/**
+ * Supported archive display currencies.
+ */
 export type CurrencyCode =
   | "CAD"
   | "USD"
@@ -12,6 +21,9 @@ export type CurrencyCode =
   | "CHF"
   | "NZD";
 
+/**
+ * Currencies available for archive price display.
+ */
 export const currencies: CurrencyCode[] = [
   "CAD",
   "USD",
@@ -23,11 +35,26 @@ export const currencies: CurrencyCode[] = [
   "NZD",
 ];
 
+/**
+ * Currency used by source archive prices and exchange rates.
+ */
 export const baseCurrency: CurrencyCode = "CAD";
+/**
+ * Markup applied after conversion away from the base currency.
+ */
 const shopifyMarketsMarkup = 1.025;
 
+/**
+ * Optional conversion rates from the base currency.
+ */
 export type CurrencyRates = Partial<Record<CurrencyCode, number>>;
 
+/**
+ * Formats an ISO-like calendar date in fixed English month-day-year form, or `"-"` when incomplete.
+ *
+ * @param iso - ISO-like calendar date string.
+ * @returns The formatted date or `"-"` for empty or incomplete input.
+ */
 export function formatDate(iso: string) {
   if (!iso) return "-";
   const [year, month, day] = iso.split("-").map(Number);
@@ -40,6 +67,13 @@ export function formatDate(iso: string) {
   });
 }
 
+/**
+ * Formats product diameter in the requested unit, converting inches to millimetres when needed.
+ *
+ * @param product - Product whose diameter should be displayed.
+ * @param unit - Requested display unit.
+ * @returns The formatted diameter or `null` when unavailable.
+ */
 export function formatDiameter(product: PenProduct, unit: DimensionUnit) {
   if (unit === "mm") {
     const mm =
@@ -53,6 +87,13 @@ export function formatDiameter(product: PenProduct, unit: DimensionUnit) {
   return product.diameter_in == null ? null : `${product.diameter_in}"`;
 }
 
+/**
+ * Formats product length in the requested unit, converting inches to millimetres when needed.
+ *
+ * @param product - Product whose length should be displayed.
+ * @param unit - Requested display unit.
+ * @returns The formatted length or `null` when unavailable.
+ */
 export function formatLength(product: PenProduct, unit: DimensionUnit) {
   if (unit === "mm") {
     const mm =
@@ -65,6 +106,13 @@ export function formatLength(product: PenProduct, unit: DimensionUnit) {
   return product.length_in == null ? null : `${product.length_in}"`;
 }
 
+/**
+ * Formats product weight in grams or converted ounces.
+ *
+ * @param product - Product whose weight should be displayed.
+ * @param unit - Requested display unit.
+ * @returns The formatted weight or `null` when unavailable.
+ */
 export function formatWeight(product: PenProduct, unit: WeightUnit) {
   if (product.weight_g == null) return null;
   if (unit === "oz") {
@@ -73,6 +121,16 @@ export function formatWeight(product: PenProduct, unit: WeightUnit) {
   return `${product.weight_g} g`;
 }
 
+/**
+ * Formats a single price or converted price range, using `"-"` when the minimum is absent.
+ * Non-CAD conversions include the 2.5% Shopify Markets markup.
+ *
+ * @param min - Minimum base-currency price, or `null` when unavailable.
+ * @param max - Maximum base-currency price, or `null` when unavailable.
+ * @param currency - Target display currency.
+ * @param rates - Conversion rates from the base currency; a missing target rate defaults to `1`.
+ * @returns The formatted price or range.
+ */
 export function formatPrice(
   min: number | null,
   max: number | null,
@@ -89,6 +147,14 @@ export function formatPrice(
   )}`;
 }
 
+/**
+ * Converts and formats a base-currency amount, falling back to plain rounded text if Intl formatting fails.
+ *
+ * @param baseAmount - Amount in the base currency.
+ * @param currency - Target display currency.
+ * @param rates - Conversion rates from the base currency; a missing target rate defaults to `1`.
+ * @returns The converted currency text.
+ */
 function formatMoney(
   baseAmount: number,
   currency: CurrencyCode,
@@ -110,6 +176,11 @@ function formatMoney(
   }
 }
 
+/**
+ * Returns today's UTC calendar date as `YYYY-MM-DD`.
+ *
+ * @returns Today's UTC date string.
+ */
 export function todayUTCDateString() {
   const date = new Date();
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");

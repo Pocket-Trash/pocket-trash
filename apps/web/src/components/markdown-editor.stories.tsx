@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import * as React from "react";
-import { expect, fn, mocked, waitFor } from "storybook/test";
+import { expect, fireEvent, fn, mocked, waitFor } from "storybook/test";
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { MarkdownEditor } from "./markdown-editor";
 import type { MarkdownVisualEditorProps } from "./markdown-visual-editor";
@@ -95,6 +95,30 @@ export const TypingShortcut: Story = {
     await expect(
       canvas.getByRole("heading", { level: 1, name: "Typed heading" }),
     ).toBeVisible();
+  },
+};
+
+/** Visual input-method composition story. */
+export const VisualComposition: Story = {
+  /**
+   * Verifies composed CJK input is neither dropped nor duplicated.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after assertions complete.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const editor = await canvas.findByRole("textbox", {
+      name: "Description",
+    });
+    await userEvent.click(editor);
+    fireEvent.compositionStart(editor);
+    await userEvent.type(editor, "日本語入力");
+    fireEvent.compositionEnd(editor, { data: "日本語入力" });
+    await expect(editor).toHaveTextContent("日本語入力");
+    await userEvent.click(canvas.getByRole("button", { name: "Source" }));
+    await expect(
+      canvas.getByRole("textbox", { name: "Description" }),
+    ).toHaveValue("日本語入力");
   },
 };
 

@@ -5,11 +5,22 @@ import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * Renders a sized avatar container.
+ *
+ * @param props - Avatar properties.
+ * @param props.className - Additional CSS classes.
+ * @param props.size - Visual size variant.
+ * @returns The rendered avatar UI.
+ */
 function Avatar({
   className,
   size = "default",
   ...props
 }: React.ComponentProps<typeof AvatarPrimitive.Root> & {
+  /**
+   * Visual size variant.
+   */
   size?: "default" | "sm" | "lg";
 }) {
   return (
@@ -25,6 +36,13 @@ function Avatar({
   );
 }
 
+/**
+ * Renders the image within an avatar.
+ *
+ * @param props - Avatar image properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered avatar image UI.
+ */
 function AvatarImage({
   className,
   ...props
@@ -38,6 +56,13 @@ function AvatarImage({
   );
 }
 
+/**
+ * Renders fallback content while an avatar image is unavailable.
+ *
+ * @param props - Avatar fallback properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered avatar fallback UI.
+ */
 function AvatarFallback({
   className,
   ...props
@@ -54,6 +79,13 @@ function AvatarFallback({
   );
 }
 
+/**
+ * Renders a status badge anchored to an avatar.
+ *
+ * @param props - Avatar badge properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered avatar badge UI.
+ */
 function AvatarBadge({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
@@ -70,6 +102,13 @@ function AvatarBadge({ className, ...props }: React.ComponentProps<"span">) {
   );
 }
 
+/**
+ * Arranges overlapping avatars as a group.
+ *
+ * @param props - Avatar group properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered avatar group UI.
+ */
 function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -83,6 +122,13 @@ function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/**
+ * Renders the remaining-member count within an avatar group.
+ *
+ * @param props - Avatar group count properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered avatar group count UI.
+ */
 function AvatarGroupCount({
   className,
   ...props

@@ -5,6 +5,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { defineConfig, mergeConfig } from "vitest/config";
 import viteConfig from "./.storybook/vite.config";
 
+/** Absolute directory containing the web package configuration. */
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default mergeConfig(

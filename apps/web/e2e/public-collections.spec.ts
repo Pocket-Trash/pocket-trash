@@ -1,6 +1,6 @@
 import { createDb, type Database, schema } from "@package/database";
 import { and, eq, inArray } from "drizzle-orm";
-import { expect, test } from "./auth";
+import { expect, test, waitForHydration } from "./auth";
 import {
   createMutationFixture,
   type MutationCleanupResult,
@@ -27,6 +27,7 @@ test("@mutation public collection browsing preserves effective privacy", async (
     privacy = fixture;
 
     await page.goto("/collections");
+    await waitForHydration(page);
     const publicCard = page
       .getByRole("article")
       .filter({ hasText: fixture.publicCollection.name });
@@ -46,8 +47,11 @@ test("@mutation public collection browsing preserves effective privacy", async (
     ).toHaveCount(0);
 
     await page
-      .getByRole("link", {
-        name: new RegExp(fixture.publicCollection.name, "u"),
+      .getByRole("link")
+      .filter({
+        has: page.getByRole("heading", {
+          name: fixture.publicCollection.name,
+        }),
       })
       .click();
     await expect(page).toHaveURL(
@@ -81,9 +85,9 @@ test("@mutation public collection browsing preserves effective privacy", async (
         name: fixture.publicSpinner.name,
       })
       .click();
-    await expect(
-      page.getByRole("heading", { level: 1, name: fixture.publicSpinner.name }),
-    ).toBeVisible();
+    await expect(page.locator('span[aria-current="page"]')).toHaveText(
+      fixture.publicSpinner.name,
+    );
     await expect(
       page.getByText("Default Button", { exact: true }),
     ).toBeVisible();
@@ -107,6 +111,7 @@ test("@mutation public collection browsing preserves effective privacy", async (
     await page.goto(
       `/collections/${fixture.ownerId}/${fixture.publicCollection.id}`,
     );
+    await waitForHydration(page);
     await page
       .getByRole("link", { exact: true, name: fixture.ownerUsername })
       .click();
@@ -114,10 +119,16 @@ test("@mutation public collection browsing preserves effective privacy", async (
       new RegExp(`/collections/${fixture.ownerId}$`, "u"),
     );
     await expect(
-      page.getByText(fixture.publicCollection.name, { exact: true }),
+      page.getByRole("heading", {
+        exact: true,
+        name: fixture.publicCollection.name,
+      }),
     ).toBeVisible();
     await expect(
-      page.getByText(fixture.emptyCollection.name, { exact: true }),
+      page.getByRole("heading", {
+        exact: true,
+        name: fixture.emptyCollection.name,
+      }),
     ).toBeVisible();
     await expect(
       page.getByText(fixture.privateCollection.name, { exact: true }),
@@ -185,7 +196,7 @@ test("@mutation admins can open private collection resources directly", async ({
     );
     await expect(
       page.getByRole("heading", {
-        level: 1,
+        level: 2,
         name: fixture.privateCollection.name,
       }),
     ).toBeVisible();
@@ -198,12 +209,9 @@ test("@mutation admins can open private collection resources directly", async ({
     await page.goto(
       `/collections/${fixture.ownerId}/${fixture.privateCollection.id}/${fixture.privateCollectionItem.id}`,
     );
-    await expect(
-      page.getByRole("heading", {
-        level: 1,
-        name: fixture.privateCollectionItem.name,
-      }),
-    ).toBeVisible();
+    await expect(page.locator('span[aria-current="page"]')).toHaveText(
+      fixture.privateCollectionItem.name,
+    );
     await expect(page.getByText("Delisted", { exact: true })).toBeVisible();
   } finally {
     try {
@@ -266,6 +274,10 @@ type PublicPrivacyFixture = {
 async function createPublicPrivacyFixture(
   mutation: MutationFixture,
 ): Promise<PublicPrivacyFixture> {
+  const collectionId = mutation.collectionId;
+  if (!collectionId) {
+    throw new Error("The public privacy fixture is missing a collection.");
+  }
   const database = createDb({
     databaseUrl: requiredEnvironment("DATABASE_URL"),
   });
@@ -275,14 +287,13 @@ async function createPublicPrivacyFixture(
     .from(schema.user)
     .where(eq(schema.user.clerkId, clerkId))
     .limit(1);
-  const privateCollectionId = mutation.collectionId;
-  if (privateCollectionId === null) {
+  if (mutation.collectionId === null) {
     throw new Error("The public privacy fixture dependencies are missing.");
   }
   const [privateCollection] = await database
     .select({ id: schema.userCollection.id, name: schema.userCollection.name })
     .from(schema.userCollection)
-    .where(eq(schema.userCollection.id, privateCollectionId))
+    .where(eq(schema.userCollection.id, collectionId))
     .limit(1);
   if (!owner || !privateCollection) {
     throw new Error("The public privacy fixture dependencies are missing.");

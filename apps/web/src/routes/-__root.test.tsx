@@ -2,6 +2,9 @@ import { loggerMessages } from "@package/logger";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+/**
+ * Controls settings responses and warning logs for root-route tests.
+ */
 const mocks = vi.hoisted(() => ({
   getSettings: vi.fn(),
   warn: vi.fn(),
@@ -29,15 +32,48 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/components/page-footer", () => ({
-  PageFooter: ({ year }: { year: number }) => <footer>{year}</footer>,
+  /**
+   * Renders the footer test double with the supplied year.
+   *
+   * @param props - Footer test properties.
+   * @param props.year - Copyright year to render.
+   * @returns The footer test markup.
+   */
+  PageFooter: ({
+    year,
+  }: {
+    /**
+     * Copyright year rendered in the footer.
+     */
+    year: number;
+  }) => <footer>{year}</footer>,
 }));
 
 vi.mock("@/providers/app-providers", () => ({
-  AppProviders: ({ children }: { children: React.ReactNode }) => children,
+  /**
+   * Passes nested content through the provider test double.
+   *
+   * @param props - Provider test properties.
+   * @param props.children - Nested application content.
+   * @returns The nested application content.
+   */
+  AppProviders: ({
+    children,
+  }: {
+    /**
+     * Nested application content.
+     */
+    children: React.ReactNode;
+  }) => children,
 }));
 
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  /**
+   * Renders the router outlet test marker.
+   *
+   * @returns The outlet test markup.
+   */
   Outlet: () => <main>route content</main>,
 }));
 

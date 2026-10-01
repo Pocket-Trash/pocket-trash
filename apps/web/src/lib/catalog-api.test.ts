@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { collectionWriteSchema, productFormSchema } from "./catalog-api";
 
+/**
+ * Baseline product-form fields combined with finish options by schema tests.
+ */
 const base = {
   bearing: "",
   buttonDiameterMm: null,
@@ -21,6 +24,9 @@ const base = {
   widthMm: null,
 };
 
+/**
+ * Valid finish-option fixtures reused by schema tests.
+ */
 const validFinishOptions = [
   {
     colorEffectId: null,
@@ -215,5 +221,25 @@ describe("collection writes", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("accepts 200 description words and rejects 201", () => {
+    const input = {
+      isPrivate: true,
+      name: "New collection",
+    };
+
+    expect(
+      collectionWriteSchema.safeParse({
+        ...input,
+        description: Array.from({ length: 200 }, () => "word").join(" \n"),
+      }).success,
+    ).toBe(true);
+    expect(
+      collectionWriteSchema.safeParse({
+        ...input,
+        description: Array.from({ length: 201 }, () => "word").join("\t"),
+      }).success,
+    ).toBe(false);
   });
 });
