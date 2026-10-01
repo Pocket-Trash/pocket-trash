@@ -6,6 +6,9 @@ import {
   scraperQueueNames,
 } from "../scraper-types.js";
 
+/**
+ * Retry and retention defaults shared by scraper queues.
+ */
 const defaultJobOptions: JobsOptions = {
   attempts: 5,
   backoff: {
@@ -21,18 +24,53 @@ const defaultJobOptions: JobsOptions = {
   },
 };
 
+/**
+ * Item and image queues plus their shared close operation.
+ */
 export type ScraperQueues = {
+  /**
+   * Closes both scraper queues.
+   *
+   * @returns A promise that resolves after both queues close.
+   *
+   * @rejects When queue processing or a required dependency fails.
+   */
   close: () => Promise<void>;
+  /**
+   * Queue containing scraper image upload and deletion jobs.
+   */
   images: Queue<ScraperImageJob>;
+  /**
+   * Queue containing normalized item and reconciliation jobs.
+   */
   items: Queue<ScraperItemJob>;
 };
 
+/**
+ * Actionable BullMQ job counts for one scraper queue.
+ */
 export type ScraperQueueJobCounts = {
+  /**
+   * Number of jobs currently being processed.
+   */
   active: number;
+  /**
+   * Number of jobs waiting for a delay to expire.
+   */
   delayed: number;
+  /**
+   * Number of jobs waiting to be processed.
+   */
   waiting: number;
 };
 
+/**
+ * Creates the item and image BullMQ queues over one Redis connection.
+ *
+ * @param connection - Redis connection shared by both queues.
+ *
+ * @returns Configured item and image queues.
+ */
 export function createScraperQueues(connection: Redis): ScraperQueues {
   const items = new Queue<ScraperItemJob>(scraperQueueNames.items, {
     connection,
@@ -44,6 +82,11 @@ export function createScraperQueues(connection: Redis): ScraperQueues {
   });
 
   return {
+    /**
+     * Closes both scraper queues.
+     *
+     * @rejects When queue processing or a required dependency fails.
+     */
     async close() {
       await Promise.all([items.close(), images.close()]);
     },
@@ -52,6 +95,19 @@ export function createScraperQueues(connection: Redis): ScraperQueues {
   };
 }
 
+/**
+ * Removes completed jobs whose deterministic IDs will be reused.
+ *
+ * @param queue - BullMQ queue containing the jobs.
+ *
+ * @param jobIds - Deterministic job IDs that may be reused.
+ *
+ * @returns Number of completed jobs removed.
+ *
+ * @template TJobData - Queue job payload type.
+ *
+ * @rejects When queue processing or a required dependency fails.
+ */
 export async function removeCompletedJobsById<TJobData>(
   queue: Queue<TJobData>,
   jobIds: readonly string[],
@@ -72,6 +128,15 @@ export async function removeCompletedJobsById<TJobData>(
   return removed;
 }
 
+/**
+ * Loads actionable job counts for both scraper queues.
+ *
+ * @param queues - Item and image queues whose counts are queried.
+ *
+ * @returns Actionable counts keyed by image and item queue.
+ *
+ * @rejects When queue processing or a required dependency fails.
+ */
 export async function getScraperQueueJobCounts(
   queues: Pick<ScraperQueues, "images" | "items">,
 ) {
@@ -86,8 +151,21 @@ export async function getScraperQueueJobCounts(
   };
 }
 
+/**
+ * Checks whether either scraper queue has active, delayed, or waiting work.
+ *
+ * @param counts - Already-normalized queue counts to inspect.
+ *
+ * @returns Whether any queue has actionable work.
+ */
 export function hasActionableQueueJobs(counts: {
+  /**
+   * Actionable image-queue job counts.
+   */
   images: ScraperQueueJobCounts;
+  /**
+   * Actionable item-queue job counts.
+   */
   items: ScraperQueueJobCounts;
 }) {
   return (
@@ -101,6 +179,13 @@ export function hasActionableQueueJobs(counts: {
   );
 }
 
+/**
+ * Fills missing BullMQ job-count fields with zero.
+ *
+ * @param counts - Queue counts to inspect or normalize.
+ *
+ * @returns Complete active, delayed, and waiting counts.
+ */
 function normalizeQueueCounts(counts: Partial<ScraperQueueJobCounts>) {
   return {
     active: counts.active ?? 0,

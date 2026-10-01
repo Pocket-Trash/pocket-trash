@@ -1,9 +1,14 @@
 import privacyPolicySource from "@pocket-trash/localizations/legal/en-US/privacy-policy.mdx?raw";
+import termsOfServiceSource from "@pocket-trash/localizations/legal/en-US/terms-of-service.mdx?raw";
 import { type HelpDocument, parseHelpDocument } from "./help-content";
 
 /** Published legal documents keyed by their route slug. */
 const documents = new Map([
   ["privacy-policy", parseLegalDocument(privacyPolicySource, "privacy-policy")],
+  [
+    "terms-of-service",
+    parseLegalDocument(termsOfServiceSource, "terms-of-service"),
+  ],
 ]);
 
 /** Parsed legal Markdown and its required publication metadata. */
