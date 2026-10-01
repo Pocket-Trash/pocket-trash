@@ -24,13 +24,14 @@ type ToggleGroupBaseProps = Omit<
  */
 type ToggleGroupSingleProps = ToggleGroupBaseProps & {
   /**
-   * Initial uncontrolled toggle selection.
+   * Initial uncontrolled toggle selection. An empty or omitted string means no
+   * initial selection.
    */
   defaultValue?: string;
   /**
    * Reports selection changes.
    *
-   * @param value - Next selection value.
+   * @param value - Next selection, or an empty string when cleared.
    */
   onValueChange?: (value: string) => void;
   /**
@@ -40,7 +41,7 @@ type ToggleGroupSingleProps = ToggleGroupBaseProps & {
    */
   type?: "single";
   /**
-   * Current controlled selection.
+   * Current controlled selection. An empty or omitted string means no selection.
    */
   value?: string;
 };
@@ -50,13 +51,14 @@ type ToggleGroupSingleProps = ToggleGroupBaseProps & {
  */
 type ToggleGroupMultipleProps = ToggleGroupBaseProps & {
   /**
-   * Initial uncontrolled toggle selection.
+   * Initial uncontrolled toggle selection. An empty or omitted array means no
+   * initial selection.
    */
   defaultValue?: string[];
   /**
    * Reports selection changes.
    *
-   * @param value - Next selection value.
+   * @param value - Next selections, or an empty array when cleared.
    */
   onValueChange?: (value: string[]) => void;
   /**
@@ -64,7 +66,7 @@ type ToggleGroupMultipleProps = ToggleGroupBaseProps & {
    */
   type: "multiple";
   /**
-   * Current controlled selection.
+   * Current controlled selection. An empty or omitted array means no selection.
    */
   value?: string[];
 };

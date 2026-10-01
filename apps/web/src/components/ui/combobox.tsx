@@ -18,16 +18,24 @@ export type ComboboxOption = {
 };
 
 /**
+ * Builds the complete accessible label for a selection-removal control.
+ *
+ * @param name - Display name of the selected option.
+ * @returns The complete accessible label.
+ */
+type RemoveLabelBuilder = (name: string) => string;
+
+/**
  * Renders a single-select catalog combobox with an optional removable selection pill.
  *
  * @param props - Catalog combobox properties.
  * @param props.ariaLabel - Accessible label for the combobox input and trigger.
  * @param props.items - Options available for selection.
- * @param props.onValueChange - Callback invoked when the selection changes.
+ * @param props.onValueChange - Callback invoked with the selection, or `null` when cleared.
  * @param props.placeholder - Prompt shown when the combobox has no selection.
- * @param props.removeLabel - Accessible label for the optional removal control.
- * @param props.showSelectedPill - Whether to allow a non-default selection to render as a removable pill when `removeLabel` is provided.
- * @param props.value - Currently selected option.
+ * @param props.removeLabel - Prefix combined with the selected option name for the optional removal control.
+ * @param props.showSelectedPill - Whether to allow a selection pill when `removeLabel` is truthy, `value` is non-null, and `value.id` is not `"default"`.
+ * @param props.value - Currently selected option, or `null` when none is selected.
  * @returns The rendered catalog combobox UI.
  */
 export function CatalogCombobox({
@@ -50,7 +58,7 @@ export function CatalogCombobox({
   /**
    * Reports selection changes.
    *
-   * @param value - Next selection value.
+   * @param value - Next selection, or `null` when cleared.
    */
   onValueChange: (value: ComboboxOption | null) => void;
   /**
@@ -58,18 +66,19 @@ export function CatalogCombobox({
    */
   placeholder: string;
   /**
-   * Accessible label for the optional removal control.
+   * Prefix combined with the selected option name for the optional removal
+   * control.
    */
   removeLabel?: string;
   /**
-   * Whether to allow a non-default selection to render as a removable pill when
-   * `removeLabel` is provided.
+   * Whether to allow a selection pill when `removeLabel` is truthy, `value` is
+   * non-null, and `value.id` is not `"default"`.
    *
    * @default false
    */
   showSelectedPill?: boolean;
   /**
-   * Current controlled selection.
+   * Current controlled selection, or `null` when none is selected.
    */
   value: ComboboxOption | null;
 }) {
@@ -115,11 +124,11 @@ export function CatalogCombobox({
  * @param props.inputValue - Controlled combobox search text.
  * @param props.items - Options available for selection.
  * @param props.onInputValueChange - Callback invoked when the search text changes.
- * @param props.onValueChange - Callback invoked when the selected options change.
+ * @param props.onValueChange - Callback invoked with the selected options, or an empty array when none are selected.
  * @param props.placeholder - Prompt shown when the combobox has no selection.
  * @param props.removeDisabled - Whether selected options cannot be removed.
- * @param props.removeLabel - Accessible label or label builder for removal controls.
- * @param props.value - Currently selected options.
+ * @param props.removeLabel - String prefix combined with the selected option name, or a builder returning the complete accessible label.
+ * @param props.value - Currently selected options; an empty array means none are selected.
  * @returns The rendered catalog multi combobox UI.
  */
 export function CatalogMultiCombobox({
@@ -170,7 +179,7 @@ export function CatalogMultiCombobox({
   /**
    * Reports selection changes.
    *
-   * @param value - Next selection value.
+   * @param value - Next selected options, or an empty array when cleared.
    */
   onValueChange: (value: ComboboxOption[]) => void;
   /**
@@ -182,11 +191,12 @@ export function CatalogMultiCombobox({
    */
   removeDisabled?: boolean;
   /**
-   * Accessible label or builder called with the selected option name.
+   * String prefix combined with the selected option name, or a builder returning
+   * the complete accessible label.
    */
-  removeLabel: string | ((name: string) => string);
+  removeLabel: string | RemoveLabelBuilder;
   /**
-   * Current controlled selection.
+   * Current controlled selection. An empty array means no options are selected.
    */
   value: ComboboxOption[];
 }) {
@@ -330,7 +340,7 @@ function ComboboxOptions({
  * @param props.className - Additional CSS classes.
  * @param props.disabled - Whether interaction is disabled.
  * @param props.onRemove - Callback invoked to remove the option.
- * @param props.removeLabel - Accessible label or label builder for removal controls.
+ * @param props.removeLabel - String prefix combined with the selected option name, or a builder returning the complete accessible label.
  * @param props.value - Selected option represented by the pill.
  * @returns The rendered selection pill UI.
  */
@@ -354,9 +364,10 @@ function SelectionPill({
    */
   onRemove: () => void;
   /**
-   * Accessible label or label builder for removal controls.
+   * String prefix combined with the selected option name, or a builder returning
+   * the complete accessible label.
    */
-  removeLabel: string | ((name: string) => string);
+  removeLabel: string | RemoveLabelBuilder;
   /**
    * Current controlled selection.
    */
