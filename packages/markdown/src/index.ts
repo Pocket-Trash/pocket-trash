@@ -388,7 +388,7 @@ function safeLink(href: string): {
   href: string;
 } | null {
   let decoded = href;
-  for (let pass = 0; pass < 3; pass += 1) {
+  while (true) {
     try {
       const next = decodeURIComponent(decoded);
       if (next === decoded) break;

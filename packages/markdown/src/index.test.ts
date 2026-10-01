@@ -95,6 +95,7 @@ describe("markdownToHtml", () => {
     "JaVaScRiPt:alert(1)",
     "java%73cript:alert(1)",
     "javascript%3Aalert(1)",
+    "%2525256A%25252561%25252576%25252561%25252573%25252563%25252572%25252569%25252570%25252574%2525253Aalert(1)",
     "java%0Ascript:alert(1)",
     "java\u0000script:alert(1)",
     "data:text/html,<script>alert(1)</script>",
