@@ -26,7 +26,8 @@
     "@package/services": "workspace:*",
     "@scalar/hono-api-reference": "^0.12.2",
     "drizzle-orm": "latest",
-    "hono": "^4.13.8"
+    "hono": "^4.13.8",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260916.1",
