@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getHelpDocument,
+  getHelpDocuments,
   getImageUploadGuidance,
   parseHelpDocument,
 } from "./help-content";
@@ -31,6 +32,17 @@ describe("help content", () => {
       title: "Image size and resolution guide",
     });
     expect(guide?.body).toContain("1200 × 900");
+  });
+
+  it("lists every help topic and falls back to English", () => {
+    const documents = getHelpDocuments("es-MX");
+
+    expect(documents.map((document) => document.metadata.title)).toEqual([
+      "How to Use Markdown",
+      "Guía de tamaño y resolución de imágenes",
+    ]);
+    expect(documents[0]?.body).toContain("```markdown");
+    expect(documents[0]?.body).not.toContain("datePublished:");
   });
 
   it("returns no document for unknown topics", () => {
