@@ -217,6 +217,13 @@ export function validateResourceImages(
   }
 }
 
+/**
+ * Uploads a resource creation or version session.
+ *
+ * @param input - Resource upload files, metadata, and callbacks.
+ * @returns The created resource and version identifiers.
+ * @rejects When validation or upload fails.
+ */
 export async function uploadResourceSession(input: {
   categories?: string[];
   description?: string;
@@ -229,6 +236,8 @@ export async function uploadResourceSession(input: {
   onProgress?(fileName: string, percent: number): void;
   onStage?(stage: "complete" | "upload"): void;
   operation: "create" | "version";
+  /** Staff reason for a cross-owner version upload. */
+  reason?: string;
   resourceId?: number;
   uploadFile?: FileUploader;
 }): Promise<{ resourceId: number; version: number }> {
@@ -247,7 +256,7 @@ export async function uploadResourceSession(input: {
             isPrivate: Boolean(input.isPrivate),
             name: input.name,
           }
-        : { operation: "version" },
+        : { operation: "version", reason: input.reason },
   })) as { resourceId: number; version: number };
 }
 

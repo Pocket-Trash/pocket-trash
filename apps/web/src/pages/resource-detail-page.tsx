@@ -41,6 +41,7 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
     () => new Set(),
   );
   const [deleting, setDeleting] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const t = (
@@ -273,6 +274,21 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
                 })}
               </p>
             </div>
+            {!detail.isOwner ? (
+              <label className="grid gap-2 text-sm font-medium">
+                {t("web.resources.moderation.reasonLabel")}
+                <textarea
+                  className="min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  maxLength={1000}
+                  onChange={(event) =>
+                    setDeleteReason(event.currentTarget.value)
+                  }
+                  placeholder={t("web.resources.moderation.reasonPlaceholder")}
+                  required
+                  value={deleteReason}
+                />
+              </label>
+            ) : null}
             <div className="flex justify-end gap-2">
               <Button
                 disabled={deleting}
@@ -283,12 +299,15 @@ export function ResourceDetailPage({ detail }: { detail: ResourceDetail }) {
                 {t("action.cancel")}
               </Button>
               <Button
-                disabled={deleting}
+                disabled={deleting || (!detail.isOwner && !deleteReason.trim())}
                 onClick={async () => {
                   setDeleting(true);
                   try {
                     await softDeleteResource({
-                      data: { resourceId: detail.id },
+                      data: {
+                        reason: deleteReason || undefined,
+                        resourceId: detail.id,
+                      },
                     });
                     toast.success(
                       t("web.resources.trash.softDeleteSuccess", {
