@@ -451,6 +451,8 @@ jobs:
               branchId: $branch_id
             }')"
 
+          pnpm exec tsx scripts/seed.ts
+
       - name: Verify Neon PR branch
         if: steps.db.outputs.can_deploy == 'true' && steps.db_changes.outputs.database == 'true'
         shell: bash
@@ -996,13 +998,14 @@ jobs:
             fi
           done
 
-      - name: Migrate and reconcile development users
+      - name: Migrate, seed, and reconcile development users
         env:
           DATABASE_URL: ${{ steps.development_db.outputs.database_url }}
           MIGRATION_DATABASE_URL: ${{ steps.development_db.outputs.migration_database_url }}
         run: |
           set -euo pipefail
           DATABASE_URL="$MIGRATION_DATABASE_URL" pnpm --filter @package/database exec drizzle-kit migrate --config=drizzle.config.ts
+          DATABASE_URL="$MIGRATION_DATABASE_URL" pnpm --filter @package/database exec tsx scripts/seed.ts
           pnpm --filter @app/api exec tsx src/scripts/reconcile-clerk-users.ts
 
       - name: Deploy stable development API

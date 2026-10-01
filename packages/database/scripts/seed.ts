@@ -1,6 +1,6 @@
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { createDb } from "../src/client.js";
 import { createDatabaseEnv } from "../src/env.schema.js";
 import {
@@ -10,7 +10,43 @@ import {
   maker,
   material,
   productType,
+  user,
+  userSettings,
 } from "../src/schema/index.js";
+
+/**
+ * Users required in shared non-production databases.
+ *
+ * @internal
+ */
+export const seedUsers = [
+  { clerkId: "user_3FrjTtIKHL0ptK6jeljcf5kCM7J", username: "royanger" },
+  { clerkId: "user_3JgqrEzHG8RsUFhfmm227e96VCq", username: "someadmin" },
+  { clerkId: "user_3JRUuhMIDwBBiLyc4smN8pAtGS9", username: "ranger" },
+  { clerkId: "user_3GacmU93tlb9EiT1wQCXRefMJi1", username: "bvg001" },
+  { clerkId: "user_3FxAxWTSZhoYlM2C3Jlpk5kGvUA", username: "bvgdigi" },
+  { clerkId: "user_3FtlpxLoJA3znNat7qXDb0RHcgm", username: "bvgdigital" },
+] as const;
+
+/**
+ * Non-default preferences required by seeded users.
+ *
+ * @internal
+ */
+export const seedUserSettings = [
+  {
+    clerkId: "user_3FrjTtIKHL0ptK6jeljcf5kCM7J",
+    values: {
+      currencyCode: "CAD" as const,
+      dimensionUnit: "mm" as const,
+      weightUnit: "g" as const,
+    },
+  },
+  {
+    clerkId: "user_3JRUuhMIDwBBiLyc4smN8pAtGS9",
+    values: { weightUnit: "oz" as const },
+  },
+] as const;
 
 /**
  * Canonical product types inserted by the catalog seed.
@@ -33,7 +69,7 @@ export const seedProductTypes = [
 export const seedMakers = [
   { name: "Autmog", rootUrl: "https://www.autmog.com" },
   { name: "Inventery", rootUrl: "https://www.inventery.co" },
-  { name: "KAP EDC", rootUrl: null },
+  { name: "KAP EDC", rootUrl: "https://www.kapedc.com" },
   { name: "Clean EDC", rootUrl: "https://cleanedc.com" },
   { name: "Magnus Fidgets", rootUrl: "https://magnusfidgets.com" },
   {
@@ -121,6 +157,48 @@ export function normalizeSeedUrl(url: string | null): string | null {
 }
 
 /**
+ * Upserts the users and preferences needed in non-production databases.
+ *
+ * @param db - Database client receiving the seed values.
+ * @rejects When a user read or write fails.
+ * @internal
+ */
+export async function seedUsersAndSettings(db: ReturnType<typeof createDb>) {
+  for (const value of seedUsers) {
+    await db
+      .insert(user)
+      .values(value)
+      .onConflictDoUpdate({
+        set: { username: value.username },
+        target: user.clerkId,
+      });
+  }
+
+  const users = await db
+    .select({ clerkId: user.clerkId, id: user.id })
+    .from(user)
+    .where(
+      inArray(
+        user.clerkId,
+        seedUsers.map(({ clerkId }) => clerkId),
+      ),
+    );
+  const ids = new Map(users.map(({ clerkId, id }) => [clerkId, id]));
+
+  for (const value of seedUserSettings) {
+    const userId = ids.get(value.clerkId);
+    if (!userId) throw new Error(`Seed user ${value.clerkId} is missing.`);
+    await db
+      .insert(userSettings)
+      .values({ ...value.values, userId })
+      .onConflictDoUpdate({
+        set: value.values,
+        target: userSettings.userId,
+      });
+  }
+}
+
+/**
  * Upserts the canonical catalog lookup values.
  *
  * @param db - Database client receiving the seed values.
@@ -199,10 +277,12 @@ export async function seedCatalog(db: ReturnType<typeof createDb>) {
 async function main() {
   const env = createDatabaseEnv({ DATABASE_URL: process.env.DATABASE_URL });
   if (!env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is required to seed the product catalog.");
+    throw new Error("DATABASE_URL is required to seed the database.");
   }
 
-  await seedCatalog(createDb({ databaseUrl: env.DATABASE_URL }));
+  const db = createDb({ databaseUrl: env.DATABASE_URL });
+  await seedUsersAndSettings(db);
+  await seedCatalog(db);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main();
