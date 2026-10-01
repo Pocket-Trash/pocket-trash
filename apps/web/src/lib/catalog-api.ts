@@ -21,8 +21,17 @@ import {
 } from "./catalog";
 import { getResourceViewer } from "./resources";
 
+/**
+ * Localization key used for missing required catalog input.
+ */
 const requiredMessage = "web.catalog.error.required";
 
+/**
+ * Reports whether the current actor may manage products or collections.
+ *
+ * @returns Whether the current actor has either management permission.
+ * @rejects If actor lookup fails.
+ */
 export const isCatalogAdmin = createServerFn().handler(async () => {
   const actor = await getActor();
   return (
@@ -30,35 +39,68 @@ export const isCatalogAdmin = createServerFn().handler(async () => {
     hasPermission(actor, "collections.manage")
   );
 });
+/**
+ * Localization key used for invalid catalog URLs.
+ */
 const urlMessage = "web.catalog.error.url";
 
+/**
+ * Schema for supported catalog product-type slugs.
+ */
 const productTypeSchema = z.enum(["spinner", "spinner-button"]);
+/**
+ * Schema for positive integer identifiers.
+ */
 const idSchema = z
   .number(requiredMessage)
   .int(requiredMessage)
   .positive(requiredMessage);
+/**
+ * Schema for optional positive numeric specifications.
+ */
 const numericSpecSchema = positiveDecimalSchema;
+/**
+ * Schema for non-empty names that produce a usable slug.
+ */
 const slugNameSchema = z
   .string()
   .trim()
   .min(1, requiredMessage)
   .refine((value) => slugify(value).length > 0, requiredMessage);
+/**
+ * Schema for a non-empty trimmed display name.
+ */
 const displayNameSchema = z.string().trim().min(1, requiredMessage);
+/**
+ * Schema that preserves nonblank descriptions, limits them to 5,000 characters, and maps whitespace-only values to `null`.
+ */
 const optionalDescriptionSchema = z
   .string()
   .max(5000, "web.catalog.error.descriptionLength")
   .transform((value) => (value.trim() ? value : null));
+/**
+ * Schema that trims bearing descriptions, limits them to 200 characters, and maps blanks to `null`.
+ */
 const optionalBearingSchema = z
   .string()
   .trim()
   .max(200, "web.catalog.error.bearingLength")
   .transform((value) => value || null);
+/**
+ * Schema that accepts blank or HTTP(S) URLs and normalizes blanks to `null`.
+ */
 const optionalUrlSchema = z
   .string()
   .trim()
   .refine((value) => isWebUrl(normalizeOptionalUrl(value)), urlMessage)
   .transform((value) => normalizeOptionalUrl(value) || null);
 
+/**
+ * Checks whether an optional URL uses HTTP or HTTPS.
+ *
+ * @param value - Optional URL text to validate.
+ * @returns `true` for `null` or a parseable HTTP(S) URL.
+ */
 function isWebUrl(value: string | null) {
   if (value === null) return true;
   try {
@@ -68,6 +110,9 @@ function isWebUrl(value: string | null) {
   }
 }
 
+/**
+ * Schema that validates finish, color, and color-effect combinations.
+ */
 export const finishOptionSchema = z
   .object({
     colorEffectId: idSchema.nullable(),
@@ -126,6 +171,9 @@ export const finishOptionSchema = z
     }
   });
 
+/**
+ * Schema that validates product form values and product-type-specific specifications.
+ */
 export const productFormSchema = z
   .object({
     bearing: optionalBearingSchema,
@@ -176,11 +224,17 @@ export const productFormSchema = z
     },
   );
 
+/**
+ * Schema for product-type and product route slugs.
+ */
 const productLookupSchema = z.object({
   productSlug: z.string().regex(slugPattern),
   productTypeSlug: z.string().regex(slugPattern),
 });
 
+/**
+ * Schema for maker names and optional root URLs.
+ */
 const makerSchema = z.object({
   name: z.string().trim().min(1, requiredMessage),
   rootUrl: z
@@ -193,11 +247,20 @@ const makerSchema = z.object({
     ),
 });
 
+/**
+ * Schema for material names.
+ */
 const materialSchema = z.object({
   name: slugNameSchema,
 });
 
+/**
+ * Schema for finish names.
+ */
 const finishSchema = z.object({ name: slugNameSchema });
+/**
+ * Schema for color names and six-digit uppercase hexadecimal values.
+ */
 const colorSchema = z.object({
   hex: z
     .string()
@@ -206,6 +269,9 @@ const colorSchema = z.object({
   name: slugNameSchema,
 });
 
+/**
+ * Schema for collection names, privacy, descriptions, and audit reasons.
+ */
 export const collectionWriteSchema = z.object({
   description: z
     .string()
@@ -221,17 +287,40 @@ export const collectionWriteSchema = z.object({
   reason: z.string().trim().max(1000).optional(),
 });
 
+/**
+ * Success or validation-aware failure returned by catalog lookup mutations.
+ *
+ * @template K - Success payload property name.
+ * @template T - Catalog lookup returned on success.
+ */
 type CatalogLookupMutationResult<
   K extends string,
   T extends CatalogLookup = CatalogLookup,
 > =
-  | ({ ok: true } & Record<K, T>)
+  | ({
+      /**
+       * Whether the mutation succeeded.
+       */
+      ok: true;
+    } & Record<K, T>)
   | {
+      /**
+       * Localized validation messages keyed by form field.
+       */
       fieldErrors: Record<string, string[] | undefined>;
+      /**
+       * Localized form-level failure message.
+       */
       formError: string;
+      /**
+       * Whether the mutation succeeded.
+       */
       ok: false;
     };
 
+/**
+ * Schema for adding a configured product and optional button to a collection.
+ */
 const collectionAddSchema = z
   .object({
     bearing: optionalBearingSchema,
@@ -291,6 +380,9 @@ const collectionAddSchema = z
     }
   });
 
+/**
+ * Schema for editing a collection item and its optional installed button.
+ */
 const collectionEditSchema = z
   .object({
     bearing: optionalBearingSchema,
@@ -333,18 +425,51 @@ const collectionEditSchema = z
     }
   });
 
+/**
+ * Unparsed input accepted by the product form schema.
+ */
 export type ProductFormInput = z.input<typeof productFormSchema>;
 
+/**
+ * Lookup values and spinner buttons required by catalog forms.
+ */
 export type CatalogOptions = {
+  /**
+   * Available color effects.
+   */
   colorEffects: Awaited<ReturnType<typeof listColorEffects>>;
+  /**
+   * Available catalog colors.
+   */
   colors: Awaited<ReturnType<typeof listColors>>;
+  /**
+   * Available finishes.
+   */
   finishes: Awaited<ReturnType<typeof listFinishes>>;
+  /**
+   * Available makers.
+   */
   makers: Awaited<ReturnType<typeof listMakers>>;
+  /**
+   * Available materials.
+   */
   materials: Awaited<ReturnType<typeof listMaterials>>;
+  /**
+   * Available product types.
+   */
   productTypes: Awaited<ReturnType<typeof listProductTypes>>;
+  /**
+   * Visible spinner-button products.
+   */
   spinnerButtons: CatalogProduct[];
 };
 
+/**
+ * Loads catalog lookups and visible spinner buttons.
+ *
+ * @returns Catalog form options.
+ * @rejects If service loading, viewer lookup, or a catalog query fails.
+ */
 export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
   async (): Promise<CatalogOptions> => {
     const { s } = await import("@/lib/services");
@@ -378,6 +503,12 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
   },
 );
 
+/**
+ * Lists visible products, optionally limited to one product type.
+ *
+ * @returns Visible products sorted by name when all product types are requested.
+ * @rejects If input validation, service loading, viewer lookup, a catalog query, or image signing fails.
+ */
 export const listCatalogProducts = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
     z
@@ -403,6 +534,12 @@ export const listCatalogProducts = createServerFn({ method: "GET" })
     );
   });
 
+/**
+ * Loads one visible catalog product by route slugs.
+ *
+ * @returns The product, with signed images when configured, or `null` when it is unavailable.
+ * @rejects If input validation, service loading, viewer lookup, the catalog query, or image signing fails.
+ */
 export const getCatalogProduct = createServerFn({ method: "GET" })
   .validator((input: unknown) => productLookupSchema.parse(input))
   .handler(async ({ data }): Promise<CatalogProduct | null> => {
@@ -416,13 +553,25 @@ export const getCatalogProduct = createServerFn({ method: "GET" })
     return product ? ((await signCatalogProducts([product]))[0] ?? null) : null;
   });
 
+/**
+ * Loads a visible product and the collection items that contain it.
+ *
+ * @returns The product and items, with signed images when configured, or `null` when unavailable.
+ * @rejects If input validation, service loading, viewer lookup, a catalog query, or image signing fails.
+ */
 export const getCatalogProductDetail = createServerFn({ method: "GET" })
   .validator((input: unknown) => productLookupSchema.parse(input))
   .handler(
     async ({
       data,
     }): Promise<{
+      /**
+       * Visible collection items containing the product.
+       */
       collectionItems: UserCollectionItem[];
+      /**
+       * Requested catalog product.
+       */
       product: CatalogProduct;
     } | null> => {
       const { s } = await import("@/lib/services");
@@ -447,6 +596,12 @@ export const getCatalogProductDetail = createServerFn({ method: "GET" })
     },
   );
 
+/**
+ * Validates and creates a maker for an authorized product manager.
+ *
+ * @returns The created maker or a validation-aware mutation failure.
+ * @rejects If permission checking or service loading fails.
+ */
 export const createCatalogMaker = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
@@ -467,6 +622,12 @@ export const createCatalogMaker = createServerFn({ method: "POST" })
     }
   });
 
+/**
+ * Validates and creates a uniquely slugged material for an authorized product manager.
+ *
+ * @returns The created material or a validation-aware mutation failure.
+ * @rejects If permission checking, service loading, or existing-material lookup fails.
+ */
 export const createCatalogMaterial = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
@@ -492,6 +653,12 @@ export const createCatalogMaterial = createServerFn({ method: "POST" })
     }
   });
 
+/**
+ * Validates and creates a uniquely slugged finish for an authorized product manager.
+ *
+ * @returns The created finish or a validation-aware mutation failure.
+ * @rejects If permission checking, service loading, or existing-finish lookup fails.
+ */
 export const createCatalogFinish = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }): Promise<CatalogLookupMutationResult<"finish">> => {
@@ -516,6 +683,12 @@ export const createCatalogFinish = createServerFn({ method: "POST" })
     }
   });
 
+/**
+ * Validates and creates a uniquely slugged color for an authorized product manager.
+ *
+ * @returns The created color or a validation-aware mutation failure.
+ * @rejects If permission checking, service loading, or existing-color lookup fails.
+ */
 export const createCatalogColor = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(
@@ -545,6 +718,12 @@ export const createCatalogColor = createServerFn({ method: "POST" })
     },
   );
 
+/**
+ * Validates and creates or updates a catalog product for the current actor.
+ *
+ * @returns The saved product or a validation-aware mutation failure.
+ * @rejects If authentication, service loading, or a prerequisite catalog query fails.
+ */
 export const saveCatalogProduct = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
@@ -622,6 +801,12 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     }
   });
 
+/**
+ * Validates and adds a product to a collection, requesting confirmation for duplicates.
+ *
+ * @returns The created item identifiers, a duplicate-confirmation result, or a validation-aware failure.
+ * @rejects If authentication or service loading fails.
+ */
 export const addCollectionProduct = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
@@ -696,6 +881,12 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
     }
   });
 
+/**
+ * Lists public collection owners, signing image URLs when configured.
+ *
+ * @returns Public owners with conditionally signed collection and item images.
+ * @rejects If service loading, viewer lookup, the owner query, or image signing fails.
+ */
 export const getPublicCollectionOwners = createServerFn({
   method: "GET",
 }).handler(async () => {
@@ -705,6 +896,12 @@ export const getPublicCollectionOwners = createServerFn({
   );
 });
 
+/**
+ * Loads one public collection owner by user ID.
+ *
+ * @returns The owner, with signed images when configured, or `null` when no visible owner matches.
+ * @rejects If input validation, service loading, viewer lookup, the owner query, or image signing fails.
+ */
 export const getPublicCollectionOwner = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ userId: idSchema }).parse(input))
   .handler(async ({ data }) => {
@@ -717,6 +914,12 @@ export const getPublicCollectionOwner = createServerFn({ method: "GET" })
     return owner ? ((await signCollectionOwners([owner]))[0] ?? null) : null;
   });
 
+/**
+ * Loads a public collection item and its optional installed button.
+ *
+ * @returns The item and installed button, with signed images when configured, or `null` when unavailable.
+ * @rejects If input validation, service loading, viewer lookup, an item query, or image signing fails.
+ */
 export const getPublicCollectionItem = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
     z
@@ -753,6 +956,12 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
     };
   });
 
+/**
+ * Lists the current user's collection items.
+ *
+ * @returns The actor's collection items, with signed images when configured.
+ * @rejects If authentication, service loading, the item query, or image signing fails.
+ */
 export const getUserCollection = createServerFn({ method: "GET" }).handler(
   async () => {
     const actor = await requireActor();
@@ -763,6 +972,12 @@ export const getUserCollection = createServerFn({ method: "GET" }).handler(
   },
 );
 
+/**
+ * Lists the current user's collection summaries.
+ *
+ * @returns The actor's collection summaries, with signed cover images when configured.
+ * @rejects If authentication, service loading, the collection query, or image signing fails.
+ */
 export const getUserCollections = createServerFn({ method: "GET" }).handler(
   async () => {
     const actor = await requireActor();
@@ -773,6 +988,12 @@ export const getUserCollections = createServerFn({ method: "GET" }).handler(
   },
 );
 
+/**
+ * Loads collection choices and a best-effort default collection name.
+ *
+ * @returns Collection choices with conditionally signed covers, the optional default name, and sync status.
+ * @rejects If authentication, service loading, collection lookup, or image signing fails.
+ */
 export const getCollectionAddContext = createServerFn({
   method: "GET",
 }).handler(async () => {
@@ -797,6 +1018,12 @@ export const getCollectionAddContext = createServerFn({
   };
 });
 
+/**
+ * Loads one owned collection and its items.
+ *
+ * @returns The collection and items, with signed images when configured, or `null` when unavailable.
+ * @rejects If input validation, authentication, service loading, a collection query, or image signing fails.
+ */
 export const getUserCollectionById = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
     z.object({ collectionId: idSchema }).parse(input),
@@ -817,7 +1044,12 @@ export const getUserCollectionById = createServerFn({ method: "GET" })
     };
   });
 
-/** Loads deletion choices and their affected item count for a collection. */
+/**
+ * Loads collection deletion choices and the affected item count.
+ *
+ * @returns Destinations with conditionally signed covers and the item count, or `null` when unavailable.
+ * @rejects If input validation, authentication, service loading, the context query, or image signing fails.
+ */
 export const getCollectionDeletionContext = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
     z.object({ collectionId: idSchema }).parse(input),
@@ -836,7 +1068,11 @@ export const getCollectionDeletionContext = createServerFn({ method: "GET" })
     };
   });
 
-/** Moves or permanently deletes a collection and its contents. */
+/**
+ * Moves or permanently deletes a collection and its contents.
+ *
+ * @rejects If input validation, authentication, service loading, service authorization, auditing, operation logging, or persistence fails.
+ */
 export const deleteUserCollection = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
@@ -853,6 +1089,12 @@ export const deleteUserCollection = createServerFn({ method: "POST" })
     await s.db.collections.deleteCollection({ actor, ...data });
   });
 
+/**
+ * Loads a public collection, its owner, and items, signing images when configured.
+ *
+ * @returns The collection, items, and optional owner username, or `null` when unavailable.
+ * @rejects If input validation, service loading, viewer lookup, a collection query, or image signing fails.
+ */
 export const getPublicCollection = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
     z.object({ collectionId: idSchema, userId: idSchema }).parse(input),
@@ -883,6 +1125,11 @@ export const getPublicCollection = createServerFn({ method: "GET" })
     };
   });
 
+/**
+ * Selects or clears an owned collection's cover image.
+ *
+ * @rejects If input validation, authentication, service loading, service authorization, auditing, operation logging, or persistence fails.
+ */
 export const selectCollectionCover = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
@@ -899,6 +1146,12 @@ export const selectCollectionCover = createServerFn({ method: "POST" })
     await s.db.catalog.selectCollectionCover({ ...data, actor });
   });
 
+/**
+ * Validates and creates or updates a collection.
+ *
+ * @returns The collection, with signed images when configured, or a validation-aware mutation failure.
+ * @rejects If authentication or service loading fails.
+ */
 export const saveCollection = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     collectionWriteSchema
@@ -931,6 +1184,12 @@ export const saveCollection = createServerFn({ method: "POST" })
     }
   });
 
+/**
+ * Loads one owned collection summary.
+ *
+ * @returns The owned collection summary, or `null` when it is unavailable.
+ * @rejects If input validation, authentication, service loading, or the collection query fails.
+ */
 export const getUserCollectionSummary = createServerFn({
   method: "GET",
 })
@@ -943,6 +1202,12 @@ export const getUserCollectionSummary = createServerFn({
     return await s.db.collections.getOwnedCollection(actor, data.collectionId);
   });
 
+/**
+ * Loads an owned item and its collection-edit choices.
+ *
+ * @returns Edit data, or empty choices with a `null` item and product when the item is unavailable.
+ * @rejects If input validation, authentication, service loading, a catalog query, or image signing fails.
+ */
 export const getCollectionEditData = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
     z.object({ collectionItemId: idSchema }).parse(input),
@@ -987,6 +1252,12 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
     };
   });
 
+/**
+ * Validates and updates a collection item.
+ *
+ * @returns A success marker or a validation-aware mutation failure.
+ * @rejects If authentication or service loading fails.
+ */
 export const updateCollectionItem = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => {
@@ -1017,6 +1288,11 @@ export const updateCollectionItem = createServerFn({ method: "POST" })
     }
   });
 
+/**
+ * Moves a product or collection-item image to trash.
+ *
+ * @rejects If input validation, authentication, service loading, service authorization, auditing, operation logging, or persistence fails.
+ */
 export const softDeleteCatalogImage = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
@@ -1036,6 +1312,11 @@ export const softDeleteCatalogImage = createServerFn({ method: "POST" })
     });
   });
 
+/**
+ * Restores a trashed product or collection-item image.
+ *
+ * @rejects If input validation, authentication, service loading, service authorization, auditing, operation logging, or persistence fails.
+ */
 export const restoreCatalogImage = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
@@ -1055,6 +1336,12 @@ export const restoreCatalogImage = createServerFn({ method: "POST" })
     });
   });
 
+/**
+ * Lists trashed catalog images, signing URLs when configured.
+ *
+ * @returns Trashed catalog images with conditionally signed URLs.
+ * @rejects If authentication, service loading, the trash query, or image signing fails.
+ */
 export const listCatalogImageTrash = createServerFn({ method: "GET" }).handler(
   async () => {
     const actor = await requireActor();
@@ -1065,6 +1352,11 @@ export const listCatalogImageTrash = createServerFn({ method: "GET" }).handler(
   },
 );
 
+/**
+ * Changes product visibility.
+ *
+ * @rejects If input validation, authentication, service loading, service authorization, auditing, operation logging, or persistence fails.
+ */
 export const setProductVisibility = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
@@ -1084,6 +1376,11 @@ export const setProductVisibility = createServerFn({ method: "POST" })
     });
   });
 
+/**
+ * Changes collection visibility.
+ *
+ * @rejects If input validation, authentication, service loading, service authorization, auditing, operation logging, or persistence fails.
+ */
 export const setCollectionVisibility = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
@@ -1103,6 +1400,11 @@ export const setCollectionVisibility = createServerFn({ method: "POST" })
     });
   });
 
+/**
+ * Changes collection-item visibility.
+ *
+ * @rejects If input validation, authentication, service loading, service authorization, auditing, operation logging, or persistence fails.
+ */
 export const setCollectionItemVisibility = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
@@ -1122,6 +1424,12 @@ export const setCollectionItemVisibility = createServerFn({ method: "POST" })
     });
   });
 
+/**
+ * Removes validation-only color-effect metadata from a finish option.
+ *
+ * @param option - Validated finish option to convert.
+ * @returns The database write shape for the finish option.
+ */
 function toFinishWriteOption(
   option: z.infer<typeof finishOptionSchema>,
 ): ProductWriteInput["finishOptions"][number] {
@@ -1132,36 +1440,78 @@ function toFinishWriteOption(
   };
 }
 
+/**
+ * Loads catalog makers.
+ *
+ * @returns A promise resolving to catalog makers.
+ * @rejects If the service module or maker query fails.
+ */
 async function listMakers() {
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listMakers();
 }
 
+/**
+ * Loads catalog color effects.
+ *
+ * @returns A promise resolving to catalog color effects.
+ * @rejects If the service module or color-effect query fails.
+ */
 async function listColorEffects(): Promise<CatalogLookup[]> {
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listColorEffects();
 }
 
+/**
+ * Loads catalog colors.
+ *
+ * @returns A promise resolving to catalog colors.
+ * @rejects If the service module or color query fails.
+ */
 async function listColors(): Promise<CatalogLookup[]> {
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listColors();
 }
 
+/**
+ * Loads catalog finishes.
+ *
+ * @returns A promise resolving to catalog finishes.
+ * @rejects If the service module or finish query fails.
+ */
 async function listFinishes(): Promise<CatalogLookup[]> {
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listFinishes();
 }
 
+/**
+ * Loads catalog materials.
+ *
+ * @returns A promise resolving to catalog materials.
+ * @rejects If the service module or material query fails.
+ */
 async function listMaterials() {
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listMaterials();
 }
 
+/**
+ * Loads catalog product types.
+ *
+ * @returns A promise resolving to catalog product types.
+ * @rejects If the service module or product-type query fails.
+ */
 async function listProductTypes() {
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listProductTypes();
 }
 
+/**
+ * Converts a Zod error into the standard form failure shape.
+ *
+ * @param error - Validation or mutation error to normalize.
+ * @returns The standard validation failure payload.
+ */
 function validationFailure(error: z.ZodError) {
   return {
     fieldErrors: z.flattenError(error).fieldErrors,
@@ -1171,6 +1521,12 @@ function validationFailure(error: z.ZodError) {
   };
 }
 
+/**
+ * Converts a caught mutation error into a duplicate or generic form failure.
+ *
+ * @param error - Validation or mutation error to normalize.
+ * @returns The standard mutation failure payload.
+ */
 function mutationFailure(error: unknown) {
   return {
     fieldErrors: {},
@@ -1183,6 +1539,13 @@ function mutationFailure(error: unknown) {
   };
 }
 
+/**
+ * Returns product copies with image URLs signed when configured.
+ *
+ * @param products - Catalog products whose images should be signed.
+ * @returns Product copies with conditionally signed image URLs.
+ * @rejects If image URL signing fails.
+ */
 async function signCatalogProducts(products: CatalogProduct[]) {
   return await Promise.all(
     products.map(async (product) => ({
@@ -1192,8 +1555,23 @@ async function signCatalogProducts(products: CatalogProduct[]) {
   );
 }
 
+/**
+ * Returns a collection-item copy with item and product image URLs signed when configured.
+ *
+ * @param item - Collection item whose image URLs should be signed.
+ * @returns The collection item with conditionally signed image URLs.
+ * @rejects If image URL signing fails.
+ * @template T - Collection-item shape preserved by the operation.
+ */
 async function signCollectionItem<
-  T extends { images: CatalogImage[]; productImages: CatalogImage[] },
+  T extends {
+    /**
+     * Images owned by the collection item.
+     */
+    images: CatalogImage[];
+    /** Images inherited from the catalog product. */
+    productImages: CatalogImage[];
+  },
 >(item: T): Promise<T> {
   const [images, productImages] = await Promise.all([
     signCatalogImageUrls(item.images),
@@ -1202,6 +1580,13 @@ async function signCollectionItem<
   return { ...item, images, productImages };
 }
 
+/**
+ * Returns collection-summary copies with cover image URLs signed when configured.
+ *
+ * @param collections - Collection summaries to sign.
+ * @returns Collection copies with conditionally signed cover URLs.
+ * @rejects If cover image URL signing fails.
+ */
 async function signCollectionSummaries(
   collections: UserCollectionSummary[],
 ): Promise<UserCollectionSummary[]> {
@@ -1219,10 +1604,31 @@ async function signCollectionSummaries(
   );
 }
 
+/**
+ * Returns owner copies with collection and item image URLs signed when configured.
+ *
+ * @param owners - Public collection owners to sign.
+ * @returns Owner copies with conditionally signed nested image URLs.
+ * @rejects If nested collection or item image signing fails.
+ * @template T - Collection-owner shape preserved by the operation.
+ */
 async function signCollectionOwners<
   T extends {
+    /**
+     * Collection summaries owned by the user.
+     */
     collections: UserCollectionSummary[];
-    items: Array<{ images: CatalogImage[]; productImages: CatalogImage[] }>;
+    /**
+     * Collection items owned by the user.
+     */
+    items: Array<{
+      /**
+       * Images owned by the collection item.
+       */
+      images: CatalogImage[];
+      /** Images inherited from the catalog product. */
+      productImages: CatalogImage[];
+    }>;
   },
 >(owners: T[]): Promise<T[]> {
   return await Promise.all(
@@ -1234,6 +1640,14 @@ async function signCollectionOwners<
   );
 }
 
+/**
+ * Signs catalog image URLs when Bunny CDN credentials are configured.
+ *
+ * @param images - Catalog images whose URLs may need signing.
+ * @returns A promise resolving to signed image copies, or the original array when signing is disabled.
+ * @rejects If the signing modules fail to load or sign an image.
+ * @template T - Catalog image subtype preserved by the operation.
+ */
 async function signCatalogImageUrls<T extends CatalogImage>(
   images: T[],
 ): Promise<T[]> {
@@ -1252,12 +1666,24 @@ async function signCatalogImageUrls<T extends CatalogImage>(
   );
 }
 
+/**
+ * Checks and narrows a string to a supported catalog product type.
+ *
+ * @param value - Candidate product-type slug.
+ * @returns Whether the value is a supported catalog product type.
+ */
 export function productTypeIsSupported(
   value: string,
 ): value is CatalogProductType {
   return productTypeSchema.safeParse(value).success;
 }
 
+/**
+ * Builds the normalized slug preview for a product name.
+ *
+ * @param name - Human-readable name.
+ * @returns The normalized product slug preview.
+ */
 export function productSlugPreview(name: string): string {
   return slugify(name);
 }
