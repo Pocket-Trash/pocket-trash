@@ -52,6 +52,7 @@ export type {
   ErasureOperations,
   ErasureReceipt,
   ErasureService,
+  FeedbackAdminActionInput,
   FeedbackListItem,
   FeedbackMergeTarget,
   FeedbackNotificationItem,
@@ -62,6 +63,7 @@ export type {
   ListAdminFeedbackOptions,
   ListAuditEventsInput,
   ListMyFeedbackOptions,
+  MergePendingFeedbackInput,
   ProductWriteInput,
   PublicCollectionOwner,
   SubmitFeedbackInput,
@@ -160,7 +162,12 @@ export class Services {
 
       const db = createDb(config.db);
       this.#db = createDbServices(db, this.#logger);
-      this.#flags = createFeatureFlagsService(db, this.#db.users, this.#logger);
+      this.#flags = createFeatureFlagsService(
+        db,
+        this.#db.users,
+        this.#logger,
+        this.#db.audit,
+      );
       if (config.storage) {
         const configStorage = config.storage;
         const storage = createUploadStorage(configStorage);

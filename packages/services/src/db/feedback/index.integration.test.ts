@@ -4,14 +4,28 @@ import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
-import { createLogger } from "@package/logger";
+import { createNoopLogger } from "@package/logger";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
-import {
-  createFeedbackService,
-  FeedbackPlanRecoveryRequiredError,
-} from "./index.js";
+import { createDbServices } from "../index.js";
+import { FeedbackPlanRecoveryRequiredError } from "./index.js";
+
+/** Staff actor used by administrative feedback checks. */
+const adminActor = { clerkId: "feedback-admin", role: "admin" } as const;
+
+/**
+ * Creates feedback services with production audit dependencies.
+ *
+ * @param db - Isolated integration-test database.
+ * @returns Feedback service configured through the production factory.
+ */
+function createFeedbackTestService(db: Database) {
+  return createDbServices(
+    db,
+    createNoopLogger({ app: "test", environment: "test" }),
+  ).feedback;
+}
 
 describe("feedback lifecycle", () => {
   it("creates a pending request, permanent vote, and submitted notification atomically", async () => {
@@ -20,10 +34,7 @@ describe("feedback lifecycle", () => {
 
     try {
       await migrate(client);
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
 
       const created = await service.submit({
         description: "Let people save searches.",
@@ -72,10 +83,7 @@ describe("feedback lifecycle", () => {
 
     try {
       await migrate(client);
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
       const feedback = await service.submit({
         description: "Notify admins about lifecycle changes.",
         submitterClerkId: "submitter",
@@ -135,10 +143,7 @@ describe("feedback lifecycle", () => {
           title: `Request ${index}`,
         })),
       );
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
 
       const results = await Promise.allSettled([
         service.submit({
@@ -174,10 +179,7 @@ describe("feedback lifecycle", () => {
 
     try {
       await migrate(client);
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
       const approved = await service.submit({
         description: "First description",
         submitterClerkId: "user-test",
@@ -189,7 +191,9 @@ describe("feedback lifecycle", () => {
         title: "Second title",
       });
 
-      await expect(service.approve(approved.id)).rejects.toThrow();
+      await expect(
+        service.approve({ actor: adminActor, feedbackId: approved.id }),
+      ).rejects.toThrow();
       await service.updatePending({
         category: "feature",
         description: "Edited description",
@@ -197,6 +201,7 @@ describe("feedback lifecycle", () => {
         title: "Edited title",
       });
       await service.updateAdmin({
+        actor: adminActor,
         description: "Edited description",
         feedbackId: approved.id,
         title: "Edited title",
@@ -206,15 +211,18 @@ describe("feedback lifecycle", () => {
           ({ id }) => id === approved.id,
         ),
       ).toEqual(expect.objectContaining({ category: null, id: approved.id }));
-      await expect(service.approve(approved.id)).rejects.toThrow();
+      await expect(
+        service.approve({ actor: adminActor, feedbackId: approved.id }),
+      ).rejects.toThrow();
       await service.updateAdmin({
+        actor: adminActor,
         category: "feature",
         description: "Edited description",
         feedbackId: approved.id,
         title: "Edited title",
       });
-      await service.approve(approved.id);
-      await service.deny(denied.id);
+      await service.approve({ actor: adminActor, feedbackId: approved.id });
+      await service.deny({ actor: adminActor, feedbackId: denied.id });
 
       expect((await service.listMine("user-test")).items).toEqual([
         expect.objectContaining({
@@ -243,10 +251,7 @@ describe("feedback lifecycle", () => {
           title: `Request ${index}`,
         })),
       );
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
 
       const firstPage = await service.listPending();
       const secondPage = await service.listPending({ offset: 30 });
@@ -311,10 +316,7 @@ describe("feedback lifecycle", () => {
         { feedbackId: popular.id, voterClerkId: "voter-1" },
         { feedbackId: popular.id, voterClerkId: "voter-2" },
       ]);
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
 
       const active = await service.listActive("viewer");
       const searched = await service.listActive("viewer", "old description");
@@ -341,17 +343,14 @@ describe("feedback lifecycle", () => {
 
     try {
       await migrate(client);
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
       const created = await service.submit({
         category: "feature",
         description: "Vote safely",
         submitterClerkId: "submitter",
         title: "Permanent vote",
       });
-      await service.approve(created.id);
+      await service.approve({ actor: adminActor, feedbackId: created.id });
 
       await expect(service.toggleVote(created.id, "submitter")).resolves.toBe(
         true,
@@ -417,10 +416,7 @@ describe("feedback lifecycle", () => {
           title: "Email alerts",
         },
       ]);
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
 
       const duplicates = await service.findDuplicates("viewer", "Saved search");
 
@@ -468,10 +464,7 @@ describe("feedback lifecycle", () => {
         ])
         .returning();
       if (!needle) throw new Error("Failed to seed feedback.");
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
 
       const firstPage = await service.listMine("owner");
       const searched = await service.listMine("owner", {
@@ -539,10 +532,7 @@ describe("feedback lifecycle", () => {
         { feedbackId: morePopular.id, voterClerkId: "voter-1" },
         { feedbackId: morePopular.id, voterClerkId: "voter-2" },
       ]);
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
 
       const active = await service.listAdminActive({
         search: "saved often",
@@ -596,17 +586,14 @@ describe("feedback lifecycle", () => {
 
     try {
       await migrate(client);
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
       const feedback = await service.submit({
         category: "feature",
         description: "Create this once in Linear.",
         submitterClerkId: "submitter",
         title: "Idempotent planning",
       });
-      await service.approve(feedback.id);
+      await service.approve({ actor: adminActor, feedbackId: feedback.id });
 
       const firstUuid = "11111111-1111-4111-8111-111111111111";
       const retryUuid = "22222222-2222-4222-8222-222222222222";
@@ -642,17 +629,14 @@ describe("feedback lifecycle", () => {
 
     try {
       await migrate(client);
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
       const feedback = await service.submit({
         category: "feature",
         description: "Follow Linear lifecycle changes.",
         submitterClerkId: "submitter",
         title: "Linear lifecycle",
       });
-      await service.approve(feedback.id);
+      await service.approve({ actor: adminActor, feedbackId: feedback.id });
       const entityUuid = "11111111-1111-4111-8111-111111111111";
       await service.reserveLinearPlan(feedback.id, entityUuid);
       await service.completeLinearPlan(feedback.id, entityUuid);
@@ -810,12 +794,10 @@ describe("feedback lifecycle", () => {
       if (!completed || !merged || !reserved || !requested) {
         throw new Error("Failed to seed editable feedback.");
       }
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
 
       await service.updateAdmin({
+        actor: adminActor,
         category: "improvement",
         description: "Updated description",
         feedbackId: completed.id,
@@ -823,16 +805,19 @@ describe("feedback lifecycle", () => {
       });
       await expect(
         service.updateAdmin({
+          actor: adminActor,
           category: "improvement",
           description: "Cannot update",
           feedbackId: merged.id,
           title: "Cannot update",
         }),
       ).rejects.toThrow();
-      await expect(service.deny(reserved.id)).rejects.toBeInstanceOf(
-        FeedbackPlanRecoveryRequiredError,
-      );
-      await expect(service.deny(requested.id)).resolves.toBeUndefined();
+      await expect(
+        service.deny({ actor: adminActor, feedbackId: reserved.id }),
+      ).rejects.toBeInstanceOf(FeedbackPlanRecoveryRequiredError);
+      await expect(
+        service.deny({ actor: adminActor, feedbackId: requested.id }),
+      ).resolves.toBeUndefined();
 
       expect(await service.listArchive({ statuses: ["completed"] })).toEqual({
         hasNext: false,
@@ -855,17 +840,14 @@ describe("feedback lifecycle", () => {
 
     try {
       await migrate(client);
-      const service = createFeedbackService(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      );
+      const service = createFeedbackTestService(db as unknown as Database);
       const target = await service.submit({
         category: "feature",
         description: "Approved target",
         submitterClerkId: "target-owner",
         title: "Approved target",
       });
-      await service.approve(target.id);
+      await service.approve({ actor: adminActor, feedbackId: target.id });
       const first = await service.submit({
         description: "First duplicate",
         submitterClerkId: "duplicate-owner",
@@ -888,10 +870,26 @@ describe("feedback lifecycle", () => {
         .returning();
       if (!completedTarget) throw new Error("Failed to seed completed target.");
 
-      await expect(service.mergePending(target.id, first.id)).rejects.toThrow();
-      await expect(service.mergePending(first.id, second.id)).rejects.toThrow();
       await expect(
-        service.mergePending(first.id, completedTarget.id),
+        service.mergePending({
+          actor: adminActor,
+          feedbackId: target.id,
+          targetId: first.id,
+        }),
+      ).rejects.toThrow();
+      await expect(
+        service.mergePending({
+          actor: adminActor,
+          feedbackId: first.id,
+          targetId: second.id,
+        }),
+      ).rejects.toThrow();
+      await expect(
+        service.mergePending({
+          actor: adminActor,
+          feedbackId: first.id,
+          targetId: completedTarget.id,
+        }),
       ).rejects.toThrow();
       expect(
         await db
@@ -900,8 +898,16 @@ describe("feedback lifecycle", () => {
           .where(eq(schema.feedback.id, first.id)),
       ).toEqual([{ status: "pending" }]);
 
-      await service.mergePending(first.id, target.id);
-      await service.mergePending(second.id, target.id);
+      await service.mergePending({
+        actor: adminActor,
+        feedbackId: first.id,
+        targetId: target.id,
+      });
+      await service.mergePending({
+        actor: adminActor,
+        feedbackId: second.id,
+        targetId: target.id,
+      });
 
       expect(
         await db

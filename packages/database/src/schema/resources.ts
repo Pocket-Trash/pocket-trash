@@ -13,12 +13,15 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+/** Lifecycle events that create resource notifications. */
 export const resourceNotificationTypes = [
   "resource_created",
   "category_created",
 ] as const;
+/** Roles allowed to soft-delete resources. */
 export const resourceDeletionRoles = ["owner", "admin"] as const;
 
+/** User-uploaded resources and their lifecycle state. */
 export const resources = pgTable(
   "resources",
   {
@@ -63,6 +66,7 @@ export const resources = pgTable(
   ],
 );
 
+/** Ordered images attached to resources. */
 export const resourceImages = pgTable(
   "resource_images",
   {
@@ -95,6 +99,7 @@ export const resourceImages = pgTable(
   ],
 );
 
+/** Immutable uploaded versions of resources. */
 export const resourceVersions = pgTable(
   "resource_versions",
   {
@@ -138,6 +143,7 @@ export const resourceVersions = pgTable(
   ],
 );
 
+/** Files belonging to immutable resource versions. */
 export const resourceFiles = pgTable(
   "resource_files",
   {
@@ -168,6 +174,7 @@ export const resourceFiles = pgTable(
   ],
 );
 
+/** Reusable categories assigned to resources. */
 export const resourceCategories = pgTable("resource_categories", {
   id: bigint("id", { mode: "number" })
     .primaryKey()
@@ -180,6 +187,7 @@ export const resourceCategories = pgTable("resource_categories", {
     .notNull(),
 });
 
+/** Unique resource-to-category assignments. */
 export const resourcesToCategories = pgTable(
   "resources_to_categories",
   {
@@ -199,6 +207,7 @@ export const resourcesToCategories = pgTable(
   ],
 );
 
+/** Unique authenticated downloads of resource versions. */
 export const resourceDownloads = pgTable(
   "resource_downloads",
   {
@@ -222,6 +231,7 @@ export const resourceDownloads = pgTable(
   ],
 );
 
+/** Admin notifications emitted for new resources and categories. */
 export const resourceNotifications = pgTable(
   "resource_notifications",
   {
@@ -260,18 +270,32 @@ export const resourceNotifications = pgTable(
   ],
 );
 
+/** Stored resource row. */
 export type Resource = typeof resources.$inferSelect;
+/** Values accepted when creating a resource row. */
 export type NewResource = typeof resources.$inferInsert;
+/** Stored resource version row. */
 export type ResourceVersion = typeof resourceVersions.$inferSelect;
+/** Values accepted when creating a resource version row. */
 export type NewResourceVersion = typeof resourceVersions.$inferInsert;
+/** Stored resource file row. */
 export type ResourceFile = typeof resourceFiles.$inferSelect;
+/** Values accepted when creating a resource file row. */
 export type NewResourceFile = typeof resourceFiles.$inferInsert;
 
+/** Stored resource image row. */
 export type ResourceImage = typeof resourceImages.$inferSelect;
+/** Values accepted when creating a resource image row. */
 export type NewResourceImage = typeof resourceImages.$inferInsert;
+/** Stored resource category row. */
 export type ResourceCategory = typeof resourceCategories.$inferSelect;
+/** Values accepted when creating a resource category row. */
 export type NewResourceCategory = typeof resourceCategories.$inferInsert;
+/** Stored resource download row. */
 export type ResourceDownload = typeof resourceDownloads.$inferSelect;
+/** Values accepted when creating a resource download row. */
 export type NewResourceDownload = typeof resourceDownloads.$inferInsert;
+/** Stored resource notification row. */
 export type ResourceNotification = typeof resourceNotifications.$inferSelect;
+/** Values accepted when creating a resource notification row. */
 export type NewResourceNotification = typeof resourceNotifications.$inferInsert;

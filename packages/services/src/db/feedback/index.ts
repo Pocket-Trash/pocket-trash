@@ -1,4 +1,5 @@
 import type {
+  AuditJsonObject,
   Database,
   FeedbackCategory,
   FeedbackStatus,
@@ -18,7 +19,10 @@ import {
   type SQL,
   sql,
 } from "drizzle-orm";
+import { type Actor, hasPermission } from "../../authorization.js";
 import { hashLogIdentifier } from "../../logging.js";
+import { feedbackAudit, writeFeedbackAudit } from "../audit/feedback.js";
+import type { AuditService } from "../audit/index.js";
 
 const activeStatuses: (typeof schema.feedbackStatuses)[number][] = [
   "pending",
@@ -134,14 +138,39 @@ export type SubmitFeedbackInput = {
   title: string;
 };
 
+/** Actor and editable fields for an administrative feedback update. */
 export type UpdateAdminFeedbackInput = {
+  /** Authorized staff actor. */
+  actor: Actor;
+  /** Updated feedback category. */
   category?: FeedbackCategory;
+  /** Updated feedback description. */
   description: string;
+  /** Feedback identifier. */
   feedbackId: number;
+  /** Updated feedback title. */
   title: string;
 };
 
-export type UpdatePendingFeedbackInput = UpdateAdminFeedbackInput;
+/** Submitter-editable fields for a pending feedback request. */
+export type UpdatePendingFeedbackInput = Omit<
+  UpdateAdminFeedbackInput,
+  "actor"
+>;
+
+/** Authorized input for an administrative feedback decision. */
+export type FeedbackAdminActionInput = {
+  /** Authorized staff actor. */
+  actor: Actor;
+  /** Feedback identifier. */
+  feedbackId: number;
+};
+
+/** Authorized input for merging one pending request into another. */
+export type MergePendingFeedbackInput = FeedbackAdminActionInput & {
+  /** Destination feedback identifier. */
+  targetId: number;
+};
 
 /** Reserved feedback data used to create a Linear entity. */
 export type FeedbackPlanReservation = Pick<
@@ -176,10 +205,10 @@ export type FeedbackService = {
   /**
    * Approves a feedback request for planning.
    *
-   * @param feedbackId - Feedback identifier.
+   * @param input - Authorized feedback decision.
    * @returns Completion of the update.
    */
-  approve(feedbackId: number): Promise<void>;
+  approve(input: FeedbackAdminActionInput): Promise<void>;
   /**
    * Marks a linked feedback plan as completed.
    *
@@ -194,10 +223,10 @@ export type FeedbackService = {
   /**
    * Denies a pending feedback request.
    *
-   * @param feedbackId - Feedback identifier.
+   * @param input - Authorized feedback decision.
    * @returns Completion of the update.
    */
-  deny(feedbackId: number): Promise<void>;
+  deny(input: FeedbackAdminActionInput): Promise<void>;
   /**
    * Finds active feedback with similar title terms.
    *
@@ -274,7 +303,13 @@ export type FeedbackService = {
     notificationId: number,
     actorClerkId: string,
   ): Promise<void>;
-  mergePending(feedbackId: number, targetId: number): Promise<void>;
+  /**
+   * Merges a pending request into active feedback.
+   *
+   * @param input - Authorized source and destination identifiers.
+   * @returns Completion of the transactional merge.
+   */
+  mergePending(input: MergePendingFeedbackInput): Promise<void>;
   reserveLinearPlan(
     feedbackId: number,
     linearClientUuid: string,
@@ -305,30 +340,59 @@ export class FeedbackPlanRecoveryRequiredError extends Error {}
  *
  * @param db - Application database.
  * @param logger - Application logger.
+ * @param audit - Shared audit service.
  * @returns The configured feedback service.
  */
 export function createFeedbackService(
   db: Database,
   logger: Logger,
+  audit: AuditService,
 ): FeedbackService {
   return {
-    async approve(feedbackId) {
+    /**
+     * Approves categorized feedback and records the staff decision.
+     *
+     * @param input - Authorized feedback decision.
+     * @returns Completion after the mutation and audit event commit.
+     * @rejects When authorization, state, or audit persistence fails.
+     */
+    async approve(input) {
       await logger.operation(
         loggerMessages.database.feedback.approve,
         async () => {
-          assertPositiveInteger(feedbackId, "feedbackId");
-          const updated = await db
-            .update(schema.feedback)
-            .set({ status: "requested", updatedAt: new Date() })
-            .where(
-              and(
-                eq(schema.feedback.id, feedbackId),
-                eq(schema.feedback.status, "pending"),
-                sql`${schema.feedback.category} is not null`,
-              ),
-            )
-            .returning({ id: schema.feedback.id });
-          if (updated.length === 0) throw new FeedbackStateError();
+          assertFeedbackAdmin(input.actor);
+          assertPositiveInteger(input.feedbackId, "feedbackId");
+          await db.transaction(async (tx) => {
+            const actorUser = await ensureFeedbackAuditUser(
+              tx,
+              input.actor.clerkId,
+            );
+            const current = await loadFeedbackAuditState(tx, input.feedbackId);
+            if (current.status !== "pending" || current.category === null) {
+              throw new FeedbackStateError();
+            }
+            const updated = await tx
+              .update(schema.feedback)
+              .set({ status: "requested", updatedAt: new Date() })
+              .where(
+                and(
+                  eq(schema.feedback.id, input.feedbackId),
+                  eq(schema.feedback.status, "pending"),
+                  sql`${schema.feedback.category} is not null`,
+                ),
+              )
+              .returning({ id: schema.feedback.id });
+            if (updated.length === 0) throw new FeedbackStateError();
+            await writeFeedbackAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: feedbackAuditState(current, { status: "requested" }),
+              before: feedbackAuditState(current),
+              definition: feedbackAudit.approved,
+              ownerUserId: current.ownerUserId,
+              targetId: input.feedbackId,
+            });
+          });
         },
       );
     },
@@ -374,42 +438,56 @@ export function createFeedbackService(
     /**
      * Denies eligible feedback.
      *
-     * @param feedbackId - Feedback identifier.
+     * @param input - Authorized feedback decision.
      * @returns A promise that resolves after denial.
+     * @rejects When authorization, state, or audit persistence fails.
      */
-    async deny(feedbackId) {
+    async deny(input) {
       await logger.operation(
         loggerMessages.database.feedback.deny,
         async () => {
-          assertPositiveInteger(feedbackId, "feedbackId");
-          const updated = await db
-            .update(schema.feedback)
-            .set({ status: "denied", updatedAt: new Date() })
-            .where(
-              and(
-                eq(schema.feedback.id, feedbackId),
-                inArray(schema.feedback.status, ["pending", "requested"]),
-                isNull(schema.feedback.linearClientUuid),
-              ),
-            )
-            .returning({ id: schema.feedback.id });
-          if (updated.length > 0) return;
-
-          const [feedback] = await db
-            .select({
-              linearClientUuid: schema.feedback.linearClientUuid,
-              status: schema.feedback.status,
-            })
-            .from(schema.feedback)
-            .where(eq(schema.feedback.id, feedbackId))
-            .limit(1);
-          if (
-            feedback?.status === "requested" &&
-            feedback.linearClientUuid !== null
-          ) {
-            throw new FeedbackPlanRecoveryRequiredError();
-          }
-          throw new FeedbackStateError();
+          assertFeedbackAdmin(input.actor);
+          assertPositiveInteger(input.feedbackId, "feedbackId");
+          await db.transaction(async (tx) => {
+            const actorUser = await ensureFeedbackAuditUser(
+              tx,
+              input.actor.clerkId,
+            );
+            const current = await loadFeedbackAuditState(tx, input.feedbackId);
+            if (
+              current.status === "requested" &&
+              current.linearClientUuid !== null
+            ) {
+              throw new FeedbackPlanRecoveryRequiredError();
+            }
+            if (
+              current.status !== "pending" &&
+              current.status !== "requested"
+            ) {
+              throw new FeedbackStateError();
+            }
+            const updated = await tx
+              .update(schema.feedback)
+              .set({ status: "denied", updatedAt: new Date() })
+              .where(
+                and(
+                  eq(schema.feedback.id, input.feedbackId),
+                  inArray(schema.feedback.status, ["pending", "requested"]),
+                  isNull(schema.feedback.linearClientUuid),
+                ),
+              )
+              .returning({ id: schema.feedback.id });
+            if (updated.length === 0) throw new FeedbackStateError();
+            await writeFeedbackAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: feedbackAuditState(current, { status: "denied" }),
+              before: feedbackAuditState(current),
+              definition: feedbackAudit.denied,
+              ownerUserId: current.ownerUserId,
+              targetId: input.feedbackId,
+            });
+          });
         },
       );
     },
@@ -740,33 +818,32 @@ export function createFeedbackService(
     /**
      * Merges a pending feedback request into another request.
      *
-     * @param feedbackId - Source feedback identifier.
-     * @param targetId - Target feedback identifier.
+     * @param input - Authorized source and destination identifiers.
+     * @returns Completion after the merge and audit event commit.
+     * @rejects When authorization, state, or audit persistence fails.
      */
-    async mergePending(feedbackId, targetId) {
+    async mergePending(input) {
       await logger.operation(
         loggerMessages.database.feedback.mergePending,
         async () => {
-          assertPositiveInteger(feedbackId, "feedbackId");
-          assertPositiveInteger(targetId, "targetId");
-          if (feedbackId === targetId) throw new FeedbackStateError();
-
+          assertFeedbackAdmin(input.actor);
+          assertPositiveInteger(input.feedbackId, "feedbackId");
+          assertPositiveInteger(input.targetId, "targetId");
+          if (input.feedbackId === input.targetId)
+            throw new FeedbackStateError();
           await db.transaction(async (tx) => {
-            const [source] = await tx
-              .select({
-                status: schema.feedback.status,
-                submitterClerkId: schema.feedback.submitterClerkId,
-              })
-              .from(schema.feedback)
-              .where(eq(schema.feedback.id, feedbackId))
-              .for("update");
+            const actorUser = await ensureFeedbackAuditUser(
+              tx,
+              input.actor.clerkId,
+            );
+            const source = await loadFeedbackAuditState(tx, input.feedbackId);
             const [target] = await tx
               .select({ status: schema.feedback.status })
               .from(schema.feedback)
-              .where(eq(schema.feedback.id, targetId))
+              .where(eq(schema.feedback.id, input.targetId))
               .for("update");
             if (
-              source?.status !== "pending" ||
+              source.status !== "pending" ||
               !target ||
               !publicStatuses.includes(target.status)
             ) {
@@ -776,7 +853,7 @@ export function createFeedbackService(
             await tx
               .insert(schema.feedbackVotes)
               .values({
-                feedbackId: targetId,
+                feedbackId: input.targetId,
                 isPermanent: false,
                 voterClerkId: source.submitterClerkId,
               })
@@ -786,12 +863,24 @@ export function createFeedbackService(
               .set({ status: "merged", updatedAt: new Date() })
               .where(
                 and(
-                  eq(schema.feedback.id, feedbackId),
+                  eq(schema.feedback.id, input.feedbackId),
                   eq(schema.feedback.status, "pending"),
                 ),
               )
               .returning({ id: schema.feedback.id });
             if (updated.length === 0) throw new FeedbackStateError();
+            await writeFeedbackAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: feedbackAuditState(source, {
+                mergedIntoFeedbackId: input.targetId,
+                status: "merged",
+              }),
+              before: feedbackAuditState(source),
+              definition: feedbackAudit.merged,
+              ownerUserId: source.ownerUserId,
+              targetId: input.feedbackId,
+            });
           });
         },
       );
@@ -984,10 +1073,58 @@ export function createFeedbackService(
       );
     },
 
+    /**
+     * Updates editable feedback and records the staff mutation.
+     *
+     * @param input - Authorized editable feedback fields.
+     * @returns Completion after the mutation and audit event commit.
+     * @rejects When authorization, state, or audit persistence fails.
+     */
     async updateAdmin(input) {
       await logger.operation(
         loggerMessages.database.feedback.updateAdmin,
-        async () => await updateAdminFeedback(db, input),
+        async () => {
+          assertFeedbackAdmin(input.actor);
+          await db.transaction(async (tx) => {
+            const actorUser = await ensureFeedbackAuditUser(
+              tx,
+              input.actor.clerkId,
+            );
+            const current = await loadFeedbackAuditState(tx, input.feedbackId);
+            if (!editableStatuses.includes(current.status)) {
+              throw new FeedbackStateError();
+            }
+            const normalized = normalizeFeedbackDetails(input);
+            const updated = await tx
+              .update(schema.feedback)
+              .set({
+                category: normalized.category ?? null,
+                description: normalized.description,
+                title: normalized.title,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(schema.feedback.id, input.feedbackId),
+                  inArray(schema.feedback.status, editableStatuses),
+                ),
+              )
+              .returning({ id: schema.feedback.id });
+            if (updated.length === 0) throw new FeedbackStateError();
+            await writeFeedbackAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: feedbackAuditState(current, {
+                ...normalized,
+                category: normalized.category ?? null,
+              }),
+              before: feedbackAuditState(current),
+              definition: feedbackAudit.updated,
+              ownerUserId: current.ownerUserId,
+              targetId: input.feedbackId,
+            });
+          });
+        },
       );
     },
 
@@ -1000,9 +1137,123 @@ export function createFeedbackService(
   };
 }
 
+/** Feedback data and owner identity required by an audit event. */
+type FeedbackAuditState = {
+  /** Current feedback category. */
+  category: FeedbackCategory | null;
+  /** Current feedback description. */
+  description: string;
+  /** Reserved Linear identifier, when planning has started. */
+  linearClientUuid: string | null;
+  /** Internal submitter identifier used for erasure redaction. */
+  ownerUserId: number;
+  /** Current feedback lifecycle state. */
+  status: FeedbackStatus;
+  /** Submitter's Clerk identifier used to transfer a merge vote. */
+  submitterClerkId: string;
+  /** Current feedback title. */
+  title: string;
+};
+
+/**
+ * Rejects feedback administration by an actor without its permission.
+ *
+ * @param actor - Actor requesting an administrative mutation.
+ * @returns Nothing after authorization succeeds.
+ * @throws When the actor lacks feedback management permission.
+ */
+function assertFeedbackAdmin(actor: Actor): void {
+  if (!hasPermission(actor, "feedback.manage")) {
+    throw new Error("Feedback does not exist.");
+  }
+}
+
+/**
+ * Locks and loads feedback state and its submitter identity.
+ *
+ * @param transaction - Caller-owned source transaction.
+ * @param feedbackId - Feedback identifier.
+ * @returns Current feedback state and internal owner identifier.
+ * @rejects When the feedback or submitter identity is missing.
+ */
+async function loadFeedbackAuditState(
+  transaction: Parameters<AuditService["write"]>[0],
+  feedbackId: number,
+): Promise<FeedbackAuditState> {
+  const [feedback] = await transaction
+    .select({
+      category: schema.feedback.category,
+      description: schema.feedback.description,
+      linearClientUuid: schema.feedback.linearClientUuid,
+      status: schema.feedback.status,
+      submitterClerkId: schema.feedback.submitterClerkId,
+      title: schema.feedback.title,
+    })
+    .from(schema.feedback)
+    .where(eq(schema.feedback.id, feedbackId))
+    .limit(1)
+    .for("update");
+  if (!feedback) throw new FeedbackStateError();
+  const owner = await ensureFeedbackAuditUser(
+    transaction,
+    feedback.submitterClerkId,
+  );
+  return { ...feedback, ownerUserId: owner.id };
+}
+
+/**
+ * Ensures an audit-linked user in the caller's source transaction.
+ *
+ * @param transaction - Caller-owned source transaction.
+ * @param clerkId - Clerk identifier to retain only through the user link.
+ * @returns Internal user identity used by audit persistence.
+ * @rejects When the identity cannot be persisted.
+ */
+async function ensureFeedbackAuditUser(
+  transaction: Parameters<AuditService["write"]>[0],
+  clerkId: string,
+) {
+  const [user] = await transaction
+    .insert(schema.user)
+    .values({ clerkId })
+    .onConflictDoUpdate({ set: { clerkId }, target: schema.user.clerkId })
+    .returning({ id: schema.user.id, username: schema.user.username });
+  if (!user) throw new FeedbackStateError();
+  return user;
+}
+
+/**
+ * Serializes allowlisted feedback state with optional changed fields.
+ *
+ * @param current - Current feedback state.
+ * @param overrides - Fields changed by the audited operation.
+ * @returns Allowlisted state suitable for audit persistence.
+ */
+function feedbackAuditState(
+  current: FeedbackAuditState,
+  overrides: AuditJsonObject = {},
+): AuditJsonObject {
+  return {
+    category: current.category,
+    description: current.description,
+    status: current.status,
+    title: current.title,
+    ...overrides,
+  };
+}
+
+/**
+ * Updates editable feedback without recording an administrative event.
+ *
+ * @param db - Application database.
+ * @param input - Submitter-owned editable feedback fields.
+ * @param statuses - Lifecycle states eligible for the update.
+ * @returns Completion after feedback is updated.
+ * @rejects When input or feedback state is invalid.
+ */
 async function updateAdminFeedback(
   db: Database,
-  input: UpdateAdminFeedbackInput,
+  input: UpdatePendingFeedbackInput,
   statuses = editableStatuses,
 ) {
   assertPositiveInteger(input.feedbackId, "feedbackId");
