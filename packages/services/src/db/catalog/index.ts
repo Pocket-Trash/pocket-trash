@@ -19,6 +19,7 @@ import {
   lockTarget,
   selectCollectionCover as selectStoredCover,
 } from "../../storage/image-records.js";
+import { queueObjectDeletions } from "../../storage/object-lifecycle.js";
 import type {
   UploadActor,
   UploadedFile,
@@ -333,6 +334,7 @@ export type CollectionWriteInput = {
   reason?: string;
 };
 
+/** Database operations for user collections and their catalog items. */
 export type CollectionsService = {
   addSpinner(input: {
     actor: Actor;
@@ -370,6 +372,38 @@ export type CollectionsService = {
     actorClerkId: string;
     productIds: number[];
   }): Promise<Record<number, number>>;
+  /**
+   * Moves or permanently deletes a collection and its contents.
+   *
+   * @param input - Authorized deletion request.
+   * @returns Completion after the transaction commits.
+   */
+  deleteCollection(input: {
+    /** Actor requesting deletion. */
+    actor: Actor;
+    /** Collection to delete. */
+    collectionId: number;
+    /** Collection receiving moved items, or null for permanent deletion. */
+    destinationCollectionId: number | null;
+    /** Required moderation reason when acting for another user. */
+    reason?: string;
+  }): Promise<void>;
+  /**
+   * Loads valid deletion destinations and the affected item count.
+   *
+   * @param actor - Actor requesting the deletion choices.
+   * @param collectionId - Collection being considered for deletion.
+   * @returns Deletion context, or null when the collection is inaccessible.
+   */
+  getDeletionContext(
+    actor: Actor,
+    collectionId: number,
+  ): Promise<{
+    /** Collections eligible to receive moved items. */
+    destinations: UserCollectionSummary[];
+    /** Number of items affected by deletion. */
+    itemCount: number;
+  } | null>;
   getOwnedItem(
     actor: Actor,
     collectionItemId: number,
@@ -1317,6 +1351,15 @@ export function createCatalogService(
   };
 }
 
+/**
+ * Creates the collection database service.
+ *
+ * @param db - Application database.
+ * @param users - User lookup service.
+ * @param audit - Audit writer.
+ * @param logger - Structured operation logger.
+ * @returns Collection database operations.
+ */
 export function createCollectionsService(
   db: Database,
   users: UsersService,
@@ -1615,6 +1658,163 @@ export function createCollectionsService(
         }
       }
       return result;
+    },
+    /**
+     * Moves or permanently deletes a collection and its contents.
+     *
+     * @param input - Authorized deletion request.
+     * @returns Completion after the transaction commits.
+     * @throws When the source or destination is inaccessible.
+     */
+    async deleteCollection(input) {
+      await logger.operation(
+        loggerMessages.database.collections.delete,
+        async () => {
+          const actorUser = await users.getByClerkId(input.actor.clerkId);
+          if (!actorUser) throw new Error("Collection does not exist.");
+          await db.transaction(async (tx) => {
+            const collectionIds = [
+              input.collectionId,
+              ...(input.destinationCollectionId === null
+                ? []
+                : [input.destinationCollectionId]),
+            ];
+            const collections = await tx
+              .select({
+                id: schema.userCollection.id,
+                name: schema.userCollection.name,
+                ownerId: schema.userCollection.ownerId,
+              })
+              .from(schema.userCollection)
+              .where(inArray(schema.userCollection.id, collectionIds))
+              .orderBy(asc(schema.userCollection.id))
+              .for("update");
+            const source = collections.find(
+              ({ id }) => id === input.collectionId,
+            );
+            if (
+              !source ||
+              (source.ownerId !== actorUser.id &&
+                !hasPermission(input.actor, "collections.manage"))
+            ) {
+              throw new Error("Collection does not exist.");
+            }
+            const destination =
+              input.destinationCollectionId === null
+                ? null
+                : collections.find(
+                    ({ id }) => id === input.destinationCollectionId,
+                  );
+            if (
+              input.destinationCollectionId === input.collectionId ||
+              (input.destinationCollectionId !== null &&
+                (!destination || destination.ownerId !== source.ownerId))
+            ) {
+              throw new Error("Destination collection does not exist.");
+            }
+
+            const collectionImages = await tx
+              .select({ objectPath: schema.collectionImage.objectPath })
+              .from(schema.collectionImage)
+              .where(
+                eq(schema.collectionImage.collectionId, input.collectionId),
+              );
+            const itemImages = destination
+              ? []
+              : await tx
+                  .select({ objectPath: schema.collectionItemImage.objectPath })
+                  .from(schema.collectionItemImage)
+                  .innerJoin(
+                    schema.collectionItem,
+                    eq(
+                      schema.collectionItemImage.collectionItemId,
+                      schema.collectionItem.id,
+                    ),
+                  )
+                  .where(
+                    eq(schema.collectionItem.collectionId, input.collectionId),
+                  );
+            await queueObjectDeletions(
+              tx,
+              [...collectionImages, ...itemImages].map(
+                ({ objectPath }) => objectPath,
+              ),
+            );
+
+            if (destination) {
+              await tx
+                .update(schema.collectionItem)
+                .set({
+                  collectionId: destination.id,
+                  updatedAt: new Date(),
+                })
+                .where(
+                  and(
+                    eq(schema.collectionItem.collectionId, input.collectionId),
+                    eq(schema.collectionItem.ownerId, source.ownerId),
+                  ),
+                );
+              await touchCollection(tx, destination.id);
+            }
+            await tx
+              .delete(schema.userCollection)
+              .where(eq(schema.userCollection.id, input.collectionId));
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: {
+                deleted: true,
+                destinationCollectionId: destination?.id ?? null,
+              },
+              before: { deleted: false, name: source.name },
+              definition: collectionAudit.collectionDeleted,
+              ownerUserId: source.ownerId,
+              reason: input.reason,
+              targetId: input.collectionId,
+            });
+          });
+        },
+        actorAttributes(input.actor.clerkId, {
+          collectionId: input.collectionId,
+          destinationCollectionId: input.destinationCollectionId ?? undefined,
+        }),
+      );
+    },
+    /**
+     * Loads valid deletion destinations and the affected item count.
+     *
+     * @param actor - Actor requesting the deletion choices.
+     * @param collectionId - Collection being considered for deletion.
+     * @returns Deletion context, or null when the collection is inaccessible.
+     */
+    async getDeletionContext(actor, collectionId) {
+      const canManage = hasPermission(actor, "collections.manage");
+      const actorUser = await users.getByClerkId(actor.clerkId);
+      if (!actorUser) return null;
+      const [source] = await db
+        .select({ ownerId: schema.userCollection.ownerId })
+        .from(schema.userCollection)
+        .where(eq(schema.userCollection.id, collectionId))
+        .limit(1);
+      if (!source || (source.ownerId !== actorUser.id && !canManage)) {
+        return null;
+      }
+      const [itemCountRows, collections] = await Promise.all([
+        db
+          .select({ itemCount: count(schema.collectionItem.id) })
+          .from(schema.collectionItem)
+          .where(eq(schema.collectionItem.collectionId, collectionId)),
+        queryCollections(db, {
+          includePrivate: true,
+          ownerUserId: source.ownerId,
+          viewerCanManage: canManage,
+          viewerClerkId: actor.clerkId,
+        }),
+      ]);
+      return {
+        destinations: collections.filter(({ id }) => id !== collectionId),
+        itemCount: Number(itemCountRows[0]?.itemCount ?? 0),
+      };
     },
     async getOwnedItem(actor, collectionItemId) {
       const canManage = hasPermission(actor, "collections.manage");

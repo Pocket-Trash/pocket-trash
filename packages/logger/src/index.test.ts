@@ -13,8 +13,19 @@ import {
   redactValue,
 } from "./index.js";
 
+/**
+ * Creates an in-memory transport for logger assertions.
+ *
+ * @param events - Mutable event collection populated by the transport.
+ * @returns A transport that appends each received event.
+ */
 function captureTransport(events: LogEvent[] = []): LogTransport {
   return {
+    /**
+     * Captures one emitted event.
+     *
+     * @param event - Event to append to the collection.
+     */
     log(event) {
       events.push(event);
     },

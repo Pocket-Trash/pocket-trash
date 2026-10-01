@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type FormatContext, formatGitHubNotification } from "./format.js";
 
+/** GitHub repository and workflow metadata shared by formatter tests. */
 const context = {
   eventName: "pull_request",
   repository: "BVG-Digital/machinedpens.info",
@@ -218,7 +219,18 @@ describe("formatGitHubNotification", () => {
   });
 });
 
-function pullRequest(input: { merged?: boolean; number: number }) {
+/**
+ * Builds the minimal pull-request payload used by formatter tests.
+ *
+ * @param input - Pull-request number and optional merged state.
+ * @returns GitHub-style pull-request fields for one test event.
+ */
+function pullRequest(input: {
+  /** Whether GitHub reports the pull request as merged. */
+  merged?: boolean;
+  /** Pull-request number. */
+  number: number;
+}) {
   return {
     base: { ref: "main" },
     head: { ref: "feature/discord" },
