@@ -230,7 +230,8 @@ jobs:
             --var "BUNNY_STORAGE_ZONE_NAME:${BUNNY_STORAGE_ZONE_NAME}"
           )
 
-          pnpm exec wrangler deploy --env preview --keep-vars "${api_vars[@]}"
+          secrets_file="$(mktemp)"
+          trap 'rm -f "$secrets_file"' EXIT
           jq -cn \
             --arg axiom_token "$AXIOM_TOKEN" \
             --arg clerk_secret_key "$CLERK_SECRET_KEY" \
@@ -242,11 +243,12 @@ jobs:
             --arg bunny_cdn_token_key "$BUNNY_CDN_TOKEN_KEY" \
             --arg bunny_pull_zone_id "$BUNNY_PULL_ZONE_ID" \
             --arg resource_storage_access_key "$BUNNY_STORAGE_ACCESS_KEY" \
-            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, CLERK_WEBHOOK_SIGNING_SECRET: $clerk_webhook_signing_secret, LINEAR_WEBHOOK_SIGNING_SECRET: $linear_webhook_signing_secret, ERASURE_HMAC_SECRET: $erasure_hmac_secret, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, BUNNY_API_KEY: $bunny_api_key, BUNNY_CDN_TOKEN_KEY: $bunny_cdn_token_key, BUNNY_PULL_ZONE_ID: $bunny_pull_zone_id, BUNNY_STORAGE_ACCESS_KEY: $resource_storage_access_key}' | \
-            pnpm exec wrangler secret bulk --env preview
+            '{AXIOM_TOKEN: $axiom_token, CLERK_SECRET_KEY: $clerk_secret_key, CLERK_WEBHOOK_SIGNING_SECRET: $clerk_webhook_signing_secret, LINEAR_WEBHOOK_SIGNING_SECRET: $linear_webhook_signing_secret, ERASURE_HMAC_SECRET: $erasure_hmac_secret, LOG_PROXY_CLIENT_KEY: $log_proxy_client_key, BUNNY_API_KEY: $bunny_api_key, BUNNY_CDN_TOKEN_KEY: $bunny_cdn_token_key, BUNNY_PULL_ZONE_ID: $bunny_pull_zone_id, BUNNY_STORAGE_ACCESS_KEY: $resource_storage_access_key}' > "$secrets_file"
           pnpm exec wrangler versions upload \
             --env preview \
             --preview-alias "$PREVIEW_ALIAS" \
+            --secrets-file "$secrets_file" \
+            --keep-vars \
             "${api_vars[@]}"
 
           workers_subdomain="$(curl --fail --silent --show-error \
