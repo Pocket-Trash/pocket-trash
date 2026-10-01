@@ -10,6 +10,12 @@ import { createLinearWebhookHandler } from "./linear-webhooks.js";
 
 /** API application configured for the Cloudflare worker runtime. */
 const app = createApp({
+  /**
+   * Creates the Clerk webhook runtime for a request.
+   *
+   * @param bindings - Worker environment bindings.
+   * @returns The configured Clerk webhook runtime.
+   */
   getClerkWebhookRuntime(bindings) {
     validateClerkWebhookBindings(bindings);
     const { logger, services } = createApiServices(bindings);
@@ -24,6 +30,13 @@ const app = createApp({
 
     return {
       expectedInitials: bindings.URL_INITIALS?.trim().toUpperCase(),
+      /**
+       * Routes a delivery with the current environment kind.
+       *
+       * @param request - Incoming webhook request.
+       * @param target - Routed target kind.
+       * @returns The webhook response.
+       */
       handle: (request, target) =>
         handle(
           request,
@@ -60,12 +73,32 @@ const app = createApp({
   getLinearWebhookRuntime(bindings) {
     validateLinearWebhookBindings(bindings);
     const { logger, services } = createApiServices(bindings);
+    const handle = createLinearWebhookHandler({
+      feedback: services.db.feedback,
+      logger,
+      signingSecret: bindings.LINEAR_WEBHOOK_SIGNING_SECRET as string,
+      targets: bindings.CLERK_WEBHOOK_TARGETS,
+    });
     return {
-      handle: createLinearWebhookHandler({
-        feedback: services.db.feedback,
-        logger,
-        signingSecret: bindings.LINEAR_WEBHOOK_SIGNING_SECRET as string,
-      }),
+      expectedInitials: bindings.URL_INITIALS?.trim().toUpperCase(),
+      /**
+       * Routes a delivery with the current environment kind.
+       *
+       * @param request - Incoming webhook request.
+       * @param target - Routed target kind.
+       * @returns The webhook response.
+       */
+      handle: (request, target) =>
+        handle(
+          request,
+          target === "local"
+            ? "local"
+            : bindings.APP_ENV === "production"
+              ? "production"
+              : bindings.APP_ENV === "preview"
+                ? "preview"
+                : "development",
+        ),
     };
   },
   getUploadRuntime(bindings) {
