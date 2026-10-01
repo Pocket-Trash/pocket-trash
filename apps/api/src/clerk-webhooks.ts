@@ -11,8 +11,10 @@ import {
   WebhookForwardingError,
 } from "./webhook-forwarding.js";
 
+/** Public API path that receives Clerk webhook deliveries. */
 export const clerkWebhookPath = "/api/v0/webhooks/clerk";
 
+/** Deployment category recorded for a webhook delivery target. */
 type TargetKind =
   | "development"
   | "local"
@@ -20,14 +22,23 @@ type TargetKind =
   | "production"
   | "unknown";
 
+/** Dependencies and secrets for verified Clerk webhook processing. */
 export type ClerkWebhookHandlerOptions = {
+  /** Erasure service required for Clerk user-deletion events. */
   erasure?: Pick<ErasureService, "handleClerkDeletion">;
+  /** Secret used to pseudonymize deleted Clerk identities. */
   erasureHmacSecret?: string;
+  /** HTTP client used to forward verified deliveries. */
   fetch?: typeof fetch;
+  /** Delivery logger. */
   logger: Logger;
+  /** Clerk webhook signing secret. */
   signingSecret: string;
+  /** Optional KV registry of downstream webhook targets. */
   targets?: KVNamespace;
+  /** User synchronization service for create and update events. */
   users: Pick<UsersService, "syncFromClerk">;
+  /** Webhook verifier override used by tests. */
   verify?: typeof verifyWebhook;
 };
 
@@ -154,8 +165,11 @@ export function createClerkWebhookHandler(options: ClerkWebhookHandlerOptions) {
 async function logDelivery(
   logger: Logger,
   attributes: {
+    /** Svix delivery identifier, or `unknown` when absent. */
     deliveryId: string;
+    /** Verified Clerk event type, when verification succeeded. */
     eventType?: string;
+    /** Processing stage responsible for an unsuccessful response. */
     failureCategory?:
       | "database"
       | "forwarding"
@@ -165,6 +179,7 @@ async function logDelivery(
     status: number;
     /** KV key for the forwarded target. */
     targetKey?: string;
+    /** Deployment category receiving or forwarding the delivery. */
     targetKind: TargetKind;
   },
 ) {

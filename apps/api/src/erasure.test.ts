@@ -2,6 +2,7 @@ import { ClerkAPIResponseError } from "@clerk/backend/errors";
 import { describe, expect, it, vi } from "vitest";
 import { createErasureOperations, drainErasureQueue } from "./erasure.js";
 
+/** Reusable self-service erasure request fixture. */
 const request = {
   id: "request_123",
   initiator: "self" as const,
@@ -20,6 +21,11 @@ describe("erasure runtime", () => {
     const operations = createErasureOperations({
       clerk: { deleteUser, getUser },
       erasure: { eraseDatabase, makeAccountInaccessible },
+      /**
+       * Returns the fixed retention timestamp used by assertions.
+       *
+       * @returns Deterministic test time.
+       */
       now: () => new Date("2026-09-29T12:00:00.000Z"),
       storage: { eraseAccountObjects, snapshotErasureTargets },
     });
@@ -83,6 +89,11 @@ describe("erasure runtime", () => {
   });
 });
 
+/**
+ * Creates the Clerk SDK error returned for an absent user.
+ *
+ * @returns Clerk 404 response error.
+ */
 function missingClerkUser() {
   return new ClerkAPIResponseError("Not found", {
     data: [],

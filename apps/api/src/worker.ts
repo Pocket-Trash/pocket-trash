@@ -1,5 +1,6 @@
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import { isLogLevel, loggerMessages } from "@package/logger";
+import type { ErasureService } from "@package/services";
 import { type Actor, normalizeActor } from "@package/services/authorization";
 import { type ApiBindings, createApp } from "./app.js";
 import { drainAuditQueue } from "./audit.js";
@@ -102,31 +103,63 @@ const app = createApp({
         ),
     };
   },
+  /**
+   * Creates storage and authentication dependencies for upload routes.
+   *
+   * @param bindings - Worker environment bindings.
+   * @returns Configured upload runtime.
+   * @throws {ApiEnvValidationError} When a required upload binding is missing.
+   */
   getUploadRuntime(bindings) {
     const { logger, services } = storageRuntime(bindings);
     return {
       logger,
+      /**
+       * Authenticates an upload request and verifies that its account is active.
+       *
+       * @param request - Incoming upload request.
+       * @returns Authenticated actor, or `null` for invalid credentials, origins, or accounts.
+       */
       authenticate: (request: Request) =>
         authenticateClerkRequest(
           request,
           bindings,
           services.db.erasure.assertAccountActive,
         ),
+      /**
+       * Applies the current deployment's upload origin policy.
+       *
+       * @param origin - Candidate request origin.
+       * @returns Whether the origin may use upload routes.
+       */
       isAllowedOrigin: (origin: string) =>
         isAllowedWebOrigin(origin, bindings.APP_ENV),
       service: services.storage,
     };
   },
 });
+/** Cloudflare execution context accepted by the configured Hono application. */
 type HonoExecutionContext = Parameters<typeof app.fetch>[2];
 
+/** Reports missing or invalid API worker bindings. */
 export class ApiEnvValidationError extends Error {
+  /**
+   * Creates an environment validation error listing invalid bindings.
+   *
+   * @param variables - Missing or invalid binding names.
+   */
   constructor(readonly variables: readonly string[]) {
     super(`Invalid environment variables: ${variables.join(", ")}`);
     this.name = "ApiEnvValidationError";
   }
 }
 
+/**
+ * Validates optional logger and Axiom binding combinations.
+ *
+ * @param env - Worker environment bindings.
+ * @throws {ApiEnvValidationError} When a logger value is invalid or an Axiom credential is unpaired.
+ */
 export function validateApiBindings(env: ApiBindings) {
   const invalidVariables: string[] = [];
 
@@ -148,6 +181,12 @@ export function validateApiBindings(env: ApiBindings) {
   }
 }
 
+/**
+ * Validates bindings required by upload routes.
+ *
+ * @param env - Worker environment bindings.
+ * @throws {ApiEnvValidationError} When a required upload binding is missing.
+ */
 export function validateUploadBindings(env: ApiBindings) {
   const required = [
     "CLERK_SECRET_KEY",
@@ -205,6 +244,15 @@ app.onError(async (error, context) => {
   return context.json({ error: "Internal server error." }, 500);
 });
 
+/**
+ * Dispatches an API request and converts unhandled failures into a generic response.
+ *
+ * @param request - Incoming worker request.
+ * @param env - Worker environment bindings.
+ * @param context - Cloudflare execution context.
+ * @returns API response.
+ * @rejects When exception logging fails.
+ */
 export async function handleWorkerFetch(
   request: Request,
   env: ApiBindings,
@@ -286,6 +334,13 @@ export async function handleWorkerScheduled(
   );
 }
 
+/**
+ * Checks whether a request origin is trusted in the current deployment.
+ *
+ * @param origin - Candidate origin URL.
+ * @param environment - Deployment environment name.
+ * @returns Whether the origin matches the development, preview, or production policy.
+ */
 export function isAllowedWebOrigin(
   origin: string,
   environment = "unknown",
@@ -309,10 +364,18 @@ export function isAllowedWebOrigin(
   return ["pocket-trash.app", "www.pocket-trash.app"].includes(url.hostname);
 }
 
+/**
+ * Authenticates a Clerk bearer token from an allowed web origin.
+ *
+ * @param request - Incoming upload request.
+ * @param env - Worker environment bindings.
+ * @param assertAccountActive - Verifies that the authenticated account may act.
+ * @returns Normalized actor, or `null` when authentication or account validation fails.
+ */
 async function authenticateClerkRequest(
   request: Request,
   env: ApiBindings,
-  assertAccountActive: (clerkId: string) => Promise<void>,
+  assertAccountActive: ErasureService["assertAccountActive"],
 ): Promise<Actor | null> {
   const authorization = request.headers.get("authorization");
   const origin = request.headers.get("origin");
@@ -338,6 +401,15 @@ async function authenticateClerkRequest(
   }
 }
 
+/**
+ * Records an unhandled worker failure without logging request secrets.
+ *
+ * @param error - Failure to record.
+ * @param env - Worker environment bindings.
+ * @param request - Failed request.
+ * @param trigger - Worker entry point that failed.
+ * @rejects When the logger cannot flush the event.
+ */
 async function logWorkerException(
   error: unknown,
   env: ApiBindings,
@@ -362,6 +434,13 @@ export default {
   scheduled: handleWorkerScheduled,
 } satisfies ExportedHandler<ApiBindings>;
 
+/**
+ * Creates the configured services used by storage and maintenance routes.
+ *
+ * @param bindings - Worker environment bindings.
+ * @returns API logger and service registry with storage enabled.
+ * @throws {ApiEnvValidationError} When a required upload binding is missing.
+ */
 function storageRuntime(bindings: ApiBindings) {
   validateUploadBindings(bindings);
   return createApiServices(bindings, { storage: true });

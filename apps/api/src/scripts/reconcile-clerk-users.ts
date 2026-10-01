@@ -7,27 +7,62 @@ import {
 } from "@package/logger";
 import { createServices, type UsersService } from "@package/services";
 
+/** Clerk user fields synchronized into the application database. */
 type ClerkUser = {
+  /** Clerk user identifier. */
   id: string;
+  /** Clerk update timestamp in Unix milliseconds. */
   updatedAt: number;
+  /** Public username, or `null` when unset. */
   username: string | null;
 };
 
+/** Paginated Clerk user client used by reconciliation. */
 type ClerkUsersClient = {
-  getUserList(input: { limit: number; offset: number }): Promise<{
+  /**
+   * Lists one page of Clerk users.
+   *
+   * @param input - Page size and zero-based offset.
+   * @returns Clerk users and total user count.
+   * @rejects When Clerk cannot list users.
+   */
+  getUserList(input: {
+    /** Maximum users requested for the page. */
+    limit: number;
+    /** Number of users skipped before the page. */
+    offset: number;
+  }): Promise<{
+    /** Clerk users in the requested page. */
     data: ClerkUser[];
+    /** Total Clerk users across all pages. */
     totalCount: number;
   }>;
 };
 
+/** Outcome counts for a complete Clerk-to-database reconciliation pass. */
 export type ReconciliationCounts = {
+  /** Clerk users examined. */
   examined: number;
+  /** Users skipped after validation or synchronization failure. */
   failed: number;
+  /** Database users inserted. */
   inserted: number;
+  /** Database users already current. */
   unchanged: number;
+  /** Existing database users updated. */
   updated: number;
 };
 
+/**
+ * Reconciles every Clerk user into the application database in 100-user pages.
+ *
+ * Individual user failures are counted without stopping the remaining pass.
+ *
+ * @param clerk - Paginated Clerk user client.
+ * @param users - Database user synchronization service.
+ * @returns Aggregate reconciliation outcomes.
+ * @rejects When Clerk page retrieval fails.
+ */
 export async function reconcileClerkUsers(
   clerk: ClerkUsersClient,
   users: Pick<UsersService, "syncFromClerk">,
@@ -64,6 +99,11 @@ export async function reconcileClerkUsers(
   return counts;
 }
 
+/**
+ * Runs the Clerk reconciliation CLI and prints its outcome counts.
+ *
+ * @rejects When required environment variables, Clerk access, or database synchronization fails.
+ */
 async function main() {
   const secretKey = process.env.CLERK_SECRET_KEY;
   const databaseUrl = process.env.DATABASE_URL;

@@ -8,9 +8,17 @@ import {
 } from "./clerk-webhooks.js";
 import { forwardToTargets, isValidTarget } from "./webhook-forwarding.js";
 
+/** Raw bytes encoded into the Clerk test signing secret. */
 const secretBytes = "clerk-webhook-test-secret";
+/** Clerk-compatible webhook signing secret for test requests. */
 const signingSecret = `whsec_${Buffer.from(secretBytes).toString("base64")}`;
 
+/**
+ * Creates a valid signed Clerk user webhook request.
+ *
+ * @param type - Clerk user event type placed in the payload.
+ * @returns Request with Svix signature headers.
+ */
 function signedRequest(type: "user.created" | "user.updated" = "user.created") {
   const body = JSON.stringify({
     data: {
