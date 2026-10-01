@@ -13,7 +13,9 @@ No table description has been added yet.
 | `title` | `text` | yes |  |  |  |  |  |
 | `description` | `text` | yes |  |  |  |  |  |
 | `category` | `text` | no |  |  |  |  |  |
+| `completed_at` | `timestamp with time zone` | no |  |  |  |  |  |
 | `linear_client_uuid` | `uuid` | no | unique |  |  |  |  |
+| `linear_updated_at` | `timestamp with time zone` | no |  |  |  |  |  |
 | `status` | `text` | yes |  | `'pending'` |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 | `updated_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
@@ -22,5 +24,6 @@ No table description has been added yet.
 
 | Name | Unique | Method | Columns |
 | --- | --- | --- | --- |
+| `feedback_status_completed_at_idx` | no | `btree` | `status`, `completed_at` |
 | `feedback_status_created_at_idx` | no | `btree` | `status`, `created_at` |
 | `feedback_submitter_status_idx` | no | `btree` | `submitter_clerk_id`, `status` |

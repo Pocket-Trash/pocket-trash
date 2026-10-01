@@ -52,6 +52,8 @@ export type {
   FeedbackNotificationItem,
   FeedbackPage,
   FeedbackService,
+  LinearFeedbackSyncInput,
+  LinearFeedbackSyncResult,
   ListAdminFeedbackOptions,
   ListAuditEventsInput,
   ListMyFeedbackOptions,

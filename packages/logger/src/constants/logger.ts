@@ -1,6 +1,7 @@
 export const loggerMessages = {
   api: {
     clerkWebhookDelivery: "api.clerkWebhook.delivery",
+    linearWebhookDelivery: "api.linearWebhook.delivery",
     cronHourly: "api.cron.hourly",
     healthChecked: "api.health.checked",
     serverListening: "api.server.listening",
@@ -104,10 +105,12 @@ export const loggerMessages = {
       completeLinearPlan: "database.feedback.completeLinearPlan",
       deny: "database.feedback.deny",
       findDuplicates: "database.feedback.findDuplicates",
+      getLinearSyncTarget: "database.feedback.getLinearSyncTarget",
       hasMine: "database.feedback.hasMine",
       listActive: "database.feedback.listActive",
       listAdminActive: "database.feedback.listAdminActive",
       listArchive: "database.feedback.listArchive",
+      listCompleted: "database.feedback.listCompleted",
       listMergeTargets: "database.feedback.listMergeTargets",
       listMine: "database.feedback.listMine",
       listNotifications: "database.feedback.listNotifications",
@@ -116,6 +119,7 @@ export const loggerMessages = {
       mergePending: "database.feedback.mergePending",
       reserveLinearPlan: "database.feedback.reserveLinearPlan",
       submit: "database.feedback.submit",
+      syncLinearStatus: "database.feedback.syncLinearStatus",
       toggleVote: "database.feedback.toggleVote",
       updateAdmin: "database.feedback.updateAdmin",
       updatePending: "database.feedback.updatePending",

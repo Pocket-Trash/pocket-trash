@@ -40,13 +40,18 @@ const publicStatuses: (typeof schema.feedbackStatuses)[number][] = [
   "planned",
   "in_progress",
 ];
+const syncableStatuses: (typeof schema.feedbackStatuses)[number][] = [
+  ...activeStatuses,
+  "completed",
+  "canceled",
+];
 export const adminFeedbackArchiveStatuses = schema.feedbackStatuses.filter(
   (status) => !activeStatuses.includes(status),
 );
 
 export type FeedbackListItem = Omit<
   typeof schema.feedback.$inferSelect,
-  "linearClientUuid" | "submitterClerkId"
+  "linearClientUuid" | "linearUpdatedAt" | "submitterClerkId"
 > & {
   hasPermanentVote: boolean;
   hasVoted: boolean;
@@ -139,6 +144,17 @@ export type FeedbackPlanReservation = Pick<
   "category" | "description" | "id" | "title"
 > & { linearClientUuid: string };
 
+export type LinearFeedbackSyncInput = {
+  action: "create" | "remove" | "sync" | "update";
+  archived?: boolean;
+  entityType: "issue" | "project";
+  entityUuid: string;
+  occurredAt: Date;
+  stateType?: string;
+};
+
+export type LinearFeedbackSyncResult = "ignored" | "not_found" | "updated";
+
 export type FeedbackService = {
   approve(feedbackId: number): Promise<void>;
   completeLinearPlan(
@@ -150,6 +166,7 @@ export type FeedbackService = {
     viewerClerkId: string,
     title: string,
   ): Promise<FeedbackListItem[]>;
+  getLinearSyncTarget(feedbackId: number): Promise<string | undefined>;
   hasMine(submitterClerkId: string): Promise<boolean>;
   listActive(
     viewerClerkId: string,
@@ -159,6 +176,10 @@ export type FeedbackService = {
     options?: ListAdminFeedbackOptions,
   ): Promise<AdminFeedbackPage>;
   listArchive(options?: ListAdminFeedbackOptions): Promise<AdminFeedbackPage>;
+  listCompleted(
+    viewerClerkId: string,
+    search?: string,
+  ): Promise<FeedbackListItem[]>;
   listMergeTargets(): Promise<FeedbackMergeTarget[]>;
   listMine(
     submitterClerkId: string,
@@ -180,6 +201,9 @@ export type FeedbackService = {
   submit(
     input: SubmitFeedbackInput,
   ): Promise<typeof schema.feedback.$inferSelect>;
+  syncLinearStatus(
+    input: LinearFeedbackSyncInput,
+  ): Promise<LinearFeedbackSyncResult>;
   toggleVote(feedbackId: number, voterClerkId: string): Promise<boolean>;
   updateAdmin(input: UpdateAdminFeedbackInput): Promise<void>;
   updatePending(input: UpdatePendingFeedbackInput): Promise<void>;
@@ -325,6 +349,26 @@ export function createFeedbackService(
       );
     },
 
+    async getLinearSyncTarget(feedbackId) {
+      return await logger.operation(
+        loggerMessages.database.feedback.getLinearSyncTarget,
+        async () => {
+          assertPositiveInteger(feedbackId, "feedbackId");
+          const [target] = await db
+            .select({ linearClientUuid: schema.feedback.linearClientUuid })
+            .from(schema.feedback)
+            .where(
+              and(
+                eq(schema.feedback.id, feedbackId),
+                inArray(schema.feedback.status, syncableStatuses),
+              ),
+            );
+          return target?.linearClientUuid ?? undefined;
+        },
+        { attributes: { feedbackId } },
+      );
+    },
+
     async hasMine(submitterClerkId) {
       return await logger.operation(
         loggerMessages.database.feedback.hasMine,
@@ -390,6 +434,33 @@ export function createFeedbackService(
       return await logger.operation(
         loggerMessages.database.feedback.listArchive,
         async () => await listAdminFeedback(db, "archive", options),
+      );
+    },
+
+    async listCompleted(viewerClerkId, search) {
+      return await logger.operation(
+        loggerMessages.database.feedback.listCompleted,
+        async () => {
+          const viewer = normalizedClerkId(viewerClerkId);
+          const terms = normalizedSearch(search);
+          return await db
+            .select(feedbackListColumns(viewer))
+            .from(schema.feedback)
+            .where(
+              and(
+                eq(schema.feedback.status, "completed"),
+                terms.length > 0
+                  ? and(...terms.map(feedbackContains))
+                  : undefined,
+              ),
+            )
+            .orderBy(
+              desc(schema.feedback.completedAt),
+              desc(schema.feedback.id),
+            )
+            .limit(40);
+        },
+        { attributes: { clerkIdHash: hashLogIdentifier(viewerClerkId) } },
       );
     },
 
@@ -643,6 +714,68 @@ export function createFeedbackService(
         {
           attributes: {
             clerkIdHash: hashLogIdentifier(input.submitterClerkId),
+          },
+        },
+      );
+    },
+
+    async syncLinearStatus(input) {
+      return await logger.operation(
+        loggerMessages.database.feedback.syncLinearStatus,
+        async () => {
+          assertUuid(input.entityUuid);
+          if (Number.isNaN(input.occurredAt.getTime())) {
+            throw new Error("occurredAt must be a valid date.");
+          }
+          const status = linearFeedbackStatus(input);
+
+          return await db.transaction(async (tx) => {
+            const [current] = await tx
+              .select({
+                id: schema.feedback.id,
+                linearUpdatedAt: schema.feedback.linearUpdatedAt,
+                status: schema.feedback.status,
+              })
+              .from(schema.feedback)
+              .where(eq(schema.feedback.linearClientUuid, input.entityUuid))
+              .for("update");
+            if (!current) return "not_found";
+            if (
+              current.linearUpdatedAt &&
+              current.linearUpdatedAt >= input.occurredAt
+            ) {
+              return "ignored";
+            }
+
+            if (!status || current.status === status) {
+              await tx
+                .update(schema.feedback)
+                .set({ linearUpdatedAt: input.occurredAt })
+                .where(eq(schema.feedback.id, current.id));
+              return "ignored";
+            }
+
+            await tx
+              .update(schema.feedback)
+              .set({
+                completedAt: status === "completed" ? input.occurredAt : null,
+                linearUpdatedAt: input.occurredAt,
+                status,
+                updatedAt: input.occurredAt,
+              })
+              .where(eq(schema.feedback.id, current.id));
+            if (status === "completed") {
+              await tx.insert(schema.feedbackNotifications).values({
+                feedbackId: current.id,
+                type: "completed",
+              });
+            }
+            return "updated";
+          });
+        },
+        {
+          attributes: {
+            linearEntityUuidHash: hashLogIdentifier(input.entityUuid),
           },
         },
       );
@@ -920,6 +1053,7 @@ function normalizeFeedbackDetails(
 function feedbackListColumns(viewerClerkId: string) {
   return {
     category: schema.feedback.category,
+    completedAt: schema.feedback.completedAt,
     createdAt: schema.feedback.createdAt,
     description: schema.feedback.description,
     hasPermanentVote: sql<boolean>`exists (
@@ -939,6 +1073,26 @@ function feedbackListColumns(viewerClerkId: string) {
     updatedAt: schema.feedback.updatedAt,
     voteCount: feedbackVoteCount(),
   };
+}
+
+function linearFeedbackStatus(
+  input: LinearFeedbackSyncInput,
+): FeedbackStatus | undefined {
+  if (input.action === "create") return;
+  if (input.action === "remove" || input.archived) return "canceled";
+  if (input.entityType === "issue") {
+    if (input.stateType === "started") return "in_progress";
+    if (input.stateType === "completed") return "completed";
+    if (input.stateType === "canceled") return "canceled";
+    if (input.stateType === "backlog" || input.stateType === "unstarted") {
+      return "requested";
+    }
+    return;
+  }
+  if (input.stateType === "planned") return "planned";
+  if (input.stateType === "started") return "in_progress";
+  if (input.stateType === "completed") return "completed";
+  if (input.stateType === "canceled") return "canceled";
 }
 
 function feedbackVoteCount() {
