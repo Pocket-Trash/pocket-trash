@@ -48,7 +48,7 @@ jobs:
         shell: bash
         run: bash .github/scripts/neon-database-branch.sh refresh-preview
 
-      - name: Run preview migrations
+      - name: Run preview migrations and seed data
         working-directory: packages/database
         env:
           DATABASE_URL: ${{ steps.preview_db.outputs.migration_database_url }}
@@ -81,3 +81,5 @@ jobs:
               branchName: $branch_name,
               branchId: $branch_id
             }')"
+
+          pnpm exec tsx scripts/seed.ts
