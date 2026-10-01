@@ -512,7 +512,7 @@ function ColorFacet({
         (selected) => fadeKey(selected) === fade.key,
       ),
       /**
-       * Toggles this exact ordered fade color set in the controlled filters.
+       * Toggles this canonical fade color set, ignoring color order and duplicates.
        *
        * @returns The parent callback result.
        */
@@ -639,7 +639,7 @@ function ColorToggle({
 }
 
 /**
- * Renders maker selection and cross-facet any/all matching controls.
+ * Renders maker selection and any/all matching for values within each facet.
  *
  * @param props - Advanced filters properties.
  * @param props.copy - Localized labels and label builders.

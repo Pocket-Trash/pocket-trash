@@ -46,7 +46,7 @@ type ProductLightboxProps = {
    */
   currency: CurrencyCode;
   /**
-   * Index of the currently displayed product image.
+   * Zero-based image index. Out-of-range values display the first image.
    */
   imageIndex: number;
   /**
@@ -56,11 +56,13 @@ type ProductLightboxProps = {
   /**
    * Requests a different displayed image.
    *
-   * @param nextIndex - Next image index, already wrapped to the image list.
+   * @param nextIndex - Next zero-based image index, already wrapped to the image list.
    */
   onImageChange: (nextIndex: number) => void;
   /**
-   * Product to display, or `null` to close the view.
+   * Current product. Before any selection, `null` renders no output; after a
+   * selection, `null` retains the last product content and closes only the
+   * mobile drawer.
    */
   product: PenProduct | null;
   /**
@@ -86,14 +88,14 @@ type ProductLightboxProps = {
  *
  * @param props - Product lightbox properties.
  * @param props.currency - Currency used to display the price.
- * @param props.imageIndex - Index of the displayed image.
+ * @param props.imageIndex - Zero-based image index; out-of-range values fall back to the first image.
  * @param props.onClose - Callback that requests closure.
  * @param props.onImageChange - Callback that requests another image.
- * @param props.product - Product to display, or `null` to close.
+ * @param props.product - Current product; `null` retains prior content after a selection and closes the mobile drawer.
  * @param props.rates - Exchange rates used for price conversion.
  * @param props.units - Unit used for dimensions.
  * @param props.weight - Unit used for weight.
- * @returns The responsive product detail view, or no output before a product has been shown.
+ * @returns The responsive product detail view, or no output when no product has ever been provided.
  * @throws {Error} When rendered outside `LocaleProvider`.
  */
 export function ProductLightbox({

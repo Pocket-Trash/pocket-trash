@@ -103,11 +103,11 @@ type MobileToolbarProps = {
 };
 
 /**
- * Compact-only (`<= 880px`) bottom toolbar. It is a toolbar, not a nav bar: each
+ * Compact-only (`< 880px`) bottom toolbar. It is a toolbar, not a nav bar: each
  * item opens a sheet or field rather than switching screens. Filters and Sort
  * are vaul bottom sheets (swipe-to-dismiss); Search expands a field docked
- * above the bar. Hidden above 880px, where the persistent sidebar and header
- * controls take over.
+ * above the bar. At 880px and above, the persistent sidebar and header controls
+ * take over and the toolbar is hidden.
  *
  * @param props - Mobile toolbar properties.
  * @param props.active - Selected values grouped by filter key.

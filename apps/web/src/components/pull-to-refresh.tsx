@@ -3,13 +3,14 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Downward pull distance, in pixels, required to request a refresh.
+ * Resisted indicator distance, in CSS pixels, required to request a refresh.
+ * This corresponds to 144 CSS pixels of finger travel at the 0.5 resistance.
  */
-const TRIGGER_DISTANCE = 72; // px of pull needed to fire a refresh
+const TRIGGER_DISTANCE = 72;
 /**
  * Maximum resisted pull distance, in pixels, shown by the indicator.
  */
-const MAX_PULL = 96; // clamp so the indicator never runs away
+const MAX_PULL = 96;
 
 /**
  * Content and controlled refresh state for the compact pull gesture.
@@ -30,12 +31,9 @@ type PullToRefreshProps = {
 };
 
 /**
- * Compact-only pull-to-refresh for the document-scrolled archive. It only
- * engages when the page is already scrolled to the top and the finger drags
- * down, so it never fights normal scrolling. The indicator follows the pull and
- * spins while `refreshing`; it is hidden at `md`+ where the wrapper collapses to
- * `display: contents` and adds no box. Untested on a real touch device — verify
- * the feel on-device.
+ * Adds a resisted pull-to-refresh gesture while the document is scrolled to the
+ * top. The indicator follows the pull and spins while `refreshing`; at `md` and
+ * above it is hidden and the wrapper uses `display: contents`.
  *
  * @param props - Pull-to-refresh properties.
  * @param props.children - Content wrapped by the compact gesture surface.

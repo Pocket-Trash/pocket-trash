@@ -28,7 +28,7 @@ type AutmogProductCardProps = {
    */
   currency: CurrencyCode;
   /**
-   * Requests product details and supplies the source button for focus restoration.
+   * Requests product details and supplies the clicked card button.
    *
    * @param product - Product whose details should open.
    * @param element - Button that initiated the request.
