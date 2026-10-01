@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { resourcePayload, slugify } from "./resource-payload.js";
+import { type resourcePayload, slugify } from "./resource-payload.js";
 import type { StorageDb } from "./types.js";
 
 type UploadCompletion = { resourceId: number; version: number };
@@ -9,6 +9,22 @@ export async function completeResource(
   uploaderClerkId: string,
   payload: Extract<ReturnType<typeof resourcePayload>, { operation: "create" }>,
 ): Promise<UploadCompletion | undefined> {
+  const categories = [
+    ...new Map(
+      payload.categories.map((name) => [
+        slugify(name),
+        { name, slug: slugify(name) },
+      ]),
+    ).values(),
+  ];
+  await db.execute(sql`
+    select pg_advisory_xact_lock(
+      hashtextextended('resource-category:' || category.slug, 0)
+    )
+    from jsonb_to_recordset(${JSON.stringify(categories)}::jsonb)
+      as category(name text, slug text)
+    order by category.slug
+  `);
   const result = await db.execute<UploadCompletion>(sql`
     with locked_session as (
       select * from upload_session
@@ -35,15 +51,21 @@ export async function completeResource(
     ), input_categories as (
       select category.name, category.slug
       from locked_session,
-        lateral jsonb_to_recordset(${JSON.stringify([...new Map(payload.categories.map((name) => [slugify(name), { name, slug: slugify(name) }])).values()])}::jsonb)
+        lateral jsonb_to_recordset(${JSON.stringify(categories)}::jsonb)
           as category(name text, slug text)
     ), upserted_categories as (
-      insert into resource_categories (name, slug, created_by_clerk_id)
-      select input_categories.name, input_categories.slug,
-        locked_session.uploader_clerk_id
-      from input_categories cross join locked_session
-      on conflict (slug) do update set name = resource_categories.name
-      returning id, (xmax = 0) as created
+      merge into resource_categories as target
+      using (
+        select input_categories.name, input_categories.slug,
+          locked_session.uploader_clerk_id
+        from input_categories cross join locked_session
+      ) as source
+      on target.slug = source.slug
+      when matched then update set name = target.name
+      when not matched then
+        insert (name, slug, created_by_clerk_id)
+        values (source.name, source.slug, source.uploader_clerk_id)
+      returning target.id, merge_action() = 'INSERT' as created
     ), inserted_version as (
       insert into resource_versions (resource_id, version)
       select id, 1 from inserted_resource

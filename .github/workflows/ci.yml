@@ -138,6 +138,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run lint
+        env:
+          JSDOC_BASE_REF: ${{ github.event.pull_request.base.ref && format('origin/{0}', github.event.pull_request.base.ref) || '' }}
         run: pnpm lint
 
       - name: Run typecheck

@@ -1,6 +1,6 @@
 {
-  "id": "9cce1d5e-9584-49fe-8c77-ef9f9280bab4",
-  "prevId": "5835f94e-34ec-45cc-b615-f074e1fabc7c",
+  "id": "5c864409-b35a-49a5-b8bc-2d476cb70dc3",
+  "prevId": "9cce1d5e-9584-49fe-8c77-ef9f9280bab4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2753,9 +2753,21 @@
           "primaryKey": false,
           "notNull": false
         },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "linear_client_uuid": {
           "name": "linear_client_uuid",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linear_updated_at": {
+          "name": "linear_updated_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -2814,6 +2826,27 @@
             },
             {
               "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "feedback_status_completed_at_idx": {
+          "name": "feedback_status_completed_at_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "completed_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
