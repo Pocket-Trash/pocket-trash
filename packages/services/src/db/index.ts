@@ -2,6 +2,8 @@ import type { Database } from "@package/database";
 import type { Logger } from "@package/logger";
 import { collectionAuditEvents } from "./audit/collections.js";
 import { accountErasureAuditEvents } from "./audit/erasure.js";
+import { featureFlagAuditEvents } from "./audit/feature-flags.js";
+import { feedbackAuditEvents } from "./audit/feedback.js";
 import { type AuditService, createAuditService } from "./audit/index.js";
 import { productAuditEvents } from "./audit/products.js";
 import { resourceAuditEvents } from "./audit/resources.js";
@@ -46,6 +48,8 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
     [
       ...accountErasureAuditEvents,
       ...collectionAuditEvents,
+      ...featureFlagAuditEvents,
+      ...feedbackAuditEvents,
       ...productAuditEvents,
       ...resourceAuditEvents,
     ],
@@ -58,7 +62,7 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
     catalog: createCatalogService(db, logger, users, audit),
     collections: createCollectionsService(db, users, audit, logger),
     erasure: createErasureService(db, logger, undefined, audit),
-    feedback: createFeedbackService(db, logger),
+    feedback: createFeedbackService(db, logger, audit),
     userSettings: createUserSettingsService(db, users, logger),
     users,
   };
@@ -127,6 +131,7 @@ export type {
   AdminFeedbackPage,
   AdminFeedbackSort,
   AdminFeedbackSortField,
+  FeedbackAdminActionInput,
   FeedbackListItem,
   FeedbackMergeTarget,
   FeedbackNotificationItem,
@@ -136,6 +141,7 @@ export type {
   LinearFeedbackSyncResult,
   ListAdminFeedbackOptions,
   ListMyFeedbackOptions,
+  MergePendingFeedbackInput,
   SubmitFeedbackInput,
   UpdateAdminFeedbackInput,
   UpdatePendingFeedbackInput,
