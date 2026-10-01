@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   downgradeMarkdownCodeBlocks,
   htmlToMarkdown,
+  isSafeMarkdownLink,
   markdownToHtml,
 } from "./index.js";
 
@@ -168,4 +169,24 @@ describe("markdownToHtml", () => {
     expect(html).toContain("const x = 1;");
     expect(html).not.toContain("<code");
   });
+});
+
+describe("isSafeMarkdownLink", () => {
+  it.each([
+    "../help",
+    "/help",
+    "#details",
+    "https://example.com",
+    "HTTP://example.com",
+  ])("accepts safe destination %s", (url) =>
+    expect(isSafeMarkdownLink(url)).toBe(true));
+
+  it.each([
+    "mailto:test@example.com",
+    "javascript:alert(1)",
+    "java%73cript:alert(1)",
+    "//example.com",
+    "",
+  ])("rejects unsafe destination %s", (url) =>
+    expect(isSafeMarkdownLink(url)).toBe(false));
 });

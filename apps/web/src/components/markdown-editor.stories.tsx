@@ -69,6 +69,9 @@ export const VisualToolbar: Story = {
       name: "Description",
     });
     await userEvent.click(canvas.getByRole("button", { name: "Heading 1" }));
+    await expect(
+      canvas.getByRole("button", { name: "Heading 1" }),
+    ).toHaveAttribute("aria-pressed", "true");
     await userEvent.type(editor, "Toolbar heading");
     await expect(
       canvas.getByRole("heading", { level: 1, name: "Toolbar heading" }),
@@ -128,7 +131,11 @@ export const PastedCodeIsReadableText: Story = {
     await userEvent.click(editor);
     await userEvent.paste("before\n\n```markdown\n# Pasted text\n```\n\nafter");
     await expect(editor).toHaveTextContent("# Pasted text");
-    await expect(editor.textContent).toBe("before\n\n# Pasted text\n\nafter");
+    await expect(
+      [...editor.querySelectorAll("p")].map(
+        (paragraph) => paragraph.textContent,
+      ),
+    ).toEqual(["before", "# Pasted text", "after"]);
     await expect(editor.querySelector("code")).toBeNull();
   },
 };
@@ -154,6 +161,237 @@ export const VisualHistory: Story = {
     await expect(editor).not.toHaveTextContent("Undo me");
     await userEvent.keyboard(`{${modifier}>}{Shift>}z{/Shift}{/${modifier}}`);
     await expect(editor).toHaveTextContent("Undo me");
+  },
+};
+
+/** Existing visual link editing story. */
+export const VisualLinkEditing: Story = {
+  args: { defaultValue: "[Pocket **Trash**](/old)" },
+  /**
+   * Verifies contextual link editing and focus restoration.
+   *
+   * @param root0 - Story context.
+   * @param root0.canvas - Rendered story canvas.
+   * @param root0.userEvent - Story interaction driver.
+   * @returns A promise that resolves after assertions complete.
+   * @rejects When the expected link is absent.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const editor = await canvas.findByRole("textbox", { name: "Description" });
+    const link = editor.querySelector("a");
+    if (!link) throw new globalThis.Error("Expected initial link");
+    await userEvent.click(link);
+    await expect(canvas.getByRole("button", { name: "Link" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await userEvent.click(canvas.getByRole("button", { name: "Link" }));
+    const dialog = canvas.getByRole("dialog");
+    const url = canvas.getByLabelText("URL");
+    await expect(dialog).toBeVisible();
+    await userEvent.clear(url);
+    await userEvent.type(url, "https://pocket-trash.app");
+    await userEvent.click(canvas.getByRole("button", { name: "Update link" }));
+    await expect(editor.querySelector("a")).toHaveAttribute(
+      "href",
+      "https://pocket-trash.app",
+    );
+    await expect(editor).toHaveFocus();
+    const updatedLink = editor.querySelector("a");
+    if (!updatedLink) throw new globalThis.Error("Expected updated link");
+    await userEvent.click(updatedLink);
+    await userEvent.click(canvas.getByRole("button", { name: "Link" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Remove link" }));
+    await expect(editor.querySelector("a")).toBeNull();
+    await expect(editor).toHaveTextContent("Pocket Trash");
+    await expect(editor.querySelector("strong")).toHaveTextContent("Trash");
+  },
+};
+
+/** Selected visual text link story. */
+export const VisualSelectedTextLink: Story = {
+  args: { defaultValue: "Pocket Trash" },
+  /**
+   * Verifies selected text asks only for a URL and becomes a link.
+   *
+   * @param root0 - Story context.
+   * @param root0.canvas - Rendered story canvas.
+   * @param root0.userEvent - Story interaction driver.
+   * @returns A promise that resolves after assertions complete.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const editor = await canvas.findByRole("textbox", { name: "Description" });
+    await userEvent.click(editor);
+    const modifier = /Mac|iPhone|iPad/u.test(navigator.platform)
+      ? "Meta"
+      : "Control";
+    await userEvent.keyboard(`{${modifier}>}a{/${modifier}}`);
+    await userEvent.click(canvas.getByRole("button", { name: "Link" }));
+    await expect(canvas.queryByLabelText("Link text")).toBeNull();
+    await userEvent.type(canvas.getByLabelText("URL"), "/about");
+    await userEvent.click(canvas.getByRole("button", { name: "Insert link" }));
+    await expect(editor.querySelector("a")).toHaveTextContent("Pocket Trash");
+    await expect(editor).toHaveFocus();
+  },
+};
+
+/** Empty-selection visual link story. */
+export const VisualLinkModal: Story = {
+  /**
+   * Verifies the modal requires link text and URL.
+   *
+   * @param root0 - Story context.
+   * @param root0.canvas - Rendered story canvas.
+   * @param root0.userEvent - Story interaction driver.
+   * @returns A promise that resolves after assertions complete.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const editor = await canvas.findByRole("textbox", { name: "Description" });
+    await userEvent.click(canvas.getByRole("button", { name: "Link" }));
+    const dialog = canvas.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await userEvent.type(canvas.getByLabelText("Link text"), "Pocket Trash");
+    await userEvent.type(canvas.getByLabelText("URL"), "/about");
+    await userEvent.click(canvas.getByRole("button", { name: "Insert link" }));
+    await expect(editor.querySelector("a")).toHaveTextContent("Pocket Trash");
+    await expect(editor.querySelector("a")).toHaveAttribute("href", "/about");
+    await expect(editor).toHaveFocus();
+  },
+};
+
+/** Visual table insertion and navigation story. */
+export const VisualTable: Story = {
+  parameters: {
+    a11y: {
+      config: { rules: [{ enabled: false, id: "empty-table-header" }] },
+    },
+  },
+  /**
+   * Verifies the fixed table shape and last-cell Tab behavior.
+   *
+   * @param root0 - Story context.
+   * @param root0.canvas - Rendered story canvas.
+   * @param root0.userEvent - Story interaction driver.
+   * @returns A promise that resolves after assertions complete.
+   */
+  play: async ({ canvas, userEvent }) => {
+    await canvas.findByRole("textbox", { name: "Description" });
+    await userEvent.click(canvas.getByRole("button", { name: "Table" }));
+    const table = canvas.getByRole("table");
+    await expect(table.querySelectorAll("tr")).toHaveLength(2);
+    await expect(table.querySelectorAll("th")).toHaveLength(3);
+    await expect(table.querySelectorAll("td")).toHaveLength(3);
+    const lastCell = table.querySelectorAll("td").item(2);
+    await userEvent.click(lastCell);
+    await userEvent.keyboard("{Tab}");
+    await expect(table.querySelectorAll("tr")).toHaveLength(3);
+  },
+};
+
+/** Restricted Markdown clipboard story. */
+export const VisualClipboard: Story = {
+  /**
+   * Verifies Markdown paste, unsupported image removal, and Markdown copy.
+   *
+   * @param root0 - Story context.
+   * @param root0.canvas - Rendered story canvas.
+   * @param root0.userEvent - Story interaction driver.
+   * @returns A promise that resolves after assertions complete.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const editor = await canvas.findByRole("textbox", { name: "Description" });
+    await userEvent.click(editor);
+    await userEvent.paste(
+      "**Bold** and [safe](https://example.com) and [mail](mailto:test@example.com)\n\n![Alt](https://example.com/a.png)",
+    );
+    await expect(editor.querySelector("strong")).toHaveTextContent("Bold");
+    await expect(editor.querySelector("a")).toHaveAttribute(
+      "href",
+      "https://example.com",
+    );
+    await expect(editor.querySelector("img")).toBeNull();
+    await expect(editor).toHaveTextContent("Alt");
+    await expect(editor.querySelectorAll("a")).toHaveLength(1);
+
+    const modifier = /Mac|iPhone|iPad/u.test(navigator.platform)
+      ? "Meta"
+      : "Control";
+    await userEvent.keyboard(`{${modifier}>}a{/${modifier}}`);
+    const copied = await userEvent.copy();
+    await expect(copied?.getData("text/plain")).toContain(
+      "**Bold** and [safe](https://example.com)",
+    );
+  },
+};
+
+/** GFM URL activation story. */
+export const VisualBareUrl: Story = {
+  /**
+   * Verifies typed URLs stay plain until a parse cycle and mailto stays inert.
+   *
+   * @param root0 - Story context.
+   * @param root0.canvas - Rendered story canvas.
+   * @param root0.userEvent - Story interaction driver.
+   * @returns A promise that resolves after assertions complete.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const editor = await canvas.findByRole("textbox", { name: "Description" });
+    await userEvent.type(editor, "https://example.com");
+    await expect(editor.querySelector("a")).toBeNull();
+    await userEvent.click(canvas.getByRole("button", { name: "Source" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Visual" }));
+    const reparsed = await canvas.findByRole("textbox", {
+      name: "Description",
+    });
+    await expect(reparsed.querySelector("a")).toHaveAttribute(
+      "href",
+      "https://example.com",
+    );
+  },
+};
+
+/** Unsafe initial link story. */
+export const UnsafeLinkIsInert: Story = {
+  args: { defaultValue: "[Email](mailto:test@example.com)" },
+  /**
+   * Verifies non-HTTP schemes never become active links.
+   *
+   * @param root0 - Story context.
+   * @param root0.canvas - Rendered story canvas.
+   * @returns A promise that resolves after assertions complete.
+   */
+  play: async ({ canvas }) => {
+    const editor = await canvas.findByRole("textbox", { name: "Description" });
+    await expect(editor).toHaveTextContent("Email");
+    await expect(editor.querySelector("a")).toBeNull();
+  },
+};
+
+/** Narrow visual toolbar story. */
+export const NarrowToolbar: Story = {
+  decorators: [
+    (Story) => (
+      <div className="w-64">
+        <Story />
+      </div>
+    ),
+  ],
+  /**
+   * Verifies one-row horizontal overflow and touch-sized controls.
+   *
+   * @param root0 - Story context.
+   * @param root0.canvas - Rendered story canvas.
+   * @returns A promise that resolves after assertions complete.
+   */
+  play: async ({ canvas }) => {
+    await canvas.findByRole("textbox", { name: "Description" });
+    const toolbar = canvas.getByRole("toolbar");
+    await expect(toolbar.scrollWidth).toBeGreaterThan(toolbar.clientWidth);
+    for (const button of toolbar.querySelectorAll("button")) {
+      await expect(
+        button.getBoundingClientRect().height,
+      ).toBeGreaterThanOrEqual(44);
+    }
   },
 };
 
@@ -213,7 +451,9 @@ export const InitializationFallback: Story = {
    */
   play: async ({ canvas }) => {
     await waitFor(() =>
-      expect(canvas.getByText(/visual editor couldn't load/i)).toBeVisible(),
+      expect(
+        canvas.getByText(/visual editor couldn't load/i, { selector: "p" }),
+      ).toBeVisible(),
     );
     await expect(
       canvas.getByRole("textbox", { name: "Description" }),

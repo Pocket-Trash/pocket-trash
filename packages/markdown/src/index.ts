@@ -446,3 +446,13 @@ function safeLink(href: string): {
     href: href.replace(/^[a-z][a-z0-9+.-]*:/i, `${scheme.toLowerCase()}:`),
   };
 }
+
+/**
+ * Reports whether a Markdown link destination is relative or uses HTTP(S).
+ *
+ * @param href - Untrusted destination to classify.
+ * @returns Whether the destination can be activated safely.
+ */
+export function isSafeMarkdownLink(href: string): boolean {
+  return safeLink(href) !== null;
+}
