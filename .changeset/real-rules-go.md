@@ -4,4 +4,4 @@
 "@package/storage": patch
 ---
 
-Cover collection lifecycle and deletion choices with isolated browser tests, remove empty preview storage folders, and pin the patched TanStack Start release.
+Cover collection lifecycle and deletion choices with isolated browser tests, remove empty preview storage folders, pin the patched TanStack Start release, and keep Storybook compatible with its router API.
