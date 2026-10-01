@@ -104,7 +104,7 @@ const maxFieldValueLength = 1024;
  *
  * @param context - Metadata for the triggering workflow run.
  * @param event - The untrusted GitHub event payload.
- * @returns The formatted notification, or `undefined` for unsupported events.
+ * @returns The notification, or `undefined` for unsupported, ignored, or incomplete events.
  */
 export function formatGitHubNotification(
   context: FormatContext,
@@ -252,7 +252,7 @@ function formatPullRequestReview(
 }
 
 /**
- * Formats a push to the default branch.
+ * Formats a push to the `main` branch.
  *
  * @param context - Metadata for the triggering workflow run.
  * @param event - The GitHub push event payload.
@@ -668,7 +668,7 @@ function truncate(value: string, maxLength: number): string {
 }
 
 /**
- * Narrows an untrusted value to a plain object.
+ * Narrows an untrusted value to a non-array object.
  *
  * @param value - The value to inspect.
  * @returns The object, or an empty object for other values.
