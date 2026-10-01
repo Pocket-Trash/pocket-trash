@@ -147,9 +147,12 @@ export const VisualHistory: Story = {
     });
     await userEvent.type(editor, "Undo me");
     await expect(editor).toHaveTextContent("Undo me");
-    await userEvent.keyboard("{Meta>}z{/Meta}");
+    const modifier = /Mac|iPhone|iPad/u.test(navigator.platform)
+      ? "Meta"
+      : "Control";
+    await userEvent.keyboard(`{${modifier}>}z{/${modifier}}`);
     await expect(editor).not.toHaveTextContent("Undo me");
-    await userEvent.keyboard("{Meta>}{Shift>}z{/Shift}{/Meta}");
+    await userEvent.keyboard(`{${modifier}>}{Shift>}z{/Shift}{/${modifier}}`);
     await expect(editor).toHaveTextContent("Undo me");
   },
 };

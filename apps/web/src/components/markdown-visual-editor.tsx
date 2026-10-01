@@ -82,6 +82,7 @@ import {
 } from "@milkdown/preset-gfm";
 import { textblockTypeInputRule } from "@milkdown/prose/inputrules";
 import { $inputRule, callCommand } from "@milkdown/utils";
+import { downgradeMarkdownCodeBlocks } from "@package/markdown";
 import * as React from "react";
 import "@milkdown/prose/view/style/prosemirror.css";
 
@@ -415,19 +416,5 @@ function runFormat(editor: Editor | null, format: MarkdownVisualFormat) {
  * @returns Text safe for insertion into the restricted schema.
  */
 function pasteText(value: string): string {
-  if (!/(?:^|\n)(?: {0,3}(?:`{3,}|~{3,})| {4}|\t)/u.test(value)) {
-    return value;
-  }
-  let fence: "`" | "~" | undefined;
-  return value
-    .split("\n")
-    .flatMap((line) => {
-      const marker = /^ {0,3}(?<fence>`{3,}|~{3,})/u.exec(line)?.groups?.fence;
-      if (marker && (!fence || marker[0] === fence)) {
-        fence = fence ? undefined : (marker[0] as "`" | "~");
-        return [];
-      }
-      return [line.replace(/^(?: {4}|\t)/u, "")];
-    })
-    .join("\n");
+  return downgradeMarkdownCodeBlocks(value);
 }
