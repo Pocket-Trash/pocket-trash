@@ -52,6 +52,8 @@ describe("resource management routes", () => {
     "/admin/trash/",
     "/admin/trash/catalog-images",
     "/admin/trash/resources",
+    "/changelog/",
+    "/changelog/$slug",
     "/contact",
     "/notifications",
     "/privacy",
