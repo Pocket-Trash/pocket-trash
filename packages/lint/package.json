@@ -9,7 +9,11 @@
   },
   "exports": {
     "./biome": "./biome.json",
-    "./eslint": "./eslint/index.mjs"
+    "./eslint": "./eslint/index.mjs",
+    "./eslint/apps": "./eslint/apps.mjs",
+    "./eslint/base": "./eslint/base.mjs",
+    "./eslint/react": "./eslint/react.mjs",
+    "./eslint/react-native": "./eslint/react-native.mjs"
   },
   "peerDependencies": {
     "eslint": ">=10.0.0",
