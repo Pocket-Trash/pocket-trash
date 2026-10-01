@@ -105,6 +105,9 @@ describe("api worker", () => {
     const processDue = vi
       .spyOn(runtime.services.db.erasure, "processDue")
       .mockResolvedValueOnce(false);
+    const processAuditDue = vi
+      .spyOn(runtime.services.db.audit, "processDue")
+      .mockResolvedValueOnce(false);
     if (fails) cleanup.mockRejectedValueOnce(new Error("private SQL payload"));
     else cleanup.mockResolvedValueOnce(0);
     const flush = vi.spyOn(runtime.logger, "flush");
@@ -124,6 +127,7 @@ describe("api worker", () => {
     await Promise.all(tasks);
     expect(cleanup).toHaveBeenCalledOnce();
     expect(processDue).toHaveBeenCalledOnce();
+    expect(processAuditDue).toHaveBeenCalledOnce();
     expect(purge).toHaveBeenCalledOnce();
     expect(flush).toHaveBeenCalledOnce();
   });

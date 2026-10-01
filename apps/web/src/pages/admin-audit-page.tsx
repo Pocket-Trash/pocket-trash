@@ -1,4 +1,4 @@
-import type { AuditEventPage } from "@package/services";
+import type { AuditDeliveryFailure, AuditEventPage } from "@package/services";
 import {
   formatTranslation,
   type TranslationKey,
@@ -28,10 +28,13 @@ type AuditState = NonNullable<AuditEvent["beforeState"]>;
  * @returns The admin audit page.
  */
 export function AdminAuditPage({
+  deliveryFailures = [],
   exportState,
   page,
   search,
 }: {
+  /** Terminal audit-delivery failures requiring operational attention. */
+  deliveryFailures?: AuditDeliveryFailure[];
   /** Current audit export state. */
   exportState: AuditExportState;
   /** Current page of audit events. */
@@ -57,6 +60,61 @@ export function AdminAuditPage({
         <p className="m-0 text-sm text-muted-foreground">
           {t("web.admin.audit.description")}
         </p>
+        {deliveryFailures.length ? (
+          <section
+            aria-labelledby="audit-delivery-failures-title"
+            className="grid gap-3 rounded-lg border border-destructive bg-card p-4"
+          >
+            <h2
+              className="text-sm font-semibold"
+              id="audit-delivery-failures-title"
+            >
+              {t("web.admin.notifications.title")}
+            </h2>
+            <ul className="grid gap-3">
+              {deliveryFailures.map((failure) => (
+                <li
+                  className="grid gap-2 border-t border-border pt-3 first:border-0 first:pt-0"
+                  key={`${failure.action}:${failure.requestId ?? failure.correlationId ?? failure.targetId}`}
+                >
+                  <dl className="grid gap-1 text-sm">
+                    <div className="grid grid-cols-[8rem_1fr] gap-2">
+                      <dt className="font-semibold">
+                        {t("web.admin.audit.action")}
+                      </dt>
+                      <dd className="font-mono text-xs">{failure.action}</dd>
+                    </div>
+                    <div className="grid grid-cols-[8rem_1fr] gap-2">
+                      <dt className="font-semibold">
+                        {t("web.admin.audit.targetId")}
+                      </dt>
+                      <dd className="font-mono text-xs">{failure.targetId}</dd>
+                    </div>
+                    <div className="grid grid-cols-[8rem_1fr] gap-2">
+                      <dt className="font-semibold">
+                        {t("web.admin.audit.metadata")}
+                      </dt>
+                      <dd>
+                        <pre className="m-0 whitespace-pre-wrap break-words text-xs">
+                          {JSON.stringify(
+                            {
+                              attempts: failure.attempts,
+                              correlationId: failure.correlationId,
+                              errorCode: failure.errorCode,
+                              requestId: failure.requestId,
+                            },
+                            null,
+                            2,
+                          )}
+                        </pre>
+                      </dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         {exportState.canExport ? (
           <section
             aria-labelledby="audit-export-title"

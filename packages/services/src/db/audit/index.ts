@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type {
+  AuditDeliveryPayload,
   AuditEvent,
   AuditExport,
   AuditJsonObject,
@@ -137,6 +138,20 @@ export type AuditService = {
    */
   downloadExport(input: DownloadAuditExportInput): Promise<AuditExportDownload>;
   /**
+   * Queues one sanitized event after its external source action succeeds.
+   *
+   * @template T - Definition input type.
+   * @param transaction - Caller-owned source transaction.
+   * @param deliveryKey - Unique source-operation key.
+   * @param input - Audit event normalized before persistence.
+   * @returns Completion after the delivery is durable.
+   */
+  enqueue<T>(
+    transaction: AuditTransaction,
+    deliveryKey: string,
+    input: AuditWriteInput<T>,
+  ): Promise<void>;
+  /**
    * Finds the current unconsumed export range.
    *
    * @param actor - Authorized audit actor.
@@ -150,6 +165,20 @@ export type AuditService = {
    * @returns One page of audit events.
    */
   list(input: ListAuditEventsInput): Promise<AuditEventPage>;
+  /**
+   * Lists terminal delivery failures visible to audit readers.
+   *
+   * @param actor - Authorized audit reader.
+   * @returns Sanitized terminal failures in newest-first order.
+   */
+  listDeliveryFailures(actor: Actor): Promise<AuditDeliveryFailure[]>;
+  /**
+   * Processes the next due audit delivery.
+   *
+   * @param now - Claim and backoff clock.
+   * @returns Whether one due delivery was claimed.
+   */
+  processDue(now?: Date): Promise<boolean>;
   /**
    * Redacts retained audit data for an erased account.
    *
@@ -170,6 +199,22 @@ export type AuditService = {
     transaction: AuditTransaction,
     input: AuditWriteInput<T>,
   ): Promise<AuditEvent>;
+};
+
+/** Sanitized terminal audit-delivery failure shown to operational users. */
+export type AuditDeliveryFailure = {
+  /** Registered audit action. */
+  action: string;
+  /** Delivery attempts made. */
+  attempts: number;
+  /** Cross-request correlation identifier. */
+  correlationId: string | null;
+  /** Sanitized terminal error code. */
+  errorCode: string;
+  /** Source operation request identifier. */
+  requestId: string | null;
+  /** Stable target identifier. */
+  targetId: string;
 };
 
 /** Input for reserving an audit-export range. */
@@ -395,18 +440,10 @@ export function createAuditService(
             `Audit event ${key} is not registered.`,
           );
         }
-        const values = normalizedInput(input);
-        const payload = normalizedPayload(
-          input.definition.serialize(input.data),
-        );
+        const values = auditEventValues(input);
         const [event] = await transaction
           .insert(schema.auditEvent)
-          .values({
-            ...values,
-            afterState: payload.after,
-            beforeState: payload.before,
-            metadata: payload.metadata,
-          })
+          .values(values)
           .returning();
         if (!event) throw new Error("Failed to write audit event.");
         return event;
@@ -669,6 +706,43 @@ export function createAuditService(
     },
 
     /**
+     * Queues a normalized event under its unique source-operation key.
+     *
+     * @param transaction - Caller-owned source transaction.
+     * @param deliveryKey - Unique source-operation key.
+     * @param input - Registered audit event input.
+     * @returns Completion after the delivery is durable.
+     * @rejects When validation or persistence fails.
+     */
+    async enqueue(transaction, deliveryKey, input) {
+      const key = definitionKey(
+        input.definition as AuditEventDefinition<never>,
+      );
+      if (registered.get(key) !== input.definition) {
+        throw new AuditEventValidationError(
+          `Audit event ${key} is not registered.`,
+        );
+      }
+      const normalizedDeliveryKey = requiredText(
+        deliveryKey,
+        "deliveryKey",
+        200,
+        targetIdPattern,
+      );
+      const values = auditEventValues(input);
+      await transaction
+        .insert(schema.auditDelivery)
+        .values({
+          deliveryKey: normalizedDeliveryKey,
+          payload: {
+            ...values,
+            occurredAt: values.occurredAt.toISOString(),
+          },
+        })
+        .onConflictDoNothing({ target: schema.auditDelivery.deliveryKey });
+    },
+
+    /**
      * Finds the current unconsumed export.
      *
      * @param actor - Authorized audit actor.
@@ -770,6 +844,79 @@ export function createAuditService(
       };
     },
 
+    /**
+     * Lists sanitized terminal failures for an authorized audit reader.
+     *
+     * @param actor - Authorized audit reader.
+     * @returns Terminal failures in newest-first order.
+     * @rejects When authorization or audit queries are unavailable.
+     */
+    async listDeliveryFailures(actor) {
+      if (!hasPermission(actor, "audit.read")) {
+        throw new Error("Audit events do not exist.");
+      }
+      if (!database) throw new Error("Audit queries are not configured.");
+      const rows = await database
+        .select()
+        .from(schema.auditDelivery)
+        .where(eq(schema.auditDelivery.status, "needs_attention"))
+        .orderBy(desc(schema.auditDelivery.updatedAt))
+        .limit(50);
+      return rows.map(({ attempts, errorCode, payload }) => ({
+        action: payload.action,
+        attempts,
+        correlationId: payload.correlationId,
+        errorCode: errorCode ?? "audit_delivery_failed",
+        requestId: payload.requestId,
+        targetId: payload.targetId,
+      }));
+    },
+
+    /**
+     * Claims and attempts the oldest due audit delivery.
+     *
+     * @param now - Claim and backoff clock.
+     * @returns Whether one due delivery was claimed.
+     * @rejects When delivery persistence is unavailable.
+     */
+    async processDue(now = new Date()) {
+      if (!database) throw new Error("Audit delivery is not configured.");
+      const delivery = await claimDelivery(database, now);
+      if (!delivery) return false;
+      try {
+        await database.transaction(async (transaction) => {
+          const key = `${delivery.payload.action}:${delivery.payload.targetType}`;
+          if (!registered.has(key)) {
+            throw new AuditEventValidationError(
+              `Audit event ${key} is not registered.`,
+            );
+          }
+          await transaction
+            .insert(schema.auditEvent)
+            .values(deliveryPayloadValues(delivery.payload));
+          await transaction
+            .delete(schema.auditDelivery)
+            .where(eq(schema.auditDelivery.deliveryKey, delivery.deliveryKey));
+        });
+      } catch {
+        const terminal = delivery.attempts >= 5;
+        const backoffMs = Math.min(
+          60 * 60 * 1000,
+          60 * 1000 * 2 ** Math.max(0, delivery.attempts - 1),
+        );
+        await database
+          .update(schema.auditDelivery)
+          .set({
+            errorCode: "audit_delivery_failed",
+            nextAttemptAt: terminal ? now : new Date(now.getTime() + backoffMs),
+            status: terminal ? "needs_attention" : "pending",
+            updatedAt: now,
+          })
+          .where(eq(schema.auditDelivery.deliveryKey, delivery.deliveryKey));
+      }
+      return true;
+    },
+
     write,
 
     /**
@@ -797,7 +944,21 @@ export function createAuditService(
             .select()
             .from(schema.auditExport)
             .where(eq(schema.auditExport.requestedByUserId, userId));
-          if (events.length === 0 && exports.length === 0) return;
+          const deliveries = await transaction
+            .select()
+            .from(schema.auditDelivery)
+            .where(
+              or(
+                sql`(${schema.auditDelivery.payload}->>'actorUserId')::bigint = ${userId}`,
+                sql`(${schema.auditDelivery.payload}->>'ownerUserId')::bigint = ${userId}`,
+              ),
+            );
+          if (
+            events.length === 0 &&
+            exports.length === 0 &&
+            deliveries.length === 0
+          )
+            return;
 
           await transaction.execute(
             sql`select set_config('pocket_trash.audit_erasure_redaction', 'on', true)`,
@@ -848,6 +1009,59 @@ export function createAuditService(
             if (!redacted || !redactionMatches(redacted, expected)) {
               throw new Error("Audit erasure redaction verification failed.");
             }
+          }
+          for (const delivery of deliveries) {
+            const actorErased = delivery.payload.actorUserId === userId;
+            const ownerErased = delivery.payload.ownerUserId === userId;
+            const key = `${delivery.payload.action}:${delivery.payload.targetType}`;
+            const definition = registered.get(key);
+            if (!definition) {
+              throw new AuditEventValidationError(
+                `Audit event ${key} is not registered.`,
+              );
+            }
+            const redacted = normalizedPayload(
+              definition.redact(
+                {
+                  afterState: delivery.payload.afterState,
+                  beforeState: delivery.payload.beforeState,
+                  metadata: delivery.payload.metadata,
+                },
+                {
+                  erasedParty:
+                    actorErased && ownerErased
+                      ? "actor_and_owner"
+                      : actorErased
+                        ? "actor"
+                        : "owner",
+                },
+              ),
+            );
+            await transaction
+              .update(schema.auditDelivery)
+              .set({
+                payload: {
+                  ...delivery.payload,
+                  actorUserId: actorErased
+                    ? null
+                    : delivery.payload.actorUserId,
+                  actorUsername: actorErased
+                    ? DELETED_USERNAME
+                    : delivery.payload.actorUsername,
+                  afterState: redacted.after,
+                  beforeState: redacted.before,
+                  metadata: redacted.metadata,
+                  ownerUserId: ownerErased
+                    ? null
+                    : delivery.payload.ownerUserId,
+                  reason:
+                    delivery.payload.reason === null ? null : DELETED_REASON,
+                },
+                updatedAt: new Date(),
+              })
+              .where(
+                eq(schema.auditDelivery.deliveryKey, delivery.deliveryKey),
+              );
           }
           if (exports.length) {
             const redacted = await transaction
@@ -1191,6 +1405,75 @@ function normalizedInput<T>(input: AuditWriteInput<T>) {
       "definition.targetType",
     ),
   };
+}
+
+/**
+ * Normalizes a registered audit input into database event values.
+ *
+ * @template T - Definition input type.
+ * @param input - Registered audit input.
+ * @returns Validated event values.
+ */
+function auditEventValues<T>(input: AuditWriteInput<T>) {
+  const values = normalizedInput(input);
+  const payload = normalizedPayload(input.definition.serialize(input.data));
+  return {
+    ...values,
+    afterState: payload.after,
+    beforeState: payload.before,
+    metadata: payload.metadata,
+  };
+}
+
+/**
+ * Restores database event values from a sanitized delivery payload.
+ *
+ * @param payload - Stored retry payload.
+ * @returns Event values with a parsed occurrence timestamp.
+ * @throws When the occurrence timestamp is invalid.
+ */
+function deliveryPayloadValues(payload: AuditDeliveryPayload) {
+  const occurredAt = new Date(payload.occurredAt);
+  if (Number.isNaN(occurredAt.getTime())) {
+    throw new AuditEventValidationError("occurredAt is invalid.");
+  }
+  return { ...payload, occurredAt };
+}
+
+/**
+ * Claims the oldest due delivery with a bounded lease.
+ *
+ * @param database - Audit delivery database.
+ * @param now - Claim timestamp.
+ * @returns Claimed delivery, or null when none is due.
+ */
+async function claimDelivery(database: Database, now: Date) {
+  return await database.transaction(async (transaction) => {
+    const [delivery] = await transaction
+      .select()
+      .from(schema.auditDelivery)
+      .where(
+        and(
+          inArray(schema.auditDelivery.status, ["pending", "processing"]),
+          lte(schema.auditDelivery.nextAttemptAt, now),
+        ),
+      )
+      .orderBy(asc(schema.auditDelivery.nextAttemptAt))
+      .limit(1)
+      .for("update", { skipLocked: true });
+    if (!delivery) return null;
+    const [claimed] = await transaction
+      .update(schema.auditDelivery)
+      .set({
+        attempts: Math.min(5, delivery.attempts + 1),
+        nextAttemptAt: new Date(now.getTime() + 5 * 60 * 1000),
+        status: "processing",
+        updatedAt: now,
+      })
+      .where(eq(schema.auditDelivery.deliveryKey, delivery.deliveryKey))
+      .returning();
+    return claimed ?? null;
+  });
 }
 
 function normalizedPayload(payload: AuditPayload) {

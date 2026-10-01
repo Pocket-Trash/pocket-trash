@@ -49,6 +49,17 @@ const listAdminAuditEvents = createServerFn({ method: "GET" })
 
 export { listAdminAuditEvents };
 
+/** Lists terminal audit-delivery failures for an authorized administrator. */
+const getAuditDeliveryFailures = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const actor = await requirePermission("audit.read");
+    const { s } = await import("@/lib/services");
+    return await s.db.audit.listDeliveryFailures(actor);
+  },
+);
+
+export { getAuditDeliveryFailures };
+
 /** Loads the active audit export for an authorized administrator. */
 const getAdminAuditExport = createServerFn({ method: "GET" }).handler(
   async () => {

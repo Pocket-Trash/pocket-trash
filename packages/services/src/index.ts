@@ -24,6 +24,7 @@ export type {
   AdminFeedbackSort,
   AdminFeedbackSortField,
   ApprovedErasureExceptionCode,
+  AuditDeliveryFailure,
   AuditEventCursor,
   AuditEventDefinition,
   AuditEventPage,

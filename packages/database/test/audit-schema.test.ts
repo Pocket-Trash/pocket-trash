@@ -1,7 +1,30 @@
 import { getTableName } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
-import { auditEvent, auditExport } from "../src/schema/audit.js";
+import { auditDelivery, auditEvent, auditExport } from "../src/schema/audit.js";
+
+describe("audit delivery schema", () => {
+  it("stores bounded retry state under a unique delivery key", () => {
+    expect(getTableName(auditDelivery)).toBe("audit_delivery");
+    expect(auditDelivery.deliveryKey.primary).toBe(true);
+    expect(auditDelivery.payload.notNull).toBe(true);
+    expect(auditDelivery.status.notNull).toBe(true);
+    expect(auditDelivery.attempts.notNull).toBe(true);
+    expect(auditDelivery.nextAttemptAt.notNull).toBe(true);
+
+    const config = getTableConfig(auditDelivery);
+    expect(config.checks.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "audit_delivery_status_valid",
+        "audit_delivery_attempts_valid",
+        "audit_delivery_payload_size_valid",
+      ]),
+    );
+    expect(config.indexes.map(({ config: { name } }) => name)).toContain(
+      "audit_delivery_due_idx",
+    );
+  });
+});
 
 describe("audit event schema", () => {
   it("stores append-only event snapshots without mutable foreign keys", () => {
