@@ -6,11 +6,19 @@ import { AuthenticatedLocaleSync, LocaleProvider } from "./locale-provider";
 import { ThemeProvider } from "./theme-provider";
 import { TooltipProvider } from "./tooltip-provider";
 
+/**
+ * Composes the application locale, authentication, theme, tooltip, and toast providers.
+ *
+ * @param props - Application content and server-loaded user settings.
+ * @returns Application provider tree.
+ */
 export function AppProviders({
   children,
   initialSettingsState,
 }: {
+  /** Application content. */
   children: React.ReactNode;
+  /** Server-loaded settings, or `null` for anonymous or unavailable state. */
   initialSettingsState: UserSettingsState | null;
 }) {
   return (

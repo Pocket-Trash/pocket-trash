@@ -1,3 +1,4 @@
+/** Stable browser environment stub used by Storybook. */
 export const clientEnv = {
   VITE_CLERK_PUBLISHABLE_KEY: "pk_test_storybook",
   VITE_CLERK_SIGN_IN_URL: "/sign-in",

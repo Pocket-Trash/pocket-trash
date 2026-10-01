@@ -1,28 +1,57 @@
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 
+/** Unvalidated process values used by the web server runtime. */
 export type WebServerRuntimeEnv = {
+  /** CDN folder containing static application assets. */
   ASSET_FOLDER_PREFIX?: string;
+  /** Axiom dataset receiving server logs. */
   AXIOM_DATASET?: string;
+  /** Optional Axiom edge-ingestion domain. */
   AXIOM_EDGE_DOMAIN?: string;
+  /** Axiom ingestion token. */
   AXIOM_TOKEN?: string;
+  /** Clerk backend secret key. */
   CLERK_SECRET_KEY?: string;
+  /** PostgreSQL connection URL. */
   DATABASE_URL?: string;
+  /** HMAC secret used to pseudonymize erasure subjects. */
   ERASURE_HMAC_SECRET?: string;
+  /** Deployment-scoped Bunny image object prefix. */
   BUNNY_IMAGE_FOLDER_PREFIX?: string;
+  /** Console log output mode. */
   LOGGER?: string;
+  /** Deployment identifier attached to server logs. */
   LOG_DEPLOYMENT_ID?: string;
+  /** Hosting target attached to server logs. */
   LOG_DEPLOYMENT_TARGET?: string;
+  /** Minimum emitted server log level. */
   LOG_LEVEL?: string;
+  /** Shared key accepted by the server log proxy. */
   LOG_PROXY_CLIENT_KEY?: string;
+  /** Public Bunny CDN origin. */
   BUNNY_CDN_BASE_URL?: string;
+  /** Bunny token-authentication key. */
   BUNNY_CDN_TOKEN_KEY?: string;
+  /** Deployment-scoped Bunny resource object prefix. */
   BUNNY_RESOURCE_FOLDER_PREFIX?: string;
+  /** Bunny storage-zone access key. */
   BUNNY_STORAGE_ACCESS_KEY?: string;
+  /** Bunny storage API endpoint. */
   BUNNY_STORAGE_ENDPOINT?: string;
+  /** Bunny storage-zone name. */
   BUNNY_STORAGE_ZONE_NAME?: string;
 };
 
+/**
+ * Validates and normalizes process environment values for the web server.
+ *
+ * Empty strings are treated as missing values.
+ *
+ * @param runtimeEnv - Raw process environment values.
+ * @returns Validated server configuration.
+ * @throws When a required value is missing or any value has an invalid format.
+ */
 export function createWebServerEnv(runtimeEnv: WebServerRuntimeEnv) {
   return createEnv({
     emptyStringAsUndefined: true,
