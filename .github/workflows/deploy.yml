@@ -786,7 +786,9 @@ jobs:
               .filter(Boolean)
               .map((name) => `- \`${name}\``)
               .join("\n");
-            const retryUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/workflows/deploy.yml`;
+            const actionsUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions`;
+            const retryUrl = `${actionsUrl}/runs/${process.env.GITHUB_RUN_ID}`;
+            const historyUrl = `${actionsUrl}/workflows/deploy.yml?query=${encodeURIComponent(`branch:${process.env.GITHUB_HEAD_REF}`)}`;
             const body = [
               marker,
               "DB-isolated preview creation is blocked because the Neon branch limit has been reached.",
@@ -799,7 +801,7 @@ jobs:
               "",
               "Close stale DB-changing PRs or delete stale `preview-pr-*` branches, then push a new commit or rerun the Deploy workflow.",
               "",
-              `[Retry workflow](${retryUrl})`,
+              `[Open Deploy run to retry](${retryUrl}) · [Deploy history for this branch](${historyUrl})`,
             ].join("\n");
 
             const { owner, repo } = context.repo;
