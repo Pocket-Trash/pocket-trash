@@ -2,6 +2,9 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { ProxyAgent } from "undici";
 import { z } from "zod";
 
+/**
+ * Permissive schema for Shopify product variants used by normalization.
+ */
 export const shopifyVariantSchema = z
   .object({
     available: z.boolean().optional(),
@@ -11,6 +14,9 @@ export const shopifyVariantSchema = z
   })
   .passthrough();
 
+/**
+ * Permissive schema for Shopify product images used by normalization.
+ */
 export const shopifyImageSchema = z
   .object({
     alt: z.string().nullable().optional(),
@@ -22,6 +28,9 @@ export const shopifyImageSchema = z
   })
   .passthrough();
 
+/**
+ * Permissive schema for Shopify collection-product payloads.
+ */
 export const shopifyProductSchema = z
   .object({
     available: z.boolean().optional(),
@@ -40,25 +49,71 @@ export const shopifyProductSchema = z
   })
   .passthrough();
 
+/**
+ * Schema for Shopify's collection products response envelope.
+ */
 const shopifyProductsResponseSchema = z.object({
   products: z.array(shopifyProductSchema),
 });
 
+/**
+ * Validated Shopify product with unknown source fields preserved.
+ */
 export type ShopifyProduct = z.infer<typeof shopifyProductSchema>;
 
+/**
+ * Pagination, transport, cancellation, and retry settings for a Shopify collection.
+ */
 export type FetchShopifyCollectionProductsOptions = {
+  /**
+   * Collection endpoint URL without pagination parameters.
+   */
   collectionUrl: string;
+  /**
+   * Fetch implementation, primarily for testing.
+   */
   fetch?: typeof fetch;
+  /**
+   * Maximum products requested per page; defaults to 250.
+   */
   limit?: number;
+  /**
+   * Maximum pages requested; defaults to 25.
+   */
   pageLimit?: number;
+  /**
+   * Abortable pause between full pages in milliseconds.
+   */
   pagePauseMs?: number;
+  /**
+   * Optional HTTP proxy URL used by Undici.
+   */
   proxyUrl?: string;
+  /**
+   * Per-attempt timeout in milliseconds; values below one become one.
+   */
   requestTimeoutMs?: number;
+  /**
+   * Maximum total attempts per page; values below one become one.
+   */
   retries?: number;
+  /**
+   * Signal that cancels requests and pagination pauses.
+   */
   signal?: AbortSignal;
+  /**
+   * HTTP user-agent header sent to Shopify.
+   */
   userAgent?: string;
 };
 
+/**
+ * Fetches and validates paginated products from a Shopify collection endpoint.
+ *
+ * @param options - Collection URL and optional pagination and transport settings.
+ * @returns Validated products in source page order.
+ * @rejects When requests fail, a final response is unsuccessful, input is aborted, or payload validation fails.
+ */
 export async function fetchShopifyCollectionProducts({
   collectionUrl,
   fetch: fetcher = fetch,
@@ -114,6 +169,13 @@ export async function fetchShopifyCollectionProducts({
   return products;
 }
 
+/**
+ * Fetches one Shopify page with bounded attempts and linear backoff.
+ *
+ * @param options - Request URL, transport settings, attempt limit, and cancellation signal.
+ * @returns The first successful response, or the final unsuccessful response.
+ * @rejects When the final request attempt throws or cancellation interrupts backoff.
+ */
 async function fetchWithRetry({
   fetcher,
   proxyUrl,
@@ -123,12 +185,33 @@ async function fetchWithRetry({
   url,
   userAgent,
 }: {
+  /**
+   * Fetch implementation.
+   */
   fetcher: typeof fetch;
+  /**
+   * Optional HTTP proxy URL.
+   */
   proxyUrl?: string;
+  /**
+   * Per-attempt timeout in milliseconds.
+   */
   requestTimeoutMs: number;
+  /**
+   * Maximum total request attempts.
+   */
   retries: number;
+  /**
+   * Caller cancellation signal.
+   */
   signal?: AbortSignal;
+  /**
+   * Paginated Shopify endpoint URL.
+   */
   url: URL;
+  /**
+   * HTTP user-agent header value.
+   */
   userAgent: string;
 }) {
   let lastError: unknown;
@@ -176,13 +259,28 @@ async function fetchWithRetry({
     : new Error("Shopify products fetch failed.");
 }
 
+/**
+ * Builds request headers, cancellation, and optional Undici proxy dispatch.
+ *
+ * @param options - Proxy, cancellation, and user-agent settings.
+ * @returns Request initialization for the Shopify page fetch.
+ */
 async function getFetchInit({
   proxyUrl,
   signal,
   userAgent,
 }: {
+  /**
+   * Optional HTTP proxy URL.
+   */
   proxyUrl?: string;
+  /**
+   * Per-attempt cancellation signal.
+   */
   signal?: AbortSignal;
+  /**
+   * HTTP user-agent header value.
+   */
   userAgent: string;
 }): Promise<RequestInit> {
   const headers = {
@@ -201,13 +299,28 @@ async function getFetchInit({
   } as RequestInit;
 }
 
+/**
+ * Combines caller cancellation with a per-attempt timeout.
+ *
+ * @param options - Timeout, caller signal, and URL used in timeout errors.
+ * @returns The combined signal and a cleanup callback for timers and listeners.
+ */
 function createRequestSignal({
   requestTimeoutMs,
   signal,
   url,
 }: {
+  /**
+   * Per-attempt timeout in milliseconds.
+   */
   requestTimeoutMs: number;
+  /**
+   * Optional caller cancellation signal.
+   */
   signal?: AbortSignal;
+  /**
+   * Request URL included in timeout errors.
+   */
   url: URL;
 }) {
   const timeoutMs = Math.max(1, requestTimeoutMs);
@@ -219,6 +332,9 @@ function createRequestSignal({
       ),
     );
   }, timeoutMs);
+  /**
+   * Propagates caller cancellation and its reason to the request signal.
+   */
   const abortRequest = () => {
     controller.abort(signal?.reason);
   };
@@ -230,6 +346,9 @@ function createRequestSignal({
   }
 
   return {
+    /**
+     * Clears timeout and caller-signal listener resources.
+     */
     cleanup() {
       clearTimeout(timeout);
       signal?.removeEventListener("abort", abortRequest);
