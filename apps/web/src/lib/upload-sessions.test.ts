@@ -10,6 +10,7 @@ import {
   formatMiB,
   getUploadErrorTranslation,
   UploadRequestError,
+  uploadImages,
   uploadResourceSession,
   validateImages,
   validateResourceImages,
@@ -317,6 +318,36 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 describe("image uploads", () => {
+  it("reuses an existing exact-byte image", async () => {
+    const image = file("history.webp", 3, "image/webp");
+    const sha256 = [
+      ...new Uint8Array(
+        await crypto.subtle.digest("SHA-256", await image.arrayBuffer()),
+      ),
+    ]
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ error: "duplicate_active", imageId: 1000, sha256 }, 409),
+    );
+
+    await expect(
+      uploadImages({
+        files: [image],
+        /**
+         * Supplies authentication for the upload request.
+         *
+         * @returns A test authentication token.
+         */
+        getToken: async () => "token",
+        locale: "en-US",
+        targetId: 1000,
+        targetType: "collection",
+      }),
+    ).resolves.toEqual({ failed: [], uploaded: [image] });
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
   it("enforces the per-operation image limits", () => {
     const image = (size: number, name = "image.webp") =>
       ({ name, size, type: "image/webp" }) as File;

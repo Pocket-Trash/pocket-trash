@@ -531,6 +531,13 @@ export function validateImages(
   }
 }
 
+/**
+ * Uploads catalog images while reusing exact-byte active images.
+ *
+ * @param input - Images, target, authentication, locale, and restore callback.
+ * @returns Uploaded or reused files and any files that failed to upload.
+ * @rejects When validation, authentication, or storage fails.
+ */
 export async function uploadImages(input: {
   locale: SupportedLocale;
   files: File[];
@@ -555,11 +562,12 @@ export async function uploadImages(input: {
   } catch (error) {
     if (
       error instanceof UploadRequestError &&
-      error.code === "duplicate_owner_deleted" &&
-      error.imageId &&
       error.sha256 &&
-      input.onOwnerDeletedDuplicate &&
-      (await input.onOwnerDeletedDuplicate(error.imageId))
+      (error.code === "duplicate_active" ||
+        (error.code === "duplicate_owner_deleted" &&
+          error.imageId &&
+          input.onOwnerDeletedDuplicate &&
+          (await input.onOwnerDeletedDuplicate(error.imageId))))
     ) {
       const hashes = await Promise.all(input.files.map(hashFile));
       const remaining = input.files.filter(
@@ -568,8 +576,10 @@ export async function uploadImages(input: {
       const restored = input.files.filter(
         (_file, index) => hashes[index] === error.sha256,
       );
-      const result = await uploadImages({ ...input, files: remaining });
-      return { ...result, uploaded: [...restored, ...result.uploaded] };
+      if (restored.length) {
+        const result = await uploadImages({ ...input, files: remaining });
+        return { ...result, uploaded: [...restored, ...result.uploaded] };
+      }
     }
     throw getUploadErrorTranslation(error);
   }

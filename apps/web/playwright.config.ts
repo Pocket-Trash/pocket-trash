@@ -26,13 +26,7 @@ export default defineConfig({
   testIgnore:
     process.env.E2E_RUN_MUTATIONS === "true" ? undefined : /mutation\.spec\.ts/,
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:4005",
-    extraHTTPHeaders: vercelBypassSecret
-      ? {
-          "x-vercel-protection-bypass": vercelBypassSecret,
-          "x-vercel-set-bypass-cookie": "true",
-        }
-      : undefined,
+    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:4005",
     screenshot: "only-on-failure",
     trace: vercelBypassSecret ? "off" : "retain-on-failure",
   },

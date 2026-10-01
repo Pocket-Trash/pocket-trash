@@ -14,6 +14,13 @@ export const resourcePayloadSchema = z.discriminatedUnion("operation", [
     reason: z.string().trim().min(1).max(1000).optional(),
   }),
 ]);
+/**
+ * Validates and normalizes a resource upload payload.
+ *
+ * @param value - Untrusted upload-session payload.
+ * @returns Parsed create or version payload.
+ * @throws {UploadSessionError} When the payload or a category slug is invalid.
+ */
 export function resourcePayload(value: unknown) {
   const result = resourcePayloadSchema.safeParse(value);
   if (!result.success) throw new UploadSessionError("invalid_request", 400);
@@ -24,6 +31,12 @@ export function resourcePayload(value: unknown) {
     throw new UploadSessionError("invalid_request", 400);
   return result.data;
 }
+/**
+ * Converts a category name to its normalized URL slug.
+ *
+ * @param value - Category name to normalize.
+ * @returns Lowercase ASCII slug, or an empty string when no slug characters remain.
+ */
 export function slugify(value: string) {
   return value
     .normalize("NFKD")
