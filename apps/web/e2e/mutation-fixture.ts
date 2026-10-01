@@ -79,7 +79,7 @@ export async function createMutationFixture({
   const spinnerProductName = `${runId} spinner`;
   const spinnerProductSlug = `${runId}-spinner`;
   const bytes = new TextEncoder().encode(runId);
-  const objectPath = `${isolation.resourcePrefix}/e2e/${runId}.txt`;
+  const objectPath = `${isolation.resourcePrefix}/${runId}.txt`;
   const [owner] = await database
     .select({ id: schema.user.id })
     .from(schema.user)
