@@ -7,12 +7,17 @@ import {
   useTable,
 } from "@tanstack/react-table";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
+import {
+  MarkdownEditor,
+  type MarkdownEditorHandle,
+} from "@/components/markdown-editor";
 import { FileDropInput } from "@/components/resource-file-input";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getImageUploadGuidance } from "@/lib/help-content";
+import { countWords } from "@/lib/text";
 import { useLocale } from "@/providers/locale-provider";
 
 export type CollectionFormValue = {
@@ -33,6 +38,12 @@ const managerColumns = managerColumnHelper.columns([
   managerColumnHelper.accessor("id", { header: "id" }),
 ]);
 
+/**
+ * Renders the shared create and edit form for collections.
+ *
+ * @param root0 - Collection form properties.
+ * @returns The collection form.
+ */
 export function CollectionForm({
   copy,
   disabled = false,
@@ -64,6 +75,7 @@ export function CollectionForm({
   const imageGuidance = getImageUploadGuidance(locale);
   const nameId = useId();
   const descriptionId = useId();
+  const descriptionRef = useRef<MarkdownEditorHandle>(null);
   const [value, setValue] = useState<CollectionFormValue>(
     initialValue ?? { description: "", isPrivate: true, name: "" },
   );
@@ -74,7 +86,10 @@ export function CollectionForm({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
-        void onSubmit(value, files);
+        const description =
+          descriptionRef.current?.getValue() ?? value.description;
+        if (countWords(description) > 200) return;
+        void onSubmit({ ...value, description }, files);
       }}
     >
       <label className="grid gap-2 text-sm font-medium" htmlFor={nameId}>
@@ -90,19 +105,18 @@ export function CollectionForm({
           value={value.name}
         />
       </label>
-      <label className="grid gap-2 text-sm font-medium" htmlFor={descriptionId}>
-        {copy.description}
-        <textarea
-          className="min-h-28 rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
-          disabled={disabled}
-          id={descriptionId}
-          onChange={(event) =>
-            setValue({ ...value, description: event.target.value })
-          }
-          placeholder={copy.descriptionPlaceholder}
-          value={value.description}
-        />
-      </label>
+      <MarkdownEditor
+        counter={{ limit: 200, type: "words", warningAt: 180 }}
+        defaultValue={value.description}
+        disabled={disabled}
+        id={descriptionId}
+        label={copy.description}
+        onChange={(description) =>
+          setValue((current) => ({ ...current, description }))
+        }
+        placeholder={copy.descriptionPlaceholder}
+        ref={descriptionRef}
+      />
       <div className="grid gap-2">
         <span className="text-sm font-medium">{copy.public}</span>
         <PublicResourceSwitch
@@ -140,7 +154,14 @@ export function CollectionForm({
         />
       ) : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button disabled={disabled || value.name.trim().length < 2} type="submit">
+      <Button
+        disabled={
+          disabled ||
+          value.name.trim().length < 2 ||
+          countWords(value.description) > 200
+        }
+        type="submit"
+      >
         {copy.submit}
       </Button>
     </form>
