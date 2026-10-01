@@ -24,12 +24,27 @@ test("database detection ignores base-only and package changes", (context) => {
     .run.split("source .github/scripts/ci-log.sh")[0];
   const directory = mkdtempSync(join(tmpdir(), "database-detection-"));
   context.after(() => rmSync(directory, { recursive: true, force: true }));
+  /**
+   * Runs Git inside the temporary fixture repository.
+   *
+   * @param args - Git arguments.
+   * @returns Trimmed standard output.
+   * @throws When Git exits unsuccessfully.
+   */
   const git = (...args) =>
     execFileSync("git", args, {
       cwd: directory,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     }).trim();
+  /**
+   * Writes and commits a fixture file.
+   *
+   * @param path - Repository-relative fixture path.
+   * @param content - File contents to commit.
+   * @returns The new commit SHA.
+   * @throws When file or Git operations fail.
+   */
   const commit = (path, content) => {
     mkdirSync(dirname(join(directory, path)), { recursive: true });
     writeFileSync(join(directory, path), content);

@@ -1,6 +1,13 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
+/**
+ * Loads and sorts package manifests from the monorepo workspaces.
+ *
+ * @param repoRoot - The absolute repository root.
+ * @returns Workspace package directories, manifests, and manifest paths.
+ * @throws When workspace directories or package manifests cannot be read.
+ */
 export function getWorkspacePackages(repoRoot) {
   return ["apps", "packages"]
     .flatMap((workspaceDirectory) => {

@@ -1,9 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+/** Bunny management API base URL. */
 const apiBaseUrl = "https://api.bunny.net";
+/** Default directory for raw audit responses and the report. */
 const defaultOutputDirectory = "bunny-audit";
 
+/** Bunny endpoints and resource-specific summarizers included in the audit. */
 const endpoints = [
   {
     name: "CDN Pull Zones",
@@ -57,6 +60,7 @@ const endpoints = [
   },
 ];
 
+/** Bunny API credential injected by the local runner. */
 const apiKey = process.env.BUNNY_API_KEY?.trim();
 
 if (!apiKey) {
@@ -65,11 +69,14 @@ if (!apiKey) {
   );
 }
 
+/** Output directory selected by the CLI or default. */
 const outputDirectory = getOutputDirectory();
 await mkdir(outputDirectory, { recursive: true });
 
+/** Endpoint audit results used to build the report. */
 const results = [];
 
+/** Audits each configured Bunny endpoint and saves its raw response. */
 for (const endpoint of endpoints) {
   const result = await fetchEndpoint(endpoint);
   results.push(result);
@@ -80,18 +87,30 @@ for (const endpoint of endpoints) {
   );
 }
 
+/** Complete human-readable Bunny services audit report. */
 const report = buildMarkdownReport(results);
 await writeFile(join(outputDirectory, "report.md"), report);
 
 console.log(report);
 console.log(`\nReport written to ${join(outputDirectory, "report.md")}`);
 
+/**
+ * Resolves the audit output directory from `--out=`.
+ *
+ * @returns The requested or default output directory.
+ */
 function getOutputDirectory() {
   const outputArg = process.argv.find((arg) => arg.startsWith("--out="));
 
   return outputArg?.slice("--out=".length) || defaultOutputDirectory;
 }
 
+/**
+ * Fetches and summarizes one Bunny API endpoint without failing the audit.
+ *
+ * @param endpoint - Endpoint path, display name, and summarizer.
+ * @returns The raw response, summary, and optional error message.
+ */
 async function fetchEndpoint(endpoint) {
   try {
     const response = await fetch(`${apiBaseUrl}${endpoint.path}`, {
@@ -126,6 +145,13 @@ async function fetchEndpoint(endpoint) {
   }
 }
 
+/**
+ * Reads a response body as JSON when possible.
+ *
+ * @param response - Fetch response to consume.
+ * @returns Parsed JSON, raw text, or `null` for an empty body.
+ * @rejects When the response body cannot be read.
+ */
 async function readJsonResponse(response) {
   const text = await response.text();
 
@@ -140,6 +166,12 @@ async function readJsonResponse(response) {
   }
 }
 
+/**
+ * Builds the human-readable audit report.
+ *
+ * @param results - Endpoint audit results.
+ * @returns Markdown summarizing usage, details, and attention items.
+ */
 function buildMarkdownReport(results) {
   const lines = [
     "# Bunny Services Audit",
@@ -195,6 +227,12 @@ function buildMarkdownReport(results) {
   return `${lines.join("\n").trim()}\n`;
 }
 
+/**
+ * Summarizes Bunny CDN pull zones.
+ *
+ * @param raw - Pull zone API response.
+ * @returns Normalized audit items.
+ */
 function summarizePullZones(raw) {
   return getItems(raw).map((zone) => {
     const monthlyCharges = numberValue(zone.MonthlyCharges);
@@ -234,6 +272,12 @@ function summarizePullZones(raw) {
   });
 }
 
+/**
+ * Summarizes Bunny storage zones.
+ *
+ * @param raw - Storage zone API response.
+ * @returns Normalized audit items.
+ */
 function summarizeStorageZones(raw) {
   return getItems(raw).map((zone) => {
     const storageUsed = numberValue(zone.StorageUsed);
@@ -265,6 +309,12 @@ function summarizeStorageZones(raw) {
   });
 }
 
+/**
+ * Summarizes Bunny Stream libraries.
+ *
+ * @param raw - Stream library API response.
+ * @returns Normalized audit items.
+ */
 function summarizeStreamLibraries(raw) {
   return getItems(raw).map((library) => {
     const videoCount = numberValue(library.VideoCount);
@@ -301,6 +351,12 @@ function summarizeStreamLibraries(raw) {
   });
 }
 
+/**
+ * Summarizes Bunny DNS zones.
+ *
+ * @param raw - DNS zone API response.
+ * @returns Normalized audit items.
+ */
 function summarizeDnsZones(raw) {
   return getItems(raw).map((zone) => {
     const recordCount = numberValue(zone.Records?.length ?? zone.RecordCount);
@@ -319,6 +375,12 @@ function summarizeDnsZones(raw) {
   });
 }
 
+/**
+ * Summarizes Bunny Edge Scripts.
+ *
+ * @param raw - Edge Script API response.
+ * @returns Normalized audit items.
+ */
 function summarizeEdgeScripts(raw) {
   return getItems(raw).map((script) => {
     const monthlyCost = numberValue(script.MonthlyCost);
@@ -351,6 +413,12 @@ function summarizeEdgeScripts(raw) {
   });
 }
 
+/**
+ * Summarizes Bunny database resources across API naming variants.
+ *
+ * @param raw - Database API response.
+ * @returns Normalized audit items.
+ */
 function summarizeDatabases(raw) {
   return getItems(raw).map((database) => {
     const sizeBytes = numberValue(
@@ -382,6 +450,12 @@ function summarizeDatabases(raw) {
   });
 }
 
+/**
+ * Summarizes Bunny Magic Containers applications.
+ *
+ * @param raw - Magic Containers API response.
+ * @returns Normalized audit items.
+ */
 function summarizeMagicContainers(raw) {
   return getItems(raw).map((app) => {
     const id = app.id ?? app.Id ?? app.appId ?? app.AppId ?? "unknown";
@@ -409,6 +483,12 @@ function summarizeMagicContainers(raw) {
   });
 }
 
+/**
+ * Summarizes Bunny Shield zones.
+ *
+ * @param raw - Shield zone API response.
+ * @returns Normalized audit items.
+ */
 function summarizeShieldZones(raw) {
   return getItems(raw).map((zone) => {
     const id = zone.shieldZoneId ?? zone.Id ?? "unknown";
@@ -441,6 +521,12 @@ function summarizeShieldZones(raw) {
   });
 }
 
+/**
+ * Summarizes Bunny billing payment requests.
+ *
+ * @param raw - Payment request API response.
+ * @returns Normalized audit items.
+ */
 function summarizePaymentRequests(raw) {
   return getItems(raw).map((request) => {
     const amount = numberValue(request.Amount);
@@ -460,6 +546,12 @@ function summarizePaymentRequests(raw) {
   });
 }
 
+/**
+ * Summarizes account-wide CDN usage statistics.
+ *
+ * @param raw - Account statistics API response.
+ * @returns A single normalized usage audit item.
+ */
 function summarizeAccountStatistics(raw) {
   const bandwidthUsed = numberValue(raw?.TotalBandwidthUsed);
   const originTraffic = numberValue(raw?.TotalOriginTraffic);
@@ -480,6 +572,12 @@ function summarizeAccountStatistics(raw) {
   ];
 }
 
+/**
+ * Normalizes common Bunny collection response shapes.
+ *
+ * @param raw - Candidate collection response.
+ * @returns The contained items or an empty array.
+ */
 function getItems(raw) {
   if (Array.isArray(raw)) {
     return raw;
@@ -500,10 +598,22 @@ function getItems(raw) {
   return [];
 }
 
+/**
+ * Narrows a value to an array.
+ *
+ * @param value - Candidate array value.
+ * @returns The array or an empty array.
+ */
 function getArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+/**
+ * Formats a boolean for the audit report.
+ *
+ * @param value - Candidate boolean value.
+ * @returns `yes`, `no`, or `unknown`.
+ */
 function formatBoolean(value) {
   if (typeof value === "boolean") {
     return value ? "yes" : "no";
@@ -512,6 +622,12 @@ function formatBoolean(value) {
   return "unknown";
 }
 
+/**
+ * Formats a byte count with a compact binary unit.
+ *
+ * @param value - Byte count.
+ * @returns The formatted size, using zero for invalid or non-positive values.
+ */
 function formatBytes(value) {
   if (!Number.isFinite(value) || value <= 0) {
     return "0 B";
@@ -529,6 +645,12 @@ function formatBytes(value) {
   return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
+/**
+ * Formats a numeric dollar amount with four decimal places.
+ *
+ * @param value - Candidate monetary value.
+ * @returns The formatted amount or `unknown`.
+ */
 function formatMoney(value) {
   if (!Number.isFinite(value)) {
     return "unknown";
@@ -537,12 +659,24 @@ function formatMoney(value) {
   return `$${value.toFixed(4)}`;
 }
 
+/**
+ * Coerces a value to a finite number.
+ *
+ * @param value - Candidate numeric value.
+ * @returns The finite number or zero.
+ */
 function numberValue(value) {
   const number = Number(value);
 
   return Number.isFinite(number) ? number : 0;
 }
 
+/**
+ * Converts a display name into a lowercase filename slug.
+ *
+ * @param value - Display name.
+ * @returns The slug.
+ */
 function slugify(value) {
   return value
     .toLowerCase()

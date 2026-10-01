@@ -4,9 +4,13 @@ import process from "node:process";
 import readline from "node:readline/promises";
 import YAML from "yaml";
 
+/** Repository root used to resolve diagram inputs and outputs. */
 const repoRoot = process.cwd();
+/** Infrastructure diagram metadata file. */
 const metadataPath = path.join(repoRoot, "docs/infrastructure-diagram.yaml");
+/** Workspace roots scanned for package manifests. */
 const packageRoots = ["apps", "packages"];
+/** Source extensions eligible for runtime dependency detection. */
 const sourceExtensions = new Set([
   ".cjs",
   ".cts",
@@ -17,8 +21,11 @@ const sourceExtensions = new Set([
   ".ts",
   ".tsx",
 ]);
+/** Prefix identifying local workspace dependencies. */
 const workspaceDependencyPrefix = "workspace:";
+/** Eraser relationship connector used by generated edges. */
 const connector = ">";
+/** Source detections restored when absent from metadata. */
 const defaultDetections = [
   {
     id: "webLogProxy",
@@ -46,6 +53,14 @@ const defaultDetections = [
   },
 ];
 
+/**
+ * Validates and returns an array metadata value.
+ *
+ * @param value - Candidate metadata value.
+ * @param label - Metadata path used in validation errors.
+ * @returns The validated array.
+ * @throws When the value is not an array.
+ */
 function assertArray(value, label) {
   if (!Array.isArray(value)) {
     throw new Error(`${label} must be an array.`);
@@ -54,6 +69,12 @@ function assertArray(value, label) {
   return value;
 }
 
+/**
+ * Converts a label or package name into an Eraser identifier.
+ *
+ * @param value - Source label.
+ * @returns A normalized identifier.
+ */
 function createSlug(value) {
   return value
     .replace(/^@/, "")
@@ -63,6 +84,12 @@ function createSlug(value) {
     .replace(/[^A-Za-z0-9_]/g, "_");
 }
 
+/**
+ * Escapes a value as an Eraser quoted string.
+ *
+ * @param value - Value to serialize.
+ * @returns The quoted string.
+ */
 function quote(value) {
   return `"${String(value)
     .replaceAll("\\", "\\\\")
@@ -70,6 +97,13 @@ function quote(value) {
     .replaceAll("\n", "\\n")}"`;
 }
 
+/**
+ * Serializes one Eraser attribute value.
+ *
+ * @param key - Attribute name.
+ * @param value - Attribute value.
+ * @returns A quoted or safe unquoted value.
+ */
 function propertyValue(key, value) {
   if (key === "label" || key === "link") {
     return quote(value);
@@ -82,6 +116,12 @@ function propertyValue(key, value) {
   return quote(value);
 }
 
+/**
+ * Serializes populated Eraser attributes.
+ *
+ * @param attributes - Attribute names and values.
+ * @returns A bracketed attribute list, or an empty string.
+ */
 function properties(attributes) {
   const entries = Object.entries(attributes).filter(
     ([, value]) => value !== undefined && value !== "",
@@ -94,14 +134,35 @@ function properties(attributes) {
   return ` [${entries.map(([key, value]) => `${key}: ${propertyValue(key, value)}`).join(", ")}]`;
 }
 
+/**
+ * Indents one generated diagram line.
+ *
+ * @param indent - Two-space indentation depth.
+ * @param value - Line content.
+ * @returns The indented line.
+ */
 function line(indent, value) {
   return `${"  ".repeat(indent)}${value}`;
 }
 
+/**
+ * Reads and parses a JSON file.
+ *
+ * @param filePath - JSON file path.
+ * @returns The parsed value.
+ * @rejects When the file cannot be read or parsed.
+ */
 async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, "utf8"));
 }
 
+/**
+ * Tests whether a filesystem path exists.
+ *
+ * @param filePath - Path to inspect.
+ * @returns Whether the path exists.
+ * @rejects When filesystem inspection fails for a reason other than absence.
+ */
 async function pathExists(filePath) {
   try {
     await stat(filePath);
@@ -115,6 +176,12 @@ async function pathExists(filePath) {
   }
 }
 
+/**
+ * Finds package manifests directly beneath configured workspace roots.
+ *
+ * @returns Sorted absolute manifest paths.
+ * @rejects When workspace directories cannot be inspected.
+ */
 async function findPackageJsonFiles() {
   const files = [];
 
@@ -147,6 +214,12 @@ async function findPackageJsonFiles() {
   );
 }
 
+/**
+ * Loads dependency metadata for every workspace package.
+ *
+ * @returns Sorted workspace package information.
+ * @rejects When package discovery or manifest parsing fails.
+ */
 async function collectAllWorkspacePackageInfos() {
   const packageJsonFiles = await findPackageJsonFiles();
   const packages = [];
@@ -169,6 +242,13 @@ async function collectAllWorkspacePackageInfos() {
   );
 }
 
+/**
+ * Loads workspace packages included by diagram metadata.
+ *
+ * @param metadata - Infrastructure diagram metadata.
+ * @returns Included packages indexed by name.
+ * @rejects When metadata or package manifests are invalid.
+ */
 async function collectWorkspacePackages(metadata) {
   const packageJsonFiles = await findPackageJsonFiles();
   const includedNames = new Set([
@@ -209,6 +289,14 @@ async function collectWorkspacePackages(metadata) {
   );
 }
 
+/**
+ * Finds workspace packages reachable from included applications.
+ *
+ * @param packageInfos - All workspace package dependency metadata.
+ * @param appNames - Application package names that seed traversal.
+ * @param excludedNames - Package names excluded from traversal.
+ * @returns Reachable package names, including seed applications.
+ */
 function reachableWorkspacePackageNames(packageInfos, appNames, excludedNames) {
   const packageByName = new Map(
     packageInfos.map((packageInfo) => [packageInfo.name, packageInfo]),
@@ -243,6 +331,13 @@ function reachableWorkspacePackageNames(packageInfos, appNames, excludedNames) {
   return reachable;
 }
 
+/**
+ * Refreshes generated scope and default detections in diagram metadata.
+ *
+ * @param metadata - Existing infrastructure diagram metadata.
+ * @returns Refreshed metadata without writing it.
+ * @rejects When workspace discovery or metadata validation fails.
+ */
 async function refreshMetadata(metadata) {
   const packageInfos = await collectAllWorkspacePackageInfos();
   const excludedApps = new Set(
@@ -301,6 +396,12 @@ async function refreshMetadata(metadata) {
   };
 }
 
+/**
+ * Collects diagram edges for local workspace dependencies.
+ *
+ * @param packages - Included packages indexed by name.
+ * @returns Package dependency edges.
+ */
 function collectManifestEdges(packages) {
   const edges = [];
 
@@ -327,6 +428,13 @@ function collectManifestEdges(packages) {
   return edges;
 }
 
+/**
+ * Recursively collects eligible source files beneath a path.
+ *
+ * @param targetPath - Repository-relative file or directory path.
+ * @returns Sorted absolute source file paths.
+ * @rejects When the target tree cannot be inspected.
+ */
 async function collectSourceFiles(targetPath) {
   const fullPath = path.join(repoRoot, targetPath);
   const stats = await stat(fullPath);
@@ -368,6 +476,13 @@ async function collectSourceFiles(targetPath) {
   );
 }
 
+/**
+ * Tests whether every configured detection pattern exists in its source paths.
+ *
+ * @param detection - Source detection metadata.
+ * @returns Whether all patterns were found.
+ * @rejects When metadata is invalid or source files cannot be read.
+ */
 async function detectionMatches(detection) {
   const patterns = assertArray(
     detection.patterns,
@@ -403,6 +518,14 @@ async function detectionMatches(detection) {
   return false;
 }
 
+/**
+ * Collects runtime relationship edges confirmed by source detections.
+ *
+ * @param metadata - Infrastructure diagram metadata.
+ * @param packages - Included packages indexed by name.
+ * @returns Confirmed source detection edges.
+ * @rejects When references, detections, or source access are invalid.
+ */
 async function collectDetectionEdges(metadata, packages) {
   const edges = [];
   const serviceIds = new Set(
@@ -449,6 +572,12 @@ async function collectDetectionEdges(metadata, packages) {
   return edges;
 }
 
+/**
+ * Indexes configured external services by identifier.
+ *
+ * @param metadata - Infrastructure diagram metadata.
+ * @returns Services indexed by identifier.
+ */
 function createServiceMap(metadata) {
   return new Map(
     assertArray(metadata.services, "services").map((service) => [
@@ -458,6 +587,14 @@ function createServiceMap(metadata) {
   );
 }
 
+/**
+ * Renders one Eraser node definition.
+ *
+ * @param id - Node identifier.
+ * @param node - Node metadata.
+ * @param serviceMap - Services indexed by identifier.
+ * @returns The rendered node definition.
+ */
 function createNodeDefinition(id, node, serviceMap) {
   const service = serviceMap.get(node.service);
   const attributes = {
@@ -469,11 +606,23 @@ function createNodeDefinition(id, node, serviceMap) {
   return `${id}${properties(attributes)}`;
 }
 
+/**
+ * Renders one Eraser relationship definition.
+ *
+ * @param edge - Relationship endpoints and optional label.
+ * @returns The rendered edge definition.
+ */
 function createEdgeDefinition(edge) {
   const labelText = edge.label ? `: ${edge.label}` : "";
   return `${edge.from} ${connector} ${edge.to}${labelText}`;
 }
 
+/**
+ * Removes duplicate edges while preserving encounter order.
+ *
+ * @param edges - Candidate diagram edges.
+ * @returns Unique edges by endpoints and label.
+ */
 function uniqueEdges(edges) {
   const seen = new Set();
   const output = [];
@@ -492,6 +641,13 @@ function uniqueEdges(edges) {
   return output;
 }
 
+/**
+ * Renders one deployment environment and its relationships.
+ *
+ * @param environment - Environment metadata.
+ * @param serviceMap - Services indexed by identifier.
+ * @returns Generated Eraser lines.
+ */
 function renderEnvironment(environment, serviceMap) {
   const output = [];
   const nodesByGroup = new Map();
@@ -537,6 +693,15 @@ function renderEnvironment(environment, serviceMap) {
   return output;
 }
 
+/**
+ * Renders shared packages, services, and detected relationships.
+ *
+ * @param packages - Included packages indexed by name.
+ * @param manifestEdges - Workspace dependency edges.
+ * @param detectionEdges - Source-detected runtime edges.
+ * @param serviceMap - Services indexed by identifier.
+ * @returns Generated Eraser lines.
+ */
 function renderSharedPackages(
   packages,
   manifestEdges,
@@ -584,6 +749,11 @@ function renderSharedPackages(
   return output;
 }
 
+/**
+ * Renders the diagram legend.
+ *
+ * @returns Generated Eraser legend lines.
+ */
 function renderLegend() {
   return [
     "",
@@ -597,6 +767,12 @@ function renderLegend() {
   ];
 }
 
+/**
+ * Renders unsaved interactive feedback lines.
+ *
+ * @param feedbackOverlay - User-provided Eraser lines or comments.
+ * @returns Generated overlay lines.
+ */
 function renderFeedbackOverlay(feedbackOverlay) {
   if (feedbackOverlay.length === 0) {
     return [];
@@ -609,6 +785,14 @@ function renderFeedbackOverlay(feedbackOverlay) {
   ];
 }
 
+/**
+ * Generates a complete Eraser infrastructure diagram.
+ *
+ * @param metadata - Infrastructure diagram metadata.
+ * @param feedbackOverlay - Unsaved interactive additions.
+ * @returns The generated Eraser diagram source.
+ * @rejects When metadata validation or workspace detection fails.
+ */
 async function generateDiagram(metadata, feedbackOverlay = []) {
   const packages = await collectWorkspacePackages(metadata);
   const serviceMap = createServiceMap(metadata);
@@ -646,10 +830,22 @@ async function generateDiagram(metadata, feedbackOverlay = []) {
   return `${output.join("\n").replace(/\n{3,}/g, "\n\n")}\n`;
 }
 
+/**
+ * Loads parsed infrastructure diagram metadata.
+ *
+ * @returns Parsed YAML metadata.
+ * @rejects When the metadata file cannot be read or parsed.
+ */
 async function loadMetadata() {
   return YAML.parse(await readFile(metadataPath, "utf8"));
 }
 
+/**
+ * Loads the editable YAML metadata document.
+ *
+ * @returns The parsed YAML document.
+ * @rejects When the metadata file cannot be read or parsed.
+ */
 async function loadMetadataDocument() {
   const document = YAML.parseDocument(await readFile(metadataPath, "utf8"));
 
@@ -660,6 +856,12 @@ async function loadMetadataDocument() {
   return document;
 }
 
+/**
+ * Refreshes generated metadata fields and writes the YAML file.
+ *
+ * @returns The refreshed plain metadata value.
+ * @rejects When discovery, parsing, or writing fails.
+ */
 async function refreshMetadataFile() {
   const document = await loadMetadataDocument();
   const refreshedMetadata = await refreshMetadata(document.toJS());
@@ -690,16 +892,38 @@ async function refreshMetadataFile() {
   return refreshedMetadata;
 }
 
+/**
+ * Writes generated diagram source between terminal delimiters.
+ *
+ * @param diagram - Eraser diagram source.
+ */
 function printDiagram(diagram) {
   process.stdout.write("\n--- Eraser diagram code ---\n\n");
   process.stdout.write(diagram);
   process.stdout.write("\n--- End diagram code ---\n\n");
 }
 
+/**
+ * Writes generated diagram source to its configured output path.
+ *
+ * @param metadata - Metadata containing the output path.
+ * @param diagram - Eraser diagram source.
+ * @returns A promise that settles after the file is written.
+ * @rejects When the output file cannot be written.
+ */
 async function writeDiagram(metadata, diagram) {
   await writeFile(path.join(repoRoot, metadata.output), diagram);
 }
 
+/**
+ * Generates and writes the diagram once.
+ *
+ * @param options - One-shot generation options.
+ * @param options.print - Whether to also print generated source.
+ * @param options.refresh - Whether to refresh metadata before generation.
+ * @returns A promise that settles after generation and writing.
+ * @rejects When refresh, generation, or writing fails.
+ */
 async function runOnce({ print = false, refresh = false } = {}) {
   const metadata = refresh ? await refreshMetadataFile() : await loadMetadata();
   const diagram = await generateDiagram(metadata);
@@ -712,6 +936,12 @@ async function runOnce({ print = false, refresh = false } = {}) {
   process.stdout.write(`Wrote ${metadata.output}\n`);
 }
 
+/**
+ * Runs the terminal feedback loop for diagram generation.
+ *
+ * @returns A promise that settles after writing or quitting.
+ * @rejects When metadata, generation, input, or writing fails.
+ */
 async function runInteractive() {
   const feedbackOverlay = [];
   const rl = readline.createInterface({
@@ -777,6 +1007,7 @@ async function runInteractive() {
   }
 }
 
+/** Command-line flags controlling diagram generation mode. */
 const args = new Set(process.argv.slice(2));
 
 if (args.has("--once")) {
