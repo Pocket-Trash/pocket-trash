@@ -20,6 +20,7 @@ import {
   slugPattern,
 } from "./catalog";
 import { getResourceViewer } from "./resources";
+import { countWords } from "./text";
 
 const requiredMessage = "web.catalog.error.required";
 
@@ -206,15 +207,13 @@ const colorSchema = z.object({
   name: slugNameSchema,
 });
 
+/** Validates collection values before they are sent to the catalog service. */
 export const collectionWriteSchema = z.object({
   description: z
     .string()
     .trim()
     .nullable()
-    .refine(
-      (value) => !value || value.split(/\s+/u).length <= 200,
-      requiredMessage,
-    )
+    .refine((value) => !value || countWords(value) <= 200, requiredMessage)
     .transform((value) => value || null),
   isPrivate: z.boolean(),
   name: z.string().trim().min(2, requiredMessage).max(80, requiredMessage),

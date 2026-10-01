@@ -306,6 +306,11 @@ describe("MarkdownEditor", () => {
     const textarea = container.querySelector("textarea");
     expect(textarea?.getAttribute("aria-invalid")).toBeNull();
     expect(container.textContent).toContain("4 / 4 characters, limit reached");
+    expect(
+      container
+        .querySelector(`#${textarea?.getAttribute("aria-describedby")}`)
+        ?.classList.contains("text-destructive"),
+    ).toBe(true);
 
     act(() => {
       if (!textarea) return;
@@ -345,6 +350,11 @@ describe("MarkdownEditor", () => {
     });
     expect(status?.textContent).toContain("4 / 5");
     expect(status?.textContent).toContain("approaching limit");
+    expect(
+      container
+        .querySelector(`#${textarea?.getAttribute("aria-describedby")}`)
+        ?.classList.contains("text-primary"),
+    ).toBe(true);
   });
 });
 

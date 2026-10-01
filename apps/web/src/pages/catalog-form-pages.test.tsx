@@ -31,7 +31,18 @@ vi.mock("@/components/app-shell", () => ({
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Provides locale data for page tests.
+   *
+   * @returns The stable test locale.
+   */
   useLocale: () => ({ locale: "en-US" }),
+  /**
+   * Provides an optional locale for page tests.
+   *
+   * @returns The test locale.
+   */
+  useOptionalLocale: () => "en-US",
 }));
 
 const t = (key: string, values: Readonly<Record<string, unknown>> = {}) =>
