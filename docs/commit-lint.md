@@ -37,7 +37,7 @@ request titles only, not the individual commits already present on the branch.
 | `scraper` | `apps/scraper/` |
 | `packages` | Multiple packages or the `packages/` root |
 | `database` | `packages/database/` |
-| `eslint` | `packages/eslint/` |
+| `lint` | `packages/lint/` |
 | `figjam` | `packages/figjam/` |
 | `github-discord-notifier` | `packages/github-discord-notifier/` |
 | `infisical-runner` | `packages/infisical-runner/` |
