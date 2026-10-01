@@ -111,6 +111,15 @@ describe("account storage erasure", () => {
   }, 30_000);
 });
 
+/**
+ * Inserts storage ownership fixtures for account-erasure integration tests.
+ *
+ * @param client - In-memory PostgreSQL client.
+ * @param target - Clerk identifier whose objects should be erased.
+ * @param survivor - Clerk identifier that retains a shared object.
+ * @returns Named object paths used by the assertions.
+ * @rejects When fixture insertion fails.
+ */
 async function fixtures(client: PGlite, target: string, survivor: string) {
   const paths = {
     archive: "resources/dev/1000/v1/archive.zip",
@@ -125,17 +134,26 @@ async function fixtures(client: PGlite, target: string, survivor: string) {
     upload: "resources/dev/1000/v2/upload.zip",
   };
   const hash = "b".repeat(64);
-  const users = await client.query<{ id: number }>(
-    "insert into users(clerk_id) values($1),($2) returning id",
-    [target, survivor],
-  );
+  const users = await client.query<{
+    /** Inserted user identifier. */
+    id: number;
+  }>("insert into users(clerk_id) values($1),($2) returning id", [
+    target,
+    survivor,
+  ]);
   const targetId = rowId(users.rows, 0);
-  const collection = await client.query<{ id: number }>(
+  const collection = await client.query<{
+    /** Inserted collection identifier. */
+    id: number;
+  }>(
     "insert into user_collection(owner_id,name,normalized_name) values($1,'Erase','erase') returning id",
     [targetId],
   );
   const collectionId = rowId(collection.rows);
-  const item = await client.query<{ id: number }>(
+  const item = await client.query<{
+    /** Inserted collection-item identifier. */
+    id: number;
+  }>(
     "insert into collection_item(owner_id,collection_id) values($1,$2) returning id",
     [targetId, collectionId],
   );
@@ -157,7 +175,10 @@ async function fixtures(client: PGlite, target: string, survivor: string) {
       values($1,0,'item.png','image/png',1,$2,$3,$3,$4)`,
     [rowId(item.rows), hash, paths.item, target],
   );
-  const resources = await client.query<{ id: number }>(
+  const resources = await client.query<{
+    /** Inserted resource identifier. */
+    id: number;
+  }>(
     `insert into resources(uploader_clerk_id,name,description)
       values($1,'Erase resource','target'),($2,'Keep resource','survivor') returning id`,
     [target, survivor],
@@ -170,7 +191,10 @@ async function fixtures(client: PGlite, target: string, survivor: string) {
             ($3,0,'shared.png','image/png',1,$4,$4)`,
     [targetResourceId, paths.resourceImage, survivorResourceId, paths.shared],
   );
-  const version = await client.query<{ id: number }>(
+  const version = await client.query<{
+    /** Inserted resource-version identifier. */
+    id: number;
+  }>(
     `insert into resource_versions(resource_id,version,file_name,content_type,size,object_path,url,archive_object_path)
       values($1,1,'legacy.zip','application/zip',1,$2,$2,$3) returning id`,
     [targetResourceId, paths.legacy, paths.archive],
@@ -194,13 +218,20 @@ async function fixtures(client: PGlite, target: string, survivor: string) {
     "insert into storage_object_deletion(object_path,owner_clerk_id) values($1,$2)",
     [paths.queue, target],
   );
-  const maker = await client.query<{ id: number }>(
-    "insert into makers(name) values('Erasure maker') returning id",
-  );
-  const type = await client.query<{ id: number }>(
+  const maker = await client.query<{
+    /** Inserted maker identifier. */
+    id: number;
+  }>("insert into makers(name) values('Erasure maker') returning id");
+  const type = await client.query<{
+    /** Inserted product-type identifier. */
+    id: number;
+  }>(
     "insert into product_types(name,slug) values('Erasure type','erasure-type') returning id",
   );
-  const product = await client.query<{ id: number }>(
+  const product = await client.query<{
+    /** Inserted product identifier. */
+    id: number;
+  }>(
     "insert into product(product_type_id,maker_id,owner_clerk_id,name,slug) values($1,$2,$3,'Keep product','keep-product') returning id",
     [rowId(type.rows), rowId(maker.rows), target],
   );
@@ -212,12 +243,32 @@ async function fixtures(client: PGlite, target: string, survivor: string) {
   return paths;
 }
 
-function rowId(rows: { id: number }[], index = 0) {
+/**
+ * Requires an inserted fixture row and returns its identifier.
+ *
+ * @param rows - Inserted rows returned by PostgreSQL.
+ * @param index - Row position to read.
+ * @returns Identifier at the requested position.
+ * @throws When the expected fixture row was not created.
+ */
+function rowId(
+  rows: {
+    /** Inserted row identifier. */
+    id: number;
+  }[],
+  index = 0,
+) {
   const row = rows[index];
   if (!row) throw new Error("Fixture row was not created.");
   return row.id;
 }
 
+/**
+ * Applies the repository migrations to the in-memory test database.
+ *
+ * @param client - In-memory PostgreSQL client.
+ * @rejects When a migration cannot be applied.
+ */
 async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
     new URL("../../../database/drizzle", import.meta.url),

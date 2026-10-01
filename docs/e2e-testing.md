@@ -55,10 +55,13 @@ Before any mutation, the guard verifies these exact boundaries:
 - `preview-pr-<number>`, `images/preview/pr-<number>`, and
   `resources/preview/pr-<number>` for the current pull request.
 
-The fixture creates uniquely named catalog lookups, two catalog products, one
-private collection, and one text object. Its cleanup removes every created row
-and object before the test exits. The PR-close workflow removes the full Neon
-branch and Bunny prefixes if a failed or canceled run leaves data behind.
+The fixture creates uniquely named catalog lookups, selectable finishes, two
+catalog products, optional private collections, and one text object. Its
+cleanup removes every created row and object before the test exits. The
+collection mutation suite clears the dedicated regular user's collections,
+then uses those rows to cover selection, duplicate warnings, and linked-item
+moves through the public UI. The PR-close workflow removes the full Neon branch
+and Bunny prefixes if a failed or canceled run leaves data behind.
 
 Playwright keeps screenshots on failure. Anonymous tests keep traces only when
 no Vercel bypass credential is present; authenticated, mutation, and protected
