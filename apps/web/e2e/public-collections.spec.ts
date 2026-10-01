@@ -275,10 +275,14 @@ async function createPublicPrivacyFixture(
     .from(schema.user)
     .where(eq(schema.user.clerkId, clerkId))
     .limit(1);
+  const privateCollectionId = mutation.collectionId;
+  if (privateCollectionId === null) {
+    throw new Error("The public privacy fixture dependencies are missing.");
+  }
   const [privateCollection] = await database
     .select({ id: schema.userCollection.id, name: schema.userCollection.name })
     .from(schema.userCollection)
-    .where(eq(schema.userCollection.id, mutation.collectionId))
+    .where(eq(schema.userCollection.id, privateCollectionId))
     .limit(1);
   if (!owner || !privateCollection) {
     throw new Error("The public privacy fixture dependencies are missing.");
