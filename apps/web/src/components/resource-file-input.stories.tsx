@@ -74,6 +74,8 @@ export const AddAndRemove: Story = {
    * @param context - Storybook interaction context.
    * @param context.canvas - Queries scoped to the rendered story canvas.
    * @param context.userEvent - Storybook interaction driver.
+   * @returns A promise that resolves after the story assertions complete.
+   * @rejects When a Storybook interaction or assertion fails.
    */
   play: async ({ canvas, userEvent }) => {
     const input = canvas.getByLabelText(

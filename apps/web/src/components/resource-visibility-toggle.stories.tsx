@@ -55,6 +55,8 @@ export const OwnerPublic: Story = {
    * @param context - Storybook interaction context.
    * @param context.canvas - Queries scoped to the rendered story canvas.
    * @param context.userEvent - Storybook interaction driver.
+   * @returns A promise that resolves after the story assertions complete.
+   * @rejects When a Storybook interaction or assertion fails.
    */
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("switch", { name: "Public" }));
@@ -79,6 +81,8 @@ export const AdminLocked: Story = {
    *
    * @param context - Storybook interaction context.
    * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @returns A promise that resolves after the story assertions complete.
+   * @rejects When a Storybook interaction or assertion fails.
    */
   play: async ({ canvas }) => {
     await expect(
@@ -99,6 +103,8 @@ export const AdminModeration: Story = {
    * @param context.canvas - Queries scoped to the rendered story canvas.
    * @param context.canvasElement - Rendered Storybook canvas element.
    * @param context.userEvent - Storybook interaction driver.
+   * @returns A promise that resolves after the story assertions complete.
+   * @rejects When a Storybook interaction or assertion fails.
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
     await userEvent.click(canvas.getByRole("switch", { name: "Public" }));
@@ -124,6 +130,7 @@ export const AdminRestore: Story = {
    *
    * @param context - Story interaction context.
    * @returns A promise that resolves after the interaction completes.
+   * @rejects When a Storybook interaction or assertion fails.
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
     const originalPrompt = canvasElement.ownerDocument.defaultView?.prompt;

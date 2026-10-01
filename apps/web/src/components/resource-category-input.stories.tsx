@@ -96,6 +96,8 @@ export const AddAndRemove: Story = {
    * @param context.canvas - Queries scoped to the rendered story canvas.
    * @param context.canvasElement - Rendered Storybook canvas element.
    * @param context.userEvent - Storybook interaction driver.
+   * @returns A promise that resolves after the story assertions complete.
+   * @rejects When a Storybook interaction or assertion fails.
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
     await userEvent.click(

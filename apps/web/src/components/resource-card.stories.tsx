@@ -60,6 +60,8 @@ export const Directory: Story = {
    *
    * @param context - Storybook interaction context.
    * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @returns A promise that resolves after the story assertions complete.
+   * @rejects When a Storybook interaction or assertion fails.
    */
   play: async ({ canvas }) => {
     await expect(
@@ -93,6 +95,8 @@ export const MultiFile: Story = {
    *
    * @param context - Storybook interaction context.
    * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @returns A promise that resolves after the story assertions complete.
+   * @rejects When a Storybook interaction or assertion fails.
    */
   play: async ({ canvas }) => {
     await expect(
