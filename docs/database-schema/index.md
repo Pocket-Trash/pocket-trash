@@ -59,6 +59,7 @@ Generated schema documentation for committed Drizzle tables.
 - [`tmp_products`](./tmp-products.md)
 - [`upload_file`](./upload-file.md)
 - [`upload_session`](./upload-session.md)
+- [`user_ban`](./user-ban.md)
 - [`user_collection`](./user-collection.md)
 - [`user_settings`](./user-settings.md)
 - [`users`](./users.md)

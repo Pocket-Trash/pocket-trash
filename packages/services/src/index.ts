@@ -70,6 +70,7 @@ export type {
   UpdateAdminFeedbackInput,
   UpdatePendingFeedbackInput,
   UpsertUserSettingsInput,
+  UserBanState,
   UserCollectionItem,
   UserCollectionSummary,
   UserSettingsService,
@@ -92,6 +93,7 @@ export {
   FeedbackPlanRecoveryRequiredError,
   FeedbackStateError,
   FeedbackSubmissionLimitError,
+  UserBanStateError,
 } from "./db/index.js";
 
 import {

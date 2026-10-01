@@ -5,12 +5,21 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { Bell, Flag, MessageSquare, ScrollText, Trash2 } from "lucide-react";
+import {
+  Bell,
+  Flag,
+  MessageSquare,
+  ScrollText,
+  Trash2,
+  UsersRound,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { AppShell, type AppShellProps } from "@/components/app-shell";
 import { useLocale } from "@/providers/locale-provider";
 
-type AdminSection = "audit" | "feedback" | "notifications" | "trash";
+/** Administrator navigation section identifiers. */
+type AdminSection = "audit" | "feedback" | "notifications" | "trash" | "users";
+/** Routes available from the administrator shell. */
 type AdminPath =
   | "/admin/audit"
   | "/admin/feedback"
@@ -23,6 +32,7 @@ type AdminPath =
   | "/admin/trash"
   | "/admin/trash/catalog-images"
   | "/admin/trash/resources"
+  | "/admin/users"
   | "/notifications";
 
 type AdminPageShellProps = Pick<AppShellProps, "breadcrumbItems" | "title"> & {
@@ -56,9 +66,20 @@ function AdminSidebar({ section }: { section?: AdminSection }) {
     hasPermission(actor, "collections.manage");
   const canManageFlags = hasPermission(actor, "feature_flags.manage");
   const canReadAudit = hasPermission(actor, "audit.read");
+  const canManageUsers = hasPermission(actor, "users.manage");
   const { locale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const primaryLinks = [
+    ...(canManageUsers
+      ? [
+          {
+            icon: UsersRound,
+            label: t("web.admin.users.title"),
+            section: "users" as const,
+            to: "/admin/users" as const,
+          },
+        ]
+      : []),
     ...(canReadAudit
       ? [
           {

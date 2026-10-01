@@ -124,7 +124,13 @@ export function ProductFormPage({
   );
 }
 
-function ProductEditor({
+/**
+ * Renders the product fields shared by add and edit flows.
+ *
+ * @param props - Product type, catalog options, and optional existing product.
+ * @returns The product editor form.
+ */
+export function ProductEditor({
   initialProduct,
   options: initialOptions,
   productTypeSlug,
