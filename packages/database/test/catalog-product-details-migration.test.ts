@@ -30,9 +30,10 @@ describe("catalog product details migration", () => {
   it("backfills and defaults maker product URL validity", async () => {
     await database.exec('INSERT INTO "product" ("id") VALUES (2)');
     await expect(
-      database.query<{ maker_product_url_valid: boolean }>(
-        'SELECT "maker_product_url_valid" FROM "product" ORDER BY "id"',
-      ),
+      database.query<{
+        /** Stored validity flag after the migration backfill. */
+        maker_product_url_valid: boolean;
+      }>('SELECT "maker_product_url_valid" FROM "product" ORDER BY "id"'),
     ).resolves.toMatchObject({
       rows: [
         { maker_product_url_valid: true },

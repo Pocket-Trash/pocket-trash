@@ -18,26 +18,86 @@ import {
   productType,
 } from "../src/schema/index.js";
 
+/**
+ * Creates an in-memory Drizzle-shaped fake for catalog seed tests.
+ *
+ * @returns The fake database and its persisted lookup maps.
+ */
 function createSeedDb() {
   const makers = new Map<
     string,
-    { id: number; name: string; rootUrl: string | null }
+    {
+      /** Synthetic maker identifier. */
+      id: number;
+      /** Maker display name. */
+      name: string;
+      /** Normalized maker root URL. */
+      rootUrl: string | null;
+    }
   >();
-  const materials = new Map<string, { name: string; slug: string }>();
-  const finishes = new Map<string, { name: string; slug: string }>();
-  const colors = new Map<string, { hex: string; name: string; slug: string }>();
-  const colorEffects = new Map<string, { name: string; slug: string }>();
-  const productTypes = new Map<string, { name: string; slug: string }>();
+  const materials = new Map<
+    string,
+    {
+      /** Material display name. */
+      name: string;
+      /** Stable material slug. */
+      slug: string;
+    }
+  >();
+  const finishes = new Map<
+    string,
+    {
+      /** Finish display name. */
+      name: string;
+      /** Stable finish slug. */
+      slug: string;
+    }
+  >();
+  const colors = new Map<
+    string,
+    {
+      /** Hexadecimal color value. */
+      hex: string;
+      /** Color display name. */
+      name: string;
+      /** Stable color slug. */
+      slug: string;
+    }
+  >();
+  const colorEffects = new Map<
+    string,
+    {
+      /** Color-effect display name. */
+      name: string;
+      /** Stable color-effect slug. */
+      slug: string;
+    }
+  >();
+  const productTypes = new Map<
+    string,
+    {
+      /** Product-type display name. */
+      name: string;
+      /** Stable product-type slug. */
+      slug: string;
+    }
+  >();
 
+  /** Drizzle-shaped fake that persists mutations in the lookup maps. */
   const db = {
     insert: vi.fn((table: unknown) => ({
       values: vi.fn(
         (value: {
+          /** Optional hexadecimal value for colors. */
           hex?: string;
+          /** Lookup display name. */
           name: string;
+          /** Optional maker root URL. */
           rootUrl?: string | null;
+          /** Optional stable lookup slug. */
           slug?: string;
         }) => {
+          /** Persists the supplied value in the map for its table. */
           const insert = () => {
             if (table === maker) {
               makers.set(value.name.toLowerCase(), {
@@ -76,23 +136,37 @@ function createSeedDb() {
       from: vi.fn(async () => [...makers.values()]),
     })),
     update: vi.fn(() => ({
-      set: vi.fn((value: { name: string; rootUrl: string | null }) => ({
-        where: vi.fn(async () => {
-          const existing = makers.get(value.name.toLowerCase());
-          if (existing)
-            makers.set(value.name.toLowerCase(), { ...existing, ...value });
+      set: vi.fn(
+        (value: {
+          /** Updated maker display name. */
+          name: string;
+          /** Updated normalized maker root URL. */
+          rootUrl: string | null;
+        }) => ({
+          where: vi.fn(async () => {
+            const existing = makers.get(value.name.toLowerCase());
+            if (existing)
+              makers.set(value.name.toLowerCase(), { ...existing, ...value });
+          }),
         }),
-      })),
+      ),
     })),
   } as unknown as ReturnType<typeof createDb>;
 
   return {
+    /** Persisted color-effect rows keyed by slug. */
     colorEffects,
+    /** Persisted color rows keyed by slug. */
     colors,
+    /** Drizzle-shaped fake database client. */
     db,
+    /** Persisted finish rows keyed by slug. */
     finishes,
+    /** Persisted maker rows keyed by normalized name. */
     makers,
+    /** Persisted material rows keyed by slug. */
     materials,
+    /** Persisted product-type rows keyed by slug. */
     productTypes,
   };
 }

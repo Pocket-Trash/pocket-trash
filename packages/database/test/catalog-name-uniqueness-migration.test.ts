@@ -61,7 +61,10 @@ describe("catalog name uniqueness migration", () => {
       1,
     );
     await expect(
-      database.query<{ count: number }>(
+      database.query<{
+        /** Number of rows that retain the tested normalized name. */
+        count: number;
+      }>(
         `SELECT count(*)::int AS count FROM "${table}" WHERE lower("name") = 'bronze'`,
       ),
     ).resolves.toMatchObject({ rows: [{ count: 1 }] });

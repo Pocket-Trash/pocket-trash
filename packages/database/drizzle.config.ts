@@ -1,6 +1,7 @@
 import { defineConfig } from "drizzle-kit";
 import { createDatabaseEnv } from "./src/env.schema.js";
 
+/** Validated environment available to Drizzle Kit. */
 const env = createDatabaseEnv({
   DATABASE_URL: process.env.DATABASE_URL,
 });
