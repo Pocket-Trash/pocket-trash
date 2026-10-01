@@ -30,6 +30,14 @@ describe("preview cleanup", () => {
       "https://storage.example/zone/images/preview/pr-52/products/photo.jpg",
       expect.objectContaining({ method: "DELETE" }),
     );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://storage.example/zone/images/preview/pr-52/products/",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://storage.example/zone/images/preview/pr-52/",
+      expect.objectContaining({ method: "DELETE" }),
+    );
   });
   it("rejects unsafe PRs and directory entries before deleting", async () => {
     const fetchMock = vi.fn<typeof fetch>(async () =>
