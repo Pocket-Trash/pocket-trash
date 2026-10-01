@@ -1,7 +1,14 @@
 import type { CatalogProduct } from "@package/services";
 import { Badge } from "@/components/ui/badge";
 
+/**
+ * Renders one catalog product summary card.
+ *
+ * @param props - Product data and localized labels.
+ * @returns The catalog card UI.
+ */
 export function ProductCard({
+  approvalLabel,
   finishOptionCountLabel,
   imageAlt,
   imageCountLabel,
@@ -9,6 +16,8 @@ export function ProductCard({
   privateLabel,
   product,
 }: {
+  /** Localized review state shown to authorized viewers. */
+  approvalLabel?: string;
   finishOptionCountLabel: string;
   imageAlt: string;
   imageCountLabel: string;
@@ -30,6 +39,11 @@ export function ProductCard({
         </div>
       ) : null}
       <div className="flex-1 p-5">
+        {approvalLabel ? (
+          <Badge className="mb-2" variant="secondary">
+            {approvalLabel}
+          </Badge>
+        ) : null}
         {product.isPrivate ? (
           <Badge className="mb-2" variant="secondary">
             {privateLabel}

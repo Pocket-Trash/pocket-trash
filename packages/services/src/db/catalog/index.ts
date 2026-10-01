@@ -71,6 +71,10 @@ function mapCatalogNameConflict(error: unknown): never {
 }
 
 export type CatalogProductType = "spinner" | "spinner-button";
+/** Durable review state for a catalog product. */
+export type ProductApprovalStatus = "approved" | "pending" | "rejected";
+/** Administrative transition accepted by the product approval workflow. */
+export type ProductApprovalAction = "approve" | "reject" | "reverse";
 
 export type CatalogLookup = { id: number; name: string; slug: string };
 
@@ -116,7 +120,10 @@ export type ProductWriteFinishOption = {
   finishIds: number[];
 };
 
+/** Catalog product returned to authorized viewers. */
 export type CatalogProduct = {
+  /** Durable product review state. */
+  approvalStatus: ProductApprovalStatus;
   bearing: string | null;
   buttonDiameterMm: string | null;
   compatibleButtonId: number | null;
@@ -179,6 +186,7 @@ export type ProductWriteInput = {
   };
 };
 
+/** Authorized catalog product and lookup operations. */
 export type CatalogService = {
   attachImages(input: {
     target: UploadTarget;
@@ -214,6 +222,23 @@ export type CatalogService = {
     slug: string;
   }): Promise<{ id: number; name: string; slug: string }>;
   createProduct(input: ProductWriteInput): Promise<CatalogProduct>;
+  /**
+   * Applies one authorized product approval transition.
+   *
+   * @param input - Product decision, actor, and nonblank reason.
+   * @returns The resulting durable approval state.
+   * @rejects When authorization, input, product lookup, or transition validation fails.
+   */
+  decideProductApproval(input: {
+    /** Requested approval transition. */
+    action: ProductApprovalAction;
+    /** Staff actor making the decision. */
+    actor: Actor;
+    /** Product receiving the decision. */
+    productId: number;
+    /** Nonblank reason for the decision. */
+    reason: string;
+  }): Promise<ProductApprovalStatus>;
   getProduct(
     productTypeSlug: string,
     productSlug: string,
@@ -469,6 +494,15 @@ export type CollectionsService = {
   ): Promise<UserCollectionSummary>;
 };
 
+/**
+ * Creates catalog and collection operations backed by the database.
+ *
+ * @param db - Database used for catalog persistence.
+ * @param logger - Structured operation logger.
+ * @param users - Optional user service required by audited mutations.
+ * @param audit - Optional audit service required by audited mutations.
+ * @returns Catalog operations bound to the supplied dependencies.
+ */
 export function createCatalogService(
   db: Database,
   logger: Logger,
@@ -876,6 +910,50 @@ export function createCatalogService(
         viewer,
       );
       return products[0] ?? null;
+    },
+    /**
+     * Applies one serialized product approval transition.
+     *
+     * @param input - Authorized approval decision.
+     * @returns The resulting durable approval state.
+     * @rejects When authorization, validation, lookup, or persistence fails.
+     */
+    async decideProductApproval(input) {
+      if (!hasPermission(input.actor, "products.manage")) {
+        throw new Error("Product does not exist.");
+      }
+      const reason = input.reason.trim();
+      if (!reason || reason.length > 1000) {
+        throw new Error("A decision reason is required.");
+      }
+      return await logger.operation(
+        loggerMessages.database.catalog.updateProduct,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [product] = await tx
+              .select({ approvalStatus: schema.product.approvalStatus })
+              .from(schema.product)
+              .where(eq(schema.product.id, input.productId))
+              .limit(1)
+              .for("update");
+            if (!product) throw new Error("Product does not exist.");
+            const approvalStatus = nextProductApprovalStatus(
+              product.approvalStatus,
+              input.action,
+            );
+            await tx
+              .update(schema.product)
+              .set({
+                approvalDecidedAt: new Date(),
+                approvalDecisionReason: reason,
+                approvalStatus,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.product.id, input.productId));
+            return approvalStatus;
+          }),
+        actorAttributes(input.actor.clerkId, { productId: input.productId }),
+      );
     },
     async listMakers() {
       return await db
@@ -2867,6 +2945,15 @@ async function updateCollectionItemSnapshot(
   if (!finish) throw new Error("A finish is required.");
 }
 
+/**
+ * Loads visible catalog products and their related display data.
+ *
+ * @param db - Database used for the query.
+ * @param productTypeSlug - Optional product type filter.
+ * @param productSlug - Optional product slug filter.
+ * @param viewer - Optional viewer controlling private and review visibility.
+ * @returns Visible catalog products in display order.
+ */
 async function queryProducts(
   db: Database,
   productTypeSlug?: string,
@@ -2885,13 +2972,17 @@ async function queryProducts(
   if (!hasPermission(viewer, "products.manage")) {
     conditions.push(
       viewer?.clerkId
-        ? sql`(${schema.product.isPrivate} = false or ${schema.product.ownerClerkId} = ${viewer.clerkId})`
-        : eq(schema.product.isPrivate, false),
+        ? sql`((${schema.product.approvalStatus} = 'approved' and ${schema.product.isPrivate} = false) or ${schema.product.ownerClerkId} = ${viewer.clerkId})`
+        : and(
+            eq(schema.product.approvalStatus, "approved"),
+            eq(schema.product.isPrivate, false),
+          ),
     );
   }
 
   const rows = await db
     .select({
+      approvalStatus: schema.product.approvalStatus,
       bearing: schema.productSpinner.bearing,
       buttonDiameterMm: schema.productSpinner.buttonDiameterMm,
       compatibleButtonId: schema.productSpinner.compatibleButtonId,
@@ -2971,6 +3062,7 @@ async function queryProducts(
       continue;
     }
     products.set(row.id, {
+      approvalStatus: row.approvalStatus,
       bearing: row.bearing,
       buttonDiameterMm: row.buttonDiameterMm,
       compatibleButtonId: row.compatibleButtonId,
@@ -3186,6 +3278,15 @@ async function loadFinishOptionComponents(
   return result;
 }
 
+/**
+ * Loads owned collection items subject to visibility and identity filters.
+ *
+ * @param db - Database used for the query.
+ * @param actorClerkId - Optional collection owner Clerk identifier.
+ * @param collectionItemId - Optional collection item identifier.
+ * @param options - Visibility, owner, collection, and product filters.
+ * @returns Matching collection items with effective product data.
+ */
 async function queryOwnedItems(
   db: Database,
   actorClerkId?: string,
@@ -3218,7 +3319,7 @@ async function queryOwnedItems(
   if (options.productId !== undefined) {
     conditions.push(eq(schema.product.id, options.productId));
   }
-  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false)`;
+  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false and ${schema.product.approvalStatus} = 'approved')`;
   if (options.publicOnly) {
     conditions.push(publicItem);
   } else if (!options.includePrivate) {
@@ -4034,6 +4135,24 @@ function normalizeOptionalUrl(value: string | null | undefined) {
 
 function normalizeOptionalDescription(value: string | null | undefined) {
   return value?.trim() ? value : null;
+}
+
+/**
+ * Resolves a valid product approval transition.
+ *
+ * @param current - Current durable approval state.
+ * @param action - Requested administrative action.
+ * @returns The resulting approval state.
+ * @throws When the requested transition is not allowed.
+ */
+function nextProductApprovalStatus(
+  current: ProductApprovalStatus,
+  action: ProductApprovalAction,
+): ProductApprovalStatus {
+  if (current === "pending" && action === "approve") return "approved";
+  if (current === "pending" && action === "reject") return "rejected";
+  if (current !== "pending" && action === "reverse") return "pending";
+  throw new Error("Product approval transition is invalid.");
 }
 
 function buttonSpecs(specs: ProductWriteInput["specs"]) {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { collectionWriteSchema, productFormSchema } from "./catalog-api";
+import {
+  collectionWriteSchema,
+  productApprovalSchema,
+  productFormSchema,
+} from "./catalog-api";
 
 const base = {
   bearing: "",
@@ -201,6 +205,32 @@ describe("product source details", () => {
         finishOptions: validFinishOptions,
         productTypeSlug: "spinner-button",
         spinDiameterMm: "22",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("product approval", () => {
+  it("requires a bounded nonblank reason", () => {
+    expect(
+      productApprovalSchema.parse({
+        action: "approve",
+        productId: 1000,
+        reason: "  Ready  ",
+      }),
+    ).toEqual({ action: "approve", productId: 1000, reason: "Ready" });
+    expect(
+      productApprovalSchema.safeParse({
+        action: "reject",
+        productId: 1000,
+        reason: " ",
+      }).success,
+    ).toBe(false);
+    expect(
+      productApprovalSchema.safeParse({
+        action: "reverse",
+        productId: 1000,
+        reason: "x".repeat(1001),
       }).success,
     ).toBe(false);
   });

@@ -141,6 +141,7 @@ describe("finish option editor", () => {
 
   it("renders the owned material and product finish choices", () => {
     const product: CatalogProduct = {
+      approvalStatus: "approved",
       bearing: null,
       buttonDiameterMm: null,
       canAdminister: false,
@@ -424,12 +425,21 @@ describe("collection add form", () => {
   });
 });
 
+/**
+ * Builds a catalog product fixture for form rendering tests.
+ *
+ * @param id - Product identifier.
+ * @param name - Product display name.
+ * @param productTypeSlug - Catalog product type.
+ * @returns A complete catalog product fixture.
+ */
 function productFixture(
   id: number,
   name: string,
   productTypeSlug: "spinner" | "spinner-button",
 ): CatalogProduct {
   return {
+    approvalStatus: "approved",
     bearing: null,
     buttonDiameterMm: null,
     canAdminister: false,

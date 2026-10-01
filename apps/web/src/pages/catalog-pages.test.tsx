@@ -134,7 +134,9 @@ const owners = [
   },
 ] satisfies PublicCollectionOwner[];
 
+/** Approved catalog product fixture for page rendering tests. */
 const product: CatalogProduct = {
+  approvalStatus: "approved",
   bearing: null,
   buttonDiameterMm: null,
   canAdminister: false,

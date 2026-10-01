@@ -20,6 +20,9 @@ describe("catalog schema", () => {
       "name",
       "slug",
       "description",
+      "approval_status",
+      "approval_decision_reason",
+      "approval_decided_at",
       "maker_product_url",
       "maker_product_url_valid",
       "is_private",
@@ -71,6 +74,17 @@ describe("catalog schema", () => {
       product.columns.find(({ name }) => name === "maker_product_url_valid")
         ?.hasDefault,
     ).toBe(true);
+    expect(
+      product.columns.find(({ name }) => name === "approval_status")
+        ?.hasDefault,
+    ).toBe(true);
+    expect(product.checks.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "product_approval_status_valid",
+        "product_approval_decision_metadata_consistent",
+        "product_approval_reason_valid",
+      ]),
+    );
     expect(
       getTableConfig(schema.collectionSpinner).columns.map(({ name }) => name),
     ).toEqual(expect.arrayContaining(["bearing"]));

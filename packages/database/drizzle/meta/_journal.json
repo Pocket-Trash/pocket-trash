@@ -344,6 +344,13 @@
       "when": 1790836541490,
       "tag": "0048_redundant_spot",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1790869531059,
+      "tag": "0049_stormy_absorbing_man",
+      "breakpoints": true
     }
   ]
 }

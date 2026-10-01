@@ -2,7 +2,9 @@ import type { CatalogImage, CatalogProduct } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { ProductCard } from "./product-card";
 
+/** Approved product fixture for card stories. */
 const product: CatalogProduct = {
+  approvalStatus: "approved",
   bearing: null,
   buttonDiameterMm: null,
   canAdminister: false,

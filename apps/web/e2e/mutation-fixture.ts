@@ -95,12 +95,14 @@ export async function createMutationFixture(): Promise<MutationFixture> {
       .insert(schema.product)
       .values([
         {
+          approvalStatus: "approved",
           makerId: maker.id,
           name: `${runId} spinner`,
           productTypeId: spinnerType.id,
           slug: `${runId}-spinner`,
         },
         {
+          approvalStatus: "approved",
           makerId: maker.id,
           name: `${runId} button`,
           productTypeId: buttonType.id,
