@@ -28,6 +28,7 @@ import {
 import { useLocale } from "@/providers/locale-provider";
 
 type ActiveFeedback = Awaited<ReturnType<typeof listActiveFeedback>>[number];
+/** Completed feedback item returned by the server. */
 type CompletedFeedback = Awaited<
   ReturnType<typeof listCompletedFeedback>
 >[number];
@@ -181,6 +182,12 @@ export function SubmitFeedbackPage() {
   );
 }
 
+/**
+ * Renders the active feedback board.
+ *
+ * @param props - Initial active feedback data.
+ * @returns The active feedback board page.
+ */
 export function FeedbackBoardPage({
   initialItems,
 }: {
@@ -192,6 +199,11 @@ export function FeedbackBoardPage({
   const [search, setSearch] = useState("");
   const t = useFeedbackCopy();
 
+  /**
+   * Reloads active feedback using the current search.
+   *
+   * @returns A promise that resolves when loading finishes.
+   */
   async function load() {
     setError(false);
     setLoading(true);
@@ -294,9 +306,16 @@ export function FeedbackBoardPage({
   );
 }
 
+/**
+ * Renders completed feedback without voting controls.
+ *
+ * @param props - Initial completed feedback data.
+ * @returns The completed feedback page.
+ */
 export function CompletedFeedbackPage({
   initialItems,
 }: {
+  /** Initial completed feedback items. */
   initialItems: CompletedFeedback[];
 }) {
   const [error, setError] = useState(false);
@@ -305,6 +324,11 @@ export function CompletedFeedbackPage({
   const [search, setSearch] = useState("");
   const t = useFeedbackCopy();
 
+  /**
+   * Reloads completed feedback using the current search.
+   *
+   * @returns A promise that resolves when loading finishes.
+   */
   async function load() {
     setError(false);
     setLoading(true);

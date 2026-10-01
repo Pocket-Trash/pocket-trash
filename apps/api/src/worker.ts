@@ -8,6 +8,7 @@ import { createErasureOperations, drainErasureQueue } from "./erasure.js";
 import { createApiLogger, createApiServices } from "./lib/services.js";
 import { createLinearWebhookHandler } from "./linear-webhooks.js";
 
+/** API application configured for the Cloudflare worker runtime. */
 const app = createApp({
   getClerkWebhookRuntime(bindings) {
     validateClerkWebhookBindings(bindings);
@@ -36,6 +37,12 @@ const app = createApp({
         ),
     };
   },
+  /**
+   * Creates request logging configuration.
+   *
+   * @param bindings - Worker environment bindings.
+   * @returns The request logging configuration.
+   */
   getRuntimeConfig(bindings) {
     validateApiBindings(bindings);
 
@@ -44,6 +51,12 @@ const app = createApp({
       logger: createApiLogger(bindings),
     };
   },
+  /**
+   * Creates the Linear webhook runtime for a request.
+   *
+   * @param bindings - Worker environment bindings.
+   * @returns The configured Linear webhook runtime.
+   */
   getLinearWebhookRuntime(bindings) {
     validateLinearWebhookBindings(bindings);
     const { logger, services } = createApiServices(bindings);
@@ -119,6 +132,13 @@ export function validateUploadBindings(env: ApiBindings) {
   }
 }
 
+/**
+ * Validates bindings required by Clerk webhooks.
+ *
+ * @param env - Worker environment bindings.
+ * @returns Nothing.
+ * @throws {ApiEnvValidationError} When a required binding is missing.
+ */
 export function validateClerkWebhookBindings(env: ApiBindings) {
   const required = [
     "CLERK_WEBHOOK_SIGNING_SECRET",
@@ -131,6 +151,13 @@ export function validateClerkWebhookBindings(env: ApiBindings) {
   }
 }
 
+/**
+ * Validates bindings required by Linear webhooks.
+ *
+ * @param env - Worker environment bindings.
+ * @returns Nothing.
+ * @throws {ApiEnvValidationError} When a required binding is missing.
+ */
 export function validateLinearWebhookBindings(env: ApiBindings) {
   const required = ["DATABASE_URL", "LINEAR_WEBHOOK_SIGNING_SECRET"] as const;
   const invalidVariables = required.filter((name) => !env[name]?.trim());

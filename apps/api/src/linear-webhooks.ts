@@ -4,8 +4,10 @@ import type { Logger } from "@package/logger";
 import { loggerMessages } from "@package/logger";
 import type { FeedbackService } from "@package/services";
 
+/** Public Linear webhook endpoint path. */
 export const linearWebhookPath = "/api/v0/webhooks/linear";
 
+/** Accepted Linear lifecycle webhook payload. */
 const webhookSchema = z.object({
   action: z.enum(["create", "remove", "update"]),
   createdAt: z.string(),
@@ -20,10 +22,24 @@ const webhookSchema = z.object({
   webhookTimestamp: z.number().int(),
 });
 
+/**
+ * Creates a verified Linear lifecycle webhook handler.
+ *
+ * @param options - Handler dependencies and configuration.
+ * @returns A request handler for Linear webhook deliveries.
+ */
 export function createLinearWebhookHandler(options: {
+  /** Feedback lifecycle service. */
   feedback: Pick<FeedbackService, "syncLinearStatus">;
+  /** Delivery logger. */
   logger: Logger;
+  /**
+   * Provides the current time for replay protection.
+   *
+   * @returns The current time.
+   */
   now?: () => Date;
+  /** Linear webhook signing secret. */
   signingSecret: string;
 }) {
   return async (request: Request): Promise<Response> => {
@@ -82,6 +98,14 @@ export function createLinearWebhookHandler(options: {
   };
 }
 
+/**
+ * Verifies a Linear webhook signature against the exact request body.
+ *
+ * @param signature - Hex-encoded signature header.
+ * @param body - Exact raw request body.
+ * @param signingSecret - Linear webhook signing secret.
+ * @returns Whether the signature is valid.
+ */
 function validSignature(
   signature: string | null,
   body: ArrayBuffer,
@@ -94,6 +118,15 @@ function validSignature(
   return timingSafeEqual(expected, Buffer.from(signature, "hex"));
 }
 
+/**
+ * Records and flushes a Linear webhook delivery result.
+ *
+ * @param logger - Delivery logger.
+ * @param deliveryId - Linear delivery identifier.
+ * @param status - HTTP response status.
+ * @param failureCategory - Optional failure classification.
+ * @returns A promise that resolves after logs are flushed.
+ */
 async function logDelivery(
   logger: Logger,
   deliveryId: string,

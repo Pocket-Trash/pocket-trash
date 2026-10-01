@@ -1,3 +1,4 @@
+/** Stable structured logger message names. */
 export const loggerMessages = {
   api: {
     clerkWebhookDelivery: "api.clerkWebhook.delivery",

@@ -100,6 +100,12 @@ export function AdminFeedbackArchivePage({
   );
 }
 
+/**
+ * Renders the shared admin feedback table.
+ *
+ * @param props - Feedback table configuration and initial data.
+ * @returns The admin feedback page.
+ */
 function AdminFeedbackPage({
   archiveStatuses = [],
   initialPage,
@@ -197,6 +203,12 @@ function AdminFeedbackPage({
 
   const columns = useMemo(() => {
     const title = columnHelper.accessor("title", {
+      /**
+       * Renders the feedback title cell.
+       *
+       * @param context - Table cell context.
+       * @returns The title button.
+       */
       cell: ({ row }) => (
         <button
           aria-label={t("web.feedback.admin.requests.detailsOpen", {
@@ -216,6 +228,12 @@ function AdminFeedbackPage({
       ),
     });
     const category = columnHelper.accessor("category", {
+      /**
+       * Renders the feedback category cell.
+       *
+       * @param context - Table cell context.
+       * @returns The localized category label.
+       */
       cell: ({ row }) =>
         row.original.category
           ? t(feedbackCategoryKey(row.original.category))
@@ -227,7 +245,18 @@ function AdminFeedbackPage({
       ),
     });
     const submitter = columnHelper.accessor("submitterUsername", {
+      /**
+       * Renders the feedback submitter cell.
+       *
+       * @param context - Table cell context.
+       * @returns The submitter username.
+       */
       cell: ({ row }) => row.original.submitterUsername ?? "",
+      /**
+       * Renders the submitter column header.
+       *
+       * @returns The sortable submitter header.
+       */
       header: () => (
         <SortButton field="submitter" onChange={changeSort} sort={sort}>
           {t("web.feedback.admin.table.submitter")}
@@ -241,7 +270,18 @@ function AdminFeedbackPage({
         category,
         submitter,
         columnHelper.accessor("createdAt", {
+          /**
+           * Renders the submission date cell.
+           *
+           * @param context - Table cell context.
+           * @returns The localized submission date.
+           */
           cell: ({ row }) => formatDate(row.original.createdAt, locale),
+          /**
+           * Renders the submission-date column header.
+           *
+           * @returns The sortable submission-date header.
+           */
           header: () => (
             <SortButton field="submitted" onChange={changeSort} sort={sort}>
               {t("web.feedback.admin.table.submitted")}
@@ -252,6 +292,12 @@ function AdminFeedbackPage({
       ]);
     }
     const statusColumn = columnHelper.accessor("status", {
+      /**
+       * Renders the feedback status cell.
+       *
+       * @param context - Table cell context.
+       * @returns The status icon and label.
+       */
       cell: ({ row }) => {
         const details = feedbackStatus(row.original.status);
         return (
@@ -266,6 +312,11 @@ function AdminFeedbackPage({
           </span>
         );
       },
+      /**
+       * Renders the status column header.
+       *
+       * @returns The sortable status header.
+       */
       header: () => (
         <SortButton field="status" onChange={changeSort} sort={sort}>
           {t("web.feedback.admin.table.status")}
@@ -273,6 +324,12 @@ function AdminFeedbackPage({
       ),
     });
     const syncColumn = columnHelper.display({
+      /**
+       * Renders the feedback synchronization action.
+       *
+       * @param context - Table cell context.
+       * @returns The synchronization button when eligible.
+       */
       cell: ({ row }) =>
         row.original.linearClientUuid &&
         !["merged", "denied"].includes(row.original.status) ? (
@@ -303,6 +360,11 @@ function AdminFeedbackPage({
             {t("web.feedback.admin.sync.action")}
           </Button>
         ) : null,
+      /**
+       * Renders the synchronization column header.
+       *
+       * @returns The accessible synchronization column label.
+       */
       header: () => (
         <span className="sr-only">{t("web.feedback.admin.sync.action")}</span>
       ),
@@ -322,6 +384,12 @@ function AdminFeedbackPage({
       statusColumn,
       category,
       columnHelper.accessor("voteCount", {
+        /**
+         * Renders the feedback vote count.
+         *
+         * @param context - Table cell context.
+         * @returns The vote count.
+         */
         cell: ({ row }) => row.original.voteCount,
         header: () => (
           <SortButton field="votes" onChange={changeSort} sort={sort}>
@@ -332,6 +400,12 @@ function AdminFeedbackPage({
       }),
       submitter,
       columnHelper.accessor("updatedAt", {
+        /**
+         * Renders the feedback update date.
+         *
+         * @param context - Table cell context.
+         * @returns The localized update date.
+         */
         cell: ({ row }) =>
           formatDate(row.original.updatedAt ?? row.original.createdAt, locale),
         header: () => (

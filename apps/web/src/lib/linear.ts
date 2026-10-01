@@ -29,6 +29,7 @@ const projectMutationSchema = z.object({
     success: z.boolean(),
   }),
 });
+/** Linear issue status query response. */
 const issueStatusSchema = z.object({
   issue: z.object({
     archivedAt: z.string().nullable(),
@@ -37,6 +38,7 @@ const issueStatusSchema = z.object({
     updatedAt: z.string(),
   }),
 });
+/** Linear project status query response. */
 const projectStatusSchema = z.object({
   project: z.object({
     archivedAt: z.string().nullable(),
@@ -171,6 +173,14 @@ export async function createLinearProject(
   }
 }
 
+/**
+ * Checks whether a reserved UUID already exists in Linear.
+ *
+ * @param token - Linear OAuth token.
+ * @param id - Reserved Linear entity identifier.
+ * @param request - HTTP request implementation.
+ * @returns Whether the issue or project exists.
+ */
 export async function linearEntityExists(
   token: string,
   id: string,
@@ -203,6 +213,15 @@ export async function linearEntityExists(
   return false;
 }
 
+/**
+ * Loads the current Linear lifecycle state for linked feedback.
+ *
+ * @param token - Linear OAuth token.
+ * @param id - Linked Linear entity identifier.
+ * @param request - HTTP request implementation.
+ * @returns A feedback lifecycle synchronization input.
+ * @rejects When neither a matching issue nor project can be loaded.
+ */
 export async function getLinearFeedbackStatus(
   token: string,
   id: string,
@@ -233,8 +252,23 @@ export async function getLinearFeedbackStatus(
   }
 }
 
+/**
+ * Maps a Linear entity response to a feedback synchronization input.
+ *
+ * @param entity - Linear entity state.
+ * @param entityType - Linear entity kind.
+ * @param stateType - Linear lifecycle state type.
+ * @returns The feedback synchronization input.
+ */
 function linearSyncInput(
-  entity: { archivedAt: string | null; id: string; updatedAt: string },
+  entity: {
+    /** Linear archival timestamp. */
+    archivedAt: string | null;
+    /** Linear entity identifier. */
+    id: string;
+    /** Linear update timestamp. */
+    updatedAt: string;
+  },
   entityType: "issue" | "project",
   stateType: string,
 ) {

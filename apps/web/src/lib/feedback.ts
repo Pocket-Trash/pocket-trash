@@ -64,6 +64,7 @@ export const listActiveFeedback = createServerFn({ method: "GET" })
     return await s.db.feedback.listActive(viewer.clerkId, data.search);
   });
 
+/** Lists completed feedback for the public completed page. */
 export const listCompletedFeedback = createServerFn({ method: "GET" })
   .validator(parseFeedbackListInput)
   .handler(async ({ data }) => {
@@ -282,6 +283,7 @@ export const planFeedback = createServerFn({ method: "POST" })
     }
   });
 
+/** Synchronizes a linked feedback item with its current Linear status. */
 export const syncFeedbackStatus = createServerFn({ method: "POST" })
   .validator(parseFeedbackId)
   .handler(async ({ data }) => {

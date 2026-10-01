@@ -27,6 +27,7 @@ export const openApiJsonPath = `${apiPrefix}/openapi.json`;
 export const apiDocsPath = `${apiPrefix}/docs`;
 export { clerkWebhookPath, linearWebhookPath };
 
+/** Cloudflare bindings used by the API worker. */
 export type ApiBindings = Omit<Env, "APP_ENV" | "BUNNY_IMAGE_FOLDER_PREFIX"> & {
   APP_ENV?: string;
   AXIOM_DATASET?: string;
@@ -41,7 +42,9 @@ export type ApiBindings = Omit<Env, "APP_ENV" | "BUNNY_IMAGE_FOLDER_PREFIX"> & {
   LOG_DEPLOYMENT_ID?: string;
   LOG_DEPLOYMENT_TARGET?: string;
   LOG_LEVEL?: string;
+  /** Shared key accepted by the client log proxy. */
   LOG_PROXY_CLIENT_KEY?: string;
+  /** Secret used to verify Linear webhook signatures. */
   LINEAR_WEBHOOK_SIGNING_SECRET?: string;
   URL_INITIALS?: string;
   BUNNY_API_KEY?: string;
@@ -60,6 +63,7 @@ type RuntimeConfig = {
   logger: Logger;
 };
 
+/** Injectable API application dependencies. */
 type AppDependencies = {
   getRuntimeConfig?: (
     bindings: ApiBindings,
@@ -69,22 +73,52 @@ type AppDependencies = {
     bindings: ApiBindings,
   ) => Promise<UploadRuntime> | UploadRuntime;
   uploadRuntime?: UploadRuntime;
+  /**
+   * Resolves the Clerk webhook runtime for a request.
+   *
+   * @param bindings - Request environment bindings.
+   * @returns The request's Clerk webhook runtime.
+   */
   getClerkWebhookRuntime?: (
     bindings: ApiBindings,
   ) => Promise<ClerkWebhookRuntime> | ClerkWebhookRuntime;
+  /** Fixed Clerk webhook runtime used by tests. */
   clerkWebhookRuntime?: ClerkWebhookRuntime;
+  /**
+   * Resolves the Linear webhook runtime for a request.
+   *
+   * @param bindings - Request environment bindings.
+   * @returns The request's Linear webhook runtime.
+   */
   getLinearWebhookRuntime?: (
     bindings: ApiBindings,
   ) => Promise<LinearWebhookRuntime> | LinearWebhookRuntime;
+  /** Fixed Linear webhook runtime used by tests. */
   linearWebhookRuntime?: LinearWebhookRuntime;
 };
 
+/** Runtime capable of handling Clerk webhook requests. */
 export type ClerkWebhookRuntime = {
+  /** Expected initials for a local webhook target. */
   expectedInitials?: string;
+  /**
+   * Handles a Clerk webhook request.
+   *
+   * @param request - Incoming webhook request.
+   * @param targetKind - Webhook target environment.
+   * @returns The webhook response.
+   */
   handle(request: Request, targetKind: "local" | "primary"): Promise<Response>;
 };
 
+/** Runtime capable of handling Linear webhook requests. */
 export type LinearWebhookRuntime = {
+  /**
+   * Handles a Linear webhook request.
+   *
+   * @param request - Incoming webhook request.
+   * @returns The webhook response.
+   */
   handle(request: Request): Promise<Response>;
 };
 
@@ -144,6 +178,7 @@ const ClientLogRequestSchema = z
   ])
   .openapi("ClientLogRequest");
 
+/** OpenAPI health-check route definition. */
 const HealthRoute = createRoute({
   method: "get",
   path: "/health",
@@ -158,6 +193,12 @@ const HealthRoute = createRoute({
   },
 });
 
+/**
+ * Creates the API application.
+ *
+ * @param dependencies - Optional runtime dependencies.
+ * @returns The configured API application.
+ */
 export function createApp(dependencies: AppDependencies = {}) {
   const app = new OpenAPIHono<{ Bindings: ApiBindings }>();
   const api = new OpenAPIHono<{
@@ -421,6 +462,13 @@ export function createApp(dependencies: AppDependencies = {}) {
   return app;
 }
 
+/**
+ * Resolves the optional upload runtime.
+ *
+ * @param dependencies - Application dependencies.
+ * @param bindings - Request environment bindings.
+ * @returns The configured upload runtime, when available.
+ */
 async function resolveUploadRuntime(
   dependencies: AppDependencies,
   bindings: ApiBindings,
@@ -430,11 +478,26 @@ async function resolveUploadRuntime(
     dependencies.uploadRuntime
   );
 }
+/**
+ * Requires an upload runtime.
+ *
+ * @param runtime - Optional upload runtime.
+ * @returns The configured upload runtime.
+ * @throws {Error} When uploads are not configured.
+ */
 function requireUploadRuntime(runtime: UploadRuntime | undefined) {
   if (!runtime) throw new Error("Storage uploads are not configured.");
   return runtime;
 }
 
+/**
+ * Resolves the configured Clerk webhook runtime.
+ *
+ * @param dependencies - Application dependencies.
+ * @param bindings - Request environment bindings.
+ * @returns The configured Clerk webhook runtime.
+ * @rejects When Clerk webhooks are not configured.
+ */
 async function requireClerkWebhookRuntime(
   dependencies: AppDependencies,
   bindings: ApiBindings,
@@ -446,6 +509,14 @@ async function requireClerkWebhookRuntime(
   return runtime;
 }
 
+/**
+ * Resolves the configured Linear webhook runtime.
+ *
+ * @param dependencies - Application dependencies.
+ * @param bindings - Request environment bindings.
+ * @returns The configured Linear webhook runtime.
+ * @rejects When Linear webhooks are not configured.
+ */
 async function requireLinearWebhookRuntime(
   dependencies: AppDependencies,
   bindings: ApiBindings,

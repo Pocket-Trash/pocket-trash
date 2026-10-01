@@ -33,6 +33,7 @@ const request = {
   voteCount: 8,
 };
 
+/** Admin feedback page Storybook configuration. */
 const meta = {
   args: {
     initialPage: { hasNext: false, items: [request] },
@@ -40,6 +41,11 @@ const meta = {
       { id: 1001, status: "requested", title: "Existing request" },
     ],
   },
+  /**
+   * Configures admin feedback story mocks.
+   *
+   * @returns Nothing.
+   */
   beforeEach: () => {
     mockStoryRole("admin");
     mocked(listPendingFeedback).mockResolvedValue({
@@ -236,7 +242,13 @@ export const Active: Story = {
   },
 };
 
+/** Linear planning interaction story. */
 export const Planning: Story = {
+  /**
+   * Renders the planning story.
+   *
+   * @returns The planning story page.
+   */
   render: () => (
     <AdminActiveFeedbackPage
       initialPage={{
@@ -245,6 +257,12 @@ export const Planning: Story = {
       }}
     />
   ),
+  /**
+   * Exercises the Linear planning flow.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas, canvasElement, userEvent }) => {
     await userEvent.click(
       canvas.getByRole("button", { name: "Manage Saved searches" }),
@@ -286,7 +304,13 @@ export const Planning: Story = {
   },
 };
 
+/** Manual feedback synchronization story. */
 export const Synchronization: Story = {
+  /**
+   * Renders the synchronization story.
+   *
+   * @returns The synchronization story page.
+   */
   render: () => (
     <AdminActiveFeedbackPage
       initialPage={{
@@ -301,6 +325,12 @@ export const Synchronization: Story = {
       }}
     />
   ),
+  /**
+   * Exercises the manual synchronization action.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: "Sync" }));
     await waitFor(() =>

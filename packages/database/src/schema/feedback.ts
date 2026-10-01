@@ -34,6 +34,7 @@ export const feedbackNotificationTypes = ["submitted", "completed"] as const;
 export type FeedbackCategory = (typeof feedbackCategories)[number];
 export type FeedbackStatus = (typeof feedbackStatuses)[number];
 
+/** Feedback request records and Linear lifecycle metadata. */
 export const feedback = pgTable(
   "feedback",
   {

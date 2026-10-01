@@ -4,7 +4,9 @@ import type { FeedbackService } from "@package/services";
 import { describe, expect, it, vi } from "vitest";
 import { createLinearWebhookHandler } from "./linear-webhooks.js";
 
+/** Signing secret used by webhook tests. */
 const signingSecret = "linear-webhook-test-secret";
+/** Fixed current time used by replay-protection tests. */
 const now = new Date("2026-09-30T12:05:00Z");
 
 describe("Linear webhooks", () => {
@@ -16,6 +18,11 @@ describe("Linear webhooks", () => {
         "syncLinearStatus"
       >,
       logger: createNoopLogger(),
+      /**
+       * Returns the fixed test time.
+       *
+       * @returns The fixed test time.
+       */
       now: () => now,
       signingSecret,
     });
@@ -53,6 +60,11 @@ describe("Linear webhooks", () => {
         "syncLinearStatus"
       >,
       logger: createNoopLogger(),
+      /**
+       * Returns the fixed test time.
+       *
+       * @returns The fixed test time.
+       */
       now: () => now,
       signingSecret,
     });
@@ -79,6 +91,12 @@ describe("Linear webhooks", () => {
   });
 });
 
+/**
+ * Creates a signed Linear webhook request.
+ *
+ * @param body - Serialized webhook payload.
+ * @returns A signed request.
+ */
 function signedRequest(body: string) {
   return new Request("https://api.example.test/api/v0/webhooks/linear", {
     body,
