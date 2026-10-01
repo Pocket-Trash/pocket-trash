@@ -123,7 +123,7 @@ export function createErasureOperations(input: {
      * Verifies that the Clerk identity remains absent.
      *
      * @param request - Active erasure request.
-     * @rejects When the target identity is missing or Clerk still returns the user.
+     * @rejects When the target identity is missing, Clerk still returns the user, or absence verification fails.
      */
     verify: async (request) => {
       await assertClerkUserAbsent(
@@ -142,7 +142,6 @@ export function createErasureOperations(input: {
  * @param maximum - Maximum requests processed in this invocation.
  * @returns Number of requests advanced.
  * @rejects When queue processing fails.
- * @default 25
  */
 export async function drainErasureQueue(
   erasure: Pick<ErasureService, "processDue">,

@@ -1,6 +1,5 @@
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import { isLogLevel, loggerMessages } from "@package/logger";
-import type { ErasureService } from "@package/services";
 import { type Actor, normalizeActor } from "@package/services/authorization";
 import { type ApiBindings, createApp } from "./app.js";
 import { drainAuditQueue } from "./audit.js";
@@ -141,6 +140,15 @@ const app = createApp({
 /** Cloudflare execution context accepted by the configured Hono application. */
 type HonoExecutionContext = Parameters<typeof app.fetch>[2];
 
+/**
+ * Verifies that a Clerk account may act.
+ *
+ * @param clerkId - Clerk account identifier.
+ * @returns Promise that resolves when the account is active.
+ * @rejects When account access is blocked or verification fails.
+ */
+type AssertAccountActive = (clerkId: string) => Promise<void>;
+
 /** Reports missing or invalid API worker bindings. */
 export class ApiEnvValidationError extends Error {
   /**
@@ -209,7 +217,6 @@ export function validateUploadBindings(env: ApiBindings) {
  * Validates bindings required by Clerk webhooks.
  *
  * @param env - Worker environment bindings.
- * @returns Nothing.
  * @throws {ApiEnvValidationError} When a required binding is missing.
  */
 export function validateClerkWebhookBindings(env: ApiBindings) {
@@ -228,7 +235,6 @@ export function validateClerkWebhookBindings(env: ApiBindings) {
  * Validates bindings required by Linear webhooks.
  *
  * @param env - Worker environment bindings.
- * @returns Nothing.
  * @throws {ApiEnvValidationError} When a required binding is missing.
  */
 export function validateLinearWebhookBindings(env: ApiBindings) {
@@ -375,7 +381,7 @@ export function isAllowedWebOrigin(
 async function authenticateClerkRequest(
   request: Request,
   env: ApiBindings,
-  assertAccountActive: ErasureService["assertAccountActive"],
+  assertAccountActive: AssertAccountActive,
 ): Promise<Actor | null> {
   const authorization = request.headers.get("authorization");
   const origin = request.headers.get("origin");

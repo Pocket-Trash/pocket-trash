@@ -102,7 +102,9 @@ export async function reconcileClerkUsers(
 /**
  * Runs the Clerk reconciliation CLI and prints its outcome counts.
  *
- * @rejects When required environment variables, Clerk access, or database synchronization fails.
+ * Individual synchronization failures set a nonzero process exit code.
+ *
+ * @rejects When required environment variables, service setup, Clerk page retrieval, or output fails.
  */
 async function main() {
   const secretKey = process.env.CLERK_SECRET_KEY;
