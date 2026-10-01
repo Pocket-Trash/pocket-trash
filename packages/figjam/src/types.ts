@@ -6,7 +6,10 @@ export type AgentName = "codex" | "claude" | "user" | "system";
 
 /**
  * Operation the FigJam plugin can apply to a board.
- * Operations run in payload order; unresolved connector endpoints are skipped.
+ * Operations run in payload order; connectors are skipped when endpoints are
+ * unresolved or the editor lacks connector support. Shape style fields and
+ * defaults apply only to rectangle-backed shapes because fallback shapes ignore
+ * them.
  */
 export type FigjamOperation =
   | {
