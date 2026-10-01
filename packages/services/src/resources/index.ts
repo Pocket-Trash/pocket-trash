@@ -164,9 +164,9 @@ export type ResourceDetail = {
   isPrivate: boolean;
   /** Resource name. */
   name: string;
-  /** Staff privacy reason. */
+  /** Staff privacy reason, or `null` when staff did not make the resource private. */
   privateReason: string | null;
-  /** Time the resource was made private. */
+  /** Time staff made the resource private, or `null` when no moderation action applies. */
   privatedAt: Date | null;
   /** Clerk identifier of the uploader. */
   uploaderClerkId: string;
@@ -221,7 +221,7 @@ export type ResourceDirectoryItem = {
   };
   /** Download count across versions. */
   downloadCount: number;
-  /** Signed cover image URL. */
+  /** Signed cover image URL, or `null` when the resource has no gallery image. */
   coverImageUrl: string | null;
   /** Resource identifier. */
   id: number;
@@ -229,7 +229,7 @@ export type ResourceDirectoryItem = {
   isPrivate: boolean;
   /** Resource name. */
   name: string;
-  /** Staff privacy reason. */
+  /** Staff privacy reason, or `null` when staff did not make the resource private. */
   privateReason: string | null;
   /** Clerk identifier of the uploader. */
   uploaderClerkId: string;
@@ -241,7 +241,7 @@ export type ResourceDirectoryItem = {
 export type ResourceNotificationItem = {
   /** Current category names. */
   categories: string[];
-  /** Category associated with the notification. */
+  /** Category associated with the notification, or `null` for non-category events. */
   categoryName: string | null;
   /** Notification creation time. */
   createdAt: Date;
@@ -249,9 +249,9 @@ export type ResourceNotificationItem = {
   id: number;
   /** Whether the resource is private. */
   isPrivate: boolean;
-  /** Notification read time. */
+  /** Notification read time, or `null` while unread. */
   readAt: Date | null;
-  /** Username of the staff reader. */
+  /** Username of the staff reader, or `null` while unread or when the reader identity is unavailable. */
   readByUsername: string | null;
   /** Resource identifier. */
   resourceId: number;
@@ -288,6 +288,7 @@ export type ResourcesService = {
    *
    * @param input - Version upload input.
    * @returns Created version identity.
+   * @rejects When validation, authorization, upload, persistence, audit, or logging fails.
    */
   addVersion(input: UploadResourceVersionInput): Promise<{
     /** Version identifier. */
@@ -300,6 +301,7 @@ export type ResourcesService = {
    *
    * @param input - Resource creation input.
    * @returns Created resource identity.
+   * @rejects When validation, upload, persistence, audit, or logging fails.
    */
   create(input: CreateResourceInput): Promise<{
     /** Resource identifier. */
@@ -311,7 +313,8 @@ export type ResourcesService = {
    * @param resourceId - Resource identifier.
    * @param fileId - File identifier.
    * @param viewer - Optional viewer.
-   * @returns Signed file URL when visible.
+   * @returns Signed file URL, or `null` when the file is missing or inaccessible.
+   * @rejects When an identifier is invalid or database, signing, or logging work fails.
    */
   downloadFile(
     resourceId: number,
@@ -324,7 +327,8 @@ export type ResourcesService = {
    * @param resourceId - Resource identifier.
    * @param versionId - Version identifier.
    * @param viewer - Optional viewer.
-   * @returns Signed archive URL when visible.
+   * @returns Signed archive URL, or `null` when the version is missing, inaccessible, or has fewer than two files.
+   * @rejects When an identifier is invalid or database, storage, signing, or logging work fails.
    */
   downloadVersion(
     resourceId: number,
@@ -336,7 +340,8 @@ export type ResourcesService = {
    *
    * @param resourceId - Resource identifier.
    * @param viewer - Optional viewer.
-   * @returns Resource details when visible.
+   * @returns Resource details, or `null` when the resource is missing or inaccessible.
+   * @rejects When the identifier is invalid or database, signing, or logging work fails.
    */
   getDetail(
     resourceId: number,
@@ -347,7 +352,8 @@ export type ResourcesService = {
    *
    * @param categorySlugs - Category filters.
    * @param viewer - Optional viewer.
-   * @returns Filtered resource directory.
+   * @returns Filtered directory with resources ordered newest-first.
+   * @rejects When category validation, database, signing, or logging fails.
    */
   listDirectory(
     categorySlugs?: string[],
@@ -356,20 +362,23 @@ export type ResourcesService = {
   /**
    * Lists soft-deleted resources visible to staff.
    *
-   * @returns Soft-deleted resources visible to staff.
+   * @returns Soft-deleted resources ordered newest-first.
+   * @rejects When database access or logging fails.
    */
   listAdminTrash(): Promise<ResourceTrashItem[]>;
   /**
    * Lists resource notifications visible to staff.
    *
-   * @returns Resource notifications visible to staff.
+   * @returns Resource notifications ordered newest-first.
+   * @rejects When database access or logging fails.
    */
   listNotifications(): Promise<ResourceNotificationItem[]>;
   /**
    * Lists resources owned by an account.
    *
    * @param uploaderClerkId - Owner Clerk identifier.
-   * @returns Owned resource summaries.
+   * @returns Owned resource summaries ordered by latest update.
+   * @rejects When owner validation, database access, or logging fails.
    */
   listOwned(uploaderClerkId: string): Promise<
     {
@@ -379,7 +388,7 @@ export type ResourcesService = {
       isPrivate: boolean;
       /** Resource name. */
       name: string;
-      /** Staff privacy reason. */
+      /** Staff privacy reason, or `null` when staff did not make the resource private. */
       privateReason: string | null;
       /** Last update time. */
       updatedAt: Date;
@@ -391,14 +400,16 @@ export type ResourcesService = {
    * Lists owner-deleted resources.
    *
    * @param uploaderClerkId - Owner Clerk identifier.
-   * @returns Owner trash items.
+   * @returns Owner trash items ordered newest-first.
+   * @rejects When owner validation, database access, or logging fails.
    */
   listOwnerTrash(uploaderClerkId: string): Promise<ResourceTrashItem[]>;
   /**
    * Lists resource categories.
    *
    * @param search - Optional category search.
-   * @returns Matching categories.
+   * @returns Up to 20 matching categories in alphabetical order.
+   * @rejects When database access or logging fails.
    */
   listCategories(search?: string): Promise<
     {
@@ -416,6 +427,7 @@ export type ResourcesService = {
    * @param notificationId - Notification identifier.
    * @param actorClerkId - Reader Clerk identifier.
    * @returns Completion after updating the notification.
+   * @rejects When the identifier is invalid or database access or logging fails.
    */
   markNotificationRead(
     notificationId: number,
@@ -426,6 +438,7 @@ export type ResourcesService = {
    *
    * @param input - Actor, reason, and resource identity.
    * @returns Completion after moderation.
+   * @rejects When validation, authorization, persistence, audit, or logging fails.
    */
   markPrivate(input: {
     /** Staff actor. */
@@ -440,6 +453,7 @@ export type ResourcesService = {
    *
    * @param input - Actor, reason, and resource identity.
    * @returns Completion after deletion is queued.
+   * @rejects When validation, authorization, persistence, deletion queuing, audit, or logging fails.
    */
   permanentlyDelete(input: {
     /** Staff actor. */
@@ -454,6 +468,7 @@ export type ResourcesService = {
    *
    * @param input - Visibility change input.
    * @returns Completion after the update.
+   * @rejects When validation, authorization, persistence, audit, or logging fails.
    */
   setVisibility(input: {
     /** User changing visibility. */
@@ -470,6 +485,7 @@ export type ResourcesService = {
    *
    * @param input - Restore input.
    * @returns Completion after restoration.
+   * @rejects When validation, authorization, persistence, audit, or logging fails.
    */
   restore(input: {
     /** User restoring the resource. */
@@ -484,6 +500,7 @@ export type ResourcesService = {
    *
    * @param input - Deletion input.
    * @returns Recorded deletion role.
+   * @rejects When validation, authorization, persistence, audit, or logging fails.
    */
   softDelete(input: {
     /** User deleting the resource. */
@@ -501,6 +518,7 @@ export type ResourcesService = {
    *
    * @param input - Resource update input.
    * @returns Updated resource identity.
+   * @rejects When validation, authorization, upload, persistence, audit, or logging fails.
    */
   update(input: UpdateResourceInput): Promise<{
     /** Resource identifier. */
@@ -533,6 +551,7 @@ export function createResourcesService(
      *
      * @param input - Version upload input.
      * @returns Created version identity.
+     * @rejects When validation, authorization, upload, persistence, audit, or logging fails.
      */
     async addVersion(input) {
       return await loggedMutation(
@@ -578,6 +597,7 @@ export function createResourcesService(
      *
      * @param input - Resource creation input.
      * @returns Created resource identity.
+     * @rejects When validation, upload, persistence, audit, or logging fails.
      */
     async create(input) {
       return await loggedMutation(
@@ -616,7 +636,8 @@ export function createResourcesService(
      * @param resourceId - Resource identifier.
      * @param fileId - File identifier.
      * @param viewer - Optional viewer.
-     * @returns Signed file URL when visible.
+     * @returns Signed file URL, or `null` when the file is missing or inaccessible.
+     * @rejects When an identifier is invalid or database, signing, or logging work fails.
      */
     async downloadFile(resourceId, fileId, viewer) {
       return await logger.operation(
@@ -626,7 +647,9 @@ export function createResourcesService(
           assertPositiveInteger(fileId, "fileId");
 
           const result = await db.execute<{
+            /** Stored path signed to download the requested file. */
             objectPath: string;
+            /** Owning version recorded in the download event. */
             versionId: number;
           }>(sql`
             select resource_files.object_path as "objectPath",
@@ -661,7 +684,8 @@ export function createResourcesService(
      * @param resourceId - Resource identifier.
      * @param versionId - Version identifier.
      * @param viewer - Optional viewer.
-     * @returns Signed archive URL when visible.
+     * @returns Signed archive URL, or `null` when the version is missing, inaccessible, or has fewer than two files.
+     * @rejects When an identifier is invalid or database, storage, signing, or logging work fails.
      */
     async downloadVersion(resourceId, versionId, viewer) {
       return await logger.operation(
@@ -670,11 +694,19 @@ export function createResourcesService(
           assertPositiveInteger(resourceId, "resourceId");
           assertPositiveInteger(versionId, "versionId");
           const result = await db.execute<{
+            /** Archive object path, or `null` before an archive is recorded. */
             archiveObjectPath: string | null;
+            /** Download filename stored in the archive. */
             fileName: string;
+            /** Stored file object path. */
             objectPath: string;
+            /**
+             * File size in bytes.
+             */
             size: number;
+            /** Human-facing resource version number. */
             version: number;
+            /** Version whose files are assembled into the archive. */
             versionId: number;
           }>(sql`
             select resource_versions.id as "versionId",
@@ -721,7 +753,8 @@ export function createResourcesService(
      *
      * @param resourceId - Resource identifier.
      * @param viewer - Optional viewer.
-     * @returns Resource detail when visible.
+     * @returns Resource detail, or `null` when the resource is missing or inaccessible.
+     * @rejects When the identifier is invalid or database, signing, or logging work fails.
      */
     async getDetail(resourceId, viewer) {
       return await logger.operation(
@@ -888,7 +921,8 @@ export function createResourcesService(
      *
      * @param categorySlugs - Category filters to apply.
      * @param viewer - Optional requesting user.
-     * @returns The filtered directory resources and categories.
+     * @returns Filtered directory with resources ordered newest-first.
+     * @rejects When category validation, database, signing, or logging fails.
      */
     async listDirectory(categorySlugs = [], viewer) {
       return await logger.operation(
@@ -933,6 +967,7 @@ export function createResourcesService(
                 )`;
           const resourceResult = await db.execute<
             Omit<ResourceDirectoryItem, "coverImageUrl"> & {
+              /** Cover image object path, or `null` when no cover exists. */
               coverImageObjectPath: string | null;
             }
           >(sql`
@@ -1037,7 +1072,8 @@ export function createResourcesService(
      * Lists resources owned by an account.
      *
      * @param uploaderClerkId - Owner Clerk identifier.
-     * @returns Owned resource summaries.
+     * @returns Owned resource summaries ordered by latest update.
+     * @rejects When owner validation, database access, or logging fails.
      */
     async listOwned(uploaderClerkId) {
       return await logger.operation(
@@ -1052,7 +1088,7 @@ export function createResourcesService(
             isPrivate: boolean;
             /** Resource name. */
             name: string;
-            /** Staff privacy reason. */
+            /** Staff privacy reason, or `null` when staff did not make the resource private. */
             privateReason: string | null;
             /** Last update time. */
             updatedAt: Date;
@@ -1087,7 +1123,8 @@ export function createResourcesService(
     /**
      * Lists soft-deleted resources visible to staff.
      *
-     * @returns Soft-deleted resources visible to staff.
+     * @returns Soft-deleted resources ordered newest-first.
+     * @rejects When database access or logging fails.
      */
     async listAdminTrash() {
       return await logger.operation(
@@ -1099,7 +1136,8 @@ export function createResourcesService(
      * Lists owner-deleted resources.
      *
      * @param uploaderClerkId - Owner Clerk identifier.
-     * @returns Owner trash items.
+     * @returns Owner trash items ordered newest-first.
+     * @rejects When owner validation, database access, or logging fails.
      */
     async listOwnerTrash(uploaderClerkId) {
       return await logger.operation(
@@ -1124,7 +1162,8 @@ export function createResourcesService(
     /**
      * Lists resource notifications visible to staff.
      *
-     * @returns Resource notifications visible to staff.
+     * @returns Resource notifications ordered newest-first.
+     * @rejects When database access or logging fails.
      */
     async listNotifications() {
       return await logger.operation(
@@ -1177,7 +1216,8 @@ export function createResourcesService(
      * Lists resource categories.
      *
      * @param search - Optional category search.
-     * @returns Matching categories.
+     * @returns Up to 20 matching categories in alphabetical order.
+     * @rejects When database access or logging fails.
      */
     async listCategories(search = "") {
       return await logger.operation(
@@ -1208,6 +1248,7 @@ export function createResourcesService(
      * @param notificationId - Notification identifier.
      * @param actorClerkId - Reader Clerk identifier.
      * @returns Completion after updating the notification.
+     * @rejects When the identifier is invalid or database access or logging fails.
      */
     async markNotificationRead(notificationId, actorClerkId) {
       await logger.operation(
@@ -1235,6 +1276,7 @@ export function createResourcesService(
      *
      * @param input - Actor, reason, and resource identity.
      * @returns Completion after moderation.
+     * @rejects When validation, authorization, persistence, audit, or logging fails.
      */
     async markPrivate(input) {
       await logger.operation(
@@ -1299,6 +1341,7 @@ export function createResourcesService(
      *
      * @param input - Actor, reason, and resource identity.
      * @returns Completion after deletion is queued.
+     * @rejects When validation, authorization, persistence, deletion queuing, audit, or logging fails.
      */
     async permanentlyDelete(input) {
       await loggedMutation(
@@ -1326,7 +1369,10 @@ export function createResourcesService(
                   input.resourceId,
                 )
               : undefined;
-            const objects = await tx.execute<{ objectPath: string | null }>(sql`
+            const objects = await tx.execute<{
+              /** Stored object path, or `null` when the resource has no objects. */
+              objectPath: string | null;
+            }>(sql`
             select stored_objects.object_path as "objectPath"
             from resources
             left join lateral (
@@ -1409,6 +1455,7 @@ export function createResourcesService(
      *
      * @param input - Visibility change input.
      * @returns Completion after the update.
+     * @rejects When validation, authorization, persistence, audit, or logging fails.
      */
     async setVisibility(input) {
       await logger.operation(
@@ -1476,6 +1523,7 @@ export function createResourcesService(
      *
      * @param input - Restore input.
      * @returns Completion after restoration.
+     * @rejects When validation, authorization, persistence, audit, or logging fails.
      */
     async restore(input) {
       await logger.operation(
@@ -1543,6 +1591,7 @@ export function createResourcesService(
      *
      * @param input - Deletion input.
      * @returns Recorded deletion role.
+     * @rejects When validation, authorization, persistence, audit, or logging fails.
      */
     async softDelete(input) {
       return await logger.operation(
@@ -1610,6 +1659,7 @@ export function createResourcesService(
      *
      * @param input - Resource update input.
      * @returns Updated resource identity.
+     * @rejects When validation, authorization, upload, persistence, audit, or logging fails.
      */
     async update(input) {
       return await loggedMutation(
@@ -1727,6 +1777,7 @@ export function createResourcesService(
  * @param config - Upload storage configuration.
  * @param logger - Application logger.
  * @returns Configured resource service.
+ * @throws When the storage configuration is invalid.
  */
 export function createConfiguredResourcesService(
   db: Database,
@@ -1742,6 +1793,7 @@ export function createConfiguredResourcesService(
      *
      * @param objectPath - Resource object path.
      * @returns Signed resource URL.
+     * @rejects When URL signing fails.
      */
     async (objectPath) => await signResourceUrl({ ...config, objectPath }),
     createAuditService(logger, resourceAuditEvents, db),
@@ -1755,7 +1807,6 @@ export function createConfiguredResourcesService(
  * @param input - Normalized update input.
  * @param images - Uploaded gallery images.
  * @returns Updated resource identity.
- * @throws When the resource cannot be updated.
  * @rejects When the resource cannot be updated.
  */
 async function persistResourceUpdate(
@@ -1860,6 +1911,14 @@ async function persistResourceUpdate(
   return { id: Number(updated.id) };
 }
 
+/**
+ * Lists deleted resources matching an authorization filter.
+ *
+ * @param db - Application database.
+ * @param filter - SQL authorization condition applied to deleted resources.
+ * @returns Deleted resources ordered newest first.
+ * @rejects When the database query fails.
+ */
 async function listTrash(
   db: Database,
   filter: SQL,
@@ -1883,6 +1942,13 @@ async function listTrash(
   return result.rows;
 }
 
+/**
+ * Validates and normalizes a resource update request.
+ *
+ * @param input - Candidate update fields, uploads, and actor identity.
+ * @returns Deduplicated image identifiers, normalized metadata, and management permission.
+ * @throws When an identifier, metadata field, image, or upload size is invalid.
+ */
 function normalizeUpdateInput(input: UpdateResourceInput) {
   assertPositiveInteger(input.resourceId, "resourceId");
   const retainedImageIds = [...new Set(input.retainedImageIds)];
@@ -1903,10 +1969,29 @@ function normalizeUpdateInput(input: UpdateResourceInput) {
   };
 }
 
+/**
+ * Validates and normalizes resource metadata.
+ *
+ * @param input - Candidate resource metadata and uploader identity.
+ * @returns Trimmed metadata and deduplicated category names and slugs.
+ * @throws When a required field or category violates its limits.
+ */
 function normalizeMetadata(input: {
+  /**
+   * Category display names supplied by the uploader.
+   */
   categories: string[];
+  /**
+   * Resource description supplied by the uploader.
+   */
   description: string;
+  /**
+   * Display name.
+   */
   name: string;
+  /**
+   * Uploader Clerk user identifier.
+   */
   uploaderClerkId: string;
 }) {
   const name = input.name.trim();
@@ -1940,6 +2025,13 @@ function normalizeMetadata(input: {
   return { categories, description, name, uploaderClerkId };
 }
 
+/**
+ * Deduplicates and validates resource category filters.
+ *
+ * @param categorySlugs - Candidate lowercase category slugs.
+ * @returns Trimmed unique category slugs.
+ * @throws When more than ten filters are supplied or a slug is invalid.
+ */
 function normalizeCategorySlugs(categorySlugs: string[]): string[] {
   const filters = [...new Set(categorySlugs.map((slug) => slug.trim()))];
   if (
@@ -1951,6 +2043,12 @@ function normalizeCategorySlugs(categorySlugs: string[]): string[] {
   return filters;
 }
 
+/**
+ * Converts a display value to a lowercase URL slug.
+ *
+ * @param value - Display value to normalize.
+ * @returns Hyphen-separated ASCII slug.
+ */
 function slugify(value: string): string {
   return value
     .normalize("NFKD")
@@ -1959,12 +2057,27 @@ function slugify(value: string): string {
     .replace(/^-+|-+$/gu, "");
 }
 
+/**
+ * Requires a positive integer.
+ *
+ * @param value - Candidate identifier.
+ * @param name - Field name included in the validation error.
+ * @throws When the value is not a positive safe integer.
+ */
 function assertPositiveInteger(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive integer.`);
   }
 }
 
+/**
+ * Validates a resource image collection.
+ *
+ * @param images - Candidate image uploads.
+ * @param required - Whether at least one image must be present.
+ * @returns Validated uploads in their original order.
+ * @throws When the count is invalid or filenames are duplicated.
+ */
 function normalizeResourceImages(
   images: UploadInput[],
   required: boolean,
@@ -1984,6 +2097,12 @@ function normalizeResourceImages(
   return images;
 }
 
+/**
+ * Validates combined upload size.
+ *
+ * @param files - Uploads whose byte lengths are combined.
+ * @throws When the total is unsafe or exceeds the session limit.
+ */
 function assertCombinedUploadSize(files: UploadInput[]): void {
   const total = files.reduce((size, file) => size + file.bytes.byteLength, 0);
   if (!Number.isSafeInteger(total) || total > maxResourceSessionBytes) {
@@ -1991,6 +2110,16 @@ function assertCombinedUploadSize(files: UploadInput[]): void {
   }
 }
 
+/**
+ * Uploads validated resource images with collision protection.
+ *
+ * @param storage - Object storage used to derive targets and upload bytes.
+ * @param images - Validated image uploads.
+ * @param resourceId - Resource identifier.
+ * @param db - Application database.
+ * @returns Uploaded image targets in input order.
+ * @rejects When hashing, collision checks, or upload fails.
+ */
 async function uploadResourceImages(
   storage: UploadStorage,
   images: UploadInput[],
@@ -2031,6 +2160,12 @@ async function uploadResourceImages(
   }
 }
 
+/**
+ * Attempts to delete every uploaded object without failing on individual errors.
+ *
+ * @param storage - Object storage containing the uploads.
+ * @param files - Uploaded targets to delete.
+ */
 async function deleteUploadedFiles(
   storage: UploadStorage,
   files: UploadResult[],
@@ -2040,17 +2175,42 @@ async function deleteUploadedFiles(
   );
 }
 
+/**
+ * Uploads and atomically records an uncompressed resource-version archive.
+ *
+ * @param db - Application database.
+ * @param storage - Object storage used to read files and write the archive.
+ * @param resourceId - Resource identifier.
+ * @param versionId - Version identifier.
+ * @param version - Human-facing resource version number.
+ * @param files - Stored version files included in the archive.
+ * @returns Winning archive object path after concurrent creation is reconciled.
+ * @rejects When reading, uploading, recording, or cleanup fails.
+ */
 async function createVersionArchive(
   db: Database,
   storage: UploadStorage,
   resourceId: number,
   versionId: number,
   version: number,
-  files: Array<{ fileName: string; objectPath: string; size: number }>,
+  files: Array<{
+    /** Download filename written into the archive. */
+    fileName: string;
+    /** Stored object path read into the archive. */
+    objectPath: string;
+    /** Uncompressed file size in bytes. */
+    size: number;
+  }>,
 ): Promise<string> {
   const archive = createUncompressedZip(
     files.map((file) => ({
       fileName: file.fileName,
+      /**
+       * Opens the stored file as an archive entry stream.
+       *
+       * @returns Readable file stream.
+       * @rejects When object storage cannot read the file.
+       */
       open: async () => await storage.readFile(file.objectPath),
       size: file.size,
     })),
@@ -2069,7 +2229,10 @@ async function createVersionArchive(
       contentType: candidate.contentType,
       objectPath: candidate.objectPath,
     });
-    const result = await db.execute<{ objectPath: string }>(sql`
+    const result = await db.execute<{
+      /** Archive path won by this request or a concurrent creator. */
+      objectPath: string;
+    }>(sql`
       with selected_archive as (
         update resource_versions
         set archive_object_path = ${candidate.objectPath}
@@ -2098,6 +2261,14 @@ async function createVersionArchive(
   }
 }
 
+/**
+ * Records an authenticated or anonymous resource-version download.
+ *
+ * @param db - Application database.
+ * @param versionId - Version identifier.
+ * @param userClerkId - Authenticated Clerk identifier, or absent for an anonymous download.
+ * @rejects When download persistence fails.
+ */
 async function recordResourceDownload(
   db: Database,
   versionId: number,
@@ -2119,8 +2290,20 @@ async function recordResourceDownload(
   `);
 }
 
+/**
+ * Checks public, owner, and administrator access to a resource.
+ *
+ * @param resource - Resource privacy and ownership fields.
+ * @param viewer - Optional catalog viewer.
+ * @returns Whether the viewer may read the resource.
+ */
 export function canViewResource(
-  resource: { isPrivate: boolean; uploaderClerkId: string },
+  resource: {
+    /** Whether public discovery is disabled for the resource. */
+    isPrivate: boolean;
+    /** Clerk identifier allowed to view its own private resource. */
+    uploaderClerkId: string;
+  },
   viewer?: ResourceViewer,
 ): boolean {
   return (
@@ -2141,6 +2324,7 @@ type ResourceAuditCallback<T> = {
    *
    * @param transaction - Caller-owned transaction.
    * @returns Callback result.
+   * @rejects When the resource mutation fails.
    */
   (transaction: Parameters<AuditService["write"]>[0]): Promise<T>;
 };
@@ -2153,6 +2337,7 @@ type ResourceAuditCallback<T> = {
  * @param audit - Optional audit service.
  * @param callback - Mutation callback.
  * @returns Callback result.
+ * @rejects When the mutation callback or database transaction fails.
  */
 async function withResourceAuditTransaction<T>(
   db: Database,
@@ -2173,8 +2358,7 @@ async function withResourceAuditTransaction<T>(
  * @param payload - Resource session payload.
  * @param audit - Optional audit service.
  * @returns Completed resource upload identity.
- * @throws When an upload target or result is missing.
- * @rejects When an upload target or result is missing.
+ * @rejects When hashing, session creation, upload, persistence, audit, logging, or result validation fails.
  */
 async function uploadBufferedSession(
   db: Database,
