@@ -2,6 +2,11 @@ import { auth as clerkAuth } from "@clerk/tanstack-react-start/server";
 import { redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 
+/** Loads Clerk authentication and blocks accounts currently being erased.
+ *
+ * @returns The active Clerk authentication state.
+ * @rejects When Clerk authentication, service loading, or the erasure guard fails.
+ */
 export async function activeAuth(): Promise<
   Awaited<ReturnType<typeof clerkAuth>>
 > {
@@ -13,6 +18,11 @@ export async function activeAuth(): Promise<
   return state;
 }
 
+/** Resolves the public auth state and redirects erasing accounts.
+ *
+ * @returns Authentication and Clerk user identity fields.
+ * @rejects With a redirect for an erasure in progress, or the original auth failure.
+ */
 export async function resolveAuthState() {
   try {
     const { isAuthenticated, userId } = await activeAuth();
@@ -30,4 +40,9 @@ export async function resolveAuthState() {
   }
 }
 
+/** Returns the guarded authentication state to web clients.
+ *
+ * @returns Authentication and Clerk user identity fields.
+ * @rejects With a redirect for an erasure in progress, or the original auth failure.
+ */
 export const getAuthState = createServerFn().handler(resolveAuthState);
