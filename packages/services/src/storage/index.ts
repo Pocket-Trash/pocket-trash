@@ -54,6 +54,7 @@ import {
 
 export type { UploadActor } from "./types.js";
 export { UploadSessionError } from "./types.js";
+/** Validates upload targets, file metadata, and per-session file limits. */
 export const uploadManifestSchema = z.object({
   target: z.object({
     type: z.enum(uploadTargetTypes),
@@ -73,7 +74,9 @@ export const uploadManifestSchema = z.object({
     .min(1)
     .max(maxImageSessionFiles),
 });
+/** Parsed manifest used to reserve and upload session files. */
 export type UploadManifest = z.infer<typeof uploadManifestSchema>;
+/** Persisted attachment kinds accepted by file deletion. */
 export const fileTypes = [
   "product_image",
   "collection_image",
@@ -81,7 +84,9 @@ export const fileTypes = [
   "resource_image",
   "resource_file",
 ] as const;
+/** Persisted attachment kind accepted by file deletion. */
 export type FileType = (typeof fileTypes)[number];
+/** Stored upload-session row. */
 type Session = typeof schema.uploadSession.$inferSelect;
 
 /**
@@ -123,7 +128,7 @@ export function createStorageService(input: {
      * @param actor - Uploading actor.
      * @param attributes - Mutable log attributes.
      * @returns Reserved upload session.
-     * @rejects When the manifest or target is invalid.
+     * @rejects When validation, authorization, reservation, audit, or persistence fails.
      */
     async create(value: unknown, actor: UploadActor, attributes: LogContext) {
       const parsed = uploadManifestSchema.safeParse(value);
@@ -145,7 +150,10 @@ export function createStorageService(input: {
         let targetId = manifest.target.id;
         const isCreate = resource?.operation === "create";
         if (isCreate) {
-          const reserved = await tx.execute<{ id: number }>(
+          const reserved = await tx.execute<{
+            /** Resource identifier reserved from the database sequence. */
+            id: number;
+          }>(
             sql`select nextval(pg_get_serial_sequence('resources','id'))::bigint as id`,
           );
           targetId = Number(reserved.rows[0]?.id);
@@ -181,7 +189,10 @@ export function createStorageService(input: {
             .limit(1);
           if (pending.length)
             throw new UploadSessionError("upload_in_progress", 409);
-          const versions = await tx.execute<{ version: number }>(
+          const versions = await tx.execute<{
+            /** Next sequential version number for the resource. */
+            version: number;
+          }>(
             sql`select coalesce(max(version),0)::int + 1 as version from resource_versions where resource_id = ${targetId}`,
           );
           version = versions.rows[0]?.version ?? 1;
@@ -250,6 +261,19 @@ export function createStorageService(input: {
         };
       });
     },
+    /**
+     * Validates and stores one file reserved by an upload session.
+     *
+     * Repeated uploads of an already stored file complete without another write.
+     *
+     * @param sessionId - Upload session UUID.
+     * @param fileId - Reserved upload file UUID.
+     * @param actor - Actor who owns the session.
+     * @param request - Request carrying the exact declared bytes and content headers.
+     * @param attributes - Mutable log attributes populated by the operation.
+     * @returns Promise that resolves after the file is stored or found already uploaded.
+     * @rejects When database access, hashing, or storage fails, or the session, request metadata, or digest is invalid.
+     */
     async upload(
       sessionId: string,
       fileId: string,
@@ -339,6 +363,7 @@ export function createStorageService(input: {
      * @param actor - Uploading actor.
      * @param attributes - Mutable log attributes.
      * @returns Completed upload identity.
+     * @rejects When the session is invalid or incomplete, authorization fails, or persistence or audit fails.
      */
     async completeUpload(
       sessionId: string,
@@ -469,6 +494,15 @@ export function createStorageService(input: {
         return completion(session);
       });
     },
+    /**
+     * Removes expired sessions and any unattached uploaded objects.
+     *
+     * Individual session failures are logged and left for a later retry.
+     *
+     * @param attributes - Mutable aggregate cleanup counts for logging.
+     * @returns Number of expired sessions removed.
+     * @rejects When session discovery, deferred-deletion cleanup, or retry logging fails.
+     */
     async cleanupExpired(attributes: LogContext) {
       const sessions = await db
         .select({ id: schema.uploadSession.id })
@@ -526,9 +560,21 @@ export function createStorageService(input: {
       await cleanupObjectDeletions(db, storage, logger);
       return removed;
     },
+    /**
+     * Captures the initial sorted set of account-owned object paths for resumable erasure.
+     *
+     * Existing snapshots are preserved for idempotent retries.
+     *
+     * @param requestId - Erasure request identifier.
+     * @param targetClerkId - Clerk identifier of the account being erased.
+     * @rejects When the request is missing or snapshot persistence fails.
+     */
     async snapshotErasureTargets(requestId: string, targetClerkId: string) {
       await db.transaction(async (tx) => {
-        const request = await tx.execute<{ storageTargets: string[] | null }>(
+        const request = await tx.execute<{
+          /** Existing path snapshot, or `null` before capture. */
+          storageTargets: string[] | null;
+        }>(
           sql`select storage_targets as "storageTargets" from erasure_request
             where id = ${requestId} and target_clerk_id = ${targetClerkId}
             for update`,
@@ -536,7 +582,10 @@ export function createStorageService(input: {
         const current = request.rows[0];
         if (!current) throw new Error("Erasure request target was not found.");
         if (current.storageTargets !== null) return;
-        const targets = await tx.execute<{ objectPath: string }>(sql`
+        const targets = await tx.execute<{
+          /** Account-owned object path included in the snapshot. */
+          objectPath: string;
+        }>(sql`
           select distinct owned.object_path as "objectPath" from (
             select collection_image.object_path
             from collection_image
@@ -592,9 +641,22 @@ export function createStorageService(input: {
           .where(eq(schema.erasureRequest.id, requestId));
       });
     },
+    /**
+     * Erases captured account objects that have no surviving protected reference.
+     *
+     * Each erased path is removed from the request snapshot for resumable retries.
+     *
+     * @param requestId - Erasure request identifier.
+     * @param targetClerkId - Clerk identifier of the account being erased.
+     * @returns Known provider-retention exceptions with their expiration times.
+     * @rejects When erasure readiness, snapshot lookup, object erasure, or persistence fails.
+     */
     async eraseAccountObjects(requestId: string, targetClerkId: string) {
       await storage.assertErasureReady();
-      const request = await db.execute<{ storageTargets: string[] | null }>(
+      const request = await db.execute<{
+        /** Captured object paths, or `null` before snapshotting. */
+        storageTargets: string[] | null;
+      }>(
         sql`select storage_targets as "storageTargets" from erasure_request
           where id = ${requestId} and target_clerk_id = ${targetClerkId}`,
       );
@@ -605,7 +667,10 @@ export function createStorageService(input: {
       for (const objectPath of targets) {
         await db.transaction(async (tx) => {
           await lockObjectPath(tx, objectPath);
-          const current = await tx.execute<{ storageTargets: string[] }>(
+          const current = await tx.execute<{
+            /** Remaining captured paths for the erasure request. */
+            storageTargets: string[];
+          }>(
             sql`select storage_targets as "storageTargets" from erasure_request
               where id = ${requestId} and target_clerk_id = ${targetClerkId}
               for update`,
@@ -641,6 +706,15 @@ export function createStorageService(input: {
         ],
       };
     },
+    /**
+     * Removes an authorized attachment and queues its object for deletion.
+     *
+     * The final resource file or image cannot be removed.
+     *
+     * @param input - Attachment identity, requesting actor, and optional audit reason.
+     * @param attributes - Mutable log attributes populated by the operation.
+     * @rejects When database, audit, or retry logging fails; input or access is invalid; or removal would violate resource requirements.
+     */
     async deleteFile(
       {
         fileType,
@@ -648,9 +722,13 @@ export function createStorageService(input: {
         actor,
         reason,
       }: {
+        /** Persisted attachment kind. */
         fileType: FileType;
+        /** Attachment record identifier. */
         fileId: number;
+        /** Actor requesting deletion. */
         actor: UploadActor;
+        /** Required reason for audited administrative changes. */
         reason?: string;
       },
       attributes: LogContext,
@@ -668,9 +746,13 @@ export function createStorageService(input: {
       attributes.fileCount = 1;
       const objectPath = await db.transaction(async (tx) => {
         const result = await tx.execute<{
+          /** Entity that owns the attachment. */
           targetId: number;
+          /** Object-storage path queued after the record is removed. */
           objectPath: string;
+          /** Owning resource version for resource files. */
           versionId: number;
+          /** Whether this image is the current collection cover. */
           isCurrent: boolean;
         }>(
           fileType === "resource_file"
@@ -686,18 +768,27 @@ export function createStorageService(input: {
         await lockTarget(tx, target);
         await assertCanEditTarget(tx, target, actor);
         // Re-read under the target lock so concurrent cover selection/deletions cannot bypass the rules.
-        const current = await tx.execute<{ isCurrent: boolean }>(
+        const current = await tx.execute<{
+          /** Whether the locked image remains the current collection cover. */
+          isCurrent: boolean;
+        }>(
           sql`select ${fileType === "collection_image" ? sql`is_current` : sql`false`} as "isCurrent" from ${sql.identifier(mapping.table)} where id = ${fileId} for update`,
         );
         if (!current.rows.length)
           throw new UploadSessionError("session_not_found", 404);
         const replacement = current.rows[0]?.isCurrent
-          ? await tx.execute<{ id: number }>(
+          ? await tx.execute<{
+              /** Replacement collection cover identifier. */
+              id: number;
+            }>(
               sql`select id from collection_image where collection_id = ${file.targetId} and id <> ${fileId} order by position desc, id desc limit 1`,
             )
           : null;
         if (fileType === "resource_image" || fileType === "resource_file") {
-          const count = await tx.execute<{ count: number }>(
+          const count = await tx.execute<{
+            /** Number of files or images remaining on the resource version. */
+            count: number;
+          }>(
             sql`select count(*)::int as count from ${sql.identifier(mapping.table)} where ${sql.identifier(mapping.column)} = ${fileType === "resource_file" ? file.versionId : file.targetId}`,
           );
           if ((count.rows[0]?.count ?? 0) <= 1)
@@ -743,6 +834,14 @@ export function createStorageService(input: {
   return {
     snapshotErasureTargets: service.snapshotErasureTargets,
     eraseAccountObjects: service.eraseAccountObjects,
+    /**
+     * Creates a logged upload session.
+     *
+     * @param value - Untrusted upload manifest.
+     * @param actor - Actor reserving the upload.
+     * @returns Reserved session and ordered file upload descriptors.
+     * @rejects When validation, authorization, reservation, audit, or logging fails.
+     */
     create: (value: unknown, actor: UploadActor) => {
       const attributes = actorAttributes(actor);
       return loggedMutation(
@@ -752,6 +851,16 @@ export function createStorageService(input: {
         { attributes },
       );
     },
+    /**
+     * Stores one file through a logged upload operation.
+     *
+     * @param sessionId - Upload session UUID.
+     * @param fileId - Reserved upload file UUID.
+     * @param actor - Actor who owns the session.
+     * @param request - Request containing the upload bytes and content headers.
+     * @returns Promise that resolves after the file is stored or found already uploaded.
+     * @rejects When validation, authorization, storage, persistence, or logging fails.
+     */
     upload: (
       sessionId: string,
       fileId: string,
@@ -767,6 +876,14 @@ export function createStorageService(input: {
         { attributes },
       );
     },
+    /**
+     * Completes a logged upload session.
+     *
+     * @param sessionId - Upload session UUID.
+     * @param actor - Actor who owns the session.
+     * @returns Completed target identity; retries return the original identity.
+     * @rejects When validation, authorization, persistence, audit, or logging fails.
+     */
     completeUpload: (sessionId: string, actor: UploadActor) => {
       const attributes = actorAttributes(actor, sessionId);
       return loggedMutation(
@@ -776,6 +893,13 @@ export function createStorageService(input: {
         { attributes },
       );
     },
+    /**
+     * Deletes an attachment through a logged mutation.
+     *
+     * @param input - Attachment identity, requesting actor, and optional audit reason.
+     * @returns Promise that resolves after the attachment is removed and cleanup is attempted.
+     * @rejects When validation, authorization, persistence, audit, or logging fails.
+     */
     deleteFile: (input: Parameters<typeof service.deleteFile>[0]) => {
       const attributes = actorAttributes(input.actor);
       return loggedMutation(
@@ -785,6 +909,12 @@ export function createStorageService(input: {
         { attributes },
       );
     },
+    /**
+     * Runs logged cleanup for expired upload sessions and queued objects.
+     *
+     * @returns Number of expired sessions removed.
+     * @rejects When cleanup or logging fails.
+     */
     cleanupExpired: () => {
       const attributes: LogContext = {};
       return loggedMutation(
@@ -797,7 +927,19 @@ export function createStorageService(input: {
   };
 }
 
-function catalogUploadPayload(value: unknown): { reason?: string } | null {
+/**
+ * Validates and normalizes an optional catalog-image audit reason.
+ *
+ * @param value - Untrusted upload payload.
+ * @returns Trimmed reason object, or `null` when no non-empty reason is supplied.
+ * @throws {UploadSessionError} When the payload shape or reason is invalid.
+ */
+function catalogUploadPayload(value: unknown): {
+  /**
+   * Administrative reason for the operation.
+   */
+  reason?: string;
+} | null {
   if (value === undefined || value === null) return null;
   if (typeof value !== "object" || Array.isArray(value))
     throw new UploadSessionError("invalid_request", 400);
@@ -808,10 +950,21 @@ function catalogUploadPayload(value: unknown): { reason?: string } | null {
   return reason.trim() ? { reason: reason.trim() } : null;
 }
 
+/**
+ * Loads the owner needed to audit collection or collection-item image changes.
+ *
+ * @param db - Application database.
+ * @param target - Upload target to inspect.
+ * @returns Owner context, or `null` for other target types or missing targets.
+ * @rejects When the context query fails.
+ */
 async function collectionTargetContext(
   db: Pick<Database, "select">,
   target: UploadTarget,
-): Promise<{ ownerUserId: number } | null> {
+): Promise<{
+  /** Database user that owns the collection or item. */
+  ownerUserId: number;
+} | null> {
   if (target.type === "collection") {
     const [row] = await db
       .select({ ownerUserId: schema.userCollection.ownerId })
@@ -831,6 +984,14 @@ async function collectionTargetContext(
   return null;
 }
 
+/**
+ * Loads owner identities needed to audit product-image changes.
+ *
+ * @param db - Application database.
+ * @param target - Upload target to inspect.
+ * @returns Product owner context, whose Clerk or database user identity may be `null`, or `null` for non-product or missing targets.
+ * @rejects When the context query fails.
+ */
 async function productTargetContext(
   db: Pick<Database, "select">,
   target: UploadTarget,
@@ -848,6 +1009,14 @@ async function productTargetContext(
   return row ?? null;
 }
 
+/**
+ * Captures image identifiers and current-cover state for an upload target.
+ *
+ * @param db - Application database.
+ * @param target - Upload target whose image state is read.
+ * @returns Audit snapshot; `currentImageId` is `null` when no collection cover is selected or the target is not a collection.
+ * @rejects When image lookup fails.
+ */
 async function collectionTargetImageState(
   db: Pick<Database, "select">,
   target: UploadTarget,
@@ -882,6 +1051,15 @@ async function collectionTargetImageState(
   return { currentImageId: null, imageIds: [] };
 }
 
+/**
+ * Checks whether an object remains referenced outside the erased account.
+ *
+ * @param db - Application database.
+ * @param objectPath - Captured object-storage path.
+ * @param targetClerkId - Clerk identifier of the account being erased.
+ * @returns Whether a protected product or another account still references the path.
+ * @rejects When the reference query fails.
+ */
 async function hasSurvivingReference(
   db: Parameters<typeof objectIsAttached>[0],
   objectPath: string,
@@ -927,13 +1105,31 @@ async function hasSurvivingReference(
     limit 1`);
   return result.rows.length > 0;
 }
+/**
+ * Builds privacy-safe logging attributes for an upload actor and session.
+ *
+ * @param actor - Actor whose Clerk identifier is hashed.
+ * @param sessionId - Optional upload session UUID to hash.
+ * @returns Structured log attributes without raw identifiers.
+ */
 function actorAttributes(actor: UploadActor, sessionId?: string): LogContext {
   return {
     actorClerkIdHash: hashLogIdentifier(actor.clerkId),
     ...(sessionId ? { sessionIdHash: hashLogIdentifier(sessionId) } : {}),
   };
 }
-function fileCounts(files: ReadonlyArray<{ kind: "image" | "file" }>) {
+/**
+ * Counts images and resource files in an upload manifest.
+ *
+ * @param files - Ordered upload entries to count.
+ * @returns Total, image, and non-image counts.
+ */
+function fileCounts(
+  files: ReadonlyArray<{
+    /** Upload entry kind. */
+    kind: "image" | "file";
+  }>,
+) {
   const imageCount = files.filter((file) => file.kind === "image").length;
   return {
     fileCount: files.length,
@@ -941,7 +1137,17 @@ function fileCounts(files: ReadonlyArray<{ kind: "image" | "file" }>) {
     resourceFileCount: files.length - imageCount,
   };
 }
+/** Public upload, cleanup, deletion, and erasure operations. */
 export type StorageService = ReturnType<typeof createStorageService>;
+/**
+ * Loads and locks an upload session owned by a Clerk account.
+ *
+ * @param db - Application database.
+ * @param id - Upload session UUID.
+ * @param clerkId - Expected owner Clerk identifier.
+ * @returns Locked upload-session row.
+ * @rejects When session lookup fails or no owned session exists.
+ */
 async function loadSession(
   db: Pick<Database, "select">,
   id: string,
@@ -960,11 +1166,24 @@ async function loadSession(
   if (!session) throw new UploadSessionError("session_not_found", 404);
   return session;
 }
+/**
+ * Derives the stable completion identity retained for upload retries.
+ *
+ * @param session - Completed or completing upload-session row.
+ * @returns Resource and version identity for resource uploads, otherwise target identity.
+ */
 function completion(session: Session) {
   return session.targetType === "resource"
     ? { resourceId: session.targetId, version: session.reservedVersion ?? 1 }
     : { targetId: session.targetId };
 }
+/**
+ * Enforces target-specific upload counts, sizes, and uniqueness rules.
+ *
+ * @param manifest - Parsed upload manifest.
+ * @param operation - Resource create or version operation, when applicable.
+ * @throws {UploadSessionError} When target shape, limits, digests, or filenames are invalid.
+ */
 export function validateManifest(
   manifest: UploadManifest,
   operation?: "create" | "version",
