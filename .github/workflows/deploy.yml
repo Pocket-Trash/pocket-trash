@@ -417,7 +417,7 @@ jobs:
           bash .github/scripts/vercel-branch-database-url.sh set-resource-folder-prefix
 
       - name: Run migrations on Neon PR branch
-        if: steps.db.outputs.can_deploy == 'true' && steps.db_changes.outputs.database == 'true'
+        if: steps.db.outputs.can_deploy == 'true' && steps.db.outputs.isolated == 'true'
         working-directory: packages/database
         env:
           BUNNY_IMAGE_FOLDER_PREFIX: images/preview/pr-${{ github.event.pull_request.number }}
