@@ -13,6 +13,7 @@ import {
   CollectionProductFields,
   collectionEditSubmissionMode,
   FinishOptionsEditor,
+  ProductEditor,
 } from "./catalog-form-pages";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -277,6 +278,67 @@ describe("collection edit submission", () => {
     expect(collectionEditSubmissionMode(false, 0)).toBe("disabled");
     expect(collectionEditSubmissionMode(false, 3)).toBe("upload");
     expect(collectionEditSubmissionMode(true, 0)).toBe("save");
+  });
+});
+
+describe("product form conditional fields", () => {
+  it.each([
+    "spinner",
+    "spinner-button",
+  ] as const)("renders spinner-only fields correctly for %s add and edit forms", (productTypeSlug) => {
+    const product = productFixture(1005, "Test product", productTypeSlug);
+    const props = {
+      options: {
+        ...emptyCatalogOptions,
+        productTypes: [
+          {
+            id: product.productTypeId,
+            name: product.productTypeName,
+            slug: productTypeSlug,
+          },
+        ],
+      },
+      productTypeSlug,
+    };
+    const addHtml = renderToStaticMarkup(createElement(ProductEditor, props));
+    const editHtml = renderToStaticMarkup(
+      createElement(ProductEditor, { ...props, initialProduct: product }),
+    );
+
+    for (const html of [addHtml, editHtml]) {
+      if (productTypeSlug === "spinner") {
+        expect(html).toContain('aria-label="Bearing"');
+        expect(html).toContain('aria-label="Spin diameter"');
+      } else {
+        expect(html).not.toContain('aria-label="Bearing"');
+        expect(html).not.toContain('aria-label="Spin diameter"');
+      }
+    }
+  });
+});
+
+describe("collection edit conditional fields", () => {
+  it.each([
+    "spinner",
+    "spinner-button",
+  ] as const)("renders the bearing override correctly for %s items", (productTypeSlug) => {
+    const product = productFixture(1006, "Test product", productTypeSlug);
+    const html = renderToStaticMarkup(
+      createElement(CollectionEditPage, {
+        buttonProducts: [],
+        collections: [],
+        item: collectionFixture(30, product, 1007),
+        options: emptyCatalogOptions,
+        ownedButtons: [],
+        product,
+      }),
+    );
+
+    if (productTypeSlug === "spinner") {
+      expect(html).toContain('aria-label="Bearing"');
+    } else {
+      expect(html).not.toContain('aria-label="Bearing"');
+    }
   });
 });
 
