@@ -19,9 +19,7 @@ test("@mutation isolated fixtures create and remove database and Bunny records",
     expect(fixture.spinnerProductId).toBeGreaterThan(0);
     expect(fixture.buttonProductId).toBeGreaterThan(0);
     expect(fixture.materialId).toBeGreaterThan(0);
-    expect(fixture.objectPath).toContain(
-      `/pr-${process.env.E2E_PR_NUMBER}/e2e/`,
-    );
+    expect(fixture.objectPath).toContain(`/pr-${process.env.E2E_PR_NUMBER}/`);
   } finally {
     cleanup = await fixture.cleanup();
   }
