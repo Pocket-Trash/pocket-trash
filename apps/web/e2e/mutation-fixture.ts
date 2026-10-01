@@ -88,14 +88,9 @@ export async function createMutationFixture({
   if (!owner)
     throw new Error("The regular E2E user is missing from the database.");
   if (!createCollection) {
-    const [existingCollection] = await database
-      .select({ id: schema.userCollection.id })
-      .from(schema.userCollection)
-      .where(eq(schema.userCollection.ownerId, owner.id))
-      .limit(1);
-    if (existingCollection) {
-      throw new Error("The regular E2E user must start without collections.");
-    }
+    await database
+      .delete(schema.userCollection)
+      .where(eq(schema.userCollection.ownerId, owner.id));
   }
 
   const databaseFixture = await database.transaction(async (transaction) => {

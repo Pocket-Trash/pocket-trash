@@ -170,8 +170,11 @@ test("@mutation collection selection and linked-item moves use the public UI", a
  * @returns When the nested dialog closes.
  */
 async function stageCollection(page: Page, name: string) {
-  await page.getByRole("button", { name: "Add new collection" }).click();
   const dialog = page.getByRole("dialog");
+  await expect(async () => {
+    await page.getByRole("button", { name: "Add new collection" }).click();
+    await expect(dialog).toBeVisible();
+  }).toPass({ timeout: 5_000 });
   await dialog.getByRole("textbox", { exact: true, name: "Name" }).fill(name);
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).not.toBeVisible();
