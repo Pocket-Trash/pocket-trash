@@ -307,10 +307,8 @@ describe("MarkdownEditor", () => {
     expect(textarea?.getAttribute("aria-invalid")).toBeNull();
     expect(container.textContent).toContain("4 / 4 characters, limit reached");
     expect(
-      container
-        .querySelector(`#${textarea?.getAttribute("aria-describedby")}`)
-        ?.classList.contains("text-destructive"),
-    ).toBe(true);
+      container.querySelector("p.text-destructive")?.textContent,
+    ).toContain("4 / 4 characters, limit reached");
 
     act(() => {
       if (!textarea) return;
@@ -319,6 +317,22 @@ describe("MarkdownEditor", () => {
     });
     expect(textarea?.getAttribute("aria-invalid")).toBe("true");
     expect(container.textContent).toContain("1 over limit");
+  });
+
+  it("styles the warning state before the character limit", async () => {
+    await act(() =>
+      root.render(
+        <MarkdownEditor
+          counter={{ limit: 4, type: "characters", warningAt: 3 }}
+          defaultValue="123"
+          label="Description"
+        />,
+      ),
+    );
+
+    expect(container.querySelector("p.text-primary")?.textContent).toContain(
+      "3 / 4 characters, approaching limit",
+    );
   });
 
   it("announces counter transitions without announcing every edit", async () => {

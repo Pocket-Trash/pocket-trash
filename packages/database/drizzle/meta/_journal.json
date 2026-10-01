@@ -337,6 +337,13 @@
       "when": 1790831554049,
       "tag": "0047_absent_stark_industries",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1790836541490,
+      "tag": "0048_redundant_spot",
+      "breakpoints": true
     }
   ]
 }

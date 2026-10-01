@@ -153,6 +153,13 @@ describe("product source details", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
+        description: "x".repeat(5000),
+        finishOptions: validFinishOptions,
+      }).success,
+    ).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
         description: "x".repeat(5001),
         finishOptions: validFinishOptions,
       }).success,

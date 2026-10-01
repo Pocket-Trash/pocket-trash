@@ -7,6 +7,7 @@ import { feedbackAuditEvents } from "./audit/feedback.js";
 import { type AuditService, createAuditService } from "./audit/index.js";
 import { productAuditEvents } from "./audit/products.js";
 import { resourceAuditEvents } from "./audit/resources.js";
+import { userBanAuditEvents } from "./audit/users.js";
 import {
   type CatalogService,
   type CollectionsService,
@@ -60,10 +61,11 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
       ...feedbackAuditEvents,
       ...productAuditEvents,
       ...resourceAuditEvents,
+      ...userBanAuditEvents,
     ],
     db,
   );
-  const users = createUsersService(db, logger);
+  const users = createUsersService(db, logger, audit);
 
   return {
     audit,
@@ -77,6 +79,7 @@ export function createDbServices(db: Database, logger: Logger): DbServices {
 }
 
 export type {
+  AuditDeliveryFailure,
   AuditEventCursor,
   AuditEventDefinition,
   AuditEventPage,

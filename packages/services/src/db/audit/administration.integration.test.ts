@@ -245,6 +245,7 @@ describe("administration audit adoption", () => {
  *
  * @param client - Isolated database client.
  * @returns Completion after every migration is applied.
+ * @rejects When a migration cannot be discovered, read, or executed.
  */
 async function migrate(client: PGlite): Promise<void> {
   const migrationsFolder = fileURLToPath(

@@ -286,12 +286,12 @@ export const MarkdownEditor = React.forwardRef<
     setStatusAnnouncement(
       [
         fallback ? t("web.markdownEditor.status.fallback") : "",
-        counter ? counterText(t, counter, count) : "",
+        counter ? counterText(t, counter, count, locale) : "",
       ]
         .filter(Boolean)
         .join(" "),
     );
-  }, [count, countStatus, counter, fallback, t]);
+  }, [count, countStatus, counter, fallback, locale, t]);
 
   React.useLayoutEffect(() => {
     const selection = pendingSelectionRef.current;
@@ -730,7 +730,7 @@ export const MarkdownEditor = React.forwardRef<
         >
           {fallback ? t("web.markdownEditor.status.fallback") : null}
           {fallback && counter ? " " : null}
-          {counter ? counterText(t, counter, count) : null}
+          {counter ? counterText(t, counter, count, locale) : null}
         </p>
       ) : null}
       {statusAnnouncement ? (
@@ -806,14 +806,21 @@ function countValue(value: string, type: MarkdownCounter["type"]): number {
  * @param t - Translation formatter.
  * @param counter - Counter configuration.
  * @param count - Current count.
+ * @param locale - Locale used to format numeric values.
  * @returns Localized counter status.
  */
-function counterText(t: Translator, counter: MarkdownCounter, count: number) {
+function counterText(
+  t: Translator,
+  counter: MarkdownCounter,
+  count: number,
+  locale: string | null | undefined,
+) {
   const state = counterState(counter, count);
+  const format = new Intl.NumberFormat(locale ?? undefined).format;
   return t(`web.markdownEditor.count.${counter.type}.${state}`, {
-    current: count,
-    limit: counter.limit,
-    over: Math.max(0, count - counter.limit),
+    current: format(count),
+    limit: format(counter.limit),
+    over: format(Math.max(0, count - counter.limit)),
   } as never);
 }
 

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type {
+  AuditDeliveryPayload,
   AuditEvent,
   AuditExport,
   AuditJsonObject,
@@ -31,6 +32,7 @@ import {
   type Role,
 } from "../../authorization.js";
 
+/** Maximum encoded size of one audit payload. */
 const MAX_PAYLOAD_BYTES = 256 * 1024;
 /** Maximum number of events captured by one export range. */
 const MAX_EXPORT_EVENTS = 10_000;
@@ -38,10 +40,15 @@ const MAX_EXPORT_EVENTS = 10_000;
 const EXPORT_BATCH_SIZE = 100;
 /** Minimum event age eligible for export. */
 const EXPORT_MINIMUM_AGE_MS = 60 * 24 * 60 * 60 * 1000;
+/** Replacement reason retained after account erasure. */
 const DELETED_REASON = "[erased]";
+/** Replacement actor name retained after account erasure. */
 const DELETED_USERNAME = "Deleted user";
+/** Pattern for dot-delimited audit action and target names. */
 const namePattern = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/u;
+/** Pattern for non-empty target identifiers without edge whitespace. */
 const targetIdPattern = /^\S(?:.*\S)?$/u;
+/** Actor roles that may be persisted in the audit ledger. */
 const roles = ["user", "editor", "admin", "system_admin", "system"] as const;
 
 /** Database operations available while writing audit events. */
@@ -50,46 +57,91 @@ type AuditTransaction = Pick<
   "delete" | "execute" | "insert" | "select" | "update"
 >;
 
+/** State or metadata persisted for one audit event. */
 export type AuditPayload =
   | {
+      /** Entity state after the audited mutation. */
       after?: AuditJsonObject;
+      /** Entity state before the audited mutation. */
       before?: AuditJsonObject;
+      /** Metadata is excluded when state snapshots are present. */
       metadata?: never;
     }
   | {
+      /** State snapshots are excluded from metadata events. */
       after?: never;
+      /** State snapshots are excluded from metadata events. */
       before?: never;
+      /** Event-specific metadata. */
       metadata: AuditJsonObject;
     };
 
+/** Payload columns read from a stored audit event. */
 type StoredAuditPayload = Pick<
   AuditEvent,
   "afterState" | "beforeState" | "metadata"
 >;
 
+/** Relationship between an erased account and an audit event. */
 export type AuditRedactionContext = {
+  /** Whether the erased account acted on, owned, or both acted on and owned the target. */
   erasedParty: "actor" | "actor_and_owner" | "owner";
 };
 
+/**
+ * Serialization and erasure rules for one registered audit event.
+ *
+ * @template T - Input accepted by the serializer.
+ */
 export type AuditEventDefinition<T> = {
+  /** Namespaced action stored in the audit ledger. */
   action: string;
+  /** Namespaced target category stored in the audit ledger. */
   targetType: string;
+  /**
+   * Redacts a stored payload for account erasure.
+   *
+   * @param payload - Stored event payload.
+   * @param context - Erased account relationship to the event.
+   * @returns Payload safe to retain after erasure.
+   */
   redact(
     payload: StoredAuditPayload,
     context: AuditRedactionContext,
   ): AuditPayload;
+  /**
+   * Serializes domain input for audit persistence.
+   *
+   * @param input - Domain-specific event data.
+   * @returns Valid audit state or metadata.
+   */
   serialize(input: T): AuditPayload;
 };
 
+/** Actor identity persisted with an audit event. */
 type AuditActor = {
+  /** Role held when the event occurred. */
   role: Role | "system";
+  /** Internal user ID, or `null` for the system actor. */
   userId: number | null;
+  /** Username at event time, or `null` when unavailable. */
   username: string | null;
 };
 
+/** Authorization basis retained with an audit event. */
 type AuditAuthorization =
-  | { permission: Permission; type: "permission" }
-  | { permission?: never; type: "owner" | "system" };
+  | {
+      /** Permission used to authorize a staff action. */
+      permission: Permission;
+      /** Permission-based authorization discriminator. */
+      type: "permission";
+    }
+  | {
+      /** Permission is absent for owner and system actions. */
+      permission?: never;
+      /** Non-permission authorization discriminator. */
+      type: "owner" | "system";
+    };
 
 /**
  * Input for writing a registered audit event.
@@ -97,10 +149,15 @@ type AuditAuthorization =
  * @template T - Definition input type.
  */
 export type AuditWriteInput<T> = {
+  /** Identity persisted as the event actor. */
   actor: AuditActor;
+  /** Authorization basis for the audited action. */
   authorization: AuditAuthorization;
+  /** Cross-operation correlation identifier, when available. */
   correlationId?: string | null;
+  /** Domain data serialized by the event definition. */
   data: T;
+  /** Registered definition controlling serialization and redaction. */
   definition: AuditEventDefinition<T>;
   /** Timestamp when the audited action occurred. */
   occurredAt: Date;
@@ -108,6 +165,7 @@ export type AuditWriteInput<T> = {
   ownerUserId?: number | null;
   /** Operational reason for a staff action. */
   reason?: string | null;
+  /** Request identifier associated with the action, when available. */
   requestId?: string | null;
   /** Stable identifier of the affected target. */
   targetId: string;
@@ -120,6 +178,7 @@ export type AuditService = {
    *
    * @param input - Authorized export request.
    * @returns The reserved export range.
+   * @rejects When authorization, configuration, validation, lookup, or persistence fails.
    */
   createExport(input: CreateAuditExportInput): Promise<AuditExportView>;
   /**
@@ -127,6 +186,7 @@ export type AuditService = {
    *
    * @param input - Authorized and confirmed deletion request.
    * @returns Completion after the range is deleted and audited.
+   * @rejects When authorization, configuration, verification, persistence, or audit logging fails.
    */
   deleteExport(input: DeleteAuditExportInput): Promise<void>;
   /**
@@ -134,13 +194,29 @@ export type AuditService = {
    *
    * @param input - Authorized download request.
    * @returns The export stream and download filename.
+   * @rejects When authorization, configuration, validation, or export lookup fails.
    */
   downloadExport(input: DownloadAuditExportInput): Promise<AuditExportDownload>;
+  /**
+   * Queues one sanitized event after its external source action succeeds.
+   *
+   * @template T - Definition input type.
+   * @param transaction - Caller-owned source transaction.
+   * @param deliveryKey - Unique source-operation key.
+   * @param input - Audit event normalized before persistence.
+   * @returns Completion after the delivery is durable.
+   */
+  enqueue<T>(
+    transaction: AuditTransaction,
+    deliveryKey: string,
+    input: AuditWriteInput<T>,
+  ): Promise<void>;
   /**
    * Finds the current unconsumed export range.
    *
    * @param actor - Authorized audit actor.
    * @returns The active export, when one exists.
+   * @rejects When authorization, configuration, or the export query fails.
    */
   getActiveExport(actor: Actor): Promise<AuditExportView | null>;
   /**
@@ -148,14 +224,30 @@ export type AuditService = {
    *
    * @param input - Authorized query and filters.
    * @returns One page of audit events.
+   * @rejects When authorization, configuration, validation, or the event query fails.
    */
   list(input: ListAuditEventsInput): Promise<AuditEventPage>;
+  /**
+   * Lists terminal delivery failures visible to audit readers.
+   *
+   * @param actor - Authorized audit reader.
+   * @returns Sanitized terminal failures in newest-first order.
+   */
+  listDeliveryFailures(actor: Actor): Promise<AuditDeliveryFailure[]>;
+  /**
+   * Processes the next due audit delivery.
+   *
+   * @param now - Claim and backoff clock.
+   * @returns Whether one due delivery was claimed.
+   */
+  processDue(now?: Date): Promise<boolean>;
   /**
    * Redacts retained audit data for an erased account.
    *
    * @param transaction - Caller-owned database transaction.
    * @param userId - Internal user identifier to erase.
    * @returns Completion after redaction.
+   * @rejects When validation, registration, redaction, persistence, or operation logging fails.
    */
   redactAccount(transaction: AuditTransaction, userId: number): Promise<void>;
   /**
@@ -165,11 +257,28 @@ export type AuditService = {
    * @param transaction - Caller-owned database transaction.
    * @param input - Audit-event input.
    * @returns The stored audit event.
+   * @rejects When validation, serialization, persistence, or operation logging fails.
    */
   write<T>(
     transaction: AuditTransaction,
     input: AuditWriteInput<T>,
   ): Promise<AuditEvent>;
+};
+
+/** Sanitized terminal audit-delivery failure shown to operational users. */
+export type AuditDeliveryFailure = {
+  /** Registered audit action. */
+  action: string;
+  /** Delivery attempts made. */
+  attempts: number;
+  /** Cross-request correlation identifier. */
+  correlationId: string | null;
+  /** Sanitized terminal error code. */
+  errorCode: string;
+  /** Source operation request identifier. */
+  requestId: string | null;
+  /** Stable target identifier. */
+  targetId: string;
 };
 
 /** Input for reserving an audit-export range. */
@@ -352,7 +461,7 @@ const auditExportDeleted = {
  * @param definitions - Registered audit-event definitions.
  * @param database - Database used for reads, exports, and redaction.
  * @returns Configured audit service.
- * @throws When event definitions are duplicated.
+ * @throws When event definitions have invalid names or are duplicated.
  */
 export function createAuditService(
   logger: Logger,
@@ -379,7 +488,7 @@ export function createAuditService(
    * @param transaction - Caller-owned database transaction.
    * @param input - Audit-event input.
    * @returns The stored audit event.
-   * @throws When validation or persistence fails.
+   * @rejects When validation, serialization, persistence, or operation logging fails.
    */
   async function write<T>(
     transaction: AuditTransaction,
@@ -395,18 +504,10 @@ export function createAuditService(
             `Audit event ${key} is not registered.`,
           );
         }
-        const values = normalizedInput(input);
-        const payload = normalizedPayload(
-          input.definition.serialize(input.data),
-        );
+        const values = auditEventValues(input);
         const [event] = await transaction
           .insert(schema.auditEvent)
-          .values({
-            ...values,
-            afterState: payload.after,
-            beforeState: payload.before,
-            metadata: payload.metadata,
-          })
+          .values(values)
           .returning();
         if (!event) throw new Error("Failed to write audit event.");
         return event;
@@ -426,7 +527,7 @@ export function createAuditService(
      *
      * @param input - Authorized export request.
      * @returns The reserved export range.
-     * @rejects When authorization, validation, or reservation fails.
+     * @rejects When authorization, configuration, validation, lookup, or persistence fails.
      */
     async createExport(input) {
       assertPermission(input.actor, "audit.export");
@@ -491,7 +592,7 @@ export function createAuditService(
      *
      * @param input - Authorized, confirmed deletion request.
      * @returns Completion after the range is deleted.
-     * @rejects When authorization or export verification fails.
+     * @rejects When authorization, configuration, verification, persistence, or audit logging fails.
      */
     async deleteExport(input) {
       assertPermission(input.actor, "audit.delete");
@@ -605,7 +706,7 @@ export function createAuditService(
      *
      * @param input - Authorized download request.
      * @returns Export stream and attachment filename.
-     * @rejects When authorization or export lookup fails.
+     * @rejects When authorization, configuration, export ID validation, or export lookup fails.
      */
     async downloadExport(input) {
       assertPermission(input.actor, "audit.export");
@@ -669,11 +770,48 @@ export function createAuditService(
     },
 
     /**
+     * Queues a normalized event under its unique source-operation key.
+     *
+     * @param transaction - Caller-owned source transaction.
+     * @param deliveryKey - Unique source-operation key.
+     * @param input - Registered audit event input.
+     * @returns Completion after the delivery is durable.
+     * @rejects When validation or persistence fails.
+     */
+    async enqueue(transaction, deliveryKey, input) {
+      const key = definitionKey(
+        input.definition as AuditEventDefinition<never>,
+      );
+      if (registered.get(key) !== input.definition) {
+        throw new AuditEventValidationError(
+          `Audit event ${key} is not registered.`,
+        );
+      }
+      const normalizedDeliveryKey = requiredText(
+        deliveryKey,
+        "deliveryKey",
+        200,
+        targetIdPattern,
+      );
+      const values = auditEventValues(input);
+      await transaction
+        .insert(schema.auditDelivery)
+        .values({
+          deliveryKey: normalizedDeliveryKey,
+          payload: {
+            ...values,
+            occurredAt: values.occurredAt.toISOString(),
+          },
+        })
+        .onConflictDoNothing({ target: schema.auditDelivery.deliveryKey });
+    },
+
+    /**
      * Finds the current unconsumed export.
      *
      * @param actor - Authorized audit actor.
      * @returns The active export, when one exists.
-     * @rejects When authorization or configuration is missing.
+     * @rejects When authorization, configuration, or the export query fails.
      */
     async getActiveExport(actor) {
       assertPermission(actor, "audit.export");
@@ -691,7 +829,7 @@ export function createAuditService(
      *
      * @param input - Authorized query and filters.
      * @returns One page of audit events.
-     * @rejects When authorization or configuration is missing.
+     * @rejects When authorization, configuration, filter validation, or the event query fails.
      */
     async list(input) {
       if (!hasPermission(input.actor, "audit.read")) {
@@ -770,6 +908,79 @@ export function createAuditService(
       };
     },
 
+    /**
+     * Lists sanitized terminal failures for an authorized audit reader.
+     *
+     * @param actor - Authorized audit reader.
+     * @returns Terminal failures in newest-first order.
+     * @rejects When authorization or audit queries are unavailable.
+     */
+    async listDeliveryFailures(actor) {
+      if (!hasPermission(actor, "audit.read")) {
+        throw new Error("Audit events do not exist.");
+      }
+      if (!database) throw new Error("Audit queries are not configured.");
+      const rows = await database
+        .select()
+        .from(schema.auditDelivery)
+        .where(eq(schema.auditDelivery.status, "needs_attention"))
+        .orderBy(desc(schema.auditDelivery.updatedAt))
+        .limit(50);
+      return rows.map(({ attempts, errorCode, payload }) => ({
+        action: payload.action,
+        attempts,
+        correlationId: payload.correlationId,
+        errorCode: errorCode ?? "audit_delivery_failed",
+        requestId: payload.requestId,
+        targetId: payload.targetId,
+      }));
+    },
+
+    /**
+     * Claims and attempts the oldest due audit delivery.
+     *
+     * @param now - Claim and backoff clock.
+     * @returns Whether one due delivery was claimed.
+     * @rejects When delivery persistence is unavailable.
+     */
+    async processDue(now = new Date()) {
+      if (!database) throw new Error("Audit delivery is not configured.");
+      const delivery = await claimDelivery(database, now);
+      if (!delivery) return false;
+      try {
+        await database.transaction(async (transaction) => {
+          const key = `${delivery.payload.action}:${delivery.payload.targetType}`;
+          if (!registered.has(key)) {
+            throw new AuditEventValidationError(
+              `Audit event ${key} is not registered.`,
+            );
+          }
+          await transaction
+            .insert(schema.auditEvent)
+            .values(deliveryPayloadValues(delivery.payload));
+          await transaction
+            .delete(schema.auditDelivery)
+            .where(eq(schema.auditDelivery.deliveryKey, delivery.deliveryKey));
+        });
+      } catch {
+        const terminal = delivery.attempts >= 5;
+        const backoffMs = Math.min(
+          60 * 60 * 1000,
+          60 * 1000 * 2 ** Math.max(0, delivery.attempts - 1),
+        );
+        await database
+          .update(schema.auditDelivery)
+          .set({
+            errorCode: "audit_delivery_failed",
+            nextAttemptAt: terminal ? now : new Date(now.getTime() + backoffMs),
+            status: terminal ? "needs_attention" : "pending",
+            updatedAt: now,
+          })
+          .where(eq(schema.auditDelivery.deliveryKey, delivery.deliveryKey));
+      }
+      return true;
+    },
+
     write,
 
     /**
@@ -778,6 +989,7 @@ export function createAuditService(
      * @param transaction - Caller-owned database transaction.
      * @param userId - Internal user identifier to erase.
      * @returns Completion after verified redaction.
+     * @rejects When validation, registration, redaction, persistence, or operation logging fails.
      */
     async redactAccount(transaction, userId) {
       await logger.operation(
@@ -797,7 +1009,21 @@ export function createAuditService(
             .select()
             .from(schema.auditExport)
             .where(eq(schema.auditExport.requestedByUserId, userId));
-          if (events.length === 0 && exports.length === 0) return;
+          const deliveries = await transaction
+            .select()
+            .from(schema.auditDelivery)
+            .where(
+              or(
+                sql`(${schema.auditDelivery.payload}->>'actorUserId')::bigint = ${userId}`,
+                sql`(${schema.auditDelivery.payload}->>'ownerUserId')::bigint = ${userId}`,
+              ),
+            );
+          if (
+            events.length === 0 &&
+            exports.length === 0 &&
+            deliveries.length === 0
+          )
+            return;
 
           await transaction.execute(
             sql`select set_config('pocket_trash.audit_erasure_redaction', 'on', true)`,
@@ -849,6 +1075,59 @@ export function createAuditService(
               throw new Error("Audit erasure redaction verification failed.");
             }
           }
+          for (const delivery of deliveries) {
+            const actorErased = delivery.payload.actorUserId === userId;
+            const ownerErased = delivery.payload.ownerUserId === userId;
+            const key = `${delivery.payload.action}:${delivery.payload.targetType}`;
+            const definition = registered.get(key);
+            if (!definition) {
+              throw new AuditEventValidationError(
+                `Audit event ${key} is not registered.`,
+              );
+            }
+            const redacted = normalizedPayload(
+              definition.redact(
+                {
+                  afterState: delivery.payload.afterState,
+                  beforeState: delivery.payload.beforeState,
+                  metadata: delivery.payload.metadata,
+                },
+                {
+                  erasedParty:
+                    actorErased && ownerErased
+                      ? "actor_and_owner"
+                      : actorErased
+                        ? "actor"
+                        : "owner",
+                },
+              ),
+            );
+            await transaction
+              .update(schema.auditDelivery)
+              .set({
+                payload: {
+                  ...delivery.payload,
+                  actorUserId: actorErased
+                    ? null
+                    : delivery.payload.actorUserId,
+                  actorUsername: actorErased
+                    ? DELETED_USERNAME
+                    : delivery.payload.actorUsername,
+                  afterState: redacted.after,
+                  beforeState: redacted.before,
+                  metadata: redacted.metadata,
+                  ownerUserId: ownerErased
+                    ? null
+                    : delivery.payload.ownerUserId,
+                  reason:
+                    delivery.payload.reason === null ? null : DELETED_REASON,
+                },
+                updatedAt: new Date(),
+              })
+              .where(
+                eq(schema.auditDelivery.deliveryKey, delivery.deliveryKey),
+              );
+          }
           if (exports.length) {
             const redacted = await transaction
               .update(schema.auditExport)
@@ -875,7 +1154,7 @@ export function createAuditService(
  * @param database - Database used to read the range.
  * @param record - Reserved export ledger row.
  * @yields Serialized JSON chunks in export order.
- * @rejects When the reserved range changes before completion.
+ * @rejects When the event query fails or the reserved range changes before completion.
  */
 async function* exportChunks(database: Database, record: AuditExport) {
   yield `${JSON.stringify({
@@ -953,6 +1232,7 @@ function exportRangeCondition(record: AuditExport) {
  * @param actor - Actor completing the download.
  * @param checksum - SHA-256 checksum of the streamed JSON.
  * @returns Completion after the transaction commits.
+ * @rejects When export lookup, actor lookup, validation, persistence, or audit logging fails.
  */
 async function completeExport(
   database: Database,
@@ -1084,6 +1364,13 @@ function requiredUuid(value: string) {
   return normalized;
 }
 
+/**
+ * Validates and normalizes audit-list filters.
+ *
+ * @param input - Raw list request.
+ * @returns Normalized filters and cursor values.
+ * @throws When a filter, cursor, or date range is invalid.
+ */
 function normalizedListInput(input: ListAuditEventsInput) {
   const actorUserId = input.actorUserId
     ? positiveInteger(input.actorUserId, "actorUserId")
@@ -1121,6 +1408,14 @@ function normalizedListInput(input: ListAuditEventsInput) {
   };
 }
 
+/**
+ * Validates an optional date.
+ *
+ * @param value - Candidate date.
+ * @param name - Field name used in validation errors.
+ * @returns The supplied date, or `undefined` when omitted.
+ * @throws When the date is invalid.
+ */
 function validDate(value: Date | undefined, name: string) {
   if (value === undefined) return undefined;
   if (Number.isNaN(value.getTime())) {
@@ -1129,10 +1424,23 @@ function validDate(value: Date | undefined, name: string) {
   return value;
 }
 
+/**
+ * Raises the shared invalid-cursor error.
+ *
+ * @throws Always, because the cursor timestamp is invalid.
+ */
 function failInvalidCursor(): never {
   throw new AuditEventValidationError("cursor.recordedAt is invalid.");
 }
 
+/**
+ * Validates and normalizes common audit-write fields.
+ *
+ * @template T - Domain data accepted by the event definition.
+ * @param input - Raw audit-write input.
+ * @returns Database-ready common event fields.
+ * @throws When actor, ownership, authorization, timestamp, or text fields are invalid.
+ */
 function normalizedInput<T>(input: AuditWriteInput<T>) {
   const actorUserId = nullablePositiveInteger(
     input.actor.userId,
@@ -1193,6 +1501,82 @@ function normalizedInput<T>(input: AuditWriteInput<T>) {
   };
 }
 
+/**
+ * Normalizes a registered audit input into database event values.
+ *
+ * @template T - Definition input type.
+ * @param input - Registered audit input.
+ * @returns Validated event values.
+ */
+function auditEventValues<T>(input: AuditWriteInput<T>) {
+  const values = normalizedInput(input);
+  const payload = normalizedPayload(input.definition.serialize(input.data));
+  return {
+    ...values,
+    afterState: payload.after,
+    beforeState: payload.before,
+    metadata: payload.metadata,
+  };
+}
+
+/**
+ * Restores database event values from a sanitized delivery payload.
+ *
+ * @param payload - Stored retry payload.
+ * @returns Event values with a parsed occurrence timestamp.
+ * @throws When the occurrence timestamp is invalid.
+ */
+function deliveryPayloadValues(payload: AuditDeliveryPayload) {
+  const occurredAt = new Date(payload.occurredAt);
+  if (Number.isNaN(occurredAt.getTime())) {
+    throw new AuditEventValidationError("occurredAt is invalid.");
+  }
+  return { ...payload, occurredAt };
+}
+
+/**
+ * Claims the oldest due delivery with a bounded lease.
+ *
+ * @param database - Audit delivery database.
+ * @param now - Claim timestamp.
+ * @returns Claimed delivery, or null when none is due.
+ */
+async function claimDelivery(database: Database, now: Date) {
+  return await database.transaction(async (transaction) => {
+    const [delivery] = await transaction
+      .select()
+      .from(schema.auditDelivery)
+      .where(
+        and(
+          inArray(schema.auditDelivery.status, ["pending", "processing"]),
+          lte(schema.auditDelivery.nextAttemptAt, now),
+        ),
+      )
+      .orderBy(asc(schema.auditDelivery.nextAttemptAt))
+      .limit(1)
+      .for("update", { skipLocked: true });
+    if (!delivery) return null;
+    const [claimed] = await transaction
+      .update(schema.auditDelivery)
+      .set({
+        attempts: Math.min(5, delivery.attempts + 1),
+        nextAttemptAt: new Date(now.getTime() + 5 * 60 * 1000),
+        status: "processing",
+        updatedAt: now,
+      })
+      .where(eq(schema.auditDelivery.deliveryKey, delivery.deliveryKey))
+      .returning();
+    return claimed ?? null;
+  });
+}
+
+/**
+ * Validates, canonicalizes, and sizes an audit payload.
+ *
+ * @param payload - Serialized event payload.
+ * @returns Database-ready state and metadata columns.
+ * @throws When the payload is malformed, empty, mixed, or too large.
+ */
 function normalizedPayload(payload: AuditPayload) {
   if (!payload || typeof payload !== "object") {
     throw new AuditEventValidationError("Audit payload is invalid.");
@@ -1218,6 +1602,14 @@ function normalizedPayload(payload: AuditPayload) {
   return { after, before, metadata };
 }
 
+/**
+ * Converts an optional JSON object into a persistable value.
+ *
+ * @param value - Candidate audit JSON object.
+ * @param name - Payload field name used in validation errors.
+ * @returns A JSON-safe object, or `null` when omitted.
+ * @throws When the value cannot be serialized as an object.
+ */
 function jsonObject(
   value: AuditJsonObject | undefined,
   name: string,
@@ -1238,16 +1630,40 @@ function jsonObject(
   }
 }
 
+/**
+ * Builds the registration key for an audit definition.
+ *
+ * @param definition - Definition action and target type.
+ * @returns Validated compound registration key.
+ * @throws When either definition name is invalid.
+ */
 function definitionKey(
   definition: Pick<AuditEventDefinition<never>, "action" | "targetType">,
 ) {
   return `${namespacedName(definition.action, "definition.action")}:${namespacedName(definition.targetType, "definition.targetType")}`;
 }
 
+/**
+ * Validates a namespaced audit identifier.
+ *
+ * @param value - Candidate identifier.
+ * @param name - Field name used in validation errors.
+ * @returns Trimmed valid identifier.
+ * @throws When the identifier is empty, too long, or malformed.
+ */
 function namespacedName(value: string, name: string) {
   return requiredText(value, name, 120, namePattern);
 }
 
+/**
+ * Normalizes optional audit text.
+ *
+ * @param value - Candidate text.
+ * @param name - Field name used in validation errors.
+ * @param maximum - Maximum allowed character count.
+ * @returns Trimmed text, or `null` when absent.
+ * @throws When supplied text is empty or too long.
+ */
 function nullableText(
   value: string | null | undefined,
   name: string,
@@ -1256,6 +1672,16 @@ function nullableText(
   return value == null ? null : requiredText(value, name, maximum);
 }
 
+/**
+ * Validates and trims required audit text.
+ *
+ * @param value - Candidate text.
+ * @param name - Field name used in validation errors.
+ * @param maximum - Maximum allowed character count.
+ * @param pattern - Optional format constraint.
+ * @returns Trimmed valid text.
+ * @throws When the text is empty, too long, or fails the pattern.
+ */
 function requiredText(
   value: string,
   name: string,
@@ -1273,12 +1699,28 @@ function requiredText(
   return normalized;
 }
 
+/**
+ * Validates an optional positive database identifier.
+ *
+ * @param value - Candidate identifier.
+ * @param name - Field name used in validation errors.
+ * @returns The positive integer, or `null` when absent.
+ * @throws When the supplied value is not a positive safe integer.
+ */
 function nullablePositiveInteger(value: number | null, name: string) {
   if (value === null) return null;
   positiveInteger(value, name);
   return value;
 }
 
+/**
+ * Validates a positive database identifier.
+ *
+ * @param value - Candidate identifier.
+ * @param name - Field name used in validation errors.
+ * @returns The validated positive integer.
+ * @throws When the value is not a positive safe integer.
+ */
 function positiveInteger(value: number, name: string) {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new AuditEventValidationError(`${name} is invalid.`);
@@ -1286,6 +1728,13 @@ function positiveInteger(value: number, name: string) {
   return value;
 }
 
+/**
+ * Compares an audit event with its expected redacted state.
+ *
+ * @param event - Persisted event after redaction.
+ * @param expected - Expected identity and payload fields.
+ * @returns Whether every redacted field matches canonically.
+ */
 function redactionMatches(
   event: AuditEvent,
   expected: Pick<
@@ -1310,6 +1759,12 @@ function redactionMatches(
   );
 }
 
+/**
+ * Serializes an audit object with stable key ordering.
+ *
+ * @param value - Audit object or `null`.
+ * @returns Deterministic JSON text.
+ */
 function canonicalJson(value: AuditJsonObject | null): string {
   if (value === null) return "null";
   return `{${Object.keys(value)
@@ -1321,6 +1776,12 @@ function canonicalJson(value: AuditJsonObject | null): string {
     .join(",")}}`;
 }
 
+/**
+ * Serializes one nested audit JSON value canonically.
+ *
+ * @param value - JSON-compatible audit value.
+ * @returns Deterministic JSON fragment.
+ */
 function canonicalJsonValue(value: AuditJsonObject[string]): string {
   if (Array.isArray(value)) {
     return `[${value.map(canonicalJsonValue).join(",")}]`;

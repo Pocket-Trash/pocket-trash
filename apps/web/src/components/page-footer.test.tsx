@@ -20,6 +20,7 @@ it("renders the site links, accessible social links, and supplied year", () => {
 
   for (const href of [
     "/",
+    "/changelog",
     "/help",
     "/contact",
     "/feedback",

@@ -119,6 +119,12 @@ describe("collection audit adoption", () => {
   }, 30_000);
 });
 
+/**
+ * Applies repository migrations to an in-memory test database.
+ *
+ * @param client - PGlite test database.
+ * @rejects When a migration cannot be read or executed.
+ */
 async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
     new URL("../../../../database/drizzle", import.meta.url),

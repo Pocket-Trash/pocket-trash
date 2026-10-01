@@ -7,7 +7,18 @@ import { MarkdownContent } from "@/components/markdown-content";
 import type { HelpDocument } from "@/lib/help-content";
 import { useLocale } from "@/providers/locale-provider";
 
-export function HelpIndexPage({ guideTitle }: { guideTitle: string }) {
+/**
+ * Renders the localized help topic index.
+ *
+ * @param props - Published help documents.
+ * @returns The help index page.
+ */
+export function HelpIndexPage({
+  documents,
+}: {
+  /** Published help documents. */
+  documents: HelpDocument[];
+}) {
   const { locale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
@@ -19,15 +30,17 @@ export function HelpIndexPage({ guideTitle }: { guideTitle: string }) {
         </blockquote>
         <section className="grid gap-4">
           <h2 className="text-xl font-semibold">{t("web.help.topics")}</h2>
-          <ul>
-            <li className="ml-5 list-disc">
-              <a
-                className="text-primary underline underline-offset-2"
-                href="/help/image-size-and-resolution-guide"
-              >
-                {guideTitle}
-              </a>
-            </li>
+          <ul className="grid gap-2">
+            {documents.map((document) => (
+              <li className="ml-5 list-disc" key={document.slug}>
+                <a
+                  className="text-primary underline underline-offset-2"
+                  href={`/help/${document.slug}`}
+                >
+                  {document.metadata.title}
+                </a>
+              </li>
+            ))}
           </ul>
         </section>
         <section className="grid gap-4">

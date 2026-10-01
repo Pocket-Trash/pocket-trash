@@ -11,4 +11,6 @@ No table description has been added yet.
 | `user_id` | `bigint` | yes | PK, FK |  | `users.id` (on delete cascade) |  |  |
 | `status` | `text` | yes |  |  |  |  |  |
 | `reason` | `text` | yes |  |  |  |  |  |
+| `pending_before_status` | `text` | no |  |  |  |  |  |
+| `pending_request_id` | `uuid` | no |  |  |  |  |  |
 | `updated_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |

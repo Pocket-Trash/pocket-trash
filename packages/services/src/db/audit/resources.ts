@@ -141,7 +141,7 @@ export function resourceAuditAuthorization(
  * @param actor - Actor performing the resource mutation.
  * @param resourceId - Resource being mutated.
  * @returns Resource audit context.
- * @rejects When the actor or resource does not exist.
+ * @rejects When the actor or resource does not exist, or the database query fails.
  */
 export async function loadResourceAuditContext(
   transaction: ResourceAuditTransaction,
@@ -237,7 +237,7 @@ export async function loadResourceAuditContext(
  * @param transaction - Caller-owned source transaction.
  * @param input - Resource event and identity context.
  * @returns Completion after the event is stored.
- * @rejects When staff authorization or its required reason is missing.
+ * @rejects When authorization, validation, serialization, persistence, or operation logging fails.
  */
 export async function writeResourceAudit(
   audit: AuditService,

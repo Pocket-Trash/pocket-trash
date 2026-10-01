@@ -18,23 +18,63 @@ import {
   createAuditService,
 } from "./index.js";
 
+/** Audit definition that exposes public profile state during tests. */
 const profileUpdated = {
   action: "test.profile_updated",
   targetType: "test.profile",
-  serialize: (input: { name: string; secret: string }) => ({
+  /**
+   * Serializes public profile state while excluding secrets.
+   *
+   * @param input - Test profile values.
+   * @returns Public profile state.
+   */
+  serialize: (input: {
+    /** Public profile name. */
+    name: string;
+    /** Secret value excluded from the audit payload. */
+    secret: string;
+  }) => ({
     after: { name: input.name },
   }),
+  /**
+   * Replaces erased profile state with a redaction marker.
+   *
+   * @returns Redacted audit metadata.
+   */
   redact: () => ({ metadata: { redacted: true } }),
-} satisfies AuditEventDefinition<{ name: string; secret: string }>;
+} satisfies AuditEventDefinition<{
+  /** Public profile name. */
+  name: string;
+  /** Secret excluded from the serialized event. */
+  secret: string;
+}>;
 
+/** Audit definition used to exercise payload-size limits. */
 const largeEvent = {
   action: "test.large_event",
   targetType: "test.payload",
-  serialize: (input: { value: string }) => ({
+  /**
+   * Serializes the supplied payload without reducing its size.
+   *
+   * @param input - Test payload value.
+   * @returns Metadata containing the test value.
+   */
+  serialize: (input: {
+    /** Value used to control the serialized payload size. */
+    value: string;
+  }) => ({
     metadata: { value: input.value },
   }),
+  /**
+   * Replaces erased payload state with a redaction marker.
+   *
+   * @returns Redacted audit metadata.
+   */
   redact: () => ({ metadata: { redacted: true } }),
-} satisfies AuditEventDefinition<{ value: string }>;
+} satisfies AuditEventDefinition<{
+  /** Value used to control payload size. */
+  value: string;
+}>;
 
 describe("audit service", () => {
   it("writes in the caller transaction, enforces payload limits, and redacts erasures", async () => {
@@ -552,6 +592,12 @@ describe("audit service", () => {
   }, 60_000);
 });
 
+/**
+ * Applies repository migrations to an in-memory test database.
+ *
+ * @param client - PGlite test database.
+ * @rejects When a migration cannot be read or executed.
+ */
 async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
     new URL("../../../../database/drizzle", import.meta.url),
