@@ -27,84 +27,258 @@ import {
 import { getTmpImageDeleteJobId, getTmpImageUploadJobId } from "./job-ids.js";
 import { removeCompletedJobsById, type ScraperQueues } from "./queues.js";
 
+/**
+ * Completed, failed, and skipped counts from draining one queue.
+ */
 export type QueueDrainStats = {
+  /**
+   * Number of jobs completed successfully.
+   */
   completed: number;
+  /**
+   * Number of jobs that failed during this drain.
+   */
   failed: number;
+  /**
+   * Number of jobs deliberately skipped.
+   */
   skipped: number;
 };
 
+/**
+ * Dependencies and limits for draining scraper item and image queues.
+ */
 export type RunQueueProcessorOptions = {
+  /**
+   * Target jobs processed from each queue during this run.
+   */
   batchSize: {
+    /**
+     * Target image job count for this drain; concurrency may complete additional active jobs.
+     */
     images: number;
+    /**
+     * Target item job count for this drain; concurrency may complete additional active jobs.
+     */
     items: number;
   };
+  /**
+   * Maximum jobs processed concurrently by a queue worker.
+   */
   concurrency: number;
+  /**
+   * Redis connection shared with BullMQ workers and queues.
+   */
   connection: Redis;
+  /**
+   * Database used for scraper persistence.
+   */
   db: Database;
+  /**
+   * Storage folder prefix for uploaded scraper images.
+   */
   imageFolderPrefix: string;
+  /**
+   * Image service used for upload and deletion operations.
+   */
   imageStorage: ImagesService;
+  /**
+   * Logger used for scraper lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Scraper item and image queues.
+   */
   queues: ScraperQueues;
 };
 
+/**
+ * Drain counts for the scraper item and image queues.
+ */
 export type RunQueueProcessorResult = {
+  /**
+   * Image-queue drain statistics.
+   */
   images: QueueDrainStats;
+  /**
+   * Item-queue drain statistics.
+   */
   items: QueueDrainStats;
 };
 
+/**
+ * Failed-job and requeue counts for one queue.
+ */
 export type QueueDeadLetterStats = {
+  /**
+   * Total failed-job count read before retries, including jobs outside this batch.
+   */
   failed: number;
+  /**
+   * Number of failed jobs that could not be retried.
+   */
   requeueFailed: number;
+  /**
+   * Number of failed jobs successfully requeued for another processing attempt.
+   */
   requeued: number;
 };
 
+/**
+ * Queue dependencies and batch limits for dead-letter retries.
+ */
 export type RunQueueDeadLetterProcessorOptions = {
+  /**
+   * Maximum jobs processed from each queue during this run.
+   */
   batchSize: {
+    /**
+     * Maximum failed image jobs retried during this run.
+     */
     images: number;
+    /**
+     * Maximum failed item jobs retried during this run.
+     */
     items: number;
   };
+  /**
+   * Logger used for scraper lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Scraper item and image queues.
+   */
   queues: ScraperQueues;
 };
 
+/**
+ * Dead-letter processing counts for the item and image queues.
+ */
 export type RunQueueDeadLetterProcessorResult = {
+  /**
+   * Image-queue dead-letter retry statistics.
+   */
   images: QueueDeadLetterStats;
+  /**
+   * Item-queue dead-letter retry statistics.
+   */
   items: QueueDeadLetterStats;
 };
 
+/**
+ * Aggregated processor error counts and bounded samples.
+ */
 export type ProcessorErrorSummary = {
+  /**
+   * Error counts keyed by logger message.
+   */
   errorsByMessage: Record<string, number>;
+  /**
+   * Bounded representative processor error samples.
+   */
   sampleErrors: ProcessorErrorSample[];
+  /**
+   * Total processor errors across all messages.
+   */
   totalErrors: number;
 };
 
+/**
+ * Accumulator that groups processor errors and retains bounded samples.
+ */
 type ProcessorErrorCounter = {
+  /**
+   * Records one processor error count and optional bounded sample.
+   *
+   * @param message - Logger message that groups equivalent errors.
+   *
+   * @param sample - Optional representative error context.
+   */
   record: (message: string, sample?: ProcessorErrorSampleInput) => void;
+  /**
+   * Returns sorted error counts, bounded samples, and the total count.
+   *
+   * @returns Sorted counts, bounded samples, and total errors.
+   */
   summary: () => ProcessorErrorSummary;
 };
+/**
+ * Serializable context retained for one representative processor error.
+ */
 type ProcessorErrorSample = {
+  /**
+   * Captured error value or its serializable representation.
+   */
   error?: {
+    /**
+     * Serializable cause of the sampled error, when present.
+     */
     cause?: {
+      /**
+       * Message from the captured error cause.
+       */
       message: string;
+      /**
+       * Name of the captured error cause.
+       */
       name: string;
     };
+    /**
+     * Message from the captured error.
+     */
     message: string;
+    /**
+     * Name of the captured error.
+     */
     name: string;
   };
+  /**
+   * Database identifier for the temporary image.
+   */
   imageId?: number;
+  /**
+   * Deterministic BullMQ job identifier.
+   */
   jobId?: string;
+  /**
+   * Logger message that groups equivalent processor errors.
+   */
   message: string;
+  /**
+   * Scraper source identifier for the record or job.
+   */
   source?: string;
+  /**
+   * Discriminator for the job or sampled error.
+   */
   type?: string;
 };
+/**
+ * Unformatted processor error context accepted by the accumulator.
+ */
 type ProcessorErrorSampleInput = Omit<
   ProcessorErrorSample,
   "error" | "message"
 > & {
+  /**
+   * Captured error value or its serializable representation.
+   */
   error?: unknown;
 };
+/**
+ * Terminal outcome recorded for an image queue job.
+ */
 type ImageJobResult = "completed" | "skipped";
 
+/**
+ * Drains bounded item and image queue batches in sequence.
+ *
+ * @param options - Dependencies and controls for the operation.
+ *
+ * @returns Drain outcomes for the item and image queues.
+ *
+ * @rejects When queue processing or a required dependency fails.
+ */
 export async function runQueueProcessor({
   batchSize,
   concurrency,
@@ -131,6 +305,16 @@ export async function runQueueProcessor({
       batchSize: batchSize.items,
       concurrency,
       connection,
+      /**
+       * Processes one queued job and returns its drain outcome.
+       *
+       * @param job - BullMQ job to process.
+       *
+       * @returns Promise resolving to `"skipped"` for a skipped job; `"completed"` or
+       * `undefined` count as completed.
+       *
+       * @rejects When queue processing or a required dependency fails.
+       */
       handler: (job) =>
         processItemJob({ db, errorCounter, job, logger, queues }),
       logger,
@@ -140,6 +324,16 @@ export async function runQueueProcessor({
       batchSize: batchSize.images,
       concurrency,
       connection,
+      /**
+       * Processes one queued job and returns its drain outcome.
+       *
+       * @param job - BullMQ job to process.
+       *
+       * @returns Promise resolving to `"skipped"` for a skipped job; `"completed"` or
+       * `undefined` count as completed.
+       *
+       * @rejects When queue processing or a required dependency fails.
+       */
       handler: (job) =>
         processImageJob({
           db,
@@ -187,6 +381,15 @@ export async function runQueueProcessor({
   }
 }
 
+/**
+ * Retries bounded failed-job batches from both scraper queues.
+ *
+ * @param options - Dependencies and controls for the operation.
+ *
+ * @returns Dead-letter outcomes for both scraper queues.
+ *
+ * @rejects When queue processing or a required dependency fails.
+ */
 export async function runQueueDeadLetterProcessor({
   batchSize,
   logger,
@@ -241,6 +444,13 @@ export async function runQueueDeadLetterProcessor({
   }
 }
 
+/**
+ * Processes one scraper item or archive-reconciliation job.
+ *
+ * @param options - Dependencies and controls for the operation.
+ *
+ * @rejects When queue processing or a required dependency fails.
+ */
 async function processItemJob({
   db,
   errorCounter,
@@ -248,10 +458,25 @@ async function processItemJob({
   logger,
   queues,
 }: {
+  /**
+   * Database used for scraper persistence.
+   */
   db: Database;
+  /**
+   * Accumulator for processor error counts and samples.
+   */
   errorCounter: ProcessorErrorCounter;
+  /**
+   * BullMQ job being processed.
+   */
   job: Job<ScraperItemJob>;
+  /**
+   * Logger used for scraper lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Scraper item and image queues.
+   */
   queues: ScraperQueues;
 }): Promise<undefined> {
   const startedAt = Date.now();
@@ -565,6 +790,15 @@ async function processItemJob({
   }
 }
 
+/**
+ * Processes one scraper image job through the shared image workflow.
+ *
+ * @param options - Dependencies and controls for the operation.
+ *
+ * @returns Completed or skipped image-job outcome.
+ *
+ * @rejects When queue processing or a required dependency fails.
+ */
 async function processImageJob({
   db,
   errorCounter,
@@ -573,11 +807,29 @@ async function processImageJob({
   job,
   logger,
 }: {
+  /**
+   * Database used for scraper persistence.
+   */
   db: Database;
+  /**
+   * Accumulator for processor error counts and samples.
+   */
   errorCounter: ProcessorErrorCounter;
+  /**
+   * Storage folder prefix for uploaded scraper images.
+   */
   imageFolderPrefix: string;
+  /**
+   * Image service used for upload and deletion operations.
+   */
   imageStorage: ImagesService;
+  /**
+   * BullMQ job being processed.
+   */
   job: Job<ScraperImageJob>;
+  /**
+   * Logger used for scraper lifecycle events.
+   */
   logger: Logger;
 }): Promise<ImageJobResult> {
   const startedAt = Date.now();
@@ -593,12 +845,35 @@ async function processImageJob({
   });
 }
 
+/**
+ * Replaces completed duplicates and bulk-enqueues image jobs.
+ *
+ * @param queues - Scraper queues to inspect or enqueue into.
+ *
+ * @param imageJobs - Image jobs to enqueue.
+ *
+ * @returns Number of completed duplicate jobs removed.
+ *
+ * @rejects When queue processing or a required dependency fails.
+ */
 async function enqueueImageJobs(
   queues: ScraperQueues,
   imageJobs: {
+    /**
+     * Queue payload for the job.
+     */
     data: ScraperImageJob;
+    /**
+     * BullMQ job name passed to `addBulk`.
+     */
     name: string;
+    /**
+     * BullMQ options for the queued job.
+     */
     opts: {
+      /**
+       * Deterministic BullMQ job identifier.
+       */
       jobId: string;
     };
   }[],
@@ -616,6 +891,11 @@ async function enqueueImageJobs(
   return removedCompletedImageJobs;
 }
 
+/**
+ * Logs the database and image-job outcome for one item mutation.
+ *
+ * @param options - Dependencies and controls for the operation.
+ */
 function logItemMutationCompleted({
   durationMs,
   imageJobs,
@@ -626,20 +906,62 @@ function logItemMutationCompleted({
   source,
   sourceProductId,
 }: {
+  /**
+   * Elapsed operation time in milliseconds.
+   */
   durationMs: number;
+  /**
+   * Number of follow-up image jobs enqueued.
+   */
   imageJobs: number;
+  /**
+   * Deterministic BullMQ job identifier.
+   */
   jobId: string | undefined;
+  /**
+   * Logger used for scraper lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Number of completed image jobs removed before enqueueing.
+   */
   removedCompletedImageJobs: number;
+  /**
+   * Synchronization result summarized by the logger.
+   */
   result: {
+    /**
+     * Whether the variation came from the archive source collection.
+     */
     archived?: boolean;
+    /**
+     * Whether synchronization inserted a new source record.
+     */
     created: boolean;
+    /**
+     * Image deletion jobs produced by synchronization.
+     */
     deleteImageJobs: readonly unknown[];
+    /**
+     * Whether synchronization changed normalized details.
+     */
     updated: boolean;
+    /**
+     * Image upload jobs produced by synchronization.
+     */
     uploadImageJobs: readonly unknown[];
+    /**
+     * Whether synchronization saved a previous-state version.
+     */
     versioned: boolean;
   };
+  /**
+   * Scraper source identifier for the record or job.
+   */
   source: string;
+  /**
+   * Stable product identifier supplied by the source.
+   */
   sourceProductId: string;
 }) {
   logger.info(loggerMessages.scraper.database.mutationCompleted, {
@@ -660,6 +982,15 @@ function logItemMutationCompleted({
   });
 }
 
+/**
+ * Uploads or deletes one temporary image and persists its outcome.
+ *
+ * @param options - Dependencies and controls for the operation.
+ *
+ * @returns Completed or skipped image-job outcome.
+ *
+ * @rejects When queue processing or a required dependency fails.
+ */
 async function processTmpImageJob({
   db,
   errorCounter,
@@ -669,12 +1000,33 @@ async function processTmpImageJob({
   logger,
   startedAt,
 }: {
+  /**
+   * Database used for scraper persistence.
+   */
   db: Database;
+  /**
+   * Accumulator for processor error counts and samples.
+   */
   errorCounter: ProcessorErrorCounter;
+  /**
+   * Storage folder prefix for uploaded scraper images.
+   */
   imageFolderPrefix: string;
+  /**
+   * Image service used for upload and deletion operations.
+   */
   imageStorage: ImagesService;
+  /**
+   * BullMQ job being processed.
+   */
   job: Job<ScraperImageJob>;
+  /**
+   * Logger used for scraper lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Operation start time as Unix milliseconds.
+   */
   startedAt: number;
 }): Promise<ImageJobResult> {
   try {
@@ -805,13 +1157,29 @@ async function processTmpImageJob({
   }
 }
 
+/**
+ * Logs and skips an image job whose database row is absent.
+ *
+ * @param options - Dependencies and controls for the operation.
+ *
+ * @returns The skipped image-job outcome.
+ */
 function logMissingImageRow({
   job,
   logger,
   startedAt,
 }: {
+  /**
+   * BullMQ job being processed.
+   */
   job: Job<ScraperImageJob>;
+  /**
+   * Logger used for scraper lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Operation start time as Unix milliseconds.
+   */
   startedAt: number;
 }): ImageJobResult {
   logger.warn(loggerMessages.scraper.processor.imageJobCompleted, {
@@ -827,6 +1195,11 @@ function logMissingImageRow({
   return "skipped";
 }
 
+/**
+ * Records and logs a failed temporary image job.
+ *
+ * @param options - Dependencies and controls for the operation.
+ */
 function logImageJobError({
   error,
   errorCounter,
@@ -834,10 +1207,25 @@ function logImageJobError({
   logger,
   startedAt,
 }: {
+  /**
+   * Captured error value or its serializable representation.
+   */
   error: unknown;
+  /**
+   * Accumulator for processor error counts and samples.
+   */
   errorCounter: ProcessorErrorCounter;
+  /**
+   * BullMQ job being processed.
+   */
   job: Job<ScraperImageJob>;
+  /**
+   * Logger used for scraper lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Operation start time as Unix milliseconds.
+   */
   startedAt: number;
 }) {
   const primaryErrorMessage = job.data.type.includes(".upload")
@@ -870,11 +1258,24 @@ function logImageJobError({
   });
 }
 
+/**
+ * Builds the storage folder key for a product or variation image.
+ *
+ * @param options - Dependencies and controls for the operation.
+ *
+ * @returns Product ID alone or product and variation IDs joined by a hyphen.
+ */
 export function getTmpImageFolderKey({
   productId,
   productVariationId,
 }: {
+  /**
+   * Database identifier for the parent temporary product.
+   */
   productId: number;
+  /**
+   * Database variation identifier, or `null` for parent-product images.
+   */
   productVariationId: number | null;
 }) {
   return productVariationId === null
@@ -882,13 +1283,29 @@ export function getTmpImageFolderKey({
     : `${productId}-${productVariationId}`;
 }
 
+/**
+ * Builds storage tags for a temporary product image.
+ *
+ * @param options - Dependencies and controls for the operation.
+ *
+ * @returns Stable storage tags for the image scope and source.
+ */
 function getTmpImageTags({
   productId,
   productVariationId,
   source,
 }: {
+  /**
+   * Database identifier for the parent temporary product.
+   */
   productId: number;
+  /**
+   * Database variation identifier, or `null` for parent-product images.
+   */
   productVariationId: number | null;
+  /**
+   * Scraper source identifier for the record or job.
+   */
   source: string;
 }) {
   return [
@@ -901,12 +1318,24 @@ function getTmpImageTags({
   ];
 }
 
+/**
+ * Creates a bounded processor error accumulator.
+ *
+ * @returns A fresh bounded error accumulator.
+ */
 export function createProcessorErrorCounter(): ProcessorErrorCounter {
   const errorsByMessage = new Map<string, number>();
   const sampleErrors: ProcessorErrorSample[] = [];
   const maxSampleErrors = 5;
 
   return {
+    /**
+     * Records one processor error count and optional bounded sample.
+     *
+     * @param message - Logger message that groups equivalent errors.
+     *
+     * @param sample - Optional representative error context.
+     */
     record(message, sample) {
       errorsByMessage.set(message, (errorsByMessage.get(message) ?? 0) + 1);
       if (sample && sampleErrors.length < maxSampleErrors) {
@@ -920,6 +1349,11 @@ export function createProcessorErrorCounter(): ProcessorErrorCounter {
         });
       }
     },
+    /**
+     * Returns sorted error counts, bounded samples, and the total count.
+     *
+     * @returns Sorted counts, bounded samples, and total errors.
+     */
     summary() {
       const entries = [...errorsByMessage.entries()].sort(([left], [right]) =>
         left.localeCompare(right),
@@ -938,6 +1372,13 @@ export function createProcessorErrorCounter(): ProcessorErrorCounter {
   };
 }
 
+/**
+ * Converts an unknown error into serializable logger attributes.
+ *
+ * @param error - Unknown error value to serialize.
+ *
+ * @returns Serializable error name, message, and optional cause.
+ */
 function formatProcessorErrorForAttributes(error: unknown) {
   if (!(error instanceof Error)) {
     return {
@@ -960,6 +1401,11 @@ function formatProcessorErrorForAttributes(error: unknown) {
   };
 }
 
+/**
+ * Logs aggregated processor errors when any were recorded.
+ *
+ * @param options - Dependencies and controls for the operation.
+ */
 function logProcessorErrorSummary({
   command,
   durationMs,
@@ -967,10 +1413,25 @@ function logProcessorErrorSummary({
   logger,
   processor,
 }: {
+  /**
+   * Processor command recorded in summary logs.
+   */
   command: "process:queue";
+  /**
+   * Elapsed operation time in milliseconds.
+   */
   durationMs: number;
+  /**
+   * Accumulator for processor error counts and samples.
+   */
   errorCounter: ProcessorErrorCounter;
+  /**
+   * Logger used for scraper lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Processor identifier recorded in summary logs.
+   */
   processor: "queue";
 }) {
   const summary = errorCounter.summary();
@@ -991,6 +1452,19 @@ function logProcessorErrorSummary({
   });
 }
 
+/**
+ * Processes one bounded queue batch and returns terminal job counts.
+ * Forces worker closure after five minutes; earlier completion allows thirty seconds
+ * for graceful closure before forcing it.
+ *
+ * @param options - Dependencies and controls for the operation.
+ *
+ * @returns Completed, failed, and skipped job counts.
+ *
+ * @template TJobData - Queue job payload type.
+ *
+ * @rejects When queue processing or a required dependency fails.
+ */
 async function drainQueue<TJobData>({
   batchSize,
   concurrency,
@@ -999,11 +1473,36 @@ async function drainQueue<TJobData>({
   logger,
   queueName,
 }: {
+  /**
+   * Target job count for this drain; concurrency may complete additional active jobs.
+   */
   batchSize: number;
+  /**
+   * Maximum jobs processed concurrently by a queue worker.
+   */
   concurrency: number;
+  /**
+   * Redis connection shared with BullMQ workers and queues.
+   */
   connection: Redis;
+  /**
+   * Processes one queued job and returns its drain outcome.
+   *
+   * @param job - BullMQ job to process.
+   *
+   * @returns Promise resolving to `"skipped"` for a skipped job; `"completed"` or
+   * `undefined` count as completed.
+   *
+   * @rejects When queue processing or a required dependency fails.
+   */
   handler: (job: Job<TJobData>) => Promise<"completed" | "skipped" | undefined>;
+  /**
+   * Logger used for scraper lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Stable BullMQ queue name.
+   */
   queueName: string;
 }): Promise<QueueDrainStats> {
   const startedAt = Date.now();
@@ -1022,7 +1521,21 @@ async function drainQueue<TJobData>({
       },
       5 * 60 * 1000,
     );
-    const finishDrain = ({ force = false }: { force?: boolean } = {}) => {
+    /**
+     * Stops the active queue drain once and records its final statistics.
+     *
+     * @param options - Dependencies and controls for the operation.
+     *
+     * @returns The shared worker-close promise.
+     */
+    const finishDrain = ({
+      force = false,
+    }: {
+      /**
+       * Whether to force closure without waiting for active jobs.
+       */
+      force?: boolean;
+    } = {}) => {
       if (finishPromise) {
         return finishPromise;
       }
@@ -1043,6 +1556,9 @@ async function drainQueue<TJobData>({
 
       return finishPromise;
     };
+    /**
+     * Finishes the drain after the requested number of jobs reaches a terminal state.
+     */
     const maybeCloseWorker = () => {
       if (stats.completed + stats.failed + stats.skipped >= batchSize) {
         void finishDrain().then(() => resolve(stats), reject);
@@ -1088,6 +1604,18 @@ async function drainQueue<TJobData>({
   });
 }
 
+/**
+ * Closes a worker immediately when forced; otherwise allows thirty seconds for
+ * graceful closure before forcing it.
+ *
+ * @param worker - BullMQ worker to close, or `null` before creation.
+ *
+ * @param force - Whether to force worker closure.
+ *
+ * @template TJobData - Queue job payload type.
+ *
+ * @rejects When queue processing or a required dependency fails.
+ */
 async function closeWorkerWithDeadline<TJobData>(
   worker: Worker<TJobData> | null,
   force: boolean,
@@ -1115,15 +1643,38 @@ async function closeWorkerWithDeadline<TJobData>(
   clearTimeout(forceClose);
 }
 
+/**
+ * Retries a bounded batch of failed jobs and reports requeue outcomes.
+ *
+ * @param options - Dependencies and controls for the operation.
+ *
+ * @returns Failed, requeued, and retry-failure counts.
+ *
+ * @template TJobData - Queue job payload type.
+ *
+ * @rejects When queue processing or a required dependency fails.
+ */
 async function processDeadLetters<TJobData>({
   batchSize,
   logger,
   queue,
   queueName,
 }: {
+  /**
+   * Maximum jobs processed from each queue during this run.
+   */
   batchSize: number;
+  /**
+   * Logger used for scraper lifecycle events.
+   */
   logger: Logger;
+  /**
+   * BullMQ queue operated on by the processor.
+   */
   queue: Queue<TJobData>;
+  /**
+   * Stable BullMQ queue name.
+   */
   queueName: string;
 }): Promise<QueueDeadLetterStats> {
   const startedAt = Date.now();

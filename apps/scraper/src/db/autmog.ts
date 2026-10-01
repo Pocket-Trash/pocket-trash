@@ -13,100 +13,346 @@ import {
   type TmpImageUploadJobCandidate,
 } from "./images.js";
 
+/**
+ * Canonical maker values used to ensure the Autmog maker row.
+ */
 const autmogMaker = {
   name: "Autmog",
   rootUrl: "https://www.autmog.com",
 };
 
+/**
+ * Outcome of synchronizing one normalized Autmog pen.
+ */
 export type AutmogPenSyncResult = {
+  /**
+   * Whether synchronization inserted a new source record.
+   */
   created: boolean;
+  /**
+   * Database rows returned by synchronization.
+   */
   dbResponse: AutmogPenSyncDbResponse;
-  deleteImageJobs: { imageId: number }[];
+  /**
+   * Image deletion jobs produced by synchronization.
+   */
+  deleteImageJobs: {
+    /**
+     * Database identifier for the temporary image.
+     */
+    imageId: number;
+  }[];
+  /**
+   * Normalized values supplied to database synchronization.
+   */
   mutationInput: AutmogPenSyncMutationInput;
+  /**
+   * Image upload jobs produced by synchronization.
+   */
   uploadImageJobs: TmpImageUploadJobCandidate[];
+  /**
+   * Whether synchronization changed normalized details.
+   */
   updated: boolean;
+  /**
+   * Whether synchronization saved a previous-state version.
+   */
   versioned: boolean;
 };
 
+/**
+ * Normalized Autmog values written during pen synchronization.
+ */
 export type AutmogPenSyncMutationInput = {
+  /**
+   * Normalized source images written during pen synchronization.
+   */
   images: {
+    /**
+     * Source-provided alternative text, when available.
+     */
     altText: string | null;
+    /**
+     * Image height in pixels, when known.
+     */
     height: number | null;
+    /**
+     * Source-provided image position, with a one-based index fallback.
+     */
     position: number;
+    /**
+     * Stable hash of source image identity metadata.
+     */
     sourceHash: string;
+    /**
+     * Source platform image identifier, when available.
+     */
     sourceImageId: string | null;
+    /**
+     * Original source image URL.
+     */
     sourceUrl: string;
+    /**
+     * Image width in pixels, when known.
+     */
     width: number | null;
   }[];
+  /**
+   * Normalized or persisted Autmog pen values.
+   */
   pen: {
+    /**
+     * Whether the source currently reports the product available.
+     */
     availableForSale: boolean;
+    /**
+     * Normalized Autmog body-detail labels.
+     */
     bodyDetails: string[];
+    /**
+     * Normalized Autmog clip style, when recognized.
+     */
     clip: string | null;
+    /**
+     * Currency code for normalized prices.
+     */
     currencyCode: string;
+    /**
+     * Normalized product description, when available.
+     */
     description: string | null;
+    /**
+     * Stable hash of normalized non-image details.
+     */
     detailsHash: string;
+    /**
+     * Normalized Autmog finish, when recognized.
+     */
     finish: string | null;
+    /**
+     * Normalized Autmog grip style, when recognized.
+     */
     grip: string | null;
+    /**
+     * Stable hash of source image identity and ordering.
+     */
     imageSetHash: string;
+    /**
+     * Database identifier for the canonical maker.
+     */
     makerId: number;
+    /**
+     * Normalized material labels associated with the pen.
+     */
     materials: string[];
+    /**
+     * Normalized mechanism label, when recognized.
+     */
     mechanism: string | null;
+    /**
+     * Database identifier for the normalized mechanism, or `null` when none exists.
+     */
     mechanismId: number | null;
+    /**
+     * Normalized Autmog nose style, when recognized.
+     */
     nose: string | null;
+    /**
+     * Maximum normalized variant price in integer cents, or `null` when none is available.
+     */
     priceMaxCents: number | null;
+    /**
+     * Minimum normalized variant price in integer cents, or `null` when none is available.
+     */
     priceMinCents: number | null;
+    /**
+     * Normalized product-type labels.
+     */
     productTypes: string[];
+    /**
+     * Canonical storefront URL for the product.
+     */
     productUrl: string;
+    /**
+     * Normalized pen refill label, when recognized.
+     */
     refill: string | null;
+    /**
+     * Normalized Autmog size, when recognized.
+     */
     size: string | null;
+    /**
+     * Stable storefront handle for the source listing.
+     */
     sourceHandle: string;
+    /**
+     * Stable product identifier supplied by the source.
+     */
     sourceProductId: string;
+    /**
+     * Source-provided product tags.
+     */
     tags: string[];
+    /**
+     * Normalized display title for the product.
+     */
     title: string;
   };
 };
 
+/**
+ * Database rows returned after synchronizing an Autmog pen.
+ */
 export type AutmogPenSyncDbResponse = {
+  /**
+   * Image synchronization rows and image job candidates.
+   */
   images: {
+    /**
+     * Database image IDs requiring deletion jobs.
+     */
     deleteJobImageIds: number[];
+    /**
+     * Database image IDs requiring upload jobs.
+     */
     uploadJobImageIds: number[];
+    /**
+     * Image rows returned by the database upsert.
+     */
     upserted: {
+      /**
+       * Source-provided alternative text, when available.
+       */
       altText: string | null;
+      /**
+       * Image height in pixels, when known.
+       */
       height: number | null;
+      /**
+       * Database identifier for the record.
+       */
       id: number;
+      /**
+       * Storage-provider file identifier, when uploaded.
+       */
       imageFileId: string | null;
+      /**
+       * Storage-provider path for the uploaded image.
+       */
       imagePath: string | null;
+      /**
+       * Storage provider that owns the uploaded image.
+       */
       imageProvider: string | null;
+      /**
+       * Public URL for the uploaded image.
+       */
       imageUrl: string | null;
+      /**
+       * Database identifier for the parent temporary product.
+       */
       productId: number;
+      /**
+       * Database variation identifier, or `null` for parent-product images.
+       */
       productVariationId: number | null;
+      /**
+       * Stable hash of source image identity metadata.
+       */
       sourceHash: string;
+      /**
+       * Current lifecycle status for the record or operation.
+       */
       status: string;
+      /**
+       * Image width in pixels, when known.
+       */
       width: number | null;
     }[];
   };
+  /**
+   * Normalized or persisted Autmog pen values.
+   */
   pen: {
+    /**
+     * Stable hash of normalized non-image details.
+     */
     detailsHash: string;
+    /**
+     * Timestamp when the record was archived, or `null` while active.
+     */
     archivedAt: Date | null;
+    /**
+     * Database identifier for the record.
+     */
     id: number;
+    /**
+     * Stable hash of source image identity and ordering.
+     */
     imageSetHash: string;
+    /**
+     * Database identifier for the canonical maker.
+     */
     makerId: number;
+    /**
+     * Stable storefront handle for the source listing.
+     */
     sourceHandle: string;
+    /**
+     * Stable product identifier supplied by the source.
+     */
     sourceProductId: string;
+    /**
+     * Normalized display title for the product.
+     */
     title: string;
   };
+  /**
+   * Parent product values associated with the variation or image.
+   */
   product: {
+    /**
+     * Database identifier for the record.
+     */
     id: number;
+    /**
+     * Scraper source identifier for the record or job.
+     */
     source: string;
   };
 };
 
+/**
+ * Terminal status and optional diagnostics for a scraper run.
+ */
 export type ScraperRunUpdate = {
+  /**
+   * Terminal scraper-run error message, when failed.
+   */
   errorMessage?: string;
+  /**
+   * Terminal statistics; omitted values persist as an empty object.
+   *
+   * @default {}
+   */
   stats?: ScraperRunStats;
+  /**
+   * Current lifecycle status for the record or operation.
+   */
   status: "completed" | "failed";
 };
 
+/**
+ * Loads persisted Autmog synchronization hashes for selected source IDs.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param sourceProductIds - Source product IDs to load from persisted state.
+ *
+ * @returns Persisted hash state for matching source product IDs.
+ *
+ * @rejects When loading persisted synchronization state fails.
+ */
 export async function getAutmogPenSyncState(
   db: Database,
   sourceProductIds: readonly string[],
@@ -128,14 +374,39 @@ export async function getAutmogPenSyncState(
     );
 }
 
+/**
+ * Creates the scraper database client for a connection URL.
+ *
+ * @param databaseUrl - PostgreSQL connection URL.
+ *
+ * @returns Database client connected through the supplied URL.
+ */
 export function createScraperDb(databaseUrl: string): Database {
   return createDb({ databaseUrl });
 }
 
+/**
+ * Creates a uniquely active scraper run after deleting history older than fourteen days
+ * and failing matching active runs older than two hours.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param input - Source and job type that form the active-run lock.
+ *
+ * @returns The newly inserted running scraper-run row.
+ *
+ * @rejects When a matching run is already active or the database cannot create the run.
+ */
 export async function startScraperRun(
   db: Database,
   input: {
+    /**
+     * Scraper job category used for run locking.
+     */
     jobType: string;
+    /**
+     * Scraper source identifier for the record or job.
+     */
     source: string;
   },
 ) {
@@ -190,7 +461,14 @@ export async function startScraperRun(
       error && typeof error === "object" && "cause" in error
         ? error.cause
         : error
-    ) as { code?: unknown; constraint?: unknown };
+    ) as {
+      /**
+       * PostgreSQL error code exposed by a failed query.
+       */
+      code?: unknown;
+      /** PostgreSQL constraint name exposed by a failed query. */
+      constraint?: unknown;
+    };
     if (
       databaseError.code === "23505" &&
       databaseError.constraint === "scraper_runs_active_source_job_unique"
@@ -207,8 +485,21 @@ export async function startScraperRun(
   return run;
 }
 
+/**
+ * Builds the concurrency error for an already-running scrape.
+ *
+ * @param input - Operation-specific normalized values and controls.
+ *
+ * @returns Concurrency error for the requested run key.
+ */
 function createScraperRunAlreadyActiveError(input: {
+  /**
+   * Scraper job category used for run locking.
+   */
   jobType: string;
+  /**
+   * Scraper source identifier for the record or job.
+   */
   source: string;
 }) {
   return new Error(
@@ -216,6 +507,15 @@ function createScraperRunAlreadyActiveError(input: {
   );
 }
 
+/**
+ * Deletes scraper-run history older than fourteen days.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param now - Reference time for retention or mutation timestamps.
+ *
+ * @rejects When deleting expired scraper runs fails.
+ */
 export async function pruneScraperRuns(db: Database, now = new Date()) {
   const cutoff = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
@@ -224,6 +524,19 @@ export async function pruneScraperRuns(db: Database, now = new Date()) {
     .where(lt(schema.scraperRuns.startedAt, cutoff));
 }
 
+/**
+ * Persists a scraper run's terminal status, stats, and finish time.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param runId - Database identifier for the scraper run.
+ *
+ * @param update - Terminal status and optional run diagnostics.
+ *
+ * @returns The updated scraper-run row.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 export async function finishScraperRun(
   db: Database,
   runId: number,
@@ -247,6 +560,17 @@ export async function finishScraperRun(
   return run;
 }
 
+/**
+ * Upserts one Autmog pen, versions changes, and synchronizes related images and taxonomy.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param item - Normalized source item to persist or identify.
+ *
+ * @returns Creation, update, version, image-job, and database outcomes.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 export async function syncAutmogPen(
   db: Database,
   item: NormalizedAutmogPen,
@@ -397,6 +721,17 @@ export async function syncAutmogPen(
   };
 }
 
+/**
+ * Archives active Autmog pens absent from a complete source snapshot.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param seenSourceProductIds - Source product IDs present in the complete snapshot.
+ *
+ * @returns Number of pens newly marked archived.
+ *
+ * @rejects When updating the unseen pens fails.
+ */
 export async function archiveMissingAutmogPens(
   db: Database,
   seenSourceProductIds: readonly string[],
@@ -423,6 +758,17 @@ export async function archiveMissingAutmogPens(
   return archived.length;
 }
 
+/**
+ * Replaces an Autmog pen's material associations with normalized names.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param penId - Database identifier for the parent pen.
+ *
+ * @param materialNames - Normalized material names for the pen.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 async function syncAutmogPenMaterials(
   db: Database,
   penId: number,
@@ -469,6 +815,17 @@ async function syncAutmogPenMaterials(
   );
 }
 
+/**
+ * Returns the normalized mechanism row, inserting it when needed.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param mechanismName - Normalized mechanism name, or `null`.
+ *
+ * @returns The ensured mechanism row, or `null` when unnamed.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 async function ensureAutmogMechanism(
   db: Database,
   mechanismName: string | null,
@@ -496,6 +853,19 @@ async function ensureAutmogMechanism(
   return mechanism ?? (await getMechanismBySlug(db, slug, `mechanism ${name}`));
 }
 
+/**
+ * Loads the ensured material row for a canonical slug.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param slug - Canonical entity slug.
+ *
+ * @param label - Human-readable entity label used in failures.
+ *
+ * @returns The matching material row.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 async function getMaterialBySlug(db: Database, slug: string, label: string) {
   const [material] = await db
     .select({ id: schema.material.id })
@@ -510,6 +880,19 @@ async function getMaterialBySlug(db: Database, slug: string, label: string) {
   return material;
 }
 
+/**
+ * Loads the ensured mechanism row for a canonical slug.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param slug - Canonical entity slug.
+ *
+ * @param label - Human-readable entity label used in failures.
+ *
+ * @returns The matching mechanism row.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 async function getMechanismBySlug(db: Database, slug: string, label: string) {
   const [mechanism] = await db
     .select({ id: schema.mechanism.id })
@@ -524,6 +907,19 @@ async function getMechanismBySlug(db: Database, slug: string, label: string) {
   return mechanism;
 }
 
+/**
+ * Loads the ensured product-type row for a canonical slug.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param slug - Canonical entity slug.
+ *
+ * @param label - Human-readable entity label used in failures.
+ *
+ * @returns The matching product-type row.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 async function getProductTypeBySlug(db: Database, slug: string, label: string) {
   const [productType] = await db
     .select({ id: schema.productType.id })
@@ -538,6 +934,17 @@ async function getProductTypeBySlug(db: Database, slug: string, label: string) {
   return productType;
 }
 
+/**
+ * Replaces a temporary product's product-type associations.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param productId - Database identifier for the parent product.
+ *
+ * @param productTypeNames - Normalized product-type names for the product.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 async function syncTmpProductProductTypes(
   db: Database,
   productId: number,
@@ -585,6 +992,13 @@ async function syncTmpProductProductTypes(
   );
 }
 
+/**
+ * Converts a canonical label into a stable lowercase slug.
+ *
+ * @param name - Canonical label to convert into a slug.
+ *
+ * @returns Normalized slug, falling back to `value` when empty.
+ */
 function slugifyCanonicalName(name: string): string {
   return (
     name
@@ -595,6 +1009,15 @@ function slugifyCanonicalName(name: string): string {
   );
 }
 
+/**
+ * Returns the canonical Autmog maker, inserting it when absent.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @returns The canonical Autmog maker row.
+ *
+ * @rejects When the database operation fails or a required row cannot be produced.
+ */
 async function ensureAutmogMaker(db: Database) {
   const [maker] = await db
     .insert(schema.maker)
@@ -613,6 +1036,17 @@ async function ensureAutmogMaker(db: Database) {
   return row;
 }
 
+/**
+ * Loads a maker by its canonical root URL.
+ *
+ * @param db - Database used for scraper persistence.
+ *
+ * @param rootUrl - Canonical maker root URL.
+ *
+ * @returns The matching maker row, or `undefined`.
+ *
+ * @rejects When querying the maker fails.
+ */
 async function getMakerByRootUrl(db: Database, rootUrl: string) {
   const [maker] = await db
     .select()
@@ -623,8 +1057,24 @@ async function getMakerByRootUrl(db: Database, rootUrl: string) {
   return maker;
 }
 
+/**
+ * Summarizes which Autmog content hashes changed.
+ *
+ * @param existing - Persisted state to compare.
+ *
+ * @param item - Normalized source item to persist or identify.
+ *
+ * @returns `details`, `images`, both joined by `+`, or `unknown`.
+ */
 function getChangeReason(
-  existing: { detailsHash: string; imageSetHash: string },
+  existing: {
+    /**
+     * Stable hash of normalized non-image details.
+     */
+    detailsHash: string;
+    /** Stable hash of source image identity and ordering. */
+    imageSetHash: string;
+  },
   item: NormalizedAutmogPen,
 ) {
   const changes = [];
@@ -640,6 +1090,17 @@ function getChangeReason(
   return changes.join("+") || "unknown";
 }
 
+/**
+ * Projects a normalized Autmog pen into its database mutation payload.
+ *
+ * @param item - Normalized source item to persist or identify.
+ *
+ * @param makerId - Database identifier for the canonical maker.
+ *
+ * @param mechanismId - Database mechanism identifier, or `null`.
+ *
+ * @returns Database mutation projection for the pen and its images.
+ */
 function getAutmogPenSyncMutationInput(
   item: NormalizedAutmogPen,
   makerId: number,

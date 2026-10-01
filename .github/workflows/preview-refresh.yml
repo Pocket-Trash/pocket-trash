@@ -1,6 +1,7 @@
 name: Preview Refresh
 
 on:
+  workflow_call:
   workflow_dispatch:
   schedule:
     - cron: "0 8 * * *"
@@ -43,7 +44,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Reset preview from production
+      - name: Refresh preview from development
         id: preview_db
         shell: bash
         run: bash .github/scripts/neon-database-branch.sh refresh-preview

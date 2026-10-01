@@ -340,6 +340,7 @@ describe("ProductDetailPage", () => {
     expect(html).toContain('href="https://www.kapedc.com/products/catla"');
     expect(html).toContain("hover:text-primary");
     expect(html).toContain("focus-visible:ring-ring");
+    expect(html).toContain("text-[13.5px] leading-[1.6]");
     expect(html).toContain("text-card-foreground");
     expect(invalidHtml).not.toContain(
       'href="https://www.kapedc.com/products/catla"',
@@ -375,5 +376,6 @@ describe("CollectionItemDetailPage", () => {
 
     expect(html).toContain("One Drop");
     expect(html).toContain("Collection <strong>override</strong>");
+    expect(html).toContain("text-[13.5px] leading-[1.6]");
   });
 });
