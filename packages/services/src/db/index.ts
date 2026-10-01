@@ -155,5 +155,12 @@ export type {
   UpsertUserSettingsInput,
   UserSettingsService,
 } from "./user-settings/index.js";
-export type { UserSyncResult, UsersService } from "./users/index.js";
+export type {
+  ApplyUserBanProviderState,
+  SetUserBanStateInput,
+  UserBanState,
+  UserSyncResult,
+  UsersService,
+} from "./users/index.js";
+export { UserBanStateError } from "./users/index.js";
 export { defaultUserSettings };

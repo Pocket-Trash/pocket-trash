@@ -31,8 +31,10 @@ function createUsersServiceMock(): UsersService {
       id: 1000,
       username: "Admin",
     }),
+    getBanState: vi.fn(),
     getByClerkId: vi.fn(),
     listClerkIds: vi.fn(),
+    setBanState: vi.fn(),
     syncFromClerk: vi.fn(),
   };
 }
