@@ -15,13 +15,25 @@ import {
 } from "./catalog-pages";
 
 vi.mock("@tanstack/react-router", () => ({
+  /**
+   * Renders router links as anchors for static markup tests.
+   *
+   * @param props - Link properties.
+   * @param props.children - Linked content.
+   * @param props.params - Route parameter values.
+   * @param props.to - Route destination.
+   * @returns A test anchor.
+   */
   Link: ({
     children,
     params = {},
     to,
   }: {
+    /** Linked content. */
     children: React.ReactNode;
+    /** Route parameter values. */
     params?: Record<string, number | string>;
+    /** Route destination. */
     to: string;
   }) => {
     const href = Object.entries(params).reduce(
@@ -33,15 +45,32 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 vi.mock("@/components/app-shell", () => ({
+  /**
+   * Renders a minimal application shell for tests.
+   *
+   * @param props - Shell properties.
+   * @param props.breadcrumbItems - Breadcrumb labels.
+   * @param props.children - Nested page content.
+   * @param props.headerActions - Header controls.
+   * @param props.title - Page title.
+   * @returns The test shell.
+   */
   AppShell: ({
     breadcrumbItems = [],
     children,
     headerActions,
     title,
   }: {
-    breadcrumbItems?: Array<{ label: string }>;
+    /** Breadcrumb labels. */
+    breadcrumbItems?: Array<{
+      /** Visible breadcrumb label. */
+      label: string;
+    }>;
+    /** Nested page content. */
     children: React.ReactNode;
+    /** Header controls. */
     headerActions?: React.ReactNode;
+    /** Page title. */
     title: string;
   }) => (
     <div
@@ -57,9 +86,15 @@ vi.mock("@/components/app-shell", () => ({
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns the fixed test locale.
+   *
+   * @returns Fixed English locale state.
+   */
   useLocale: () => ({ locale: "en-US" }),
 }));
 
+/** Public collection owner fixtures used by page tests. */
 const owners = [
   {
     collections: [
@@ -134,6 +169,7 @@ const owners = [
   },
 ] satisfies PublicCollectionOwner[];
 
+/** Catalog product fixture used by page tests. */
 const product: CatalogProduct = {
   bearing: null,
   buttonDiameterMm: null,
@@ -266,6 +302,12 @@ describe("CollectionPage", () => {
   });
 });
 
+/**
+ * Creates a collection image fixture.
+ *
+ * @param id - Image identifier and position.
+ * @returns The collection image fixture.
+ */
 function collectionImage(id: number): CatalogImage {
   return {
     contentType: "image/webp",
