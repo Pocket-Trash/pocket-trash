@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { clerk } from "@clerk/testing/playwright";
 import { createDb, schema } from "@package/database";
 import { and, eq, inArray } from "drizzle-orm";
+import type { Locator, Page } from "playwright/test";
 import { expect, test, waitForHydration } from "./auth";
 import {
   createMutationFixture,
@@ -99,7 +100,10 @@ test("@mutation collection covers survive failures and retain reusable history",
     await page
       .locator('input[type="file"][aria-label="Gallery"]')
       .setInputFiles(firstImage);
-    await page.getByRole("button", { name: "Upload images" }).click();
+    await clickAndWaitForReload(
+      page,
+      page.getByRole("button", { name: "Upload images" }),
+    );
     await expect(
       page.getByRole("heading", { name: "Current cover" }),
     ).toBeVisible();
@@ -157,7 +161,10 @@ test("@mutation collection covers survive failures and retain reusable history",
     await page
       .locator('input[type="file"][aria-label="Gallery"]')
       .setInputFiles(secondImage);
-    await page.getByRole("button", { name: "Upload images" }).click();
+    await clickAndWaitForReload(
+      page,
+      page.getByRole("button", { name: "Upload images" }),
+    );
     await expect(
       page.getByRole("button", { name: "Use this cover" }),
     ).toHaveCount(1);
@@ -190,10 +197,10 @@ test("@mutation collection covers survive failures and retain reusable history",
       }),
     });
 
-    await replacementGalleryItem
-      .getByRole("button", { name: "Use this cover" })
-      .click();
-    await expect(replacementGalleryItem).toHaveCount(0);
+    await clickAndWaitForReload(
+      page,
+      replacementGalleryItem.getByRole("button", { name: "Use this cover" }),
+    );
     await expect
       .poll(async () => {
         const [current] = await database
@@ -209,10 +216,10 @@ test("@mutation collection covers survive failures and retain reusable history",
       })
       .toBe(replacement.id);
 
-    await originalGalleryItem
-      .getByRole("button", { name: "Use this cover" })
-      .click();
-    await expect(originalGalleryItem).toHaveCount(0);
+    await clickAndWaitForReload(
+      page,
+      originalGalleryItem.getByRole("button", { name: "Use this cover" }),
+    );
     await expect
       .poll(async () => {
         const [current] = await database
@@ -231,7 +238,10 @@ test("@mutation collection covers survive failures and retain reusable history",
     await page
       .locator('input[type="file"][aria-label="Gallery"]')
       .setInputFiles(secondImage);
-    await page.getByRole("button", { name: "Upload images" }).click();
+    await clickAndWaitForReload(
+      page,
+      page.getByRole("button", { name: "Upload images" }),
+    );
     await expect(
       page.getByRole("heading", { name: "Current cover" }),
     ).toBeVisible();
@@ -251,7 +261,10 @@ test("@mutation collection covers survive failures and retain reusable history",
     );
 
     page.once("dialog", (dialog) => dialog.accept());
-    await page.getByRole("button", { name: "Clear cover" }).click();
+    await clickAndWaitForReload(
+      page,
+      page.getByRole("button", { name: "Clear cover" }),
+    );
     await expect
       .poll(async () => {
         const current = await database
@@ -270,10 +283,10 @@ test("@mutation collection covers survive failures and retain reusable history",
       page.getByRole("button", { name: "Use this cover" }),
     ).toHaveCount(2);
 
-    await replacementGalleryItem
-      .getByRole("button", { name: "Use this cover" })
-      .click();
-    await expect(replacementGalleryItem).toHaveCount(0);
+    await clickAndWaitForReload(
+      page,
+      replacementGalleryItem.getByRole("button", { name: "Use this cover" }),
+    );
     await expect
       .poll(async () => {
         const [current] = await database
@@ -290,11 +303,12 @@ test("@mutation collection covers survive failures and retain reusable history",
       .toBe(replacement.id);
 
     page.once("dialog", (dialog) => dialog.accept());
-    await page
-      .getByRole("button", {
+    await clickAndWaitForReload(
+      page,
+      page.getByRole("button", {
         name: new RegExp(`Delete image.*${original.fileName}`, "u"),
-      })
-      .click();
+      }),
+    );
     await expect
       .poll(async () => {
         const remaining = await database
@@ -414,3 +428,15 @@ test("@mutation collection covers survive failures and retain reusable history",
     objectDeleted: "deleted",
   });
 });
+
+/**
+ * Waits for a successful collection image action to finish reloading the page.
+ *
+ * @param page - Active collection edit page.
+ * @param button - Mutation button to click.
+ * @returns When the reloaded page is hydrated.
+ */
+async function clickAndWaitForReload(page: Page, button: Locator) {
+  await Promise.all([page.waitForEvent("load"), button.click()]);
+  await waitForHydration(page);
+}
