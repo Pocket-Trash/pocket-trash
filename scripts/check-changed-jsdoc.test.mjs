@@ -299,6 +299,26 @@ function loadPen(penId) {
   assert.deepEqual(diagnostics, []);
 });
 
+test("accepts a documented exported variable", async (context) => {
+  const directory = mkdtempSync(join(tmpdir(), "changed-jsdoc-export-"));
+  context.after(() => rmSync(directory, { force: true, recursive: true }));
+  writeFileSync(
+    join(directory, "documentation.ts"),
+    `/** Public endpoint path. */
+export const endpoint = "/api";
+`,
+  );
+
+  const diagnostics = await lintChangedDeclarations({
+    changes: new Map([
+      ["documentation.ts", { changedLines: new Set([2]), isNewFile: false }],
+    ]),
+    cwd: directory,
+  });
+
+  assert.deepEqual(diagnostics, []);
+});
+
 test("selects stable data, class, type-member, and object contracts", () => {
   const sourceText = `
 interface Pen {

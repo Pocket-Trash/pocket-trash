@@ -11,6 +11,7 @@ import {
   clerkWebhookPath,
   createApp,
   healthPath,
+  linearWebhookPath,
   logsPath,
   openApiJsonPath,
   uploadSessionsPath,
@@ -132,6 +133,18 @@ describe("api", () => {
     expect(
       (await app.request(`${clerkWebhookPath}/rb`, { method: "POST" })).status,
     ).toBe(404);
+    expect(handle).toHaveBeenCalledOnce();
+  });
+
+  it("forwards Linear webhooks to their runtime", async () => {
+    const handle = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    const app = createApp({ linearWebhookRuntime: { handle } });
+
+    const response = await app.request(linearWebhookPath, { method: "POST" });
+
+    expect(response.status).toBe(200);
     expect(handle).toHaveBeenCalledOnce();
   });
 

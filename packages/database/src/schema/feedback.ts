@@ -34,6 +34,7 @@ export const feedbackNotificationTypes = ["submitted", "completed"] as const;
 export type FeedbackCategory = (typeof feedbackCategories)[number];
 export type FeedbackStatus = (typeof feedbackStatuses)[number];
 
+/** Feedback request records and Linear lifecycle metadata. */
 export const feedback = pgTable(
   "feedback",
   {
@@ -44,7 +45,15 @@ export const feedback = pgTable(
     title: text("title").notNull(),
     description: text("description").notNull(),
     category: text("category", { enum: feedbackCategories }),
+    completedAt: timestamp("completed_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
     linearClientUuid: uuid("linear_client_uuid").unique(),
+    linearUpdatedAt: timestamp("linear_updated_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
     status: text("status", { enum: feedbackStatuses })
       .default("pending")
       .notNull(),
@@ -61,6 +70,10 @@ export const feedback = pgTable(
       table.status,
     ),
     index("feedback_status_created_at_idx").on(table.status, table.createdAt),
+    index("feedback_status_completed_at_idx").on(
+      table.status,
+      table.completedAt,
+    ),
     check(
       "feedback_title_length_valid",
       sql`char_length(${table.title}) between 1 and 120`,

@@ -1,10 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect, within } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
-import { FeedbackBoardPage, MyFeedbackPage } from "./feedback-pages";
+import {
+  CompletedFeedbackPage,
+  FeedbackBoardPage,
+  MyFeedbackPage,
+} from "./feedback-pages";
 
+/** Requested feedback fixture used by page stories. */
 const requested = {
   category: "feature" as const,
+  completedAt: null,
   createdAt: new Date("2026-09-28T12:00:00Z"),
   description: "Let people save searches they use often.",
   hasPermanentVote: false,
@@ -84,7 +90,13 @@ export const EmptyBoard: Story = {
   render: () => <FeedbackBoardPage initialItems={[]} />,
 };
 
+/** Submitter feedback history story. */
 export const MyRequests: Story = {
+  /**
+   * Renders the submitter feedback history.
+   *
+   * @returns The submitter feedback page story.
+   */
   render: () => (
     <MyFeedbackPage
       initialPage={{
@@ -100,4 +112,35 @@ export const MyRequests: Story = {
       }}
     />
   ),
+};
+
+/** Completed feedback page story. */
+export const Completed: Story = {
+  /**
+   * Renders the completed feedback story.
+   *
+   * @returns The completed feedback page story.
+   */
+  render: () => (
+    <CompletedFeedbackPage
+      initialItems={[
+        {
+          ...requested,
+          completedAt: new Date("2026-09-30T12:00:00Z"),
+          status: "completed",
+        },
+      ]}
+    />
+  ),
+  /**
+   * Verifies completed feedback omits voting actions.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after assertions complete.
+   */
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText("Saved searches")).toBeVisible();
+    await expect(canvas.queryByText("Upvote")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("Remove vote")).not.toBeInTheDocument();
+  },
 };
