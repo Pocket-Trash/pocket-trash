@@ -5,8 +5,8 @@ import {
 } from "@/lib/catalog-api";
 import { CollectionFormPage } from "@/pages/catalog-form-pages";
 
-export /** Route configuration for editing a collection. */
-const Route = createFileRoute("/user/collections_/$collectionId_/edit")({
+/** Route configuration for editing a collection. */
+export const Route = createFileRoute("/user/collections_/$collectionId_/edit")({
   params: {
     parse: ({ collectionId }) => ({ collectionId: Number(collectionId) }),
     stringify: ({ collectionId }) => ({ collectionId: String(collectionId) }),

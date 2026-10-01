@@ -38,8 +38,8 @@ function definition(
   } satisfies AuditEventDefinition<CollectionAuditData>;
 }
 
-export /** Audit event definitions for collection mutations. */
-const collectionAudit = {
+/** Audit event definitions for collection mutations. */
+export const collectionAudit = {
   collectionCreated: definition(
     "collections.collection.created",
     "collections.collection",

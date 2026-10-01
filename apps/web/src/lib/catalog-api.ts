@@ -817,8 +817,8 @@ export const getUserCollectionById = createServerFn({ method: "GET" })
     };
   });
 
-export /** Loads deletion choices and their affected item count for a collection. */
-const getCollectionDeletionContext = createServerFn({ method: "GET" })
+/** Loads deletion choices and their affected item count for a collection. */
+export const getCollectionDeletionContext = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
     z.object({ collectionId: idSchema }).parse(input),
   )
@@ -836,8 +836,8 @@ const getCollectionDeletionContext = createServerFn({ method: "GET" })
     };
   });
 
-export /** Moves or permanently deletes a collection and its contents. */
-const deleteUserCollection = createServerFn({ method: "POST" })
+/** Moves or permanently deletes a collection and its contents. */
+export const deleteUserCollection = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
       .object({
