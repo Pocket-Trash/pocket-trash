@@ -17,18 +17,34 @@ import {
 } from "@/lib/locale-api";
 import type { UserSettingsState } from "@/lib/user-settings";
 
+/** Active locale and local preference update operation. */
 type LocaleProviderValue = {
+  /** Active supported locale. */
   locale: SupportedLocale;
+  /**
+   * Updates and locally persists the active locale.
+   *
+   * @param locale - Supported locale selected by the user.
+   */
   setLocale: (locale: SupportedLocale) => void;
 };
 
+/** Locale context, or `null` outside the provider. */
 const LocaleContext = React.createContext<LocaleProviderValue | null>(null);
 
+/**
+ * Initializes locale state and keeps the document language synchronized.
+ *
+ * @param props - Application content and server-loaded settings.
+ * @returns Locale context provider around the application content.
+ */
 export function LocaleProvider({
   children,
   initialSettingsState,
 }: {
+  /** Application content. */
   children: React.ReactNode;
+  /** Server-loaded settings, or `null` when unavailable. */
   initialSettingsState: UserSettingsState | null;
 }) {
   const [locale, setLocaleState] = React.useState<SupportedLocale>(
@@ -57,9 +73,16 @@ export function LocaleProvider({
   );
 }
 
+/**
+ * Reconciles an authenticated user's local locale with persisted settings.
+ *
+ * @param props - Optional server-loaded settings used before a client fetch.
+ * @returns No UI.
+ */
 export function AuthenticatedLocaleSync({
   initialSettingsState,
 }: {
+  /** Server-loaded settings, or `null` when a client fetch is required. */
   initialSettingsState: UserSettingsState | null;
 }) {
   const { isLoaded, isSignedIn } = useAuth();
@@ -119,6 +142,12 @@ export function AuthenticatedLocaleSync({
   return null;
 }
 
+/**
+ * Reads the required locale provider value.
+ *
+ * @returns Active locale and update operation.
+ * @throws When called outside {@link LocaleProvider}.
+ */
 export function useLocale() {
   const context = React.useContext(LocaleContext);
 
@@ -129,6 +158,11 @@ export function useLocale() {
   return context;
 }
 
+/**
+ * Reads the active locale without requiring a provider.
+ *
+ * @returns Active locale, or `null` outside {@link LocaleProvider}.
+ */
 export function useOptionalLocale() {
   return React.useContext(LocaleContext)?.locale ?? null;
 }

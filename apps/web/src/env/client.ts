@@ -1,5 +1,6 @@
 import { createWebClientEnv } from "./client.schema";
 
+/** Validated browser configuration sourced from Vite environment values. */
 export const clientEnv = createWebClientEnv({
   VITE_ASSET_FOLDER_PREFIX: import.meta.env.VITE_ASSET_FOLDER_PREFIX,
   VITE_CDN_BASE_URL: import.meta.env.VITE_CDN_BASE_URL,

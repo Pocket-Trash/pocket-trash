@@ -5,7 +5,18 @@ import type * as React from "react";
 import { clientEnv } from "@/env/client";
 import { useLocale } from "./locale-provider";
 
-export function ClerkProvider({ children }: { children: React.ReactNode }) {
+/**
+ * Configures Clerk with the active locale and application design tokens.
+ *
+ * @param props - Application content requiring Clerk context.
+ * @returns Configured Clerk provider.
+ */
+export function ClerkProvider({
+  children,
+}: {
+  /** Application content. */
+  children: React.ReactNode;
+}) {
   const { locale } = useLocale();
 
   return (
@@ -42,6 +53,12 @@ export function ClerkProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Maps an application locale to Clerk's optional translation bundle.
+ *
+ * @param locale - Active application locale.
+ * @returns Spanish Clerk translations, or `undefined` for Clerk's English default.
+ */
 function clerkLocalization(locale: SupportedLocale) {
   return locale === "es-MX" ? esMX : undefined;
 }
