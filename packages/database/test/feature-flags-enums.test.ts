@@ -8,11 +8,19 @@ import {
   featureFlagOverrideSources,
 } from "../src/schema/enums.js";
 
+/** Absolute path to the shared feature-flag constants. */
 const sharedFeatureFlagsPath = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../feature-flags/src/index.ts",
 );
 
+/**
+ * Reads an exported string-array constant from the feature-flags package.
+ *
+ * @param exportName - Exported constant name to locate.
+ * @returns The constant's string values.
+ * @throws When the export is absent or is not a string-array literal.
+ */
 function readSharedStringArray(exportName: string): string[] {
   const sourceFile = ts.createSourceFile(
     sharedFeatureFlagsPath,
@@ -40,6 +48,14 @@ function readSharedStringArray(exportName: string): string[] {
   throw new Error(`Could not find ${exportName} in ${sharedFeatureFlagsPath}.`);
 }
 
+/**
+ * Extracts string values from a TypeScript array initializer.
+ *
+ * @param initializer - Export initializer to inspect.
+ * @param exportName - Export name used in validation errors.
+ * @returns String literals in source order.
+ * @throws When the initializer is not an array of string literals.
+ */
 function readStringArrayInitializer(
   initializer: ts.Expression,
   exportName: string,

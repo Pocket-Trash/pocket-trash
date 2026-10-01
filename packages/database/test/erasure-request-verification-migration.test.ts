@@ -104,6 +104,13 @@ describe("erasure request verification migration", () => {
     );
   });
 
+  /**
+   * Inserts one raw verification-provenance tuple for constraint testing.
+   *
+   * @param values - SQL values for the provenance columns.
+   * @returns The database execution promise.
+   * @rejects When PostgreSQL rejects the inserted tuple.
+   */
   function insert(values: string) {
     return database.exec(`
       INSERT INTO "erasure_request" (
