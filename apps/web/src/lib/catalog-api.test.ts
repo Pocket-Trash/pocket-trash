@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { collectionWriteSchema, productFormSchema } from "./catalog-api";
 
+/**
+ * Baseline product-form fields combined with finish options by schema tests.
+ */
 const base = {
   bearing: "",
   buttonDiameterMm: null,
@@ -21,6 +24,9 @@ const base = {
   widthMm: null,
 };
 
+/**
+ * Valid finish-option fixtures reused by schema tests.
+ */
 const validFinishOptions = [
   {
     colorEffectId: null,

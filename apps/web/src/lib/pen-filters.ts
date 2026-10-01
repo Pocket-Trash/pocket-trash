@@ -4,6 +4,9 @@ import {
 } from "@pocket-trash/localizations";
 import type { PenProduct } from "./pen-data";
 
+/**
+ * Ordered archive filter definitions and their any/all matching capabilities.
+ */
 export const filterGroups = [
   {
     key: "category",
@@ -27,13 +30,31 @@ export const filterGroups = [
   { key: "noses", labelKey: "web.archive.filter.tipNose", andable: true },
   { key: "finishes", labelKey: "web.archive.filter.finish", andable: false },
 ] as const satisfies readonly {
+  /**
+   * Whether the group supports matching all selected values.
+   */
   andable: boolean;
+  /**
+   * Product field used by the filter group.
+   */
   key: keyof PenProduct;
+  /**
+   * Localization key for the filter-group label.
+   */
   labelKey: TranslationKey;
 }[];
 
+/**
+ * Archive product fields exposed as filters.
+ */
 export type FilterKey = (typeof filterGroups)[number]["key"];
+/**
+ * Whether an andable filter group matches any or all selections.
+ */
 export type MatchMode = "any" | "all";
+/**
+ * Supported archive product ordering modes.
+ */
 export type SortKey =
   | "date_desc"
   | "date_asc"
@@ -45,21 +66,44 @@ export type SortKey =
   | "diameter_desc"
   | "title_asc";
 
+/**
+ * Selected archive filter values keyed by filter group.
+ */
 export type ActiveFilters = Record<FilterKey, Set<string>>;
+/**
+ * Per-group any/all matching modes.
+ */
 export type MatchModes = Record<FilterKey, MatchMode>;
 
+/**
+ * Creates empty selection sets for every archive filter group.
+ *
+ * @returns Fresh empty filter sets for every group.
+ */
 export function createEmptyFilters(): ActiveFilters {
   return Object.fromEntries(
     filterGroups.map((group) => [group.key, new Set<string>()]),
   ) as ActiveFilters;
 }
 
+/**
+ * Creates `any` matching mode for every archive filter group.
+ *
+ * @returns Fresh default match modes for every group.
+ */
 export function createDefaultMatchModes(): MatchModes {
   return Object.fromEntries(
     filterGroups.map((group) => [group.key, "any"]),
   ) as MatchModes;
 }
 
+/**
+ * Counts distinct non-empty values for one archive filter and sorts them for display.
+ *
+ * @param products - Archive products to inspect.
+ * @param key - Archive field whose values should be counted.
+ * @returns Value/count pairs sorted numerically for sizes or by count and label otherwise.
+ */
 export function valuesFor(products: PenProduct[], key: FilterKey) {
   const counts = new Map<string, number>();
 
@@ -80,8 +124,17 @@ export function valuesFor(products: PenProduct[], key: FilterKey) {
   });
 }
 
+/**
+ * Per-product cache of normalized archive search text.
+ */
 const haystackCache = new WeakMap<PenProduct, string>();
 
+/**
+ * Builds and caches lowercase searchable text for an archive product.
+ *
+ * @param product - Archive product whose searchable text is needed.
+ * @returns Cached lowercase text used for token matching.
+ */
 function searchableHaystack(product: PenProduct) {
   const cached = haystackCache.get(product);
   if (cached) return cached;
@@ -109,6 +162,15 @@ function searchableHaystack(product: PenProduct) {
   return haystack;
 }
 
+/**
+ * Checks search tokens and active any/all filters against an archive product.
+ *
+ * @param product - Archive product to test.
+ * @param query - Whitespace-separated search query.
+ * @param active - Active archive filter selections.
+ * @param matchModes - Per-group any/all matching modes.
+ * @returns Whether the product satisfies the search query and active filters.
+ */
 export function productMatches(
   product: PenProduct,
   query: string,
@@ -147,13 +209,32 @@ export function productMatches(
   return true;
 }
 
+/**
+ * Returns a copy of archive products ordered by the requested mode.
+ *
+ * @param products - Archive products to sort.
+ * @param sort - Requested archive ordering.
+ * @returns A newly sorted product array.
+ */
 export function sortProducts(products: PenProduct[], sort: SortKey) {
   const rows = [...products];
+  /**
+   * Builds an ascending numeric comparator that places missing values last.
+   *
+   * @param key - Numeric product field to compare.
+   * @returns An ascending comparator for the selected numeric field.
+   */
   const numberAscending =
     (key: "price_min" | "weight_g" | "diameter_in") =>
     (a: PenProduct, b: PenProduct) =>
       (a[key] ?? Number.POSITIVE_INFINITY) -
       (b[key] ?? Number.POSITIVE_INFINITY);
+  /**
+   * Builds a descending numeric comparator that places missing values last.
+   *
+   * @param key - Numeric product field to compare.
+   * @returns A descending comparator for the selected numeric field.
+   */
   const numberDescending =
     (key: "price_min" | "weight_g" | "diameter_in") =>
     (a: PenProduct, b: PenProduct) =>
@@ -193,6 +274,13 @@ export function sortProducts(products: PenProduct[], sort: SortKey) {
   return rows;
 }
 
+/**
+ * Builds the archive headline from product size, clip, mechanism, and category data.
+ *
+ * @param product - Archive product to summarize.
+ * @param t - Translation formatter; defaults to the shared formatter.
+ * @returns The normalized archive headline.
+ */
 export function normalizedHeadline(
   product: PenProduct,
   t: (
@@ -222,6 +310,12 @@ export function normalizedHeadline(
     .join(" ");
 }
 
+/**
+ * Splits an archive title into headline and detail segments.
+ *
+ * @param title - Archive product title.
+ * @returns Headline and detail text; detail is empty when no separator exists.
+ */
 export function splitTitle(title: string) {
   const dual = title.match(/^(\d{2}\s+\w+\s+-\s+\d{2}\s+\w+)\s*(.*)$/);
 
