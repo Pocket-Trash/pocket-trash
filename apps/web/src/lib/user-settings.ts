@@ -15,21 +15,32 @@ import {
 } from "@/lib/pen-formatters";
 import { isThemeMode, type ThemeMode } from "@/lib/theme";
 
+/** Fully resolved preferences used by the web client. */
 export type UserSettingsPreferences = UpsertUserSettingsInput & {
+  /** Preferred ISO currency code. */
   currencyCode: CurrencyCode;
+  /** Preferred dimension display unit. */
   dimensionUnit: DimensionUnit;
+  /** Explicit supported locale, or `null` for automatic selection. */
   locale: SupportedLocale | null;
+  /** Preferred light, dark, or system theme. */
   theme: ThemeMode;
+  /** Preferred weight display unit. */
   weightUnit: WeightUnit;
 };
 
+/** Validated preference fields that may participate in an update. */
 export type UserSettingsPatch = Partial<UserSettingsPreferences>;
 
+/** Current preference values and whether they were persisted. */
 export type UserSettingsState = {
+  /** Whether the user has saved a settings record. */
   hasSavedSettings: boolean;
+  /** Resolved preferences, including defaults when no record exists. */
   settings: UserSettingsPreferences;
 };
 
+/** Default preferences for users without saved settings. */
 export const defaultUserSettings: UserSettingsPreferences = {
   currencyCode: "USD",
   dimensionUnit: "in",
@@ -38,8 +49,14 @@ export const defaultUserSettings: UserSettingsPreferences = {
   weightUnit: "g",
 };
 
+/** Browser storage key for local user-setting state. */
 export const userSettingsStorageKey = "pocket-trash.settings";
 
+/** Returns resolved settings for the current user, or `null` when signed out.
+ *
+ * @returns Saved or default settings, or `null` for an anonymous request.
+ * @rejects When authentication, service loading, or settings lookup fails.
+ */
 export const getCurrentUserSettingsState = createServerFn({
   method: "GET",
 }).handler(async (): Promise<UserSettingsState | null> => {
@@ -58,6 +75,11 @@ export const getCurrentUserSettingsState = createServerFn({
   };
 });
 
+/** Patches persisted settings, returning `null` when the request is signed out.
+ *
+ * @returns The updated resolved settings, or `null` for an anonymous request.
+ * @rejects When validation, authentication, service loading, or persistence fails.
+ */
 export const patchCurrentUserSettings = createServerFn({ method: "POST" })
   .validator(parseUserSettingsPatch)
   .handler(async ({ data }): Promise<UserSettingsPreferences | null> => {
@@ -73,6 +95,12 @@ export const patchCurrentUserSettings = createServerFn({ method: "POST" })
     return toUserSettingsPreferences(settings);
   });
 
+/** Validates a non-empty patch of supported user preferences.
+ *
+ * @param input - Untrusted request payload.
+ * @returns The validated settings patch.
+ * @throws When the payload is empty, malformed, or contains an invalid supplied setting.
+ */
 function parseUserSettingsPatch(input: unknown): UserSettingsPatch {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     throw new Error(formatTranslation("web.error.userSettingsObject"));
@@ -123,23 +151,48 @@ function parseUserSettingsPatch(input: unknown): UserSettingsPatch {
   return patch;
 }
 
+/** Tests whether a value is a supported dimension unit.
+ *
+ * @param value - Value to inspect.
+ * @returns Whether the value is inches or millimetres.
+ */
 function isDimensionUnit(value: unknown): value is DimensionUnit {
   return value === "in" || value === "mm";
 }
 
+/** Tests whether a value is a supported weight unit.
+ *
+ * @param value - Value to inspect.
+ * @returns Whether the value is grams or ounces.
+ */
 function isWeightUnit(value: unknown): value is WeightUnit {
   return value === "g" || value === "oz";
 }
 
+/** Tests whether a value is already a canonical supported locale.
+ *
+ * @param value - Value to inspect.
+ * @returns Whether locale resolution preserves the value exactly.
+ */
 function isSupportedLocale(value: unknown): value is SupportedLocale {
   return resolveLocale(value as LocalePreference) === value;
 }
 
+/** Resolves persisted settings into client preference values.
+ *
+ * @param settings - Stored or default settings values.
+ * @returns Preferences with a canonical locale or the automatic `null` sentinel.
+ */
 function toUserSettingsPreferences(settings: {
+  /** Preferred ISO currency code. */
   currencyCode: CurrencyCode;
+  /** Preferred dimension display unit. */
   dimensionUnit: DimensionUnit;
+  /** Stored locale preference, or automatic selection when absent. */
   locale?: LocalePreference | null;
+  /** Preferred light, dark, or system theme. */
   theme: ThemeMode;
+  /** Preferred weight display unit. */
   weightUnit: WeightUnit;
 }) {
   return {
