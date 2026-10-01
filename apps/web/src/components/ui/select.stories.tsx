@@ -8,15 +8,29 @@ import {
   SelectValue,
 } from "./select";
 
+/**
+ * Configures Storybook coverage for the select examples.
+ */
 const meta = {
   component: Select,
   title: "UI/Select",
 } satisfies Meta<typeof Select>;
 
 export default meta;
+/**
+ * Storybook story contract for the select examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Shows the select closed example.
+ */
 export const Closed: Story = {
+  /**
+   * Renders the select closed example.
+   *
+   * @returns The rendered story example.
+   */
   render: () => (
     <Select defaultValue="material">
       <SelectTrigger aria-label="Sort">
@@ -31,7 +45,15 @@ export const Closed: Story = {
   ),
 };
 
+/**
+ * Shows the select open example.
+ */
 export const Open: Story = {
+  /**
+   * Renders the select open example.
+   *
+   * @returns The rendered story example.
+   */
   render: () => (
     <Select defaultValue="material" open>
       <SelectTrigger aria-label="Sort">
@@ -46,7 +68,15 @@ export const Open: Story = {
   ),
 };
 
+/**
+ * Shows the select selection example.
+ */
 export const Selection: Story = {
+  /**
+   * Renders the select selection example.
+   *
+   * @returns The rendered story example.
+   */
   render: () => (
     <Select defaultValue="material">
       <SelectTrigger aria-label="Sort">
@@ -59,6 +89,14 @@ export const Selection: Story = {
       </SelectContent>
     </Select>
   ),
+  /**
+   * Exercises the select selection interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.canvasElement - Rendered Storybook canvas element.
+   * @param context.userEvent - Storybook interaction driver.
+   */
   play: async ({ canvas, canvasElement, userEvent }) => {
     await userEvent.click(canvas.getByRole("combobox", { name: "Sort" }));
 

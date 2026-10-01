@@ -1,6 +1,14 @@
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Renders a styled native input.
+ *
+ * @param props - Input properties.
+ * @param props.className - Additional CSS classes.
+ * @param props.type - Native input control type.
+ * @returns The rendered input UI.
+ */
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
     <input

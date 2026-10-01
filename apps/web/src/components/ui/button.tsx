@@ -3,6 +3,9 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Maps button variants and sizes to their CSS classes.
+ */
 const buttonVariants = cva(
   "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
@@ -32,6 +35,15 @@ const buttonVariants = cva(
   },
 );
 
+/**
+ * Renders a button with the selected visual variant and size.
+ *
+ * @param props - Button properties.
+ * @param props.className - Additional CSS classes.
+ * @param props.variant - Visual style variant; defaults to `"default"`.
+ * @param props.size - Visual size variant; defaults to `"default"`.
+ * @returns The rendered button UI.
+ */
 function Button({
   className,
   variant,

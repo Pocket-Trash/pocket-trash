@@ -3,18 +3,38 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Provides the select interaction root.
+ *
+ * @param props - Select properties.
+ * @returns The rendered select UI.
+ */
 function Select({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
   return <SelectPrimitive.Root data-slot="select" {...props} />;
 }
 
+/**
+ * Renders the selected value or placeholder for a select.
+ *
+ * @param props - Select value properties.
+ * @returns The rendered select value UI.
+ */
 function SelectValue({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Value>) {
   return <SelectPrimitive.Value data-slot="select-value" {...props} />;
 }
 
+/**
+ * Renders the control that opens the select.
+ *
+ * @param props - Select trigger properties.
+ * @param props.className - Additional CSS classes.
+ * @param props.children - Nested content.
+ * @returns The rendered select trigger UI.
+ */
 function SelectTrigger({
   className,
   children,
@@ -37,6 +57,18 @@ function SelectTrigger({
   );
 }
 
+/**
+ * Renders the positioned select panel.
+ *
+ * @param props - Select content properties.
+ * @param props.align - Popup alignment relative to its trigger.
+ * @param props.className - Additional CSS classes.
+ * @param props.children - Nested content.
+ * @param props.position - Popup positioning strategy.
+ * @param props.side - Screen edge used to place the panel.
+ * @param props.sideOffset - Distance in pixels, or a resolver returning pixels, between the popup and its trigger; defaults to `4` for popper positioning and `0` for item-aligned positioning.
+ * @returns The rendered select content UI.
+ */
 function SelectContent({
   align,
   className,
@@ -50,6 +82,9 @@ function SelectContent({
     React.ComponentProps<typeof SelectPrimitive.Positioner>,
     "align" | "side" | "sideOffset"
   > & {
+    /**
+     * Popup positioning strategy.
+     */
     position?: "popper" | "item-aligned";
   }) {
   return (
@@ -82,6 +117,14 @@ function SelectContent({
   );
 }
 
+/**
+ * Renders one selectable select item.
+ *
+ * @param props - Select item properties.
+ * @param props.className - Additional CSS classes.
+ * @param props.children - Nested content.
+ * @returns The rendered select item UI.
+ */
 function SelectItem({
   className,
   children,
@@ -106,6 +149,13 @@ function SelectItem({
   );
 }
 
+/**
+ * Renders the control for scrolling select options upward.
+ *
+ * @param props - Select scroll up button properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered select scroll up button UI.
+ */
 function SelectScrollUpButton({
   className,
   ...props
@@ -124,6 +174,13 @@ function SelectScrollUpButton({
   );
 }
 
+/**
+ * Renders the control for scrolling select options downward.
+ *
+ * @param props - Select scroll down button properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered select scroll down button UI.
+ */
 function SelectScrollDownButton({
   className,
   ...props

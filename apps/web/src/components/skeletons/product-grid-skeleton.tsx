@@ -2,6 +2,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 // Stable keys for the placeholder cards (they never reorder), so we avoid keying
 // by array index.
+/**
+ * Stable keys used to render the maximum product-grid placeholder count.
+ */
 const PLACEHOLDER_KEYS = Array.from(
   { length: 48 },
   (_, index) => `product-skeleton-${index}`,
@@ -11,7 +14,25 @@ const PLACEHOLDER_KEYS = Array.from(
 // now, and behind the service worker's cache warm-up once the PWA lands. Mirrors
 // the reserved heights in `product-card.tsx` so there is no layout shift when the
 // real cards swap in. Renders bare cards so the caller keeps them in its grid.
-export function ProductGridSkeleton({ count = 12 }: { count?: number }) {
+/**
+ * Renders bare product-card placeholders for placement in a caller-owned grid.
+ *
+ * @param props - Product grid skeleton properties.
+ * @param props.count - Slice endpoint applied to the fixed set of 48 placeholders.
+ * @returns Up to 48 product-card placeholders without a grid wrapper.
+ */
+export function ProductGridSkeleton({
+  count = 12,
+}: {
+  /**
+   * Slice endpoint applied to the fixed set of 48 placeholders. Values above 48
+   * render all placeholders; negative and fractional values follow `Array.slice`
+   * endpoint semantics.
+   *
+   * @default 12
+   */
+  count?: number;
+}) {
   return (
     <>
       {PLACEHOLDER_KEYS.slice(0, count).map((key) => (
@@ -21,6 +42,11 @@ export function ProductGridSkeleton({ count = 12 }: { count?: number }) {
   );
 }
 
+/**
+ * Renders a placeholder for one product card.
+ *
+ * @returns The rendered product card skeleton UI.
+ */
 function ProductCardSkeleton() {
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card">

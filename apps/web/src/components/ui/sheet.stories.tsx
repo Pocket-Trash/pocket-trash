@@ -12,6 +12,9 @@ import {
   SheetTrigger,
 } from "./sheet";
 
+/**
+ * Localized settings displayed by sheet stories.
+ */
 const settings: UserSettingsState = {
   hasSavedSettings: true,
   settings: {
@@ -23,6 +26,9 @@ const settings: UserSettingsState = {
   },
 };
 
+/**
+ * Configures Storybook coverage for the sheet examples.
+ */
 const meta: Meta<typeof Sheet> = {
   component: Sheet,
   decorators: [
@@ -36,9 +42,20 @@ const meta: Meta<typeof Sheet> = {
 };
 
 export default meta;
+/**
+ * Storybook story contract for the sheet examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Shows the sheet right example.
+ */
 export const Right: Story = {
+  /**
+   * Renders the sheet right example.
+   *
+   * @returns The rendered story example.
+   */
   render: () => (
     <Sheet open>
       <SheetTrigger render={<Button variant="outline" />}>Open</SheetTrigger>
@@ -54,7 +71,15 @@ export const Right: Story = {
   ),
 };
 
+/**
+ * Shows the sheet left example.
+ */
 export const Left: Story = {
+  /**
+   * Renders the sheet left example.
+   *
+   * @returns The rendered story example.
+   */
   render: () => (
     <Sheet open>
       <SheetContent side="left">
@@ -67,7 +92,15 @@ export const Left: Story = {
   ),
 };
 
+/**
+ * Shows the sheet dismiss example.
+ */
 export const Dismiss: Story = {
+  /**
+   * Renders the sheet dismiss example.
+   *
+   * @returns The rendered story example.
+   */
   render: () => (
     <Sheet>
       <SheetTrigger render={<Button variant="outline" />}>Open</SheetTrigger>
@@ -81,6 +114,14 @@ export const Dismiss: Story = {
       </SheetContent>
     </Sheet>
   ),
+  /**
+   * Exercises the sheet dismiss interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.canvasElement - Rendered Storybook canvas element.
+   * @param context.userEvent - Storybook interaction driver.
+   */
   play: async ({ canvas, canvasElement, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: "Open" }));
 

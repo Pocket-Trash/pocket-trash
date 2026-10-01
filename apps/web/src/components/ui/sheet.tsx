@@ -5,30 +5,61 @@ import type * as React from "react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Provides the sheet interaction root, defaulting swipe gestures to the right.
+ *
+ * @param props - Sheet properties.
+ * @returns The rendered sheet UI.
+ */
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return (
     <SheetPrimitive.Root data-slot="sheet" swipeDirection="right" {...props} />
   );
 }
 
+/**
+ * Renders the control that opens the sheet.
+ *
+ * @param props - Sheet trigger properties.
+ * @returns The rendered sheet trigger UI.
+ */
 function SheetTrigger({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Trigger>) {
   return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />;
 }
 
+/**
+ * Renders a control that closes the sheet.
+ *
+ * @param props - Sheet close properties.
+ * @returns The rendered sheet close UI.
+ */
 function SheetClose({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Close>) {
   return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
 }
 
+/**
+ * Portals the floating sheet layer.
+ *
+ * @param props - Sheet portal properties.
+ * @returns The rendered sheet portal UI.
+ */
 function SheetPortal({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Portal>) {
   return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />;
 }
 
+/**
+ * Renders the backdrop behind the sheet.
+ *
+ * @param props - Sheet overlay properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered sheet overlay UI.
+ */
 function SheetOverlay({
   className,
   ...props
@@ -45,12 +76,25 @@ function SheetOverlay({
   );
 }
 
+/**
+ * Renders the positioned sheet panel.
+ *
+ * @param props - Sheet content properties.
+ * @param props.className - Additional CSS classes.
+ * @param props.children - Nested content.
+ * @param props.side - Screen edge used to place the panel.
+ * @returns The rendered sheet content UI.
+ * @throws {Error} When rendered outside `LocaleProvider`.
+ */
 function SheetContent({
   className,
   children,
   side = "right",
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
+  /**
+   * Screen edge used to place the panel.
+   */
   side?: "top" | "right" | "bottom" | "left";
 }) {
   const { locale } = useLocale();
@@ -93,6 +137,13 @@ function SheetContent({
   );
 }
 
+/**
+ * Renders the header region of the sheet.
+ *
+ * @param props - Sheet header properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered sheet header UI.
+ */
 function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -106,6 +157,13 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/**
+ * Renders the accessible title of the sheet.
+ *
+ * @param props - Sheet title properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered sheet title UI.
+ */
 function SheetTitle({
   className,
   ...props
@@ -122,6 +180,13 @@ function SheetTitle({
   );
 }
 
+/**
+ * Renders the accessible description of the sheet.
+ *
+ * @param props - Sheet description properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered sheet description UI.
+ */
 function SheetDescription({
   className,
   ...props
