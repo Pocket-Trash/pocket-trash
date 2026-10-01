@@ -4,14 +4,13 @@ import { canManageResources, listResourceNotifications } from "@/lib/resources";
 import { AdminResourceNotificationsPage } from "@/pages/admin-resource-notifications-page";
 
 /**
- * Defines the `/admin/notifications/resources` route and its data lifecycle.
+ * Shows resource notifications to resource administrators.
  */
 export const Route = createFileRoute("/admin/notifications/resources")({
   /**
    * Requires resource administration access before entering the route.
    *
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @rejects When the current user lacks resource administration access.
    */
   beforeLoad: async () => {
     if (!(await canManageResources())) throw notFound();
@@ -28,7 +27,8 @@ export const Route = createFileRoute("/admin/notifications/resources")({
   /**
    * Loads resource notifications for administrators.
    *
-   * @returns The route's loader data.
+   * @returns Resource notifications.
+   * @rejects When resource notifications cannot be loaded.
    */
   loader: async () => await listResourceNotifications(),
 });

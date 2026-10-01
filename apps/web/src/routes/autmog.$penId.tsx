@@ -6,7 +6,7 @@ import { absoluteUrl } from "@/lib/site-url";
 import { ArchivePage } from "@/pages/archive-page";
 
 /**
- * Defines the `/autmog/$penId` route and its data lifecycle.
+ * Shows a legacy archive entry and canonicalizes its pen identifier.
  */
 export const Route = createFileRoute("/autmog/$penId")({
   /**
@@ -41,8 +41,8 @@ export const Route = createFileRoute("/autmog/$penId")({
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
    * @param context.deps - Normalized loader dependencies.
-   * @returns The route's loader data.
-   * @throws When the requested route data is unavailable or access is denied.
+   * @returns Archive data for the resolved pen.
+   * @throws When the pen identifier is unknown or requires a canonical redirect.
    */
   loader: ({ params, deps }) => {
     const product = decodePenParam(params.penId);

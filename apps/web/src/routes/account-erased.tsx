@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AccountErasedPage } from "@/pages/account-erasure-pages";
 
 /**
- * Defines the `/account-erased` route and its data lifecycle.
+ * Shows confirmation after an account erasure finishes.
  */
 export const Route = createFileRoute("/account-erased")({
   component: AccountErasedPage,

@@ -5,14 +5,13 @@ import { canManageResources } from "@/lib/resources";
 import { AdminNotificationsIndexPage } from "@/pages/admin-notifications-index-page";
 
 /**
- * Defines the `/notifications` route and its data lifecycle.
+ * Shows notification areas available to the current administrator.
  */
 export const Route = createFileRoute("/notifications")({
   /**
    * Requires feedback or resource administration access before entering the route.
    *
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @rejects When the current user lacks both feedback and resource administration access.
    */
   beforeLoad: async () => {
     const [mayManageFeedback, mayManageResources] = await Promise.all([

@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AdminTrashIndexPage } from "@/pages/admin-trash-index-page";
 
 /**
- * Defines the `/admin/trash/` route and its data lifecycle.
+ * Shows the administrator trash landing page.
  */
 export const Route = createFileRoute("/admin/trash/")({
   component: AdminTrashIndexPage,

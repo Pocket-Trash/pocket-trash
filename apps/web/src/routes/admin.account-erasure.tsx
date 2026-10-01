@@ -4,14 +4,13 @@ import { canEraseAccounts } from "@/lib/account-erasure";
 import { AdminAccountErasurePage } from "@/pages/admin-account-erasure-page";
 
 /**
- * Defines the `/admin/account-erasure` route and its data lifecycle.
+ * Provides account-erasure operations to authorized administrators.
  */
 export const Route = createFileRoute("/admin/account-erasure")({
   /**
    * Requires account-erasure administration access before entering the route.
    *
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @rejects When the current user lacks account-erasure administration access.
    */
   beforeLoad: async () => {
     if (!(await canEraseAccounts())) throw notFound();

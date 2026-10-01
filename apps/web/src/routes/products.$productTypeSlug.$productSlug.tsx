@@ -4,7 +4,7 @@ import { getCatalogProductDetail } from "@/lib/catalog-api";
 import { ProductDetailPage } from "@/pages/catalog-pages";
 
 /**
- * Defines the `/products/$productTypeSlug/$productSlug` route and its data lifecycle.
+ * Shows one catalog product and its collection usage.
  */
 export const Route = createFileRoute("/products/$productTypeSlug/$productSlug")(
   {
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/products/$productTypeSlug/$productSlug")(
        *
        * @param params - Serialized route parameters.
        * @returns Typed route parameters.
-       * @throws When the requested route data is unavailable or access is denied.
+       * @throws When either slug has an invalid format.
        */
       parse: (params) => {
         if (
@@ -31,9 +31,8 @@ export const Route = createFileRoute("/products/$productTypeSlug/$productSlug")(
      *
      * @param context - Route callback context.
      * @param context.params - Parsed route parameters.
-     * @returns The route's loader data.
-     * @throws When the requested route data is unavailable or access is denied.
-     * @rejects When the requested route data is unavailable or access is denied.
+     * @returns The catalog product and its collection items.
+     * @rejects When the catalog product cannot be loaded.
      */
     loader: async ({ params }) => {
       const detail = await getCatalogProductDetail({ data: params });

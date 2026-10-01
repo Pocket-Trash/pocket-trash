@@ -5,7 +5,7 @@ import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { CollectionPage } from "@/pages/catalog-pages";
 
 /**
- * Defines the `/user/collections_/$collectionId` route and its data lifecycle.
+ * Shows one collection owned by the current user.
  */
 export const Route = createFileRoute("/user/collections_/$collectionId")({
   params: {
@@ -32,9 +32,8 @@ export const Route = createFileRoute("/user/collections_/$collectionId")({
    *
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
-   * @returns The route's loader data.
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @returns The owned collection and its items.
+   * @rejects When the identifier is invalid or the owned collection cannot be loaded.
    */
   loader: async ({ params }) => {
     if (

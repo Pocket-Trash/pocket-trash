@@ -5,14 +5,15 @@ import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { ProductsPage } from "@/pages/catalog-pages";
 
 /**
- * Defines the `/products/` route and its data lifecycle.
+ * Shows the filterable catalog product directory.
  */
 export const Route = createFileRoute("/products/")({
   validateSearch: parseCatalogFilterSearch,
   /**
    * Loads the catalog product directory.
    *
-   * @returns The route's loader data.
+   * @returns Catalog products available to the directory.
+   * @rejects When catalog products cannot be loaded.
    */
   loader: () => listCatalogProducts(),
   component: ProductsRoute,

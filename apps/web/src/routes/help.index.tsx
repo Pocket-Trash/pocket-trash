@@ -5,7 +5,7 @@ import { HelpIndexPage } from "@/pages/help-pages";
 import { useLocale } from "@/providers/locale-provider";
 
 /**
- * Defines the `/help/` route and its data lifecycle.
+ * Shows the localized help index.
  */
 export const Route = createFileRoute("/help/")({
   component: HelpIndexRoute,

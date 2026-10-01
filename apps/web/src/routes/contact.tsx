@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PublicPlaceholderPage } from "@/pages/public-placeholder-page";
 
 /**
- * Defines the `/contact` route and its data lifecycle.
+ * Shows the public contact placeholder page.
  */
 export const Route = createFileRoute("/contact")({
   /**

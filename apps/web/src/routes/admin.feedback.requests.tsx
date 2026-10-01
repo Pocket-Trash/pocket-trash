@@ -8,14 +8,13 @@ import {
 import { AdminFeedbackRequestsPage } from "@/pages/admin-feedback-pages";
 
 /**
- * Defines the `/admin/feedback/requests` route and its data lifecycle.
+ * Shows pending feedback and merge targets to feedback administrators.
  */
 export const Route = createFileRoute("/admin/feedback/requests")({
   /**
    * Requires feedback administration access before entering the route.
    *
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @rejects When the current user lacks feedback administration access.
    */
   beforeLoad: async () => {
     if (!(await canManageFeedback())) throw notFound();
@@ -23,7 +22,8 @@ export const Route = createFileRoute("/admin/feedback/requests")({
   /**
    * Loads pending feedback and eligible merge targets.
    *
-   * @returns The route's loader data.
+   * @returns The first pending-feedback page and eligible merge targets.
+   * @rejects When pending feedback or merge targets cannot be loaded.
    */
   loader: async () => {
     const [initialPage, mergeTargets] = await Promise.all([

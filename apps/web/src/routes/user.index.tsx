@@ -3,13 +3,14 @@ import { hasMyFeedback } from "@/lib/feedback";
 import { UserIndexPage } from "@/pages/user-index-page";
 
 /**
- * Defines the `/user/` route and its data lifecycle.
+ * Shows the current user's account landing page.
  */
 export const Route = createFileRoute("/user/")({
   /**
    * Loads whether the current user has submitted feedback.
    *
-   * @returns The route's loader data.
+   * @returns Whether the current user has submitted feedback.
+   * @rejects When the current user's feedback state cannot be loaded.
    */
   loader: async () => await hasMyFeedback(),
   component: UserIndexRoute,

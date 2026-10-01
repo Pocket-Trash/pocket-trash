@@ -4,13 +4,14 @@ import { listMyFeedback } from "@/lib/feedback";
 import { MyFeedbackPage } from "@/pages/feedback-pages";
 
 /**
- * Defines the `/feedback/my-requests` route and its data lifecycle.
+ * Shows feedback submitted by the current user.
  */
 export const Route = createFileRoute("/feedback/my-requests")({
   /**
    * Loads the current user's first page of feedback requests.
    *
-   * @returns The route's loader data.
+   * @returns The current user's first feedback page.
+   * @rejects When the current user's feedback cannot be loaded.
    */
   loader: async () => await listMyFeedback({ data: { offset: 0, search: "" } }),
   component: MyFeedbackRoute,

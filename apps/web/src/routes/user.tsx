@@ -2,14 +2,13 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { getAuthState } from "@/lib/auth";
 
 /**
- * Defines the `/user` route and its data lifecycle.
+ * Guards the authenticated user route tree and renders its selected child route.
  */
 export const Route = createFileRoute("/user")({
   /**
    * Requires authentication before entering the user route.
    *
-   * @throws When navigation must continue at another route.
-   * @rejects When navigation must continue at another route.
+   * @rejects When an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     const { isAuthenticated } = await getAuthState();

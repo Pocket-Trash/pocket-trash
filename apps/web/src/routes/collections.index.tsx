@@ -5,14 +5,15 @@ import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { PublicCollectionsPage } from "@/pages/catalog-pages";
 
 /**
- * Defines the `/collections/` route and its data lifecycle.
+ * Shows users who expose public collections.
  */
 export const Route = createFileRoute("/collections/")({
   validateSearch: parseCatalogFilterSearch,
   /**
    * Loads users who expose public collections.
    *
-   * @returns The route's loader data.
+   * @returns Users who expose public collections.
+   * @rejects When public collection owners cannot be loaded.
    */
   loader: () => getPublicCollectionOwners(),
   component: CollectionsRoute,

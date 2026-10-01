@@ -4,14 +4,13 @@ import { getCatalogOptions } from "@/lib/catalog-api";
 import { ProductFormPage } from "@/pages/catalog-form-pages";
 
 /**
- * Defines the `/products/add` route and its data lifecycle.
+ * Provides authenticated catalog-product creation.
  */
 export const Route = createFileRoute("/products/add")({
   /**
    * Requires authentication before entering the products add route.
    *
-   * @throws When navigation must continue at another route.
-   * @rejects When navigation must continue at another route.
+   * @rejects When an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     if (!(await getAuthState()).isAuthenticated) {
@@ -21,7 +20,8 @@ export const Route = createFileRoute("/products/add")({
   /**
    * Loads catalog options for creating a product.
    *
-   * @returns The route's loader data.
+   * @returns Catalog form options.
+   * @rejects When catalog form options cannot be loaded.
    */
   loader: () => getCatalogOptions(),
   component: ProductAddRoute,

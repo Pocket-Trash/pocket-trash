@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SubmitFeedbackPage } from "@/pages/feedback-pages";
 
 /**
- * Defines the `/feedback/new` route and its data lifecycle.
+ * Provides the feedback submission page.
  */
 export const Route = createFileRoute("/feedback/new")({
   component: SubmitFeedbackPage,

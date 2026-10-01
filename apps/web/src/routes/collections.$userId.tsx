@@ -3,7 +3,7 @@ import { getPublicCollectionOwner } from "@/lib/catalog-api";
 import { PublicCollectionPage } from "@/pages/catalog-pages";
 
 /**
- * Defines the `/collections/$userId` route and its data lifecycle.
+ * Shows the public collection profile for one user.
  */
 export const Route = createFileRoute("/collections/$userId")({
   params: {
@@ -29,9 +29,8 @@ export const Route = createFileRoute("/collections/$userId")({
    *
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
-   * @returns The route's loader data.
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @returns The public collection owner.
+   * @rejects When the user identifier is invalid or its public owner cannot be loaded.
    */
   loader: async ({ params }) => {
     if (!Number.isSafeInteger(params.userId) || params.userId <= 0) {

@@ -5,7 +5,7 @@ import { HelpTopicPage } from "@/pages/help-pages";
 import { useLocale } from "@/providers/locale-provider";
 
 /**
- * Defines the `/help/$slug` route and its data lifecycle.
+ * Shows one localized help document selected by slug.
  */
 export const Route = createFileRoute("/help/$slug")({
   component: HelpTopicRoute,
@@ -14,8 +14,8 @@ export const Route = createFileRoute("/help/$slug")({
    *
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
-   * @returns The route's loader data.
-   * @throws When the requested route data is unavailable or access is denied.
+   * @returns The validated help-document slug.
+   * @throws When the help topic slug is unknown.
    */
   loader: ({ params }) => {
     if (!getHelpDocument("en-US", params.slug)) throw notFound();
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/help/$slug")({
  * Renders the help topic route content.
  *
  * @returns The rendered route UI.
- * @throws When the requested route data is unavailable or access is denied.
+ * @throws When the localized help document is unavailable.
  */
 function HelpTopicRoute() {
   const slug = Route.useLoaderData();

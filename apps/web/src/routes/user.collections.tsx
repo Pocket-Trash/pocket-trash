@@ -5,14 +5,15 @@ import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { UserCollectionsPage } from "@/pages/catalog-pages";
 
 /**
- * Defines the `/user/collections` route and its data lifecycle.
+ * Shows all collection items owned by the current user.
  */
 export const Route = createFileRoute("/user/collections")({
   validateSearch: parseCatalogFilterSearch,
   /**
    * Loads the current user's collection items and collection choices.
    *
-   * @returns The route's loader data.
+   * @returns The current user's collection items and collection choices.
+   * @rejects When the current user's collection data cannot be loaded.
    */
   loader: async () => {
     const [items, collections] = await Promise.all([

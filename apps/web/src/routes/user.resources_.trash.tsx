@@ -4,7 +4,7 @@ import { listOwnerResourceTrash } from "@/lib/resources";
 import { OwnerResourceTrashPage } from "@/pages/resource-trash-page";
 
 /**
- * Defines the `/user/resources_/trash` route and its data lifecycle.
+ * Shows resources trashed by the current user.
  */
 export const Route = createFileRoute("/user/resources_/trash")({
   component: OwnerResourceTrashRoute,
@@ -19,7 +19,8 @@ export const Route = createFileRoute("/user/resources_/trash")({
   /**
    * Loads the current user's trashed resources.
    *
-   * @returns The route's loader data.
+   * @returns Resources trashed by the current user.
+   * @rejects When the current user's trashed resources cannot be loaded.
    */
   loader: () => listOwnerResourceTrash(),
 });

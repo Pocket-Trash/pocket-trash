@@ -7,7 +7,7 @@ import {
 } from "@/pages/resources-page";
 
 /**
- * Defines the `/resources/` route and its data lifecycle.
+ * Shows the resource directory filtered by category.
  */
 export const Route = createFileRoute("/resources/")({
   component: ResourceDirectoryRoute,
@@ -53,7 +53,8 @@ export const Route = createFileRoute("/resources/")({
    *
    * @param context - Route callback context.
    * @param context.deps - Normalized loader dependencies.
-   * @returns The route's loader data.
+   * @returns The resource directory for the selected category slugs.
+   * @rejects When the filtered resource directory cannot be loaded.
    */
   loader: ({ deps }) =>
     listResourceDirectory({ data: { categorySlugs: deps.category } }),

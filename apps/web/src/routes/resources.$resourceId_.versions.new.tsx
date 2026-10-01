@@ -5,14 +5,13 @@ import { getOwnedResourceDetail } from "@/lib/resources";
 import { ResourceVersionUploadPage } from "@/pages/resource-management-pages";
 
 /**
- * Defines the `/resources/$resourceId_/versions/new` route and its data lifecycle.
+ * Provides a new-version upload for an owned resource.
  */
 export const Route = createFileRoute("/resources/$resourceId_/versions/new")({
   /**
    * Requires authentication before entering the resource-version upload route.
    *
-   * @throws When navigation must continue at another route.
-   * @rejects When navigation must continue at another route.
+   * @rejects When an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     const { isAuthenticated } = await getAuthState();
@@ -26,9 +25,8 @@ export const Route = createFileRoute("/resources/$resourceId_/versions/new")({
    *
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
-   * @returns The route's loader data.
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @returns The owned resource detail.
+   * @rejects When an owned resource cannot be loaded.
    */
   loader: async ({ params }) => {
     const detail = await getOwnedResourceDetail({

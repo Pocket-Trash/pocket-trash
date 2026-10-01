@@ -4,7 +4,7 @@ import { getResourceDetail } from "@/lib/resources";
 import { ResourceDetailPage } from "@/pages/resource-detail-page";
 
 /**
- * Defines the `/resources/$resourceId` route and its data lifecycle.
+ * Shows one publicly readable resource.
  */
 export const Route = createFileRoute("/resources/$resourceId")({
   component: ResourceRoute,
@@ -13,9 +13,8 @@ export const Route = createFileRoute("/resources/$resourceId")({
    *
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
-   * @returns The route's loader data.
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @returns The publicly readable resource detail.
+   * @rejects When the public resource cannot be loaded.
    */
   loader: async ({ params }) => {
     const detail = await getResourceDetail({

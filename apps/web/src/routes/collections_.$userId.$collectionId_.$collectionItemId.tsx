@@ -3,7 +3,7 @@ import { getPublicCollectionItem } from "@/lib/catalog-api";
 import { CollectionItemDetailPage } from "@/pages/catalog-pages";
 
 /**
- * Defines the `/collections_/$userId/$collectionId_/$collectionItemId` route and its data lifecycle.
+ * Shows one item from a public collection.
  */
 export const Route = createFileRoute(
   "/collections_/$userId/$collectionId_/$collectionItemId",
@@ -43,9 +43,8 @@ export const Route = createFileRoute(
    *
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
-   * @returns The route's loader data.
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @returns Detail data for the public collection item.
+   * @rejects When the identifiers are invalid or the public item cannot be loaded.
    */
   loader: async ({ params }) => {
     if (

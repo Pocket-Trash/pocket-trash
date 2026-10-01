@@ -4,7 +4,7 @@ import { listOwnedResources } from "@/lib/resources";
 import { ResourceManagementPage } from "@/pages/resource-management-pages";
 
 /**
- * Defines the `/user/resources` route and its data lifecycle.
+ * Shows resources owned by the current user.
  */
 export const Route = createFileRoute("/user/resources")({
   component: ResourceManagementRoute,
@@ -19,7 +19,8 @@ export const Route = createFileRoute("/user/resources")({
   /**
    * Loads resources owned by the current user.
    *
-   * @returns The route's loader data.
+   * @returns Resources owned by the current user.
+   * @rejects When the current user's resources cannot be loaded.
    */
   loader: () => listOwnedResources(),
 });

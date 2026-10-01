@@ -4,13 +4,14 @@ import { listActiveFeedback } from "@/lib/feedback";
 import { FeedbackBoardPage } from "@/pages/feedback-pages";
 
 /**
- * Defines the `/feedback/` route and its data lifecycle.
+ * Shows the active public feedback board.
  */
 export const Route = createFileRoute("/feedback/")({
   /**
    * Loads the first page of active feedback.
    *
-   * @returns The route's loader data.
+   * @returns The first page of active feedback.
+   * @rejects When active feedback cannot be loaded.
    */
   loader: async () =>
     await listActiveFeedback({ data: { offset: 0, search: "" } }),

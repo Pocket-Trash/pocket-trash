@@ -4,14 +4,13 @@ import { canManageResources, listAdminResourceTrash } from "@/lib/resources";
 import { AdminResourceTrashPage } from "@/pages/resource-trash-page";
 
 /**
- * Defines the `/admin/trash/resources` route and its data lifecycle.
+ * Shows deleted resources to resource administrators.
  */
 export const Route = createFileRoute("/admin/trash/resources")({
   /**
    * Requires resource administration access before entering the route.
    *
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @rejects When the current user lacks resource administration access.
    */
   beforeLoad: async () => {
     if (!(await canManageResources())) throw notFound();
@@ -28,7 +27,8 @@ export const Route = createFileRoute("/admin/trash/resources")({
   /**
    * Loads resources in the administrative trash.
    *
-   * @returns The route's loader data.
+   * @returns Resources in the administrative trash.
+   * @rejects When trashed resources cannot be loaded.
    */
   loader: () => listAdminResourceTrash(),
 });

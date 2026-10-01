@@ -20,14 +20,14 @@ import { AppProviders } from "@/providers/app-providers";
 import "../styles.css";
 
 /**
- * Defines the application root route and shared document shell.
+ * Provides the shared document shell, settings bootstrap, providers, and application chrome.
  */
 export const Route = createRootRoute({
   component: RootContent,
   /**
    * Loads optional user settings, theme bootstrap state, and the current copyright year.
    *
-   * @returns The route's loader data.
+   * @returns Copyright year, optional settings state, and resolved theme bootstrap state.
    */
   loader: async () => {
     const settingsState = await getCurrentUserSettingsState().catch(

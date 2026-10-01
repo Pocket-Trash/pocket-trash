@@ -4,14 +4,13 @@ import { getAuthState } from "@/lib/auth";
 import { ResourceUploadPage } from "@/pages/resource-upload-page";
 
 /**
- * Defines the `/resources/add` route and its data lifecycle.
+ * Provides authenticated resource uploads.
  */
 export const Route = createFileRoute("/resources/add")({
   /**
    * Requires authentication before entering the resource upload route.
    *
-   * @throws When navigation must continue at another route.
-   * @rejects When navigation must continue at another route.
+   * @rejects When an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     const { isAuthenticated } = await getAuthState();

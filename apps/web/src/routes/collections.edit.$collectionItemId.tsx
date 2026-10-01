@@ -4,7 +4,7 @@ import { getCatalogOptions, getCollectionEditData } from "@/lib/catalog-api";
 import { CollectionEditPage } from "@/pages/catalog-form-pages";
 
 /**
- * Defines the `/collections/edit/$collectionItemId` route and its data lifecycle.
+ * Provides authenticated collection-item editing.
  */
 export const Route = createFileRoute("/collections/edit/$collectionItemId")({
   params: {
@@ -32,8 +32,7 @@ export const Route = createFileRoute("/collections/edit/$collectionItemId")({
   /**
    * Requires authentication before entering the collection-item edit route.
    *
-   * @throws When navigation must continue at another route.
-   * @rejects When navigation must continue at another route.
+   * @rejects When an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     if (!(await getAuthState()).isAuthenticated) {
@@ -45,9 +44,8 @@ export const Route = createFileRoute("/collections/edit/$collectionItemId")({
    *
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
-   * @returns The route's loader data.
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @returns The editable item, product, ownership data, and form options.
+   * @rejects When the item is unavailable or its edit context cannot be loaded.
    */
   loader: async ({ params }) => {
     if (!Number.isInteger(params.collectionItemId)) throw notFound();

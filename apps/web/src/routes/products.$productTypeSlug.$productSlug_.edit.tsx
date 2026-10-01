@@ -5,7 +5,7 @@ import { getCatalogOptions, getCatalogProduct } from "@/lib/catalog-api";
 import { ProductFormPage } from "@/pages/catalog-form-pages";
 
 /**
- * Defines the `/products/$productTypeSlug/$productSlug_/edit` route and its data lifecycle.
+ * Provides authenticated editing for an authorized catalog product.
  */
 export const Route = createFileRoute(
   "/products/$productTypeSlug/$productSlug_/edit",
@@ -16,7 +16,7 @@ export const Route = createFileRoute(
      *
      * @param params - Serialized route parameters.
      * @returns Typed route parameters.
-     * @throws When the requested route data is unavailable or access is denied.
+     * @throws When either slug has an invalid format.
      */
     parse: (params) => {
       if (
@@ -31,8 +31,7 @@ export const Route = createFileRoute(
   /**
    * Requires authentication before entering the product edit route.
    *
-   * @throws When navigation must continue at another route.
-   * @rejects When navigation must continue at another route.
+   * @rejects When an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     if (!(await getAuthState()).isAuthenticated) {
@@ -44,9 +43,8 @@ export const Route = createFileRoute(
    *
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
-   * @returns The route's loader data.
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @returns The editable product and catalog form options.
+   * @rejects When the product is not editable or its form data cannot be loaded.
    */
   loader: async ({ params }) => {
     const [initialProduct, options] = await Promise.all([

@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 /**
- * Defines the `/pens/$penId` route and its data lifecycle.
+ * Redirects legacy pen URLs to their canonical archive entries.
  */
 export const Route = createFileRoute("/pens/$penId")({
   /**

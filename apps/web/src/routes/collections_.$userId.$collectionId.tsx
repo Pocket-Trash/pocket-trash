@@ -5,7 +5,7 @@ import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { CollectionPage } from "@/pages/catalog-pages";
 
 /**
- * Defines the `/collections_/$userId/$collectionId` route and its data lifecycle.
+ * Shows one public collection and its visible items.
  */
 export const Route = createFileRoute("/collections_/$userId/$collectionId")({
   params: {
@@ -40,9 +40,8 @@ export const Route = createFileRoute("/collections_/$userId/$collectionId")({
    *
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
-   * @returns The route's loader data.
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @returns The public collection, owner name, and visible items.
+   * @rejects When the identifiers are invalid or the public collection cannot be loaded.
    */
   loader: async ({ params }) => {
     if (

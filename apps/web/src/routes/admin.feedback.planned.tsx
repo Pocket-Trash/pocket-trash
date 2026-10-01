@@ -4,14 +4,13 @@ import { canManageFeedback, listAdminActiveFeedback } from "@/lib/feedback";
 import { AdminActiveFeedbackPage } from "@/pages/admin-feedback-pages";
 
 /**
- * Defines the `/admin/feedback/planned` route and its data lifecycle.
+ * Shows planned feedback to feedback administrators.
  */
 export const Route = createFileRoute("/admin/feedback/planned")({
   /**
    * Requires feedback administration access before entering the route.
    *
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @rejects When the current user lacks feedback administration access.
    */
   beforeLoad: async () => {
     if (!(await canManageFeedback())) throw notFound();
@@ -19,7 +18,8 @@ export const Route = createFileRoute("/admin/feedback/planned")({
   /**
    * Loads the first page of planned feedback.
    *
-   * @returns The route's loader data.
+   * @returns The first page of planned feedback.
+   * @rejects When planned feedback cannot be loaded.
    */
   loader: async () => await listAdminActiveFeedback({ data: { offset: 0 } }),
   component: AdminPlannedFeedbackRoute,

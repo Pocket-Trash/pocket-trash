@@ -2,14 +2,13 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { getAuthState } from "@/lib/auth";
 
 /**
- * Defines the `/feedback` route and its data lifecycle.
+ * Guards the authenticated feedback route tree.
  */
 export const Route = createFileRoute("/feedback")({
   /**
    * Requires authentication before entering the feedback route.
    *
-   * @throws When navigation must continue at another route.
-   * @rejects When navigation must continue at another route.
+   * @rejects When an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     if (!(await getAuthState()).isAuthenticated) {

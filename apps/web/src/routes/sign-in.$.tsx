@@ -3,14 +3,13 @@ import { getAuthState } from "@/lib/auth";
 import { SignInPage } from "@/pages/sign-in-page";
 
 /**
- * Defines the `/sign-in/$` route and its data lifecycle.
+ * Provides sign-in to unauthenticated visitors.
  */
 export const Route = createFileRoute("/sign-in/$")({
   /**
    * Redirects authenticated visitors away from the sign-in route.
    *
-   * @throws When navigation must continue at another route.
-   * @rejects When navigation must continue at another route.
+   * @rejects When an authenticated visitor is redirected home.
    */
   beforeLoad: async () => {
     const { isAuthenticated } = await getAuthState();

@@ -8,14 +8,13 @@ import {
 import { AdminFeedbackArchivePage } from "@/pages/admin-feedback-pages";
 
 /**
- * Defines the `/admin/feedback/archive` route and its data lifecycle.
+ * Shows archived feedback and status filters to feedback administrators.
  */
 export const Route = createFileRoute("/admin/feedback/archive")({
   /**
    * Requires feedback administration access before entering the route.
    *
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @rejects When the current user lacks feedback administration access.
    */
   beforeLoad: async () => {
     if (!(await canManageFeedback())) throw notFound();
@@ -23,7 +22,8 @@ export const Route = createFileRoute("/admin/feedback/archive")({
   /**
    * Loads archived feedback and its available archive states.
    *
-   * @returns The route's loader data.
+   * @returns The first archived-feedback page and available archive states.
+   * @rejects When archived feedback or archive states cannot be loaded.
    */
   loader: async () => {
     const [initialPage, archiveStatuses] = await Promise.all([

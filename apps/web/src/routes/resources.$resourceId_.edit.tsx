@@ -5,14 +5,13 @@ import { getEditableResourceDetail } from "@/lib/resources";
 import { ResourceEditPage } from "@/pages/resource-management-pages";
 
 /**
- * Defines the `/resources/$resourceId_/edit` route and its data lifecycle.
+ * Provides resource editing to an authorized user.
  */
 export const Route = createFileRoute("/resources/$resourceId_/edit")({
   /**
    * Requires authentication before entering the resource edit route.
    *
-   * @throws When navigation must continue at another route.
-   * @rejects When navigation must continue at another route.
+   * @rejects When an unauthenticated visitor is redirected to sign in.
    */
   beforeLoad: async () => {
     const { isAuthenticated } = await getAuthState();
@@ -26,9 +25,8 @@ export const Route = createFileRoute("/resources/$resourceId_/edit")({
    *
    * @param context - Route callback context.
    * @param context.params - Parsed route parameters.
-   * @returns The route's loader data.
-   * @throws When the requested route data is unavailable or access is denied.
-   * @rejects When the requested route data is unavailable or access is denied.
+   * @returns The editable resource detail.
+   * @rejects When an editable resource cannot be loaded.
    */
   loader: async ({ params }) => {
     const detail = await getEditableResourceDetail({
