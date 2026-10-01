@@ -20,6 +20,11 @@ test("@mutation collection lifecycle and deletion choices persist through the pu
   test.setTimeout(120_000);
 
   const mutation = await createMutationFixture();
+  if (!mutation.collectionId) {
+    throw new Error(
+      "The collection lifecycle fixture is missing a collection.",
+    );
+  }
   let lifecycle: CollectionLifecycleFixture | undefined;
   let cleanup: MutationCleanupResult | undefined;
   try {

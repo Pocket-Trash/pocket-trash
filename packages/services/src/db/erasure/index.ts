@@ -26,14 +26,38 @@ import {
   eraseAccountDatabaseData,
 } from "./database.js";
 
+/**
+ * Milliseconds in one day for retention calculations.
+ */
 const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * Thirty-minute lease preventing concurrent request processing.
+ */
 const LEASE_MS = 30 * 60 * 1000;
+/**
+ * Thirty-day lifetime for completed erasure receipts.
+ */
 const RECEIPT_MS = 30 * DAY_MS;
+/**
+ * Administrative route linked from erasure alerts.
+ */
 const ADMIN_ERASURE_URL = "https://pocket-trash.app/admin/account-erasure";
+/**
+ * Format accepted for stable machine-readable operation errors.
+ */
 const errorCodePattern = /^[a-z0-9_]{1,64}$/u;
+/**
+ * Lowercase hexadecimal SHA-256 HMAC format.
+ */
 const subjectHmacPattern = /^[0-9a-f]{64}$/u;
+/**
+ * Allowed format for administrator verification evidence.
+ */
 const verificationReferencePattern = /^[A-Za-z0-9:_-]{1,120}$/u;
 
+/**
+ * Maximum approved retention duration for each provider exception.
+ */
 const exceptionMaximumMs = {
   axiom_30_days: 30 * DAY_MS,
   bunny_cache_30_days: 30 * DAY_MS,
@@ -45,6 +69,9 @@ const exceptionMaximumMs = {
   vercel_logs_1_hour: 60 * 60 * 1000,
 } as const;
 
+/**
+ * Durable erasure steps in execution order.
+ */
 const operationSteps = [
   "snapshot",
   "inaccessible",
@@ -54,22 +81,44 @@ const operationSteps = [
   "verify",
 ] as const;
 
+/**
+ * Retention exception whose maximum duration is explicitly approved.
+ */
 export type ApprovedErasureExceptionCode = keyof typeof exceptionMaximumMs;
 
+/**
+ * Public erasure request receipt with sensitive execution fields removed.
+ */
 export type ErasureReceipt = Omit<
   ErasureRequest,
   "storageTargets" | "targetClerkId" | "verifiedByClerkId"
 >;
 
+/**
+ * Minimum account-erasure request context passed to each operation step.
+ */
 export type ErasureOperationRequest = Pick<
   ErasureRequest,
   "id" | "initiator" | "subjectHmac" | "targetClerkId"
 >;
 
+/**
+ * Candidate retention exceptions reported by an erasure operation.
+ */
 export type ErasureOperationResult = {
+  /**
+   * Retained-data exceptions awaiting workflow validation.
+   */
   exceptions?: ErasureRetentionException[];
 };
 
+/**
+ * Ordered account-erasure step implementations keyed by step name.
+ *
+ * @param request - Minimum erasure request context for the step.
+ * @returns Optional candidate retention exceptions discovered by the step.
+ * @rejects When the external erasure step cannot complete.
+ */
 export type ErasureOperations = Record<
   (typeof operationSteps)[number],
   (
@@ -77,6 +126,9 @@ export type ErasureOperations = Record<
   ) => Promise<ErasureOperationResult | undefined>
 >;
 
+/**
+ * Durable account-erasure workflow and administration operations.
+ */
 export type ErasureService = ReturnType<typeof createErasureService>;
 
 /** Human-initiated account-erasure request input. */
@@ -112,14 +164,30 @@ export type RetryErasureRequestInput = {
   requestId: string;
 };
 
+/**
+ * Error raised for account erasure in progress.
+ */
 export class AccountErasureInProgressError extends Error {
+  /**
+   * Creates the error returned while account erasure is active.
+   */
   constructor() {
     super("Account erasure is in progress.");
     this.name = "AccountErasureInProgressError";
   }
 }
 
+/**
+ * Error raised for erasure operation.
+ */
 export class ErasureOperationError extends Error {
+  /**
+   * Creates a stable erasure-operation failure.
+   *
+   * @param code - Machine-readable lowercase failure code.
+   * @param retryable - Whether the workflow may retry the failed operation.
+   * @throws When the failure code does not match the supported format.
+   */
   constructor(
     readonly code: string,
     readonly retryable = true,
@@ -132,6 +200,14 @@ export class ErasureOperationError extends Error {
   }
 }
 
+/**
+ * Creates the stable HMAC used to identify an erased account.
+ *
+ * @param clerkId - Clerk user identifier to pseudonymize.
+ * @param secret - HMAC secret containing at least 32 characters.
+ * @returns Lowercase hexadecimal SHA-256 HMAC.
+ * @rejects When either input is invalid or Web Crypto cannot sign it.
+ */
 export async function createErasureSubjectHmac(
   clerkId: string,
   secret: string,
@@ -177,6 +253,12 @@ export function createErasureService(
   ),
 ) {
   return {
+    /**
+     * Verifies that an account has no active erasure request.
+     *
+     * @param clerkId - Clerk user identifier to check.
+     * @rejects When the identifier is invalid, the query fails, or erasure is active.
+     */
     async assertAccountActive(clerkId: string): Promise<void> {
       const normalizedClerkId = requiredValue(clerkId, "Subject");
       const [request] = await db
@@ -196,6 +278,13 @@ export function createErasureService(
       if (request) throw new AccountErasureInProgressError();
     },
 
+    /**
+     * Finds an erasure receipt by subject digest.
+     *
+     * @param subjectHmac - Subject digest used to find a prior request receipt.
+     * @returns Matching receipt by subject, when available.
+     * @rejects When the digest is invalid or persistence fails.
+     */
     async getReceiptBySubject(
       subjectHmac: string,
     ): Promise<ErasureReceipt | null> {
@@ -212,6 +301,13 @@ export function createErasureService(
       return request ? receipt(request) : null;
     },
 
+    /**
+     * Loads an erasure request for administration.
+     *
+     * @param id - Erasure request identifier.
+     * @returns Matching erasure request, when available.
+     * @rejects When the identifier is invalid or persistence fails.
+     */
     async getForAdmin(id: string): Promise<ErasureRequest | null> {
       const [request] = await db
         .select()
@@ -221,6 +317,12 @@ export function createErasureService(
       return request ?? null;
     },
 
+    /**
+     * Makes an account inaccessible before erasure proceeds.
+     *
+     * @param targetClerkId - Clerk user identifier made inaccessible.
+     * @rejects When the identifier is invalid or persistence fails.
+     */
     async makeAccountInaccessible(targetClerkId: string): Promise<void> {
       await db.transaction(async (tx) => {
         await hideAccountContent(tx, requiredValue(targetClerkId, "Subject"));
@@ -232,7 +334,7 @@ export function createErasureService(
      *
      * @param input - Verified human request and subject digest.
      * @returns Safe erasure receipt.
-     * @rejects When authorization, verification, or persistence fails.
+     * @rejects When authorization, verification, persistence, audit, or operation logging fails.
      */
     async create(input: CreateErasureRequestInput): Promise<ErasureReceipt> {
       const values = normalizeCreateInput(input);
@@ -306,6 +408,12 @@ export function createErasureService(
       return receipt(request);
     },
 
+    /**
+     * Erases account data and maps verification failures to operation errors.
+     *
+     * @param targetClerkId - Clerk user identifier whose data is erased.
+     * @rejects When validation or database erasure fails.
+     */
     async eraseDatabase(targetClerkId: string): Promise<void> {
       try {
         await eraseAccountDatabaseData(
@@ -326,6 +434,7 @@ export function createErasureService(
      *
      * @param input - Request identifier and subject digest.
      * @returns Matching safe receipt, or null when absent.
+     * @rejects When the digest is invalid or persistence fails.
      */
     async getReceipt(input: {
       /** Erasure request identifier. */
@@ -354,7 +463,7 @@ export function createErasureService(
      *
      * @param input - Subject digest and deleted Clerk identity.
      * @returns Request identifier and whether deletion was unexpected.
-     * @rejects When reconciliation or audit persistence fails.
+     * @rejects When reconciliation, audit persistence, or logging fails.
      */
     async handleClerkDeletion(input: {
       /** Non-reversible subject lookup digest. */
@@ -473,7 +582,7 @@ export function createErasureService(
      *
      * @param operations - Idempotent external erasure operations.
      * @returns Whether a due request was claimed.
-     * @rejects When durable state or audit persistence fails.
+     * @rejects When durable state, audit persistence, or logging fails.
      */
     async processDue(operations: ErasureOperations): Promise<boolean> {
       const claimedAt = now();
@@ -538,6 +647,12 @@ export function createErasureService(
       return true;
     },
 
+    /**
+     * Deletes expired completed-erasure receipts.
+     *
+     * @returns Number of expired receipts deleted.
+     * @rejects When persistence fails.
+     */
     async purgeExpiredReceipts(): Promise<number> {
       const deleted = await db
         .delete(schema.erasureRequest)
@@ -645,6 +760,14 @@ export function createErasureService(
   };
 }
 
+/**
+ * Atomically claims the next due erasure request.
+ *
+ * @param db - Application database.
+ * @param claimedAt - Timestamp used to acquire the processing lease.
+ * @returns Claimed request, or `null` when none is due.
+ * @rejects When the transaction fails.
+ */
 async function claimDueRequest(
   db: Database,
   claimedAt: Date,
@@ -687,6 +810,7 @@ async function claimDueRequest(
  * @param request - Claimed request with completed steps.
  * @param completedAt - Terminal completion time.
  * @returns Completion after the source transaction commits.
+ * @rejects When request or audit persistence fails.
  */
 async function completeRequest(
   db: Database,
@@ -741,6 +865,7 @@ async function completeRequest(
  * @param error - Operation failure.
  * @param failedAt - Failure time.
  * @returns Durable request state after failure classification.
+ * @rejects When request or audit persistence fails.
  */
 async function recordFailure(
   db: Database,
@@ -835,6 +960,12 @@ function normalizeCreateInput(input: CreateErasureRequestInput) {
   };
 }
 
+/**
+ * Creates pending results for every erasure step.
+ *
+ * @param createdAt - Request creation time assigned to every pending step.
+ * @returns Pending result map keyed by erasure step.
+ */
 function initialStepResults(createdAt: Date): ErasureStepResults {
   return {
     database: { status: "pending" },
@@ -847,6 +978,12 @@ function initialStepResults(createdAt: Date): ErasureStepResults {
   };
 }
 
+/**
+ * Builds a completed erasure-step result.
+ *
+ * @param completedAt - Time the erasure step completed.
+ * @returns Completed erasure-step result.
+ */
 function completedStep(completedAt: Date) {
   return {
     completedAt: completedAt.toISOString(),
@@ -854,6 +991,14 @@ function completedStep(completedAt: Date) {
   } as const;
 }
 
+/**
+ * Validates approved exceptions for one erasure step.
+ *
+ * @param exceptions - Retention exceptions reported by an operation.
+ * @param referenceTime - Time used to evaluate exception expiry limits.
+ * @returns Validated exceptions with normalized expiry timestamps.
+ * @throws When a code or expiry is invalid or exceeds its retention limit.
+ */
 function validateExceptions(
   exceptions: ErasureRetentionException[],
   referenceTime: Date,
@@ -874,12 +1019,24 @@ function validateExceptions(
   });
 }
 
+/**
+ * Returns the stable code for an erasure operation error.
+ *
+ * @param error - Candidate error.
+ * @returns Stable operation error code.
+ */
 function operationErrorCode(error: unknown): string {
   return error instanceof ErasureOperationError
     ? error.code
     : "operation_failed";
 }
 
+/**
+ * Deduplicates approved erasure exceptions by identity.
+ *
+ * @param exceptions - Retention exceptions to deduplicate by code.
+ * @returns Deduplicated approved exceptions.
+ */
 function uniqueExceptions(
   exceptions: ErasureRetentionException[],
 ): ErasureRetentionException[] {
@@ -890,6 +1047,13 @@ function uniqueExceptions(
   ];
 }
 
+/**
+ * Validates and normalizes an erasure subject HMAC.
+ *
+ * @param value - Candidate hexadecimal SHA-256 HMAC.
+ * @returns Normalized lowercase hexadecimal HMAC.
+ * @throws When the value is not a 64-character hexadecimal digest.
+ */
 function normalizeSubjectHmac(value: string): string {
   const normalized = value.trim().toLowerCase();
   if (!subjectHmacPattern.test(normalized)) {
@@ -898,12 +1062,26 @@ function normalizeSubjectHmac(value: string): string {
   return normalized;
 }
 
+/**
+ * Trims a required string value.
+ *
+ * @param value - Candidate required string.
+ * @param name - Field name included in the validation error.
+ * @returns Trimmed nonempty value.
+ * @throws When the trimmed value is empty.
+ */
 function requiredValue(value: string, name: string): string {
   const normalized = value.trim();
   if (!normalized) throw new Error(`${name} is required.`);
   return normalized;
 }
 
+/**
+ * Maps an erasure request to its public receipt.
+ *
+ * @param request - Request whose sensitive fields are removed.
+ * @returns Public erasure receipt.
+ */
 function receipt(request: ErasureRequest): ErasureReceipt {
   const { storageTargets, targetClerkId, verifiedByClerkId, ...safe } = request;
   void storageTargets;
@@ -912,6 +1090,9 @@ function receipt(request: ErasureRequest): ErasureReceipt {
   return safe;
 }
 
+/**
+ * Caller-owned database transaction used for atomic erasure work.
+ */
 type ErasureTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 /**
@@ -921,7 +1102,7 @@ type ErasureTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
  * @param clerkId - Clerk identifier to resolve.
  * @param required - Whether a missing identity must reject the operation.
  * @returns Internal audit identity, or null when optional and absent.
- * @rejects When a required identity does not exist.
+ * @rejects When persistence fails or a required identity does not exist.
  */
 async function loadAuditUser(
   transaction: ErasureTransaction,
@@ -943,6 +1124,7 @@ async function loadAuditUser(
  * @param transaction - Caller-owned erasure transaction.
  * @param requestId - Erasure request identifier.
  * @returns Initiation event identifier, or null for a legacy request.
+ * @rejects When persistence fails.
  */
 async function findInitiationEventId(
   transaction: ErasureTransaction,
@@ -982,6 +1164,7 @@ function countExceptions(stepResults: ErasureStepResults): number {
  * @param transaction - Caller-owned erasure transaction.
  * @param input - Safe transition data and event definition.
  * @returns Completion after the event is stored.
+ * @rejects When audit persistence fails.
  */
 async function writeSystemAudit(
   audit: Pick<AuditService, "write">,
@@ -1008,6 +1191,13 @@ async function writeSystemAudit(
   });
 }
 
+/**
+ * Redacts user-owned content during account erasure.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param targetClerkId - Clerk user identifier whose content is redacted.
+ * @rejects When persistence fails.
+ */
 async function hideAccountContent(
   tx: ErasureTransaction,
   targetClerkId: string,

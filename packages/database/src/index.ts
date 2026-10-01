@@ -1,5 +1,7 @@
 export * from "./client.js";
 export type {
+  AuditDelivery,
+  AuditDeliveryPayload,
   AuditEvent,
   AuditExport,
   AuditJson,
@@ -27,6 +29,7 @@ export type {
   Maker,
   Material,
   Mechanism,
+  NewAuditDelivery,
   NewAuditEvent,
   NewAuditExport,
   NewErasureRequest,

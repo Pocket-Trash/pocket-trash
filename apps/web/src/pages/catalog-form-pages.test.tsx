@@ -31,7 +31,18 @@ vi.mock("@/components/app-shell", () => ({
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Provides locale data for page tests.
+   *
+   * @returns The stable test locale.
+   */
   useLocale: () => ({ locale: "en-US" }),
+  /**
+   * Provides an optional locale for page tests.
+   *
+   * @returns The test locale.
+   */
+  useOptionalLocale: () => "en-US",
 }));
 
 const t = (key: string, values: Readonly<Record<string, unknown>> = {}) =>
@@ -306,6 +317,7 @@ describe("product form conditional fields", () => {
     );
 
     for (const html of [addHtml, editHtml]) {
+      expect(html).toContain("0 / 5,000 characters");
       if (productTypeSlug === "spinner") {
         expect(html).toContain('aria-label="Bearing"');
         expect(html).toContain('aria-label="Spin diameter"');
@@ -339,6 +351,7 @@ describe("collection edit conditional fields", () => {
     } else {
       expect(html).not.toContain('aria-label="Bearing"');
     }
+    expect(html).toContain("0 / 5,000 characters");
   });
 });
 
@@ -377,7 +390,11 @@ describe("collection add form", () => {
     expect(html).toContain(">Add new collection<");
     expect(html).toContain(">Add to collection<");
     expect(html).toContain("disabled");
-    expect(html).toContain('aria-label="Description"');
+    expect(html).toContain(
+      'id="collection-item-description-label">Description',
+    );
+    expect(html).toContain("0 / 5,000 characters");
+    expect(html).not.toContain('maxlength="5000"');
     expect(html).toContain('aria-label="Bearing"');
     expect(html).toContain("border-input bg-background");
     expect(html).toContain("focus-visible:ring-ring");
@@ -400,7 +417,9 @@ describe("collection add form", () => {
       }),
     );
 
-    expect(html).toContain('aria-label="Description"');
+    expect(html).toContain(
+      'id="collection-item-description-label">Description',
+    );
     expect(html).not.toContain('aria-label="Bearing"');
   });
 });

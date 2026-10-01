@@ -1404,7 +1404,7 @@ jobs:
       - name: Validate web app
         run: |
           pnpm exec turbo run test:ci --filter=@app/web
-          pnpm --filter @app/web run lint
+          pnpm lint
           pnpm exec turbo run typecheck --filter=@app/web
 
       - name: Align Vercel production framework

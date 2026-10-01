@@ -4,8 +4,14 @@ import { type Logger, loggerMessages } from "@package/logger";
 import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { type Actor, hasPermission } from "../../authorization.js";
 import { hashLogIdentifier } from "../../logging.js";
+import type { AuditService, AuditWriteInput } from "../audit/index.js";
+import { type UserBanAuditData, userBanAudit } from "../audit/users.js";
 
+/**
+ * Clerk identity required to ensure a database user exists.
+ */
 export type EnsureUserInput = {
+  /** Clerk identity used as the user upsert key. */
   clerkId: string;
 };
 
@@ -16,6 +22,7 @@ export type UsersService = {
    *
    * @param input - Clerk identity to persist.
    * @returns Stored user row.
+   * @rejects When validation, persistence, or operation logging fails.
    */
   ensure(input: EnsureUserInput): Promise<User>;
   /**
@@ -23,6 +30,7 @@ export type UsersService = {
    *
    * @param clerkId - Clerk identifier to load.
    * @returns Current ban state, or null when unmanaged.
+   * @rejects When validation or persistence fails.
    */
   getBanState(clerkId: string): Promise<UserBanState | null>;
   /**
@@ -30,12 +38,14 @@ export type UsersService = {
    *
    * @param clerkId - Clerk identifier to load.
    * @returns Stored user, or null when absent.
+   * @rejects When validation, persistence, or operation logging fails.
    */
   getByClerkId(clerkId: string): Promise<User | null>;
   /**
    * Lists every stored Clerk identifier.
    *
    * @returns Every stored Clerk identifier.
+   * @rejects When persistence fails.
    */
   listClerkIds(): Promise<string[]>;
   /**
@@ -44,6 +54,7 @@ export type UsersService = {
    * @param input - Authorized ban decision.
    * @param applyProviderState - Identity-provider reconciliation callback.
    * @returns Completed durable ban state.
+   * @rejects When authorization, validation, persistence, or provider reconciliation fails.
    */
   setBanState(
     input: SetUserBanStateInput,
@@ -54,6 +65,7 @@ export type UsersService = {
    *
    * @param input - Current Clerk user fields.
    * @returns Synchronization outcome.
+   * @rejects When validation, persistence, or operation logging fails.
    */
   syncFromClerk(input: SyncUserFromClerkInput): Promise<UserSyncResult>;
 };
@@ -64,6 +76,7 @@ export type UsersService = {
  * @param clerkId - Clerk identifier of the affected user.
  * @param banned - Desired identity-provider ban state.
  * @returns Completion after the provider matches the desired state.
+ * @rejects When provider reconciliation fails.
  */
 export type ApplyUserBanProviderState = (
   /** Clerk identifier of the affected user. */
@@ -71,6 +84,17 @@ export type ApplyUserBanProviderState = (
   /** Desired identity-provider ban state. */
   banned: boolean,
 ) => Promise<void>;
+
+/** Audit outcome persisted with a completed user-ban state. */
+type RecordUserBanAudit = {
+  /**
+   * Persists the direct event or its durable delivery.
+   *
+   * @param transaction - Caller-owned completion transaction.
+   * @returns Completion after the audit outcome is durable.
+   */
+  (transaction: Parameters<AuditService["write"]>[0]): Promise<unknown>;
+};
 
 /** Administrator request to change or explain a user's ban state. */
 export type SetUserBanStateInput = {
@@ -90,23 +114,45 @@ export type UserBanState = Pick<UserBan, "reason" | "status" | "updatedAt"> & {
   clerkId: string;
 };
 
+/**
+ * Current Clerk identity fields used for idempotent synchronization.
+ */
 export type SyncUserFromClerkInput = {
+  /** Clerk identity used to locate or insert the user. */
   clerkId: string;
+  /** Provider update time used to ignore stale synchronization events. */
   clerkUpdatedAt: Date;
+  /** Current provider username persisted for newer events. */
   username: string;
 };
 
+/**
+ * Outcome of comparing a Clerk update with the stored user record.
+ */
 export type UserSyncResult = "inserted" | "unchanged" | "updated";
 
 /** Rejects invalid or unauthorized user-ban state transitions. */
 export class UserBanStateError extends Error {}
 
+/**
+ * Validates a Clerk user identifier.
+ *
+ * @param clerkId - Clerk user identifier to validate.
+ * @throws When the identifier is blank.
+ */
 function assertClerkId(clerkId: string): void {
   if (!clerkId.trim()) {
     throw new Error("clerkId is required.");
   }
 }
 
+/**
+ * Validates and trims Clerk synchronization input.
+ *
+ * @param input - Clerk identity fields and provider update timestamp.
+ * @returns Input with trimmed Clerk identifier and username.
+ * @throws When an identity field or timestamp is invalid.
+ */
 function normalizeSyncInput(input: SyncUserFromClerkInput) {
   const clerkId = input.clerkId.trim();
   const username = input.username.trim();
@@ -123,11 +169,24 @@ function normalizeSyncInput(input: SyncUserFromClerkInput) {
  *
  * @param db - Application database.
  * @param logger - Structured operation logger.
+ * @param audit - Shared audit persistence and retry service.
  * @returns Configured user service.
  */
-export function createUsersService(db: Database, logger: Logger): UsersService {
+export function createUsersService(
+  db: Database,
+  logger: Logger,
+  audit?: AuditService,
+): UsersService {
   return {
-    async ensure({ clerkId }) {
+    /**
+     * Ensures a database user exists for a Clerk identity.
+     *
+     * @param input - Clerk identity to ensure exists.
+     * @returns Persisted user record.
+     * @rejects When validation, persistence, or operation logging fails.
+     */
+    async ensure(input) {
+      const { clerkId } = input;
       return await logger.operation(
         loggerMessages.database.users.ensure,
         async () => {
@@ -160,6 +219,7 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
      *
      * @param clerkId - Clerk identifier to load.
      * @returns Current ban state, or null when unmanaged.
+     * @rejects When validation or persistence fails.
      */
     async getBanState(clerkId) {
       assertClerkId(clerkId);
@@ -176,6 +236,13 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
         .limit(1);
       return state ?? null;
     },
+    /**
+     * Loads a user by Clerk identifier.
+     *
+     * @param clerkId - Clerk user identifier to load.
+     * @returns Stored user, or `null` when absent.
+     * @rejects When validation, persistence, or operation logging fails.
+     */
     async getByClerkId(clerkId) {
       return await logger.operation(
         loggerMessages.database.users.getByClerkId,
@@ -197,6 +264,12 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
         },
       );
     },
+    /**
+     * Lists every stored Clerk user identifier.
+     *
+     * @returns Stored Clerk identifiers in unspecified order.
+     * @rejects When persistence fails.
+     */
     async listClerkIds() {
       const users = await db
         .select({ clerkId: schema.user.clerkId })
@@ -209,9 +282,10 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
      * @param input - Authorized ban decision.
      * @param applyProviderState - Identity-provider reconciliation callback.
      * @returns Completed durable ban state.
-     * @rejects When authorization, validation, or reconciliation fails.
+     * @rejects When authorization, validation, persistence, or provider reconciliation fails.
      */
     async setBanState(input, applyProviderState) {
+      if (!audit) throw new Error("User-ban auditing is not configured.");
       if (!hasPermission(input.actor, "users.manage")) {
         throw new UserBanStateError("User management permission is required.");
       }
@@ -228,18 +302,8 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${`user-ban:${targetClerkId}`}, 0))`,
         );
-        let [target] = await tx
-          .select({ id: schema.user.id })
-          .from(schema.user)
-          .where(eq(schema.user.clerkId, targetClerkId))
-          .limit(1);
-        if (!target) {
-          [target] = await tx
-            .insert(schema.user)
-            .values({ clerkId: targetClerkId })
-            .returning({ id: schema.user.id });
-        }
-        if (!target) throw new Error("Failed to ensure ban target.");
+        const target = await ensureAuditUser(tx, targetClerkId);
+        const actorUser = await ensureAuditUser(tx, input.actor.clerkId);
 
         const [current] = await tx
           .select()
@@ -263,33 +327,104 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
           throw new UserBanStateError("Only banned users can be unbanned.");
         }
 
+        const retrying = current?.status === pendingStatus;
+        const pendingRequestId = retrying
+          ? current.pendingRequestId
+          : crypto.randomUUID();
+        if (!pendingRequestId) {
+          throw new Error("Pending user-ban request is invalid.");
+        }
+        const pendingBeforeStatus = retrying
+          ? current.pendingBeforeStatus
+          : current?.status === "banned" || current?.status === "unbanned"
+            ? current.status
+            : null;
         const [state] = await tx
           .insert(schema.userBan)
-          .values({ reason, status: pendingStatus, userId: target.id })
+          .values({
+            pendingBeforeStatus,
+            pendingRequestId,
+            reason,
+            status: pendingStatus,
+            userId: target.id,
+          })
           .onConflictDoUpdate({
-            set: { reason, status: pendingStatus, updatedAt: new Date() },
+            set: {
+              pendingBeforeStatus,
+              pendingRequestId,
+              reason,
+              status: pendingStatus,
+              updatedAt: new Date(),
+            },
             target: schema.userBan.userId,
           })
           .returning();
         if (!state) throw new Error("Failed to record pending ban state.");
-        return { userId: target.id };
+        return {
+          actorUser,
+          beforeStatus: pendingBeforeStatus,
+          requestId: pendingRequestId,
+          userId: target.id,
+        };
       });
 
       await applyProviderState(targetClerkId, input.banned);
+      const occurredAt = new Date();
+      const definition = !input.banned
+        ? userBanAudit.unbanned
+        : start.beforeStatus
+          ? userBanAudit.banUpdated
+          : userBanAudit.banned;
+      const auditInput: AuditWriteInput<UserBanAuditData> = {
+        actor: {
+          role: input.actor.role,
+          userId: start.actorUser.id,
+          username: start.actorUser.username,
+        },
+        authorization: { permission: "users.manage", type: "permission" },
+        data: {
+          after: { banned: input.banned, status: completedStatus },
+          before: {
+            banned: start.beforeStatus === "banned" || !input.banned,
+            status:
+              start.beforeStatus ?? (input.banned ? "unmanaged" : "banned"),
+          },
+        },
+        definition,
+        occurredAt,
+        ownerUserId: start.userId,
+        reason,
+        requestId: start.requestId,
+        targetId: String(start.userId),
+      };
 
-      const [completed] = await db
-        .update(schema.userBan)
-        .set({ status: completedStatus, updatedAt: new Date() })
-        .where(
-          and(
-            eq(schema.userBan.userId, start.userId),
-            eq(schema.userBan.status, pendingStatus),
-          ),
-        )
-        .returning();
-      if (!completed) throw new Error("Failed to complete user-ban operation.");
-      return banState(targetClerkId, completed);
+      try {
+        const completed = await completeBanState(
+          db,
+          start,
+          pendingStatus,
+          completedStatus,
+          async (tx) => await audit.write(tx, auditInput),
+        );
+        return banState(targetClerkId, completed);
+      } catch {
+        const completed = await completeBanState(
+          db,
+          start,
+          pendingStatus,
+          completedStatus,
+          async (tx) => await audit.enqueue(tx, start.requestId, auditInput),
+        );
+        return banState(targetClerkId, completed);
+      }
     },
+    /**
+     * Synchronizes a Clerk user into the application database.
+     *
+     * @param input - Current Clerk user fields.
+     * @returns Synchronization outcome.
+     * @rejects When validation, persistence, or operation logging fails.
+     */
     async syncFromClerk(input) {
       return await logger.operation(
         loggerMessages.database.users.syncFromClerk,
@@ -334,6 +469,75 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
     },
   };
 }
+
+/**
+ * Ensures a user identity inside an audit source transaction.
+ *
+ * @param transaction - Caller-owned source transaction.
+ * @param clerkId - Clerk identity to ensure.
+ * @returns Internal audit actor or target identity.
+ * @rejects When the user cannot be persisted.
+ */
+async function ensureAuditUser(
+  transaction: Parameters<AuditService["write"]>[0],
+  clerkId: string,
+) {
+  const [user] = await transaction
+    .insert(schema.user)
+    .values({ clerkId })
+    .onConflictDoUpdate({ set: { clerkId }, target: schema.user.clerkId })
+    .returning({ id: schema.user.id, username: schema.user.username });
+  if (!user) throw new Error("Failed to ensure audit user.");
+  return user;
+}
+
+/**
+ * Completes one pending ban operation with its audit outcome atomically.
+ *
+ * @param db - User-ban database.
+ * @param start - Pending operation identity.
+ * @param pendingStatus - Expected pending state.
+ * @param completedStatus - Desired completed state.
+ * @param recordAudit - Direct write or durable enqueue callback.
+ * @returns Completed user-ban row.
+ */
+async function completeBanState(
+  db: Database,
+  start: Pick<PendingBanOperation, "requestId" | "userId">,
+  pendingStatus: "pending_ban" | "pending_unban",
+  completedStatus: "banned" | "unbanned",
+  recordAudit: RecordUserBanAudit,
+) {
+  return await db.transaction(async (transaction) => {
+    const [completed] = await transaction
+      .update(schema.userBan)
+      .set({
+        pendingBeforeStatus: null,
+        pendingRequestId: null,
+        status: completedStatus,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.userBan.userId, start.userId),
+          eq(schema.userBan.status, pendingStatus),
+          eq(schema.userBan.pendingRequestId, start.requestId),
+        ),
+      )
+      .returning();
+    if (!completed) throw new Error("Failed to complete user-ban operation.");
+    await recordAudit(transaction);
+    return completed;
+  });
+}
+
+/** Pending ban operation fields required after provider reconciliation. */
+type PendingBanOperation = {
+  /** Durable source request identifier. */
+  requestId: string;
+  /** Internal target user identifier. */
+  userId: number;
+};
 
 /**
  * Adds a Clerk identifier to a stored user-ban row.

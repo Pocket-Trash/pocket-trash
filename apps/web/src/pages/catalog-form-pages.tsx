@@ -21,6 +21,7 @@ import { RotateCcw, Trash2 } from "lucide-react";
 import * as React from "react";
 import { z } from "zod";
 import { AppShell } from "@/components/app-shell";
+import { CatalogMarkdownEditor } from "@/components/catalog-markdown-editor";
 import {
   CollectionCoverManager,
   CollectionForm,
@@ -28,6 +29,7 @@ import {
   CollectionImageUploader,
 } from "@/components/collection-form";
 import { CollectionSelector } from "@/components/collection-selector";
+import type { MarkdownEditorHandle } from "@/components/markdown-editor";
 import { FileDropInput } from "@/components/resource-file-input";
 import { Button } from "@/components/ui/button";
 import {
@@ -156,6 +158,8 @@ export function ProductEditor({
     Record<string, string[] | undefined>
   >({});
   const [formError, setFormError] = React.useState<string | null>(null);
+  const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
+  const [descriptionLoading, setDescriptionLoading] = React.useState(true);
   const form = useForm({
     defaultValues: {
       bearing: initialProduct?.bearing ?? "",
@@ -196,7 +200,19 @@ export function ProductEditor({
       weightG: initialProduct?.weightG ?? null,
       widthMm: initialProduct?.widthMm ?? null,
     },
+    /**
+     * Saves the current product editor values.
+     *
+     * @param root0 - Form submission state.
+     * @param root0.value - Current product field values.
+     * @returns A promise that resolves after the save flow completes.
+     */
     onSubmit: async ({ value }) => {
+      if (descriptionRef.current?.isLoading()) return;
+      const currentValue = {
+        ...value,
+        description: descriptionRef.current?.getValue() ?? value.description,
+      };
       const moderating = Boolean(
         initialProduct?.canAdminister && !initialProduct.isOwner,
       );
@@ -204,7 +220,7 @@ export function ProductEditor({
         ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
         : undefined;
       if (moderating && !reason) return;
-      const clientResult = productFormSchema.safeParse(value);
+      const clientResult = productFormSchema.safeParse(currentValue);
       if (!clientResult.success) {
         setServerErrors(z.flattenError(clientResult.error).fieldErrors);
         setFormError("web.catalog.error.form");
@@ -217,7 +233,7 @@ export function ProductEditor({
       }
       const result = await saveCatalogProduct({
         data: {
-          ...value,
+          ...currentValue,
           productId: savedProductId ?? value.productId,
           reason,
         },
@@ -309,16 +325,19 @@ export function ProductEditor({
       </form.Subscribe>
       <form.Field name="description">
         {(field) => (
-          <MarkdownTextarea
-            error={serverErrors.description?.[0]}
+          <CatalogMarkdownEditor
+            defaultValue={field.state.value}
+            error={
+              serverErrors.description?.[0]
+                ? t(serverErrors.description[0])
+                : undefined
+            }
             help={t("web.catalog.help.markdownDescription")}
             id="product-description"
             label={t("web.catalog.field.description")}
-            name={field.name}
-            onBlur={field.handleBlur}
             onChange={field.handleChange}
-            t={t}
-            value={field.state.value}
+            onLoadingChange={setDescriptionLoading}
+            ref={descriptionRef}
           />
         )}
       </form.Field>
@@ -586,9 +605,18 @@ export function ProductEditor({
           {t("web.erasure.productNotice")}
         </p>
       ) : null}
-      <form.Subscribe selector={(state) => state.isSubmitting}>
-        {(isSubmitting) => (
-          <Button disabled={isSubmitting} type="submit">
+      <form.Subscribe
+        selector={(state) => [state.isSubmitting, state.values.description]}
+      >
+        {([isSubmitting, description]) => (
+          <Button
+            disabled={
+              Boolean(isSubmitting) ||
+              descriptionLoading ||
+              String(description).length > 5000
+            }
+            type="submit"
+          >
             {initialProduct ? t("action.save") : t("web.action.addProduct")}
           </Button>
         )}
@@ -606,6 +634,12 @@ const emptyFinishOption = (): FinishOptionFormValue => ({
   finishIds: [],
 });
 
+/**
+ * Renders editable finish options for a catalog product.
+ *
+ * @param root0 - Finish option editor properties.
+ * @returns The finish option fields.
+ */
 export function FinishOptionsEditor({
   onChange,
   onOptionsChange,
@@ -614,11 +648,25 @@ export function FinishOptionsEditor({
   t,
   value,
 }: {
+  /**
+   * Receives the next ordered finish options.
+   *
+   * @param value - Updated finish options.
+   */
   onChange: (value: FinishOptionFormValue[]) => void;
+  /**
+   * Updates shared catalog lookup options.
+   *
+   * @param value - Next options or an updater function.
+   */
   onOptionsChange: React.Dispatch<React.SetStateAction<CatalogOptions>>;
+  /** Available catalog lookup values. */
   options: CatalogOptions;
+  /** Whether the editor contains exactly one option. */
   singleOption?: boolean;
+  /** Localized catalog message formatter. */
   t: ReturnType<typeof useCatalogCopy>;
+  /** Current ordered finish options. */
   value: FinishOptionFormValue[];
 }) {
   const update = (index: number, option: FinishOptionFormValue) =>
@@ -810,22 +858,56 @@ export function FinishOptionsEditor({
   );
 }
 
+/** Properties for catalog lookup creation dialogs. */
 type LookupDialogProps = (
   | {
+      /** Lookup kind created by this dialog. */
       kind: "maker";
+      /**
+       * Receives a newly created maker.
+       *
+       * @param value - Created maker value.
+       */
       onCreated: (value: {
+        /** Maker identifier. */
         id: number;
+        /** Maker name. */
         name: string;
+        /** Optional maker website root. */
         rootUrl: string | null;
       }) => void;
     }
-  | { kind: "color"; onCreated: (value: CatalogColor) => void }
   | {
+      /** Lookup kind created by this dialog. */
+      kind: "color";
+      /**
+       * Receives a newly created color.
+       *
+       * @param value - Created color value.
+       */
+      onCreated: (value: CatalogColor) => void;
+    }
+  | {
+      /** Lookup kind created by this dialog. */
       kind: "finish" | "material";
+      /**
+       * Receives a newly created finish or material.
+       *
+       * @param value - Created lookup value.
+       */
       onCreated: (value: CatalogLookup) => void;
     }
-) & { t: ReturnType<typeof useCatalogCopy> };
+) & {
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+};
 
+/**
+ * Renders a modal for creating one catalog lookup value.
+ *
+ * @param props - Lookup kind, callback, and localized copy.
+ * @returns The lookup creation dialog.
+ */
 function LookupDialog(props: LookupDialogProps) {
   const { kind, t } = props;
   const ref = React.useRef<HTMLDialogElement>(null);
@@ -1441,6 +1523,12 @@ function CollectionDeletionSection({
   );
 }
 
+/**
+ * Renders the form for adding a product to a collection.
+ *
+ * @param root0 - Collection-item creation properties.
+ * @returns The collection-item creation page.
+ */
 export function CollectionAddPage({
   collections,
   defaultCollectionName,
@@ -1504,6 +1592,8 @@ export function CollectionAddPage({
     initialProduct?.name ?? "",
   );
   const [description, setDescription] = React.useState("");
+  const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
+  const [descriptionLoading, setDescriptionLoading] = React.useState(true);
   const [bearing, setBearing] = React.useState("");
   const [material, setMaterial] = React.useState<CatalogLookup | null>(null);
   const [finish, setFinish] = React.useState<ComboboxOption | null>(null);
@@ -1558,9 +1648,19 @@ export function CollectionAddPage({
       ]
     : collections;
 
+  /**
+   * Saves the current collection-item fields.
+   *
+   * @param confirmed - Whether duplicate items were confirmed.
+   * @returns A promise that resolves after the save flow completes.
+   */
   const submit = async (confirmed: boolean) => {
+    const currentDescription =
+      descriptionRef.current?.getValue() ?? description;
     setFormError(null);
     if (
+      descriptionRef.current?.isLoading() ||
+      currentDescription.length > 5000 ||
       !product ||
       !displayName.trim() ||
       selectedCollectionId === null ||
@@ -1636,7 +1736,7 @@ export function CollectionAddPage({
         confirmed,
         customFinish: finish.id === "custom" ? customFinish : null,
         displayName,
-        description,
+        description: currentDescription,
         finishOptionId: finish.id === "custom" ? null : Number(finish.id),
         materialId: material.id,
         newCollection:
@@ -1734,14 +1834,15 @@ export function CollectionAddPage({
             value={displayName}
           />
         </Field>
-        <MarkdownTextarea
+        <CatalogMarkdownEditor
+          defaultValue={description}
           disabled={!product}
           help={t("web.catalog.help.markdownDescription")}
           id="collection-item-description"
           label={t("web.catalog.field.description")}
           onChange={setDescription}
-          t={t}
-          value={description}
+          onLoadingChange={setDescriptionLoading}
+          ref={descriptionRef}
         />
         {product?.productTypeSlug === "spinner" ? (
           <Field label={t("web.catalog.field.bearing")}>
@@ -1992,6 +2093,8 @@ export function CollectionAddPage({
           <Button
             disabled={Boolean(
               !material ||
+                descriptionLoading ||
+                description.length > 5000 ||
                 !displayName.trim() ||
                 !finish ||
                 (finish.id === "custom" && !customFinishIsValid) ||
@@ -2014,6 +2117,12 @@ export function CollectionAddPage({
   );
 }
 
+/**
+ * Renders material and finish fields for a collection item.
+ *
+ * @param root0 - Collection product field properties.
+ * @returns The collection product fields.
+ */
 export function CollectionProductFields({
   currentFinish,
   customFinish,
@@ -2027,16 +2136,43 @@ export function CollectionProductFields({
   product,
   t,
 }: {
+  /** Existing item finish available as a choice. */
   currentFinish?: CatalogFinishOption | null;
+  /** Current custom finish value. */
   customFinish: FinishOptionFormValue;
+  /** Selected finish choice. */
   finish: ComboboxOption | null;
+  /** Selected material. */
   material: CatalogLookup | null;
+  /**
+   * Updates the custom finish value.
+   *
+   * @param value - Updated custom finish.
+   */
   onCustomFinishChange: (value: FinishOptionFormValue) => void;
+  /**
+   * Updates the selected finish.
+   *
+   * @param value - Selected finish, or null to clear it.
+   */
   onFinishChange: (value: ComboboxOption | null) => void;
+  /**
+   * Updates the selected material.
+   *
+   * @param value - Selected material, or null to clear it.
+   */
   onMaterialChange: (value: CatalogLookup | null) => void;
+  /**
+   * Updates shared catalog lookup options.
+   *
+   * @param value - Next options or an updater function.
+   */
   onOptionsChange: React.Dispatch<React.SetStateAction<CatalogOptions>>;
+  /** Available catalog lookup options. */
   options: CatalogOptions;
+  /** Product supplying available materials and finishes. */
   product: CatalogProduct;
+  /** Localized catalog message formatter. */
   t: ReturnType<typeof useCatalogCopy>;
 }) {
   const finishItems: ComboboxOption[] = [
@@ -2116,6 +2252,12 @@ function localizedFinishLabel(
   });
 }
 
+/**
+ * Renders the collection-item edit page.
+ *
+ * @param root0 - Existing item, product, and lookup values.
+ * @returns The collection-item edit page.
+ */
 export function CollectionEditPage({
   buttonProducts,
   collections,
@@ -2144,6 +2286,8 @@ export function CollectionEditPage({
   const [description, setDescription] = React.useState(
     item.descriptionOverride ?? "",
   );
+  const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
+  const [descriptionLoading, setDescriptionLoading] = React.useState(true);
   const [bearing, setBearing] = React.useState(item.bearingOverride ?? "");
   const [options, setOptions] = React.useState(initialOptions);
   const [formError, setFormError] = React.useState<string | null>(null);
@@ -2199,6 +2343,7 @@ export function CollectionEditPage({
       finishOptionSchema.safeParse(buttonCustomFinish).success);
   const detailsAreValid = Boolean(
     displayName.trim() &&
+      description.length <= 5000 &&
       material &&
       finish &&
       finishSelectionIsValid &&
@@ -2225,13 +2370,14 @@ export function CollectionEditPage({
             value={displayName}
           />
         </Field>
-        <MarkdownTextarea
+        <CatalogMarkdownEditor
+          defaultValue={description}
           help={t("web.catalog.help.collectionDescriptionOverride")}
           id="collection-item-override"
           label={t("web.catalog.field.description")}
           onChange={setDescription}
-          t={t}
-          value={description}
+          onLoadingChange={setDescriptionLoading}
+          ref={descriptionRef}
         />
         {item.productTypeSlug === "spinner" ? (
           <Field label={t("web.catalog.field.bearing")}>
@@ -2363,9 +2509,15 @@ export function CollectionEditPage({
           targetType="collection_item"
         />
         <Button
-          disabled={submissionMode === "disabled"}
+          disabled={descriptionLoading || submissionMode === "disabled"}
           onClick={async () => {
-            if (submissionMode === "disabled") {
+            const currentDescription =
+              descriptionRef.current?.getValue() ?? description;
+            if (
+              descriptionRef.current?.isLoading() ||
+              currentDescription.length > 5000 ||
+              submissionMode === "disabled"
+            ) {
               return;
             }
             const moderating = item.canAdminister && !item.isOwner;
@@ -2469,7 +2621,7 @@ export function CollectionEditPage({
                 collectionItemId: item.collectionItemId,
                 customFinish: finish.id === "custom" ? customFinish : null,
                 displayName,
-                description,
+                description: currentDescription,
                 finishOptionId:
                   finish.id === "current" || finish.id === "custom"
                     ? null
@@ -2508,11 +2660,19 @@ export function collectionEditSubmissionMode(
   return pendingImageCount > 0 ? "upload" : "disabled";
 }
 
+/**
+ * Renders one labeled catalog form field.
+ *
+ * @param root0 - Field label and content.
+ * @returns The labeled field.
+ */
 function Field({
   children,
   label,
 }: {
+  /** Field control and supporting content. */
   children: React.ReactNode;
+  /** Localized field label. */
   label: string;
 }) {
   return (
@@ -2523,53 +2683,12 @@ function Field({
   );
 }
 
-function MarkdownTextarea({
-  disabled = false,
-  error,
-  help,
-  id,
-  label,
-  name,
-  onBlur,
-  onChange,
-  t,
-  value,
-}: {
-  disabled?: boolean;
-  error?: string;
-  help: string;
-  id: string;
-  label: string;
-  name?: string;
-  onBlur?: React.FocusEventHandler<HTMLTextAreaElement>;
-  onChange(value: string): void;
-  t: ReturnType<typeof useCatalogCopy>;
-  value: string;
-}) {
-  const helpId = `${id}-help`;
-
-  return (
-    <Field label={label}>
-      <textarea
-        aria-describedby={helpId}
-        aria-label={label}
-        className="min-h-28 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={disabled}
-        id={id}
-        maxLength={5000}
-        name={name}
-        onBlur={onBlur}
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
-      />
-      <p className="text-xs text-muted-foreground" id={helpId}>
-        {help}
-      </p>
-      <FieldError error={error} t={t} />
-    </Field>
-  );
-}
-
+/**
+ * Renders archive and restore controls for catalog images.
+ *
+ * @param root0 - Catalog image editor properties.
+ * @returns The image controls, or nothing when no images exist.
+ */
 function CatalogImageEditor({
   getReason,
   images,
@@ -2577,10 +2696,23 @@ function CatalogImageEditor({
   t,
   targetType,
 }: {
+  /**
+   * Collects a moderation reason when required.
+   *
+   * @returns The moderation reason, or undefined when canceled.
+   */
   getReason?(): string | undefined;
+  /** Images available for archive or restore. */
   images: CatalogImage[];
+  /**
+   * Receives the updated image list.
+   *
+   * @param images - Updated catalog images.
+   */
   onChange(images: CatalogImage[]): void;
+  /** Localized catalog message formatter. */
   t: ReturnType<typeof useCatalogCopy>;
+  /** Catalog record type that owns the images. */
   targetType: "collection_item" | "product";
 }) {
   if (!images.length) return null;
@@ -2657,11 +2789,19 @@ function CatalogImageEditor({
   );
 }
 
+/**
+ * Renders one localized field error.
+ *
+ * @param root0 - Field error properties.
+ * @returns The localized error, or nothing without an error.
+ */
 function FieldError({
   error,
   t,
 }: {
+  /** Translation key for the field error. */
   error?: string;
+  /** Localized catalog message formatter. */
   t: ReturnType<typeof useCatalogCopy>;
 }) {
   return error ? (
@@ -2671,6 +2811,12 @@ function FieldError({
   ) : null;
 }
 
+/**
+ * Renders a catalog form status notice.
+ *
+ * @param root0 - Notice content.
+ * @returns The status notice.
+ */
 function Notice({ children }: { children: React.ReactNode }) {
   return (
     <div

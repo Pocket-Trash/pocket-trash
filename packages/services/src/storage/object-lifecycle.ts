@@ -6,6 +6,7 @@ import { hashLogIdentifier } from "../logging.js";
 import { imageTargets, lockObjectPath } from "./image-records.js";
 import { type StorageDb, UploadSessionError } from "./types.js";
 
+/** Maps persisted file kinds to their attachment tables and owning target types. */
 export const fileRecords = {
   product_image: { ...imageTargets.product, targetType: "product" },
   collection_image: { ...imageTargets.collection, targetType: "collection" },
@@ -27,6 +28,14 @@ export const fileRecords = {
 
 export { lockObjectPath } from "./image-records.js";
 
+/**
+ * Checks whether any persisted record references an object path, including soft-deleted attachments.
+ *
+ * @param db - Application database.
+ * @param path - Object-storage path to check.
+ * @returns Whether an attachment or resource version references the path.
+ * @rejects When the attachment query fails.
+ */
 export async function objectIsAttached(db: StorageDb, path: string) {
   const result = await db.execute(
     sql`select 1 from (${sql.join(
@@ -43,6 +52,13 @@ export async function objectIsAttached(db: StorageDb, path: string) {
   return result.rows.length > 0;
 }
 
+/**
+ * Locks an object path and requires it not to be queued for deletion.
+ *
+ * @param db - Application database.
+ * @param path - Object-storage path to validate.
+ * @rejects When locking or lookup fails, or deletion is already pending.
+ */
 export async function assertNotPendingDeletion(db: StorageDb, path: string) {
   await lockObjectPath(db, path);
   const pending = await db.execute(
@@ -54,6 +70,13 @@ export async function assertNotPendingDeletion(db: StorageDb, path: string) {
 
 // Call inside the same transaction that removes the attachment. Writers use the
 // same path lock and refuse queued paths until cleanup has finished.
+/**
+ * Queues unique object paths for deferred deletion under per-path locks.
+ *
+ * @param db - Application database.
+ * @param paths - Object-storage paths removed from their attachments.
+ * @rejects When locking, ownership lookup, or queue persistence fails.
+ */
 export async function queueObjectDeletions(db: StorageDb, paths: string[]) {
   for (const path of [...new Set(paths)].sort()) {
     await lockObjectPath(db, path);
@@ -67,8 +90,19 @@ export async function queueObjectDeletions(db: StorageDb, paths: string[]) {
   }
 }
 
+/**
+ * Resolves the sole erasure-eligible account owner of an attached object path.
+ *
+ * @param db - Application database.
+ * @param path - Object-storage path to inspect.
+ * @returns Clerk identifier when exactly one eligible owner is found, otherwise `null`.
+ * @rejects When the ownership query fails.
+ */
 async function erasableObjectOwner(db: StorageDb, path: string) {
-  const result = await db.execute<{ clerkId: string }>(sql`
+  const result = await db.execute<{
+    /** Clerk identifier of an attachment owner. */
+    clerkId: string;
+  }>(sql`
     select distinct owned.clerk_id as "clerkId" from (
       select users.clerk_id, collection_image.object_path
       from collection_image
@@ -102,6 +136,15 @@ async function erasableObjectOwner(db: StorageDb, path: string) {
   return result.rows.length === 1 ? result.rows[0]?.clerkId : null;
 }
 
+/**
+ * Drains queued object deletions without failing the batch on individual errors.
+ *
+ * @param db - Application database.
+ * @param storage - Object storage from which unreferenced paths are deleted.
+ * @param logger - Application logger.
+ * @param paths - Optional object-path filter; at most 100 matching queued paths are processed in creation order.
+ * @rejects When retry logging itself fails.
+ */
 export async function cleanupObjectDeletions(
   db: Database,
   storage: UploadStorage,
@@ -110,9 +153,18 @@ export async function cleanupObjectDeletions(
 ) {
   if (paths?.length === 0) return;
   // ponytail: drain at most 100 objects per run; increase capacity if the backlog grows.
-  let pending: { rows: { objectPath: string }[] };
+  let pending: {
+    /** Queued deletion rows selected for this batch. */
+    rows: {
+      /** Object-storage path queued for deletion. */
+      objectPath: string;
+    }[];
+  };
   try {
-    pending = await db.execute<{ objectPath: string }>(
+    pending = await db.execute<{
+      /** Object-storage path queued for deletion. */
+      objectPath: string;
+    }>(
       sql`select object_path as "objectPath" from storage_object_deletion ${
         paths
           ? sql`where object_path in (${sql.join(

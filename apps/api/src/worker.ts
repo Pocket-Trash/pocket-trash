@@ -2,6 +2,7 @@ import { createClerkClient, verifyToken } from "@clerk/backend";
 import { isLogLevel, loggerMessages } from "@package/logger";
 import { type Actor, normalizeActor } from "@package/services/authorization";
 import { type ApiBindings, createApp } from "./app.js";
+import { drainAuditQueue } from "./audit.js";
 import { findClerkOrphans } from "./clerk-orphans.js";
 import { createClerkWebhookHandler } from "./clerk-webhooks.js";
 import { createErasureOperations, drainErasureQueue } from "./erasure.js";
@@ -217,6 +218,14 @@ export async function handleWorkerFetch(
   }
 }
 
+/**
+ * Runs bounded production maintenance from the Cloudflare schedule.
+ *
+ * @param _controller - Schedule metadata for the current invocation.
+ * @param env - Worker bindings used by maintenance services.
+ * @param context - Execution context retaining background work.
+ * @returns Completion after maintenance is scheduled.
+ */
 export async function handleWorkerScheduled(
   _controller: ScheduledController,
   env: ApiBindings,
@@ -232,6 +241,7 @@ export async function handleWorkerScheduled(
         const clerk = createClerkClient({
           secretKey: env.CLERK_SECRET_KEY as string,
         });
+        await drainAuditQueue(runtime.services.db.audit);
         await drainErasureQueue(
           runtime.services.db.erasure,
           createErasureOperations({

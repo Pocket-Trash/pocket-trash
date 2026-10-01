@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const canReadAudit = vi.hoisted(() => vi.fn());
 const getAdminAuditExport = vi.hoisted(() => vi.fn());
+const getAuditDeliveryFailures = vi.hoisted(() => vi.fn());
 const listAdminAuditEvents = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/audit", () => ({
   canReadAudit,
   getAdminAuditExport,
+  getAuditDeliveryFailures,
   listAdminAuditEvents,
   parseAuditSearch: (value: unknown) => value,
 }));
@@ -37,8 +39,10 @@ describe("admin audit route", () => {
       canDelete: false,
       canExport: true,
     });
+    getAuditDeliveryFailures.mockResolvedValueOnce([]);
     await loader({ deps: search } as never);
     expect(listAdminAuditEvents).toHaveBeenCalledWith({ data: search });
     expect(getAdminAuditExport).toHaveBeenCalledOnce();
+    expect(getAuditDeliveryFailures).toHaveBeenCalledOnce();
   });
 });

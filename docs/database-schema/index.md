@@ -4,6 +4,7 @@
 
 Generated schema documentation for committed Drizzle tables.
 
+- [`audit_delivery`](./audit-delivery.md)
 - [`audit_event`](./audit-event.md)
 - [`audit_export`](./audit-export.md)
 - [`collection_image`](./collection-image.md)
