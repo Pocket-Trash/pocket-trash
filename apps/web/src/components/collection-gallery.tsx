@@ -93,6 +93,7 @@ export type CollectionGalleryCopy = {
 
 /**
  * Renders collection details, a responsive image grid, and a shared lightbox.
+ * The cover leads the lightbox; remaining images sort by descending position, then ID, in pages of six below 64rem and nine otherwise.
  *
  * @param props - Collection gallery properties.
  * @param props.collection - Collection summary and cover images to present.
@@ -148,10 +149,10 @@ export function CollectionGallery({
     const desktop = window.matchMedia("(min-width: 64rem)");
     /**
      * Uses nine gallery images on desktop and six on smaller viewports.
-     *
-     * @returns No value.
      */
-    const updatePageSize = () => setPageSize(desktop.matches ? 9 : 6);
+    const updatePageSize = () => {
+      setPageSize(desktop.matches ? 9 : 6);
+    };
     updatePageSize();
     desktop.addEventListener("change", updatePageSize);
     return () => desktop.removeEventListener("change", updatePageSize);

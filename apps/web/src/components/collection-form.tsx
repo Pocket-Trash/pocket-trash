@@ -55,7 +55,7 @@ const managerColumns = managerColumnHelper.columns([
 ]);
 
 /**
- * Renders a controlled collection-details form with optional image selection.
+ * Renders a stateful collection-details form with optional image selection.
  *
  * @param props - Collection form properties.
  * @param props.copy - Localized form labels and guidance.
@@ -65,6 +65,7 @@ const managerColumns = managerColumnHelper.columns([
  * @param props.initialValue - Initial metadata, defaulting to a blank private collection.
  * @param props.onSubmit - Receives the current metadata and selected image files.
  * @returns The collection form UI.
+ * @throws {Error} When rendered outside `LocaleProvider`.
  */
 export function CollectionForm({
   copy,
@@ -141,6 +142,8 @@ export function CollectionForm({
   includeImages?: boolean;
   /**
    * Initial metadata, defaulting to a blank private collection.
+   *
+   * @default { description: "", isPrivate: true, name: "" }
    */
   initialValue?: CollectionFormValue;
   /**
@@ -148,7 +151,7 @@ export function CollectionForm({
    *
    * @param value - Current collection metadata.
    * @param images - Image files selected for upload.
-   * @returns Callback completion.
+   * @returns No value, or a promise the form starts without awaiting.
    */
   onSubmit(value: CollectionFormValue, images: File[]): void | Promise<void>;
 }) {
@@ -240,7 +243,8 @@ export function CollectionForm({
 }
 
 /**
- * Renders the current collection cover and paginated cover history controls.
+ * Renders the current cover and 12-image pages of historical covers.
+ * History excludes the current cover and orders images by descending position, then ID.
  *
  * @param props - Collection cover manager properties.
  * @param props.collection - Collection whose cover images can be managed.
@@ -321,21 +325,21 @@ export function CollectionCoverManager({
   /**
    * Clears the current collection cover.
    *
-   * @returns Callback completion.
+   * @returns No value, or a promise the manager starts without awaiting.
    */
   onClear(): void | Promise<void>;
   /**
    * Deletes a collection cover image.
    *
    * @param image - Image selected for deletion.
-   * @returns Callback completion.
+   * @returns No value, or a promise the manager starts without awaiting.
    */
   onDelete(image: CatalogImage): void | Promise<void>;
   /**
    * Makes a historical image the current collection cover.
    *
    * @param image - Image selected as the cover.
-   * @returns Callback completion.
+   * @returns No value, or a promise the manager starts without awaiting.
    */
   onSelect(image: CatalogImage): void | Promise<void>;
 }) {
@@ -487,6 +491,7 @@ export function CollectionCoverManager({
  * @param props.error - Optional upload error shown above the submit button.
  * @param props.onUpload - Uploads the selected files and reports whether to clear them.
  * @returns The collection image uploader UI.
+ * @throws {Error} When rendered outside `LocaleProvider`.
  */
 export function CollectionImageUploader({
   copy,

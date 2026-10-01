@@ -165,17 +165,17 @@ export function ImageButton({
 }
 
 /**
- * Renders caller-provided thumbnails and a modal, wraparound image lightbox.
+ * Renders caller-provided launchers and, when images exist, a modal lightbox with adjacent wraparound navigation.
  *
  * @param props - Image lightbox properties.
  * @param props.alt - Alternative text shared by lightbox images.
  * @param props.children - Renders image launchers with a guarded selection callback.
  * @param props.closeLabel - Accessible label for closing the lightbox.
- * @param props.images - Ordered images available in the lightbox.
+ * @param props.images - Ordered images available in the lightbox; an empty array omits the dialog and makes selection inert.
  * @param props.label - Accessible label for the modal dialog.
  * @param props.nextLabel - Accessible label for the next-image control.
  * @param props.previousLabel - Accessible label for the previous-image control.
- * @returns The launcher content and lightbox dialog.
+ * @returns The launcher content and, when images exist, the lightbox dialog.
  */
 export function ImageLightbox({
   alt,
@@ -202,7 +202,7 @@ export function ImageLightbox({
    */
   closeLabel: string;
   /**
-   * Ordered images available in the lightbox.
+   * Ordered images available in the lightbox; an empty array omits the dialog and makes selection inert.
    */
   images: GalleryImage[];
   /**
@@ -231,15 +231,15 @@ export function ImageLightbox({
     dialogRef.current?.showModal();
   };
   /**
-   * Moves the selection by an offset and wraps at either end.
+   * Moves to the adjacent image and wraps at either end.
    *
-   * @param offset - Relative index movement.
-   * @returns No value.
+   * @param offset - Adjacent movement: `-1` for previous or `1` for next.
    */
-  const cycle = (offset: number) =>
+  const cycle = (offset: number) => {
     setSelectedIndex(
       (index) => (index + offset + images.length) % images.length,
     );
+  };
 
   return (
     <>
