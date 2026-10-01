@@ -14,7 +14,7 @@ const maxSummaryNodes = 120;
  * @returns Markdown summary and every notable node found in the document.
  */
 export function summarizeSnapshot(snapshot: FigjamSnapshot): {
-  /** Markdown overview capped to the configured number of displayed nodes. */
+  /** Markdown overview of at most 120 nodes and the first 25 returned comments. */
   markdown: string;
   /** Every notable node found in the document tree. */
   nodes: FigjamSummaryNode[];

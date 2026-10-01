@@ -68,7 +68,7 @@ async function main(argv: readonly string[]): Promise<number> {
 /**
  * Downloads an allowed Figma file and writes its cache artifacts.
  *
- * @param args - Optional Figma file key.
+ * @param args - Optional Figma file key, defaulting to the configured file.
  * @returns A promise that resolves after all snapshot artifacts are written.
  * @rejects When configuration, Figma access, or file output fails.
  */
@@ -92,7 +92,7 @@ async function read(args: readonly string[]): Promise<void> {
 /**
  * Regenerates summary artifacts from a cached FigJam snapshot.
  *
- * @param args - Optional path to a cached snapshot JSON file.
+ * @param args - Optional snapshot path, defaulting to the configured file's cache.
  * @returns A promise that resolves after summary artifacts are written.
  * @rejects When configuration, snapshot parsing, or file output fails.
  */
@@ -157,7 +157,7 @@ async function writePayload(args: readonly string[]): Promise<void> {
 /**
  * Starts the local FigJam outbox bridge on a requested port.
  *
- * @param args - Optional localhost port.
+ * @param args - Optional localhost port, defaulting to `4873`.
  * @returns A promise that resolves after server startup is initiated.
  * @rejects When the port is not an integer from 1 through 65535.
  */
@@ -184,7 +184,7 @@ async function serve(args: readonly string[]): Promise<void> {
 /**
  * Posts a message to an allowed Figma or FigJam file.
  *
- * @param args - Optional file key and required `--message` value.
+ * @param args - Optional file key, defaulting to the configured file, and required `--message` value.
  * @returns A promise that resolves after Figma accepts the comment.
  * @rejects When the message, configuration, file key, or API request is invalid.
  */

@@ -128,7 +128,7 @@ export type FigjamOperation =
       y: number;
     };
 
-/** Versioned batch of operations destined for one allowed FigJam file. */
+/** Versioned batch of operations destined for one FigJam file. */
 export type FigjamPayload = {
   /** Figma file key receiving the operations. */
   fileKey: string;
@@ -182,7 +182,7 @@ export type FigmaComment = {
 
 /** Figma file response and comments captured at one point in time. */
 export type FigjamSnapshot = {
-  /** Recent comments returned for the file. */
+  /** Comments returned for the file in Figma response order. */
   comments?: FigmaComment[];
   /** ISO timestamp when the snapshot was fetched. */
   fetchedAt: string;
