@@ -5,8 +5,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { listPayloads } from "./outbox.js";
 import { payloadSchemaVersion } from "./types.js";
 
+/** Temporary outbox directories removed after each test. */
 const temporaryDirectories: string[] = [];
 
+/** Valid sticky-note payload used by outbox file tests. */
 const payload = {
   fileKey: "board123",
   operations: [

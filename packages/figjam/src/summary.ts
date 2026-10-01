@@ -4,10 +4,19 @@ import type {
   FigmaComment,
 } from "./types.js";
 
+/** Maximum number of notable nodes rendered in a Markdown summary. */
 const maxSummaryNodes = 120;
 
+/**
+ * Builds a readable Markdown overview and node index from a Figma snapshot.
+ *
+ * @param snapshot - Captured Figma file and comment data.
+ * @returns Markdown summary and every notable node found in the document.
+ */
 export function summarizeSnapshot(snapshot: FigjamSnapshot): {
+  /** Markdown overview capped to the configured number of displayed nodes. */
   markdown: string;
+  /** Every notable node found in the document tree. */
   nodes: FigjamSummaryNode[];
 } {
   const file = asRecord(snapshot.file) ?? {};
@@ -54,6 +63,12 @@ export function summarizeSnapshot(snapshot: FigjamSnapshot): {
   };
 }
 
+/**
+ * Traverses a Figma document breadth-first and collects notable nodes.
+ *
+ * @param input - Unknown document root from the Figma API.
+ * @returns Notable nodes in document traversal order.
+ */
 function collectSummaryNodes(input: unknown): FigjamSummaryNode[] {
   const nodes: FigjamSummaryNode[] = [];
   const queue = [input];
@@ -91,6 +106,14 @@ function collectSummaryNodes(input: unknown): FigjamSummaryNode[] {
   return nodes;
 }
 
+/**
+ * Determines whether a Figma node carries useful summary information.
+ *
+ * @param type - Figma node type.
+ * @param node - Raw Figma node fields.
+ * @param characters - Text found on the node, when present.
+ * @returns Whether the node should appear in summary output.
+ */
 function shouldIncludeNode(
   type: string,
   node: Record<string, unknown>,
@@ -108,6 +131,12 @@ function shouldIncludeNode(
   return Boolean(name && name !== "Page 1" && name !== "Untitled");
 }
 
+/**
+ * Formats one Figma comment as a single Markdown list item.
+ *
+ * @param comment - Comment fields returned by Figma.
+ * @returns Markdown list item with author, timestamp, and normalized text.
+ */
 function formatComment(comment: FigmaComment): string {
   const author = comment.user?.handle ?? "Unknown";
   const createdAt = comment.created_at ? ` (${comment.created_at})` : "";
@@ -115,6 +144,12 @@ function formatComment(comment: FigmaComment): string {
   return `- ${author}${createdAt}: ${message}`;
 }
 
+/**
+ * Narrows a value to a non-array object record.
+ *
+ * @param input - Value to inspect.
+ * @returns The object record, or `undefined` for non-object values and arrays.
+ */
 function asRecord(input: unknown): Record<string, unknown> | undefined {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return undefined;
@@ -123,10 +158,22 @@ function asRecord(input: unknown): Record<string, unknown> | undefined {
   return input as Record<string, unknown>;
 }
 
+/**
+ * Reads a non-blank string from an unknown value.
+ *
+ * @param input - Value to inspect.
+ * @returns The original string, or `undefined` when it is blank or not a string.
+ */
 function stringValue(input: unknown): string | undefined {
   return typeof input === "string" && input.trim() ? input : undefined;
 }
 
+/**
+ * Collapses whitespace so text fits on one summary line.
+ *
+ * @param input - Text to normalize.
+ * @returns Trimmed text with each whitespace run replaced by one space.
+ */
 function singleLine(input: string): string {
   return input.replaceAll(/\s+/g, " ").trim();
 }

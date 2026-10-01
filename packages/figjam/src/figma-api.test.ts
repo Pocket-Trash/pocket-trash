@@ -6,6 +6,7 @@ import {
   postFigmaComment,
 } from "./figma-api.js";
 
+/** Figma API configuration shared by request-behavior tests. */
 const config = {
   accessToken: "figma-token",
   allowedFileKeys: ["board123"],

@@ -8,10 +8,20 @@ import { basename, join } from "node:path";
 import type { FigjamPayload } from "./types.js";
 import { validatePayload } from "./validation.js";
 
+/**
+ * Lists valid JSON payloads from an outbox in file-name order.
+ * Missing directories and malformed payload files are skipped.
+ *
+ * @param outboxDir - Directory containing bridge payload files.
+ * @returns Valid payloads with their source names and paths.
+ */
 export async function listPayloads(outboxDir: string): Promise<
   {
+    /** Base name of the payload file. */
     fileName: string;
+    /** Full path to the payload file. */
     filePath: string;
+    /** Validated bridge payload read from the file. */
     payload: FigjamPayload;
   }[]
 > {
@@ -27,11 +37,31 @@ export async function listPayloads(outboxDir: string): Promise<
     .sort((left, right) => left.fileName.localeCompare(right.fileName));
 }
 
+/**
+ * Starts a localhost HTTP bridge for listing, reading, and acknowledging payloads.
+ *
+ * @param options - Outbox directory, local port, and status reporter.
+ * @returns A handle that gracefully stops the bridge server.
+ */
 export function serveOutbox(options: {
+  /** Directory exposed through the bridge. */
   outboxDir: string;
+  /** Localhost TCP port used by the bridge. */
   port: number;
+  /**
+   * Reports the address once the bridge starts listening.
+   *
+   * @param message - Bridge status message.
+   */
   print: (message: string) => void;
-}): { close: () => Promise<void> } {
+}): {
+  /**
+   * Stops the bridge server after active connections close.
+   *
+   * @returns A promise that resolves after the server closes.
+   */
+  close: () => Promise<void>;
+} {
   const server = createServer(async (request, response) => {
     try {
       setCorsHeaders(response);
@@ -106,6 +136,12 @@ export function serveOutbox(options: {
   });
 
   return {
+    /**
+     * Stops the bridge server after active connections close.
+     *
+     * @returns A promise that resolves after the server closes.
+     * @rejects When the HTTP server reports a close error.
+     */
     close: () =>
       new Promise((resolve, reject) => {
         server.close((error) => {
@@ -119,13 +155,23 @@ export function serveOutbox(options: {
   };
 }
 
+/**
+ * Reads and validates one payload file without failing its surrounding listing.
+ *
+ * @param outboxDir - Directory containing bridge payload files.
+ * @param fileName - Payload file name within the outbox.
+ * @returns File metadata and payload, or `undefined` when reading or validation fails.
+ */
 async function readPayloadFile(
   outboxDir: string,
   fileName: string,
 ): Promise<
   | {
+      /** Base name of the payload file. */
       fileName: string;
+      /** Full path to the payload file. */
       filePath: string;
+      /** Validated bridge payload read from the file. */
       payload: FigjamPayload;
     }
   | undefined
@@ -143,6 +189,13 @@ async function readPayloadFile(
   }
 }
 
+/**
+ * Reads an HTTP request body and parses it as JSON.
+ *
+ * @param request - Incoming bridge request stream.
+ * @returns Parsed JSON, or an empty object for an empty body.
+ * @rejects When reading the stream fails or the body is invalid JSON.
+ */
 async function readRequestJson(request: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
 
@@ -154,12 +207,24 @@ async function readRequestJson(request: IncomingMessage): Promise<unknown> {
   return text ? (JSON.parse(text) as unknown) : {};
 }
 
+/**
+ * Adds permissive local bridge CORS headers to an HTTP response.
+ *
+ * @param response - Outgoing bridge response.
+ */
 function setCorsHeaders(response: ServerResponse): void {
   response.setHeader("Access-Control-Allow-Origin", "*");
   response.setHeader("Access-Control-Allow-Headers", "Content-Type");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
 }
 
+/**
+ * Sends an indented JSON response with the requested status.
+ *
+ * @param response - Outgoing bridge response.
+ * @param statusCode - HTTP response status.
+ * @param body - Value serialized as JSON.
+ */
 function writeJson(
   response: ServerResponse,
   statusCode: number,
