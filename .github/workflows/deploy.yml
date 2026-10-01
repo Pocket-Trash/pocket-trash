@@ -92,31 +92,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-
-          changed_files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
-          database=false
-
-          if grep -Eq '^(packages/database/src/schema/|packages/database/drizzle/|packages/database/drizzle\.config\.ts$)' <<< "$changed_files"; then
-            database=true
-          fi
-
-          echo "database=$database" >> "$GITHUB_OUTPUT"
-          {
-            echo "changed_files<<EOF"
-            printf '%s\n' "$changed_files"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-          source .github/scripts/ci-log.sh
-          emit_ci_log info "ci.database.preview.changeDetection.completed" "$(jq -n \
-            --argjson database "$database" \
-            --arg changed_files "$changed_files" \
-            '{
-              databaseChanged: $database,
-              changedFiles: ($changed_files | split("\n") | map(select(. != "")))
-            }')"
+        run: bash .github/scripts/detect-database-changes.sh
 
       - name: Sync db-change label
         uses: actions/github-script@v8
@@ -891,12 +867,25 @@ jobs:
     name: Development API
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.target == 'development')
     runs-on: ubuntu-latest
+    outputs:
+      database_changed: ${{ steps.db_changes.outputs.database }}
     permissions:
       contents: read
       id-token: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect database changes
+        id: db_changes
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: bash .github/scripts/detect-database-changes.sh
 
       - name: Fetch deployment secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
@@ -997,6 +986,16 @@ jobs:
           curl --fail --retry 5 --retry-all-errors --retry-delay 2 \
             --silent --show-error "https://dev-api.pocket-trash.app/api/v0/health" | \
             jq -e '.ok == true and .service == "api"' >/dev/null
+
+  refresh-preview:
+    name: Refresh shared preview
+    needs: development-api
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.development-api.outputs.database_changed == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/preview-refresh.yml
+    secrets: inherit
 
   preview-webhook-cleanup:
     name: Preview Webhook Cleanup
