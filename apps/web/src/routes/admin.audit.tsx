@@ -3,6 +3,7 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import {
   canReadAudit,
   getAdminAuditExport,
+  getAuditDeliveryFailures,
   listAdminAuditEvents,
   parseAuditSearch,
 } from "@/lib/audit";
@@ -43,11 +44,12 @@ const Route = createFileRoute("/admin/audit")({
    * @returns Audit page data.
    */
   loader: async ({ deps }) => {
-    const [page, exportState] = await Promise.all([
+    const [page, exportState, deliveryFailures] = await Promise.all([
       listAdminAuditEvents({ data: deps }),
       getAdminAuditExport(),
+      getAuditDeliveryFailures(),
     ]);
-    return { exportState, page };
+    return { deliveryFailures, exportState, page };
   },
   validateSearch: parseAuditSearch,
 });
@@ -60,9 +62,10 @@ export { Route };
  * @returns The configured admin audit page.
  */
 function AdminAuditRoute() {
-  const { exportState, page } = Route.useLoaderData();
+  const { deliveryFailures, exportState, page } = Route.useLoaderData();
   return (
     <AdminAuditPage
+      deliveryFailures={deliveryFailures}
       exportState={exportState}
       page={page}
       search={Route.useSearch()}

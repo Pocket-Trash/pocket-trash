@@ -29,6 +29,49 @@ export type AuditJsonObject = {
   [key: string]: AuditJson;
 };
 
+/** Sanitized event values retained while an audit write is retried. */
+export type AuditDeliveryPayload = {
+  /** Registered audit action. */
+  action: string;
+  /** Role snapshot of the actor. */
+  actorRole: string;
+  /** Internal actor identifier, or null for a system or erased actor. */
+  actorUserId: number | null;
+  /** Actor username snapshot. */
+  actorUsername: string | null;
+  /** Allowlisted state after the action. */
+  afterState: AuditJsonObject | null;
+  /** Authorization provenance kind. */
+  authorizationType: string;
+  /** Allowlisted state before the action. */
+  beforeState: AuditJsonObject | null;
+  /** Cross-request correlation identifier. */
+  correlationId: string | null;
+  /** Allowlisted metadata for events without state snapshots. */
+  metadata: AuditJsonObject | null;
+  /** ISO timestamp when the source action occurred. */
+  occurredAt: string;
+  /** Internal owner identifier associated with the target. */
+  ownerUserId: number | null;
+  /** Permission authorizing the action. */
+  permission: string | null;
+  /** Bounded operational reason. */
+  reason: string | null;
+  /** Source operation request identifier. */
+  requestId: string | null;
+  /** Stable target identifier. */
+  targetId: string;
+  /** Registered target domain. */
+  targetType: string;
+};
+
+/** Durable states for an audit delivery retry. */
+export const auditDeliveryStatuses = [
+  "pending",
+  "processing",
+  "needs_attention",
+] as const;
+
 /** Append-only audit events, except for account-erasure redaction and retention deletion. */
 export const auditEvent = pgTable(
   "audit_event",
@@ -129,6 +172,52 @@ export const auditEvent = pgTable(
 export type AuditEvent = typeof auditEvent.$inferSelect;
 /** Values accepted when creating an audit-event row. */
 export type NewAuditEvent = typeof auditEvent.$inferInsert;
+
+/** Audit events awaiting durable delivery after an external side effect. */
+export const auditDelivery = pgTable(
+  "audit_delivery",
+  {
+    deliveryKey: text("delivery_key").primaryKey(),
+    payload: jsonb("payload").$type<AuditDeliveryPayload>().notNull(),
+    status: text("status", { enum: auditDeliveryStatuses })
+      .default("pending")
+      .notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
+    errorCode: text("error_code"),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("audit_delivery_due_idx").on(table.status, table.nextAttemptAt),
+    check(
+      "audit_delivery_status_valid",
+      sql`${table.status} in ('pending', 'processing', 'needs_attention')`,
+    ),
+    check(
+      "audit_delivery_attempts_valid",
+      sql`${table.attempts} between 0 and 5`,
+    ),
+    check(
+      "audit_delivery_payload_size_valid",
+      sql`octet_length(${table.payload}::text) <= 270000`,
+    ),
+  ],
+);
+
+/** Stored audit-delivery row. */
+export type AuditDelivery = typeof auditDelivery.$inferSelect;
+/** Values accepted when creating an audit-delivery row. */
+export type NewAuditDelivery = typeof auditDelivery.$inferInsert;
 
 /** Durable ranges and completion state for bounded audit exports. */
 const auditExport = pgTable(

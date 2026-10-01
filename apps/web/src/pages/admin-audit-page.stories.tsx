@@ -55,6 +55,16 @@ type Story = StoryObj<typeof meta>;
 /** Populated audit log with filtering and event details. */
 const Populated: Story = {
   args: {
+    deliveryFailures: [
+      {
+        action: "user.banned",
+        attempts: 5,
+        correlationId: null,
+        errorCode: "audit_delivery_failed",
+        requestId: "request-456",
+        targetId: "1042",
+      },
+    ],
     exportState: { activeExport: null, canDelete: false, canExport: false },
     page,
     search: {},
@@ -70,6 +80,7 @@ const Populated: Story = {
     await expect(canvas.getByRole("link", { name: "Audit log" })).toBeVisible();
     await expect(canvas.getByLabelText("Actor ID")).toBeVisible();
     await expect(canvas.getByText("product.updated")).toBeVisible();
+    await expect(canvas.getByText("user.banned")).toBeVisible();
     await expect(
       canvas.getByRole("link", { name: "Older events" }),
     ).toBeVisible();

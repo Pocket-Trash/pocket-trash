@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { bigint, check, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  check,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 /** Durable lifecycle states for administrator-managed user access. */
 export const userBanStatuses = [
@@ -34,6 +41,10 @@ export const userBan = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     status: text("status", { enum: userBanStatuses }).notNull(),
     reason: text("reason").notNull(),
+    pendingBeforeStatus: text("pending_before_status", {
+      enum: ["banned", "unbanned"],
+    }),
+    pendingRequestId: uuid("pending_request_id"),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -44,6 +55,10 @@ export const userBan = pgTable(
       sql`${table.status} in ('pending_ban', 'banned', 'pending_unban', 'unbanned')`,
     ),
     check("user_ban_reason_nonblank", sql`length(btrim(${table.reason})) > 0`),
+    check(
+      "user_ban_pending_audit_valid",
+      sql`(${table.status} in ('pending_ban', 'pending_unban')) = (${table.pendingRequestId} is not null)`,
+    ),
   ],
 );
 
