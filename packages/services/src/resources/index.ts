@@ -216,6 +216,15 @@ export type ResourcesService = {
   update(input: UpdateResourceInput): Promise<{ id: number }>;
 };
 
+/**
+ * Creates the resource service.
+ *
+ * @param db - Application database.
+ * @param storage - Resource object storage.
+ * @param logger - Application logger.
+ * @param signUrl - Signs a resource object path for access.
+ * @returns The configured resource service.
+ */
 export function createResourcesService(
   db: Database,
   storage: UploadStorage,
@@ -543,6 +552,13 @@ export function createResourcesService(
         { attributes: { resourceId } },
       );
     },
+    /**
+     * Lists resources visible in the public directory.
+     *
+     * @param categorySlugs - Category filters to apply.
+     * @param viewer - Optional requesting user.
+     * @returns The filtered directory resources and categories.
+     */
     async listDirectory(categorySlugs = [], viewer) {
       return await logger.operation(
         loggerMessages.resources.listDirectory,
@@ -668,12 +684,12 @@ export function createResourcesService(
                 async ({ coverImageObjectPath, ...resource }) => ({
                   ...resource,
                   coverImageUrl: coverImageObjectPath
-                    ? (
+                    ? ((
                         await signImages(
                           [{ objectPath: coverImageObjectPath, url: "" }],
                           signUrl,
                         )
-                      )[0]!.url
+                      ).at(0)?.url ?? null)
                     : null,
                 }),
               ),
