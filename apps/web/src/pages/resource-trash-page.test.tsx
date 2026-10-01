@@ -7,11 +7,21 @@ import {
 } from "./resource-trash-page";
 
 vi.mock("@/components/admin-page-shell", () => ({
+  /**
+   * Renders a minimal admin shell for tests.
+   *
+   * @param props - Shell properties.
+   * @param props.children - Nested page content.
+   * @param props.title - Page title.
+   * @returns The test shell.
+   */
   AdminPageShell: ({
     children,
     title,
   }: {
+    /** Nested page content. */
     children: ReactNode;
+    /** Page title. */
     title: string;
   }) => (
     <div>
@@ -22,11 +32,21 @@ vi.mock("@/components/admin-page-shell", () => ({
 }));
 
 vi.mock("@/components/user-page-shell", () => ({
+  /**
+   * Renders a minimal user shell for tests.
+   *
+   * @param props - Shell properties.
+   * @param props.children - Nested page content.
+   * @param props.title - Page title.
+   * @returns The test shell.
+   */
   UserPageShell: ({
     children,
     title,
   }: {
+    /** Nested page content. */
     children: ReactNode;
+    /** Page title. */
     title: string;
   }) => (
     <div>
@@ -37,6 +57,11 @@ vi.mock("@/components/user-page-shell", () => ({
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns the fixed test locale.
+   *
+   * @returns Fixed English locale state.
+   */
   useLocale: () => ({ locale: "en-US" }),
 }));
 
