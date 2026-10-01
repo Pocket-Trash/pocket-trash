@@ -19,6 +19,7 @@ export type AppShellProps = {
   /** Optional breadcrumb links shown above the page title. */
   breadcrumbItems?: Array<
     | {
+        /** Breadcrumb label. */
         label: string;
         /** Supported static destination for this breadcrumb. */
         to?:
@@ -35,18 +36,42 @@ export type AppShellProps = {
           | "/user/collections";
       }
     | {
+        /** Breadcrumb label. */
         label: string;
-        params: { userId: number };
+        /** Parameters for the user collection route. */
+        params: {
+          /** Numeric collection owner identifier. */
+          userId: number;
+        };
+        /** User collection destination. */
         to: "/collections/$userId";
       }
   >;
+  /** Page content rendered below the shared header. */
   children: React.ReactNode;
+  /** Whether to constrain the shell to the application container width. @default true */
   contained?: boolean;
+  /** Optional controls rendered at the end of the page header. */
   headerActions?: React.ReactNode;
+  /** Optional supporting page metadata rendered with the header. */
   meta?: React.ReactNode;
+  /** Current page title. */
   title: string;
 };
 
+/**
+ * Renders the shared page header, breadcrumbs, controls, and content region.
+ *
+ * @param props - App shell properties.
+ * @param props.breadcrumbItems - Breadcrumbs preceding the current page. Defaults to none.
+ * @param props.children - Page content rendered below the header.
+ * @param props.contained - Whether to constrain the shell width. Defaults to `true`.
+ * @param props.headerActions - Optional controls rendered at the end of the header.
+ * @param props.meta - Optional supporting page metadata.
+ * @param props.title - Current page title.
+ * @returns The shared application page layout.
+ * @throws {Error} If the required locale provider is missing.
+ */
 export function AppShell({
   breadcrumbItems = [],
   children,
@@ -57,8 +82,20 @@ export function AppShell({
 }: AppShellProps) {
   const { isLoaded, isSignedIn } = useAuth();
   const { locale, setLocale } = useLocale();
+  /**
+   * Formats an application-shell translation for the active locale.
+   *
+   * @param key - Application-shell localization key.
+   * @returns The localized application-shell text.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const siteName = t("web.site.name");
+  /**
+   * Applies a locale immediately and requests persistence for loaded signed-in users.
+   * Failed requests show a settings error without reverting the applied locale.
+   *
+   * @param nextLocale - Locale selected by the user.
+   */
   const onLocaleChange = (nextLocale: typeof locale) => {
     setLocale(nextLocale);
 

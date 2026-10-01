@@ -31,10 +31,22 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Renders loading, signed-out, or account navigation for the current user.
+ *
+ * @returns The current user's account control.
+ * @throws {Error} If the required locale provider is missing.
+ */
 export function UserMenu() {
   const { sessionClaims, userId } = useAuth();
   const clerk = useClerk();
   const { locale } = useLocale();
+  /**
+   * Formats an account-menu translation for the active locale.
+   *
+   * @param key - Account-menu localization key.
+   * @returns The localized account-menu text.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const { isLoaded, user } = useUser();
 
@@ -134,6 +146,12 @@ export function UserMenu() {
   );
 }
 
+/**
+ * Derives a one-character avatar fallback from a display name.
+ *
+ * @param value - Display name, if available.
+ * @returns The uppercase first non-whitespace character, or `"U"`.
+ */
 function initialsFor(value: string | null | undefined) {
   const first = value?.trim().charAt(0).toUpperCase();
   return first || "U";

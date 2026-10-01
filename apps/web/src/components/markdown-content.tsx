@@ -4,7 +4,10 @@ import { cn } from "@/lib/utils";
 /**
  * Renders Markdown through the shared sanitized read pipeline.
  *
- * @param props - Markdown source, styling, and trusted fenced-code capability.
+ * @param props - Markdown rendering options.
+ * @param props.className - Additional classes applied to the article.
+ * @param props.markdown - Markdown source to sanitize and render.
+ * @param props.trustedCodeBlocks - Whether trusted fenced code blocks are enabled. Defaults to `false`.
  * @returns Sanitized Markdown content.
  */
 export function MarkdownContent({
@@ -12,7 +15,11 @@ export function MarkdownContent({
   markdown,
   trustedCodeBlocks = false,
 }: {
+  /**
+   * Additional CSS classes.
+   */
   className?: string;
+  /** Markdown source to sanitize and render. */
   markdown: string;
   /** Enables fenced code for trusted repository content. */
   trustedCodeBlocks?: boolean;
