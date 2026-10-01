@@ -78,6 +78,7 @@ export function LocaleProvider({
  *
  * @param props - Optional server-loaded settings used before a client fetch.
  * @returns No UI.
+ * @throws When rendered outside {@link LocaleProvider}.
  */
 export function AuthenticatedLocaleSync({
   initialSettingsState,

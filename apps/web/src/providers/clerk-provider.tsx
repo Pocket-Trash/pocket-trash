@@ -10,6 +10,7 @@ import { useLocale } from "./locale-provider";
  *
  * @param props - Application content requiring Clerk context.
  * @returns Configured Clerk provider.
+ * @throws When rendered outside `LocaleProvider`.
  */
 export function ClerkProvider({
   children,

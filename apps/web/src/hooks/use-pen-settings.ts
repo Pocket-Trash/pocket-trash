@@ -92,6 +92,7 @@ function writeStoredPenSettings(settings: PenSettings): void {
  * Synchronizes pen display settings across local storage and the signed-in account.
  *
  * @returns Current units and currency, optimistic setters, and save state.
+ * @throws When called outside `LocaleProvider`.
  */
 export function usePenSettings() {
   const { isLoaded, isSignedIn } = useAuth();

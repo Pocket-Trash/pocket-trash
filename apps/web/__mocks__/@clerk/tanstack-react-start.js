@@ -4,7 +4,12 @@ import { fn } from "storybook/test";
 export const useAuth = fn().mockName("useAuth");
 /** Configurable Clerk client hook mock. */
 export const useClerk = fn().mockName("useClerk");
-/** Clerk reverification mock that returns the supplied action unchanged. */
+/**
+ * Returns an action unchanged in place of Clerk reverification.
+ *
+ * @param action - Protected action supplied by the caller.
+ * @returns The same action without a reverification wrapper.
+ */
 export const useReverification = fn((action) => action).mockName(
   "useReverification",
 );

@@ -62,6 +62,7 @@ function readTheme(initialSettingsState: UserSettingsState | null): ThemeMode {
  *
  * @param props - Application content and server-loaded settings.
  * @returns Theme context provider around the application content.
+ * @throws When rendered outside `LocaleProvider`.
  */
 export function ThemeProvider({
   children,
