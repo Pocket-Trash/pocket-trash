@@ -1,17 +1,31 @@
 import { spawn } from "node:child_process";
 import { applyDatabaseUrlOverride } from "./database-url-override.js";
 
+/** A source and destination pair for an environment variable alias. */
 type EnvironmentAlias = {
+  /** The existing environment variable name. */
   from: string;
+  /** The destination environment variable name. */
   to: string;
 };
 
+/** Options passed from the Infisical runner to its environment helper. */
 type EnvironmentRunnerOptions = {
+  /** Environment files searched for a user database selector. */
   databaseUrlUserOverrideFilePaths?: string[];
+  /** Whether to apply a user-specific database URL. */
   databaseUrlUserOverride?: boolean;
+  /** Environment variables copied under alternate names. */
   envAliases?: EnvironmentAlias[];
 };
 
+/**
+ * Parses current options or the legacy aliases-only array.
+ *
+ * @param value - Serialized helper options.
+ * @returns Normalized environment runner options.
+ * @throws When the value is not valid JSON.
+ */
 function parseOptions(value: string): EnvironmentRunnerOptions {
   const parsed = JSON.parse(value) as
     | EnvironmentAlias[]
@@ -26,6 +40,11 @@ function parseOptions(value: string): EnvironmentRunnerOptions {
   };
 }
 
+/**
+ * Copies available source variables into absent destination variables.
+ *
+ * @param aliases - Environment variable mappings to apply to `process.env`.
+ */
 function applyAliases(aliases: readonly EnvironmentAlias[]): void {
   for (const alias of aliases) {
     if (process.env[alias.to] || !process.env[alias.from]) {
@@ -36,6 +55,12 @@ function applyAliases(aliases: readonly EnvironmentAlias[]): void {
   }
 }
 
+/**
+ * Applies a configured user database URL and reports the selection.
+ *
+ * @param filePaths - Environment files searched in precedence order.
+ * @throws When the database selector or selected secret is invalid.
+ */
 function applyDatabaseUrlUserOverride(filePaths: string[] | undefined): void {
   if (!filePaths) {
     return;

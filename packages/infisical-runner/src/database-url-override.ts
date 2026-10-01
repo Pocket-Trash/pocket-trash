@@ -1,12 +1,31 @@
 import { existsSync, readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 
+/** The allowed format for user database URL initials. */
 const urlInitialsPattern = /^[A-Z0-9]+$/;
 
+/**
+ * Finds the first configured personal database URL override.
+ *
+ * @param filePaths - Environment files to inspect in precedence order.
+ * @param environment - Environment containing the selected Infisical secret.
+ * @returns The normalized selector and secret, or `undefined` when no selector exists.
+ * @throws When an environment file cannot be read or parsed.
+ * @throws When the selector is invalid or its selected secret is absent.
+ */
 export function getDatabaseUrlOverride(
   filePaths: readonly string[],
   environment: NodeJS.ProcessEnv = process.env,
-): { initials: string; name: string; value: string } | undefined {
+):
+  | {
+      /** The normalized user initials. */
+      initials: string;
+      /** The selected environment variable name. */
+      name: string;
+      /** The selected database connection string. */
+      value: string;
+    }
+  | undefined {
   for (const filePath of filePaths) {
     if (!existsSync(filePath)) {
       continue;
@@ -43,6 +62,14 @@ export function getDatabaseUrlOverride(
   return undefined;
 }
 
+/**
+ * Applies a selected personal database URL to an environment object.
+ *
+ * @param filePaths - Environment files to inspect in precedence order.
+ * @param environment - Environment to read and mutate.
+ * @returns The applied override, or `undefined` when no selector exists.
+ * @throws When override discovery fails validation or file access.
+ */
 export function applyDatabaseUrlOverride(
   filePaths: readonly string[],
   environment: NodeJS.ProcessEnv = process.env,

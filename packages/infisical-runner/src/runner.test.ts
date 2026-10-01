@@ -9,6 +9,13 @@ import {
   validateSecretPaths,
 } from "./runner.js";
 
+/**
+ * Reads serialized environment-helper options from generated runner arguments.
+ *
+ * @param args - Generated Infisical CLI arguments.
+ * @returns The database override options passed to the helper.
+ * @throws When the environment helper is absent from the arguments.
+ */
 function getEnvAliasRunnerOptions(args: readonly string[]) {
   const runnerIndex = args.findIndex((arg) =>
     arg.endsWith("/packages/infisical-runner/src/env-alias-runner.ts"),
@@ -19,7 +26,9 @@ function getEnvAliasRunnerOptions(args: readonly string[]) {
   }
 
   return JSON.parse(args[runnerIndex + 1] ?? "{}") as {
+    /** Whether a user-specific database URL is enabled. */
     databaseUrlUserOverride?: boolean;
+    /** Environment files searched for a user database selector. */
     databaseUrlUserOverrideFilePaths?: string[];
   };
 }
@@ -42,6 +51,12 @@ describe("parseCliArguments", () => {
 
 describe("buildInfisicalRunArgs", () => {
   const quietArgs = ["--silent", "--log-level=error"];
+  /**
+   * Builds the expected quiet `run` layer for a secret path.
+   *
+   * @param path - The Infisical secret path.
+   * @returns The expected CLI argument prefix.
+   */
   const quietRunArgs = (path: string) => [
     "run",
     ...quietArgs,
