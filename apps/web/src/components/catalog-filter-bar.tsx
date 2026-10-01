@@ -37,29 +37,109 @@ import {
 } from "@/lib/catalog-filters";
 import { cn } from "@/lib/utils";
 
+/**
+ * Localized labels and label builders used by catalog filter controls.
+ */
 export type CatalogFilterCopy = {
+  /**
+   * Label for requiring all selected values.
+   */
   all: string;
+  /**
+   * Label for accepting any selected value.
+   */
   any: string;
+  /**
+   * Label for closing the advanced filter panel after applying filters.
+   */
   apply: string;
+  /**
+   * Label for clearing all filters.
+   */
   clear: string;
+  /**
+   * Prefix for selection-removal accessible labels.
+   */
   close: string;
+  /**
+   * Color facet label.
+   */
   colors: string;
+  /**
+   * Description of the advanced filter sheet.
+   */
   description: string;
+  /**
+   * Builds the display label for a color fade.
+   *
+   * @param colors - Arrow-separated color names in the fade.
+   * @returns The localized fade label.
+   */
   fadeName: (colors: string) => string;
+  /**
+   * Advanced filter panel title.
+   */
   filters: string;
+  /**
+   * Finish facet label.
+   */
   finishes: string;
+  /**
+   * Maker facet label.
+   */
   maker: string;
+  /**
+   * Any/all matching fieldset label.
+   */
   matchMode: string;
+  /**
+   * Material facet label.
+   */
   materials: string;
+  /**
+   * Short label for opening overflow facet options.
+   */
   more: string;
+  /**
+   * Label for opening advanced filters.
+   */
   moreFilters: string;
+  /**
+   * Builds an accessible label for overflow facet options.
+   *
+   * @param label - Facet label whose overflow options will open.
+   * @returns The localized overflow-options label.
+   */
   moreOptions: (label: string) => string;
+  /**
+   * Product-type facet label.
+   */
   productType: string;
+  /**
+   * Label for the all-product-types option.
+   */
   productTypeAll: string;
+  /**
+   * Placeholder for the maker combobox.
+   */
   selectMaker: string;
+  /**
+   * Placeholder for the product-type combobox.
+   */
   selectProductType: string;
 };
 
+/**
+ * Renders responsive quick and advanced controls for catalog filters.
+ *
+ * @param props - Catalog filter bar properties.
+ * @param props.action - Optional trailing action beside the filter controls.
+ * @param props.copy - Localized filter labels and label builders.
+ * @param props.facets - Available catalog facet values and counts.
+ * @param props.filters - Current controlled filter state.
+ * @param props.onChange - Callback receiving the complete next filter state.
+ * @returns The responsive catalog filter controls.
+ */
 export function CatalogFilterBar({
   action,
   copy,
@@ -67,10 +147,27 @@ export function CatalogFilterBar({
   filters,
   onChange,
 }: {
+  /**
+   * Optional trailing action beside the filter controls.
+   */
   action?: React.ReactNode;
+  /**
+   * Localized filter labels and label builders.
+   */
   copy: CatalogFilterCopy;
+  /**
+   * Available catalog facet values and counts.
+   */
   facets: CatalogFacets;
+  /**
+   * Current controlled filter state.
+   */
   filters: CatalogFilters;
+  /**
+   * Replaces the controlled filter state.
+   *
+   * @param filters - Complete next filter state.
+   */
   onChange: (filters: CatalogFilters) => void;
 }) {
   const [desktopAdvancedOpen, setDesktopAdvancedOpen] = React.useState(false);
@@ -90,6 +187,11 @@ export function CatalogFilterBar({
   }, [facetKey, facets, filters, onChange]);
   React.useEffect(() => {
     if (!desktopAdvancedOpen) return;
+    /**
+     * Closes the desktop advanced panel for pointer events outside its controls and popups.
+     *
+     * @param event - Document pointer event used to locate the interaction target.
+     */
     const closeOnOutsidePointer = (event: PointerEvent) => {
       const target = event.target as Element;
       const inFilterPopup = target.closest(
@@ -99,6 +201,11 @@ export function CatalogFilterBar({
         setDesktopAdvancedOpen(false);
       }
     };
+    /**
+     * Closes the desktop advanced panel when Escape is pressed.
+     *
+     * @param event - Document keyboard event.
+     */
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setDesktopAdvancedOpen(false);
     };
@@ -247,6 +354,17 @@ export function CatalogFilterBar({
   );
 }
 
+/**
+ * Renders a checkbox facet with four quick options and optional overflow menu.
+ *
+ * @param props - Checkbox facet properties.
+ * @param props.copy - Localized labels and label builders.
+ * @param props.label - Facet legend.
+ * @param props.onChange - Callback receiving the next selected IDs.
+ * @param props.options - Facet options in display order.
+ * @param props.selected - Currently selected option IDs.
+ * @returns The checkbox facet controls.
+ */
 function CheckboxFacet({
   copy,
   label,
@@ -254,14 +372,37 @@ function CheckboxFacet({
   options,
   selected,
 }: {
+  /**
+   * Localized labels and label builders.
+   */
   copy: CatalogFilterCopy;
+  /**
+   * Facet legend.
+   */
   label: string;
+  /**
+   * Replaces the selected option IDs.
+   *
+   * @param ids - Next selected option IDs.
+   */
   onChange: (ids: number[]) => void;
+  /**
+   * Facet options in display order.
+   */
   options: CatalogFacet[];
+  /**
+   * Currently selected option IDs.
+   */
   selected: number[];
 }) {
   const quick = options.slice(0, 4);
   const more = options.slice(4);
+  /**
+   * Renders one controlled checkbox facet option.
+   *
+   * @param option - Facet option to render.
+   * @returns The labeled checkbox option.
+   */
   const checkbox = (option: CatalogFacet) => (
     <label className="flex items-center gap-1.5 text-xs" key={option.id}>
       <input
@@ -313,15 +454,39 @@ function CheckboxFacet({
   );
 }
 
+/**
+ * Renders popular color and fade toggles with overflow options.
+ *
+ * @param props - Color facet properties.
+ * @param props.copy - Localized labels and label builders.
+ * @param props.facets - Available colors and fades with counts.
+ * @param props.filters - Current controlled filter state.
+ * @param props.onChange - Callback receiving the complete next filter state.
+ * @returns The color and fade facet controls.
+ */
 function ColorFacet({
   copy,
   facets,
   filters,
   onChange,
 }: {
+  /**
+   * Localized labels and label builders.
+   */
   copy: CatalogFilterCopy;
+  /**
+   * Available colors and fades with counts.
+   */
   facets: CatalogFacets;
+  /**
+   * Current controlled filter state.
+   */
   filters: CatalogFilters;
+  /**
+   * Replaces the controlled filter state.
+   *
+   * @param filters - Complete next filter state.
+   */
   onChange: (filters: CatalogFilters) => void;
 }) {
   const choices = [
@@ -330,6 +495,11 @@ function ColorFacet({
       count: color.count,
       key: `color-${color.id}`,
       selected: filters.colorIds.includes(color.id),
+      /**
+       * Toggles this solid color in the controlled filters.
+       *
+       * @returns The parent callback result.
+       */
       toggle: () =>
         onChange({ ...filters, colorIds: toggle(filters.colorIds, color.id) }),
       tooltip: color.name,
@@ -341,6 +511,11 @@ function ColorFacet({
       selected: filters.fadeColorSets.some(
         (selected) => fadeKey(selected) === fade.key,
       ),
+      /**
+       * Toggles this canonical fade color set, ignoring color order and duplicates.
+       *
+       * @returns The parent callback result.
+       */
       toggle: () =>
         onChange({
           ...filters,
@@ -399,15 +574,37 @@ function ColorFacet({
   );
 }
 
+/**
+ * Renders an accessible solid-color or fade swatch toggle with a tooltip.
+ *
+ * @param props - Color toggle properties.
+ * @param props.colors - Ordered colors displayed by the swatch.
+ * @param props.selected - Whether the color or fade is selected.
+ * @param props.toggle - Callback that toggles the selection.
+ * @param props.tooltip - Accessible name and visible tooltip text.
+ * @returns The color or fade toggle.
+ */
 function ColorToggle({
   colors,
   selected,
   toggle: onClick,
   tooltip,
 }: {
+  /**
+   * Ordered colors displayed by the swatch.
+   */
   colors: CatalogColor[];
+  /**
+   * Whether the color or fade is selected.
+   */
   selected: boolean;
+  /**
+   * Toggles the color or fade selection.
+   */
   toggle: () => void;
+  /**
+   * Accessible name and visible tooltip text.
+   */
   tooltip: string;
 }) {
   return (
@@ -441,6 +638,17 @@ function ColorToggle({
   );
 }
 
+/**
+ * Renders maker selection and any/all matching for values within each facet.
+ *
+ * @param props - Advanced filters properties.
+ * @param props.copy - Localized labels and label builders.
+ * @param props.facets - Available maker options.
+ * @param props.filters - Current controlled filter state.
+ * @param props.onChange - Callback receiving the complete next filter state.
+ * @param props.selectedMakers - Selected maker option objects.
+ * @returns The advanced filter controls.
+ */
 function AdvancedFilters({
   copy,
   facets,
@@ -448,11 +656,33 @@ function AdvancedFilters({
   onChange,
   selectedMakers,
 }: {
+  /**
+   * Localized labels and label builders.
+   */
   copy: CatalogFilterCopy;
+  /**
+   * Available maker options.
+   */
   facets: CatalogFacets;
+  /**
+   * Current controlled filter state.
+   */
   filters: CatalogFilters;
+  /**
+   * Replaces the controlled filter state.
+   *
+   * @param filters - Complete next filter state.
+   */
   onChange: (filters: CatalogFilters) => void;
-  selectedMakers: Array<{ id: number; name: string }>;
+  /**
+   * Selected maker option objects.
+   */
+  selectedMakers: Array<{
+    /** Stable maker identifier. */
+    id: number;
+    /** Maker display name. */
+    name: string;
+  }>;
 }) {
   return (
     <>
@@ -488,6 +718,13 @@ function AdvancedFilters({
   );
 }
 
+/**
+ * Toggles one numeric identifier while preserving the other selections.
+ *
+ * @param values - Current selected identifiers.
+ * @param value - Identifier to add or remove.
+ * @returns A new array containing the toggled selection state.
+ */
 function toggle(values: number[], value: number): number[] {
   return values.includes(value)
     ? values.filter((candidate) => candidate !== value)

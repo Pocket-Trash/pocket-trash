@@ -19,15 +19,52 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Data and callbacks required by an Autmog archive product card.
+ */
 type AutmogProductCardProps = {
+  /**
+   * Currency used to display the product price.
+   */
   currency: CurrencyCode;
+  /**
+   * Requests product details and supplies the clicked card button.
+   *
+   * @param product - Product whose details should open.
+   * @param element - Button that initiated the request.
+   */
   onOpen: (product: PenProduct, element: HTMLButtonElement) => void;
+  /**
+   * Autmog product displayed by the card.
+   */
   product: PenProduct;
+  /**
+   * Exchange rates used to convert the product price.
+   */
   rates: CurrencyRates;
+  /**
+   * Unit used to display product dimensions.
+   */
   units: DimensionUnit;
+  /**
+   * Unit used to display product weight.
+   */
   weight: WeightUnit;
 };
 
+/**
+ * Renders an Autmog archive product summary that opens its detail view.
+ *
+ * @param props - Autmog product card properties.
+ * @param props.currency - Currency used to display the price.
+ * @param props.onOpen - Callback that requests the product detail view.
+ * @param props.product - Autmog product to summarize.
+ * @param props.rates - Exchange rates used for price conversion.
+ * @param props.units - Unit used for dimensions.
+ * @param props.weight - Unit used for weight.
+ * @returns The interactive product card.
+ * @throws {Error} When rendered outside `LocaleProvider`.
+ */
 export function AutmogProductCard({
   currency,
   onOpen,
@@ -37,6 +74,13 @@ export function AutmogProductCard({
   weight,
 }: AutmogProductCardProps) {
   const { locale } = useLocale();
+  /**
+   * Formats an archive translation for the active locale.
+   *
+   * @param key - Translation key to format.
+   * @param values - Placeholder values interpolated into the translation.
+   * @returns The localized archive text.
+   */
   const t = (
     key: TranslationKey,
     values: Readonly<Record<string, unknown>> = {},
@@ -57,8 +101,17 @@ export function AutmogProductCard({
       icon: MoveHorizontal,
       value: formatLength(product, units),
     },
-  ].filter((item): item is { icon: typeof Scale; id: string; value: string } =>
-    Boolean(item.value),
+  ].filter(
+    (
+      item,
+    ): item is {
+      /** Icon displayed beside the measurement. */
+      icon: typeof Scale;
+      /** Stable measurement identifier. */
+      id: string;
+      /** Formatted measurement text. */
+      value: string;
+    } => Boolean(item.value),
   );
 
   return (
@@ -141,11 +194,25 @@ export function AutmogProductCard({
   );
 }
 
+/**
+ * Renders a compact tag attached to an Autmog product card.
+ *
+ * @param props - Product tag properties.
+ * @param props.children - Nested content.
+ * @param props.className - Additional CSS classes.
+ * @returns The styled product tag.
+ */
 function ProductTag({
   children,
   className,
 }: {
+  /**
+   * Nested content.
+   */
   children: React.ReactNode;
+  /**
+   * Additional CSS classes.
+   */
   className?: string;
 }) {
   return (
