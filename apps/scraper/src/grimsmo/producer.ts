@@ -27,22 +27,67 @@ import {
   getGrimsmoSourceDefinition,
 } from "./source.js";
 
+/**
+ * Dependencies, source, and fetch controls for a Grimsmo producer run.
+ */
 export type RunGrimsmoProducerOptions = FetchGrimsmoProductsOptions & {
+  /**
+   * Database used to compare persisted synchronization state.
+   */
   db: Database;
+  /**
+   * Logger used for producer lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Scraper queues that receive normalized item jobs.
+   */
   queues: ScraperQueues;
+  /**
+   * Whether to omit the batch job that reconciles archived listings.
+   */
   skipArchiveReconciliation?: boolean;
 };
 
+/**
+ * Counts and normalized items produced by a Grimsmo run.
+ */
 export type RunGrimsmoProducerResult = {
+  /**
+   * Number of archive variations retained after inventory duplicates are removed.
+   */
   archivedFetchedCount: number;
+  /**
+   * Number of changed item jobs enqueued.
+   */
   enqueuedCount: number;
+  /**
+   * Total normalized variations retained after merging source collections.
+   */
   fetchedCount: number;
+  /**
+   * Number of normalized variations from the inventory collection.
+   */
   inventoryFetchedCount: number;
+  /**
+   * Normalized source items involved in the producer operation.
+   */
   items: (NormalizedGrimsmoKnifeVariation | NormalizedGrimsmoPenVariation)[];
+  /**
+   * Number of completed jobs removed before re-enqueueing.
+   */
   removedCompletedItemJobs: number;
 };
 
+/**
+ * Fetches one Grimsmo source and enqueues changed variations plus reconciliation.
+ *
+ * @param options - Producer dependencies, source, and fetch controls.
+ *
+ * @returns Producer counts and all normalized fetched variations.
+ *
+ * @rejects When fetching, synchronization lookup, or queue operations fail.
+ */
 export async function runGrimsmoProducer({
   db,
   logger,
@@ -179,18 +224,37 @@ export async function runGrimsmoProducer({
   }
 }
 
+/**
+ * Builds changed-item jobs and the optional archive reconciliation batch job.
+ *
+ * @param options - Normalized items, source, and archive reconciliation controls.
+ *
+ * @returns Queue jobs in item-first, reconciliation-last order.
+ */
 function createJobs({
   changedItems,
   items,
   skipArchiveReconciliation,
   source,
 }: {
+  /**
+   * Normalized items whose persisted synchronization state changed.
+   */
   changedItems: (
     | NormalizedGrimsmoKnifeVariation
     | NormalizedGrimsmoPenVariation
   )[];
+  /**
+   * Normalized source items involved in the producer operation.
+   */
   items: (NormalizedGrimsmoKnifeVariation | NormalizedGrimsmoPenVariation)[];
+  /**
+   * Whether to omit the batch job that reconciles archived listings.
+   */
   skipArchiveReconciliation: boolean;
+  /**
+   * Grimsmo scraper source identifier.
+   */
   source: GrimsmoSourceName;
 }) {
   const itemJobs = changedItems.map((item) => {
@@ -229,9 +293,23 @@ function createJobs({
 
   if (skipArchiveReconciliation) {
     return itemJobs satisfies {
+      /**
+       * Queue payload for the scraper job.
+       */
       data: ScraperItemJob;
+      /**
+       * Queue job name consumed by the item worker.
+       */
       name: string;
-      opts: { jobId: string };
+      /**
+       * Queue options carrying the deterministic job identifier.
+       */
+      opts: {
+        /**
+         * Deterministic identifier used to deduplicate the queue job.
+         */
+        jobId: string;
+      };
     }[];
   }
 
@@ -272,8 +350,22 @@ function createJobs({
         };
 
   return [...itemJobs, batchJob] satisfies {
+    /**
+     * Queue payload for the scraper job.
+     */
     data: ScraperItemJob;
+    /**
+     * Queue job name consumed by the item worker.
+     */
     name: string;
-    opts: { jobId: string };
+    /**
+     * Queue options carrying the deterministic job identifier.
+     */
+    opts: {
+      /**
+       * Deterministic identifier used to deduplicate the queue job.
+       */
+      jobId: string;
+    };
   }[];
 }
