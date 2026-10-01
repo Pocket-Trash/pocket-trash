@@ -2,6 +2,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 // Stable keys for the placeholder cards (they never reorder), so we avoid keying
 // by array index.
+/**
+ * Stable keys used to render the maximum product-grid placeholder count.
+ */
 const PLACEHOLDER_KEYS = Array.from(
   { length: 48 },
   (_, index) => `product-skeleton-${index}`,
@@ -11,7 +14,23 @@ const PLACEHOLDER_KEYS = Array.from(
 // now, and behind the service worker's cache warm-up once the PWA lands. Mirrors
 // the reserved heights in `product-card.tsx` so there is no layout shift when the
 // real cards swap in. Renders bare cards so the caller keeps them in its grid.
-export function ProductGridSkeleton({ count = 12 }: { count?: number }) {
+/**
+ * Renders a configurable grid of product-card placeholders.
+ *
+ * @param props - Product grid skeleton properties.
+ * @param props.count - Number of product-card placeholders to render.
+ * @returns The rendered product grid skeleton UI.
+ */
+export function ProductGridSkeleton({
+  count = 12,
+}: {
+  /**
+   * Number of product-card placeholders to render.
+   *
+   * @default 12
+   */
+  count?: number;
+}) {
   return (
     <>
       {PLACEHOLDER_KEYS.slice(0, count).map((key) => (
@@ -21,6 +40,11 @@ export function ProductGridSkeleton({ count = 12 }: { count?: number }) {
   );
 }
 
+/**
+ * Renders a placeholder for one product card.
+ *
+ * @returns The rendered product card skeleton UI.
+ */
 function ProductCardSkeleton() {
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card">

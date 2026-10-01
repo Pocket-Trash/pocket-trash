@@ -3,8 +3,33 @@ import { Check, ChevronDown, X } from "lucide-react";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-export type ComboboxOption = { id: number | string; name: string };
+/**
+ * Selectable catalog option displayed by a combobox.
+ */
+export type ComboboxOption = {
+  /**
+   * Stable option identifier.
+   */
+  id: number | string;
+  /**
+   * Display label for the option.
+   */
+  name: string;
+};
 
+/**
+ * Renders a single-select catalog combobox with an optional removable selection pill.
+ *
+ * @param props - Catalog combobox properties.
+ * @param props.ariaLabel - Accessible label for the combobox input and trigger.
+ * @param props.items - Options available for selection.
+ * @param props.onValueChange - Callback invoked when the selection changes.
+ * @param props.placeholder - Prompt shown when the combobox has no selection.
+ * @param props.removeLabel - Accessible label or label builder for removal controls.
+ * @param props.showSelectedPill - Whether to render the current selection as a removable pill.
+ * @param props.value - Currently selected option.
+ * @returns The rendered catalog combobox UI.
+ */
 export function CatalogCombobox({
   ariaLabel,
   items,
@@ -14,12 +39,37 @@ export function CatalogCombobox({
   showSelectedPill = false,
   value,
 }: {
+  /**
+   * Accessible label for the combobox input and trigger.
+   */
   ariaLabel: string;
+  /**
+   * Options available for selection.
+   */
   items: ComboboxOption[];
+  /**
+   * Reports selection changes.
+   *
+   * @param value - Next selection value.
+   */
   onValueChange: (value: ComboboxOption | null) => void;
+  /**
+   * Prompt shown when the combobox has no selection.
+   */
   placeholder: string;
+  /**
+   * Accessible label or label builder for removal controls.
+   */
   removeLabel?: string;
+  /**
+   * Whether to render the current selection as a removable pill.
+   *
+   * @default false
+   */
   showSelectedPill?: boolean;
+  /**
+   * Current controlled selection.
+   */
   value: ComboboxOption | null;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -53,6 +103,24 @@ export function CatalogCombobox({
   );
 }
 
+/**
+ * Renders a multi-select catalog combobox with removable selection pills.
+ *
+ * @param props - Catalog multi combobox properties.
+ * @param props.ariaLabel - Accessible label for the combobox input and trigger.
+ * @param props.disabled - Whether interaction is disabled.
+ * @param props.emptyLabel - Message shown when no combobox options match.
+ * @param props.filter - Custom filtering mode, or `null` to disable built-in filtering.
+ * @param props.inputValue - Controlled combobox search text.
+ * @param props.items - Options available for selection.
+ * @param props.onInputValueChange - Callback invoked when the search text changes.
+ * @param props.onValueChange - Callback invoked when the selected options change.
+ * @param props.placeholder - Prompt shown when the combobox has no selection.
+ * @param props.removeDisabled - Whether selected options cannot be removed.
+ * @param props.removeLabel - Accessible label or label builder for removal controls.
+ * @param props.value - Currently selected options.
+ * @returns The rendered catalog multi combobox UI.
+ */
 export function CatalogMultiCombobox({
   ariaLabel,
   disabled = false,
@@ -67,17 +135,57 @@ export function CatalogMultiCombobox({
   removeLabel,
   value,
 }: {
+  /**
+   * Accessible label for the combobox input and trigger.
+   */
   ariaLabel: string;
+  /**
+   * Whether interaction is disabled.
+   */
   disabled?: boolean;
+  /**
+   * Message shown when no combobox options match.
+   */
   emptyLabel?: string;
+  /**
+   * Custom filtering mode, or `null` to disable built-in filtering.
+   */
   filter?: null;
+  /**
+   * Controlled combobox search text.
+   */
   inputValue?: string;
+  /**
+   * Options available for selection.
+   */
   items: ComboboxOption[];
+  /**
+   * Reports controlled combobox search-text changes.
+   *
+   * @param value - Next selection value.
+   */
   onInputValueChange?: (value: string) => void;
+  /**
+   * Reports selection changes.
+   *
+   * @param value - Next selection value.
+   */
   onValueChange: (value: ComboboxOption[]) => void;
+  /**
+   * Prompt shown when the combobox has no selection.
+   */
   placeholder: string;
+  /**
+   * Whether selected options cannot be removed.
+   */
   removeDisabled?: boolean;
+  /**
+   * Accessible label or label builder for removal controls.
+   */
   removeLabel: string | ((name: string) => string);
+  /**
+   * Current controlled selection.
+   */
   value: ComboboxOption[];
 }) {
   const [open, setOpen] = React.useState(false);
@@ -127,11 +235,25 @@ export function CatalogMultiCombobox({
   );
 }
 
+/**
+ * Renders the catalog combobox input and disclosure control.
+ *
+ * @param props - Combobox control properties.
+ * @param props.ariaLabel - Accessible label for the combobox input and trigger.
+ * @param props.placeholder - Prompt shown when the combobox has no selection.
+ * @returns The rendered combobox control UI.
+ */
 function ComboboxControl({
   ariaLabel,
   placeholder,
 }: {
+  /**
+   * Accessible label for the combobox input and trigger.
+   */
   ariaLabel: string;
+  /**
+   * Prompt shown when the combobox has no selection.
+   */
   placeholder: string;
 }) {
   return (
@@ -151,11 +273,25 @@ function ComboboxControl({
   );
 }
 
+/**
+ * Renders the portal-hosted catalog combobox option list.
+ *
+ * @param props - Combobox options properties.
+ * @param props.placeholder - Prompt shown when the combobox has no selection.
+ * @param props.emptyLabel - Message shown when no combobox options match.
+ * @returns The rendered combobox options UI.
+ */
 function ComboboxOptions({
   placeholder,
   emptyLabel = placeholder,
 }: {
+  /**
+   * Message shown when no combobox options match.
+   */
   emptyLabel?: string;
+  /**
+   * Prompt shown when the combobox has no selection.
+   */
   placeholder: string;
 }) {
   return (
@@ -185,6 +321,17 @@ function ComboboxOptions({
   );
 }
 
+/**
+ * Renders one selected combobox option with a removal control.
+ *
+ * @param props - Selection pill properties.
+ * @param props.className - Additional CSS classes.
+ * @param props.disabled - Whether interaction is disabled.
+ * @param props.onRemove - Callback invoked to remove the option.
+ * @param props.removeLabel - Accessible label or label builder for removal controls.
+ * @param props.value - Selected option represented by the pill.
+ * @returns The rendered selection pill UI.
+ */
 function SelectionPill({
   className,
   disabled = false,
@@ -192,10 +339,25 @@ function SelectionPill({
   removeLabel,
   value,
 }: {
+  /**
+   * Additional CSS classes.
+   */
   className: string;
+  /**
+   * Whether interaction is disabled.
+   */
   disabled?: boolean;
+  /**
+   * Removes the selected option.
+   */
   onRemove: () => void;
+  /**
+   * Accessible label or label builder for removal controls.
+   */
   removeLabel: string | ((name: string) => string);
+  /**
+   * Current controlled selection.
+   */
   value: ComboboxOption;
 }) {
   return (
@@ -220,8 +382,18 @@ function SelectionPill({
   );
 }
 
+/**
+ * Base UI combobox root primitive.
+ */
 const Combobox = ComboboxPrimitive.Root;
 
+/**
+ * Renders a combobox input with its disclosure control.
+ *
+ * @param props - Combobox input properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered combobox input UI.
+ */
 function ComboboxInput({ className, ...props }: ComboboxPrimitive.Input.Props) {
   return (
     <div className="relative">
@@ -242,6 +414,13 @@ function ComboboxInput({ className, ...props }: ComboboxPrimitive.Input.Props) {
   );
 }
 
+/**
+ * Renders the positioned combobox popup.
+ *
+ * @param props - Combobox content properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered combobox content UI.
+ */
 function ComboboxContent({
   className,
   ...props
@@ -261,6 +440,13 @@ function ComboboxContent({
   );
 }
 
+/**
+ * Renders the scrollable combobox option list.
+ *
+ * @param props - Combobox list properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered combobox list UI.
+ */
 function ComboboxList({ className, ...props }: ComboboxPrimitive.List.Props) {
   return (
     <ComboboxPrimitive.List
@@ -270,6 +456,14 @@ function ComboboxList({ className, ...props }: ComboboxPrimitive.List.Props) {
   );
 }
 
+/**
+ * Renders one selectable combobox option and its selected indicator.
+ *
+ * @param props - Combobox item properties.
+ * @param props.children - Nested content.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered combobox item UI.
+ */
 function ComboboxItem({
   children,
   className,
@@ -291,6 +485,13 @@ function ComboboxItem({
   );
 }
 
+/**
+ * Renders the combobox empty-state message.
+ *
+ * @param props - Combobox empty properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered combobox empty UI.
+ */
 function ComboboxEmpty({ className, ...props }: ComboboxPrimitive.Empty.Props) {
   return (
     <ComboboxPrimitive.Empty
