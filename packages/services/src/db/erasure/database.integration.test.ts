@@ -329,6 +329,12 @@ async function migrate(client: PGlite) {
   }
 }
 
+/**
+ * Seeds account-owned and shared records for erasure verification.
+ *
+ * @param client - In-memory PostgreSQL client.
+ * @returns Completion after fixture insertion.
+ */
 async function seedInventory(client: PGlite) {
   await client.exec(`
     insert into users (clerk_id, username) values

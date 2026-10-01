@@ -44,7 +44,12 @@ describe("audit service", () => {
       createLogger({
         app: "test",
         environment: "test",
-        transports: [{ log() {} }],
+        transports: [
+          {
+            /** Discards test log entries. */
+            log() {},
+          },
+        ],
       }),
       [profileUpdated, largeEvent],
     );
@@ -199,7 +204,12 @@ describe("audit service", () => {
       createLogger({
         app: "test",
         environment: "test",
-        transports: [{ log() {} }],
+        transports: [
+          {
+            /** Discards test log entries. */
+            log() {},
+          },
+        ],
       }),
       [profileUpdated, largeEvent],
       db,
@@ -273,7 +283,12 @@ describe("audit service", () => {
       createLogger({
         app: "test",
         environment: "test",
-        transports: [{ log() {} }],
+        transports: [
+          {
+            /** Discards test log entries. */
+            log() {},
+          },
+        ],
       }),
       [profileUpdated, largeEvent],
       db,
@@ -361,8 +376,18 @@ describe("audit service", () => {
       });
       const json = await new Response(download.body).text();
       const parsed = JSON.parse(json) as {
-        events: Array<{ targetId: string }>;
-        export: { count: number; id: string };
+        /** Exported audit events. */
+        events: Array<{
+          /** Exported target identifier. */
+          targetId: string;
+        }>;
+        /** Export range metadata. */
+        export: {
+          /** Number of exported events. */
+          count: number;
+          /** Export ledger identifier. */
+          id: string;
+        };
       };
       expect(parsed.export).toEqual({
         count: 10_000,

@@ -31,8 +31,11 @@ import {
 } from "../../authorization.js";
 
 const MAX_PAYLOAD_BYTES = 256 * 1024;
+/** Maximum number of events captured by one export range. */
 const MAX_EXPORT_EVENTS = 10_000;
+/** Number of audit events fetched for each streamed export chunk. */
 const EXPORT_BATCH_SIZE = 100;
+/** Minimum event age eligible for export. */
 const EXPORT_MINIMUM_AGE_MS = 60 * 24 * 60 * 60 * 1000;
 const DELETED_REASON = "[erased]";
 const DELETED_USERNAME = "Deleted user";
@@ -86,41 +89,97 @@ type AuditAuthorization =
   | { permission: Permission; type: "permission" }
   | { permission?: never; type: "owner" | "system" };
 
+/**
+ * Input for writing a registered audit event.
+ *
+ * @template T - Definition input type.
+ */
 export type AuditWriteInput<T> = {
   actor: AuditActor;
   authorization: AuditAuthorization;
   correlationId?: string | null;
   data: T;
   definition: AuditEventDefinition<T>;
+  /** Timestamp when the audited action occurred. */
   occurredAt: Date;
+  /** Internal owner identifier associated with the target. */
   ownerUserId?: number | null;
+  /** Operational reason for a staff action. */
   reason?: string | null;
   requestId?: string | null;
+  /** Stable identifier of the affected target. */
   targetId: string;
 };
 
+/** Audit persistence, query, export, and erasure operations. */
 export type AuditService = {
+  /**
+   * Reserves the oldest eligible audit-event range.
+   *
+   * @param input - Authorized export request.
+   * @returns The reserved export range.
+   */
   createExport(input: CreateAuditExportInput): Promise<AuditExportView>;
+  /**
+   * Streams an existing audit export.
+   *
+   * @param input - Authorized download request.
+   * @returns The export stream and download filename.
+   */
   downloadExport(input: DownloadAuditExportInput): Promise<AuditExportDownload>;
+  /**
+   * Finds the current unconsumed export range.
+   *
+   * @param actor - Authorized audit actor.
+   * @returns The active export, when one exists.
+   */
   getActiveExport(actor: Actor): Promise<AuditExportView | null>;
+  /**
+   * Lists filtered audit events.
+   *
+   * @param input - Authorized query and filters.
+   * @returns One page of audit events.
+   */
   list(input: ListAuditEventsInput): Promise<AuditEventPage>;
+  /**
+   * Redacts retained audit data for an erased account.
+   *
+   * @param transaction - Caller-owned database transaction.
+   * @param userId - Internal user identifier to erase.
+   * @returns Completion after redaction.
+   */
   redactAccount(transaction: AuditTransaction, userId: number): Promise<void>;
+  /**
+   * Writes one registered audit event.
+   *
+   * @template T - Definition input type.
+   * @param transaction - Caller-owned database transaction.
+   * @param input - Audit-event input.
+   * @returns The stored audit event.
+   */
   write<T>(
     transaction: AuditTransaction,
     input: AuditWriteInput<T>,
   ): Promise<AuditEvent>;
 };
 
+/** Input for reserving an audit-export range. */
 export type CreateAuditExportInput = {
+  /** Actor requesting the export. */
   actor: Actor;
+  /** Operational reason retained with the export ledger. */
   reason: string;
 };
 
+/** Input for downloading a reserved audit export. */
 export type DownloadAuditExportInput = {
+  /** Actor downloading the export. */
   actor: Actor;
+  /** Reserved export identifier. */
   exportId: string;
 };
 
+/** Public audit-export state. */
 export type AuditExportView = Pick<
   AuditExport,
   | "completedAt"
@@ -134,55 +193,106 @@ export type AuditExportView = Pick<
   | "sha256"
 >;
 
+/** Stream and filename returned for an audit export. */
 export type AuditExportDownload = {
+  /** Streamed JSON export body. */
   body: ReadableStream<Uint8Array>;
+  /** Safe attachment filename. */
   filename: string;
 };
 
+/** Stable keyset cursor for audit-event pagination. */
 export type AuditEventCursor = {
+  /** Event identifier at the cursor boundary. */
   id: number;
+  /** Recorded timestamp at the cursor boundary. */
   recordedAt: Date;
 };
 
+/** Authorized audit-event query filters. */
 export type ListAuditEventsInput = {
+  /** Exact audit action to match. */
   action?: string;
+  /** Actor requesting the audit events. */
   actor: Actor;
+  /** Exact internal actor identifier to match. */
   actorUserId?: number;
+  /** Keyset cursor for the next page. */
   cursor?: AuditEventCursor;
+  /** Inclusive recorded-time lower bound. */
   recordedFrom?: Date;
+  /** Inclusive recorded-time upper bound. */
   recordedTo?: Date;
+  /** Exact target identifier to match. */
   targetId?: string;
+  /** Exact target type to match. */
   targetType?: string;
 };
 
+/** One page of audit events and coverage metadata. */
 export type AuditEventPage = {
+  /** Earliest retained event timestamp. */
   coverageStartAt: Date | null;
+  /** Registered top-level audit action domains. */
   coveredDomains: string[];
+  /** Events in descending keyset order. */
   items: AuditEvent[];
+  /** Cursor for the next page, when one exists. */
   nextCursor: AuditEventCursor | null;
 };
 
+/** Raised when audit input fails validation. */
 export class AuditEventValidationError extends Error {}
+/** Raised when no events are old enough to export. */
 export class AuditExportEmptyError extends Error {}
+/** Raised when an unconsumed export already exists. */
 export class AuditExportInProgressError extends Error {}
+/** Raised when an audit payload exceeds its storage limit. */
 export class AuditPayloadTooLargeError extends Error {}
 
+/** Payload recorded when an audit export finishes streaming. */
 type AuditExportCompletedData = {
+  /** SHA-256 checksum of the streamed JSON. */
   checksum: string;
+  /** Number of exported events. */
   count: number;
+  /** Eligibility cutoff captured for the export. */
   cutoff: string;
+  /** Last event identifier included in the export. */
   highWaterEventId: number;
 };
 
+/** Audit-event definition for completed exports. */
 const auditExportCompleted = {
   action: "audit.export.completed",
   targetType: "audit.export",
+  /**
+   * Serializes export completion metadata.
+   *
+   * @param data - Completed export metadata.
+   * @returns Audit metadata payload.
+   */
   serialize: (data: AuditExportCompletedData) => ({ metadata: data }),
+  /**
+   * Redacts export metadata when an associated account is erased.
+   *
+   * @param payload - Stored audit payload.
+   * @returns Redacted metadata payload.
+   */
   redact: (payload: StoredAuditPayload) => ({
     metadata: payload.metadata ?? { redacted: true },
   }),
 } satisfies AuditEventDefinition<AuditExportCompletedData>;
 
+/**
+ * Creates the shared audit service.
+ *
+ * @param logger - Structured operation logger.
+ * @param definitions - Registered audit-event definitions.
+ * @param database - Database used for reads, exports, and redaction.
+ * @returns Configured audit service.
+ * @throws When event definitions are duplicated.
+ */
 export function createAuditService(
   logger: Logger,
   definitions: readonly AuditEventDefinition<never>[] = [],
@@ -200,6 +310,15 @@ export function createAuditService(
     registered.set(key, definition);
   }
 
+  /**
+   * Writes one registered audit event.
+   *
+   * @template T - Definition input type.
+   * @param transaction - Caller-owned database transaction.
+   * @param input - Audit-event input.
+   * @returns The stored audit event.
+   * @throws When validation or persistence fails.
+   */
   async function write<T>(
     transaction: AuditTransaction,
     input: AuditWriteInput<T>,
@@ -240,6 +359,13 @@ export function createAuditService(
   }
 
   return {
+    /**
+     * Reserves the oldest eligible audit-event range.
+     *
+     * @param input - Authorized export request.
+     * @returns The reserved export range.
+     * @rejects When authorization, validation, or reservation fails.
+     */
     async createExport(input) {
       assertPermission(input.actor, "audit.export");
       if (!database) throw new Error("Audit exports are not configured.");
@@ -298,6 +424,13 @@ export function createAuditService(
       });
     },
 
+    /**
+     * Streams a reserved audit-event range.
+     *
+     * @param input - Authorized download request.
+     * @returns Export stream and attachment filename.
+     * @rejects When authorization or export lookup fails.
+     */
     async downloadExport(input) {
       assertPermission(input.actor, "audit.export");
       if (!database) throw new Error("Audit exports are not configured.");
@@ -318,9 +451,16 @@ export function createAuditService(
       const chunks = exportChunks(database, record)[Symbol.asyncIterator]();
       let completed = false;
       const body = new ReadableStream<Uint8Array>({
+        /** Closes the backing event iterator when the client cancels. */
         async cancel() {
           await chunks.return?.();
         },
+        /**
+         * Enqueues the next serialized export chunk.
+         *
+         * @param controller - Export stream controller.
+         * @returns Completion after the next chunk is handled.
+         */
         async pull(controller) {
           try {
             const next = await chunks.next();
@@ -352,6 +492,13 @@ export function createAuditService(
       };
     },
 
+    /**
+     * Finds the current unconsumed export.
+     *
+     * @param actor - Authorized audit actor.
+     * @returns The active export, when one exists.
+     * @rejects When authorization or configuration is missing.
+     */
     async getActiveExport(actor) {
       assertPermission(actor, "audit.export");
       if (!database) throw new Error("Audit exports are not configured.");
@@ -363,6 +510,13 @@ export function createAuditService(
       return record ? exportView(record) : null;
     },
 
+    /**
+     * Lists filtered audit events.
+     *
+     * @param input - Authorized query and filters.
+     * @returns One page of audit events.
+     * @rejects When authorization or configuration is missing.
+     */
     async list(input) {
       if (!hasPermission(input.actor, "audit.read")) {
         throw new Error("Audit events do not exist.");
@@ -442,6 +596,13 @@ export function createAuditService(
 
     write,
 
+    /**
+     * Redacts audit data associated with an erased account.
+     *
+     * @param transaction - Caller-owned database transaction.
+     * @param userId - Internal user identifier to erase.
+     * @returns Completion after verified redaction.
+     */
     async redactAccount(transaction, userId) {
       await logger.operation(
         loggerMessages.database.audit.redactAccount,
@@ -532,6 +693,14 @@ export function createAuditService(
   };
 }
 
+/**
+ * Streams deterministic JSON chunks for a reserved export range.
+ *
+ * @param database - Database used to read the range.
+ * @param record - Reserved export ledger row.
+ * @yields Serialized JSON chunks in export order.
+ * @rejects When the reserved range changes before completion.
+ */
 async function* exportChunks(database: Database, record: AuditExport) {
   yield `${JSON.stringify({
     export: {
@@ -587,6 +756,16 @@ async function* exportChunks(database: Database, record: AuditExport) {
   yield "]}";
 }
 
+/**
+ * Records an export checksum and completion audit event atomically.
+ *
+ * @param database - Database containing the export ledger.
+ * @param write - Audit writer used for the completion event.
+ * @param record - Export ledger row being completed.
+ * @param actor - Actor completing the download.
+ * @param checksum - SHA-256 checksum of the streamed JSON.
+ * @returns Completion after the transaction commits.
+ */
 async function completeExport(
   database: Database,
   write: AuditService["write"],
@@ -636,6 +815,12 @@ async function completeExport(
   });
 }
 
+/**
+ * Converts an audit event to its stable JSON representation.
+ *
+ * @param event - Stored audit event.
+ * @returns Serializable export event.
+ */
 function exportEvent(event: AuditEvent) {
   return {
     action: event.action,
@@ -659,6 +844,12 @@ function exportEvent(event: AuditEvent) {
   };
 }
 
+/**
+ * Selects public export-ledger fields.
+ *
+ * @param record - Stored export row.
+ * @returns Public export state.
+ */
 function exportView(record: AuditExport): AuditExportView {
   return {
     completedAt: record.completedAt,
@@ -673,12 +864,26 @@ function exportView(record: AuditExport): AuditExportView {
   };
 }
 
+/**
+ * Requires an audit permission without revealing export existence.
+ *
+ * @param actor - Actor to authorize.
+ * @param permission - Required permission.
+ * @throws When the actor lacks the permission.
+ */
 function assertPermission(actor: Actor, permission: Permission) {
   if (!hasPermission(actor, permission)) {
     throw new Error("Audit export does not exist.");
   }
 }
 
+/**
+ * Validates and normalizes an export UUID.
+ *
+ * @param value - Candidate UUID.
+ * @returns Normalized UUID.
+ * @throws When the value is not a UUID.
+ */
 function requiredUuid(value: string) {
   const normalized = value.trim();
   if (

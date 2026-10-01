@@ -18,13 +18,25 @@ import { useLocale } from "@/providers/locale-provider";
 type AuditEvent = AuditEventPage["items"][number];
 type AuditState = NonNullable<AuditEvent["beforeState"]>;
 
+/**
+ * Renders searchable audit events and export controls for administrators.
+ *
+ * @param props - Audit page data and search state.
+ * @param props.exportState - Current audit export state.
+ * @param props.page - Current page of audit events.
+ * @param props.search - Active audit search filters.
+ * @returns The admin audit page.
+ */
 export function AdminAuditPage({
   exportState,
   page,
   search,
 }: {
+  /** Current audit export state. */
   exportState: AuditExportState;
+  /** Current page of audit events. */
   page: AuditEventPage;
+  /** Active audit search filters. */
   search: AuditSearch;
 }) {
   const { locale } = useLocale();

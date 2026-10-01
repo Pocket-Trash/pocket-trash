@@ -18,6 +18,7 @@ vi.mock("@/lib/services", () => ({
 
 import { handleAuditExportRequest } from "./audit";
 
+/** Administrator fixture authorized to export audit events. */
 const actor = { clerkId: "admin_123", role: "admin" } as const;
 
 describe("audit export route", () => {
@@ -79,6 +80,12 @@ describe("audit export route", () => {
   });
 });
 
+/**
+ * Builds an audit-export form request.
+ *
+ * @param fields - Form fields to include.
+ * @returns A POST request containing the fields.
+ */
 function request(fields: Record<string, string>) {
   const form = new FormData();
   for (const [key, value] of Object.entries(fields)) form.set(key, value);

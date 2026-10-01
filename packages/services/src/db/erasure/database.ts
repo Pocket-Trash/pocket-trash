@@ -23,6 +23,14 @@ type VerificationFinding = {
   remaining: number | string;
 };
 
+/**
+ * Erases account-owned database data and redacts retained audit records.
+ *
+ * @param db - Database containing the account data.
+ * @param targetClerkId - Clerk identifier of the account to erase.
+ * @param audit - Audit service used for retained-record redaction.
+ * @returns Completion after the erasure transaction commits.
+ */
 export async function eraseAccountDatabaseData(
   db: Database,
   targetClerkId: string,

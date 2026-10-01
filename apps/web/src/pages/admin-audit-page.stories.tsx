@@ -52,13 +52,21 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Populated: Story = {
+/** Populated audit log with filtering and event details. */
+const Populated: Story = {
   args: {
     exportState: { activeExport: null, canExport: false },
     page,
     search: {},
   },
-  play: async ({ canvas, userEvent }) => {
+  /**
+   * Verifies populated audit-log interactions.
+   *
+   * @param context - Story interaction context.
+   * @returns Completion after the interaction checks.
+   */
+  play: async (context) => {
+    const { canvas, userEvent } = context;
     await expect(canvas.getByRole("link", { name: "Audit log" })).toBeVisible();
     await expect(canvas.getByLabelText("Actor ID")).toBeVisible();
     await expect(canvas.getByText("product.updated")).toBeVisible();
@@ -73,32 +81,49 @@ export const Populated: Story = {
   },
 };
 
-export const Empty: Story = {
+/** Empty filtered audit-log state. */
+const Empty: Story = {
   args: {
     exportState: { activeExport: null, canExport: false },
     page: { ...page, items: [], nextCursor: null },
     search: { action: "missing.action" },
   },
-  play: async ({ canvas }) => {
+  /**
+   * Verifies the empty state.
+   *
+   * @param context - Story interaction context.
+   * @returns Completion after the interaction checks.
+   */
+  play: async (context) => {
+    const { canvas } = context;
     await expect(canvas.getByRole("status")).toHaveTextContent(
       "No audit events match these filters.",
     );
   },
 };
 
-export const ExportAvailable: Story = {
+/** Audit-log state with a new export available. */
+const ExportAvailable: Story = {
   args: {
     exportState: { activeExport: null, canExport: true },
     page,
     search: {},
   },
-  play: async ({ canvas }) => {
+  /**
+   * Verifies the new-export controls.
+   *
+   * @param context - Story interaction context.
+   * @returns Completion after the interaction checks.
+   */
+  play: async (context) => {
+    const { canvas } = context;
     await expect(canvas.getByLabelText("Reason")).toBeRequired();
     await expect(canvas.getByRole("button", { name: "Export" })).toBeVisible();
   },
 };
 
-export const ExportReady: Story = {
+/** Audit-log state with a completed export ready to repeat. */
+const ExportReady: Story = {
   args: {
     exportState: {
       activeExport: {
@@ -117,9 +142,18 @@ export const ExportReady: Story = {
     page,
     search: {},
   },
-  play: async ({ canvas }) => {
+  /**
+   * Verifies completed export details.
+   *
+   * @param context - Story interaction context.
+   * @returns Completion after the interaction checks.
+   */
+  play: async (context) => {
+    const { canvas } = context;
     await expect(canvas.getByText(/125 events through/)).toBeVisible();
     await expect(canvas.getByText(/Incident review/)).toBeVisible();
     await expect(canvas.getByText(/a{64}/)).toBeVisible();
   },
 };
+
+export { Empty, ExportAvailable, ExportReady, Populated };

@@ -119,7 +119,8 @@ export const auditEvent = pgTable(
 export type AuditEvent = typeof auditEvent.$inferSelect;
 export type NewAuditEvent = typeof auditEvent.$inferInsert;
 
-export const auditExport = pgTable(
+/** Durable ranges and completion state for bounded audit exports. */
+const auditExport = pgTable(
   "audit_export",
   {
     id: uuid("id").defaultRandom().primaryKey(),
@@ -187,5 +188,9 @@ export const auditExport = pgTable(
   ],
 );
 
+export { auditExport };
+
+/** Stored audit-export row. */
 export type AuditExport = typeof auditExport.$inferSelect;
+/** Values accepted when creating an audit-export row. */
 export type NewAuditExport = typeof auditExport.$inferInsert;

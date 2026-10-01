@@ -15,8 +15,11 @@ export type AuditSearch = {
   to?: string;
 };
 
+/** Audit-export state displayed on the admin audit page. */
 export type AuditExportState = {
+  /** The unconsumed export range, when one exists. */
   activeExport: AuditExportView | null;
+  /** Whether the current actor may create or download exports. */
   canExport: boolean;
 };
 
@@ -24,7 +27,8 @@ export const canReadAudit = createServerFn().handler(async () => {
   return hasPermission(await getActor(), "audit.read");
 });
 
-export const listAdminAuditEvents = createServerFn({ method: "GET" })
+/** Lists filtered audit events for an authorized administrator. */
+const listAdminAuditEvents = createServerFn({ method: "GET" })
   .validator(parseAuditListInput)
   .handler(async ({ data }) => {
     const actor = await requirePermission("audit.read");
@@ -41,7 +45,10 @@ export const listAdminAuditEvents = createServerFn({ method: "GET" })
     });
   });
 
-export const getAdminAuditExport = createServerFn({ method: "GET" }).handler(
+export { listAdminAuditEvents };
+
+/** Loads the active audit export for an authorized administrator. */
+const getAdminAuditExport = createServerFn({ method: "GET" }).handler(
   async () => {
     const actor = await requirePermission("audit.read");
     if (!hasPermission(actor, "audit.export")) {
@@ -55,6 +62,14 @@ export const getAdminAuditExport = createServerFn({ method: "GET" }).handler(
   },
 );
 
+export { getAdminAuditExport };
+
+/**
+ * Creates or repeats an audit export download.
+ *
+ * @param request - Export form request.
+ * @returns Download response or a localized error response.
+ */
 export async function handleAuditExportRequest(request: Request) {
   try {
     const actor = await requirePermission("audit.export");
@@ -160,6 +175,13 @@ function searchCursor(value: unknown) {
   }
 }
 
+/**
+ * Parses a serialized audit pagination cursor.
+ *
+ * @param value - Serialized cursor value.
+ * @returns Parsed cursor fields.
+ * @throws When the cursor is malformed.
+ */
 function parseCursor(value: string) {
   const separator = value.lastIndexOf("|");
   const recordedAtText = value.slice(0, separator);
@@ -181,6 +203,12 @@ function invalidAuditRequest() {
   return localizedServerError("error.generic");
 }
 
+/**
+ * Reads a string form value.
+ *
+ * @param value - Form entry to normalize.
+ * @returns The string value, or an empty string for files and missing entries.
+ */
 function formString(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value : "";
 }
