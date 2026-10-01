@@ -35,7 +35,8 @@ const apiCommandSecretConfig = {
   paths: [apiSecretPath, databaseLocalSecretPath],
 } as const satisfies CommandSecretConfig;
 
-export const commandSecrets = {
+export /** Maps application commands to the Infisical secret paths they require. */
+const commandSecrets = {
   api: {
     dev: apiCommandSecretConfig,
     deploy: {
@@ -70,7 +71,7 @@ export const commandSecrets = {
     "db:seed": {
       allowServerSecrets: true,
       databaseUrlUserOverride: true,
-      paths: [webSecretPath],
+      paths: [webSecretPath, databaseLocalSecretPath],
     },
     "db:studio": {
       allowServerSecrets: true,
