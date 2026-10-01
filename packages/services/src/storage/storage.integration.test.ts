@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { collectionAuditEvents } from "../db/audit/collections.js";
 import { createAuditService } from "../db/audit/index.js";
 import { productAuditEvents } from "../db/audit/products.js";
+import { resourceAuditEvents } from "../db/audit/resources.js";
 import { hashLogIdentifier } from "../logging.js";
 import { createResourcesService } from "../resources/index.js";
 import { selectCollectionCover } from "./image-records.js";
@@ -64,6 +65,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     audit: createAuditService(logger, [
       ...collectionAuditEvents,
       ...productAuditEvents,
+      ...resourceAuditEvents,
     ]),
     db,
     storage,
@@ -932,6 +934,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     try {
       await resources.permanentlyDelete({
         actor: { clerkId: "admin", role: "system_admin" },
+        reason: "Expired retention period",
         resourceId: created.id,
       });
     } finally {

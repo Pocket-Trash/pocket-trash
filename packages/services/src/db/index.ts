@@ -3,6 +3,7 @@ import type { Logger } from "@package/logger";
 import { collectionAuditEvents } from "./audit/collections.js";
 import { type AuditService, createAuditService } from "./audit/index.js";
 import { productAuditEvents } from "./audit/products.js";
+import { resourceAuditEvents } from "./audit/resources.js";
 import {
   type CatalogService,
   type CollectionsService,
@@ -31,10 +32,17 @@ export type DbServices = {
   users: UsersService;
 };
 
+/**
+ * Creates database-backed services.
+ *
+ * @param db - Application database.
+ * @param logger - Application logger.
+ * @returns Configured database services.
+ */
 export function createDbServices(db: Database, logger: Logger): DbServices {
   const audit = createAuditService(
     logger,
-    [...collectionAuditEvents, ...productAuditEvents],
+    [...collectionAuditEvents, ...productAuditEvents, ...resourceAuditEvents],
     db,
   );
   const users = createUsersService(db, logger);

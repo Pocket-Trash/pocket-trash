@@ -118,6 +118,7 @@ export type ServicesConfig = {
   storage?: UploadStorageConfig;
 };
 
+/** Lazily configured application services. */
 export class Services {
   #db?: DbServices;
   #flags?: FeatureFlagsService;
@@ -126,6 +127,13 @@ export class Services {
   #resources?: ResourcesService;
   #storage?: StorageService;
 
+  /**
+   * Configures services from runtime settings.
+   *
+   * @param config - Runtime service configuration.
+   * @returns Nothing.
+   * @throws When required logger or database configuration is missing.
+   */
   configure(config: ServicesConfig): void {
     if (config.db && !config.logger && !this.#logger) {
       throw new Error("Database services require logger configuration.");
@@ -167,6 +175,7 @@ export class Services {
           storage,
           this.#logger,
           (objectPath) => signResourceUrl({ ...configStorage, objectPath }),
+          this.#db.audit,
         );
       }
     }

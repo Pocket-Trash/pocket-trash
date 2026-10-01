@@ -521,7 +521,7 @@ describe("resources service", () => {
   });
 
   it("records private moderation metadata", async () => {
-    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const execute = vi.fn().mockResolvedValue({ rows: [{ id: 1000 }] });
     const service = createResourcesService(
       { execute } as unknown as Database,
       {} as UploadStorage,
@@ -530,7 +530,7 @@ describe("resources service", () => {
 
     await expect(
       service.markPrivate({
-        actorClerkId: "admin_123",
+        actor: actor("admin_123", "admin"),
         reason: "Inappropriate content",
         resourceId: 1000,
       }),
@@ -811,6 +811,7 @@ describe("resources service", () => {
     );
     await service.permanentlyDelete({
       actor: actor("admin", "system_admin"),
+      reason: "Expired retention period",
       resourceId: 1000,
     });
     expect(transaction).toHaveBeenCalledOnce();
@@ -847,6 +848,7 @@ describe("resources service", () => {
     await expect(
       service.permanentlyDelete({
         actor: actor("owner"),
+        reason: "Expired retention period",
         resourceId: 1000,
       }),
     ).rejects.toThrow("requires an admin");
@@ -854,6 +856,7 @@ describe("resources service", () => {
     await expect(
       service.permanentlyDelete({
         actor: actor("admin", "system_admin"),
+        reason: "Expired retention period",
         resourceId: 1000,
       }),
     ).rejects.toThrow("must be soft-deleted");
@@ -877,6 +880,7 @@ describe("resources service", () => {
     await expect(
       service.permanentlyDelete({
         actor: actor("admin_private", "system_admin"),
+        reason: "Expired retention period",
         resourceId: 1000,
       }),
     ).rejects.toBe(failure);
