@@ -420,6 +420,8 @@ jobs:
         if: steps.db.outputs.can_deploy == 'true' && steps.db_changes.outputs.database == 'true'
         working-directory: packages/database
         env:
+          BUNNY_IMAGE_FOLDER_PREFIX: images/preview/pr-${{ github.event.pull_request.number }}
+          BUNNY_RESOURCE_FOLDER_PREFIX: resources/preview/pr-${{ github.event.pull_request.number }}
           DATABASE_URL: ${{ steps.db.outputs.migration_database_url }}
         run: |
           set -euo pipefail
@@ -1000,6 +1002,8 @@ jobs:
 
       - name: Migrate, seed, and reconcile development users
         env:
+          BUNNY_IMAGE_FOLDER_PREFIX: images/dev
+          BUNNY_RESOURCE_FOLDER_PREFIX: resources/dev
           DATABASE_URL: ${{ steps.development_db.outputs.database_url }}
           MIGRATION_DATABASE_URL: ${{ steps.development_db.outputs.migration_database_url }}
         run: |
