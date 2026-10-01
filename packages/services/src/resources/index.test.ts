@@ -12,13 +12,31 @@ import { describe, expect, it, vi } from "vitest";
 import { hashLogIdentifier } from "../logging.js";
 import { canViewResource, createResourcesService } from "./index.js";
 
+/**
+ * Creates a test actor.
+ *
+ * @param clerkId - Clerk identity assigned to the actor.
+ * @param role - Authorization role, defaulting to a regular user.
+ * @returns Test actor identity.
+ */
 const actor = (
   clerkId: string,
   role: "user" | "admin" | "system_admin" = "user",
 ) => ({ clerkId, role }) as const;
 
+/**
+ * Creates an in-memory logger for resource-service assertions.
+ *
+ * @param events - Array that receives structured log events.
+ * @returns Logger wired to the supplied event array.
+ */
 function captureLogger(events: LogEvent[]) {
   const transport: LogTransport = {
+    /**
+     * Captures a structured log event for assertions.
+     *
+     * @param event - Structured event captured for assertions.
+     */
     log(event) {
       events.push(event);
     },
@@ -199,9 +217,16 @@ describe("resources service", () => {
       })
       .mockResolvedValueOnce({ rows: [] });
     const remove = vi.fn().mockResolvedValue("deleted");
-    const putFile = vi.fn(async ({ body }: { body: ReadableStream }) => {
-      await new Response(body).arrayBuffer();
-    });
+    const putFile = vi.fn(
+      async ({
+        body,
+      }: {
+        /** Readable upload body consumed by the storage double. */
+        body: ReadableStream;
+      }) => {
+        await new Response(body).arrayBuffer();
+      },
+    );
     const storage = {
       createArchiveTarget: vi.fn(() => ({
         contentType: "application/zip",
@@ -281,9 +306,29 @@ describe("resources service", () => {
     const select = vi
       .fn()
       .mockReturnValueOnce({
+        /**
+         * Starts the next stage of the select-query stub.
+         *
+         * @returns Next select-query stage.
+         */
         from: () => ({
+          /**
+           * Adds an inner join to the select-query stub.
+           *
+           * @returns Next select-query stage.
+           */
           innerJoin: () => ({
+            /**
+             * Applies the configured filter to the select-query stub.
+             *
+             * @returns Query stage that limits the resource-detail rows.
+             */
             where: () => ({
+              /**
+               * Resolves the configured limited query rows.
+               *
+               * @returns Configured query rows.
+               */
               limit: async () => [
                 {
                   resource: {
@@ -304,38 +349,139 @@ describe("resources service", () => {
         }),
       })
       .mockReturnValueOnce({
+        /**
+         * Starts the next stage of the select-query stub.
+         *
+         * @returns Next select-query stage.
+         */
         from: () => ({
-          where: () => ({ orderBy: async () => [image] }),
+          /**
+           * Applies the configured filter to the select-query stub.
+           *
+           * @returns Query stage that orders the resource images.
+           */
+          where: () => ({
+            /**
+             * Applies ordering to the select-query stub.
+             *
+             * @returns Configured query rows.
+             */
+            orderBy: async () => [image],
+          }),
         }),
       })
       .mockReturnValueOnce({
+        /**
+         * Starts the next stage of the select-query stub.
+         *
+         * @returns Next select-query stage.
+         */
         from: () => ({
+          /**
+           * Adds a left join to the select-query stub.
+           *
+           * @returns Next select-query stage.
+           */
           leftJoin: () => ({
+            /**
+             * Applies the configured filter to the select-query stub.
+             *
+             * @returns Query stage that groups the resource versions.
+             */
             where: () => ({
-              groupBy: () => ({ orderBy: async () => [version] }),
+              /**
+               * Adds grouping to the select-query stub.
+               *
+               * @returns Next select-query stage.
+               */
+              groupBy: () => ({
+                /**
+                 * Applies ordering to the select-query stub.
+                 *
+                 * @returns Configured query rows.
+                 */
+                orderBy: async () => [version],
+              }),
             }),
           }),
         }),
       })
       .mockReturnValueOnce({
+        /**
+         * Starts the next stage of the select-query stub.
+         *
+         * @returns Next select-query stage.
+         */
         from: () => ({
+          /**
+           * Adds an inner join to the select-query stub.
+           *
+           * @returns Next select-query stage.
+           */
           innerJoin: () => ({
+            /**
+             * Applies the configured filter to the select-query stub.
+             *
+             * @returns Query stage that orders the version files.
+             */
             where: () => ({
+              /**
+               * Applies ordering to the select-query stub.
+               *
+               * @returns Configured query rows.
+               */
               orderBy: async () => [file],
             }),
           }),
         }),
       })
       .mockReturnValueOnce({
+        /**
+         * Starts the next stage of the select-query stub.
+         *
+         * @returns Next select-query stage.
+         */
         from: () => ({
+          /**
+           * Adds an inner join to the select-query stub.
+           *
+           * @returns Next select-query stage.
+           */
           innerJoin: () => ({
-            where: () => ({ orderBy: async () => categories }),
+            /**
+             * Applies the configured filter to the select-query stub.
+             *
+             * @returns Query stage that orders the resource categories.
+             */
+            where: () => ({
+              /**
+               * Applies ordering to the select-query stub.
+               *
+               * @returns Configured query rows.
+               */
+              orderBy: async () => categories,
+            }),
           }),
         }),
       })
       .mockReturnValueOnce({
+        /**
+         * Starts the next stage of the select-query stub.
+         *
+         * @returns Next select-query stage.
+         */
         from: () => ({
+          /**
+           * Adds a left join to the select-query stub.
+           *
+           * @returns Next select-query stage.
+           */
           leftJoin: () => ({
+            /**
+             * Applies the configured filter to the select-query stub.
+             *
+             * @returns Configured aggregate download-count row.
+             */
             where: async () => [{ downloadCount: 3 }],
           }),
         }),
@@ -378,9 +524,29 @@ describe("resources service", () => {
 
   it("returns no detail for a private resource viewed by an unrelated user", async () => {
     const select = vi.fn().mockReturnValue({
+      /**
+       * Starts the next stage of the select-query stub.
+       *
+       * @returns Next select-query stage.
+       */
       from: () => ({
+        /**
+         * Adds an inner join to the select-query stub.
+         *
+         * @returns Next select-query stage.
+         */
         innerJoin: () => ({
+          /**
+           * Applies the configured filter to the select-query stub.
+           *
+           * @returns Query stage that limits the private-resource rows.
+           */
           where: () => ({
+            /**
+             * Resolves the configured limited query rows.
+             *
+             * @returns Configured query rows.
+             */
             limit: async () => [
               {
                 resource: {
@@ -585,15 +751,70 @@ describe("resources service", () => {
   it("rejects non-owner mutations before uploading files", async () => {
     const upload = vi.fn();
     const db = {
+      /**
+       * Runs work against the transaction double.
+       *
+       * @param fn - Work to run with the transaction double.
+       * @returns Result produced by the transaction callback.
+       * @rejects When the transaction callback rejects.
+       */
       transaction: async (fn: (tx: unknown) => unknown) =>
         fn({
           execute: vi.fn(),
+          /**
+           * Starts a select-query stub.
+           *
+           * @returns First select-query stage.
+           */
           select: () => ({
-            from: () => ({ where: () => ({ limit: async () => [] }) }),
+            /**
+             * Starts the next stage of the select-query stub.
+             *
+             * @returns Next select-query stage.
+             */
+            from: () => ({
+              /**
+               * Applies the configured filter to the select-query stub.
+               *
+               * @returns Query stage that limits the existing-resource rows.
+               */
+              where: () => ({
+                /**
+                 * Resolves the configured limited query rows.
+                 *
+                 * @returns Configured query rows.
+                 */
+                limit: async () => [],
+              }),
+            }),
           }),
         }),
+      /**
+       * Starts a select-query stub.
+       *
+       * @returns First select-query stage.
+       */
       select: () => ({
-        from: () => ({ where: () => ({ limit: async () => [] }) }),
+        /**
+         * Starts the next stage of the select-query stub.
+         *
+         * @returns Next select-query stage.
+         */
+        from: () => ({
+          /**
+           * Applies the configured filter to the select-query stub.
+           *
+           * @returns Query stage that limits the resource lookup rows.
+           */
+          where: () => ({
+            /**
+             * Resolves the configured limited query rows.
+             *
+             * @returns Configured query rows.
+             */
+            limit: async () => [],
+          }),
+        }),
       }),
     } as unknown as Database;
     const service = createResourcesService(
@@ -621,16 +842,50 @@ describe("resources service", () => {
     const select = vi
       .fn()
       .mockReturnValueOnce({
+        /**
+         * Starts the next stage of the select-query stub.
+         *
+         * @returns Next select-query stage.
+         */
         from: () => ({
-          where: () => ({ limit: async () => [{ id: 1000 }] }),
+          /**
+           * Applies the configured filter to the select-query stub.
+           *
+           * @returns Query stage that limits the editable-resource rows.
+           */
+          where: () => ({
+            /**
+             * Resolves the configured limited query rows.
+             *
+             * @returns Configured query rows.
+             */
+            limit: async () => [{ id: 1000 }],
+          }),
         }),
       })
       .mockReturnValueOnce({
+        /**
+         * Starts the next stage of the select-query stub.
+         *
+         * @returns Next select-query stage.
+         */
         from: () => ({
+          /**
+           * Applies the configured filter to the select-query stub.
+           *
+           * @returns Configured retained-image rows.
+           */
           where: async () => [{ id: 1000, objectPath: "dev/1000/image.webp" }],
         }),
       });
     const db = {
+      /**
+       * Runs work against the transaction double.
+       *
+       * @param fn - Work to run with the transaction double.
+       * @returns Result produced by the transaction callback.
+       * @rejects When the transaction callback rejects.
+       */
       transaction: async (fn: (tx: unknown) => unknown) =>
         fn({ execute, select }),
       execute,
@@ -670,10 +925,22 @@ describe("resources service", () => {
       assertErasureReady: vi.fn(),
       createArchiveTarget: vi.fn(),
       createFileTarget: vi.fn(),
+      /**
+       * Records an object deleted by the storage double.
+       *
+       * @param objectPath - Stored object path to capture.
+       * @returns Fixed deletion result from the double.
+       */
       async delete(objectPath) {
         deleted.push(objectPath);
         return "deleted";
       },
+      /**
+       * Creates a deterministic image target for update assertions.
+       *
+       * @param input - Image metadata supplied by the service.
+       * @returns Input metadata with fixed storage location fields.
+       */
       createImageTarget(input) {
         return {
           ...input,
@@ -690,18 +957,52 @@ describe("resources service", () => {
     const select = vi
       .fn()
       .mockReturnValueOnce({
+        /**
+         * Starts the next stage of the select-query stub.
+         *
+         * @returns Next select-query stage.
+         */
         from: () => ({
-          where: () => ({ limit: async () => [{ id: 1000 }] }),
+          /**
+           * Applies the configured filter to the select-query stub.
+           *
+           * @returns Query stage that limits the editable-resource rows.
+           */
+          where: () => ({
+            /**
+             * Resolves the configured limited query rows.
+             *
+             * @returns Configured query rows.
+             */
+            limit: async () => [{ id: 1000 }],
+          }),
         }),
       })
       .mockReturnValueOnce({
+        /**
+         * Starts the next stage of the select-query stub.
+         *
+         * @returns Next select-query stage.
+         */
         from: () => ({
+          /**
+           * Applies the configured filter to the select-query stub.
+           *
+           * @returns Configured retained-image rows.
+           */
           where: async () => [{ id: 1000, objectPath: "dev/old-preview.webp" }],
         }),
       });
     const db = {
       execute,
       select,
+      /**
+       * Runs work against the transaction double.
+       *
+       * @param fn - Work to run with the transaction double.
+       * @returns Result produced by the transaction callback.
+       * @rejects When the transaction callback rejects.
+       */
       transaction: async (fn: (tx: unknown) => unknown) =>
         fn({ execute, select }),
     } as unknown as Database;
