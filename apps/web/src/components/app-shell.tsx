@@ -14,15 +14,19 @@ import { updateLocaleSetting } from "@/lib/locale-api";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Content and navigation rendered by the shared application shell. */
 export type AppShellProps = {
+  /** Optional breadcrumb links shown above the page title. */
   breadcrumbItems?: Array<
     | {
         label: string;
+        /** Supported static destination for this breadcrumb. */
         to?:
           | "/admin"
           | "/admin/feedback"
           | "/admin/trash"
           | "/collections"
+          | "/changelog"
           | "/help"
           | "/products"
           | "/notifications"

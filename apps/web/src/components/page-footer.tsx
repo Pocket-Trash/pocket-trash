@@ -5,8 +5,10 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Localized internal links shown in the site footer. */
 const footerLinks = [
   { labelKey: "web.navigation.home", to: "/" },
+  { labelKey: "web.navigation.changelog", to: "/changelog" },
   { labelKey: "web.navigation.help", to: "/help" },
   { labelKey: "web.navigation.contact", to: "/contact" },
   { labelKey: "web.feedback.title", to: "/feedback" },
@@ -16,9 +18,12 @@ const footerLinks = [
     to: "/terms-of-service",
   },
 ] as const satisfies ReadonlyArray<{
+  /** Translation key for the link label. */
   labelKey: TranslationKey;
+  /** Supported internal footer destination. */
   to:
     | "/"
+    | "/changelog"
     | "/contact"
     | "/feedback"
     | "/help"

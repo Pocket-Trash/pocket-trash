@@ -27,6 +27,7 @@ import { Route as ProductsIndexRouteImport } from './routes/products.index'
 import { Route as HelpIndexRouteImport } from './routes/help.index'
 import { Route as FeedbackIndexRouteImport } from './routes/feedback.index'
 import { Route as CollectionsIndexRouteImport } from './routes/collections.index'
+import { Route as ChangelogIndexRouteImport } from './routes/changelog.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as UserSettingsRouteImport } from './routes/user.settings_'
 import { Route as UserResourcesRouteImport } from './routes/user.resources'
@@ -44,6 +45,7 @@ import { Route as FeedbackMyRequestsRouteImport } from './routes/feedback.my-req
 import { Route as FeedbackCompletedRouteImport } from './routes/feedback.completed'
 import { Route as CollectionsAddRouteImport } from './routes/collections.add'
 import { Route as CollectionsUserIdRouteImport } from './routes/collections.$userId'
+import { Route as ChangelogSlugRouteImport } from './routes/changelog.$slug'
 import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
@@ -163,6 +165,11 @@ const CollectionsIndexRoute = CollectionsIndexRouteImport.update({
   path: '/collections/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChangelogIndexRoute = ChangelogIndexRouteImport.update({
+  id: '/changelog/',
+  path: '/changelog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -246,6 +253,11 @@ const CollectionsAddRoute = CollectionsAddRouteImport.update({
 const CollectionsUserIdRoute = CollectionsUserIdRouteImport.update({
   id: '/collections/$userId',
   path: '/collections/$userId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChangelogSlugRoute = ChangelogSlugRouteImport.update({
+  id: '/changelog/$slug',
+  path: '/changelog/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AutmogPenIdRoute = AutmogPenIdRouteImport.update({
@@ -418,6 +430,7 @@ export interface FileRoutesByFullPath {
   '/admin/audit': typeof AdminAuditRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
+  '/changelog/$slug': typeof ChangelogSlugRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
   '/feedback/completed': typeof FeedbackCompletedRoute
@@ -435,6 +448,7 @@ export interface FileRoutesByFullPath {
   '/user/resources': typeof UserResourcesRoute
   '/user/settings': typeof UserSettingsRoute
   '/admin/': typeof AdminIndexRoute
+  '/changelog/': typeof ChangelogIndexRoute
   '/collections/': typeof CollectionsIndexRoute
   '/feedback/': typeof FeedbackIndexRoute
   '/help/': typeof HelpIndexRoute
@@ -479,6 +493,7 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AdminAuditRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
+  '/changelog/$slug': typeof ChangelogSlugRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
   '/feedback/completed': typeof FeedbackCompletedRoute
@@ -496,6 +511,7 @@ export interface FileRoutesByTo {
   '/user/resources': typeof UserResourcesRoute
   '/user/settings': typeof UserSettingsRoute
   '/admin': typeof AdminIndexRoute
+  '/changelog': typeof ChangelogIndexRoute
   '/collections': typeof CollectionsIndexRoute
   '/feedback': typeof FeedbackIndexRoute
   '/help': typeof HelpIndexRoute
@@ -545,6 +561,7 @@ export interface FileRoutesById {
   '/admin/audit': typeof AdminAuditRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
+  '/changelog/$slug': typeof ChangelogSlugRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
   '/feedback/completed': typeof FeedbackCompletedRoute
@@ -562,6 +579,7 @@ export interface FileRoutesById {
   '/user/resources': typeof UserResourcesRoute
   '/user/settings_': typeof UserSettingsRoute
   '/admin/': typeof AdminIndexRoute
+  '/changelog/': typeof ChangelogIndexRoute
   '/collections/': typeof CollectionsIndexRoute
   '/feedback/': typeof FeedbackIndexRoute
   '/help/': typeof HelpIndexRoute
@@ -612,6 +630,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/users'
     | '/autmog/$penId'
+    | '/changelog/$slug'
     | '/collections/$userId'
     | '/collections/add'
     | '/feedback/completed'
@@ -629,6 +648,7 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/user/settings'
     | '/admin/'
+    | '/changelog/'
     | '/collections/'
     | '/feedback/'
     | '/help/'
@@ -673,6 +693,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/users'
     | '/autmog/$penId'
+    | '/changelog/$slug'
     | '/collections/$userId'
     | '/collections/add'
     | '/feedback/completed'
@@ -690,6 +711,7 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/user/settings'
     | '/admin'
+    | '/changelog'
     | '/collections'
     | '/feedback'
     | '/help'
@@ -738,6 +760,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/users'
     | '/autmog/$penId'
+    | '/changelog/$slug'
     | '/collections/$userId'
     | '/collections/add'
     | '/feedback/completed'
@@ -755,6 +778,7 @@ export interface FileRouteTypes {
     | '/user/resources'
     | '/user/settings_'
     | '/admin/'
+    | '/changelog/'
     | '/collections/'
     | '/feedback/'
     | '/help/'
@@ -800,6 +824,7 @@ export interface RootRouteChildren {
   ResourcesRoute: typeof ResourcesRouteWithChildren
   TermsOfServiceRoute: typeof TermsOfServiceRoute
   UserRoute: typeof UserRouteWithChildren
+  ChangelogSlugRoute: typeof ChangelogSlugRoute
   CollectionsUserIdRoute: typeof CollectionsUserIdRoute
   CollectionsAddRoute: typeof CollectionsAddRoute
   HelpSlugRoute: typeof HelpSlugRoute
@@ -807,6 +832,7 @@ export interface RootRouteChildren {
   ProductsAddRoute: typeof ProductsAddRoute
   SignInSplatRoute: typeof SignInSplatRoute
   SignUpSplatRoute: typeof SignUpSplatRoute
+  ChangelogIndexRoute: typeof ChangelogIndexRoute
   CollectionsIndexRoute: typeof CollectionsIndexRoute
   HelpIndexRoute: typeof HelpIndexRoute
   ProductsIndexRoute: typeof ProductsIndexRoute
@@ -945,6 +971,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CollectionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/changelog/': {
+      id: '/changelog/'
+      path: '/changelog'
+      fullPath: '/changelog/'
+      preLoaderRoute: typeof ChangelogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
@@ -1062,6 +1095,13 @@ declare module '@tanstack/react-router' {
       path: '/collections/$userId'
       fullPath: '/collections/$userId'
       preLoaderRoute: typeof CollectionsUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/changelog/$slug': {
+      id: '/changelog/$slug'
+      path: '/changelog/$slug'
+      fullPath: '/changelog/$slug'
+      preLoaderRoute: typeof ChangelogSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/autmog/$penId': {
@@ -1403,6 +1443,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResourcesRoute: ResourcesRouteWithChildren,
   TermsOfServiceRoute: TermsOfServiceRoute,
   UserRoute: UserRouteWithChildren,
+  ChangelogSlugRoute: ChangelogSlugRoute,
   CollectionsUserIdRoute: CollectionsUserIdRoute,
   CollectionsAddRoute: CollectionsAddRoute,
   HelpSlugRoute: HelpSlugRoute,
@@ -1410,6 +1451,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsAddRoute: ProductsAddRoute,
   SignInSplatRoute: SignInSplatRoute,
   SignUpSplatRoute: SignUpSplatRoute,
+  ChangelogIndexRoute: ChangelogIndexRoute,
   CollectionsIndexRoute: CollectionsIndexRoute,
   HelpIndexRoute: HelpIndexRoute,
   ProductsIndexRoute: ProductsIndexRoute,
