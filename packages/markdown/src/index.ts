@@ -8,6 +8,7 @@ import remarkRehype from "remark-rehype";
 import remarkStringify from "remark-stringify";
 import { unified } from "unified";
 
+/** Converts HTML fragments to GitHub Flavored Markdown. */
 const htmlToMarkdownProcessor = unified()
   .use(rehypeParse, { fragment: true })
   .use(rehypeRemark)
@@ -17,6 +18,7 @@ const htmlToMarkdownProcessor = unified()
     fences: true,
   });
 
+/** Converts GitHub Flavored Markdown to sanitized HTML fragments. */
 const markdownToHtmlProcessor = unified()
   .use(remarkParse)
   .use(remarkGfm)
@@ -24,6 +26,12 @@ const markdownToHtmlProcessor = unified()
   .use(rehypeSanitize)
   .use(rehypeStringify);
 
+/**
+ * Converts an HTML fragment to trimmed GitHub Flavored Markdown.
+ *
+ * @param html - HTML fragment to convert.
+ * @returns Converted Markdown, or `null` when the input or output is empty.
+ */
 export function htmlToMarkdown(html: string | null | undefined): string | null {
   if (!html) {
     return null;
@@ -34,6 +42,12 @@ export function htmlToMarkdown(html: string | null | undefined): string | null {
   return markdown.length > 0 ? markdown : null;
 }
 
+/**
+ * Converts GitHub Flavored Markdown to a sanitized HTML fragment.
+ *
+ * @param markdown - Markdown source to convert.
+ * @returns Sanitized HTML, or `null` when the input or output is empty.
+ */
 export function markdownToHtml(
   markdown: string | null | undefined,
 ): string | null {
