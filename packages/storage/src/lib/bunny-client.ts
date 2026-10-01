@@ -121,8 +121,8 @@ export function readBunnyConfig(input: BunnyStorageConfig): BunnyConfig {
   };
 }
 /**
- * Recursively deletes every file below a Bunny Storage folder.
- * Directories are emptied through listing because Bunny has no recursive delete.
+ * Recursively deletes a Bunny Storage folder and all files below it.
+ * Directories are emptied through listing before each directory entry is deleted.
  *
  * @param config - Validated Bunny Storage settings.
  * @param folderPath - Zone-relative folder path.
@@ -157,6 +157,10 @@ export async function deleteFolderRecursive(
       if (response.status === 200) deletedFiles++;
     }
   }
+  await bunnyRequest(config, `${path}/`, {
+    expectedStatuses: [200, 404],
+    method: "DELETE",
+  });
   return { found: true, deletedFiles };
 }
 /**
