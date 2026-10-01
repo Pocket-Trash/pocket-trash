@@ -3,6 +3,9 @@ import { expect } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { PageFooter } from "./page-footer";
 
+/**
+ * Configures Storybook coverage for the page footer examples.
+ */
 const meta = {
   args: { year: 2026 },
   beforeEach: mockStoryAuth,
@@ -18,9 +21,23 @@ const meta = {
 } satisfies Meta<typeof PageFooter>;
 
 export default meta;
+/**
+ * Storybook story contract for the page footer examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Defines the default page footer story.
+ */
 export const Default: Story = {
+  /**
+   * Exercises the page footer story interaction and assertions.
+   *
+   * @param context - Storybook play context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @returns A promise that resolves after the interaction assertions pass.
+   * @rejects {Error} If a user interaction or assertion fails.
+   */
   play: async ({ canvas }) => {
     const links = canvas.getAllByRole("link");
     const home = links.find((link) => link.getAttribute("href") === "/");
@@ -37,10 +54,16 @@ export const Default: Story = {
   },
 };
 
+/**
+ * Defines the dark page footer story.
+ */
 export const Dark: Story = {
   globals: { theme: "dark" },
 };
 
+/**
+ * Defines the narrow page footer story.
+ */
 export const Narrow: Story = {
   globals: { viewport: "mobile1" },
 };
