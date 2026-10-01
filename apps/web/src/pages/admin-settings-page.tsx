@@ -9,13 +9,24 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Root URL containing Pocket Trash integration logos. */
 const logoRoot = "https://cdn.pocket-trash.app/assets/static/logos";
 
+/** Renders administrator integration settings for the current Clerk user.
+ *
+ * @returns The administrator settings page.
+ */
 export function AdminSettingsPage() {
   const { isLoaded, user } = useUser();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const { locale } = useLocale();
+  /** Formats integration copy for the active locale.
+   *
+   * @param key - Translation key to format.
+   * @param values - Values interpolated into the translation.
+   * @returns Localized integration copy.
+   */
   const t = (key: TranslationKey, values: Record<string, string> = {}) =>
     formatTranslation(key, values, locale);
   const linear = user?.externalAccounts.find(
@@ -45,6 +56,11 @@ export function AdminSettingsPage() {
     },
   );
 
+  /** Performs a Linear connection action while tracking its UI state.
+   *
+   * @param action - Connection operation to perform.
+   * @returns Completion after Clerk finishes or reports failure.
+   */
   async function act(action: "connect" | "remove" | "update") {
     setBusy(true);
     setFailed(false);

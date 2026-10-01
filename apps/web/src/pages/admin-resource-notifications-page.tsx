@@ -18,13 +18,21 @@ import {
 } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Resource notification displayed to administrators. */
 type Notification = Awaited<
   ReturnType<typeof listResourceNotifications>
 >[number];
 
+/** Renders resource notifications with read and moderation controls.
+ *
+ * @param props - Notification page properties.
+ * @param props.initialNotifications - Notifications loaded for the initial render.
+ * @returns The resource notification administration page.
+ */
 export function AdminResourceNotificationsPage({
   initialNotifications,
 }: {
+  /** Notifications loaded for the initial render. */
   initialNotifications: Notification[];
 }) {
   const { locale } = useLocale();
@@ -34,11 +42,22 @@ export function AdminResourceNotificationsPage({
   const [moderating, setModerating] = useState<Notification | null>(null);
   const [reason, setReason] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
+  /** Formats resource notification copy for the active locale.
+   *
+   * @param key - Translation key to format.
+   * @param params - Values interpolated into the translation.
+   * @returns Localized notification copy.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
 
+  /** Marks a resource notification read and refreshes the list.
+   *
+   * @param notificationId - Notification identifier to accept.
+   * @returns Completion after the notification list is refreshed or an error is shown.
+   */
   async function accept(notificationId: number) {
     setAcceptingId(notificationId);
     try {
@@ -272,6 +291,12 @@ export function AdminResourceNotificationsPage({
   );
 }
 
+/** Formats a notification timestamp for the active locale.
+ *
+ * @param value - Timestamp to format.
+ * @param locale - Locale controlling date and time formatting.
+ * @returns The localized medium-date and short-time label.
+ */
 function formatDate(value: Date, locale: SupportedLocale) {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",

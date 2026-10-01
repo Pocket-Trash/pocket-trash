@@ -35,13 +35,28 @@ import {
 } from "@/lib/feature-flags";
 import { useLocale } from "@/providers/locale-provider";
 
+/** A feature flag managed by an administrator. */
 type AdminFlag = Awaited<ReturnType<typeof listAdminFeatureFlags>>[number];
+
+/** A feature flag and its resolved state for a selected user. */
 type TargetFlag = Awaited<ReturnType<typeof listAdminTargetingForUser>>[number];
 
+/** Audiences available when creating a feature flag. */
 const audiences: FeatureFlagAudience[] = ["global", "admin", "user"];
 
+/**
+ * Renders feature flag management and user targeting controls.
+ *
+ * @returns The admin feature flags page.
+ */
 export function AdminFeatureFlagsPage() {
   const { locale } = useLocale();
+  /**
+   * Formats localized feature flag copy.
+   *
+   * @param key - Localization key.
+   * @returns The formatted translation.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const failedToLoadText = t("web.status.failedToLoad");
   const [flags, setFlags] = useState<AdminFlag[]>([]);
@@ -60,10 +75,16 @@ export function AdminFeatureFlagsPage() {
   const [targetFlags, setTargetFlags] = useState<TargetFlag[]>([]);
   const [status, setStatus] = useState<string | null>(null);
 
+  /** Loads the current feature flags into page state. */
   async function loadFlags() {
     setFlags(await listAdminFeatureFlags());
   }
 
+  /**
+   * Loads feature flag targeting for a selected user.
+   *
+   * @param user - User whose targeting is loaded.
+   */
   async function loadTargeting(user: ClerkUserSearchResult) {
     setSelectedUser(user);
     setTargetFlags(
@@ -79,6 +100,7 @@ export function AdminFeatureFlagsPage() {
     });
   }, [failedToLoadText]);
 
+  /** Creates or updates the flag represented by the form. */
   async function saveFlag() {
     if (editingSlug) {
       await updateAdminFeatureFlag({
@@ -112,6 +134,7 @@ export function AdminFeatureFlagsPage() {
     await loadFlags();
   }
 
+  /** Searches for users matching the current query. */
   async function searchUsers() {
     setUsers(await searchFeatureFlagUsers({ data: { query } }));
   }

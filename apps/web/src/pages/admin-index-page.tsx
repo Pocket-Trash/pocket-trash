@@ -22,6 +22,11 @@ export function AdminIndexPage() {
   const { sessionClaims, userId } = useAuth();
   const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
   const { locale } = useLocale();
+  /** Formats administrator copy for the active locale.
+   *
+   * @param key - Translation key to format.
+   * @returns Localized administrator copy.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const feedbackLink = {
     icon: MessageSquare,
