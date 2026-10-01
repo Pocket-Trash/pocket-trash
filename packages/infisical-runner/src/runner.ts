@@ -8,7 +8,7 @@ import {
   defaultEnvironmentSlug,
 } from "./config.js";
 
-/** An actionable configuration or prerequisite failure from the runner. */
+/** An actionable runner usage, configuration, or prerequisite failure. */
 export class RunnerError extends Error {
   /** The stable error name exposed to callers. */
   override name = "RunnerError";

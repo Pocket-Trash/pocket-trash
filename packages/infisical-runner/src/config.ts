@@ -24,7 +24,7 @@ const loggerAxiomTestSecretPath = "/tools/logger-axiom-test";
 export type CommandSecretConfig = {
   /** Whether server-only paths may be injected into the command. */
   allowServerSecrets: boolean;
-  /** Whether to select a user-specific database URL from local files. */
+  /** Whether local selector files choose an Infisical-injected user database URL. */
   databaseUrlUserOverride?: boolean;
   /** Environment variables copied under alternate names before execution. */
   envAliases?: readonly EnvironmentAlias[];

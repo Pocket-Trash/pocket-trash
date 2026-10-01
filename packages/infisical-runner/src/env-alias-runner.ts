@@ -59,7 +59,7 @@ function applyAliases(aliases: readonly EnvironmentAlias[]): void {
  * Applies a configured user database URL and reports the selection.
  *
  * @param filePaths - Environment files searched in precedence order.
- * @throws When the database selector or selected secret is invalid.
+ * @throws When a selector file is unreadable, unparseable, or selects an invalid or absent secret.
  */
 function applyDatabaseUrlUserOverride(filePaths: string[] | undefined): void {
   if (!filePaths) {
