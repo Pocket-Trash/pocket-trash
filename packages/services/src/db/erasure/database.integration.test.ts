@@ -78,6 +78,20 @@ describe("account database erasure", () => {
           );
         `),
       ).rejects.toThrow("Account erasure is in progress.");
+      await expect(
+        client.exec(`
+          insert into audit_export (
+            requested_by_user_id, requested_by_username, requested_by_role,
+            reason, cutoff_at, high_water_event_id, high_water_recorded_at,
+            event_count
+          ) select
+            u.id, u.username, 'admin', 'Late export', now() - interval '60 days',
+            e.id, e.recorded_at, 1
+          from users u cross join lateral (
+            select id, recorded_at from audit_event order by id limit 1
+          ) e where u.clerk_id = 'user_to_erase';
+        `),
+      ).rejects.toThrow("Account erasure is in progress.");
       await client.exec(`
         create rule erasure_test_block as on update to product
         where old.owner_clerk_id = 'user_to_erase'
@@ -259,6 +273,21 @@ describe("account database erasure", () => {
         redactedPayloads: 2,
         redactedReasons: 2,
       });
+      expect(
+        await row(
+          client,
+          `
+          select requested_by_user_id as "requestedByUserId",
+            requested_by_username as "requestedByUsername", reason, sha256
+          from audit_export
+        `,
+        ),
+      ).toEqual({
+        reason: "[erased]",
+        requestedByUserId: null,
+        requestedByUsername: "Deleted user",
+        sha256: "a".repeat(64),
+      });
     } finally {
       await client.close();
     }
@@ -300,6 +329,12 @@ async function migrate(client: PGlite) {
   }
 }
 
+/**
+ * Seeds account-owned and shared records for erasure verification.
+ *
+ * @param client - In-memory PostgreSQL client.
+ * @returns Completion after fixture insertion.
+ */
 async function seedInventory(client: PGlite) {
   await client.exec(`
     insert into users (clerk_id, username) values
@@ -322,6 +357,16 @@ async function seedInventory(client: PGlite) {
       'other_username', 'admin', 'permission', 'collections.manage',
       'same_username reason', '{"name":"same_username"}'::jsonb, now()
     );
+    insert into audit_export (
+      requested_by_user_id, requested_by_username, requested_by_role, reason,
+      cutoff_at, high_water_event_id, high_water_recorded_at, event_count,
+      sha256, completed_at
+    ) select
+      u.id, u.username, 'admin', 'same_username export reason', now(),
+      e.id, e.recorded_at, 1, repeat('a', 64), now()
+    from users u cross join lateral (
+      select id, recorded_at from audit_event order by id limit 1
+    ) e where u.clerk_id = 'user_to_erase';
     insert into user_settings (user_id)
       select id from users where clerk_id = 'user_to_erase';
 

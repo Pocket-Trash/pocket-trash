@@ -1,4 +1,6 @@
+import type { AuditExportView } from "@package/services";
 import { hasPermission } from "@package/services/authorization";
+import { formatTranslation } from "@pocket-trash/localizations";
 import { createServerFn } from "@tanstack/react-start";
 import { getActor, requirePermission } from "@/lib/authorization";
 import { localizedServerError } from "@/lib/server-errors";
@@ -13,11 +15,20 @@ export type AuditSearch = {
   to?: string;
 };
 
+/** Audit-export state displayed on the admin audit page. */
+export type AuditExportState = {
+  /** The unconsumed export range, when one exists. */
+  activeExport: AuditExportView | null;
+  /** Whether the current actor may create or download exports. */
+  canExport: boolean;
+};
+
 export const canReadAudit = createServerFn().handler(async () => {
   return hasPermission(await getActor(), "audit.read");
 });
 
-export const listAdminAuditEvents = createServerFn({ method: "GET" })
+/** Lists filtered audit events for an authorized administrator. */
+const listAdminAuditEvents = createServerFn({ method: "GET" })
   .validator(parseAuditListInput)
   .handler(async ({ data }) => {
     const actor = await requirePermission("audit.read");
@@ -33,6 +44,60 @@ export const listAdminAuditEvents = createServerFn({ method: "GET" })
       targetType: data.targetType,
     });
   });
+
+export { listAdminAuditEvents };
+
+/** Loads the active audit export for an authorized administrator. */
+const getAdminAuditExport = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const actor = await requirePermission("audit.read");
+    if (!hasPermission(actor, "audit.export")) {
+      return { activeExport: null, canExport: false } as const;
+    }
+    const { s } = await import("@/lib/services");
+    return {
+      activeExport: await s.db.audit.getActiveExport(actor),
+      canExport: true,
+    } as const;
+  },
+);
+
+export { getAdminAuditExport };
+
+/**
+ * Creates or repeats an audit export download.
+ *
+ * @param request - Export form request.
+ * @returns Download response or a localized error response.
+ */
+export async function handleAuditExportRequest(request: Request) {
+  try {
+    const actor = await requirePermission("audit.export");
+    const form = await request.formData();
+    const exportId = formString(form.get("exportId"));
+    const { s } = await import("@/lib/services");
+    const record = exportId
+      ? { id: exportId }
+      : await s.db.audit.createExport({
+          actor,
+          reason: formString(form.get("reason")),
+        });
+    const download = await s.db.audit.downloadExport({
+      actor,
+      exportId: record.id,
+    });
+    return new Response(download.body, {
+      headers: {
+        "Cache-Control": "no-store",
+        "Content-Disposition": `attachment; filename="${download.filename}"`,
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch {
+    return new Response(formatTranslation("error.generic"), { status: 400 });
+  }
+}
 
 export function parseAuditSearch(search: Record<string, unknown>): AuditSearch {
   return {
@@ -110,6 +175,13 @@ function searchCursor(value: unknown) {
   }
 }
 
+/**
+ * Parses a serialized audit pagination cursor.
+ *
+ * @param value - Serialized cursor value.
+ * @returns Parsed cursor fields.
+ * @throws When the cursor is malformed.
+ */
 function parseCursor(value: string) {
   const separator = value.lastIndexOf("|");
   const recordedAtText = value.slice(0, separator);
@@ -129,4 +201,14 @@ function parseCursor(value: string) {
 
 function invalidAuditRequest() {
   return localizedServerError("error.generic");
+}
+
+/**
+ * Reads a string form value.
+ *
+ * @param value - Form entry to normalize.
+ * @returns The string value, or an empty string for files and missing entries.
+ */
+function formString(value: FormDataEntryValue | null) {
+  return typeof value === "string" ? value : "";
 }

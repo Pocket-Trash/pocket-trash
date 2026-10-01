@@ -3,10 +3,13 @@ import {
   bigint,
   check,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
 
 export type AuditJson =
@@ -115,3 +118,79 @@ export const auditEvent = pgTable(
 
 export type AuditEvent = typeof auditEvent.$inferSelect;
 export type NewAuditEvent = typeof auditEvent.$inferInsert;
+
+/** Durable ranges and completion state for bounded audit exports. */
+const auditExport = pgTable(
+  "audit_export",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requestedByUserId: bigint("requested_by_user_id", { mode: "number" }),
+    requestedByUsername: text("requested_by_username"),
+    requestedByRole: text("requested_by_role").notNull(),
+    reason: text("reason").notNull(),
+    cutoffAt: timestamp("cutoff_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    highWaterEventId: bigint("high_water_event_id", {
+      mode: "number",
+    }).notNull(),
+    highWaterRecordedAt: timestamp("high_water_recorded_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    eventCount: integer("event_count").notNull(),
+    sha256: text("sha256"),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    completedAt: timestamp("completed_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    consumedAt: timestamp("consumed_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+  },
+  (table) => [
+    uniqueIndex("audit_export_one_unconsumed_unique")
+      .on(sql`(1)`)
+      .where(sql`${table.consumedAt} is null`),
+    index("audit_export_requester_idx")
+      .on(table.requestedByUserId)
+      .where(sql`${table.requestedByUserId} is not null`),
+    check(
+      "audit_export_requester_role_valid",
+      sql`${table.requestedByRole} in ('editor', 'admin', 'system_admin')`,
+    ),
+    check(
+      "audit_export_reason_valid",
+      sql`char_length(trim(${table.reason})) between 1 and 500`,
+    ),
+    check(
+      "audit_export_event_count_valid",
+      sql`${table.eventCount} between 1 and 10000`,
+    ),
+    check(
+      "audit_export_checksum_valid",
+      sql`${table.sha256} is null or ${table.sha256} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "audit_export_completion_valid",
+      sql`(${table.completedAt} is null and ${table.sha256} is null)
+        or (${table.completedAt} is not null and ${table.sha256} is not null)`,
+    ),
+    check(
+      "audit_export_consumption_valid",
+      sql`${table.consumedAt} is null or ${table.completedAt} is not null`,
+    ),
+  ],
+);
+
+export { auditExport };
+
+/** Stored audit-export row. */
+export type AuditExport = typeof auditExport.$inferSelect;
+/** Values accepted when creating an audit-export row. */
+export type NewAuditExport = typeof auditExport.$inferInsert;
