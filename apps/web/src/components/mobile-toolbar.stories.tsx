@@ -9,6 +9,9 @@ import {
 } from "../../.storybook/story-fixtures";
 import { MobileToolbar } from "./mobile-toolbar";
 
+/**
+ * Shared controlled values and interaction spies for mobile-toolbar stories.
+ */
 const args = {
   active: storyActiveFilters,
   currency: "USD" as const,
@@ -34,6 +37,9 @@ const args = {
   weight: "g" as const,
 };
 
+/**
+ * Configures Storybook coverage for the mobile toolbar examples.
+ */
 const meta = {
   args,
   beforeEach: mockStoryAuth,
@@ -52,11 +58,27 @@ const meta = {
 } satisfies Meta<typeof MobileToolbar>;
 
 export default meta;
+/**
+ * Storybook story contract for the mobile toolbar examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Defines the default mobile toolbar story.
+ */
 export const Default: Story = {};
 
+/**
+ * Defines the search open mobile toolbar story.
+ */
 export const SearchOpen: Story = {
+  /**
+   * Exercises the mobile toolbar story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.userEvent - Storybook interaction driver.
+   */
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: "Search" }));
     await expect(
@@ -67,7 +89,19 @@ export const SearchOpen: Story = {
   },
 };
 
+/**
+ * Defines the sort sheet mobile toolbar story.
+ */
 export const SortSheet: Story = {
+  /**
+   * Exercises the mobile toolbar story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.args - Current Storybook story arguments.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.canvasElement - Rendered Storybook canvas element.
+   * @param context.userEvent - Storybook interaction driver.
+   */
   play: async ({ args, canvas, canvasElement, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: "Sort" }));
     await userEvent.click(

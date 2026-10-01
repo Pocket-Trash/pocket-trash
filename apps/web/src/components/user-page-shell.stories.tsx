@@ -3,6 +3,9 @@ import { expect } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { UserPageShell } from "./user-page-shell";
 
+/**
+ * Configures Storybook coverage for the user page shell examples.
+ */
 const meta = {
   args: {
     children: (
@@ -26,9 +29,23 @@ const meta = {
 } satisfies Meta<typeof UserPageShell>;
 
 export default meta;
+/**
+ * Storybook story contract for the user page shell examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Defines the default user page shell story.
+ */
 export const Default: Story = {
+  /**
+   * Exercises the user page shell story interaction and assertions.
+   *
+   * @param context - Storybook play context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @returns A promise that resolves after the interaction assertions pass.
+   * @rejects {Error} If a user interaction or assertion fails.
+   */
   play: async ({ canvas }) => {
     await expect(
       canvas.getByText("Account", { selector: "[aria-current='page']" }),

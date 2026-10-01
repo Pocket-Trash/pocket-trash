@@ -71,7 +71,14 @@ describe("resource upload sessions", () => {
 
   it("normalizes an STL with no browser MIME type to octet-stream", async () => {
     const stl = file("GUIDE TRIM TOOL_No-Text.stl", 3, "");
-    const requests: Array<{ init?: RequestInit; url: string }> = [];
+    const requests: Array<{
+      /**
+       * Request options captured by the test double.
+       */
+      init?: RequestInit;
+      /** Request URL captured by the test double. */
+      url: string;
+    }> = [];
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const url = typeof input === "string" ? input : input.toString();
       requests.push({ init, url });
@@ -148,7 +155,14 @@ describe("resource upload sessions", () => {
   it("uses one raw PUT per file before idempotent completion", async () => {
     const files = [file("one.stl", 3), file("two.stl", 3)];
     const preview = file("preview.webp", 3, "image/webp");
-    const requests: Array<{ init?: RequestInit; url: string }> = [];
+    const requests: Array<{
+      /**
+       * Request options captured by the test double.
+       */
+      init?: RequestInit;
+      /** Request URL captured by the test double. */
+      url: string;
+    }> = [];
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const url = typeof input === "string" ? input : input.toString();
       requests.push({ init, url });
@@ -301,6 +315,14 @@ describe("resource upload sessions", () => {
   });
 });
 
+/**
+ * Builds a lightweight browser-file test fixture.
+ *
+ * @param name - Fixture filename.
+ * @param size - Fixture size in bytes.
+ * @param type - Fixture MIME type.
+ * @returns A browser-file test fixture.
+ */
 function file(name: string, size: number, type = "application/octet-stream") {
   return {
     name,
@@ -310,6 +332,13 @@ function file(name: string, size: number, type = "application/octet-stream") {
   } as File;
 }
 
+/**
+ * Builds a JSON response test fixture.
+ *
+ * @param body - JSON response body.
+ * @param status - HTTP response status.
+ * @returns A JSON response fixture.
+ */
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { "content-type": "application/json" },
@@ -349,6 +378,13 @@ describe("image uploads", () => {
   });
 
   it("enforces the per-operation image limits", () => {
+    /**
+     * Builds a lightweight WebP file fixture.
+     *
+     * @param size - Fixture size in bytes.
+     * @param name - Fixture filename.
+     * @returns A WebP browser-file fixture.
+     */
     const image = (size: number, name = "image.webp") =>
       ({ name, size, type: "image/webp" }) as File;
 

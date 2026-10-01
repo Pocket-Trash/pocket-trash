@@ -2,6 +2,9 @@ import type { CatalogImage, UserCollectionSummary } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { CollectionCard } from "./collection-card";
 
+/**
+ * Sample collection cover used by the card stories.
+ */
 const coverImage: CatalogImage = {
   contentType: "image/webp",
   createdAt: new Date("2026-01-01"),
@@ -16,6 +19,9 @@ const coverImage: CatalogImage = {
   url: "https://cdn.pocket-trash.app/assets/storybook/collection-images/thirteen.webp",
 };
 
+/**
+ * Collection summary shared by the card stories.
+ */
 const collection: UserCollectionSummary = {
   coverImage: null,
   coverImages: [],
@@ -30,6 +36,9 @@ const collection: UserCollectionSummary = {
   updatedAt: new Date("2026-01-02"),
 };
 
+/**
+ * Configures Storybook coverage for the collection card examples.
+ */
 const meta = {
   args: {
     collection,
@@ -50,10 +59,19 @@ const meta = {
 } satisfies Meta<typeof CollectionCard>;
 
 export default meta;
+/**
+ * Storybook story contract for the collection card examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Defines the without image collection card story.
+ */
 export const WithoutImage: Story = {};
 
+/**
+ * Defines the with image collection card story.
+ */
 export const WithImage: Story = {
   args: {
     collection: {

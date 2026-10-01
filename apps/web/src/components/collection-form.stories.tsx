@@ -3,6 +3,9 @@ import { expect, fn } from "storybook/test";
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { CollectionForm } from "./collection-form";
 
+/**
+ * Localized labels shared by the collection form stories.
+ */
 const copy = {
   browse: "Browse",
   cover: "Images",
@@ -17,6 +20,9 @@ const copy = {
   submit: "Save",
 };
 
+/**
+ * Configures Storybook coverage for the collection form examples.
+ */
 const meta = {
   component: CollectionForm,
   args: { copy, onSubmit: fn() },
@@ -31,13 +37,19 @@ const meta = {
 } satisfies Meta<typeof CollectionForm>;
 
 export default meta;
-/** Collection form story type. */
+/**
+ * Storybook story contract for the collection form examples.
+ */
 type Story = StoryObj<typeof meta>;
 
-/** Empty private collection form story. */
+/**
+ * Defines the new private collection form story.
+ */
 export const NewPrivate: Story = {};
 
-/** Populated public collection form story. */
+/**
+ * Defines the edit public collection form story.
+ */
 export const EditPublic: Story = {
   args: {
     initialValue: {
@@ -61,13 +73,17 @@ export const EditPublic: Story = {
   },
 };
 
-/** Immediate Markdown submission story. */
+/**
+ * Defines the submit collection form story.
+ */
 export const Submit: Story = {
   /**
-   * Verifies the current Source value is submitted immediately.
+   * Exercises the collection form story interaction and assertions.
    *
-   * @param context - Story interaction context.
-   * @returns A promise that resolves after assertions complete.
+   * @param context - Storybook interaction context.
+   * @param context.args - Current Storybook story arguments.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.userEvent - Storybook interaction driver.
    */
   play: async ({ args, canvas, userEvent }) => {
     await userEvent.type(
@@ -188,13 +204,17 @@ export const Error: Story = {
   args: { error: "The collection could not be saved." },
 };
 
-/** Multiple image submission story. */
+/**
+ * Defines the multiple images collection form story.
+ */
 export const MultipleImages: Story = {
   /**
-   * Verifies all selected images reach submission.
+   * Exercises the collection form story interaction and assertions.
    *
-   * @param context - Story interaction context.
-   * @returns A promise that resolves after assertions complete.
+   * @param context - Storybook interaction context.
+   * @param context.args - Current Storybook story arguments.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.userEvent - Storybook interaction driver.
    */
   play: async ({ args, canvas, userEvent }) => {
     const images = [

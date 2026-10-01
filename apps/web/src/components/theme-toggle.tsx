@@ -13,9 +13,13 @@ import type { ThemeMode } from "@/lib/theme";
 import { useLocale } from "@/providers/locale-provider";
 import { useTheme } from "@/providers/theme-provider";
 
+/** Selectable themes and their localized labels and icons. */
 const themeOptions: Array<{
+  /** Icon representing the theme. */
   icon: typeof Sun;
+  /** Translation key for the accessible theme label. */
   labelKey: TranslationKey;
+  /** Theme identifier selected when the option is pressed. */
   value: ThemeMode;
 }> = [
   { icon: Moon, labelKey: "web.settings.dark", value: "dark" },
@@ -23,9 +27,21 @@ const themeOptions: Array<{
   { icon: Monitor, labelKey: "web.settings.system", value: "system" },
 ];
 
+/**
+ * Renders a controlled single-select toggle for the available themes.
+ *
+ * @returns The theme selection controls.
+ * @throws {Error} If the required theme or locale provider is missing.
+ */
 export function ThemeToggle() {
   const { saving, setTheme, theme } = useTheme();
   const { locale } = useLocale();
+  /**
+   * Formats a theme translation for the active locale.
+   *
+   * @param key - Theme localization key.
+   * @returns The localized theme text.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   return (

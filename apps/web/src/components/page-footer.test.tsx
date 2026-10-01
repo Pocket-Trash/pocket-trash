@@ -3,12 +3,31 @@ import { expect, it, vi } from "vitest";
 import { PageFooter } from "./page-footer";
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
-    <a href={to}>{children}</a>
-  ),
+  /**
+   * Renders router links as plain anchors for server rendering.
+   *
+   * @param input - Link rendering input.
+   * @param input.children - Link contents.
+   * @param input.to - Anchor destination.
+   * @returns A plain anchor for the requested destination.
+   */
+  Link: ({
+    children,
+    to,
+  }: {
+    /** Link contents. */
+    children: React.ReactNode;
+    /** Anchor destination. */
+    to: string;
+  }) => <a href={to}>{children}</a>,
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns the fixed English locale used by footer assertions.
+   *
+   * @returns Locale state consumed by the footer.
+   */
   useLocale: () => ({ locale: "en-US" }),
 }));
 

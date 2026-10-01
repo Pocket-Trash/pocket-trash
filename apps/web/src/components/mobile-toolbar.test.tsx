@@ -4,6 +4,11 @@ import { createDefaultMatchModes, createEmptyFilters } from "@/lib/pen-filters";
 import { MobileToolbar } from "./mobile-toolbar";
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Supplies a stable locale without mounting `LocaleProvider`.
+   *
+   * @returns The locale context value used by the test.
+   */
   useLocale: () => ({ locale: "en-US" }),
 }));
 

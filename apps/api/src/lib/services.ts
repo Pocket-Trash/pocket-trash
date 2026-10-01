@@ -8,6 +8,12 @@ import {
 } from "@package/logger";
 import { createServices } from "@package/services";
 import type { ApiBindings } from "../app.js";
+/**
+ * Creates the API logger with Axiom and console transports from worker bindings.
+ *
+ * @param env - Cloudflare environment and logging configuration.
+ * @returns Configured API logger.
+ */
 export function createApiLogger(env: ApiBindings) {
   const environment = env.APP_ENV ?? "unknown";
   const hasAxiom = Boolean(env.AXIOM_TOKEN && env.AXIOM_DATASET);
@@ -40,9 +46,20 @@ export function createApiLogger(env: ApiBindings) {
   });
 }
 
+/**
+ * Configures API services from Cloudflare database and storage bindings.
+ *
+ * @param bindings - Cloudflare environment bindings.
+ * @param options - Optional service capabilities to configure.
+ * @returns Configured service registry and shared logger.
+ * @throws When required service configuration is invalid.
+ */
 export function createApiServices(
   bindings: ApiBindings,
-  options: { storage?: boolean } = {},
+  options: {
+    /** Whether Bunny-backed storage services are configured. */
+    storage?: boolean;
+  } = {},
 ) {
   const logger = createApiLogger(bindings);
   const services = createServices();

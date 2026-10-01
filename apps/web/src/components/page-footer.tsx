@@ -31,13 +31,34 @@ const footerLinks = [
     | "/terms-of-service";
 }>;
 
+/** Shared focus, hover, and underline styles for internal footer links. */
 const linkClassName =
   "rounded-sm text-primary underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+/** Shared focus and hover styles for icon-only social links. */
 const socialLinkClassName =
   "rounded-sm p-2 text-primary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-export function PageFooter({ year }: { year: number }) {
+/**
+ * Renders localized site navigation, social links, and copyright text.
+ *
+ * @param props - Page footer properties.
+ * @param props.year - Copyright year to display.
+ * @returns The localized site footer.
+ * @throws {Error} If the required locale provider is missing.
+ */
+export function PageFooter({
+  year,
+}: {
+  /** Copyright year to display. */
+  year: number;
+}) {
   const { locale } = useLocale();
+  /**
+   * Formats a footer translation for the active locale.
+   *
+   * @param key - Footer localization key.
+   * @returns The localized footer text.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   return (

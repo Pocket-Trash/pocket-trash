@@ -3,6 +3,9 @@ import { expect, within } from "storybook/test";
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { ImageGallery } from "./image-gallery";
 
+/**
+ * Product image fixtures shared by the gallery stories.
+ */
 const productImages = [
   image(1, "one.webp", "product-images"),
   image(2, "eleven.webp", "product-images"),
@@ -15,16 +18,28 @@ const productImages = [
   image(9, "three.webp", "product-images"),
   image(10, "twelve.webp", "product-images"),
 ];
+/**
+ * Collection image fixtures shared by the gallery stories.
+ */
 const collectionImages = [
   image(101, "thirteen.webp", "collection-images"),
   image(102, "two.webp", "collection-images"),
 ];
+/**
+ * First product image used by lightbox assertions.
+ */
 const firstProductImage = productImages[0];
+/**
+ * Second product image used by lightbox assertions.
+ */
 const secondProductImage = productImages[1];
 if (!firstProductImage || !secondProductImage) {
   throw new Error("Image gallery stories require product images.");
 }
 
+/**
+ * Configures Storybook coverage for the image gallery examples.
+ */
 const meta = {
   args: {
     alt: "Catalog item",
@@ -48,10 +63,19 @@ const meta = {
 } satisfies Meta<typeof ImageGallery>;
 
 export default meta;
+/**
+ * Storybook story contract for the image gallery examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Defines the thumbnails image gallery story.
+ */
 export const Thumbnails: Story = {};
 
+/**
+ * Defines the grouped image gallery story.
+ */
 export const Grouped: Story = {
   args: {
     groups: [
@@ -61,21 +85,41 @@ export const Grouped: Story = {
   },
 };
 
+/**
+ * Defines the grouped collection only image gallery story.
+ */
 export const GroupedCollectionOnly: Story = {
   args: {
     groups: [{ images: collectionImages, label: "Collection images" }],
   },
 };
 
+/**
+ * Defines the grouped product only image gallery story.
+ */
 export const GroupedProductOnly: Story = {
   args: {
     groups: [{ images: productImages, label: "Product images" }],
   },
 };
 
+/**
+ * Defines the empty image gallery story.
+ */
 export const Empty: Story = { args: { groups: [] } };
 
+/**
+ * Defines the lightbox navigation image gallery story.
+ */
 export const LightboxNavigation: Story = {
+  /**
+   * Exercises the image gallery story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.canvasElement - Rendered Storybook canvas element.
+   * @param context.userEvent - Storybook interaction driver.
+   */
   play: async ({ canvas, canvasElement, userEvent }) => {
     await userEvent.click(
       canvas.getByRole("button", {
@@ -101,6 +145,14 @@ export const LightboxNavigation: Story = {
   },
 };
 
+/**
+ * Creates a gallery image fixture.
+ *
+ * @param id - Stable image identifier.
+ * @param fileName - Stored file name.
+ * @param folder - Storybook asset folder.
+ * @returns A gallery image fixture.
+ */
 function image(id: number, fileName: string, folder: string) {
   return {
     fileName,

@@ -28,6 +28,11 @@ describe("useCatalogFilters", () => {
       | React.Dispatch<React.SetStateAction<CatalogFilters>>
       | undefined;
 
+    /**
+     * Exposes the catalog-filter setter while rendering no UI.
+     *
+     * @returns `null`.
+     */
     function Harness() {
       [, setFilters] = useCatalogFilters({}, commit);
       return null;

@@ -1,13 +1,27 @@
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Renders a maker name as an external link when a URL is available.
+ *
+ * @param props - Maker link properties.
+ * @param props.className - Additional CSS classes.
+ * @param props.name - Maker name displayed to the user.
+ * @param props.url - External maker URL, or `null` or an empty string to render plain text.
+ * @returns The linked or plain-text maker name.
+ */
 export function MakerLink({
   className,
   name,
   url,
 }: {
+  /**
+   * Additional CSS classes.
+   */
   className?: string;
+  /** Maker name displayed to the user. */
   name: string;
+  /** External maker URL, or `null` or an empty string when unavailable. */
   url: string | null;
 }) {
   if (!url) return <span className={className}>{name}</span>;
