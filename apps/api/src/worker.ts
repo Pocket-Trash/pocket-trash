@@ -6,8 +6,16 @@ import { findClerkOrphans } from "./clerk-orphans.js";
 import { createClerkWebhookHandler } from "./clerk-webhooks.js";
 import { createErasureOperations, drainErasureQueue } from "./erasure.js";
 import { createApiLogger, createApiServices } from "./lib/services.js";
+import { createLinearWebhookHandler } from "./linear-webhooks.js";
 
+/** API application configured for the Cloudflare worker runtime. */
 const app = createApp({
+  /**
+   * Creates the Clerk webhook runtime for a request.
+   *
+   * @param bindings - Worker environment bindings.
+   * @returns The configured Clerk webhook runtime.
+   */
   getClerkWebhookRuntime(bindings) {
     validateClerkWebhookBindings(bindings);
     const { logger, services } = createApiServices(bindings);
@@ -22,6 +30,13 @@ const app = createApp({
 
     return {
       expectedInitials: bindings.URL_INITIALS?.trim().toUpperCase(),
+      /**
+       * Routes a delivery with the current environment kind.
+       *
+       * @param request - Incoming webhook request.
+       * @param target - Routed target kind.
+       * @returns The webhook response.
+       */
       handle: (request, target) =>
         handle(
           request,
@@ -35,12 +50,55 @@ const app = createApp({
         ),
     };
   },
+  /**
+   * Creates request logging configuration.
+   *
+   * @param bindings - Worker environment bindings.
+   * @returns The request logging configuration.
+   */
   getRuntimeConfig(bindings) {
     validateApiBindings(bindings);
 
     return {
       clientLogKey: bindings.LOG_PROXY_CLIENT_KEY,
       logger: createApiLogger(bindings),
+    };
+  },
+  /**
+   * Creates the Linear webhook runtime for a request.
+   *
+   * @param bindings - Worker environment bindings.
+   * @returns The configured Linear webhook runtime.
+   */
+  getLinearWebhookRuntime(bindings) {
+    validateLinearWebhookBindings(bindings);
+    const { logger, services } = createApiServices(bindings);
+    const handle = createLinearWebhookHandler({
+      feedback: services.db.feedback,
+      logger,
+      signingSecret: bindings.LINEAR_WEBHOOK_SIGNING_SECRET as string,
+      targets: bindings.CLERK_WEBHOOK_TARGETS,
+    });
+    return {
+      expectedInitials: bindings.URL_INITIALS?.trim().toUpperCase(),
+      /**
+       * Routes a delivery with the current environment kind.
+       *
+       * @param request - Incoming webhook request.
+       * @param target - Routed target kind.
+       * @returns The webhook response.
+       */
+      handle: (request, target) =>
+        handle(
+          request,
+          target === "local"
+            ? "local"
+            : bindings.APP_ENV === "production"
+              ? "production"
+              : bindings.APP_ENV === "preview"
+                ? "preview"
+                : "development",
+        ),
     };
   },
   getUploadRuntime(bindings) {
@@ -107,12 +165,34 @@ export function validateUploadBindings(env: ApiBindings) {
   }
 }
 
+/**
+ * Validates bindings required by Clerk webhooks.
+ *
+ * @param env - Worker environment bindings.
+ * @returns Nothing.
+ * @throws {ApiEnvValidationError} When a required binding is missing.
+ */
 export function validateClerkWebhookBindings(env: ApiBindings) {
   const required = [
     "CLERK_WEBHOOK_SIGNING_SECRET",
     "DATABASE_URL",
     "ERASURE_HMAC_SECRET",
   ] as const;
+  const invalidVariables = required.filter((name) => !env[name]?.trim());
+  if (invalidVariables.length > 0) {
+    throw new ApiEnvValidationError(invalidVariables);
+  }
+}
+
+/**
+ * Validates bindings required by Linear webhooks.
+ *
+ * @param env - Worker environment bindings.
+ * @returns Nothing.
+ * @throws {ApiEnvValidationError} When a required binding is missing.
+ */
+export function validateLinearWebhookBindings(env: ApiBindings) {
+  const required = ["DATABASE_URL", "LINEAR_WEBHOOK_SIGNING_SECRET"] as const;
   const invalidVariables = required.filter((name) => !env[name]?.trim());
   if (invalidVariables.length > 0) {
     throw new ApiEnvValidationError(invalidVariables);

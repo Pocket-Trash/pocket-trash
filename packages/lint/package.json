@@ -1,0 +1,34 @@
+{
+  "name": "@package/lint",
+  "version": "0.5.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test eslint/index.test.mjs",
+    "test:ci": "node --test eslint/index.test.mjs"
+  },
+  "exports": {
+    "./biome": "./biome.json",
+    "./eslint": "./eslint/index.mjs",
+    "./eslint/apps": "./eslint/apps.mjs",
+    "./eslint/base": "./eslint/base.mjs",
+    "./eslint/react": "./eslint/react.mjs",
+    "./eslint/react-native": "./eslint/react-native.mjs"
+  },
+  "peerDependencies": {
+    "eslint": ">=10.0.0",
+    "typescript": ">=6.0.0"
+  },
+  "devDependencies": {
+    "@eslint/css": "^2.0.0",
+    "@eslint/js": "^10.0.1",
+    "@eslint/json": "^2.1.0",
+    "@html-eslint/eslint-plugin": "^0.66.1",
+    "eslint-plugin-jsx-a11y-x": "^0.2.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-x": "^5.23.3",
+    "globals": "^17.12.0",
+    "tailwind-csstree": "^0.4.1",
+    "typescript-eslint": "^8.71.0"
+  }
+}

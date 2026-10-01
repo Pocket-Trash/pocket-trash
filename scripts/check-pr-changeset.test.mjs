@@ -35,6 +35,22 @@ test("selects the highest Changeset bump for workspace packages", () => {
   );
 });
 
+test("selects a Changeset bump for a workspace package added by the PR", () => {
+  assert.equal(
+    getHighestChangesetBump(
+      [
+        {
+          filename: ".changeset/lint.md",
+          content: '---\n"@package/lint": patch\n---\nCentralize linting.',
+        },
+      ],
+      new Set(["@package/eslint"]),
+      new Set(["@package/lint"]),
+    ),
+    "patch",
+  );
+});
+
 test("only returns files introduced by the PR branch", (context) => {
   const directory = mkdtempSync(join(tmpdir(), "changeset-git-test-"));
   const git = (...args) =>

@@ -14,7 +14,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:ci": "tsc -p tsconfig.json",
-    "check": "biome check .",
     "db:check": "drizzle-kit check --config=drizzle.config.ts",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts && pnpm run db:generate:docs",
     "db:generate:docs": "tsx scripts/generate-schema-docs.ts",
@@ -25,7 +24,6 @@
     "db:view": "concurrently --kill-others --names studio,visualizer,view \"pnpm db:studio\" \"pnpm db:visualizer\" \"wait-on tcp:127.0.0.1:4009 tcp:127.0.0.1:4010 && pnpm db:view:shell\"",
     "db:view:shell": "node ../../scripts/drizzle-view.mjs --studio \"https://local.drizzle.studio?port=4009\" --visualizer http://127.0.0.1:4010 --port 4011",
     "db:visualizer": "drizzle-lab visualizer --config drizzle.config.ts --ts-config tsconfig.json --port=4010",
-    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests --exclude \"dist/**\"",
     "test:ci": "vitest run --passWithNoTests --exclude \"dist/**\"",
@@ -41,7 +39,6 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
-    "@package/eslint": "workspace:*",
     "@package/tsconfig": "workspace:*",
     "drizzle-kit": "latest"
   }

@@ -15,12 +15,10 @@
     "axiom:map-fields": "tsx scripts/configure-axiom-map-fields.ts",
     "build": "tsc -p tsconfig.json",
     "build:ci": "tsc -p tsconfig.json",
-    "check": "biome check .",
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "dev:web": "pnpm run dev",
     "dev:ios": "pnpm run dev",
     "dev:android": "pnpm run dev",
-    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:axiom": "tsx ../infisical-runner/src/cli.ts logger test:axiom -- tsx integration/axiom-live.ts",
@@ -29,7 +27,6 @@
     "test:watch:no-infisical": "vitest --passWithNoTests"
   },
   "devDependencies": {
-    "@package/eslint": "workspace:*",
     "@package/tsconfig": "workspace:*"
   }
 }

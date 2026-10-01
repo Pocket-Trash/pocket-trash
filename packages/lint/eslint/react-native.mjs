@@ -1,9 +1,11 @@
+import { defineConfig } from "eslint/config";
+
 import baseConfig from "./base.mjs";
 
-export default [
+export default defineConfig([
   ...baseConfig,
   {
-    files: ["**/*.{ts,tsx}"],
+    files: ["**/*.{js,jsx,ts,tsx}"],
     languageOptions: {
       globals: {
         __DEV__: "readonly",
@@ -11,4 +13,4 @@ export default [
       },
     },
   },
-];
+]);

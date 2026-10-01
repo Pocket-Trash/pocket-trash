@@ -467,6 +467,15 @@ function toUrl(input: Parameters<typeof fetch>[0]): URL {
   return new URL(input.url);
 }
 
+/**
+ * Uploads a resource file in storage tests.
+ *
+ * @param storage - Upload storage under test.
+ * @param input - File metadata and bytes.
+ * @param resourceId - Target resource identifier.
+ * @returns The created file target.
+ * @rejects When the response body is unavailable or storage rejects the upload.
+ */
 async function putFile(
   storage: UploadStorage,
   input: UploadInput,
@@ -476,8 +485,10 @@ async function putFile(
     { ...input, size: input.bytes.length, sha256: await sha256(input.bytes) },
     { resourceId, version: 1 },
   );
+  const body = new Response(new Uint8Array(input.bytes)).body;
+  if (!body) throw new Error("No response body");
   await storage.putFile({
-    body: new Response(new Uint8Array(input.bytes)).body!,
+    body,
     contentLength: target.size,
     contentType: target.contentType,
     objectPath: target.objectPath,

@@ -41,6 +41,12 @@ const listener = spawn(
   ],
   { cwd: repoRoot, stdio: ["ignore", "pipe", "inherit"] },
 );
+/** Cloudflare quick tunnel for local Linear webhook delivery. */
+const tunnel = spawn(
+  "cloudflared",
+  ["tunnel", "--url", "http://localhost:4006", "--no-autoupdate"],
+  { cwd: repoRoot, stdio: ["ignore", "pipe", "pipe"] },
+);
 const webEnv = { ...process.env };
 delete webEnv.APP_ID;
 delete webEnv.CLOUDFLARE_ACCOUNT_ID;
@@ -51,12 +57,66 @@ const web = spawn("pnpm", ["dev:web"], {
   env: webEnv,
   stdio: "inherit",
 });
-const key = `target:local:${initials}`;
-let registered = false;
+/** KV target keys registered by this process. */
+const registeredKeys = new Set();
 let stopping = false;
 
 try {
-  const relayUrl = await waitForRelayUrl(listener);
+  const [clerkRelayUrl, tunnelUrl] = await Promise.all([
+    waitForClerkRelayUrl(listener),
+    waitForCloudflareTunnelUrl(tunnel),
+  ]);
+  await registerTarget(
+    `target:local:${initials}`,
+    clerkRelayUrl,
+    registeredKeys,
+  );
+  await registerTarget(
+    `linear-target:local:${initials}`,
+    `${tunnelUrl}/api/v0/webhooks/linear/${initials.toLowerCase()}`,
+    registeredKeys,
+  );
+} catch (error) {
+  listener.kill("SIGTERM");
+  tunnel.kill("SIGTERM");
+  web.kill("SIGTERM");
+  await removeTargets(registeredKeys);
+  throw error;
+}
+
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => void stop(signal));
+}
+listener.on("exit", () => void stop());
+tunnel.on("exit", () => void stop());
+web.on("exit", () => void stop());
+await new Promise(() => {});
+
+/**
+ * Stops local services and removes registered webhook targets.
+ *
+ * @param {NodeJS.Signals} [signal] - Termination signal.
+ * @returns {Promise<void>} Completion of target cleanup.
+ */
+async function stop(signal) {
+  if (stopping) return;
+  stopping = true;
+  listener.kill(signal ?? "SIGTERM");
+  tunnel.kill(signal ?? "SIGTERM");
+  web.kill(signal ?? "SIGTERM");
+  await removeTargets(registeredKeys);
+  process.exit(signal ? 128 : 0);
+}
+
+/**
+ * Registers one expiring local webhook target.
+ *
+ * @param {string} key - KV target key.
+ * @param {string} url - Public target URL.
+ * @param {Set<string>} registeredKeys - Successfully registered keys.
+ * @returns {Promise<void>} Completion of target registration.
+ */
+async function registerTarget(key, url, registeredKeys) {
   await wrangler([
     "kv",
     "key",
@@ -71,29 +131,20 @@ try {
     "--ttl",
     "86400",
     "--metadata",
-    JSON.stringify({ kind: "local", url: relayUrl }),
+    JSON.stringify({ kind: "local", url }),
   ]);
-  registered = true;
-  process.stderr.write(`Registered ${key} -> ${relayUrl}\n`);
-} catch (error) {
-  listener.kill("SIGTERM");
-  web.kill("SIGTERM");
-  throw error;
+  registeredKeys.add(key);
+  process.stderr.write(`Registered ${key} -> ${url}\n`);
 }
 
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, () => void stop(signal));
-}
-listener.on("exit", () => void stop());
-web.on("exit", () => void stop());
-await new Promise(() => {});
-
-async function stop(signal) {
-  if (stopping) return;
-  stopping = true;
-  listener.kill(signal ?? "SIGTERM");
-  web.kill(signal ?? "SIGTERM");
-  if (registered) {
+/**
+ * Removes successfully registered webhook targets.
+ *
+ * @param {Set<string>} registeredKeys - Keys to remove.
+ * @returns {Promise<void>} Completion of target cleanup.
+ */
+async function removeTargets(registeredKeys) {
+  for (const key of registeredKeys) {
     try {
       await wrangler([
         "kv",
@@ -110,7 +161,6 @@ async function stop(signal) {
       process.stderr.write(`Failed to remove ${key}: ${String(error)}\n`);
     }
   }
-  process.exit(signal ? 128 : 0);
 }
 
 function readInitials(paths) {
@@ -128,7 +178,13 @@ function readInitials(paths) {
   }
 }
 
-function waitForRelayUrl(child) {
+/**
+ * Waits for the Clerk listener's public relay URL.
+ *
+ * @param {import("node:child_process").ChildProcess} child - Clerk listener.
+ * @returns {Promise<string>} Public Clerk relay URL.
+ */
+function waitForClerkRelayUrl(child) {
   return new Promise((resolve, reject) => {
     let buffer = "";
     child.stdout.setEncoding("utf8");
@@ -151,6 +207,44 @@ function waitForRelayUrl(child) {
     child.once("error", reject);
     child.once("exit", (code) =>
       reject(new Error(`Clerk webhook listener exited with code ${code}.`)),
+    );
+  });
+}
+
+/**
+ * Waits for a Cloudflare quick tunnel URL.
+ *
+ * @param {import("node:child_process").ChildProcess} child - Tunnel process.
+ * @returns {Promise<string>} Public Cloudflare tunnel URL.
+ */
+function waitForCloudflareTunnelUrl(child) {
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+    /**
+     * Reads tunnel output until its public URL appears.
+     *
+     * @param {string} chunk - Tunnel output chunk.
+     * @returns {void} Nothing.
+     */
+    const read = (chunk) => {
+      buffer += chunk;
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        process.stderr.write(`${line}\n`);
+        const url = line.match(
+          /https:\/\/[a-z0-9-]+\.trycloudflare\.com/u,
+        )?.[0];
+        if (url) resolve(url);
+      }
+    };
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", read);
+    child.stderr.on("data", read);
+    child.once("error", reject);
+    child.once("exit", (code) =>
+      reject(new Error(`Cloudflare tunnel exited with code ${code}.`)),
     );
   });
 }

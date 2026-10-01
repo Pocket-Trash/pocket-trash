@@ -399,8 +399,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
         results.filter((result) => result.status === "fulfilled"),
       ).toHaveLength(1);
       const winner = results.find((result) => result.status === "fulfilled");
-      if (!winner || winner.status !== "fulfilled")
-        throw new Error("No winning session");
+      if (winner?.status !== "fulfilled") throw new Error("No winning session");
       await put(winner.value, { "photo.png": image });
       await service.completeUpload(winner.value.id, actor);
       await expect(
@@ -549,10 +548,12 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       { target: { type: "product", id: productId }, files: [file] },
       actor,
     );
+    const upload = session.uploads.at(0);
+    if (!upload) throw new Error("No upload");
     await expect(
       service.upload(
         session.id,
-        session.uploads[0]!.id,
+        upload.id,
         actor,
         new Request("https://api.test/upload", {
           method: "PUT",
@@ -587,7 +588,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       targetType: "product",
       fileType: "product_image",
       fileCount: 1,
-      fileIdHash: hashLogIdentifier(session.uploads[0]!.id),
+      fileIdHash: hashLogIdentifier(upload.id),
     });
     expect(
       events

@@ -1,4 +1,5 @@
 export default {
+  files: ["apps/**/*.{js,jsx,ts,tsx}"],
   rules: {
     "no-restricted-imports": [
       "error",

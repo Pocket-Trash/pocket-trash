@@ -1,5 +1,5 @@
 {
-  "id": "30a328fc-67c2-4722-bcac-df654be2cc85",
+  "id": "50ce2fb1-7c39-4b2a-93b9-b744024c6369",
   "prevId": "01ba05bd-415f-4c92-b18a-aad032d5ce99",
   "version": "7",
   "dialect": "postgresql",
@@ -14,15 +14,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "audit_event_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "action": {
@@ -147,9 +147,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "audit_event_actor_recorded_at_id_idx": {
           "name": "audit_event_actor_recorded_at_id_idx",
@@ -174,10 +174,10 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"audit_event\".\"actor_user_id\" is not null",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "audit_event_owner_user_id_idx": {
           "name": "audit_event_owner_user_id_idx",
@@ -190,10 +190,10 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"audit_event\".\"owner_user_id\" is not null",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "audit_event_action_recorded_at_id_idx": {
           "name": "audit_event_action_recorded_at_id_idx",
@@ -218,9 +218,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "audit_event_target_recorded_at_id_idx": {
           "name": "audit_event_target_recorded_at_id_idx",
@@ -251,9 +251,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -379,16 +379,16 @@
           "columns": [
             {
               "expression": "(1)",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"audit_export\".\"consumed_at\" is null",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "audit_export_requester_idx": {
           "name": "audit_export_requester_idx",
@@ -401,10 +401,10 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"audit_export\".\"requested_by_user_id\" is not null",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -449,15 +449,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "collection_image_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "collection_id": {
@@ -548,9 +548,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "collection_image_current_unique": {
           "name": "collection_image_current_unique",
@@ -563,34 +563,34 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"collection_image\".\"is_current\"",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "collection_image_collection_id_user_collection_id_fk": {
           "name": "collection_image_collection_id_user_collection_id_fk",
           "tableFrom": "collection_image",
-          "columnsFrom": ["collection_id"],
           "tableTo": "user_collection",
+          "columnsFrom": ["collection_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "collection_image_object_path_unique": {
           "name": "collection_image_object_path_unique",
-          "columns": ["object_path"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["object_path"]
         },
         "collection_image_collection_hash_unique": {
           "name": "collection_image_collection_hash_unique",
-          "columns": ["collection_id", "sha256"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["collection_id", "sha256"]
         }
       },
       "policies": {},
@@ -620,15 +620,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "collection_item_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "owner_id": {
@@ -768,56 +768,56 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "collection_item_owner_id_users_id_fk": {
           "name": "collection_item_owner_id_users_id_fk",
           "tableFrom": "collection_item",
-          "columnsFrom": ["owner_id"],
           "tableTo": "users",
+          "columnsFrom": ["owner_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "collection_item_material_id_materials_id_fk": {
           "name": "collection_item_material_id_materials_id_fk",
           "tableFrom": "collection_item",
-          "columnsFrom": ["material_id"],
           "tableTo": "materials",
+          "columnsFrom": ["material_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "collection_item_purchased_from_user_id_users_id_fk": {
           "name": "collection_item_purchased_from_user_id_users_id_fk",
           "tableFrom": "collection_item",
-          "columnsFrom": ["purchased_from_user_id"],
           "tableTo": "users",
+          "columnsFrom": ["purchased_from_user_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         },
         "collection_item_sold_to_user_id_users_id_fk": {
           "name": "collection_item_sold_to_user_id_users_id_fk",
           "tableFrom": "collection_item",
-          "columnsFrom": ["sold_to_user_id"],
           "tableTo": "users",
+          "columnsFrom": ["sold_to_user_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         },
         "collection_item_collection_owner_fk": {
           "name": "collection_item_collection_owner_fk",
           "tableFrom": "collection_item",
-          "columnsFrom": ["collection_id", "owner_id"],
           "tableTo": "user_collection",
+          "columnsFrom": ["collection_id", "owner_id"],
           "columnsTo": ["id", "owner_id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -845,15 +845,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "collection_item_image_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "collection_item_id": {
@@ -955,33 +955,33 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "collection_item_image_collection_item_id_collection_item_id_fk": {
           "name": "collection_item_image_collection_item_id_collection_item_id_fk",
           "tableFrom": "collection_item_image",
-          "columnsFrom": ["collection_item_id"],
           "tableTo": "collection_item",
+          "columnsFrom": ["collection_item_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "collection_item_image_object_path_unique": {
           "name": "collection_item_image_object_path_unique",
-          "columns": ["object_path"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["object_path"]
         },
         "collection_item_image_item_hash_unique": {
           "name": "collection_item_image_item_hash_unique",
-          "columns": ["collection_item_id", "sha256"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["collection_item_id", "sha256"]
         }
       },
       "policies": {},
@@ -1050,39 +1050,39 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"collection_spinner\".\"installed_button_id\" is not null",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "collection_spinner_id_collection_item_id_fk": {
           "name": "collection_spinner_id_collection_item_id_fk",
           "tableFrom": "collection_spinner",
-          "columnsFrom": ["id"],
           "tableTo": "collection_item",
+          "columnsFrom": ["id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "collection_spinner_product_spinner_id_product_spinner_id_fk": {
           "name": "collection_spinner_product_spinner_id_product_spinner_id_fk",
           "tableFrom": "collection_spinner",
-          "columnsFrom": ["product_spinner_id"],
           "tableTo": "product_spinner",
+          "columnsFrom": ["product_spinner_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "collection_spinner_installed_button_id_collection_spinner_button_id_fk": {
           "name": "collection_spinner_installed_button_id_collection_spinner_button_id_fk",
           "tableFrom": "collection_spinner",
-          "columnsFrom": ["installed_button_id"],
           "tableTo": "collection_spinner_button",
+          "columnsFrom": ["installed_button_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1118,20 +1118,20 @@
         "collection_spinner_button_id_collection_item_id_fk": {
           "name": "collection_spinner_button_id_collection_item_id_fk",
           "tableFrom": "collection_spinner_button",
-          "columnsFrom": ["id"],
           "tableTo": "collection_item",
+          "columnsFrom": ["id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "collection_spinner_button_product_spinner_button_id_product_spinner_button_id_fk": {
           "name": "collection_spinner_button_product_spinner_button_id_product_spinner_button_id_fk",
           "tableFrom": "collection_spinner_button",
-          "columnsFrom": ["product_spinner_button_id"],
           "tableTo": "product_spinner_button",
+          "columnsFrom": ["product_spinner_button_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1150,15 +1150,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "color_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "name": {
@@ -1200,15 +1200,15 @@
           "columns": [
             {
               "expression": "lower(\"name\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "color_slug_unique": {
           "name": "color_slug_unique",
@@ -1221,9 +1221,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1248,15 +1248,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "color_effect_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "name": {
@@ -1298,9 +1298,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1320,15 +1320,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "finish_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "name": {
@@ -1364,15 +1364,15 @@
           "columns": [
             {
               "expression": "lower(\"name\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "finish_slug_unique": {
           "name": "finish_slug_unique",
@@ -1385,9 +1385,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1407,15 +1407,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "finish_option_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "product_id": {
@@ -1461,9 +1461,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "finish_option_product_position_unique": {
           "name": "finish_option_product_position_unique",
@@ -1482,47 +1482,47 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "finish_option_product_id_product_id_fk": {
           "name": "finish_option_product_id_product_id_fk",
           "tableFrom": "finish_option",
-          "columnsFrom": ["product_id"],
           "tableTo": "product",
+          "columnsFrom": ["product_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "finish_option_collection_item_id_collection_item_id_fk": {
           "name": "finish_option_collection_item_id_collection_item_id_fk",
           "tableFrom": "finish_option",
-          "columnsFrom": ["collection_item_id"],
           "tableTo": "collection_item",
+          "columnsFrom": ["collection_item_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "finish_option_source_product_finish_option_id_finish_option_id_fk": {
           "name": "finish_option_source_product_finish_option_id_finish_option_id_fk",
           "tableFrom": "finish_option",
-          "columnsFrom": ["source_product_finish_option_id"],
           "tableTo": "finish_option",
+          "columnsFrom": ["source_product_finish_option_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         },
         "finish_option_color_effect_id_color_effect_id_fk": {
           "name": "finish_option_color_effect_id_color_effect_id_fk",
           "tableFrom": "finish_option",
-          "columnsFrom": ["color_effect_id"],
           "tableTo": "color_effect",
+          "columnsFrom": ["color_effect_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1581,29 +1581,29 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "finish_option_color_finish_option_id_finish_option_id_fk": {
           "name": "finish_option_color_finish_option_id_finish_option_id_fk",
           "tableFrom": "finish_option_color",
-          "columnsFrom": ["finish_option_id"],
           "tableTo": "finish_option",
+          "columnsFrom": ["finish_option_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "finish_option_color_color_id_color_id_fk": {
           "name": "finish_option_color_color_id_color_id_fk",
           "tableFrom": "finish_option_color",
-          "columnsFrom": ["color_id"],
           "tableTo": "color",
+          "columnsFrom": ["color_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1663,29 +1663,29 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "finish_option_finish_finish_option_id_finish_option_id_fk": {
           "name": "finish_option_finish_finish_option_id_finish_option_id_fk",
           "tableFrom": "finish_option_finish",
-          "columnsFrom": ["finish_option_id"],
           "tableTo": "finish_option",
+          "columnsFrom": ["finish_option_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "finish_option_finish_finish_id_finish_id_fk": {
           "name": "finish_option_finish_finish_id_finish_id_fk",
           "tableFrom": "finish_option_finish",
-          "columnsFrom": ["finish_id"],
           "tableTo": "finish",
+          "columnsFrom": ["finish_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1714,15 +1714,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "product_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "product_type_id": {
@@ -1832,9 +1832,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "product_owner_clerk_id_idx": {
           "name": "product_owner_clerk_id_idx",
@@ -1847,9 +1847,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "product_visibility_idx": {
           "name": "product_visibility_idx",
@@ -1862,29 +1862,29 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "product_product_type_id_product_types_id_fk": {
           "name": "product_product_type_id_product_types_id_fk",
           "tableFrom": "product",
-          "columnsFrom": ["product_type_id"],
           "tableTo": "product_types",
+          "columnsFrom": ["product_type_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "product_maker_id_makers_id_fk": {
           "name": "product_maker_id_makers_id_fk",
           "tableFrom": "product",
-          "columnsFrom": ["maker_id"],
           "tableTo": "makers",
+          "columnsFrom": ["maker_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1912,15 +1912,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "product_image_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "product_id": {
@@ -2022,33 +2022,33 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "product_image_product_id_product_id_fk": {
           "name": "product_image_product_id_product_id_fk",
           "tableFrom": "product_image",
-          "columnsFrom": ["product_id"],
           "tableTo": "product",
+          "columnsFrom": ["product_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "product_image_object_path_unique": {
           "name": "product_image_object_path_unique",
-          "columns": ["object_path"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["object_path"]
         },
         "product_image_product_hash_unique": {
           "name": "product_image_product_hash_unique",
-          "columns": ["product_id", "sha256"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["product_id", "sha256"]
         }
       },
       "policies": {},
@@ -2098,20 +2098,20 @@
         "product_material_product_id_product_id_fk": {
           "name": "product_material_product_id_product_id_fk",
           "tableFrom": "product_material",
-          "columnsFrom": ["product_id"],
           "tableTo": "product",
+          "columnsFrom": ["product_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "product_material_material_id_materials_id_fk": {
           "name": "product_material_material_id_materials_id_fk",
           "tableFrom": "product_material",
-          "columnsFrom": ["material_id"],
           "tableTo": "materials",
+          "columnsFrom": ["material_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -2209,20 +2209,20 @@
         "product_spinner_id_product_id_fk": {
           "name": "product_spinner_id_product_id_fk",
           "tableFrom": "product_spinner",
-          "columnsFrom": ["id"],
           "tableTo": "product",
+          "columnsFrom": ["id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "product_spinner_compatible_button_id_product_spinner_button_id_fk": {
           "name": "product_spinner_compatible_button_id_product_spinner_button_id_fk",
           "tableFrom": "product_spinner",
-          "columnsFrom": ["compatible_button_id"],
           "tableTo": "product_spinner_button",
+          "columnsFrom": ["compatible_button_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2288,11 +2288,11 @@
         "product_spinner_button_id_product_id_fk": {
           "name": "product_spinner_button_id_product_id_fk",
           "tableFrom": "product_spinner_button",
-          "columnsFrom": ["id"],
           "tableTo": "product",
+          "columnsFrom": ["id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2316,15 +2316,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "user_collection_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "owner_id": {
@@ -2409,33 +2409,33 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "user_collection_owner_id_users_id_fk": {
           "name": "user_collection_owner_id_users_id_fk",
           "tableFrom": "user_collection",
-          "columnsFrom": ["owner_id"],
           "tableTo": "users",
+          "columnsFrom": ["owner_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "user_collection_id_owner_unique": {
           "name": "user_collection_id_owner_unique",
-          "columns": ["id", "owner_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "owner_id"]
         },
         "user_collection_owner_name_unique": {
           "name": "user_collection_owner_name_unique",
-          "columns": ["owner_id", "normalized_name"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["owner_id", "normalized_name"]
         }
       },
       "policies": {},
@@ -2587,10 +2587,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"erasure_request\".\"target_clerk_id\" is not null",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "erasure_request_due_idx": {
           "name": "erasure_request_due_idx",
@@ -2609,9 +2609,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "erasure_request_expiry_idx": {
           "name": "erasure_request_expiry_idx",
@@ -2624,9 +2624,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -2634,8 +2634,8 @@
       "uniqueConstraints": {
         "erasure_request_subject_hmac_unique": {
           "name": "erasure_request_subject_hmac_unique",
-          "columns": ["subject_hmac"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["subject_hmac"]
         }
       },
       "policies": {},
@@ -2735,28 +2735,28 @@
         "feature_flag_user_overrides_flag_id_feature_flags_id_fk": {
           "name": "feature_flag_user_overrides_flag_id_feature_flags_id_fk",
           "tableFrom": "feature_flag_user_overrides",
-          "columnsFrom": ["flag_id"],
           "tableTo": "feature_flags",
+          "columnsFrom": ["flag_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "feature_flag_user_overrides_user_id_users_id_fk": {
           "name": "feature_flag_user_overrides_user_id_users_id_fk",
           "tableFrom": "feature_flag_user_overrides",
-          "columnsFrom": ["user_id"],
           "tableTo": "users",
+          "columnsFrom": ["user_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "feature_flag_user_overrides_flag_user_source_unique": {
           "name": "feature_flag_user_overrides_flag_user_source_unique",
-          "columns": ["flag_id", "user_id", "source"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["flag_id", "user_id", "source"]
         }
       },
       "policies": {},
@@ -2851,8 +2851,8 @@
       "uniqueConstraints": {
         "feature_flags_slug_unique": {
           "name": "feature_flags_slug_unique",
-          "columns": ["slug"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -2869,15 +2869,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "feedback_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "submitter_clerk_id": {
@@ -2904,9 +2904,21 @@
           "primaryKey": false,
           "notNull": false
         },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "linear_client_uuid": {
           "name": "linear_client_uuid",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linear_updated_at": {
+          "name": "linear_updated_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -2950,9 +2962,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "feedback_status_created_at_idx": {
           "name": "feedback_status_created_at_idx",
@@ -2971,9 +2983,30 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
+        },
+        "feedback_status_completed_at_idx": {
+          "name": "feedback_status_completed_at_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "completed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -2981,8 +3014,8 @@
       "uniqueConstraints": {
         "feedback_linear_client_uuid_unique": {
           "name": "feedback_linear_client_uuid_unique",
-          "columns": ["linear_client_uuid"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["linear_client_uuid"]
         }
       },
       "policies": {},
@@ -3020,15 +3053,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "feedback_notifications_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "feedback_id": {
@@ -3075,20 +3108,20 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "feedback_notifications_feedback_id_feedback_id_fk": {
           "name": "feedback_notifications_feedback_id_feedback_id_fk",
           "tableFrom": "feedback_notifications",
-          "columnsFrom": ["feedback_id"],
           "tableTo": "feedback",
+          "columnsFrom": ["feedback_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3149,20 +3182,20 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "feedback_votes_feedback_id_feedback_id_fk": {
           "name": "feedback_votes_feedback_id_feedback_id_fk",
           "tableFrom": "feedback_votes",
-          "columnsFrom": ["feedback_id"],
           "tableTo": "feedback",
+          "columnsFrom": ["feedback_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -3186,15 +3219,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "resource_categories_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "name": {
@@ -3229,8 +3262,8 @@
       "uniqueConstraints": {
         "resource_categories_slug_unique": {
           "name": "resource_categories_slug_unique",
-          "columns": ["slug"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -3247,15 +3280,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "resource_downloads_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "version_id": {
@@ -3290,28 +3323,28 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "resource_downloads_version_id_resource_versions_id_fk": {
           "name": "resource_downloads_version_id_resource_versions_id_fk",
           "tableFrom": "resource_downloads",
-          "columnsFrom": ["version_id"],
           "tableTo": "resource_versions",
+          "columnsFrom": ["version_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "resource_downloads_version_user_unique": {
           "name": "resource_downloads_version_user_unique",
-          "columns": ["version_id", "user_clerk_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["version_id", "user_clerk_id"]
         }
       },
       "policies": {},
@@ -3328,15 +3361,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "resource_files_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "version_id": {
@@ -3402,9 +3435,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "resource_files_version_file_name_unique": {
           "name": "resource_files_version_file_name_unique",
@@ -3417,34 +3450,34 @@
             },
             {
               "expression": "lower(\"file_name\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "resource_files_version_id_resource_versions_id_fk": {
           "name": "resource_files_version_id_resource_versions_id_fk",
           "tableFrom": "resource_files",
-          "columnsFrom": ["version_id"],
           "tableTo": "resource_versions",
+          "columnsFrom": ["version_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "resource_files_object_path_unique": {
           "name": "resource_files_object_path_unique",
-          "columns": ["object_path"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["object_path"]
         }
       },
       "policies": {},
@@ -3466,15 +3499,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "resource_images_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "resource_id": {
@@ -3546,33 +3579,33 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "resource_images_resource_id_resources_id_fk": {
           "name": "resource_images_resource_id_resources_id_fk",
           "tableFrom": "resource_images",
-          "columnsFrom": ["resource_id"],
           "tableTo": "resources",
+          "columnsFrom": ["resource_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "resource_images_resource_position_unique": {
           "name": "resource_images_resource_position_unique",
-          "columns": ["resource_id", "position"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["resource_id", "position"]
         },
         "resource_images_object_path_unique": {
           "name": "resource_images_object_path_unique",
-          "columns": ["object_path"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["object_path"]
         }
       },
       "policies": {},
@@ -3598,15 +3631,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "resource_notifications_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "type": {
@@ -3665,29 +3698,29 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "resource_notifications_resource_id_resources_id_fk": {
           "name": "resource_notifications_resource_id_resources_id_fk",
           "tableFrom": "resource_notifications",
-          "columnsFrom": ["resource_id"],
           "tableTo": "resources",
+          "columnsFrom": ["resource_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "resource_notifications_category_id_resource_categories_id_fk": {
           "name": "resource_notifications_category_id_resource_categories_id_fk",
           "tableFrom": "resource_notifications",
-          "columnsFrom": ["category_id"],
           "tableTo": "resource_categories",
+          "columnsFrom": ["category_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3719,15 +3752,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "resource_versions_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "resource_id": {
@@ -3812,38 +3845,38 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "resource_versions_resource_id_resources_id_fk": {
           "name": "resource_versions_resource_id_resources_id_fk",
           "tableFrom": "resource_versions",
-          "columnsFrom": ["resource_id"],
           "tableTo": "resources",
+          "columnsFrom": ["resource_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "resource_versions_resource_version_unique": {
           "name": "resource_versions_resource_version_unique",
-          "columns": ["resource_id", "version"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["resource_id", "version"]
         },
         "resource_versions_object_path_unique": {
           "name": "resource_versions_object_path_unique",
-          "columns": ["object_path"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["object_path"]
         },
         "resource_versions_archive_object_path_unique": {
           "name": "resource_versions_archive_object_path_unique",
-          "columns": ["archive_object_path"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["archive_object_path"]
         }
       },
       "policies": {},
@@ -3873,15 +3906,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "resources_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "uploader_clerk_id": {
@@ -3972,9 +4005,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "resources_deleted_at_idx": {
           "name": "resources_deleted_at_idx",
@@ -3987,9 +4020,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "resources_uploader_clerk_id_idx": {
           "name": "resources_uploader_clerk_id_idx",
@@ -4002,9 +4035,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4063,29 +4096,29 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "resources_to_categories_resource_id_resources_id_fk": {
           "name": "resources_to_categories_resource_id_resources_id_fk",
           "tableFrom": "resources_to_categories",
-          "columnsFrom": ["resource_id"],
           "tableTo": "resources",
+          "columnsFrom": ["resource_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "resources_to_categories_category_id_resource_categories_id_fk": {
           "name": "resources_to_categories_category_id_resource_categories_id_fk",
           "tableFrom": "resources_to_categories",
-          "columnsFrom": ["category_id"],
           "tableTo": "resource_categories",
+          "columnsFrom": ["category_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -4109,15 +4142,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "makers_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "name": {
@@ -4153,15 +4186,15 @@
           "columns": [
             {
               "expression": "lower(\"name\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "makers_root_url_unique": {
           "name": "makers_root_url_unique",
@@ -4174,9 +4207,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4196,15 +4229,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "materials_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "name": {
@@ -4240,15 +4273,15 @@
           "columns": [
             {
               "expression": "lower(\"name\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "materials_slug_unique": {
           "name": "materials_slug_unique",
@@ -4261,9 +4294,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4283,15 +4316,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "mechanisms_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "name": {
@@ -4333,9 +4366,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4355,15 +4388,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "product_types_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "name": {
@@ -4417,9 +4450,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4439,15 +4472,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "scraper_runs_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "source": {
@@ -4519,10 +4552,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"scraper_runs\".\"status\" = 'running'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "scraper_runs_started_at_idx": {
           "name": "scraper_runs_started_at_idx",
@@ -4535,9 +4568,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4583,29 +4616,29 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_autmog_pen_materials_pen_id_tmp_autmog_pens_id_fk": {
           "name": "tmp_autmog_pen_materials_pen_id_tmp_autmog_pens_id_fk",
           "tableFrom": "tmp_autmog_pen_materials",
-          "columnsFrom": ["pen_id"],
           "tableTo": "tmp_autmog_pens",
+          "columnsFrom": ["pen_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "tmp_autmog_pen_materials_material_id_materials_id_fk": {
           "name": "tmp_autmog_pen_materials_material_id_materials_id_fk",
           "tableFrom": "tmp_autmog_pen_materials",
-          "columnsFrom": ["material_id"],
           "tableTo": "materials",
+          "columnsFrom": ["material_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -4629,15 +4662,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_autmog_pen_versions_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "pen_id": {
@@ -4714,9 +4747,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_autmog_pen_versions_source_product_id_idx": {
           "name": "tmp_autmog_pen_versions_source_product_id_idx",
@@ -4729,20 +4762,20 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_autmog_pen_versions_pen_id_tmp_autmog_pens_id_fk": {
           "name": "tmp_autmog_pen_versions_pen_id_tmp_autmog_pens_id_fk",
           "tableFrom": "tmp_autmog_pen_versions",
-          "columnsFrom": ["pen_id"],
           "tableTo": "tmp_autmog_pens",
+          "columnsFrom": ["pen_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4761,15 +4794,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_autmog_pens_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "product_id": {
@@ -4954,9 +4987,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_autmog_pens_mechanism_id_idx": {
           "name": "tmp_autmog_pens_mechanism_id_idx",
@@ -4969,9 +5002,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_autmog_pens_product_id_unique": {
           "name": "tmp_autmog_pens_product_id_unique",
@@ -4984,9 +5017,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_autmog_pens_source_product_id_unique": {
           "name": "tmp_autmog_pens_source_product_id_unique",
@@ -4999,38 +5032,38 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_autmog_pens_product_id_tmp_products_id_fk": {
           "name": "tmp_autmog_pens_product_id_tmp_products_id_fk",
           "tableFrom": "tmp_autmog_pens",
-          "columnsFrom": ["product_id"],
           "tableTo": "tmp_products",
+          "columnsFrom": ["product_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "tmp_autmog_pens_maker_id_makers_id_fk": {
           "name": "tmp_autmog_pens_maker_id_makers_id_fk",
           "tableFrom": "tmp_autmog_pens",
-          "columnsFrom": ["maker_id"],
           "tableTo": "makers",
+          "columnsFrom": ["maker_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "tmp_autmog_pens_mechanism_id_mechanisms_id_fk": {
           "name": "tmp_autmog_pens_mechanism_id_mechanisms_id_fk",
           "tableFrom": "tmp_autmog_pens",
-          "columnsFrom": ["mechanism_id"],
           "tableTo": "mechanisms",
+          "columnsFrom": ["mechanism_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5049,15 +5082,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_grimsmo_knife_variation_versions_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "variation_id": {
@@ -5134,9 +5167,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_knife_variation_versions_variation_id_idx": {
           "name": "tmp_grimsmo_knife_variation_versions_variation_id_idx",
@@ -5149,20 +5182,20 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_grimsmo_knife_variation_versions_variation_id_tmp_grimsmo_knife_variations_id_fk": {
           "name": "tmp_grimsmo_knife_variation_versions_variation_id_tmp_grimsmo_knife_variations_id_fk",
           "tableFrom": "tmp_grimsmo_knife_variation_versions",
-          "columnsFrom": ["variation_id"],
           "tableTo": "tmp_grimsmo_knife_variations",
+          "columnsFrom": ["variation_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5181,15 +5214,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_grimsmo_knife_variations_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "product_variation_id": {
@@ -5437,9 +5470,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_knife_variations_knife_id_idx": {
           "name": "tmp_grimsmo_knife_variations_knife_id_idx",
@@ -5452,9 +5485,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_knife_variations_product_variation_id_unique": {
           "name": "tmp_grimsmo_knife_variations_product_variation_id_unique",
@@ -5467,9 +5500,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_knife_variations_source_product_id_idx": {
           "name": "tmp_grimsmo_knife_variations_source_product_id_idx",
@@ -5482,29 +5515,29 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_grimsmo_knife_variations_product_variation_id_tmp_product_variations_id_fk": {
           "name": "tmp_grimsmo_knife_variations_product_variation_id_tmp_product_variations_id_fk",
           "tableFrom": "tmp_grimsmo_knife_variations",
-          "columnsFrom": ["product_variation_id"],
           "tableTo": "tmp_product_variations",
+          "columnsFrom": ["product_variation_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "tmp_grimsmo_knife_variations_knife_id_tmp_grimsmo_knives_id_fk": {
           "name": "tmp_grimsmo_knife_variations_knife_id_tmp_grimsmo_knives_id_fk",
           "tableFrom": "tmp_grimsmo_knife_variations",
-          "columnsFrom": ["knife_id"],
           "tableTo": "tmp_grimsmo_knives",
+          "columnsFrom": ["knife_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5523,15 +5556,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_grimsmo_knife_versions_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "knife_id": {
@@ -5596,9 +5629,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_knife_versions_knife_type_idx": {
           "name": "tmp_grimsmo_knife_versions_knife_type_idx",
@@ -5611,20 +5644,20 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_grimsmo_knife_versions_knife_id_tmp_grimsmo_knives_id_fk": {
           "name": "tmp_grimsmo_knife_versions_knife_id_tmp_grimsmo_knives_id_fk",
           "tableFrom": "tmp_grimsmo_knife_versions",
-          "columnsFrom": ["knife_id"],
           "tableTo": "tmp_grimsmo_knives",
+          "columnsFrom": ["knife_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5643,15 +5676,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_grimsmo_knives_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "product_id": {
@@ -5729,9 +5762,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_knives_maker_id_idx": {
           "name": "tmp_grimsmo_knives_maker_id_idx",
@@ -5744,9 +5777,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_knives_product_id_unique": {
           "name": "tmp_grimsmo_knives_product_id_unique",
@@ -5759,9 +5792,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_knives_product_handle_unique": {
           "name": "tmp_grimsmo_knives_product_handle_unique",
@@ -5774,29 +5807,29 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_grimsmo_knives_product_id_tmp_products_id_fk": {
           "name": "tmp_grimsmo_knives_product_id_tmp_products_id_fk",
           "tableFrom": "tmp_grimsmo_knives",
-          "columnsFrom": ["product_id"],
           "tableTo": "tmp_products",
+          "columnsFrom": ["product_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "tmp_grimsmo_knives_maker_id_makers_id_fk": {
           "name": "tmp_grimsmo_knives_maker_id_makers_id_fk",
           "tableFrom": "tmp_grimsmo_knives",
-          "columnsFrom": ["maker_id"],
           "tableTo": "makers",
+          "columnsFrom": ["maker_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5815,15 +5848,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_grimsmo_pen_variation_versions_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "variation_id": {
@@ -5900,9 +5933,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_pen_variation_versions_variation_id_idx": {
           "name": "tmp_grimsmo_pen_variation_versions_variation_id_idx",
@@ -5915,20 +5948,20 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_grimsmo_pen_variation_versions_variation_id_tmp_grimsmo_pen_variations_id_fk": {
           "name": "tmp_grimsmo_pen_variation_versions_variation_id_tmp_grimsmo_pen_variations_id_fk",
           "tableFrom": "tmp_grimsmo_pen_variation_versions",
-          "columnsFrom": ["variation_id"],
           "tableTo": "tmp_grimsmo_pen_variations",
+          "columnsFrom": ["variation_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5947,15 +5980,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_grimsmo_pen_variations_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "product_variation_id": {
@@ -6213,9 +6246,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_pen_variations_pen_id_idx": {
           "name": "tmp_grimsmo_pen_variations_pen_id_idx",
@@ -6228,9 +6261,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_pen_variations_product_variation_id_unique": {
           "name": "tmp_grimsmo_pen_variations_product_variation_id_unique",
@@ -6243,9 +6276,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_pen_variations_source_product_id_idx": {
           "name": "tmp_grimsmo_pen_variations_source_product_id_idx",
@@ -6258,29 +6291,29 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_grimsmo_pen_variations_product_variation_id_tmp_product_variations_id_fk": {
           "name": "tmp_grimsmo_pen_variations_product_variation_id_tmp_product_variations_id_fk",
           "tableFrom": "tmp_grimsmo_pen_variations",
-          "columnsFrom": ["product_variation_id"],
           "tableTo": "tmp_product_variations",
+          "columnsFrom": ["product_variation_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "tmp_grimsmo_pen_variations_pen_id_tmp_grimsmo_pens_id_fk": {
           "name": "tmp_grimsmo_pen_variations_pen_id_tmp_grimsmo_pens_id_fk",
           "tableFrom": "tmp_grimsmo_pen_variations",
-          "columnsFrom": ["pen_id"],
           "tableTo": "tmp_grimsmo_pens",
+          "columnsFrom": ["pen_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -6299,15 +6332,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_grimsmo_pen_versions_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "pen_id": {
@@ -6372,9 +6405,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_pen_versions_product_handle_idx": {
           "name": "tmp_grimsmo_pen_versions_product_handle_idx",
@@ -6387,20 +6420,20 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_grimsmo_pen_versions_pen_id_tmp_grimsmo_pens_id_fk": {
           "name": "tmp_grimsmo_pen_versions_pen_id_tmp_grimsmo_pens_id_fk",
           "tableFrom": "tmp_grimsmo_pen_versions",
-          "columnsFrom": ["pen_id"],
           "tableTo": "tmp_grimsmo_pens",
+          "columnsFrom": ["pen_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -6419,15 +6452,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_grimsmo_pens_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "product_id": {
@@ -6499,9 +6532,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_pens_product_id_unique": {
           "name": "tmp_grimsmo_pens_product_id_unique",
@@ -6514,9 +6547,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_grimsmo_pens_product_handle_unique": {
           "name": "tmp_grimsmo_pens_product_handle_unique",
@@ -6529,29 +6562,29 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_grimsmo_pens_product_id_tmp_products_id_fk": {
           "name": "tmp_grimsmo_pens_product_id_tmp_products_id_fk",
           "tableFrom": "tmp_grimsmo_pens",
-          "columnsFrom": ["product_id"],
           "tableTo": "tmp_products",
+          "columnsFrom": ["product_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "tmp_grimsmo_pens_maker_id_makers_id_fk": {
           "name": "tmp_grimsmo_pens_maker_id_makers_id_fk",
           "tableFrom": "tmp_grimsmo_pens",
-          "columnsFrom": ["maker_id"],
           "tableTo": "makers",
+          "columnsFrom": ["maker_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -6570,15 +6603,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_images_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "product_id": {
@@ -6718,9 +6751,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_images_product_source_hash_unique": {
           "name": "tmp_images_product_source_hash_unique",
@@ -6739,10 +6772,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"tmp_images\".\"product_variation_id\" is null",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "tmp_images_product_variation_id_idx": {
           "name": "tmp_images_product_variation_id_idx",
@@ -6755,9 +6788,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_images_status_idx": {
           "name": "tmp_images_status_idx",
@@ -6770,9 +6803,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_images_variation_source_hash_unique": {
           "name": "tmp_images_variation_source_hash_unique",
@@ -6791,39 +6824,39 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"tmp_images\".\"product_variation_id\" is not null",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_images_product_id_tmp_products_id_fk": {
           "name": "tmp_images_product_id_tmp_products_id_fk",
           "tableFrom": "tmp_images",
-          "columnsFrom": ["product_id"],
           "tableTo": "tmp_products",
+          "columnsFrom": ["product_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "tmp_images_product_variation_id_tmp_product_variations_id_fk": {
           "name": "tmp_images_product_variation_id_tmp_product_variations_id_fk",
           "tableFrom": "tmp_images",
-          "columnsFrom": ["product_variation_id"],
           "tableTo": "tmp_product_variations",
+          "columnsFrom": ["product_variation_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "tmp_images_product_variation_product_fk": {
           "name": "tmp_images_product_variation_product_fk",
           "tableFrom": "tmp_images",
-          "columnsFrom": ["product_variation_id", "product_id"],
           "tableTo": "tmp_product_variations",
+          "columnsFrom": ["product_variation_id", "product_id"],
           "columnsTo": ["id", "product_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -6868,29 +6901,29 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_product_product_types_product_id_tmp_products_id_fk": {
           "name": "tmp_product_product_types_product_id_tmp_products_id_fk",
           "tableFrom": "tmp_product_product_types",
-          "columnsFrom": ["product_id"],
           "tableTo": "tmp_products",
+          "columnsFrom": ["product_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "tmp_product_product_types_product_type_id_product_types_id_fk": {
           "name": "tmp_product_product_types_product_type_id_product_types_id_fk",
           "tableFrom": "tmp_product_product_types",
-          "columnsFrom": ["product_type_id"],
           "tableTo": "product_types",
+          "columnsFrom": ["product_type_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -6914,15 +6947,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_product_variations_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "product_id": {
@@ -6964,9 +6997,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_product_variations_product_source_key_unique": {
           "name": "tmp_product_variations_product_source_key_unique",
@@ -6985,9 +7018,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tmp_product_variations_id_product_id_unique": {
           "name": "tmp_product_variations_id_product_id_unique",
@@ -7006,20 +7039,20 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "tmp_product_variations_product_id_tmp_products_id_fk": {
           "name": "tmp_product_variations_product_id_tmp_products_id_fk",
           "tableFrom": "tmp_product_variations",
-          "columnsFrom": ["product_id"],
           "tableTo": "tmp_products",
+          "columnsFrom": ["product_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -7038,15 +7071,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "tmp_products_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "source": {
@@ -7082,9 +7115,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -7130,9 +7163,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "storage_object_deletion_owner_idx": {
           "name": "storage_object_deletion_owner_idx",
@@ -7145,9 +7178,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -7240,9 +7273,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "upload_file_name_unique": {
           "name": "upload_file_name_unique",
@@ -7261,39 +7294,39 @@
             },
             {
               "expression": "lower(\"file_name\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "upload_file_session_id_upload_session_id_fk": {
           "name": "upload_file_session_id_upload_session_id_fk",
           "tableFrom": "upload_file",
-          "columnsFrom": ["session_id"],
           "tableTo": "upload_session",
+          "columnsFrom": ["session_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "upload_file_path_reserved": {
           "name": "upload_file_path_reserved",
-          "columns": ["object_path"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["object_path"]
         },
         "upload_file_kind_hash_unique": {
           "name": "upload_file_kind_hash_unique",
-          "columns": ["session_id", "kind", "sha256"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["session_id", "kind", "sha256"]
         }
       },
       "policies": {},
@@ -7395,9 +7428,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "upload_session_owner_idx": {
           "name": "upload_session_owner_idx",
@@ -7410,9 +7443,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "upload_session_resource_version_reserved": {
           "name": "upload_session_resource_version_reserved",
@@ -7431,10 +7464,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"upload_session\".\"target_type\" = 'resource' and \"upload_session\".\"completed_at\" is null",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -7511,11 +7544,11 @@
         "user_settings_user_id_users_id_fk": {
           "name": "user_settings_user_id_users_id_fk",
           "tableFrom": "user_settings",
-          "columnsFrom": ["user_id"],
           "tableTo": "users",
+          "columnsFrom": ["user_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -7534,15 +7567,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
+            "type": "always",
             "name": "users_id_seq",
+            "schema": "public",
             "increment": "1",
+            "startWith": "1000",
             "minValue": "1",
             "maxValue": "9223372036854775807",
-            "startWith": "1000",
             "cache": "1",
-            "cycle": false,
-            "schema": "public",
-            "type": "always"
+            "cycle": false
           }
         },
         "clerk_id": {
@@ -7570,8 +7603,8 @@
       "uniqueConstraints": {
         "users_clerk_id_unique": {
           "name": "users_clerk_id_unique",
-          "columns": ["clerk_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["clerk_id"]
         }
       },
       "policies": {},
@@ -7612,10 +7645,10 @@
     }
   },
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

@@ -11,6 +11,7 @@ import {
   clerkWebhookPath,
   createApp,
   healthPath,
+  linearWebhookPath,
   logsPath,
   openApiJsonPath,
   uploadSessionsPath,
@@ -133,6 +134,29 @@ describe("api", () => {
       (await app.request(`${clerkWebhookPath}/rb`, { method: "POST" })).status,
     ).toBe(404);
     expect(handle).toHaveBeenCalledOnce();
+  });
+
+  it("forwards primary and matching local Linear webhooks", async () => {
+    const handle = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    const app = createApp({
+      linearWebhookRuntime: { expectedInitials: "RA", handle },
+    });
+
+    const response = await app.request(linearWebhookPath, { method: "POST" });
+    const local = await app.request(`${linearWebhookPath}/ra`, {
+      method: "POST",
+    });
+    const otherLocal = await app.request(`${linearWebhookPath}/rb`, {
+      method: "POST",
+    });
+
+    expect(response.status).toBe(200);
+    expect(local.status).toBe(200);
+    expect(otherLocal.status).toBe(404);
+    expect(handle).toHaveBeenNthCalledWith(1, expect.any(Request), "primary");
+    expect(handle).toHaveBeenNthCalledWith(2, expect.any(Request), "local");
   });
 
   it("authenticates session creation and streams each declared file", async () => {

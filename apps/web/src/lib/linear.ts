@@ -29,6 +29,24 @@ const projectMutationSchema = z.object({
     success: z.boolean(),
   }),
 });
+/** Linear issue status query response. */
+const issueStatusSchema = z.object({
+  issue: z.object({
+    archivedAt: z.string().nullable(),
+    id: z.string(),
+    state: z.object({ type: z.string() }),
+    updatedAt: z.string(),
+  }),
+});
+/** Linear project status query response. */
+const projectStatusSchema = z.object({
+  project: z.object({
+    archivedAt: z.string().nullable(),
+    id: z.string(),
+    status: z.object({ type: z.string() }),
+    updatedAt: z.string(),
+  }),
+});
 
 export type LinearPlanningOptions = {
   issueStateId: string;
@@ -155,6 +173,14 @@ export async function createLinearProject(
   }
 }
 
+/**
+ * Checks whether a reserved UUID already exists in Linear.
+ *
+ * @param token - Linear OAuth token.
+ * @param id - Reserved Linear entity identifier.
+ * @param request - HTTP request implementation.
+ * @returns Whether the issue or project exists.
+ */
 export async function linearEntityExists(
   token: string,
   id: string,
@@ -185,6 +211,75 @@ export async function linearEntityExists(
     // Neither entity exists under the reserved UUID.
   }
   return false;
+}
+
+/**
+ * Loads the current Linear lifecycle state for linked feedback.
+ *
+ * @param token - Linear OAuth token.
+ * @param id - Linked Linear entity identifier.
+ * @param request - HTTP request implementation.
+ * @returns A feedback lifecycle synchronization input.
+ * @rejects When neither a matching issue nor project can be loaded.
+ */
+export async function getLinearFeedbackStatus(
+  token: string,
+  id: string,
+  request: typeof fetch = fetch,
+) {
+  try {
+    const { issue } = await linearGraphql(
+      token,
+      `query FeedbackIssueStatus($id: String!) {
+        issue(id: $id) { id updatedAt archivedAt state { type } }
+      }`,
+      { id },
+      issueStatusSchema,
+      request,
+    );
+    return linearSyncInput(issue, "issue", issue.state.type);
+  } catch {
+    const { project } = await linearGraphql(
+      token,
+      `query FeedbackProjectStatus($id: String!) {
+        project(id: $id) { id updatedAt archivedAt status { type } }
+      }`,
+      { id },
+      projectStatusSchema,
+      request,
+    );
+    return linearSyncInput(project, "project", project.status.type);
+  }
+}
+
+/**
+ * Maps a Linear entity response to a feedback synchronization input.
+ *
+ * @param entity - Linear entity state.
+ * @param entityType - Linear entity kind.
+ * @param stateType - Linear lifecycle state type.
+ * @returns The feedback synchronization input.
+ */
+function linearSyncInput(
+  entity: {
+    /** Linear archival timestamp. */
+    archivedAt: string | null;
+    /** Linear entity identifier. */
+    id: string;
+    /** Linear update timestamp. */
+    updatedAt: string;
+  },
+  entityType: "issue" | "project",
+  stateType: string,
+) {
+  return {
+    action: "sync" as const,
+    archived: Boolean(entity.archivedAt),
+    entityType,
+    entityUuid: entity.id,
+    occurredAt: new Date(entity.updatedAt),
+    stateType,
+  };
 }
 
 async function linearGraphql<T>(

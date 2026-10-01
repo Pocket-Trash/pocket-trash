@@ -636,6 +636,137 @@ describe("feedback lifecycle", () => {
     }
   }, 30_000);
 
+  it("synchronizes linked Linear lifecycle changes once and in order", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      await migrate(client);
+      const service = createFeedbackService(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      );
+      const feedback = await service.submit({
+        category: "feature",
+        description: "Follow Linear lifecycle changes.",
+        submitterClerkId: "submitter",
+        title: "Linear lifecycle",
+      });
+      await service.approve(feedback.id);
+      const entityUuid = "11111111-1111-4111-8111-111111111111";
+      await service.reserveLinearPlan(feedback.id, entityUuid);
+      await service.completeLinearPlan(feedback.id, entityUuid);
+      await expect(service.getLinearSyncTarget(feedback.id)).resolves.toBe(
+        entityUuid,
+      );
+
+      await expect(
+        service.syncLinearStatus({
+          action: "create",
+          entityType: "issue",
+          entityUuid,
+          occurredAt: new Date("2026-09-30T12:00:00Z"),
+          stateType: "unstarted",
+        }),
+      ).resolves.toBe("ignored");
+      expect((await service.listAdminActive()).items[0]?.status).toBe(
+        "planned",
+      );
+
+      await expect(
+        service.syncLinearStatus({
+          action: "update",
+          entityType: "issue",
+          entityUuid,
+          occurredAt: new Date("2026-09-30T12:02:00Z"),
+          stateType: "started",
+        }),
+      ).resolves.toBe("updated");
+      await expect(
+        service.syncLinearStatus({
+          action: "update",
+          entityType: "issue",
+          entityUuid,
+          occurredAt: new Date("2026-09-30T12:01:00Z"),
+          stateType: "unstarted",
+        }),
+      ).resolves.toBe("ignored");
+      expect((await service.listAdminActive()).items[0]?.status).toBe(
+        "in_progress",
+      );
+
+      const completedAt = new Date("2026-09-30T12:03:00Z");
+      const completed = {
+        action: "update" as const,
+        entityType: "issue" as const,
+        entityUuid,
+        occurredAt: completedAt,
+        stateType: "completed",
+      };
+      await expect(service.syncLinearStatus(completed)).resolves.toBe(
+        "updated",
+      );
+      await expect(service.syncLinearStatus(completed)).resolves.toBe(
+        "ignored",
+      );
+      expect(await service.listCompleted("viewer")).toEqual([
+        expect.objectContaining({
+          completedAt,
+          id: feedback.id,
+          status: "completed",
+        }),
+      ]);
+      expect(
+        (await service.listNotifications()).filter(
+          ({ type }) => type === "completed",
+        ),
+      ).toHaveLength(1);
+
+      await service.syncLinearStatus({
+        action: "update",
+        entityType: "issue",
+        entityUuid,
+        occurredAt: new Date("2026-09-30T12:04:00Z"),
+        stateType: "backlog",
+      });
+      expect(await service.listCompleted("viewer")).toEqual([]);
+
+      await service.syncLinearStatus({
+        action: "update",
+        entityType: "issue",
+        entityUuid,
+        occurredAt: new Date("2026-09-30T12:05:00Z"),
+        stateType: "completed",
+      });
+      expect(
+        (await service.listNotifications()).filter(
+          ({ type }) => type === "completed",
+        ),
+      ).toHaveLength(2);
+
+      await service.syncLinearStatus({
+        action: "remove",
+        entityType: "issue",
+        entityUuid,
+        occurredAt: new Date("2026-09-30T12:06:00Z"),
+      });
+      expect(
+        (await service.listArchive({ statuses: ["canceled"] })).items[0],
+      ).toMatchObject({ id: feedback.id, status: "canceled" });
+      await expect(
+        service.syncLinearStatus({
+          action: "update",
+          entityType: "project",
+          entityUuid: "22222222-2222-4222-8222-222222222222",
+          occurredAt: new Date("2026-09-30T12:07:00Z"),
+          stateType: "planned",
+        }),
+      ).resolves.toBe("not_found");
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("edits through Completed and protects immutable or reserved feedback", async () => {
     const client = new PGlite();
     const db = drizzle(client, { schema });
