@@ -1,4 +1,4 @@
-import { expect, test } from "playwright/test";
+import { expect, test } from "./auth";
 
 test("anonymous visitors can open the public directory", async ({ page }) => {
   await page.goto("/");
