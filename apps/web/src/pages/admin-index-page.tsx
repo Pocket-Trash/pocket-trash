@@ -3,10 +3,21 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { Bell, MessageSquare, ScrollText, ShieldCheck } from "lucide-react";
+import {
+  Bell,
+  MessageSquare,
+  ScrollText,
+  ShieldCheck,
+  UsersRound,
+} from "lucide-react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Renders the permission-filtered administrator landing page.
+ *
+ * @returns Administrator navigation cards.
+ */
 export function AdminIndexPage() {
   const { sessionClaims, userId } = useAuth();
   const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
@@ -27,7 +38,13 @@ export function AdminIndexPage() {
     label: t("web.admin.audit.title"),
     to: "/admin/audit" as const,
   };
+  const usersLink = {
+    icon: UsersRound,
+    label: t("web.admin.users.title"),
+    to: "/admin/users" as const,
+  };
   const primaryLinks = [
+    ...(hasPermission(actor, "users.manage") ? [usersLink] : []),
     ...(hasPermission(actor, "audit.read") ? [auditLink] : []),
     ...(hasPermission(actor, "feedback.manage") ? [feedbackLink] : []),
     ...(hasPermission(actor, "feedback.manage") ||

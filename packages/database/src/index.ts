@@ -86,6 +86,8 @@ export type {
   TmpProductProductType,
   TmpProductVariation,
   User,
+  UserBan,
+  UserBanStatus,
   UserSettings,
   WeightUnit,
 } from "./schema/index.js";
