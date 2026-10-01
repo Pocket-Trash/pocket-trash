@@ -19,4 +19,5 @@ Canonical atomic colour values used by finish options.
 
 | Name | Unique | Method | Columns |
 | --- | --- | --- | --- |
+| `color_name_case_insensitive_unique` | yes | `btree` | `lower("name")` |
 | `color_slug_unique` | yes | `btree` | `slug` |

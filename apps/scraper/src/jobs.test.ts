@@ -219,6 +219,12 @@ describe("scraper jobs", () => {
   });
 });
 
+/**
+ * Creates scraper resources with configurable queue counts for job tests.
+ *
+ * @param counts - Actionable counts returned by the item and image queues.
+ * @returns A test scraper job context.
+ */
 function createContext(
   counts = {
     images: { active: 0, delayed: 0, waiting: 0 },
@@ -228,7 +234,7 @@ function createContext(
   return {
     close: vi.fn(),
     db: {} as ScraperJobContext["db"],
-    imageFolderPrefix: undefined,
+    imageFolderPrefix: "images/dev",
     imageStorage: {} as ScraperJobContext["imageStorage"],
     queues: {
       close: vi.fn(),
@@ -243,6 +249,11 @@ function createContext(
   };
 }
 
+/**
+ * Creates deterministic queue batch and concurrency settings for tests.
+ *
+ * @returns A partial validated queue environment.
+ */
 function createQueueEnv() {
   return {
     SCRAPER_IMAGE_BATCH_SIZE: 10,

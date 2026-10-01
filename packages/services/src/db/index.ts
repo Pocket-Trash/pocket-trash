@@ -1,11 +1,23 @@
 import type { Database } from "@package/database";
 import type { Logger } from "@package/logger";
+import { collectionAuditEvents } from "./audit/collections.js";
+import { accountErasureAuditEvents } from "./audit/erasure.js";
+import { featureFlagAuditEvents } from "./audit/feature-flags.js";
+import { feedbackAuditEvents } from "./audit/feedback.js";
+import { type AuditService, createAuditService } from "./audit/index.js";
+import { productAuditEvents } from "./audit/products.js";
+import { resourceAuditEvents } from "./audit/resources.js";
 import {
   type CatalogService,
   type CollectionsService,
   createCatalogService,
   createCollectionsService,
 } from "./catalog/index.js";
+import { createErasureService, type ErasureService } from "./erasure/index.js";
+import {
+  createFeedbackService,
+  type FeedbackService,
+} from "./feedback/index.js";
 import {
   createUserSettingsService,
   defaultUserSettings,
@@ -14,22 +26,71 @@ import {
 import { createUsersService, type UsersService } from "./users/index.js";
 
 export type DbServices = {
+  audit: AuditService;
   catalog: CatalogService;
   collections: CollectionsService;
+  erasure: ErasureService;
+  feedback: FeedbackService;
   userSettings: UserSettingsService;
   users: UsersService;
 };
 
+/**
+ * Creates database-backed services.
+ *
+ * @param db - Application database.
+ * @param logger - Application logger.
+ * @returns Configured database services.
+ */
 export function createDbServices(db: Database, logger: Logger): DbServices {
+  const audit = createAuditService(
+    logger,
+    [
+      ...accountErasureAuditEvents,
+      ...collectionAuditEvents,
+      ...featureFlagAuditEvents,
+      ...feedbackAuditEvents,
+      ...productAuditEvents,
+      ...resourceAuditEvents,
+    ],
+    db,
+  );
   const users = createUsersService(db, logger);
 
   return {
-    catalog: createCatalogService(db, logger),
-    collections: createCollectionsService(db, users, logger),
+    audit,
+    catalog: createCatalogService(db, logger, users, audit),
+    collections: createCollectionsService(db, users, audit, logger),
+    erasure: createErasureService(db, logger, undefined, audit),
+    feedback: createFeedbackService(db, logger, audit),
     userSettings: createUserSettingsService(db, users, logger),
     users,
   };
 }
+
+export type {
+  AuditEventCursor,
+  AuditEventDefinition,
+  AuditEventPage,
+  AuditExportDownload,
+  AuditExportView,
+  AuditPayload,
+  AuditRedactionContext,
+  AuditService,
+  AuditWriteInput,
+  CreateAuditExportInput,
+  DeleteAuditExportInput,
+  DownloadAuditExportInput,
+  ListAuditEventsInput,
+} from "./audit/index.js";
+export {
+  AuditEventValidationError,
+  AuditExportDeletionError,
+  AuditExportEmptyError,
+  AuditExportInProgressError,
+  AuditPayloadTooLargeError,
+  createAuditService,
+} from "./audit/index.js";
 
 export type {
   CatalogColor,
@@ -48,6 +109,48 @@ export type {
   UserCollectionItem,
   UserCollectionSummary,
 } from "./catalog/index.js";
+export { CollectionButtonAlreadyInstalledError } from "./catalog/index.js";
+export type {
+  ApprovedErasureExceptionCode,
+  CreateErasureRequestInput,
+  ErasureOperationRequest,
+  ErasureOperationResult,
+  ErasureOperations,
+  ErasureReceipt,
+  ErasureService,
+  RetryErasureRequestInput,
+} from "./erasure/index.js";
+export {
+  AccountErasureInProgressError,
+  createErasureService,
+  createErasureSubjectHmac,
+  ErasureOperationError,
+} from "./erasure/index.js";
+export type {
+  AdminFeedbackItem,
+  AdminFeedbackPage,
+  AdminFeedbackSort,
+  AdminFeedbackSortField,
+  FeedbackAdminActionInput,
+  FeedbackListItem,
+  FeedbackMergeTarget,
+  FeedbackNotificationItem,
+  FeedbackPage,
+  FeedbackService,
+  LinearFeedbackSyncInput,
+  LinearFeedbackSyncResult,
+  ListAdminFeedbackOptions,
+  ListMyFeedbackOptions,
+  MergePendingFeedbackInput,
+  SubmitFeedbackInput,
+  UpdateAdminFeedbackInput,
+  UpdatePendingFeedbackInput,
+} from "./feedback/index.js";
+export {
+  FeedbackPlanRecoveryRequiredError,
+  FeedbackStateError,
+  FeedbackSubmissionLimitError,
+} from "./feedback/index.js";
 export type {
   UpsertUserSettingsInput,
   UserSettingsService,

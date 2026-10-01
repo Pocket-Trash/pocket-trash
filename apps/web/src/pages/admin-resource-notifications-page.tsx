@@ -4,10 +4,10 @@ import {
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { Check, ShieldMinus, Trash2 } from "lucide-react";
+import { Check, ShieldMinus, Trash2, UserRoundX } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/app-shell";
+import { AdminPageShell } from "@/components/admin-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { listResourceNotifications } from "@/lib/resources";
@@ -53,8 +53,15 @@ export function AdminResourceNotificationsPage({
   }
 
   return (
-    <AppShell title={t("web.resources.notification.title")}>
-      <main className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-6 md:px-6">
+    <AdminPageShell
+      breadcrumbItems={[
+        { label: t("web.navigation.admin"), to: "/admin" },
+        { label: t("web.admin.notifications.title"), to: "/notifications" },
+      ]}
+      section="notifications"
+      title={t("web.resources.notification.title")}
+    >
+      <main className="grid w-full max-w-5xl gap-6 px-4 py-6 md:px-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="m-0 text-sm text-muted-foreground">
             {t("web.resources.notification.description")}
@@ -62,7 +69,15 @@ export function AdminResourceNotificationsPage({
           <div className="flex flex-wrap gap-2">
             <Button
               nativeButton={false}
-              render={<Link to="/admin/catalog-images/trash" />}
+              render={<Link to="/admin/account-erasure" />}
+              variant="outline"
+            >
+              <UserRoundX />
+              {t("web.erasure.admin.navigation")}
+            </Button>
+            <Button
+              nativeButton={false}
+              render={<Link to="/admin/trash/catalog-images" />}
               variant="outline"
             >
               <Trash2 />
@@ -70,7 +85,7 @@ export function AdminResourceNotificationsPage({
             </Button>
             <Button
               nativeButton={false}
-              render={<Link to="/admin/resources/trash" />}
+              render={<Link to="/admin/trash/resources" />}
               variant="outline"
             >
               <Trash2 />
@@ -253,7 +268,7 @@ export function AdminResourceNotificationsPage({
           </form>
         </dialog>
       </main>
-    </AppShell>
+    </AdminPageShell>
   );
 }
 

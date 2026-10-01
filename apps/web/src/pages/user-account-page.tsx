@@ -10,6 +10,7 @@ import {
 } from "@pocket-trash/localizations";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserPageShell } from "@/components/user-page-shell";
+import { DeleteAccountSection } from "@/pages/delete-account-section";
 import { useLocale } from "@/providers/locale-provider";
 
 export function UserAccountPage() {
@@ -22,10 +23,13 @@ export function UserAccountPage() {
         <UserProfileSkeleton />
       </ClerkLoading>
       <ClerkLoaded>
-        <UserProfileProvider>
-          <UserProfileAccountPanel />
-          <UserProfileSecurityPanel />
-        </UserProfileProvider>
+        <div className="[&_[id=linear]]:hidden">
+          <UserProfileProvider>
+            <UserProfileAccountPanel />
+            <UserProfileSecurityPanel />
+          </UserProfileProvider>
+        </div>
+        <DeleteAccountSection />
       </ClerkLoaded>
     </UserPageShell>
   );

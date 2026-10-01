@@ -49,6 +49,12 @@ export function PublicResourceSwitch({
   );
 }
 
+/**
+ * Renders owner and staff resource visibility controls.
+ *
+ * @param props - Resource visibility state and permissions.
+ * @returns The resource visibility control.
+ */
 export function ResourceVisibilityToggle({
   canAdminister,
   isAdminPrivate,
@@ -76,17 +82,31 @@ export function ResourceVisibilityToggle({
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
 
+  /**
+   * Applies a visibility change or opens the staff moderation dialog.
+   *
+   * @param nextPublic - Whether the resource should be public.
+   * @returns A promise that resolves after the change is handled.
+   */
   async function updateVisibility(nextPublic: boolean) {
     if (!nextPublic && canAdminister && !isOwner) {
       setReason("");
       dialogRef.current?.showModal();
       return;
     }
+    const moderationReason =
+      nextPublic && canAdminister && !isOwner
+        ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
+        : undefined;
+    if (nextPublic && canAdminister && !isOwner && !moderationReason) {
+      toast.error(t("web.resources.moderation.reasonRequired"));
+      return;
+    }
 
     setSaving(true);
     try {
       await setResourceVisibility({
-        data: { isPublic: nextPublic, resourceId },
+        data: { isPublic: nextPublic, reason: moderationReason, resourceId },
       });
       setIsPublic(nextPublic);
     } catch {

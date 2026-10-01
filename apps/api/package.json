@@ -8,12 +8,10 @@
     "dev:web": "pnpm run dev",
     "build": "tsc -p tsconfig.json",
     "build:ci": "tsc -p tsconfig.json",
-    "check": "biome check .",
     "cf-typegen": "wrangler types src/worker-configuration.d.ts --include-runtime false",
     "deploy": "pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy -- pnpm exec wrangler deploy --config wrangler.jsonc --env=\"\" --keep-vars",
     "deploy:development": "pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy:development -- pnpm exec wrangler deploy --config wrangler.jsonc --env=development --keep-vars",
     "deploy:preview": "pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy:preview -- pnpm exec wrangler deploy --config wrangler.jsonc --env=preview --keep-vars",
-    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:ci": "vitest run",
@@ -25,7 +23,6 @@
     "@hono/zod-openapi": "^1.6.3",
     "@package/database": "workspace:*",
     "@package/logger": "workspace:*",
-    "@package/resources": "workspace:*",
     "@package/services": "workspace:*",
     "@scalar/hono-api-reference": "^0.12.2",
     "drizzle-orm": "latest",
@@ -33,7 +30,6 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260916.1",
-    "@package/eslint": "workspace:*",
     "@package/tsconfig": "workspace:*",
     "wrangler": "4.133.0"
   }

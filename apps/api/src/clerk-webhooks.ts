@@ -2,6 +2,14 @@ import { verifyWebhook } from "@clerk/backend/webhooks";
 import type { Logger } from "@package/logger";
 import { loggerMessages } from "@package/logger";
 import type { UsersService } from "@package/services";
+import {
+  createErasureSubjectHmac,
+  type ErasureService,
+} from "@package/services";
+import {
+  forwardToTargets,
+  WebhookForwardingError,
+} from "./webhook-forwarding.js";
 
 export const clerkWebhookPath = "/api/v0/webhooks/clerk";
 
@@ -12,21 +20,9 @@ type TargetKind =
   | "production"
   | "unknown";
 
-class ForwardingError extends Error {
-  constructor(
-    readonly targetKind: TargetKind,
-    readonly failureCategory: "forwarding" | "target_validation",
-  ) {
-    super("Clerk webhook forwarding failed.");
-  }
-}
-
-export type ClerkWebhookTargetMetadata = {
-  kind: "local" | "preview";
-  url: string;
-};
-
 export type ClerkWebhookHandlerOptions = {
+  erasure?: Pick<ErasureService, "handleClerkDeletion">;
+  erasureHmacSecret?: string;
   fetch?: typeof fetch;
   logger: Logger;
   signingSecret: string;
@@ -35,6 +31,12 @@ export type ClerkWebhookHandlerOptions = {
   verify?: typeof verifyWebhook;
 };
 
+/**
+ * Creates a verified Clerk user webhook handler.
+ *
+ * @param options - Handler dependencies and configuration.
+ * @returns A request handler for Clerk webhook deliveries.
+ */
 export function createClerkWebhookHandler(options: ClerkWebhookHandlerOptions) {
   return async (
     request: Request,
@@ -70,6 +72,17 @@ export function createClerkWebhookHandler(options: ClerkWebhookHandlerOptions) {
           clerkUpdatedAt: new Date(event.data.updated_at),
           username: event.data.username ?? "",
         });
+      } else if (event.type === "user.deleted") {
+        if (!options.erasure || !options.erasureHmacSecret || !event.data.id) {
+          throw new Error("Erasure webhook handling is not configured.");
+        }
+        await options.erasure.handleClerkDeletion({
+          subjectHmac: await createErasureSubjectHmac(
+            event.data.id,
+            options.erasureHmacSecret,
+          ),
+          targetClerkId: event.data.id,
+        });
       }
     } catch {
       await logDelivery(options.logger, {
@@ -84,17 +97,20 @@ export function createClerkWebhookHandler(options: ClerkWebhookHandlerOptions) {
 
     try {
       if (options.targets) {
-        const forwarded = await forwardToTargets(
-          options.targets,
-          request.headers,
-          rawBody,
-          options.fetch ?? fetch,
-        );
+        const forwarded = await forwardToTargets({
+          body: rawBody,
+          fetch: options.fetch,
+          headers: request.headers,
+          provider: "clerk",
+          targets: options.targets,
+          webhookPath: clerkWebhookPath,
+        });
         for (const target of forwarded) {
           await logDelivery(options.logger, {
             deliveryId,
             eventType: event.type,
             status: target.status,
+            targetKey: target.key,
             targetKind: target.kind,
           });
         }
@@ -104,12 +120,16 @@ export function createClerkWebhookHandler(options: ClerkWebhookHandlerOptions) {
         deliveryId,
         eventType: event.type,
         failureCategory:
-          error instanceof ForwardingError
+          error instanceof WebhookForwardingError
             ? error.failureCategory
             : "forwarding",
         status: 500,
+        targetKey:
+          error instanceof WebhookForwardingError ? error.targetKey : undefined,
         targetKind:
-          error instanceof ForwardingError ? error.targetKind : targetKind,
+          error instanceof WebhookForwardingError
+            ? error.targetKind
+            : targetKind,
       });
       return new Response(null, { status: 500 });
     }
@@ -124,83 +144,13 @@ export function createClerkWebhookHandler(options: ClerkWebhookHandlerOptions) {
   };
 }
 
-export async function forwardToTargets(
-  targets: KVNamespace,
-  headers: Headers,
-  body: ArrayBuffer,
-  request: typeof fetch = fetch,
-): Promise<{ kind: "local" | "preview"; status: number }[]> {
-  const result = await targets.list<ClerkWebhookTargetMetadata>({
-    prefix: "target:",
-  });
-  return await Promise.all(
-    result.keys.map(async ({ metadata, name }) => {
-      if (!metadata || !isValidTarget(name, metadata)) {
-        throw new ForwardingError(
-          metadata?.kind === "local" || metadata?.kind === "preview"
-            ? metadata.kind
-            : "unknown",
-          "target_validation",
-        );
-      }
-      let response: Response;
-      try {
-        response = await request(metadata.url, {
-          body,
-          headers: {
-            "content-type": headers.get("content-type") ?? "application/json",
-            "svix-id": headers.get("svix-id") ?? "",
-            "svix-signature": headers.get("svix-signature") ?? "",
-            "svix-timestamp": headers.get("svix-timestamp") ?? "",
-          },
-          method: "POST",
-        });
-      } catch {
-        throw new ForwardingError(metadata.kind, "forwarding");
-      }
-      if (!response.ok) {
-        throw new ForwardingError(metadata.kind, "forwarding");
-      }
-      return { kind: metadata.kind, status: response.status };
-    }),
-  );
-}
-
-export function isValidTarget(
-  key: string,
-  metadata: ClerkWebhookTargetMetadata,
-): boolean {
-  let url: URL;
-  try {
-    url = new URL(metadata.url);
-  } catch {
-    return false;
-  }
-  if (url.username || url.password || url.search || url.hash) return false;
-
-  if (metadata.kind === "local") {
-    return (
-      /^target:local:[A-Z0-9]+$/u.test(key) &&
-      url.protocol === "https:" &&
-      url.hostname === "webhooks.clerk.com" &&
-      /^\/in\/c_[0-9A-Za-z]{10}\/$/u.test(url.pathname)
-    );
-  }
-
-  const prNumber = key.match(/^target:preview:(\d+)$/u)?.[1];
-  return Boolean(
-    prNumber &&
-      url.protocol === "https:" &&
-      url.pathname === clerkWebhookPath &&
-      url.hostname.match(
-        new RegExp(
-          `^pr-${prNumber}-pocket-trash-api-preview\\.[a-z0-9-]+\\.workers\\.dev$`,
-          "u",
-        ),
-      ),
-  );
-}
-
+/**
+ * Records and flushes a Clerk webhook delivery result.
+ *
+ * @param logger - Delivery logger.
+ * @param attributes - Safe delivery and target context.
+ * @returns A promise that resolves after logs are flushed.
+ */
 async function logDelivery(
   logger: Logger,
   attributes: {
@@ -211,7 +161,10 @@ async function logDelivery(
       | "forwarding"
       | "target_validation"
       | "verification";
+    /** HTTP delivery status. */
     status: number;
+    /** KV key for the forwarded target. */
+    targetKey?: string;
     targetKind: TargetKind;
   },
 ) {

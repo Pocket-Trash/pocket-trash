@@ -17,20 +17,59 @@ import {
   fetchAutmogProducts,
 } from "./shopify.js";
 
+/**
+ * Dependencies and fetch controls for an Autmog producer run.
+ */
 export type RunAutmogProducerOptions = FetchAutmogProductsOptions & {
+  /**
+   * Database used to compare persisted synchronization state.
+   */
   db: Database;
+  /**
+   * Logger used for producer lifecycle events.
+   */
   logger: Logger;
+  /**
+   * Scraper queues that receive normalized item jobs.
+   */
   queues: ScraperQueues;
+  /**
+   * Whether to omit the batch job that reconciles archived listings.
+   */
   skipArchiveReconciliation?: boolean;
 };
 
+/**
+ * Counts and normalized items produced by an Autmog run.
+ */
 export type RunAutmogProducerResult = {
+  /**
+   * Number of changed item jobs enqueued.
+   */
   enqueuedCount: number;
+  /**
+   * Total number of products fetched from the source.
+   */
   fetchedCount: number;
+  /**
+   * Normalized source items involved in the producer operation.
+   */
   items: NormalizedAutmogPen[];
+  /**
+   * Number of completed jobs removed before re-enqueueing.
+   */
   removedCompletedItemJobs: number;
 };
 
+/**
+ * Fetches Autmog products and enqueues changed items plus archive reconciliation.
+ *
+ * @param options - Producer dependencies and fetch controls.
+ *
+ * @returns Producer counts and all normalized fetched items.
+ *
+ * @rejects When fetching, synchronization lookup, or queue operations fail.
+ */
 export async function runAutmogProducer({
   logger,
   db,
@@ -74,8 +113,17 @@ export async function runAutmogProducer({
       );
     });
     const jobs: {
+      /**
+       * Queue payload for the scraper job.
+       */
       data: ScraperItemJob;
+      /**
+       * Deterministic identifier used to deduplicate the queue job.
+       */
       jobId: string;
+      /**
+       * Queue job name consumed by the item worker.
+       */
       name: string;
     }[] = changedItems.map((item) => ({
       data: {

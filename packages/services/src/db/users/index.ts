@@ -11,6 +11,7 @@ export type EnsureUserInput = {
 export type UsersService = {
   ensure(input: EnsureUserInput): Promise<User>;
   getByClerkId(clerkId: string): Promise<User | null>;
+  listClerkIds(): Promise<string[]>;
   syncFromClerk(input: SyncUserFromClerkInput): Promise<UserSyncResult>;
 };
 
@@ -89,6 +90,12 @@ export function createUsersService(db: Database, logger: Logger): UsersService {
           },
         },
       );
+    },
+    async listClerkIds() {
+      const users = await db
+        .select({ clerkId: schema.user.clerkId })
+        .from(schema.user);
+      return users.map(({ clerkId }) => clerkId);
     },
     async syncFromClerk(input) {
       return await logger.operation(

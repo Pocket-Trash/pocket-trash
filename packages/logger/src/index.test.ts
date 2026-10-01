@@ -13,8 +13,19 @@ import {
   redactValue,
 } from "./index.js";
 
+/**
+ * Creates an in-memory transport for logger assertions.
+ *
+ * @param events - Mutable event collection populated by the transport.
+ * @returns A transport that appends each received event.
+ */
 function captureTransport(events: LogEvent[] = []): LogTransport {
   return {
+    /**
+     * Captures one emitted event.
+     *
+     * @param event - Event to append to the collection.
+     */
     log(event) {
       events.push(event);
     },
@@ -72,6 +83,10 @@ describe("logger", () => {
         },
       },
       database: {
+        audit: {
+          redactAccount: "database.audit.redactAccount",
+          write: "database.audit.write",
+        },
         userSettings: {
           getByClerkId: "database.userSettings.getByClerkId",
           upsertForClerkId: "database.userSettings.upsertForClerkId",
@@ -105,6 +120,7 @@ describe("logger", () => {
         fxRatesFetchFailed: "web.fxRates.fetch.failed",
         localizationKeyMissing: "web.localization.key.missing",
         localeSyncFailed: "web.locale.sync.failed",
+        routeError: "web.route.error",
         userSettingsFetchFailed: "web.userSettings.fetch.failed",
         userSettingsSaveFailed: "web.userSettings.save.failed",
       },

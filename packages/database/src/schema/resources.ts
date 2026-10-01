@@ -5,24 +5,23 @@ import {
   check,
   index,
   integer,
-  jsonb,
   pgTable,
   primaryKey,
   text,
   timestamp,
   unique,
   uniqueIndex,
-  uuid,
 } from "drizzle-orm/pg-core";
 
+/** Lifecycle events that create resource notifications. */
 export const resourceNotificationTypes = [
   "resource_created",
   "category_created",
 ] as const;
-export const resourceUploadOperations = ["create", "version"] as const;
-export const resourceUploadFileKinds = ["resource", "image"] as const;
+/** Roles allowed to soft-delete resources. */
 export const resourceDeletionRoles = ["owner", "admin"] as const;
 
+/** User-uploaded resources and their lifecycle state. */
 export const resources = pgTable(
   "resources",
   {
@@ -54,11 +53,11 @@ export const resources = pgTable(
     index("resources_uploader_clerk_id_idx").on(table.uploaderClerkId),
     check(
       "resources_private_metadata_consistent",
-      sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
+      sql`(not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0) or (${table.isPrivate} and (num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0 or (${table.privateReason} is not null and ${table.privatedAt} is not null)))`,
     ),
     check(
       "resources_deletion_metadata_consistent",
-      sql`num_nonnulls(${table.deletedAt}, ${table.deletedByClerkId}, ${table.deletedByRole}) in (0, 3)`,
+      sql`(${table.deletedAt} is null and ${table.deletedByClerkId} is null and ${table.deletedByRole} is null) or (${table.deletedAt} is not null and ${table.deletedByRole} is not null)`,
     ),
     check(
       "resources_deleted_by_role_valid",
@@ -67,6 +66,7 @@ export const resources = pgTable(
   ],
 );
 
+/** Ordered images attached to resources. */
 export const resourceImages = pgTable(
   "resource_images",
   {
@@ -99,6 +99,7 @@ export const resourceImages = pgTable(
   ],
 );
 
+/** Immutable uploaded versions of resources. */
 export const resourceVersions = pgTable(
   "resource_versions",
   {
@@ -115,6 +116,10 @@ export const resourceVersions = pgTable(
     legacyStorageProvider: text("storage_provider").default("bunny"),
     legacyObjectPath: text("object_path"),
     legacyUrl: text("url"),
+    archiveObjectPath: text("archive_object_path"),
+    anonymousDownloadCount: integer("anonymous_download_count")
+      .default(0)
+      .notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -126,11 +131,19 @@ export const resourceVersions = pgTable(
       table.version,
     ),
     unique("resource_versions_object_path_unique").on(table.legacyObjectPath),
+    unique("resource_versions_archive_object_path_unique").on(
+      table.archiveObjectPath,
+    ),
     check("resource_versions_version_positive", sql`${table.version} > 0`),
     check("resource_versions_size_positive", sql`${table.legacySize} > 0`),
+    check(
+      "resource_versions_anonymous_download_count_nonnegative",
+      sql`${table.anonymousDownloadCount} >= 0`,
+    ),
   ],
 );
 
+/** Files belonging to immutable resource versions. */
 export const resourceFiles = pgTable(
   "resource_files",
   {
@@ -161,116 +174,20 @@ export const resourceFiles = pgTable(
   ],
 );
 
-export const resourceUploadSessions = pgTable(
-  "resource_upload_sessions",
-  {
-    id: uuid("id").primaryKey(),
-    uploaderClerkId: text("uploader_clerk_id").notNull(),
-    operation: text("operation", {
-      enum: resourceUploadOperations,
-    }).notNull(),
-    resourceId: bigint("resource_id", { mode: "number" }).references(
-      () => resources.id,
-      { onDelete: "cascade" },
-    ),
-    reservedResourceId: bigint("reserved_resource_id", { mode: "number" }),
-    name: text("name"),
-    description: text("description"),
-    categories: jsonb("categories")
-      .$type<Array<{ name: string; slug: string }>>()
-      .default(sql`'[]'::jsonb`)
-      .notNull(),
-    isPrivate: boolean("is_private").default(false).notNull(),
-    completedResourceId: bigint("completed_resource_id", {
-      mode: "number",
-    }).references(() => resources.id, { onDelete: "cascade" }),
-    completedVersion: integer("completed_version"),
-    expiresAt: timestamp("expires_at", {
-      mode: "date",
-      withTimezone: true,
-    }).notNull(),
-    completedAt: timestamp("completed_at", {
-      mode: "date",
-      withTimezone: true,
-    }),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("resource_upload_sessions_expires_at_idx").on(table.expiresAt),
-    index("resource_upload_sessions_uploader_clerk_id_idx").on(
-      table.uploaderClerkId,
-    ),
-    check(
-      "resource_upload_sessions_operation_valid",
-      sql`${table.operation} in ('create', 'version')`,
-    ),
-    check(
-      "resource_upload_sessions_metadata_consistent",
-      sql`(${table.operation} = 'create' and ${table.resourceId} is null and ${table.reservedResourceId} is not null and num_nonnulls(${table.name}, ${table.description}) = 2 and jsonb_array_length(${table.categories}) between 1 and 10) or (${table.operation} = 'version' and ${table.resourceId} is not null and ${table.reservedResourceId} is null and num_nonnulls(${table.name}, ${table.description}) = 0 and ${table.categories} = '[]'::jsonb and not ${table.isPrivate})`,
-    ),
-    check(
-      "resource_upload_sessions_completion_consistent",
-      sql`num_nonnulls(${table.completedResourceId}, ${table.completedVersion}, ${table.completedAt}) in (0, 3)`,
-    ),
-  ],
-);
-
-export const resourceUploadFiles = pgTable(
-  "resource_upload_files",
-  {
-    id: uuid("id").primaryKey(),
-    sessionId: uuid("session_id")
-      .notNull()
-      .references(() => resourceUploadSessions.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: resourceUploadFileKinds }).notNull(),
-    position: integer("position").notNull(),
-    fileName: text("file_name").notNull(),
-    contentType: text("content_type").notNull(),
-    size: integer("size").notNull(),
-    objectPath: text("object_path").notNull(),
-    url: text("url").notNull(),
-    uploadedAt: timestamp("uploaded_at", {
-      mode: "date",
-      withTimezone: true,
-    }),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("resource_upload_files_session_id_idx").on(table.sessionId),
-    unique("resource_upload_files_object_path_unique").on(table.objectPath),
-    uniqueIndex("resource_upload_files_session_file_name_unique")
-      .on(table.sessionId, sql`lower(${table.fileName})`)
-      .where(sql`${table.kind} = 'resource'`),
-    unique("resource_upload_files_session_kind_position_unique").on(
-      table.sessionId,
-      table.kind,
-      table.position,
-    ),
-    check(
-      "resource_upload_files_kind_valid",
-      sql`${table.kind} in ('resource', 'image')`,
-    ),
-    check("resource_upload_files_position_valid", sql`${table.position} >= 0`),
-    check("resource_upload_files_size_positive", sql`${table.size} > 0`),
-  ],
-);
-
+/** Reusable categories assigned to resources. */
 export const resourceCategories = pgTable("resource_categories", {
   id: bigint("id", { mode: "number" })
     .primaryKey()
     .generatedAlwaysAsIdentity({ startWith: 1000 }),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
-  createdByClerkId: text("created_by_clerk_id").notNull(),
+  createdByClerkId: text("created_by_clerk_id"),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
     .defaultNow()
     .notNull(),
 });
 
+/** Unique resource-to-category assignments. */
 export const resourcesToCategories = pgTable(
   "resources_to_categories",
   {
@@ -290,30 +207,31 @@ export const resourcesToCategories = pgTable(
   ],
 );
 
+/** Unique authenticated downloads of resource versions. */
 export const resourceDownloads = pgTable(
   "resource_downloads",
   {
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    versionId: bigint("version_id", { mode: "number" }).references(
-      () => resourceVersions.id,
-      { onDelete: "cascade" },
-    ),
-    fileId: bigint("file_id", { mode: "number" }).references(
-      () => resourceFiles.id,
-      { onDelete: "cascade" },
-    ),
+    versionId: bigint("version_id", { mode: "number" })
+      .notNull()
+      .references(() => resourceVersions.id, { onDelete: "cascade" }),
+    userClerkId: text("user_clerk_id").notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (table) => [
     index("resource_downloads_version_id_idx").on(table.versionId),
-    index("resource_downloads_file_id_idx").on(table.fileId),
+    unique("resource_downloads_version_user_unique").on(
+      table.versionId,
+      table.userClerkId,
+    ),
   ],
 );
 
+/** Admin notifications emitted for new resources and categories. */
 export const resourceNotifications = pgTable(
   "resource_notifications",
   {
@@ -352,22 +270,32 @@ export const resourceNotifications = pgTable(
   ],
 );
 
+/** Stored resource row. */
 export type Resource = typeof resources.$inferSelect;
+/** Values accepted when creating a resource row. */
 export type NewResource = typeof resources.$inferInsert;
+/** Stored resource version row. */
 export type ResourceVersion = typeof resourceVersions.$inferSelect;
+/** Values accepted when creating a resource version row. */
 export type NewResourceVersion = typeof resourceVersions.$inferInsert;
+/** Stored resource file row. */
 export type ResourceFile = typeof resourceFiles.$inferSelect;
+/** Values accepted when creating a resource file row. */
 export type NewResourceFile = typeof resourceFiles.$inferInsert;
-export type ResourceUploadSession = typeof resourceUploadSessions.$inferSelect;
-export type NewResourceUploadSession =
-  typeof resourceUploadSessions.$inferInsert;
-export type ResourceUploadFile = typeof resourceUploadFiles.$inferSelect;
-export type NewResourceUploadFile = typeof resourceUploadFiles.$inferInsert;
+
+/** Stored resource image row. */
 export type ResourceImage = typeof resourceImages.$inferSelect;
+/** Values accepted when creating a resource image row. */
 export type NewResourceImage = typeof resourceImages.$inferInsert;
+/** Stored resource category row. */
 export type ResourceCategory = typeof resourceCategories.$inferSelect;
+/** Values accepted when creating a resource category row. */
 export type NewResourceCategory = typeof resourceCategories.$inferInsert;
+/** Stored resource download row. */
 export type ResourceDownload = typeof resourceDownloads.$inferSelect;
+/** Values accepted when creating a resource download row. */
 export type NewResourceDownload = typeof resourceDownloads.$inferInsert;
+/** Stored resource notification row. */
 export type ResourceNotification = typeof resourceNotifications.$inferSelect;
+/** Values accepted when creating a resource notification row. */
 export type NewResourceNotification = typeof resourceNotifications.$inferInsert;

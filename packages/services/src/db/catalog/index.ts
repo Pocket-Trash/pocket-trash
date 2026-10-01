@@ -1,4 +1,4 @@
-import type { Database } from "@package/database";
+import type { AuditJsonObject, Database } from "@package/database";
 import { schema } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
 import {
@@ -12,8 +12,63 @@ import {
   sql,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { hashLogIdentifier } from "../../logging.js";
+import { type Actor, hasPermission } from "../../authorization.js";
+import { hashLogIdentifier, loggedMutation } from "../../logging.js";
+import {
+  attachImages as attachStoredImages,
+  lockTarget,
+  selectCollectionCover as selectStoredCover,
+} from "../../storage/image-records.js";
+import { queueObjectDeletions } from "../../storage/object-lifecycle.js";
+import type {
+  UploadActor,
+  UploadedFile,
+  UploadTarget,
+} from "../../storage/types.js";
+import { collectionAudit, writeCollectionAudit } from "../audit/collections.js";
+import type { AuditService } from "../audit/index.js";
+import {
+  productAudit,
+  writeProductAdminAudit,
+  writeProductAudit,
+} from "../audit/products.js";
 import type { UsersService } from "../users/index.js";
+
+export class CollectionButtonAlreadyInstalledError extends Error {
+  constructor() {
+    super("Collection button is already installed on another spinner.");
+    this.name = "CollectionButtonAlreadyInstalledError";
+  }
+}
+
+function uniqueConstraint(error: unknown): string | undefined {
+  const databaseError =
+    error instanceof Error && error.cause !== undefined ? error.cause : error;
+  if (
+    typeof databaseError === "object" &&
+    databaseError !== null &&
+    "code" in databaseError &&
+    databaseError.code === "23505" &&
+    "constraint" in databaseError &&
+    typeof databaseError.constraint === "string"
+  ) {
+    return databaseError.constraint;
+  }
+  return undefined;
+}
+
+const catalogNameConflictMessages: Record<string, string> = {
+  color_name_case_insensitive_unique: "Color name already exists.",
+  finish_name_case_insensitive_unique: "Finish name already exists.",
+  makers_name_case_insensitive_unique: "Maker name already exists.",
+  materials_name_case_insensitive_unique: "Material name already exists.",
+};
+
+function mapCatalogNameConflict(error: unknown): never {
+  const message = catalogNameConflictMessages[uniqueConstraint(error) ?? ""];
+  if (message) throw new Error(message);
+  throw error;
+}
 
 export type CatalogProductType = "spinner" | "spinner-button";
 
@@ -28,7 +83,7 @@ export type CatalogFinishOption = {
   id: number;
 };
 
-export type CatalogViewer = { clerkId?: string; isAdmin?: boolean };
+export type CatalogViewer = Actor;
 
 export type CatalogImage = {
   contentType: string;
@@ -49,7 +104,7 @@ export type CatalogImageTargetType =
   | "collection_item"
   | "product";
 export type CatalogImageTrashItem = CatalogImage & {
-  ownerClerkId: string;
+  ownerClerkId: string | null;
   targetId: number;
   targetName: string;
   targetType: CatalogImageTargetType;
@@ -83,7 +138,7 @@ export type CatalogProduct = {
   makerUrl: string | null;
   materials: Array<{ id: number; name: string; slug: string }>;
   name: string;
-  ownerClerkId: string;
+  ownerClerkId: string | null;
   isPrivate: boolean;
   isAdminPrivate: boolean;
   isOwner?: boolean;
@@ -100,8 +155,7 @@ export type CatalogProduct = {
 };
 
 export type ProductWriteInput = {
-  actorClerkId: string;
-  actorIsAdmin?: boolean;
+  actor: Actor;
   description?: string | null;
   makerId: number;
   makerProductUrl?: string | null;
@@ -109,6 +163,7 @@ export type ProductWriteInput = {
   materialIds: number[];
   name: string;
   productTypeSlug: CatalogProductType;
+  reason?: string;
   slug: string;
   specs: {
     bearing?: string | null;
@@ -125,24 +180,36 @@ export type ProductWriteInput = {
 };
 
 export type CatalogService = {
+  attachImages(input: {
+    target: UploadTarget;
+    files: UploadedFile[];
+    actor: UploadActor;
+    reason?: string;
+  }): Promise<void>;
+  selectCollectionCover(input: {
+    collectionId: number;
+    imageId: number | null;
+    actor: UploadActor;
+    reason?: string;
+  }): Promise<void>;
   createColor(input: {
-    actorClerkId: string;
+    actor: Actor;
     hex: string;
     name: string;
     slug: string;
   }): Promise<CatalogColor>;
   createFinish(input: {
-    actorClerkId: string;
+    actor: Actor;
     name: string;
     slug: string;
   }): Promise<CatalogLookup>;
   createMaker(input: {
-    actorClerkId: string;
+    actor: Actor;
     name: string;
     rootUrl: string | null;
   }): Promise<{ id: number; name: string; rootUrl: string | null }>;
   createMaterial(input: {
-    actorClerkId: string;
+    actor: Actor;
     name: string;
     slug: string;
   }): Promise<{ id: number; name: string; slug: string }>;
@@ -170,32 +237,30 @@ export type CatalogService = {
     productTypeSlug: string,
     exceptProductId?: number,
   ): Promise<string[]>;
-  listImageTrash(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
-  }): Promise<CatalogImageTrashItem[]>;
+  listImageTrash(input: { actor: Actor }): Promise<CatalogImageTrashItem[]>;
   restoreImage(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     imageId: number;
+    reason?: string;
     targetType: CatalogImageTargetType;
   }): Promise<void>;
   softDeleteImage(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     imageId: number;
+    reason?: string;
     targetType: CatalogImageTargetType;
   }): Promise<void>;
   setVisibility(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     isPrivate: boolean;
     productId: number;
     reason?: string;
   }): Promise<void>;
   setMakerProductUrlValidity(input: {
+    actor: Actor;
     makerProductUrlValid: boolean;
     productId: number;
+    reason?: string;
   }): Promise<void>;
   updateProduct(
     input: ProductWriteInput & { productId: number },
@@ -269,9 +334,10 @@ export type CollectionWriteInput = {
   reason?: string;
 };
 
+/** Database operations for user collections and their catalog items. */
 export type CollectionsService = {
   addSpinner(input: {
-    actorClerkId: string;
+    actor: Actor;
     bearing?: string | null;
     buttonCustomFinish: ProductWriteFinishOption | null;
     buttonFinishOptionId: number | null;
@@ -287,7 +353,7 @@ export type CollectionsService = {
     newCollection?: CollectionWriteInput | null;
   }): Promise<{ buttonItemId: number | null; spinnerItemId: number }>;
   addSpinnerButton(input: {
-    actorClerkId: string;
+    actor: Actor;
     customFinish: ProductWriteFinishOption | null;
     finishOptionId: number | null;
     materialId: number;
@@ -299,23 +365,53 @@ export type CollectionsService = {
   }): Promise<number>;
   createCollection(
     input: CollectionWriteInput & {
-      actorClerkId: string;
+      actor: Actor;
     },
   ): Promise<UserCollectionSummary>;
   countOwnedProducts(input: {
     actorClerkId: string;
     productIds: number[];
   }): Promise<Record<number, number>>;
+  /**
+   * Moves or permanently deletes a collection and its contents.
+   *
+   * @param input - Authorized deletion request.
+   * @returns Completion after the transaction commits.
+   */
+  deleteCollection(input: {
+    /** Actor requesting deletion. */
+    actor: Actor;
+    /** Collection to delete. */
+    collectionId: number;
+    /** Collection receiving moved items, or null for permanent deletion. */
+    destinationCollectionId: number | null;
+    /** Required moderation reason when acting for another user. */
+    reason?: string;
+  }): Promise<void>;
+  /**
+   * Loads valid deletion destinations and the affected item count.
+   *
+   * @param actor - Actor requesting the deletion choices.
+   * @param collectionId - Collection being considered for deletion.
+   * @returns Deletion context, or null when the collection is inaccessible.
+   */
+  getDeletionContext(
+    actor: Actor,
+    collectionId: number,
+  ): Promise<{
+    /** Collections eligible to receive moved items. */
+    destinations: UserCollectionSummary[];
+    /** Number of items affected by deletion. */
+    itemCount: number;
+  } | null>;
   getOwnedItem(
-    actorClerkId: string,
+    actor: Actor,
     collectionItemId: number,
-    actorIsAdmin?: boolean,
   ): Promise<UserCollectionItem | null>;
   getDefaultCollectionName(actorClerkId: string): Promise<string>;
   getOwnedCollection(
-    actorClerkId: string,
+    actor: Actor,
     collectionId: number,
-    actorIsAdmin?: boolean,
   ): Promise<UserCollectionSummary | null>;
   getPublicCollection(input: {
     collectionId: number;
@@ -328,37 +424,27 @@ export type CollectionsService = {
     ownerUserId: number;
     viewer?: CatalogViewer;
   }): Promise<UserCollectionItem | null>;
-  listOwned(
-    actorClerkId: string,
-    actorIsAdmin?: boolean,
-    collectionId?: number,
-  ): Promise<UserCollectionItem[]>;
-  listOwnedCollections(
-    actorClerkId: string,
-    actorIsAdmin?: boolean,
-  ): Promise<UserCollectionSummary[]>;
+  listOwned(actor: Actor, collectionId?: number): Promise<UserCollectionItem[]>;
+  listOwnedCollections(actor: Actor): Promise<UserCollectionSummary[]>;
   listProductItems(
     productId: number,
     viewer?: CatalogViewer,
   ): Promise<UserCollectionItem[]>;
   listOwners(viewer?: CatalogViewer): Promise<PublicCollectionOwner[]>;
   setCollectionVisibility(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     collectionId: number;
     isPrivate: boolean;
     reason?: string;
   }): Promise<void>;
   setItemVisibility(input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     collectionItemId: number;
     isPrivate: boolean;
     reason?: string;
   }): Promise<void>;
   updateItem(input: {
-    actorClerkId: string;
-    actorIsAdmin?: boolean;
+    actor: Actor;
     bearing?: string | null;
     collectionId?: number;
     collectionItemId: number;
@@ -373,11 +459,11 @@ export type CollectionsService = {
       materialId: number;
     } | null;
     materialId: number;
+    reason?: string;
   }): Promise<void>;
   updateCollection(
     input: CollectionWriteInput & {
-      actorClerkId: string;
-      actorIsAdmin: boolean;
+      actor: Actor;
       collectionId: number;
     },
   ): Promise<UserCollectionSummary>;
@@ -386,118 +472,307 @@ export type CollectionsService = {
 export function createCatalogService(
   db: Database,
   logger: Logger,
+  users?: UsersService,
+  audit?: AuditService,
 ): CatalogService {
   return {
+    async attachImages(input) {
+      const collectionDependencies = requireCollectionAudit(
+        users,
+        audit,
+        input.target.type,
+      );
+      const productDependencies =
+        input.target.type === "product"
+          ? requireProductAudit(users, audit)
+          : null;
+      const dependencies = collectionDependencies ?? productDependencies;
+      const actorUser = dependencies
+        ? await dependencies.users.getByClerkId(input.actor.clerkId)
+        : null;
+      if (dependencies && !actorUser)
+        throw new Error("Image target does not exist.");
+      await loggedMutation(
+        logger,
+        loggerMessages.database.catalog.attachImages,
+        () =>
+          db.transaction(async (tx) => {
+            await lockTarget(tx, input.target);
+            const collectionContext = await collectionImageTargetContext(
+              tx,
+              input.target,
+            );
+            const productContext = await productImageTargetContext(
+              tx,
+              input.target,
+            );
+            const before = await collectionImageState(tx, input.target);
+            await attachStoredImages(tx, input);
+            if (collectionContext) {
+              const after = await collectionImageState(tx, input.target);
+              if (!collectionDependencies || !actorUser)
+                throw new Error("Collection audit is not configured.");
+              await writeCollectionAudit(collectionDependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after,
+                before,
+                definition:
+                  input.target.type === "collection_item"
+                    ? collectionAudit.imageAdded
+                    : before.currentImageId === null
+                      ? collectionAudit.coverAdded
+                      : collectionAudit.coverReplaced,
+                ownerUserId: collectionContext.ownerUserId,
+                reason: input.reason,
+                targetId: input.target.id,
+              });
+            } else if (productContext) {
+              if (!productDependencies || !actorUser)
+                throw new Error("Product audit is not configured.");
+              await writeProductAudit(productDependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: await collectionImageState(tx, input.target),
+                before,
+                definition: productAudit.imageAdded,
+                ownerClerkId: productContext.ownerClerkId,
+                ownerUserId: productContext.ownerUserId,
+                reason: input.reason,
+                targetId: input.target.id,
+              });
+            }
+          }),
+        actorAttributes(input.actor.clerkId),
+      );
+    },
+    async selectCollectionCover(input) {
+      const dependencies = requireCollectionAudit(users, audit, "collection");
+      if (!dependencies) throw new Error("Collection audit is not configured.");
+      const actorUser = await dependencies.users.getByClerkId(
+        input.actor.clerkId,
+      );
+      if (!actorUser) throw new Error("Collection does not exist.");
+      await loggedMutation(
+        logger,
+        loggerMessages.database.catalog.selectCollectionCover,
+        () =>
+          db.transaction(async (tx) => {
+            const context = await collectionImageTargetContext(tx, {
+              id: input.collectionId,
+              type: "collection",
+            });
+            if (!context) throw new Error("Collection does not exist.");
+            const before = await collectionImageState(tx, {
+              id: input.collectionId,
+              type: "collection",
+            });
+            await selectStoredCover(tx, input);
+            await writeCollectionAudit(dependencies.audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: await collectionImageState(tx, {
+                id: input.collectionId,
+                type: "collection",
+              }),
+              before,
+              definition:
+                input.imageId === null
+                  ? collectionAudit.coverCleared
+                  : collectionAudit.coverSelected,
+              ownerUserId: context.ownerUserId,
+              reason: input.reason,
+              targetId: input.collectionId,
+            });
+          }),
+        actorAttributes(input.actor.clerkId),
+      );
+    },
     async createColor(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       return await logger.operation(
         loggerMessages.database.catalog.createColor,
-        async () => {
-          const [duplicate] = await db
-            .select({ id: schema.color.id })
-            .from(schema.color)
-            .where(
-              eq(sql`lower(${schema.color.name})`, input.name.toLowerCase()),
-            )
-            .limit(1);
-          if (duplicate) throw new Error("Color name already exists.");
+        async () =>
+          await db.transaction(async (tx) => {
+            const [duplicate] = await tx
+              .select({ id: schema.color.id })
+              .from(schema.color)
+              .where(
+                eq(sql`lower(${schema.color.name})`, input.name.toLowerCase()),
+              )
+              .limit(1);
+            if (duplicate) throw new Error("Color name already exists.");
 
-          const [row] = await db
-            .insert(schema.color)
-            .values({ hex: input.hex, name: input.name, slug: input.slug })
-            .returning({
-              hex: schema.color.hex,
-              id: schema.color.id,
-              name: schema.color.name,
-              slug: schema.color.slug,
-            });
-          if (!row) throw new Error("Failed to create color.");
-          return row;
-        },
-        actorAttributes(input.actorClerkId, { slug: input.slug }),
+            const [row] = await tx
+              .insert(schema.color)
+              .values({ hex: input.hex, name: input.name, slug: input.slug })
+              .returning({
+                hex: schema.color.hex,
+                id: schema.color.id,
+                name: schema.color.name,
+                slug: schema.color.slug,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create color.");
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: row,
+                definition: productAudit.colorCreated,
+                targetId: row.id,
+              });
+            }
+            return row;
+          }),
+        actorAttributes(input.actor.clerkId, { slug: input.slug }),
       );
     },
     async createFinish(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       return await logger.operation(
         loggerMessages.database.catalog.createFinish,
-        async () => {
-          const [duplicate] = await db
-            .select({ id: schema.finish.id })
-            .from(schema.finish)
-            .where(
-              eq(sql`lower(${schema.finish.name})`, input.name.toLowerCase()),
-            )
-            .limit(1);
-          if (duplicate) throw new Error("Finish name already exists.");
+        async () =>
+          await db.transaction(async (tx) => {
+            const [duplicate] = await tx
+              .select({ id: schema.finish.id })
+              .from(schema.finish)
+              .where(
+                eq(sql`lower(${schema.finish.name})`, input.name.toLowerCase()),
+              )
+              .limit(1);
+            if (duplicate) throw new Error("Finish name already exists.");
 
-          const [row] = await db
-            .insert(schema.finish)
-            .values({ name: input.name, slug: input.slug })
-            .returning({
-              id: schema.finish.id,
-              name: schema.finish.name,
-              slug: schema.finish.slug,
-            });
-          if (!row) throw new Error("Failed to create finish.");
-          return row;
-        },
-        actorAttributes(input.actorClerkId, { slug: input.slug }),
+            const [row] = await tx
+              .insert(schema.finish)
+              .values({ name: input.name, slug: input.slug })
+              .returning({
+                id: schema.finish.id,
+                name: schema.finish.name,
+                slug: schema.finish.slug,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create finish.");
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: row,
+                definition: productAudit.finishCreated,
+                targetId: row.id,
+              });
+            }
+            return row;
+          }),
+        actorAttributes(input.actor.clerkId, { slug: input.slug }),
       );
     },
     async createMaker(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       return await logger.operation(
         loggerMessages.database.catalog.createMaker,
-        async () => {
-          const [duplicate] = await db
-            .select({ id: schema.maker.id })
-            .from(schema.maker)
-            .where(
-              eq(sql`lower(${schema.maker.name})`, input.name.toLowerCase()),
-            )
-            .limit(1);
-          if (duplicate) throw new Error("Maker name already exists.");
+        async () =>
+          await db.transaction(async (tx) => {
+            const [duplicate] = await tx
+              .select({ id: schema.maker.id })
+              .from(schema.maker)
+              .where(
+                eq(sql`lower(${schema.maker.name})`, input.name.toLowerCase()),
+              )
+              .limit(1);
+            if (duplicate) throw new Error("Maker name already exists.");
 
-          const [row] = await db
-            .insert(schema.maker)
-            .values({ name: input.name, rootUrl: input.rootUrl })
-            .returning({
-              id: schema.maker.id,
-              name: schema.maker.name,
-              rootUrl: schema.maker.rootUrl,
-            });
-          if (!row) throw new Error("Failed to create maker.");
-          return row;
-        },
-        actorAttributes(input.actorClerkId),
+            const [row] = await tx
+              .insert(schema.maker)
+              .values({ name: input.name, rootUrl: input.rootUrl })
+              .returning({
+                id: schema.maker.id,
+                name: schema.maker.name,
+                rootUrl: schema.maker.rootUrl,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create maker.");
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: row,
+                definition: productAudit.makerCreated,
+                targetId: row.id,
+              });
+            }
+            return row;
+          }),
+        actorAttributes(input.actor.clerkId),
       );
     },
     async createMaterial(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       return await logger.operation(
         loggerMessages.database.catalog.createMaterial,
-        async () => {
-          const [duplicate] = await db
-            .select({ id: schema.material.id })
-            .from(schema.material)
-            .where(
-              eq(sql`lower(${schema.material.name})`, input.name.toLowerCase()),
-            )
-            .limit(1);
-          if (duplicate) throw new Error("Material name already exists.");
+        async () =>
+          await db.transaction(async (tx) => {
+            const [duplicate] = await tx
+              .select({ id: schema.material.id })
+              .from(schema.material)
+              .where(
+                eq(
+                  sql`lower(${schema.material.name})`,
+                  input.name.toLowerCase(),
+                ),
+              )
+              .limit(1);
+            if (duplicate) throw new Error("Material name already exists.");
 
-          const [row] = await db
-            .insert(schema.material)
-            .values({ name: input.name, slug: input.slug })
-            .returning({
-              id: schema.material.id,
-              name: schema.material.name,
-              slug: schema.material.slug,
-            });
-          if (!row) throw new Error("Failed to create material.");
-          return row;
-        },
-        actorAttributes(input.actorClerkId, { slug: input.slug }),
+            const [row] = await tx
+              .insert(schema.material)
+              .values({ name: input.name, slug: input.slug })
+              .returning({
+                id: schema.material.id,
+                name: schema.material.name,
+                slug: schema.material.slug,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create material.");
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: row,
+                definition: productAudit.materialCreated,
+                targetId: row.id,
+              });
+            }
+            return row;
+          }),
+        actorAttributes(input.actor.clerkId, { slug: input.slug }),
       );
     },
     async createProduct(input) {
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       return await logger.operation(
         loggerMessages.database.catalog.createProduct,
         async () => {
@@ -530,7 +805,7 @@ export function createCatalogService(
                     }
                   : {}),
                 name: input.name,
-                ownerClerkId: input.actorClerkId,
+                ownerClerkId: input.actor.clerkId,
                 productTypeId: type.id,
                 slug: input.slug,
               })
@@ -559,13 +834,31 @@ export function createCatalogService(
                 ...buttonSpecs(input.specs),
               });
             }
+            if (dependencies && actorUser) {
+              const [created] = await queryProducts(
+                tx as unknown as Database,
+                input.productTypeSlug,
+                input.slug,
+                input.actor,
+              );
+              if (!created) throw new Error("Failed to load created product.");
+              await writeProductAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: productAuditState(created),
+                definition: productAudit.productCreated,
+                ownerClerkId: input.actor.clerkId,
+                ownerUserId: actorUser.id,
+                targetId: row.id,
+              });
+            }
             return row.id;
           });
 
           const created = await this.getProduct(
             input.productTypeSlug,
             input.slug,
-            { clerkId: input.actorClerkId, isAdmin: input.actorIsAdmin },
+            input.actor,
           );
           if (!created || created.id !== productId) {
             throw new Error("Failed to load created product.");
@@ -679,50 +972,176 @@ export function createCatalogService(
       return await listCatalogImageTrash(db, input);
     },
     async restoreImage(input) {
-      await restoreCatalogImage(db, input);
+      if (input.targetType === "product") {
+        const dependencies = requireProductAudit(users, audit);
+        const actorUser = dependencies
+          ? await dependencies.users.getByClerkId(input.actor.clerkId)
+          : null;
+        await db.transaction(async (tx) => {
+          const context = dependencies
+            ? await productImageContext(tx, input.imageId)
+            : null;
+          await restoreCatalogImage(tx, input);
+          if (dependencies && actorUser) {
+            if (!context) throw new Error("Image does not exist.");
+            await writeProductAudit(dependencies.audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: { deleted: false, imageId: input.imageId },
+              before: { deleted: true, imageId: input.imageId },
+              definition: productAudit.imageRestored,
+              ownerClerkId: context.ownerClerkId,
+              ownerUserId: context.ownerUserId,
+              reason: input.reason,
+              targetId: context.productId,
+            });
+          }
+        });
+        return;
+      }
+      const dependencies = requireCollectionAudit(
+        users,
+        audit,
+        "collection_item",
+      );
+      if (!dependencies) throw new Error("Collection audit is not configured.");
+      const actorUser = await dependencies.users.getByClerkId(
+        input.actor.clerkId,
+      );
+      if (!actorUser) throw new Error("Image does not exist.");
+      await db.transaction(async (tx) => {
+        const context = await collectionItemImageContext(tx, input.imageId);
+        await restoreCatalogImage(tx, input);
+        if (!context) throw new Error("Image does not exist.");
+        await writeCollectionAudit(dependencies.audit, tx, {
+          actor: input.actor,
+          actorUser,
+          after: { deleted: false, imageId: input.imageId },
+          before: { deleted: true, imageId: input.imageId },
+          definition: collectionAudit.imageRestored,
+          ownerUserId: context.ownerUserId,
+          reason: input.reason,
+          targetId: context.collectionItemId,
+        });
+      });
     },
     async setVisibility(input) {
-      const [product] = await db
-        .select({
-          ownerClerkId: schema.product.ownerClerkId,
-          privatedByClerkId: schema.product.privatedByClerkId,
-        })
-        .from(schema.product)
-        .where(eq(schema.product.id, input.productId))
-        .limit(1);
-      if (
-        !product ||
-        (!input.actorIsAdmin && product.ownerClerkId !== input.actorClerkId)
-      ) {
-        throw new Error("Product does not exist.");
-      }
-      const actorIsModerating =
-        input.actorIsAdmin && product.ownerClerkId !== input.actorClerkId;
-      if (
-        !input.isPrivate &&
-        product.privatedByClerkId &&
-        product.privatedByClerkId !== input.actorClerkId &&
-        !actorIsModerating
-      ) {
-        throw new Error("Product is private by an administrator.");
-      }
-      if (actorIsModerating && input.isPrivate && !input.reason?.trim()) {
-        throw new Error("A privacy reason is required.");
-      }
-      await db
-        .update(schema.product)
-        .set(privacyUpdate({ ...input, actorIsAdmin: actorIsModerating }))
-        .where(eq(schema.product.id, input.productId));
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      await db.transaction(async (tx) => {
+        const [product] = await tx
+          .select({
+            isPrivate: schema.product.isPrivate,
+            ownerClerkId: schema.product.ownerClerkId,
+            ownerUserId: schema.user.id,
+            privatedByClerkId: schema.product.privatedByClerkId,
+          })
+          .from(schema.product)
+          .leftJoin(
+            schema.user,
+            eq(schema.product.ownerClerkId, schema.user.clerkId),
+          )
+          .where(eq(schema.product.id, input.productId))
+          .limit(1);
+        if (
+          !product ||
+          (product.ownerClerkId !== input.actor.clerkId &&
+            !hasPermission(input.actor, "products.manage"))
+        ) {
+          throw new Error("Product does not exist.");
+        }
+        const actorIsModerating =
+          product.ownerClerkId !== input.actor.clerkId &&
+          hasPermission(input.actor, "products.manage");
+        if (
+          !input.isPrivate &&
+          product.privatedByClerkId &&
+          product.privatedByClerkId !== input.actor.clerkId &&
+          !actorIsModerating
+        ) {
+          throw new Error("Product is private by an administrator.");
+        }
+        if (actorIsModerating && input.isPrivate && !input.reason?.trim()) {
+          throw new Error("A privacy reason is required.");
+        }
+        await tx
+          .update(schema.product)
+          .set(
+            privacyUpdate({
+              actorClerkId: input.actor.clerkId,
+              actorIsModerating,
+              isPrivate: input.isPrivate,
+              reason: input.reason,
+            }),
+          )
+          .where(eq(schema.product.id, input.productId));
+        if (dependencies && actorUser) {
+          await writeProductAudit(dependencies.audit, tx, {
+            actor: input.actor,
+            actorUser,
+            after: { isPrivate: input.isPrivate },
+            before: { isPrivate: product.isPrivate },
+            definition: productAudit.productVisibilityChanged,
+            ownerClerkId: product.ownerClerkId,
+            ownerUserId: product.ownerUserId,
+            reason: input.reason,
+            targetId: input.productId,
+          });
+        }
+      });
     },
     async setMakerProductUrlValidity(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       await logger.operation(
         loggerMessages.database.catalog.setMakerProductUrlValidity,
-        async () => {
-          await db
-            .update(schema.product)
-            .set({ makerProductUrlValid: input.makerProductUrlValid })
-            .where(eq(schema.product.id, input.productId));
-        },
+        async () =>
+          await db.transaction(async (tx) => {
+            const [product] = await tx
+              .select({
+                makerProductUrlValid: schema.product.makerProductUrlValid,
+                ownerClerkId: schema.product.ownerClerkId,
+                ownerUserId: schema.user.id,
+              })
+              .from(schema.product)
+              .leftJoin(
+                schema.user,
+                eq(schema.product.ownerClerkId, schema.user.clerkId),
+              )
+              .where(eq(schema.product.id, input.productId))
+              .limit(1);
+            if (!product) throw new Error("Product does not exist.");
+            if (
+              product.ownerClerkId !== input.actor.clerkId &&
+              !input.reason?.trim()
+            ) {
+              throw new Error("A moderation reason is required.");
+            }
+            await tx
+              .update(schema.product)
+              .set({ makerProductUrlValid: input.makerProductUrlValid })
+              .where(eq(schema.product.id, input.productId));
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: { makerProductUrlValid: input.makerProductUrlValid },
+                before: {
+                  makerProductUrlValid: product.makerProductUrlValid,
+                },
+                definition: productAudit.makerProductUrlValidityChanged,
+                ownerUserId: product.ownerUserId,
+                reason: input.reason,
+                targetId: input.productId,
+              });
+            }
+          }),
         {
           attributes: {
             makerProductUrlValid: input.makerProductUrlValid,
@@ -732,9 +1151,64 @@ export function createCatalogService(
       );
     },
     async softDeleteImage(input) {
-      await softDeleteCatalogImage(db, input);
+      if (input.targetType === "product") {
+        const dependencies = requireProductAudit(users, audit);
+        const actorUser = dependencies
+          ? await dependencies.users.getByClerkId(input.actor.clerkId)
+          : null;
+        await db.transaction(async (tx) => {
+          const context = dependencies
+            ? await productImageContext(tx, input.imageId)
+            : null;
+          if (!(await softDeleteCatalogImage(tx, input))) return;
+          if (dependencies && actorUser) {
+            if (!context) throw new Error("Image does not exist.");
+            await writeProductAudit(dependencies.audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: { deleted: true, imageId: input.imageId },
+              before: { deleted: false, imageId: input.imageId },
+              definition: productAudit.imageDeleted,
+              ownerClerkId: context.ownerClerkId,
+              ownerUserId: context.ownerUserId,
+              reason: input.reason,
+              targetId: context.productId,
+            });
+          }
+        });
+        return;
+      }
+      const dependencies = requireCollectionAudit(
+        users,
+        audit,
+        "collection_item",
+      );
+      if (!dependencies) throw new Error("Collection audit is not configured.");
+      const actorUser = await dependencies.users.getByClerkId(
+        input.actor.clerkId,
+      );
+      if (!actorUser) throw new Error("Image does not exist.");
+      await db.transaction(async (tx) => {
+        if (!(await softDeleteCatalogImage(tx, input))) return;
+        const context = await collectionItemImageContext(tx, input.imageId);
+        if (!context) throw new Error("Image does not exist.");
+        await writeCollectionAudit(dependencies.audit, tx, {
+          actor: input.actor,
+          actorUser,
+          after: { deleted: true, imageId: input.imageId },
+          before: { deleted: false, imageId: input.imageId },
+          definition: collectionAudit.imageDeleted,
+          ownerUserId: context.ownerUserId,
+          reason: input.reason,
+          targetId: context.collectionItemId,
+        });
+      });
     },
     async updateProduct(input) {
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
       return await logger.operation(
         loggerMessages.database.catalog.updateProduct,
         async () => {
@@ -746,11 +1220,17 @@ export function createCatalogService(
                 makerProductUrl: schema.product.makerProductUrl,
                 makerProductUrlValid: schema.product.makerProductUrlValid,
                 ownerClerkId: schema.product.ownerClerkId,
+                ownerUserId: schema.user.id,
+                slug: schema.product.slug,
               })
               .from(schema.product)
               .innerJoin(
                 schema.productType,
                 eq(schema.product.productTypeId, schema.productType.id),
+              )
+              .leftJoin(
+                schema.user,
+                eq(schema.product.ownerClerkId, schema.user.clerkId),
               )
               .where(
                 and(
@@ -761,11 +1241,24 @@ export function createCatalogService(
               .limit(1);
             if (!existing) throw new Error("Product does not exist.");
             if (
-              !input.actorIsAdmin &&
-              existing.ownerClerkId !== input.actorClerkId
+              existing.ownerClerkId !== input.actor.clerkId &&
+              !hasPermission(input.actor, "products.manage")
             ) {
               throw new Error("Product does not exist.");
             }
+            const before =
+              dependencies && actorUser
+                ? productAuditState(
+                    (
+                      await queryProducts(
+                        tx as unknown as Database,
+                        input.productTypeSlug,
+                        existing.slug,
+                        input.actor,
+                      )
+                    )[0] ?? failProductLoad(),
+                  )
+                : undefined;
             const makerProductUrl =
               input.makerProductUrl === undefined
                 ? undefined
@@ -822,12 +1315,32 @@ export function createCatalogService(
                 .set({ ...buttonSpecs(input.specs), updatedAt: new Date() })
                 .where(eq(schema.productSpinnerButton.id, input.productId));
             }
+            if (dependencies && actorUser) {
+              const [updated] = await queryProducts(
+                tx as unknown as Database,
+                input.productTypeSlug,
+                input.slug,
+                input.actor,
+              );
+              if (!updated) throw new Error("Failed to load updated product.");
+              await writeProductAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: productAuditState(updated),
+                before,
+                definition: productAudit.productUpdated,
+                ownerClerkId: existing.ownerClerkId,
+                ownerUserId: existing.ownerUserId,
+                reason: input.reason,
+                targetId: input.productId,
+              });
+            }
           });
 
           const updated = await this.getProduct(
             input.productTypeSlug,
             input.slug,
-            { clerkId: input.actorClerkId, isAdmin: input.actorIsAdmin },
+            input.actor,
           );
           if (!updated) throw new Error("Failed to load updated product.");
           return updated;
@@ -838,9 +1351,19 @@ export function createCatalogService(
   };
 }
 
+/**
+ * Creates the collection database service.
+ *
+ * @param db - Application database.
+ * @param users - User lookup service.
+ * @param audit - Audit writer.
+ * @param logger - Structured operation logger.
+ * @returns Collection database operations.
+ */
 export function createCollectionsService(
   db: Database,
   users: UsersService,
+  audit: AuditService,
   logger: Logger,
 ): CollectionsService {
   return {
@@ -848,36 +1371,64 @@ export function createCollectionsService(
       return await logger.operation(
         loggerMessages.database.collections.create,
         async () => {
-          const owner = await users.ensure({ clerkId: input.actorClerkId });
-          const collectionId = await db.transaction(async (tx) =>
-            insertCollection(tx, owner.id, input),
-          );
+          const owner = await users.ensure({ clerkId: input.actor.clerkId });
+          const collectionId = await db.transaction(async (tx) => {
+            const id = await insertCollection(tx, owner.id, input);
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser: owner,
+              after: {
+                id,
+                isPrivate: input.isPrivate,
+                ...validatedCollectionValues(input),
+              },
+              definition: collectionAudit.collectionCreated,
+              ownerUserId: owner.id,
+              targetId: id,
+            });
+            return id;
+          });
           const collection = (
             await queryCollections(db, {
               collectionId,
               includePrivate: true,
               ownerUserId: owner.id,
-              viewerClerkId: input.actorClerkId,
-              viewerIsAdmin: false,
+              viewerClerkId: input.actor.clerkId,
+              viewerCanManage: false,
             })
           )[0];
           if (!collection) throw new Error("Failed to load collection.");
           return collection;
         },
-        actorAttributes(input.actorClerkId),
+        actorAttributes(input.actor.clerkId),
       );
     },
     async addSpinner(input) {
       return await logger.operation(
         loggerMessages.database.collections.addSpinner,
         async () => {
-          const owner = await users.ensure({ clerkId: input.actorClerkId });
+          const owner = await users.ensure({ clerkId: input.actor.clerkId });
           return await db.transaction(async (tx) => {
-            const collectionId = await resolveCollectionForWrite(tx, {
+            const resolvedCollection = await resolveCollectionForWrite(tx, {
               collectionId: input.collectionId ?? null,
               newCollection: input.newCollection ?? null,
               ownerId: owner.id,
             });
+            const collectionId = resolvedCollection.id;
+            if (resolvedCollection.created) {
+              await writeCollectionAudit(audit, tx, {
+                actor: input.actor,
+                actorUser: owner,
+                after: {
+                  id: collectionId,
+                  isPrivate: resolvedCollection.created.isPrivate,
+                  ...validatedCollectionValues(resolvedCollection.created),
+                },
+                definition: collectionAudit.collectionCreated,
+                ownerUserId: owner.id,
+                targetId: collectionId,
+              });
+            }
             let buttonItemId: number | null = null;
             if (
               input.buttonProductId === null &&
@@ -920,6 +1471,18 @@ export function createCollectionsService(
                 productId: input.buttonProductId,
               });
               buttonItemId = buttonItem.id;
+              await writeCollectionAudit(audit, tx, {
+                actor: input.actor,
+                actorUser: owner,
+                after: {
+                  collectionId,
+                  id: buttonItem.id,
+                  materialId: input.buttonMaterialId,
+                },
+                definition: collectionAudit.itemCreated,
+                ownerUserId: owner.id,
+                targetId: buttonItem.id,
+              });
             }
 
             await assertProductMaterial(
@@ -959,10 +1522,25 @@ export function createCollectionsService(
               productId: input.spinnerProductId,
             });
             await touchCollection(tx, collectionId);
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser: owner,
+              after: {
+                collectionId,
+                description: normalizeOptionalDescription(input.description),
+                displayName: input.displayName,
+                id: spinnerItem.id,
+                installedButtonId: buttonItemId,
+                materialId: input.spinnerMaterialId,
+              },
+              definition: collectionAudit.itemCreated,
+              ownerUserId: owner.id,
+              targetId: spinnerItem.id,
+            });
             return { buttonItemId, spinnerItemId: spinnerItem.id };
           });
         },
-        actorAttributes(input.actorClerkId, {
+        actorAttributes(input.actor.clerkId, {
           buttonProductId: input.buttonProductId,
           spinnerProductId: input.spinnerProductId,
         }),
@@ -972,13 +1550,28 @@ export function createCollectionsService(
       return await logger.operation(
         loggerMessages.database.collections.addSpinnerButton,
         async () => {
-          const owner = await users.ensure({ clerkId: input.actorClerkId });
+          const owner = await users.ensure({ clerkId: input.actor.clerkId });
           return await db.transaction(async (tx) => {
-            const collectionId = await resolveCollectionForWrite(tx, {
+            const resolvedCollection = await resolveCollectionForWrite(tx, {
               collectionId: input.collectionId ?? null,
               newCollection: input.newCollection ?? null,
               ownerId: owner.id,
             });
+            const collectionId = resolvedCollection.id;
+            if (resolvedCollection.created) {
+              await writeCollectionAudit(audit, tx, {
+                actor: input.actor,
+                actorUser: owner,
+                after: {
+                  id: collectionId,
+                  isPrivate: resolvedCollection.created.isPrivate,
+                  ...validatedCollectionValues(resolvedCollection.created),
+                },
+                definition: collectionAudit.collectionCreated,
+                ownerUserId: owner.id,
+                targetId: collectionId,
+              });
+            }
             await assertProductMaterial(tx, input.productId, input.materialId);
             const [item] = await tx
               .insert(schema.collectionItem)
@@ -1008,10 +1601,24 @@ export function createCollectionsService(
               productId: input.productId,
             });
             await touchCollection(tx, collectionId);
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser: owner,
+              after: {
+                collectionId,
+                description: normalizeOptionalDescription(input.description),
+                displayName: input.displayName,
+                id: item.id,
+                materialId: input.materialId,
+              },
+              definition: collectionAudit.itemCreated,
+              ownerUserId: owner.id,
+              targetId: item.id,
+            });
             return item.id;
           });
         },
-        actorAttributes(input.actorClerkId, { productId: input.productId }),
+        actorAttributes(input.actor.clerkId, { productId: input.productId }),
       );
     },
     async countOwnedProducts({ actorClerkId, productIds }) {
@@ -1052,17 +1659,175 @@ export function createCollectionsService(
       }
       return result;
     },
-    async getOwnedItem(actorClerkId, collectionItemId, actorIsAdmin = false) {
+    /**
+     * Moves or permanently deletes a collection and its contents.
+     *
+     * @param input - Authorized deletion request.
+     * @returns Completion after the transaction commits.
+     * @throws When the source or destination is inaccessible.
+     */
+    async deleteCollection(input) {
+      await logger.operation(
+        loggerMessages.database.collections.delete,
+        async () => {
+          const actorUser = await users.getByClerkId(input.actor.clerkId);
+          if (!actorUser) throw new Error("Collection does not exist.");
+          await db.transaction(async (tx) => {
+            const collectionIds = [
+              input.collectionId,
+              ...(input.destinationCollectionId === null
+                ? []
+                : [input.destinationCollectionId]),
+            ];
+            const collections = await tx
+              .select({
+                id: schema.userCollection.id,
+                name: schema.userCollection.name,
+                ownerId: schema.userCollection.ownerId,
+              })
+              .from(schema.userCollection)
+              .where(inArray(schema.userCollection.id, collectionIds))
+              .orderBy(asc(schema.userCollection.id))
+              .for("update");
+            const source = collections.find(
+              ({ id }) => id === input.collectionId,
+            );
+            if (
+              !source ||
+              (source.ownerId !== actorUser.id &&
+                !hasPermission(input.actor, "collections.manage"))
+            ) {
+              throw new Error("Collection does not exist.");
+            }
+            const destination =
+              input.destinationCollectionId === null
+                ? null
+                : collections.find(
+                    ({ id }) => id === input.destinationCollectionId,
+                  );
+            if (
+              input.destinationCollectionId === input.collectionId ||
+              (input.destinationCollectionId !== null &&
+                (!destination || destination.ownerId !== source.ownerId))
+            ) {
+              throw new Error("Destination collection does not exist.");
+            }
+
+            const collectionImages = await tx
+              .select({ objectPath: schema.collectionImage.objectPath })
+              .from(schema.collectionImage)
+              .where(
+                eq(schema.collectionImage.collectionId, input.collectionId),
+              );
+            const itemImages = destination
+              ? []
+              : await tx
+                  .select({ objectPath: schema.collectionItemImage.objectPath })
+                  .from(schema.collectionItemImage)
+                  .innerJoin(
+                    schema.collectionItem,
+                    eq(
+                      schema.collectionItemImage.collectionItemId,
+                      schema.collectionItem.id,
+                    ),
+                  )
+                  .where(
+                    eq(schema.collectionItem.collectionId, input.collectionId),
+                  );
+            await queueObjectDeletions(
+              tx,
+              [...collectionImages, ...itemImages].map(
+                ({ objectPath }) => objectPath,
+              ),
+            );
+
+            if (destination) {
+              await tx
+                .update(schema.collectionItem)
+                .set({
+                  collectionId: destination.id,
+                  updatedAt: new Date(),
+                })
+                .where(
+                  and(
+                    eq(schema.collectionItem.collectionId, input.collectionId),
+                    eq(schema.collectionItem.ownerId, source.ownerId),
+                  ),
+                );
+              await touchCollection(tx, destination.id);
+            }
+            await tx
+              .delete(schema.userCollection)
+              .where(eq(schema.userCollection.id, input.collectionId));
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: {
+                deleted: true,
+                destinationCollectionId: destination?.id ?? null,
+              },
+              before: { deleted: false, name: source.name },
+              definition: collectionAudit.collectionDeleted,
+              ownerUserId: source.ownerId,
+              reason: input.reason,
+              targetId: input.collectionId,
+            });
+          });
+        },
+        actorAttributes(input.actor.clerkId, {
+          collectionId: input.collectionId,
+          destinationCollectionId: input.destinationCollectionId ?? undefined,
+        }),
+      );
+    },
+    /**
+     * Loads valid deletion destinations and the affected item count.
+     *
+     * @param actor - Actor requesting the deletion choices.
+     * @param collectionId - Collection being considered for deletion.
+     * @returns Deletion context, or null when the collection is inaccessible.
+     */
+    async getDeletionContext(actor, collectionId) {
+      const canManage = hasPermission(actor, "collections.manage");
+      const actorUser = await users.getByClerkId(actor.clerkId);
+      if (!actorUser) return null;
+      const [source] = await db
+        .select({ ownerId: schema.userCollection.ownerId })
+        .from(schema.userCollection)
+        .where(eq(schema.userCollection.id, collectionId))
+        .limit(1);
+      if (!source || (source.ownerId !== actorUser.id && !canManage)) {
+        return null;
+      }
+      const [itemCountRows, collections] = await Promise.all([
+        db
+          .select({ itemCount: count(schema.collectionItem.id) })
+          .from(schema.collectionItem)
+          .where(eq(schema.collectionItem.collectionId, collectionId)),
+        queryCollections(db, {
+          includePrivate: true,
+          ownerUserId: source.ownerId,
+          viewerCanManage: canManage,
+          viewerClerkId: actor.clerkId,
+        }),
+      ]);
+      return {
+        destinations: collections.filter(({ id }) => id !== collectionId),
+        itemCount: Number(itemCountRows[0]?.itemCount ?? 0),
+      };
+    },
+    async getOwnedItem(actor, collectionItemId) {
+      const canManage = hasPermission(actor, "collections.manage");
       return (
         (
           await queryOwnedItems(
             db,
-            actorIsAdmin ? undefined : actorClerkId,
+            canManage ? undefined : actor.clerkId,
             collectionItemId,
             {
               includePrivate: true,
-              viewerClerkId: actorClerkId,
-              viewerIsAdmin: actorIsAdmin,
+              viewerClerkId: actor.clerkId,
+              viewerCanManage: canManage,
             },
           )
         )[0] ?? null
@@ -1079,17 +1844,18 @@ export function createCollectionsService(
       }
       return `${owner.username}'s Collection`;
     },
-    async getOwnedCollection(actorClerkId, collectionId, actorIsAdmin = false) {
-      const owner = await users.getByClerkId(actorClerkId);
-      if (!owner && !actorIsAdmin) return null;
+    async getOwnedCollection(actor, collectionId) {
+      const canManage = hasPermission(actor, "collections.manage");
+      const owner = await users.getByClerkId(actor.clerkId);
+      if (!owner && !canManage) return null;
       return (
         (
           await queryCollections(db, {
             collectionId,
             includePrivate: true,
-            ownerUserId: actorIsAdmin ? undefined : owner?.id,
-            viewerClerkId: actorClerkId,
-            viewerIsAdmin: actorIsAdmin,
+            ownerUserId: canManage ? undefined : owner?.id,
+            viewerClerkId: actor.clerkId,
+            viewerCanManage: canManage,
           })
         )[0] ?? null
       );
@@ -1099,10 +1865,10 @@ export function createCollectionsService(
         (
           await queryCollections(db, {
             collectionId,
-            includePrivate: Boolean(viewer?.isAdmin),
+            includePrivate: hasPermission(viewer, "collections.manage"),
             ownerUserId,
             viewerClerkId: viewer?.clerkId,
-            viewerIsAdmin: viewer?.isAdmin,
+            viewerCanManage: hasPermission(viewer, "collections.manage"),
           })
         )[0] ?? null
       );
@@ -1117,30 +1883,30 @@ export function createCollectionsService(
         (
           await queryOwnedItems(db, undefined, collectionItemId, {
             collectionId,
-            includePrivate: Boolean(viewer?.isAdmin),
+            includePrivate: hasPermission(viewer, "collections.manage"),
             ownerUserId,
             viewerClerkId: viewer?.clerkId,
-            viewerIsAdmin: viewer?.isAdmin,
+            viewerCanManage: hasPermission(viewer, "collections.manage"),
           })
         )[0] ?? null
       );
     },
-    async listOwned(actorClerkId, actorIsAdmin = false, collectionId) {
-      return await queryOwnedItems(db, actorClerkId, undefined, {
+    async listOwned(actor, collectionId) {
+      return await queryOwnedItems(db, actor.clerkId, undefined, {
         collectionId,
         includePrivate: true,
-        viewerClerkId: actorClerkId,
-        viewerIsAdmin: actorIsAdmin,
+        viewerClerkId: actor.clerkId,
+        viewerCanManage: hasPermission(actor, "collections.manage"),
       });
     },
-    async listOwnedCollections(actorClerkId, actorIsAdmin = false) {
-      const owner = await users.getByClerkId(actorClerkId);
+    async listOwnedCollections(actor) {
+      const owner = await users.getByClerkId(actor.clerkId);
       if (!owner) return [];
       return await queryCollections(db, {
         includePrivate: true,
         ownerUserId: owner.id,
-        viewerClerkId: actorClerkId,
-        viewerIsAdmin: actorIsAdmin,
+        viewerClerkId: actor.clerkId,
+        viewerCanManage: hasPermission(actor, "collections.manage"),
       });
     },
     async listProductItems(productId, viewer) {
@@ -1148,7 +1914,7 @@ export function createCollectionsService(
         productId,
         publicOnly: true,
         viewerClerkId: viewer?.clerkId,
-        viewerIsAdmin: viewer?.isAdmin,
+        viewerCanManage: hasPermission(viewer, "collections.manage"),
       });
     },
     async listOwners(viewer) {
@@ -1156,12 +1922,12 @@ export function createCollectionsService(
         queryOwnedItems(db, undefined, undefined, {
           publicOnly: true,
           viewerClerkId: viewer?.clerkId,
-          viewerIsAdmin: viewer?.isAdmin,
+          viewerCanManage: hasPermission(viewer, "collections.manage"),
         }),
         queryCollections(db, {
           publicOnly: true,
           viewerClerkId: viewer?.clerkId,
-          viewerIsAdmin: viewer?.isAdmin,
+          viewerCanManage: hasPermission(viewer, "collections.manage"),
         }),
       ]);
       const ownerIds = [
@@ -1194,153 +1960,234 @@ export function createCollectionsService(
         .sort((left, right) => left.username.localeCompare(right.username));
     },
     async setCollectionVisibility(input) {
-      const owner = await users.getByClerkId(input.actorClerkId);
-      if (!owner && !input.actorIsAdmin)
-        throw new Error("Collection does not exist.");
-      const [collection] = await db
-        .select({
-          isPrivate: schema.userCollection.isPrivate,
-          ownerId: schema.userCollection.ownerId,
-          privatedByClerkId: schema.userCollection.privatedByClerkId,
-        })
-        .from(schema.userCollection)
-        .where(eq(schema.userCollection.id, input.collectionId))
-        .limit(1);
-      if (
-        !collection ||
-        (!input.actorIsAdmin && collection.ownerId !== owner?.id)
-      ) {
-        throw new Error("Collection does not exist.");
-      }
-      const actorIsModerating =
-        input.actorIsAdmin && collection.ownerId !== owner?.id;
-      if (
-        !input.isPrivate &&
-        collection.privatedByClerkId &&
-        collection.privatedByClerkId !== input.actorClerkId &&
-        !actorIsModerating
-      ) {
-        throw new Error("Collection is private by an administrator.");
-      }
-      if (actorIsModerating && input.isPrivate && !input.reason?.trim()) {
-        throw new Error("A privacy reason is required.");
-      }
-      await db
-        .update(schema.userCollection)
-        .set(privacyUpdate({ ...input, actorIsAdmin: actorIsModerating }))
-        .where(eq(schema.userCollection.id, input.collectionId));
+      const canManage = hasPermission(input.actor, "collections.manage");
+      const actorUser = await users.getByClerkId(input.actor.clerkId);
+      if (!actorUser) throw new Error("Collection does not exist.");
+      await db.transaction(async (tx) => {
+        const [collection] = await tx
+          .select({
+            description: schema.userCollection.description,
+            isPrivate: schema.userCollection.isPrivate,
+            name: schema.userCollection.name,
+            ownerId: schema.userCollection.ownerId,
+            privatedByClerkId: schema.userCollection.privatedByClerkId,
+          })
+          .from(schema.userCollection)
+          .where(eq(schema.userCollection.id, input.collectionId))
+          .limit(1);
+        if (
+          !collection ||
+          (collection.ownerId !== actorUser.id && !canManage)
+        ) {
+          throw new Error("Collection does not exist.");
+        }
+        const actorIsModerating = collection.ownerId !== actorUser.id;
+        if (
+          !input.isPrivate &&
+          collection.privatedByClerkId &&
+          collection.privatedByClerkId !== input.actor.clerkId &&
+          !actorIsModerating
+        ) {
+          throw new Error("Collection is private by an administrator.");
+        }
+        const before = {
+          description: collection.description,
+          id: input.collectionId,
+          isPrivate: collection.isPrivate,
+          name: collection.name,
+        };
+        await tx
+          .update(schema.userCollection)
+          .set(
+            privacyUpdate({
+              actorClerkId: input.actor.clerkId,
+              actorIsModerating,
+              isPrivate: input.isPrivate,
+              reason: input.reason,
+            }),
+          )
+          .where(eq(schema.userCollection.id, input.collectionId));
+        await writeCollectionAudit(audit, tx, {
+          actor: input.actor,
+          actorUser,
+          after: { ...before, isPrivate: input.isPrivate },
+          before,
+          definition: collectionAudit.collectionVisibilityChanged,
+          ownerUserId: collection.ownerId,
+          reason: input.reason,
+          targetId: input.collectionId,
+        });
+      });
     },
     async updateCollection(input) {
       return await logger.operation(
         loggerMessages.database.collections.update,
         async () => {
-          const owner = await users.getByClerkId(input.actorClerkId);
-          const [current] = await db
-            .select({
-              isPrivate: schema.userCollection.isPrivate,
-              ownerId: schema.userCollection.ownerId,
-              privatedByClerkId: schema.userCollection.privatedByClerkId,
-            })
-            .from(schema.userCollection)
-            .where(eq(schema.userCollection.id, input.collectionId))
-            .limit(1);
-          if (
-            !current ||
-            (!input.actorIsAdmin && current.ownerId !== owner?.id)
-          ) {
-            throw new Error("Collection does not exist.");
-          }
-          const actorIsModerating =
-            input.actorIsAdmin && current.ownerId !== owner?.id;
-          if (
-            !input.isPrivate &&
-            current.privatedByClerkId &&
-            current.privatedByClerkId !== input.actorClerkId &&
-            !actorIsModerating
-          ) {
-            throw new Error("Collection is private by an administrator.");
-          }
-          if (
-            actorIsModerating &&
-            input.isPrivate !== current.isPrivate &&
-            input.isPrivate &&
-            !input.reason?.trim()
-          ) {
-            throw new Error("A privacy reason is required.");
-          }
-          const values = validatedCollectionValues(input);
-          await db
-            .update(schema.userCollection)
-            .set({
-              ...values,
-              ...(input.isPrivate === current.isPrivate
-                ? { updatedAt: new Date() }
-                : privacyUpdate({
-                    ...input,
-                    actorIsAdmin: actorIsModerating,
-                  })),
-            })
-            .where(eq(schema.userCollection.id, input.collectionId));
+          const canManage = hasPermission(input.actor, "collections.manage");
+          const actorUser = await users.getByClerkId(input.actor.clerkId);
+          if (!actorUser) throw new Error("Collection does not exist.");
+          const current = await db.transaction(async (tx) => {
+            const [row] = await tx
+              .select({
+                description: schema.userCollection.description,
+                isPrivate: schema.userCollection.isPrivate,
+                name: schema.userCollection.name,
+                ownerId: schema.userCollection.ownerId,
+                privatedByClerkId: schema.userCollection.privatedByClerkId,
+              })
+              .from(schema.userCollection)
+              .where(eq(schema.userCollection.id, input.collectionId))
+              .limit(1);
+            if (!row || (row.ownerId !== actorUser.id && !canManage)) {
+              throw new Error("Collection does not exist.");
+            }
+            const actorIsModerating = row.ownerId !== actorUser.id;
+            if (
+              !input.isPrivate &&
+              row.privatedByClerkId &&
+              row.privatedByClerkId !== input.actor.clerkId &&
+              !actorIsModerating
+            ) {
+              throw new Error("Collection is private by an administrator.");
+            }
+            const values = validatedCollectionValues(input);
+            const before = {
+              description: row.description,
+              id: input.collectionId,
+              isPrivate: row.isPrivate,
+              name: row.name,
+            };
+            await tx
+              .update(schema.userCollection)
+              .set({
+                ...values,
+                ...(input.isPrivate === row.isPrivate
+                  ? { updatedAt: new Date() }
+                  : privacyUpdate({
+                      actorClerkId: input.actor.clerkId,
+                      actorIsModerating,
+                      isPrivate: input.isPrivate,
+                      reason: input.reason,
+                    })),
+              })
+              .where(eq(schema.userCollection.id, input.collectionId));
+            const after = {
+              description: values.description,
+              id: input.collectionId,
+              isPrivate: input.isPrivate,
+              name: values.name,
+            };
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after,
+              before,
+              definition: collectionAudit.collectionUpdated,
+              ownerUserId: row.ownerId,
+              reason: input.reason,
+              targetId: input.collectionId,
+            });
+            if (input.isPrivate !== row.isPrivate) {
+              await writeCollectionAudit(audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after,
+                before,
+                definition: collectionAudit.collectionVisibilityChanged,
+                ownerUserId: row.ownerId,
+                reason: input.reason,
+                targetId: input.collectionId,
+              });
+            }
+            return row;
+          });
           const collection = (
             await queryCollections(db, {
               collectionId: input.collectionId,
               includePrivate: true,
               ownerUserId: current.ownerId,
-              viewerClerkId: input.actorClerkId,
-              viewerIsAdmin: input.actorIsAdmin,
+              viewerClerkId: input.actor.clerkId,
+              viewerCanManage: canManage,
             })
           )[0];
           if (!collection) throw new Error("Failed to load collection.");
           return collection;
         },
-        actorAttributes(input.actorClerkId, {
+        actorAttributes(input.actor.clerkId, {
           collectionId: input.collectionId,
         }),
       );
     },
     async setItemVisibility(input) {
-      const owner = await users.getByClerkId(input.actorClerkId);
-      const [item] = await db
-        .select({
-          ownerId: schema.collectionItem.ownerId,
-          privatedByClerkId: schema.collectionItem.privatedByClerkId,
-        })
-        .from(schema.collectionItem)
-        .where(eq(schema.collectionItem.id, input.collectionItemId))
-        .limit(1);
-      if (!item || (!input.actorIsAdmin && item.ownerId !== owner?.id))
-        throw new Error("Collection item does not exist.");
-      const actorIsModerating =
-        input.actorIsAdmin && item.ownerId !== owner?.id;
-      if (
-        !input.isPrivate &&
-        item.privatedByClerkId &&
-        item.privatedByClerkId !== input.actorClerkId &&
-        !actorIsModerating
-      ) {
-        throw new Error("Collection item is private by an administrator.");
-      }
-      if (actorIsModerating && input.isPrivate && !input.reason?.trim())
-        throw new Error("A privacy reason is required.");
-      await db
-        .update(schema.collectionItem)
-        .set(privacyUpdate({ ...input, actorIsAdmin: actorIsModerating }))
-        .where(eq(schema.collectionItem.id, input.collectionItemId));
+      const canManage = hasPermission(input.actor, "collections.manage");
+      const actorUser = await users.getByClerkId(input.actor.clerkId);
+      if (!actorUser) throw new Error("Collection item does not exist.");
+      await db.transaction(async (tx) => {
+        const [item] = await tx
+          .select({
+            isPrivate: schema.collectionItem.isPrivate,
+            ownerId: schema.collectionItem.ownerId,
+            privatedByClerkId: schema.collectionItem.privatedByClerkId,
+          })
+          .from(schema.collectionItem)
+          .where(eq(schema.collectionItem.id, input.collectionItemId))
+          .limit(1);
+        if (!item || (item.ownerId !== actorUser.id && !canManage))
+          throw new Error("Collection item does not exist.");
+        const actorIsModerating = item.ownerId !== actorUser.id;
+        if (
+          !input.isPrivate &&
+          item.privatedByClerkId &&
+          item.privatedByClerkId !== input.actor.clerkId &&
+          !actorIsModerating
+        ) {
+          throw new Error("Collection item is private by an administrator.");
+        }
+        const before = {
+          id: input.collectionItemId,
+          isPrivate: item.isPrivate,
+        };
+        await tx
+          .update(schema.collectionItem)
+          .set(
+            privacyUpdate({
+              actorClerkId: input.actor.clerkId,
+              actorIsModerating,
+              isPrivate: input.isPrivate,
+              reason: input.reason,
+            }),
+          )
+          .where(eq(schema.collectionItem.id, input.collectionItemId));
+        await writeCollectionAudit(audit, tx, {
+          actor: input.actor,
+          actorUser,
+          after: { ...before, isPrivate: input.isPrivate },
+          before,
+          definition: collectionAudit.itemVisibilityChanged,
+          ownerUserId: item.ownerId,
+          reason: input.reason,
+          targetId: input.collectionItemId,
+        });
+      });
     },
     async updateItem(input) {
       await logger.operation(
         loggerMessages.database.collections.updateItem,
         async () => {
-          const owner = await users.getByClerkId(input.actorClerkId);
-          if (!owner && !input.actorIsAdmin)
-            throw new Error("Collection item does not exist.");
+          const canManage = hasPermission(input.actor, "collections.manage");
+          const owner = await users.getByClerkId(input.actor.clerkId);
+          if (!owner) throw new Error("Collection item does not exist.");
           await db.transaction(async (tx) => {
             const [item] = await tx
               .select({
                 buttonProductId:
                   schema.collectionSpinnerButton.productSpinnerButtonId,
                 collectionId: schema.collectionItem.collectionId,
+                description: schema.collectionItem.description,
+                displayName: schema.collectionItem.displayName,
                 installedButtonId: schema.collectionSpinner.installedButtonId,
+                isPrivate: schema.collectionItem.isPrivate,
+                materialId: schema.collectionItem.materialId,
                 ownerId: schema.collectionItem.ownerId,
                 spinnerProductId: schema.collectionSpinner.productSpinnerId,
               })
@@ -1356,7 +2203,7 @@ export function createCollectionsService(
               .where(
                 and(
                   eq(schema.collectionItem.id, input.collectionItemId),
-                  input.actorIsAdmin
+                  canManage
                     ? undefined
                     : owner
                       ? eq(schema.collectionItem.ownerId, owner.id)
@@ -1370,6 +2217,15 @@ export function createCollectionsService(
             if (!item || productId === null) {
               throw new Error("Collection item does not exist.");
             }
+            const before = {
+              collectionId: item.collectionId,
+              description: item.description,
+              displayName: item.displayName,
+              id: input.collectionItemId,
+              installedButtonId: item.installedButtonId,
+              isPrivate: item.isPrivate,
+              materialId: item.materialId,
+            };
 
             const targetCollectionId = input.collectionId ?? item.collectionId;
             const [targetCollection] = await tx
@@ -1466,7 +2322,7 @@ export function createCollectionsService(
                         schema.collectionSpinnerButton.id,
                         input.installedButton.collectionItemId,
                       ),
-                      input.actorIsAdmin
+                      canManage
                         ? undefined
                         : owner
                           ? eq(schema.collectionItem.ownerId, owner.id)
@@ -1490,18 +2346,66 @@ export function createCollectionsService(
                   productId: button.productId,
                 });
               }
-              await tx
-                .update(schema.collectionSpinner)
-                .set({
-                  installedButtonId:
-                    input.installedButton?.collectionItemId ?? null,
-                })
-                .where(eq(schema.collectionSpinner.id, input.collectionItemId));
+              try {
+                await tx
+                  .update(schema.collectionSpinner)
+                  .set({
+                    installedButtonId:
+                      input.installedButton?.collectionItemId ?? null,
+                  })
+                  .where(
+                    eq(schema.collectionSpinner.id, input.collectionItemId),
+                  );
+              } catch (error) {
+                if (
+                  uniqueConstraint(error) ===
+                  "collection_spinner_installed_button_unique"
+                ) {
+                  throw new CollectionButtonAlreadyInstalledError();
+                }
+                throw error;
+              }
             }
             await touchCollection(tx, targetCollectionId);
+            const after = {
+              ...before,
+              collectionId: targetCollectionId,
+              description:
+                input.description === undefined
+                  ? item.description
+                  : normalizeOptionalDescription(input.description),
+              displayName: input.displayName.trim(),
+              installedButtonId:
+                input.installedButton === undefined
+                  ? item.installedButtonId
+                  : (input.installedButton?.collectionItemId ?? null),
+              materialId: input.materialId,
+            };
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser: owner,
+              after,
+              before,
+              definition: collectionAudit.itemUpdated,
+              ownerUserId: item.ownerId,
+              reason: input.reason,
+              targetId: input.collectionItemId,
+            });
+            if (item.collectionId !== targetCollectionId) {
+              await writeCollectionAudit(audit, tx, {
+                actor: input.actor,
+                actorUser: owner,
+                after: { collectionId: targetCollectionId },
+                before: { collectionId: item.collectionId },
+                definition: collectionAudit.itemMoved,
+                ownerUserId: item.ownerId,
+                reason: input.reason,
+                targetId: input.collectionItemId,
+              });
+            }
           });
         },
-        actorAttributes(input.actorClerkId, {
+        actorAttributes(input.actor.clerkId, {
           collectionItemId: input.collectionItemId,
           installedButtonId: input.installedButton?.collectionItemId,
           materialId: input.materialId,
@@ -1509,6 +2413,176 @@ export function createCollectionsService(
       );
     },
   };
+}
+
+async function collectionImageTargetContext(
+  db: Pick<Database, "select">,
+  target: UploadTarget,
+): Promise<{ ownerUserId: number } | null> {
+  if (target.type === "collection") {
+    const [row] = await db
+      .select({ ownerUserId: schema.userCollection.ownerId })
+      .from(schema.userCollection)
+      .where(eq(schema.userCollection.id, target.id))
+      .limit(1);
+    return row ?? null;
+  }
+  if (target.type === "collection_item") {
+    const [row] = await db
+      .select({ ownerUserId: schema.collectionItem.ownerId })
+      .from(schema.collectionItem)
+      .where(eq(schema.collectionItem.id, target.id))
+      .limit(1);
+    return row ?? null;
+  }
+  return null;
+}
+
+async function productImageTargetContext(
+  db: Pick<Database, "select">,
+  target: UploadTarget,
+) {
+  if (target.type !== "product") return null;
+  const [row] = await db
+    .select({
+      ownerClerkId: schema.product.ownerClerkId,
+      ownerUserId: schema.user.id,
+    })
+    .from(schema.product)
+    .leftJoin(schema.user, eq(schema.product.ownerClerkId, schema.user.clerkId))
+    .where(eq(schema.product.id, target.id))
+    .limit(1);
+  return row ?? null;
+}
+
+async function collectionImageState(
+  db: Pick<Database, "select">,
+  target: UploadTarget,
+): Promise<AuditJsonObject> {
+  if (target.type === "collection") {
+    const images = await db
+      .select({
+        id: schema.collectionImage.id,
+        isCurrent: schema.collectionImage.isCurrent,
+      })
+      .from(schema.collectionImage)
+      .where(eq(schema.collectionImage.collectionId, target.id));
+    return {
+      currentImageId: images.find(({ isCurrent }) => isCurrent)?.id ?? null,
+      imageIds: images.map(({ id }) => id),
+    };
+  }
+  if (target.type === "collection_item") {
+    const images = await db
+      .select({ id: schema.collectionItemImage.id })
+      .from(schema.collectionItemImage)
+      .where(eq(schema.collectionItemImage.collectionItemId, target.id));
+    return { imageIds: images.map(({ id }) => id) };
+  }
+  if (target.type === "product") {
+    const images = await db
+      .select({ id: schema.productImage.id })
+      .from(schema.productImage)
+      .where(eq(schema.productImage.productId, target.id));
+    return { imageIds: images.map(({ id }) => id) };
+  }
+  return {};
+}
+
+async function collectionItemImageContext(
+  db: Pick<Database, "select">,
+  imageId: number,
+) {
+  const [row] = await db
+    .select({
+      collectionItemId: schema.collectionItemImage.collectionItemId,
+      ownerUserId: schema.collectionItem.ownerId,
+    })
+    .from(schema.collectionItemImage)
+    .innerJoin(
+      schema.collectionItem,
+      eq(schema.collectionItemImage.collectionItemId, schema.collectionItem.id),
+    )
+    .where(eq(schema.collectionItemImage.id, imageId))
+    .limit(1);
+  return row ?? null;
+}
+
+async function productImageContext(
+  db: Pick<Database, "select">,
+  imageId: number,
+) {
+  const [row] = await db
+    .select({
+      ownerClerkId: schema.product.ownerClerkId,
+      ownerUserId: schema.user.id,
+      productId: schema.productImage.productId,
+    })
+    .from(schema.productImage)
+    .innerJoin(
+      schema.product,
+      eq(schema.productImage.productId, schema.product.id),
+    )
+    .leftJoin(schema.user, eq(schema.product.ownerClerkId, schema.user.clerkId))
+    .where(eq(schema.productImage.id, imageId))
+    .limit(1);
+  return row ?? null;
+}
+
+function requireCollectionAudit(
+  users: UsersService | undefined,
+  audit: AuditService | undefined,
+  targetType: UploadTarget["type"],
+) {
+  if (targetType === "product" || targetType === "resource") return null;
+  if (!users || !audit) throw new Error("Collection audit is not configured.");
+  return { audit, users };
+}
+
+function requireProductAudit(
+  users: UsersService | undefined,
+  audit: AuditService | undefined,
+) {
+  if (!users && !audit) return null;
+  if (!users || !audit) throw new Error("Product audit is not configured.");
+  return { audit, users };
+}
+
+function productAuditState(product: CatalogProduct): AuditJsonObject {
+  return {
+    bearing: product.bearing,
+    buttonDiameterMm: product.buttonDiameterMm,
+    compatibleButtonId: product.compatibleButtonId,
+    description: product.description,
+    diameterMm: product.diameterMm,
+    finishOptions: product.finishOptions.map((option) => ({
+      colorEffectId: option.colorEffect?.id ?? null,
+      colorIds: option.colors.map(({ id }) => id),
+      finishIds: option.finishes.map(({ id }) => id),
+      id: option.id,
+    })),
+    id: product.id,
+    imageIds: product.images.map(({ id }) => id),
+    isPrivate: product.isPrivate,
+    lengthMm: product.lengthMm,
+    makerId: product.makerId,
+    makerProductUrl: product.makerProductUrl,
+    makerProductUrlValid: product.makerProductUrlValid,
+    materialIds: product.materials.map(({ id }) => id),
+    name: product.name,
+    productTypeId: product.productTypeId,
+    productTypeSlug: product.productTypeSlug,
+    slug: product.slug,
+    spinDiameterMm: product.spinDiameterMm,
+    thicknessMm: product.thicknessMm,
+    thicknessWithButtonMm: product.thicknessWithButtonMm,
+    weightG: product.weightG,
+    widthMm: product.widthMm,
+  };
+}
+
+function failProductLoad(): never {
+  throw new Error("Failed to load product audit state.");
 }
 
 export function normalizeCollectionName(name: string) {
@@ -1564,7 +2638,10 @@ async function resolveCollectionForWrite(
     throw new Error("Choose an existing or new collection, not both.");
   }
   if (input.newCollection !== null) {
-    return await insertCollection(tx, input.ownerId, input.newCollection);
+    return {
+      created: input.newCollection,
+      id: await insertCollection(tx, input.ownerId, input.newCollection),
+    };
   }
   if (input.collectionId !== null) {
     const [collection] = await tx
@@ -1578,7 +2655,7 @@ async function resolveCollectionForWrite(
       )
       .limit(1);
     if (!collection) throw new Error("Collection does not exist.");
-    return collection.id;
+    return { created: null, id: collection.id };
   }
 
   const collections = await tx
@@ -1588,7 +2665,7 @@ async function resolveCollectionForWrite(
     .limit(2);
   if (collections.length > 1) throw new Error("Choose a collection.");
   const existingCollection = collections[0];
-  if (existingCollection) return existingCollection.id;
+  if (existingCollection) return { created: null, id: existingCollection.id };
 
   const [owner] = await tx
     .select({ username: schema.user.username })
@@ -1598,11 +2675,15 @@ async function resolveCollectionForWrite(
   if (!owner?.username) {
     throw new Error("User profile sync is incomplete. Please retry.");
   }
-  return await insertCollection(tx, input.ownerId, {
+  const created = {
     description: null,
     isPrivate: true,
     name: `${owner.username}'s Collection`,
-  });
+  };
+  return {
+    created,
+    id: await insertCollection(tx, input.ownerId, created),
+  };
 }
 
 async function touchCollection(tx: CatalogTransaction, collectionId: number) {
@@ -1620,7 +2701,7 @@ async function queryCollections(
     ownerUserId?: number;
     publicOnly?: boolean;
     viewerClerkId?: string;
-    viewerIsAdmin?: boolean;
+    viewerCanManage?: boolean;
   } = {},
 ): Promise<UserCollectionSummary[]> {
   const conditions = [];
@@ -1713,9 +2794,9 @@ async function queryCollections(
       ]),
   );
   return visibleRows.map((row) => ({
-    canAdminister: Boolean(options.viewerIsAdmin),
+    canAdminister: Boolean(options.viewerCanManage),
     canEdit: Boolean(
-      options.viewerIsAdmin || options.viewerClerkId === row.ownerClerkId,
+      options.viewerCanManage || options.viewerClerkId === row.ownerClerkId,
     ),
     coverImage: coverByCollection.get(row.id) ?? null,
     coverImages: covers
@@ -1801,7 +2882,7 @@ async function queryProducts(
     conditions.push(eq(schema.productType.slug, productTypeSlug));
   }
   if (productSlug) conditions.push(eq(schema.product.slug, productSlug));
-  if (!viewer?.isAdmin) {
+  if (!hasPermission(viewer, "products.manage")) {
     conditions.push(
       viewer?.clerkId
         ? sql`(${schema.product.isPrivate} = false or ${schema.product.ownerClerkId} = ${viewer.clerkId})`
@@ -1894,8 +2975,11 @@ async function queryProducts(
       buttonDiameterMm: row.buttonDiameterMm,
       compatibleButtonId: row.compatibleButtonId,
       compatibleButtonName: row.compatibleButtonName,
-      canAdminister: Boolean(viewer?.isAdmin),
-      canEdit: Boolean(viewer?.isAdmin || viewer?.clerkId === row.ownerClerkId),
+      canAdminister: hasPermission(viewer, "products.manage"),
+      canEdit: Boolean(
+        viewer?.clerkId === row.ownerClerkId ||
+          hasPermission(viewer, "products.manage"),
+      ),
       createdAt: row.createdAt,
       description: row.description,
       diameterMm: row.diameterMm,
@@ -1976,7 +3060,7 @@ async function loadProductImages(
     const product = productById.get(row.productId);
     if (!product) continue;
     const canSeeDeleted =
-      viewer?.isAdmin ||
+      hasPermission(viewer, "products.manage") ||
       (viewer?.clerkId === product.ownerClerkId &&
         row.deletedByRole === "owner");
     if (row.deletedAt && !canSeeDeleted) continue;
@@ -2113,7 +3197,7 @@ async function queryOwnedItems(
     productId?: number;
     publicOnly?: boolean;
     viewerClerkId?: string;
-    viewerIsAdmin?: boolean;
+    viewerCanManage?: boolean;
   } = {},
 ): Promise<UserCollectionItem[]> {
   const conditions = [eq(schema.collectionItem.owned, true)];
@@ -2250,9 +3334,9 @@ async function queryOwnedItems(
   const items: UserCollectionItem[] = visibleRows.map((row) => ({
     bearing: row.bearingOverride ?? row.productBearing,
     bearingOverride: row.bearingOverride,
-    canAdminister: Boolean(options.viewerIsAdmin),
+    canAdminister: Boolean(options.viewerCanManage),
     canEdit: Boolean(
-      options.viewerIsAdmin || options.viewerClerkId === row.ownerClerkId,
+      options.viewerCanManage || options.viewerClerkId === row.ownerClerkId,
     ),
     collectionIsPrivate: row.collectionIsPrivate,
     collectionId: row.collectionId,
@@ -2394,14 +3478,14 @@ function toCatalogImage(row: {
 
 function privacyUpdate(input: {
   actorClerkId: string;
-  actorIsAdmin: boolean;
+  actorIsModerating: boolean;
   isPrivate: boolean;
   reason?: string;
 }) {
   return input.isPrivate
     ? {
         isPrivate: true,
-        privateReason: input.actorIsAdmin ? input.reason?.trim() : "",
+        privateReason: input.actorIsModerating ? input.reason?.trim() : "",
         privatedAt: new Date(),
         privatedByClerkId: input.actorClerkId,
         updatedAt: new Date(),
@@ -2416,16 +3500,16 @@ function privacyUpdate(input: {
 }
 
 async function softDeleteCatalogImage(
-  db: Database,
+  db: Pick<Database, "select" | "update">,
   input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     imageId: number;
     targetType: CatalogImageTargetType;
   },
 ) {
   const deletedAt = new Date();
   if (input.targetType === "product") {
+    const canManage = hasPermission(input.actor, "products.manage");
     const [image] = await db
       .select({
         deletedAt: schema.productImage.deletedAt,
@@ -2438,23 +3522,20 @@ async function softDeleteCatalogImage(
       )
       .where(eq(schema.productImage.id, input.imageId))
       .limit(1);
-    if (
-      !image ||
-      (!input.actorIsAdmin && image.ownerClerkId !== input.actorClerkId)
-    )
+    if (!image || (image.ownerClerkId !== input.actor.clerkId && !canManage))
       throw new Error("Image does not exist.");
-    if (image.deletedAt) return;
+    if (image.deletedAt) return false;
     const actorIsModerating =
-      input.actorIsAdmin && image.ownerClerkId !== input.actorClerkId;
+      canManage && image.ownerClerkId !== input.actor.clerkId;
     await db
       .update(schema.productImage)
       .set({
         deletedAt,
-        deletedByClerkId: input.actorClerkId,
+        deletedByClerkId: input.actor.clerkId,
         deletedByRole: actorIsModerating ? "admin" : "owner",
       })
       .where(eq(schema.productImage.id, input.imageId));
-    return;
+    return true;
   }
   const [image] = await db
     .select({
@@ -2469,29 +3550,27 @@ async function softDeleteCatalogImage(
     .innerJoin(schema.user, eq(schema.collectionItem.ownerId, schema.user.id))
     .where(eq(schema.collectionItemImage.id, input.imageId))
     .limit(1);
-  if (
-    !image ||
-    (!input.actorIsAdmin && image.ownerClerkId !== input.actorClerkId)
-  )
+  const canManage = hasPermission(input.actor, "collections.manage");
+  if (!image || (image.ownerClerkId !== input.actor.clerkId && !canManage))
     throw new Error("Image does not exist.");
-  if (image.deletedAt) return;
+  if (image.deletedAt) return false;
   const actorIsModerating =
-    input.actorIsAdmin && image.ownerClerkId !== input.actorClerkId;
+    canManage && image.ownerClerkId !== input.actor.clerkId;
   await db
     .update(schema.collectionItemImage)
     .set({
       deletedAt,
-      deletedByClerkId: input.actorClerkId,
+      deletedByClerkId: input.actor.clerkId,
       deletedByRole: actorIsModerating ? "admin" : "owner",
     })
     .where(eq(schema.collectionItemImage.id, input.imageId));
+  return true;
 }
 
 async function restoreCatalogImage(
-  db: Database,
+  db: Pick<Database, "select" | "update">,
   input: {
-    actorClerkId: string;
-    actorIsAdmin: boolean;
+    actor: Actor;
     imageId: number;
     targetType: CatalogImageTargetType;
   },
@@ -2515,7 +3594,7 @@ async function restoreCatalogImage(
         ),
       )
       .limit(1);
-    assertCanRestoreImage(image, input);
+    assertCanRestoreImage(image, input.actor, "products.manage");
     await db
       .update(schema.productImage)
       .set({ deletedAt: null, deletedByClerkId: null, deletedByRole: null })
@@ -2541,7 +3620,7 @@ async function restoreCatalogImage(
       ),
     )
     .limit(1);
-  assertCanRestoreImage(image, input);
+  assertCanRestoreImage(image, input.actor, "collections.manage");
   await db
     .update(schema.collectionItemImage)
     .set({ deletedAt: null, deletedByClerkId: null, deletedByRole: null })
@@ -2553,19 +3632,20 @@ function assertCanRestoreImage(
     | {
         deletedByClerkId: string | null;
         deletedByRole: "admin" | "owner" | null;
-        ownerClerkId: string;
+        ownerClerkId: string | null;
       }
     | undefined,
-  actor: { actorClerkId: string; actorIsAdmin: boolean },
+  actor: Actor,
+  permission: "products.manage" | "collections.manage",
 ) {
-  const isOwner = image?.ownerClerkId === actor.actorClerkId;
-  const actorIsModerating = actor.actorIsAdmin && !isOwner;
+  const isOwner = image?.ownerClerkId === actor.clerkId;
+  const actorIsModerating = hasPermission(actor, permission) && !isOwner;
   if (
     !image ||
     (!actorIsModerating &&
       (!isOwner ||
         image.deletedByRole === "admin" ||
-        image.deletedByClerkId !== actor.actorClerkId))
+        image.deletedByClerkId !== actor.clerkId))
   ) {
     throw new Error("Image does not exist.");
   }
@@ -2573,8 +3653,9 @@ function assertCanRestoreImage(
 
 async function listCatalogImageTrash(
   db: Database,
-  actor: { actorClerkId: string; actorIsAdmin: boolean },
+  input: { actor: Actor },
 ): Promise<CatalogImageTrashItem[]> {
+  const { actor } = input;
   const [products, collectionItems] = await Promise.all([
     db
       .select({
@@ -2601,12 +3682,12 @@ async function listCatalogImageTrash(
       .where(
         and(
           isNotNull(schema.productImage.deletedAt),
-          actor.actorIsAdmin
+          hasPermission(actor, "products.manage")
             ? undefined
             : and(
-                eq(schema.product.ownerClerkId, actor.actorClerkId),
+                eq(schema.product.ownerClerkId, actor.clerkId),
                 eq(schema.productImage.deletedByRole, "owner"),
-                eq(schema.productImage.deletedByClerkId, actor.actorClerkId),
+                eq(schema.productImage.deletedByClerkId, actor.clerkId),
               ),
         ),
       ),
@@ -2654,15 +3735,12 @@ async function listCatalogImageTrash(
       .where(
         and(
           isNotNull(schema.collectionItemImage.deletedAt),
-          actor.actorIsAdmin
+          hasPermission(actor, "collections.manage")
             ? undefined
             : and(
-                eq(schema.user.clerkId, actor.actorClerkId),
+                eq(schema.user.clerkId, actor.clerkId),
                 eq(schema.collectionItemImage.deletedByRole, "owner"),
-                eq(
-                  schema.collectionItemImage.deletedByClerkId,
-                  actor.actorClerkId,
-                ),
+                eq(schema.collectionItemImage.deletedByClerkId, actor.clerkId),
               ),
         ),
       ),
@@ -2979,7 +4057,7 @@ function actorAttributes(
 }
 
 function productAttributes(input: ProductWriteInput) {
-  return actorAttributes(input.actorClerkId, {
+  return actorAttributes(input.actor.clerkId, {
     finishOptionCount: input.finishOptions.length,
     materialIds: input.materialIds,
     productTypeSlug: input.productTypeSlug,

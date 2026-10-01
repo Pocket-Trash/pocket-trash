@@ -2,7 +2,7 @@ import type { CatalogImageTrashItem } from "@package/services";
 import { formatTranslation } from "@pocket-trash/localizations";
 import { RotateCcw } from "lucide-react";
 import { useState } from "react";
-import { AppShell } from "@/components/app-shell";
+import { AdminPageShell } from "@/components/admin-page-shell";
 import { Button } from "@/components/ui/button";
 import { restoreCatalogImage } from "@/lib/catalog-api";
 import { useLocale } from "@/providers/locale-provider";
@@ -19,7 +19,14 @@ export function CatalogImageTrashPage({
     values: Record<string, unknown> = {},
   ) => formatTranslation(key, values, locale);
   return (
-    <AppShell title={t("web.resources.upload.imagesLabel")}>
+    <AdminPageShell
+      breadcrumbItems={[
+        { label: t("web.navigation.admin"), to: "/admin" },
+        { label: t("web.admin.trash.title"), to: "/admin/trash" },
+      ]}
+      section="trash"
+      title={t("web.admin.hub.catalogImageTrash")}
+    >
       <main className="grid max-w-4xl gap-3 p-6">
         {images.map((image) => (
           <article
@@ -39,8 +46,16 @@ export function CatalogImageTrashPage({
             </div>
             <Button
               onClick={async () => {
+                const reason = window
+                  .prompt(t("web.resources.moderation.reasonLabel"))
+                  ?.trim();
+                if (!reason) return;
                 await restoreCatalogImage({
-                  data: { imageId: image.id, targetType: image.targetType },
+                  data: {
+                    imageId: image.id,
+                    reason,
+                    targetType: image.targetType,
+                  },
                 });
                 setImages((current) =>
                   current.filter(
@@ -59,6 +74,6 @@ export function CatalogImageTrashPage({
           </article>
         ))}
       </main>
-    </AppShell>
+    </AdminPageShell>
   );
 }

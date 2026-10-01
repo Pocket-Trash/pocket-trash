@@ -8,21 +8,24 @@ import { ChevronRight, Home } from "lucide-react";
 import type * as React from "react";
 import { toast } from "sonner";
 import { LanguageSelect } from "@/components/language-select";
-import { PageFooter } from "@/components/page-footer";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { updateLocaleSetting } from "@/lib/locale-api";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
-type AppShellProps = {
+export type AppShellProps = {
   breadcrumbItems?: Array<
     | {
         label: string;
         to?:
+          | "/admin"
+          | "/admin/feedback"
+          | "/admin/trash"
           | "/collections"
           | "/help"
           | "/products"
+          | "/notifications"
           | "/user"
           | "/user/account"
           | "/user/collections";
@@ -65,7 +68,7 @@ export function AppShell({
   return (
     <div
       className={cn(
-        "flex min-h-svh flex-col bg-background text-foreground",
+        "flex flex-1 flex-col bg-background text-foreground",
         contained && "container mx-auto",
       )}
     >
@@ -140,10 +143,14 @@ export function AppShell({
           </div>
         ) : null}
       </header>
-      <div className={cn("flex-1", contained && "[&>*]:mx-auto [&>*]:w-full")}>
+      <div
+        className={cn(
+          "flex flex-1 flex-col",
+          contained && "[&>*]:mx-auto [&>*]:w-full",
+        )}
+      >
         {children}
       </div>
-      <PageFooter />
     </div>
   );
 }

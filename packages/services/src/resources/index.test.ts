@@ -6,11 +6,16 @@ import {
   type LogTransport,
   loggerMessages,
 } from "@package/logger";
-import type { ResourceStorage } from "@package/resources";
+import type { UploadStorage } from "@package/storage";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 import { hashLogIdentifier } from "../logging.js";
 import { canViewResource, createResourcesService } from "./index.js";
+
+const actor = (
+  clerkId: string,
+  role: "user" | "admin" | "system_admin" = "user",
+) => ({ clerkId, role }) as const;
 
 function captureLogger(events: LogEvent[]) {
   const transport: LogTransport = {
@@ -33,173 +38,28 @@ describe("resources service", () => {
       uploaderClerkId: "user_owner",
     };
 
-    expect(canViewResource({ ...privateResource, isPrivate: false }, {})).toBe(
+    expect(canViewResource({ ...privateResource, isPrivate: false })).toBe(
       true,
     );
-    expect(canViewResource(privateResource, {})).toBe(false);
-    expect(
-      canViewResource(privateResource, {
-        clerkId: "user_other",
-        isAdmin: false,
-      }),
-    ).toBe(false);
-    expect(
-      canViewResource(privateResource, {
-        clerkId: "user_owner",
-        isAdmin: false,
-      }),
-    ).toBe(true);
-    expect(
-      canViewResource(privateResource, {
-        clerkId: "admin_123",
-        isAdmin: true,
-      }),
-    ).toBe(true);
-  });
-
-  it("creates one resource notification and one per newly created category", async () => {
-    const execute = vi.fn().mockResolvedValue({ rows: [{ id: 1000 }] });
-    const storage: ResourceStorage = {
-      createUploadTarget: vi.fn(),
-      delete: vi.fn(),
-      upload: async (input) => ({
-        ...input,
-        objectPath: "dev/resource.stl",
-        size: input.bytes.byteLength,
-        url: "https://cdn.example.test/dev/resource.stl",
-      }),
-      uploadImage: async (input) => ({
-        ...input,
-        objectPath: "dev/1000/image.webp",
-        size: input.bytes.byteLength,
-        url: "https://cdn.example.test/dev/1000/image.webp",
-      }),
-      uploadStream: vi.fn(),
-    };
-    const service = createResourcesService(
-      { execute } as unknown as Database,
-      storage,
-      createNoopLogger({ app: "web", environment: "test" }),
+    expect(canViewResource(privateResource)).toBe(false);
+    expect(canViewResource(privateResource, actor("user_other"))).toBe(false);
+    expect(canViewResource(privateResource, actor("user_owner"))).toBe(true);
+    expect(canViewResource(privateResource, actor("admin_123", "admin"))).toBe(
+      true,
     );
-
-    await expect(
-      service.create({
-        categories: ["3D printing", "Refill tools"],
-        description: "A useful clip.",
-        files: [
-          {
-            bytes: new Uint8Array([1]),
-            contentType: "model/stl",
-            fileName: "clip.stl",
-          },
-        ],
-        images: [
-          {
-            bytes: new Uint8Array([2]),
-            contentType: "image/webp",
-            fileName: "clip.webp",
-          },
-        ],
-        name: "Pocket clip",
-        uploaderClerkId: "user_123",
-      }),
-    ).resolves.toEqual({ id: 1000 });
-
-    const query = new PgDialect().sqlToQuery(execute.mock.calls[1]?.[0]);
-    expect(query.sql).toContain("(xmax = 0) as created");
-    expect(query.sql).toContain("inserted_resource_notification");
-    expect(query.sql).toContain("inserted_category_notifications");
-    expect(query.sql).toContain("where upserted_categories.created");
-  });
-
-  it("cleans uploaded objects and logs safely when persistence fails", async () => {
-    const events: LogEvent[] = [];
-    const logger = captureLogger(events);
-    const execute = vi
-      .fn()
-      .mockResolvedValueOnce({ rows: [{ id: 1000 }] })
-      .mockRejectedValueOnce(new Error("database unavailable"));
-    const deleted: string[] = [];
-    const storage: ResourceStorage = {
-      createUploadTarget: vi.fn(),
-      async delete(objectPath) {
-        deleted.push(objectPath);
-        return "deleted";
-      },
-      async upload(input) {
-        return {
-          ...input,
-          objectPath: "dev/resource.stl",
-          size: input.bytes.byteLength,
-          url: "https://cdn.example.test/dev/resource.stl",
-        };
-      },
-      async uploadImage(input) {
-        return {
-          ...input,
-          objectPath: "dev/preview.webp",
-          size: input.bytes.byteLength,
-          url: "https://cdn.example.test/dev/preview.webp",
-        };
-      },
-      uploadStream: vi.fn(),
-    };
-    const service = createResourcesService(
-      { execute } as unknown as Database,
-      storage,
-      logger,
-    );
-
-    await expect(
-      service.create({
-        categories: ["3D printing"],
-        description: "A useful clip.",
-        files: [
-          {
-            bytes: new Uint8Array([1]),
-            contentType: "model/stl",
-            fileName: "private-file.stl",
-          },
-        ],
-        name: "Pocket clip",
-        images: [
-          {
-            bytes: new Uint8Array([2]),
-            contentType: "image/webp",
-            fileName: "private-preview.webp",
-          },
-        ],
-        uploaderClerkId: "user_private",
-      }),
-    ).rejects.toThrow("database unavailable");
-    await logger.flush();
-
-    expect(deleted).toEqual(["dev/resource.stl", "dev/preview.webp"]);
-    expect(events).toHaveLength(1);
-    expect(events[0]?.message).toBe(
-      `${loggerMessages.resources.create}.failed`,
-    );
-    expect(events[0]?.attributes).toMatchObject({
-      categoryCount: 1,
-      fileCount: 1,
-      operation: loggerMessages.resources.create,
-      outcome: "failure",
-      uploaderClerkIdHash: hashLogIdentifier("user_private"),
-    });
-    expect(JSON.stringify(events)).not.toContain("private-file.stl");
-    expect(JSON.stringify(events)).not.toContain("user_private");
   });
 
   it("rejects duplicate filenames case-insensitively before upload", async () => {
     const upload = vi.fn();
     const service = createResourcesService(
       {} as Database,
-      { upload } as unknown as ResourceStorage,
+      { upload } as unknown as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
     );
 
     await expect(
       service.create({
+        actor: actor("user_123"),
         categories: ["3D printing"],
         description: "A useful clip.",
         files: [
@@ -222,55 +82,35 @@ describe("resources service", () => {
           },
         ],
         name: "Pocket clip",
-        uploaderClerkId: "user_123",
       }),
-    ).rejects.toThrow("Resource filenames must be unique within a version.");
+    ).rejects.toThrow("invalid_request");
     expect(upload).not.toHaveBeenCalled();
   });
 
-  it("records a download before returning the file URL", async () => {
+  it("signs before recording one authenticated file download per version", async () => {
     const calls: string[] = [];
     const db = {
-      insert() {
-        return {
-          async values() {
-            calls.push("recorded");
-          },
-        };
-      },
-      select() {
-        return {
-          from() {
-            return {
-              innerJoin() {
-                return {
-                  innerJoin() {
-                    return {
-                      where() {
-                        return {
-                          async limit() {
-                            calls.push("selected");
-                            return [
-                              {
-                                id: 1001,
-                                objectPath: "resources/dev/file.stl",
-                              },
-                            ];
-                          },
-                        };
-                      },
-                    };
-                  },
-                };
+      execute: vi
+        .fn()
+        .mockImplementationOnce(async () => {
+          calls.push("selected");
+          return {
+            rows: [
+              {
+                objectPath: "resources/dev/file.stl",
+                versionId: 1001,
               },
-            };
-          },
-        };
-      },
+            ],
+          };
+        })
+        .mockImplementationOnce(async () => {
+          calls.push("recorded");
+          return { rows: [] };
+        }),
     } as unknown as Database;
     const service = createResourcesService(
       db,
-      {} as ResourceStorage,
+      {} as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
       async (objectPath) => {
         calls.push("signed");
@@ -279,10 +119,127 @@ describe("resources service", () => {
       },
     );
 
-    await expect(service.download(1000, 1001)).resolves.toBe(
+    await expect(
+      service.downloadFile(1000, 1002, actor("user_123")),
+    ).resolves.toBe(
       "https://cdn.example.test/resources/dev/file.stl?token=signed",
     );
-    expect(calls).toEqual(["selected", "recorded", "signed"]);
+    expect(calls).toEqual(["selected", "signed", "recorded"]);
+    const recordQuery = new PgDialect().sqlToQuery(
+      (db.execute as ReturnType<typeof vi.fn>).mock.calls[1]?.[0],
+    );
+    expect(recordQuery.sql).toContain(
+      "on conflict (version_id, user_clerk_id) do nothing",
+    );
+    expect(recordQuery.params).toEqual([1001, "user_123"]);
+  });
+
+  it("counts every anonymous file download only after signing succeeds", async () => {
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [{ objectPath: "resources/dev/file.stl", versionId: 1001 }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ objectPath: "resources/dev/file.stl", versionId: 1001 }],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+    const sign = vi.fn().mockRejectedValueOnce(new Error("signing failed"));
+    const service = createResourcesService(
+      { execute } as unknown as Database,
+      {} as UploadStorage,
+      createNoopLogger({ app: "web", environment: "test" }),
+      sign,
+    );
+
+    await expect(service.downloadFile(1000, 1002)).rejects.toThrow(
+      "signing failed",
+    );
+    expect(execute).toHaveBeenCalledTimes(1);
+
+    sign.mockResolvedValueOnce("https://cdn.example.test/signed");
+    await expect(service.downloadFile(1000, 1002)).resolves.toBe(
+      "https://cdn.example.test/signed",
+    );
+    const countQuery = new PgDialect().sqlToQuery(execute.mock.calls[2]?.[0]);
+    expect(countQuery.sql).toContain("anonymous_download_count + 1");
+    expect(countQuery.params).toEqual([1001]);
+  });
+
+  it("streams one ZIP candidate and deletes it when compare-and-set selects a winner", async () => {
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            archiveObjectPath: null,
+            fileName: "first.stl",
+            objectPath: "resources/dev/1000/first.stl",
+            size: 3,
+            version: 2,
+            versionId: 1001,
+          },
+          {
+            archiveObjectPath: null,
+            fileName: "notes.txt",
+            objectPath: "resources/dev/1000/notes.txt",
+            size: 5,
+            version: 2,
+            versionId: 1001,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            objectPath:
+              "resources/dev/1000/archives/winner/resource-1000-v2.zip",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+    const remove = vi.fn().mockResolvedValue("deleted");
+    const putFile = vi.fn(async ({ body }: { body: ReadableStream }) => {
+      await new Response(body).arrayBuffer();
+    });
+    const storage = {
+      createArchiveTarget: vi.fn(() => ({
+        contentType: "application/zip",
+        fileName: "resource-1000-v2.zip",
+        objectPath:
+          "resources/dev/1000/archives/candidate/resource-1000-v2.zip",
+        size: 0,
+        url: "https://cdn.example.test/candidate",
+      })),
+      delete: remove,
+      readFile: vi.fn(async (objectPath: string) =>
+        new Blob([
+          objectPath.endsWith("notes.txt")
+            ? "notes"
+            : new Uint8Array([1, 2, 3]),
+        ]).stream(),
+      ),
+      putFile,
+    } as unknown as UploadStorage;
+    const service = createResourcesService(
+      { execute } as unknown as Database,
+      storage,
+      createNoopLogger({ app: "web", environment: "test" }),
+      async (objectPath) => `https://cdn.example.test/${objectPath}`,
+    );
+
+    await expect(service.downloadVersion(1000, 1001)).resolves.toBe(
+      "https://cdn.example.test/resources/dev/1000/archives/winner/resource-1000-v2.zip",
+    );
+    expect(putFile).toHaveBeenCalledOnce();
+    expect(storage.readFile).toHaveBeenCalledTimes(2);
+    expect(remove).toHaveBeenCalledWith(
+      "resources/dev/1000/archives/candidate/resource-1000-v2.zip",
+    );
+    const candidateQuery = new PgDialect().sqlToQuery(
+      execute.mock.calls[1]?.[0],
+    );
+    expect(candidateQuery.sql).toContain("archive_object_path is null");
   });
 
   it("returns resource detail with event-derived download counts", async () => {
@@ -290,12 +247,12 @@ describe("resources service", () => {
     const categories = [{ id: 1002, name: "3D printing", slug: "3d-printing" }];
     const version = {
       createdAt,
+      downloadCount: 2,
       id: 1001,
       version: 1,
     };
     const file = {
       contentType: "model/stl",
-      downloadCount: 2,
       fileName: "clip.stl",
       id: 1003,
       size: 42,
@@ -315,7 +272,6 @@ describe("resources service", () => {
       files: [
         {
           contentType: file.contentType,
-          downloadCount: file.downloadCount,
           fileName: file.fileName,
           id: file.id,
           size: file.size,
@@ -354,18 +310,18 @@ describe("resources service", () => {
       })
       .mockReturnValueOnce({
         from: () => ({
-          where: () => ({
-            orderBy: async () => [version],
+          leftJoin: () => ({
+            where: () => ({
+              groupBy: () => ({ orderBy: async () => [version] }),
+            }),
           }),
         }),
       })
       .mockReturnValueOnce({
         from: () => ({
-          leftJoin: () => ({
-            innerJoin: () => ({
-              where: () => ({
-                groupBy: () => ({ orderBy: async () => [file] }),
-              }),
+          innerJoin: () => ({
+            where: () => ({
+              orderBy: async () => [file],
             }),
           }),
         }),
@@ -379,16 +335,14 @@ describe("resources service", () => {
       })
       .mockReturnValueOnce({
         from: () => ({
-          innerJoin: () => ({
-            leftJoin: () => ({
-              where: async () => [{ downloadCount: 3 }],
-            }),
+          leftJoin: () => ({
+            where: async () => [{ downloadCount: 3 }],
           }),
         }),
       });
     const service = createResourcesService(
       { select } as unknown as Database,
-      {} as ResourceStorage,
+      {} as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
       async (objectPath) =>
         `https://cdn.example.test/${objectPath}?token=signed`,
@@ -408,7 +362,7 @@ describe("resources service", () => {
           id: image.id,
           position: image.position,
           size: image.size,
-          url: "https://cdn.example.test/resources/dev/preview.webp?token=signed",
+          url: "https://cdn.example.test/resources/dev/preview.webp?token=signed&format=webp&quality=85",
         },
       ],
       isAdminPrivate: false,
@@ -418,7 +372,7 @@ describe("resources service", () => {
       privatedAt: null,
       uploaderClerkId: "user_123",
       uploaderUsername: "roy",
-      versions: [currentVersion],
+      versions: [],
     });
   });
 
@@ -443,12 +397,12 @@ describe("resources service", () => {
     });
     const service = createResourcesService(
       { select } as unknown as Database,
-      {} as ResourceStorage,
+      {} as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
     );
 
     await expect(
-      service.getDetail(1000, { clerkId: "user_other" }),
+      service.getDetail(1000, actor("user_other")),
     ).resolves.toBeNull();
     expect(select).toHaveBeenCalledTimes(1);
   });
@@ -460,9 +414,11 @@ describe("resources service", () => {
         categories,
         createdAt: new Date("2026-09-16T12:00:00Z"),
         currentVersion: {
+          fileCount: 1,
           fileId: 1003,
           fileName: "clip.stl",
           id: 1001,
+          version: 1,
         },
         downloadCount: 3,
         id: 1000,
@@ -479,7 +435,7 @@ describe("resources service", () => {
       .mockResolvedValueOnce({ rows: categories });
     const service = createResourcesService(
       { execute } as unknown as Database,
-      {} as ResourceStorage,
+      {} as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
       async (objectPath) =>
         `https://cdn.example.test/${objectPath}?token=signed`,
@@ -493,9 +449,11 @@ describe("resources service", () => {
           categories,
           createdAt: new Date("2026-09-16T12:00:00Z"),
           currentVersion: {
+            fileCount: 1,
             fileId: 1003,
             fileName: "clip.stl",
             id: 1001,
+            version: 1,
           },
           downloadCount: 3,
           id: 1000,
@@ -503,7 +461,7 @@ describe("resources service", () => {
           uploaderClerkId: "user_123",
           uploaderUsername: "roy",
           coverImageUrl:
-            "https://cdn.example.test/resources/dev/preview.webp?token=signed",
+            "https://cdn.example.test/resources/dev/preview.webp?token=signed&format=webp&quality=85",
         },
       ],
     });
@@ -541,7 +499,7 @@ describe("resources service", () => {
       .mockResolvedValueOnce({ rows: [] });
     const service = createResourcesService(
       { execute } as unknown as Database,
-      {} as ResourceStorage,
+      {} as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
     );
 
@@ -563,16 +521,16 @@ describe("resources service", () => {
   });
 
   it("records private moderation metadata", async () => {
-    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const execute = vi.fn().mockResolvedValue({ rows: [{ id: 1000 }] });
     const service = createResourcesService(
       { execute } as unknown as Database,
-      {} as ResourceStorage,
+      {} as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
     );
 
     await expect(
       service.markPrivate({
-        actorClerkId: "admin_123",
+        actor: actor("admin_123", "admin"),
         reason: "Inappropriate content",
         resourceId: 1000,
       }),
@@ -592,30 +550,27 @@ describe("resources service", () => {
       .mockResolvedValueOnce({ rows: [{ id: 1000 }] });
     const service = createResourcesService(
       { execute } as unknown as Database,
-      {} as ResourceStorage,
+      {} as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
     );
 
     await expect(
       service.setVisibility({
-        actorClerkId: "user_123",
-        actorIsAdmin: false,
+        actor: actor("user_123"),
         isPublic: true,
         resourceId: 1000,
       }),
     ).rejects.toThrow("Resource visibility update is not allowed.");
     await expect(
       service.setVisibility({
-        actorClerkId: "user_123",
-        actorIsAdmin: false,
+        actor: actor("user_123"),
         isPublic: false,
         resourceId: 1000,
       }),
     ).rejects.toThrow("Resource visibility update is not allowed.");
     await expect(
       service.setVisibility({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
+        actor: actor("admin_123", "admin"),
         isPublic: true,
         resourceId: 1000,
       }),
@@ -630,33 +585,26 @@ describe("resources service", () => {
   it("rejects non-owner mutations before uploading files", async () => {
     const upload = vi.fn();
     const db = {
+      transaction: async (fn: (tx: unknown) => unknown) =>
+        fn({
+          execute: vi.fn(),
+          select: () => ({
+            from: () => ({ where: () => ({ limit: async () => [] }) }),
+          }),
+        }),
       select: () => ({
         from: () => ({ where: () => ({ limit: async () => [] }) }),
       }),
     } as unknown as Database;
     const service = createResourcesService(
       db,
-      { upload } as unknown as ResourceStorage,
+      { upload } as unknown as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
     );
 
     await expect(
-      service.addVersion({
-        files: [
-          {
-            bytes: new Uint8Array([1]),
-            contentType: "model/stl",
-            fileName: "clip.stl",
-          },
-        ],
-        resourceId: 1000,
-        uploaderClerkId: "user_other",
-      }),
-    ).rejects.toThrow("Resource owner is required.");
-    await expect(
       service.update({
-        actorClerkId: "user_other",
-        actorIsAdmin: false,
+        actor: actor("user_other"),
         categories: ["3D printing"],
         description: "Updated.",
         images: [],
@@ -683,19 +631,20 @@ describe("resources service", () => {
         }),
       });
     const db = {
+      transaction: async (fn: (tx: unknown) => unknown) =>
+        fn({ execute, select }),
       execute,
       select,
     } as unknown as Database;
     const service = createResourcesService(
       db,
-      {} as ResourceStorage,
+      {} as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
     );
 
     await expect(
       service.update({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
+        actor: actor("admin_123", "admin"),
         categories: ["3D printing"],
         description: "Updated.",
         images: [],
@@ -705,80 +654,38 @@ describe("resources service", () => {
       }),
     ).resolves.toEqual({ id: 1000 });
 
-    const query = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
+    const query = new PgDialect().sqlToQuery(execute.mock.calls[1]?.[0]);
     expect(query.params).toContain(true);
     expect(query.params).toContain("admin_123");
   });
 
-  it("derives the next immutable version number in the database", async () => {
-    const execute = vi.fn().mockResolvedValue({
-      rows: [{ id: 1002, version: 2 }],
-    });
-    const storage: ResourceStorage = {
-      createUploadTarget: vi.fn(),
-      delete: vi.fn(),
-      upload: async (input) => ({
-        ...input,
-        objectPath: "dev/version-2.stl",
-        size: input.bytes.byteLength,
-        url: "https://cdn.example.test/dev/version-2.stl",
-      }),
-      uploadImage: vi.fn(),
-      uploadStream: vi.fn(),
-    };
-    const db = {
-      execute,
-      select: () => ({
-        from: () => ({
-          where: () => ({ limit: async () => [{ id: 1000 }] }),
-        }),
-      }),
-    } as unknown as Database;
-    const service = createResourcesService(
-      db,
-      storage,
-      createNoopLogger({ app: "web", environment: "test" }),
-    );
-
-    await expect(
-      service.addVersion({
-        files: [
-          {
-            bytes: new Uint8Array([1]),
-            contentType: "model/stl",
-            fileName: "clip.stl",
-          },
-        ],
-        resourceId: 1000,
-        uploaderClerkId: "user_123",
-      }),
-    ).resolves.toEqual({ id: 1002, version: 2 });
-    const query = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
-    expect(query.sql).toContain(
-      "coalesce(max(resource_versions.version), 0) + 1",
-    );
-    expect(query.sql).toContain("returning id, resource_id, version");
-  });
-
   it("updates owner metadata and replaces its images", async () => {
     const deleted: string[] = [];
-    const execute = vi.fn().mockResolvedValue({ rows: [{ id: 1000 }] });
-    const storage: ResourceStorage = {
-      createUploadTarget: vi.fn(),
+    const execute = vi.fn(async (query) => ({
+      rows: new PgDialect().sqlToQuery(query).sql.includes("update resources")
+        ? [{ id: 1000 }]
+        : [],
+    }));
+    const storage: UploadStorage = {
+      assertErasureReady: vi.fn(),
+      createArchiveTarget: vi.fn(),
+      createFileTarget: vi.fn(),
       async delete(objectPath) {
         deleted.push(objectPath);
         return "deleted";
       },
-      upload: vi.fn(),
-      async uploadImage(input) {
+      createImageTarget(input) {
         return {
           ...input,
           objectPath: "dev/new-preview.webp",
-          size: input.bytes.byteLength,
+          size: input.size,
           url: "https://cdn.example.test/dev/new-preview.webp",
         };
       },
-      uploadStream: vi.fn(),
+      erase: vi.fn(),
+      putFile: vi.fn(),
+      putImage: vi.fn(),
+      readFile: vi.fn(),
     };
     const select = vi
       .fn()
@@ -792,7 +699,12 @@ describe("resources service", () => {
           where: async () => [{ id: 1000, objectPath: "dev/old-preview.webp" }],
         }),
       });
-    const db = { execute, select } as unknown as Database;
+    const db = {
+      execute,
+      select,
+      transaction: async (fn: (tx: unknown) => unknown) =>
+        fn({ execute, select }),
+    } as unknown as Database;
     const service = createResourcesService(
       db,
       storage,
@@ -801,8 +713,7 @@ describe("resources service", () => {
 
     await expect(
       service.update({
-        actorClerkId: "user_123",
-        actorIsAdmin: false,
+        actor: actor("user_123"),
         categories: ["3D printing"],
         description: "Updated description.",
         images: [
@@ -817,10 +728,22 @@ describe("resources service", () => {
         resourceId: 1000,
       }),
     ).resolves.toEqual({ id: 1000 });
-    expect(deleted).toEqual(["dev/old-preview.webp"]);
-    const query = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
-    expect(query.sql).toContain("update resources");
-    expect(query.sql).toContain("on conflict do nothing");
+    expect(deleted).toEqual([]);
+    const queries = execute.mock.calls.map(([query]) =>
+      new PgDialect().sqlToQuery(query),
+    );
+    expect(
+      queries.some(
+        (query) =>
+          query.sql.includes("insert into storage_object_deletion") &&
+          query.params.includes("dev/old-preview.webp"),
+      ),
+    ).toBe(true);
+    const query = queries.find((query) =>
+      query.sql.includes("update resources"),
+    );
+    expect(query?.sql).toContain("update resources");
+    expect(query?.sql).toContain("on conflict do nothing");
   });
 
   it("records owner and admin soft deletions without changing visibility", async () => {
@@ -831,28 +754,25 @@ describe("resources service", () => {
       .mockResolvedValueOnce({ rows: [] });
     const service = createResourcesService(
       { execute } as unknown as Database,
-      {} as ResourceStorage,
+      {} as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
     );
 
     await expect(
       service.softDelete({
-        actorClerkId: "user_owner",
-        actorIsAdmin: false,
+        actor: actor("user_owner"),
         resourceId: 1000,
       }),
     ).resolves.toEqual({ deletedByRole: "owner" });
     await expect(
       service.softDelete({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
+        actor: actor("admin_123", "admin"),
         resourceId: 1001,
       }),
     ).resolves.toEqual({ deletedByRole: "admin" });
     await expect(
       service.softDelete({
-        actorClerkId: "user_other",
-        actorIsAdmin: false,
+        actor: actor("user_other"),
         resourceId: 1001,
       }),
     ).rejects.toThrow("Resource deletion is not allowed.");
@@ -863,134 +783,117 @@ describe("resources service", () => {
     expect(query.sql).not.toContain("is_private =");
   });
 
-  it("permanently deletes every stored object before the resource row", async () => {
-    const execute = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [
-          { objectPath: "resources/dev/1000/image.webp" },
-          { objectPath: "resources/dev/1000/model.stl" },
-          { objectPath: "resources/dev/1000/legacy.zip" },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [{ id: 1000 }] });
-    const remove = vi.fn().mockResolvedValue("deleted");
-    const service = createResourcesService(
-      { execute } as unknown as Database,
-      { delete: remove } as unknown as ResourceStorage,
-      createNoopLogger({ app: "web", environment: "test" }),
+  it("queues every resource object in the purge transaction without deleting Bunny objects", async () => {
+    const execute = vi.fn(async (query) => {
+      const text = new PgDialect().sqlToQuery(query).sql;
+      if (text.includes("stored_objects.object_path"))
+        return {
+          rows: [
+            { objectPath: "resources/dev/1000/image.webp" },
+            { objectPath: "resources/dev/1000/model.stl" },
+            { objectPath: "resources/dev/1000/legacy.zip" },
+            {
+              objectPath:
+                "resources/dev/1000/archives/candidate/resource-1000-v1.zip",
+            },
+          ],
+        };
+      return { rows: [{ id: 1000 }] };
+    });
+    const transaction = vi.fn(async (fn: (tx: unknown) => unknown) =>
+      fn({ execute }),
     );
-
-    await expect(
-      service.permanentlyDelete({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
-        resourceId: 1000,
-      }),
-    ).resolves.toBeUndefined();
-
-    expect(remove).toHaveBeenCalledTimes(3);
-    expect(remove).toHaveBeenCalledWith("resources/dev/1000/image.webp");
-    expect(remove).toHaveBeenCalledWith("resources/dev/1000/model.stl");
-    expect(remove).toHaveBeenCalledWith("resources/dev/1000/legacy.zip");
-    const objectQuery = new PgDialect().sqlToQuery(execute.mock.calls[0]?.[0]);
-    expect(objectQuery.sql).toContain("from resource_images");
-    expect(objectQuery.sql).toContain("from resource_files");
-    expect(objectQuery.sql).toContain("resource_versions.object_path");
-    expect(objectQuery.sql).toContain("resources.deleted_at is not null");
-    const deleteQuery = new PgDialect().sqlToQuery(execute.mock.calls[1]?.[0]);
-    expect(deleteQuery.sql).toContain("delete from resources");
-    expect(deleteQuery.sql).toContain("deleted_at is not null");
-    expect(deleteQuery.sql).not.toContain("resource_categories");
-  });
-
-  it("requires an admin and a soft-deleted resource before deleting storage", async () => {
-    const execute = vi.fn().mockResolvedValue({ rows: [] });
     const remove = vi.fn();
     const service = createResourcesService(
-      { execute } as unknown as Database,
-      { delete: remove } as unknown as ResourceStorage,
-      createNoopLogger({ app: "web", environment: "test" }),
+      { transaction } as unknown as Database,
+      { delete: remove } as unknown as UploadStorage,
+      createNoopLogger(),
     );
+    await service.permanentlyDelete({
+      actor: actor("admin", "system_admin"),
+      reason: "Expired retention period",
+      resourceId: 1000,
+    });
+    expect(transaction).toHaveBeenCalledOnce();
+    expect(remove).not.toHaveBeenCalled();
+    const queries = execute.mock.calls.map(([query]) =>
+      new PgDialect().sqlToQuery(query),
+    );
+    expect(
+      queries
+        .filter((query) =>
+          query.sql.includes("insert into storage_object_deletion"),
+        )
+        .flatMap((query) => query.params),
+    ).toEqual([
+      "resources/dev/1000/archives/candidate/resource-1000-v1.zip",
+      "resources/dev/1000/image.webp",
+      "resources/dev/1000/legacy.zip",
+      "resources/dev/1000/model.stl",
+    ]);
+    expect(queries.at(-1)?.sql).toContain("delete from resources");
+  });
 
+  it("requires an admin and a soft-deleted resource before queuing deletion", async () => {
+    const execute = vi.fn(async () => ({ rows: [] }));
+    const transaction = vi.fn(async (fn: (tx: unknown) => unknown) =>
+      fn({ execute }),
+    );
+    const remove = vi.fn();
+    const service = createResourcesService(
+      { transaction } as unknown as Database,
+      { delete: remove } as unknown as UploadStorage,
+      createNoopLogger(),
+    );
     await expect(
       service.permanentlyDelete({
-        actorClerkId: "user_123",
-        actorIsAdmin: false,
+        actor: actor("owner"),
+        reason: "Expired retention period",
         resourceId: 1000,
       }),
     ).rejects.toThrow("requires an admin");
-    expect(execute).not.toHaveBeenCalled();
-
+    expect(transaction).not.toHaveBeenCalled();
     await expect(
       service.permanentlyDelete({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
+        actor: actor("admin", "system_admin"),
+        reason: "Expired retention period",
         resourceId: 1000,
       }),
     ).rejects.toThrow("must be soft-deleted");
     expect(remove).not.toHaveBeenCalled();
-    expect(execute).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps database state retryable when Bunny deletion fails", async () => {
-    const execute = vi.fn().mockResolvedValue({
-      rows: [{ objectPath: "resources/dev/1000/model.stl" }],
-    });
-    const remove = vi.fn().mockRejectedValue(new Error("Bunny unavailable"));
-    const service = createResourcesService(
-      { execute } as unknown as Database,
-      { delete: remove } as unknown as ResourceStorage,
-      createNoopLogger({ app: "web", environment: "test" }),
-    );
-
-    await expect(
-      service.permanentlyDelete({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
-        resourceId: 1000,
-      }),
-    ).rejects.toThrow("Bunny unavailable");
-    expect(execute).toHaveBeenCalledTimes(1);
-  });
-
-  it("logs database purge failures without exposing the admin identifier", async () => {
+  it("logs purge failures without SQL payloads or admin identifiers", async () => {
     const events: LogEvent[] = [];
     const logger = captureLogger(events);
-    const execute = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [{ objectPath: "resources/dev/1000/model.stl" }],
-      })
-      .mockRejectedValueOnce(new Error("database unavailable"));
+    const failure = new Error(
+      "query parameters: admin_private private-filename.pdf",
+    );
+    const transaction = vi.fn(async () => {
+      throw failure;
+    });
     const service = createResourcesService(
-      { execute } as unknown as Database,
-      {
-        delete: vi.fn().mockResolvedValue("deleted"),
-      } as unknown as ResourceStorage,
+      { transaction } as unknown as Database,
+      { delete: vi.fn() } as unknown as UploadStorage,
       logger,
     );
-
     await expect(
       service.permanentlyDelete({
-        actorClerkId: "admin_private",
-        actorIsAdmin: true,
+        actor: actor("admin_private", "system_admin"),
+        reason: "Expired retention period",
         resourceId: 1000,
       }),
-    ).rejects.toThrow("database unavailable");
+    ).rejects.toBe(failure);
     await logger.flush();
-
     expect(events).toHaveLength(1);
     expect(events[0]?.message).toBe(
       `${loggerMessages.resources.permanentlyDelete}.failed`,
     );
-    expect(events[0]?.attributes).toMatchObject({
-      actorClerkIdHash: hashLogIdentifier("admin_private"),
-      operation: loggerMessages.resources.permanentlyDelete,
-      outcome: "failure",
-      resourceId: 1000,
-    });
+    expect(events[0]?.attributes?.actorClerkIdHash).toBe(
+      hashLogIdentifier("admin_private"),
+    );
     expect(JSON.stringify(events)).not.toContain("admin_private");
+    expect(JSON.stringify(events)).not.toContain("private-filename.pdf");
   });
 
   it("lets owners restore only their own owner deletion and admins restore any", async () => {
@@ -1001,28 +904,25 @@ describe("resources service", () => {
       .mockResolvedValueOnce({ rows: [{ id: 1001 }] });
     const service = createResourcesService(
       { execute } as unknown as Database,
-      {} as ResourceStorage,
+      {} as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
     );
 
     await expect(
       service.restore({
-        actorClerkId: "user_owner",
-        actorIsAdmin: false,
+        actor: actor("user_owner"),
         resourceId: 1000,
       }),
     ).resolves.toBeUndefined();
     await expect(
       service.restore({
-        actorClerkId: "user_other",
-        actorIsAdmin: false,
+        actor: actor("user_other"),
         resourceId: 1001,
       }),
     ).rejects.toThrow("Resource restoration is not allowed.");
     await expect(
       service.restore({
-        actorClerkId: "admin_123",
-        actorIsAdmin: true,
+        actor: actor("admin_123", "admin"),
         resourceId: 1001,
       }),
     ).resolves.toBeUndefined();
@@ -1049,7 +949,7 @@ describe("resources service", () => {
       .mockResolvedValueOnce({ rows: [item] });
     const service = createResourcesService(
       { execute } as unknown as Database,
-      {} as ResourceStorage,
+      {} as UploadStorage,
       createNoopLogger({ app: "web", environment: "test" }),
     );
 

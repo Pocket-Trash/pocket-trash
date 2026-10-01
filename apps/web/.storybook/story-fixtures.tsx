@@ -1,4 +1,5 @@
 import { useAuth, useClerk, useUser } from "@clerk/tanstack-react-start";
+import type { Role } from "@package/services/authorization";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -70,6 +71,28 @@ export function mockStoryAuth() {
     isSignedIn: false,
     user: null,
   } as ReturnType<typeof useUser>);
+  mocked(useClerk).mockReturnValue({
+    signOut: fn(async () => undefined),
+  } as unknown as ReturnType<typeof useClerk>);
+}
+
+export function mockStoryRole(role: Role) {
+  mocked(useAuth).mockReturnValue({
+    isLoaded: true,
+    isSignedIn: true,
+    sessionClaims: { role },
+    userId: "story-user",
+  } as unknown as ReturnType<typeof useAuth>);
+  mocked(useUser).mockReturnValue({
+    isLoaded: true,
+    isSignedIn: true,
+    user: {
+      externalAccounts: [],
+      imageUrl: "",
+      primaryEmailAddress: { emailAddress: "story@example.com" },
+      username: "Story User",
+    },
+  } as unknown as ReturnType<typeof useUser>);
   mocked(useClerk).mockReturnValue({
     signOut: fn(async () => undefined),
   } as unknown as ReturnType<typeof useClerk>);

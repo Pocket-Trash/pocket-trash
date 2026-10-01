@@ -22,5 +22,5 @@ Execution log for scraper producer, processor, and dead-letter jobs.
 
 | Name | Unique | Method | Columns |
 | --- | --- | --- | --- |
-| `scraper_runs_source_job_status_idx` | no | `btree` | `source`, `job_type`, `status` |
+| `scraper_runs_active_source_job_unique` | yes | `btree` | `source`, `job_type` |
 | `scraper_runs_started_at_idx` | no | `btree` | `started_at` |

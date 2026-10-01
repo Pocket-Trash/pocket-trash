@@ -17,8 +17,8 @@ vi.mock("@/providers/locale-provider", () => ({
 }));
 
 describe("UserIndexPage", () => {
-  it("links to the five account destinations without logout", () => {
-    const html = renderToStaticMarkup(<UserIndexPage />);
+  it("links to feedback without showing My Requests when none exist", () => {
+    const html = renderToStaticMarkup(<UserIndexPage hasFeedback={false} />);
 
     for (const href of [
       "/user/account",
@@ -26,9 +26,18 @@ describe("UserIndexPage", () => {
       "/user/collections",
       "/user/settings",
       "/user/settings/beta-features",
+      "/feedback",
+      "/feedback/new",
     ]) {
       expect(html).toContain(`href="${href}"`);
     }
+    expect(html).not.toContain('href="/feedback/my-requests"');
     expect(html).not.toContain("Log out");
+  });
+
+  it("shows My Requests when eligible feedback exists", () => {
+    const html = renderToStaticMarkup(<UserIndexPage hasFeedback />);
+
+    expect(html).toContain('href="/feedback/my-requests"');
   });
 });

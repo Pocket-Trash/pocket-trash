@@ -1,4 +1,5 @@
 @import "@fontsource-variable/geist-mono/wght.css";
+@import "@package/markdown/theme.css";
 @import "tailwindcss";
 @import "sonner/dist/styles.css";
 

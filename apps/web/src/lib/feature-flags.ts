@@ -1,11 +1,14 @@
-import { auth } from "@clerk/tanstack-react-start/server";
 import type { FeatureFlagAudience } from "@package/feature-flags";
 import type {
+  Actor,
   AdminTargetingFeatureFlag,
   FeatureFlagListItem,
   UserBetaFeatureFlag,
 } from "@package/services";
+import { hasPermission } from "@package/services/authorization";
 import { createServerFn } from "@tanstack/react-start";
+import { activeAuth as auth } from "@/lib/auth";
+import { getActor, requirePermission } from "@/lib/authorization";
 import { localizedServerError } from "@/lib/server-errors";
 
 export type ClerkUserSearchResult = {
@@ -16,14 +19,8 @@ export type ClerkUserSearchResult = {
   username: string | null;
 };
 
-type SessionClaimsWithRole = {
-  role?: unknown;
-};
-
-export const isFeatureFlagAdmin = createServerFn().handler(async () => {
-  const { isAuthenticated, sessionClaims } = await auth();
-
-  return isAuthenticated && getRole(sessionClaims) === "admin";
+export const canManageFeatureFlags = createServerFn().handler(async () => {
+  return hasPermission(await getActor(), "feature_flags.manage");
 });
 
 export const listAdminFeatureFlags = createServerFn().handler(
@@ -35,14 +32,15 @@ export const listAdminFeatureFlags = createServerFn().handler(
   },
 );
 
+/** Creates an administrator-managed feature flag. */
 export const createAdminFeatureFlag = createServerFn({ method: "POST" })
   .validator(parseCreateFeatureFlagInput)
   .handler(async ({ data }): Promise<FeatureFlagListItem> => {
-    const actorClerkId = await requireFeatureFlagAdmin();
+    const actor = await requireFeatureFlagAdmin();
 
     const { s } = await import("@/lib/services");
     return await s.flags.create({
-      actorClerkId,
+      actor,
       audience: data.audience,
       defaultEnabled: data.defaultEnabled,
       description: data.description,
@@ -51,14 +49,15 @@ export const createAdminFeatureFlag = createServerFn({ method: "POST" })
     });
   });
 
+/** Updates an administrator-managed feature flag. */
 export const updateAdminFeatureFlag = createServerFn({ method: "POST" })
   .validator(parseUpdateFeatureFlagInput)
   .handler(async ({ data }): Promise<FeatureFlagListItem> => {
-    const actorClerkId = await requireFeatureFlagAdmin();
+    const actor = await requireFeatureFlagAdmin();
 
     const { s } = await import("@/lib/services");
     return await s.flags.update({
-      actorClerkId,
+      actor,
       defaultEnabled: data.defaultEnabled,
       description: data.description,
       name: data.name,
@@ -66,14 +65,15 @@ export const updateAdminFeatureFlag = createServerFn({ method: "POST" })
     });
   });
 
+/** Archives an administrator-managed feature flag. */
 export const archiveAdminFeatureFlag = createServerFn({ method: "POST" })
   .validator(parseSlugInput)
   .handler(async ({ data }): Promise<void> => {
-    const actorClerkId = await requireFeatureFlagAdmin();
+    const actor = await requireFeatureFlagAdmin();
 
     const { s } = await import("@/lib/services");
     await s.flags.archive({
-      actorClerkId,
+      actor,
       slug: data.slug,
     });
   });
@@ -114,14 +114,15 @@ export const listAdminTargetingForUser = createServerFn({ method: "GET" })
     return await s.flags.listAdminTargetingForUser(data.targetClerkId);
   });
 
+/** Sets an administrator-owned feature-flag override for a user. */
 export const setAdminFeatureFlagForUser = createServerFn({ method: "POST" })
   .validator(parseSetAdminOverrideInput)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireFeatureFlagAdmin();
+    const actor = await requireFeatureFlagAdmin();
 
     const { s } = await import("@/lib/services");
     await s.flags.setAdminOverride({
-      actorClerkId,
+      actor,
       enabled: data.enabled,
       slug: data.slug,
       targetClerkId: data.targetClerkId,
@@ -160,20 +161,14 @@ async function requireAuthenticatedUser(): Promise<string> {
   return userId;
 }
 
-async function requireFeatureFlagAdmin(): Promise<string> {
-  const { isAuthenticated, sessionClaims, userId } = await auth();
-
-  if (!isAuthenticated || !userId || getRole(sessionClaims) !== "admin") {
-    throw localizedServerError("error.generic");
-  }
-
-  return userId;
-}
-
-function getRole(sessionClaims: unknown): string | undefined {
-  const claims = sessionClaims as SessionClaimsWithRole | null | undefined;
-
-  return typeof claims?.role === "string" ? claims.role : undefined;
+/**
+ * Requires a feature-flag administrator.
+ *
+ * @returns Normalized authorized actor.
+ * @rejects When the requester lacks feature-flag management permission.
+ */
+async function requireFeatureFlagAdmin(): Promise<Actor> {
+  return await requirePermission("feature_flags.manage");
 }
 
 function parseCreateFeatureFlagInput(input: unknown) {

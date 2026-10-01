@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export type GalleryImage = { fileName: string; id: number; url: string };
@@ -20,9 +20,100 @@ export function ImageGallery({
   previousLabel: string;
 }) {
   const images = groups.flatMap((group) => group.images);
+  if (!images.length) return null;
+  return (
+    <ImageLightbox
+      alt={alt}
+      closeLabel={closeLabel}
+      images={images}
+      label={label}
+      nextLabel={nextLabel}
+      previousLabel={previousLabel}
+    >
+      {(select) => {
+        let offset = 0;
+        return groups.map((group, groupIndex) => {
+          const groupOffset = offset;
+          offset += group.images.length;
+          return group.images.length ? (
+            <section
+              aria-label={group.label ?? label}
+              className="grid gap-3"
+              key={`${group.label ?? label}-${groupIndex}`}
+            >
+              {group.label ? (
+                <h2 className="m-0 text-lg font-semibold">{group.label}</h2>
+              ) : null}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {group.images.map((image, index) => (
+                  <ImageButton
+                    alt={alt}
+                    image={image}
+                    key={image.id}
+                    label={label}
+                    onClick={() => select(groupOffset + index)}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null;
+        });
+      }}
+    </ImageLightbox>
+  );
+}
+
+export function ImageButton({
+  alt,
+  className = "",
+  image,
+  label,
+  onClick,
+}: {
+  alt: string;
+  className?: string;
+  image: GalleryImage;
+  label: string;
+  onClick(): void;
+}) {
+  return (
+    <button
+      aria-label={`${label}: ${image.fileName}`}
+      className={`overflow-hidden rounded-lg border border-border bg-card p-0 transition-colors hover:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${className}`}
+      onClick={onClick}
+      type="button"
+    >
+      <img
+        alt={alt}
+        className="aspect-4/3 w-full object-cover"
+        loading="lazy"
+        src={image.url}
+      />
+    </button>
+  );
+}
+
+export function ImageLightbox({
+  alt,
+  children,
+  closeLabel,
+  images,
+  label,
+  nextLabel,
+  previousLabel,
+}: {
+  alt: string;
+  children(select: (index: number) => void): ReactNode;
+  closeLabel: string;
+  images: GalleryImage[];
+  label: string;
+  nextLabel: string;
+  previousLabel: string;
+}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const select = (index: number) => {
+    if (!images[index]) return;
     setSelectedIndex(index);
     dialogRef.current?.showModal();
   };
@@ -31,97 +122,65 @@ export function ImageGallery({
       (index) => (index + offset + images.length) % images.length,
     );
 
-  if (!images.length) return null;
   return (
     <>
-      {groups.map((group, groupIndex) => {
-        const offset = groups
-          .slice(0, groupIndex)
-          .reduce((count, candidate) => count + candidate.images.length, 0);
-        return group.images.length ? (
-          <section
-            aria-label={group.label ?? label}
-            className="grid gap-3"
-            key={`${group.label ?? label}-${groupIndex}`}
-          >
-            {group.label ? (
-              <h2 className="m-0 text-lg font-semibold">{group.label}</h2>
+      {children(select)}
+      {images.length ? (
+        <dialog
+          aria-label={label}
+          className="m-auto h-screen w-screen max-w-none bg-transparent p-4 text-white backdrop:bg-black/90"
+          onKeyDown={(event) => {
+            if (images.length < 2) return;
+            if (event.key === "ArrowRight") cycle(1);
+            if (event.key === "ArrowLeft") cycle(-1);
+          }}
+          ref={dialogRef}
+        >
+          <div className="relative flex h-full items-center justify-center">
+            <Button
+              aria-label={closeLabel}
+              className="absolute top-0 right-0 z-10"
+              onClick={() => dialogRef.current?.close()}
+              size="icon"
+              type="button"
+              variant="secondary"
+            >
+              <X />
+            </Button>
+            {images.length > 1 ? (
+              <Button
+                aria-label={previousLabel}
+                className="absolute left-0 z-10"
+                onClick={() => cycle(-1)}
+                size="icon"
+                type="button"
+                variant="secondary"
+              >
+                <ChevronLeft />
+              </Button>
             ) : null}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {group.images.map((image, index) => (
-                <button
-                  aria-label={`${label}: ${image.fileName}`}
-                  className="overflow-hidden rounded-lg border border-border bg-card p-0 transition-colors hover:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  key={image.id}
-                  onClick={() => select(offset + index)}
-                  type="button"
-                >
-                  <img
-                    alt={alt}
-                    className="aspect-4/3 w-full object-cover"
-                    loading="lazy"
-                    src={image.url}
-                  />
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : null;
-      })}
-      <dialog
-        aria-label={label}
-        className="m-auto h-screen w-screen max-w-none bg-transparent p-4 text-white backdrop:bg-black/90"
-        onKeyDown={(event) => {
-          if (images.length < 2) return;
-          if (event.key === "ArrowRight") cycle(1);
-          if (event.key === "ArrowLeft") cycle(-1);
-        }}
-        ref={dialogRef}
-      >
-        <div className="relative flex h-full items-center justify-center">
-          <Button
-            aria-label={closeLabel}
-            className="absolute top-0 right-0 z-10"
-            onClick={() => dialogRef.current?.close()}
-            size="icon"
-            type="button"
-            variant="secondary"
-          >
-            <X />
-          </Button>
-          {images.length > 1 ? (
-            <Button
-              aria-label={previousLabel}
-              className="absolute left-0 z-10"
-              onClick={() => cycle(-1)}
-              size="icon"
-              type="button"
-              variant="secondary"
-            >
-              <ChevronLeft />
-            </Button>
-          ) : null}
-          {images[selectedIndex] ? (
-            <img
-              alt={alt}
-              className="max-h-full max-w-full object-contain"
-              src={images[selectedIndex].url}
-            />
-          ) : null}
-          {images.length > 1 ? (
-            <Button
-              aria-label={nextLabel}
-              className="absolute right-0 z-10"
-              onClick={() => cycle(1)}
-              size="icon"
-              type="button"
-              variant="secondary"
-            >
-              <ChevronRight />
-            </Button>
-          ) : null}
-        </div>
-      </dialog>
+            {images[selectedIndex] ? (
+              <img
+                alt={alt}
+                className="max-h-full max-w-full object-contain"
+                src={images[selectedIndex].url}
+              />
+            ) : null}
+            {images.length > 1 ? (
+              <Button
+                aria-label={nextLabel}
+                className="absolute right-0 z-10"
+                onClick={() => cycle(1)}
+                size="icon"
+                type="button"
+                variant="secondary"
+              >
+                <ChevronRight />
+              </Button>
+            ) : null}
+          </div>
+        </dialog>
+      ) : null}
     </>
   );
 }

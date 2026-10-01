@@ -5,11 +5,11 @@ import { CollectionForm } from "./collection-form";
 
 const copy = {
   browse: "Browse",
-  cover: "Cover image",
+  cover: "Images",
   description: "Description",
   descriptionPlaceholder: "Describe this collection",
-  imageHelp: "Choose an optional cover image.",
-  imageTypes: "Allowed image types: JPEG, PNG, and WebP.",
+  imageHelp: "Choose up to ten images. The first image is the cover.",
+  imageTypes: "Allowed image types: JPEG, PNG, WebP, and AVIF.",
   name: "Name",
   namePlaceholder: "Collection name",
   public: "Public",
@@ -53,5 +53,24 @@ export const Submit: Story = {
     );
     await userEvent.click(canvas.getByRole("button", { name: "Save" }));
     await expect(args.onSubmit).toHaveBeenCalled();
+  },
+};
+
+export const MultipleImages: Story = {
+  play: async ({ args, canvas, userEvent }) => {
+    const images = [
+      new File(["one"], "one.png", { type: "image/png" }),
+      new File(["two"], "two.png", { type: "image/png" }),
+    ];
+    await userEvent.type(
+      canvas.getByRole("textbox", { name: "Name" }),
+      "Daily Carry",
+    );
+    await userEvent.upload(canvas.getByLabelText("Images"), images);
+    await userEvent.click(canvas.getByRole("button", { name: "Save" }));
+    await expect(args.onSubmit).toHaveBeenCalledWith(
+      expect.any(Object),
+      images,
+    );
   },
 };

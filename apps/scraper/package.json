@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx ../../packages/infisical-runner/src/cli.ts scraper dev -- tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "build:ci": "tsc -p tsconfig.json",
     "cron:run": "node dist/cli.js cron:run",
@@ -15,8 +15,6 @@
     "scrape": "node dist/cli.js scrape",
     "scrape:autmog": "node dist/cli.js scrape:autmog",
     "process:queue": "node dist/cli.js process:queue",
-    "check": "biome check .",
-    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:ci": "vitest run",
@@ -37,7 +35,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@package/eslint": "workspace:*",
+    "@electric-sql/pglite": "^0.5.8",
     "@package/tsconfig": "workspace:*",
     "tsx": "latest"
   }

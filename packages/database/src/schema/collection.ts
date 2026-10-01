@@ -14,18 +14,20 @@ import {
   timestamp,
   unique,
   uniqueIndex,
-  uuid,
 } from "drizzle-orm/pg-core";
 import { maker, material, productType } from "./scraper.js";
 import { user } from "./users.js";
 
+/** Roles allowed to soft-delete catalog images. */
 export const catalogDeletionRoles = ["owner", "admin"] as const;
+/** Catalog entity types that can own an image. */
 export const catalogImageTargetTypes = [
   "product",
   "collection",
   "collection_item",
 ] as const;
 
+/** Named collections owned by application users. */
 export const userCollection = pgTable(
   "user_collection",
   {
@@ -65,11 +67,12 @@ export const userCollection = pgTable(
     ),
     check(
       "user_collection_private_metadata_consistent",
-      sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
+      sql`(not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0) or (${table.isPrivate} and (num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0 or (${table.privateReason} is not null and ${table.privatedAt} is not null)))`,
     ),
   ],
 );
 
+/** Owned catalog items stored in user collections. */
 export const collectionItem = pgTable(
   "collection_item",
   {
@@ -122,7 +125,7 @@ export const collectionItem = pgTable(
     ),
     check(
       "collection_item_private_metadata_consistent",
-      sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
+      sql`(not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0) or (${table.isPrivate} and (num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0 or (${table.privateReason} is not null and ${table.privatedAt} is not null)))`,
     ),
     check(
       "collection_item_description_length_valid",
@@ -131,6 +134,7 @@ export const collectionItem = pgTable(
   ],
 );
 
+/** Ordered images attached to a user collection. */
 export const collectionImage = pgTable(
   "collection_image",
   {
@@ -149,7 +153,7 @@ export const collectionImage = pgTable(
     storageProvider: text("storage_provider").default("bunny").notNull(),
     objectPath: text("object_path").notNull(),
     url: text("url").notNull(),
-    uploadedByClerkId: text("uploaded_by_clerk_id").notNull(),
+    uploadedByClerkId: text("uploaded_by_clerk_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -173,6 +177,7 @@ export const collectionImage = pgTable(
   ],
 );
 
+/** Canonical catalog products associated with a maker and classified by product type. */
 export const product = pgTable(
   "product",
   {
@@ -185,7 +190,7 @@ export const product = pgTable(
     makerId: bigint("maker_id", { mode: "number" })
       .notNull()
       .references(() => maker.id, { onDelete: "restrict" }),
-    ownerClerkId: text("owner_clerk_id").notNull(),
+    ownerClerkId: text("owner_clerk_id"),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     description: text("description"),
@@ -210,7 +215,7 @@ export const product = pgTable(
     index("product_visibility_idx").on(table.isPrivate),
     check(
       "product_private_metadata_consistent",
-      sql`(${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) in (0, 3)) or (not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0)`,
+      sql`(not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0) or (${table.isPrivate} and (num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0 or (${table.privateReason} is not null and ${table.privatedAt} is not null)))`,
     ),
     check(
       "product_description_length_valid",
@@ -219,6 +224,7 @@ export const product = pgTable(
   ],
 );
 
+/** Ordered images attached to a catalog product. */
 export const productImage = pgTable(
   "product_image",
   {
@@ -236,7 +242,7 @@ export const productImage = pgTable(
     storageProvider: text("storage_provider").default("bunny").notNull(),
     objectPath: text("object_path").notNull(),
     url: text("url").notNull(),
-    uploadedByClerkId: text("uploaded_by_clerk_id").notNull(),
+    uploadedByClerkId: text("uploaded_by_clerk_id"),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
     deletedByClerkId: text("deleted_by_clerk_id"),
     deletedByRole: text("deleted_by_role", { enum: catalogDeletionRoles }),
@@ -259,7 +265,7 @@ export const productImage = pgTable(
     ),
     check(
       "product_image_deletion_metadata_consistent",
-      sql`num_nonnulls(${table.deletedAt}, ${table.deletedByClerkId}, ${table.deletedByRole}) in (0, 3)`,
+      sql`(${table.deletedAt} is null and ${table.deletedByClerkId} is null and ${table.deletedByRole} is null) or (${table.deletedAt} is not null and ${table.deletedByRole} is not null)`,
     ),
     check(
       "product_image_deleted_by_role_valid",
@@ -268,6 +274,7 @@ export const productImage = pgTable(
   ],
 );
 
+/** Ordered images attached to one collection item. */
 export const collectionItemImage = pgTable(
   "collection_item_image",
   {
@@ -285,7 +292,7 @@ export const collectionItemImage = pgTable(
     storageProvider: text("storage_provider").default("bunny").notNull(),
     objectPath: text("object_path").notNull(),
     url: text("url").notNull(),
-    uploadedByClerkId: text("uploaded_by_clerk_id").notNull(),
+    uploadedByClerkId: text("uploaded_by_clerk_id"),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
     deletedByClerkId: text("deleted_by_clerk_id"),
     deletedByRole: text("deleted_by_role", { enum: catalogDeletionRoles }),
@@ -308,7 +315,7 @@ export const collectionItemImage = pgTable(
     ),
     check(
       "collection_item_image_deletion_metadata_consistent",
-      sql`num_nonnulls(${table.deletedAt}, ${table.deletedByClerkId}, ${table.deletedByRole}) in (0, 3)`,
+      sql`(${table.deletedAt} is null and ${table.deletedByClerkId} is null and ${table.deletedByRole} is null) or (${table.deletedAt} is not null and ${table.deletedByRole} is not null)`,
     ),
     check(
       "collection_item_image_deleted_by_role_valid",
@@ -317,84 +324,7 @@ export const collectionItemImage = pgTable(
   ],
 );
 
-export const catalogImageUploadSession = pgTable(
-  "catalog_image_upload_session",
-  {
-    id: uuid("id").primaryKey(),
-    uploaderClerkId: text("uploader_clerk_id").notNull(),
-    targetType: text("target_type", {
-      enum: catalogImageTargetTypes,
-    }).notNull(),
-    productId: bigint("product_id", { mode: "number" }).references(
-      () => product.id,
-      { onDelete: "cascade" },
-    ),
-    collectionItemId: bigint("collection_item_id", {
-      mode: "number",
-    }).references(() => collectionItem.id, { onDelete: "cascade" }),
-    collectionId: bigint("collection_id", { mode: "number" }).references(
-      () => userCollection.id,
-      { onDelete: "cascade" },
-    ),
-    expiresAt: timestamp("expires_at", {
-      mode: "date",
-      withTimezone: true,
-    }).notNull(),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("catalog_image_upload_session_expires_at_idx").on(table.expiresAt),
-    check(
-      "catalog_image_upload_session_target_consistent",
-      sql`(${table.targetType} = 'product' and ${table.productId} is not null and ${table.collectionId} is null and ${table.collectionItemId} is null) or (${table.targetType} = 'collection' and ${table.productId} is null and ${table.collectionId} is not null and ${table.collectionItemId} is null) or (${table.targetType} = 'collection_item' and ${table.productId} is null and ${table.collectionId} is null and ${table.collectionItemId} is not null)`,
-    ),
-  ],
-);
-
-export const catalogImageUploadFile = pgTable(
-  "catalog_image_upload_file",
-  {
-    id: uuid("id").primaryKey(),
-    sessionId: uuid("session_id")
-      .notNull()
-      .references(() => catalogImageUploadSession.id, { onDelete: "cascade" }),
-    position: integer("position").notNull(),
-    fileName: text("file_name").notNull(),
-    contentType: text("content_type").notNull(),
-    size: integer("size").notNull(),
-    sha256: text("sha256").notNull(),
-    objectPath: text("object_path").notNull(),
-    url: text("url").notNull(),
-    uploadedAt: timestamp("uploaded_at", { mode: "date", withTimezone: true }),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("catalog_image_upload_file_session_id_idx").on(table.sessionId),
-    unique("catalog_image_upload_file_object_path_unique").on(table.objectPath),
-    unique("catalog_image_upload_file_session_position_unique").on(
-      table.sessionId,
-      table.position,
-    ),
-    unique("catalog_image_upload_file_session_hash_unique").on(
-      table.sessionId,
-      table.sha256,
-    ),
-    check(
-      "catalog_image_upload_file_position_valid",
-      sql`${table.position} >= 0`,
-    ),
-    check("catalog_image_upload_file_size_positive", sql`${table.size} > 0`),
-    check(
-      "catalog_image_upload_file_sha256_valid",
-      sql`${table.sha256} ~ '^[0-9a-f]{64}$'`,
-    ),
-  ],
-);
-
+/** Material assignments for catalog products. */
 export const productMaterial = pgTable(
   "product_material",
   {
@@ -408,6 +338,11 @@ export const productMaterial = pgTable(
   (table) => [primaryKey({ columns: [table.productId, table.materialId] })],
 );
 
+/**
+ * Builds shared identity and timestamp columns for catalog lookup tables.
+ *
+ * @returns Drizzle column builders for a named, slugged lookup row.
+ */
 const lookupColumns = () => ({
   id: bigint("id", { mode: "number" })
     .primaryKey()
@@ -422,10 +357,15 @@ const lookupColumns = () => ({
     .notNull(),
 });
 
+/** Canonical catalog finishes. */
 export const finish = pgTable("finish", lookupColumns(), (table) => [
+  uniqueIndex("finish_name_case_insensitive_unique").on(
+    sql`lower(${table.name})`,
+  ),
   uniqueIndex("finish_slug_unique").on(table.slug),
 ]);
 
+/** Canonical catalog colors. */
 export const color = pgTable(
   "color",
   {
@@ -433,15 +373,20 @@ export const color = pgTable(
     hex: text("hex").notNull(),
   },
   (table) => [
+    uniqueIndex("color_name_case_insensitive_unique").on(
+      sql`lower(${table.name})`,
+    ),
     uniqueIndex("color_slug_unique").on(table.slug),
     check("color_hex_check", sql`${table.hex} ~ '^#[0-9A-Fa-f]{6}$'`),
   ],
 );
 
+/** Canonical catalog color effects. */
 export const colorEffect = pgTable("color_effect", lookupColumns(), (table) => [
   uniqueIndex("color_effect_slug_unique").on(table.slug),
 ]);
 
+/** Named finish combinations for a catalog product or collection item. */
 export const finishOption = pgTable(
   "finish_option",
   {
@@ -480,6 +425,7 @@ export const finishOption = pgTable(
   ],
 );
 
+/** Finish membership in a finish option. */
 export const finishOptionFinish = pgTable(
   "finish_option_finish",
   {
@@ -501,6 +447,7 @@ export const finishOptionFinish = pgTable(
   ],
 );
 
+/** Color membership in a finish option. */
 export const finishOptionColor = pgTable(
   "finish_option_color",
   {
@@ -522,6 +469,7 @@ export const finishOptionColor = pgTable(
   ],
 );
 
+/** Spinner-specific measurements for catalog products. */
 export const productSpinner = pgTable(
   "product_spinner",
   {
@@ -550,27 +498,42 @@ export const productSpinner = pgTable(
   },
   (table) => [
     check(
+      "product_spinner_measurements_positive",
+      sql`${table.weightG} > 0 and ${table.lengthMm} > 0 and ${table.widthMm} > 0 and ${table.thicknessMm} > 0 and ${table.thicknessWithButtonMm} > 0 and ${table.buttonDiameterMm} > 0 and ${table.spinDiameterMm} > 0`,
+    ),
+    check(
       "product_spinner_bearing_length_valid",
       sql`${table.bearing} is null or char_length(${table.bearing}) <= 200`,
     ),
   ],
 );
 
-export const productSpinnerButton = pgTable("product_spinner_button", {
-  id: bigint("id", { mode: "number" })
-    .primaryKey()
-    .references(() => product.id, { onDelete: "cascade" }),
-  weightG: decimal("weight_g"),
-  diameterMm: decimal("diameter_mm"),
-  thicknessMm: decimal("thickness_mm"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+/** Spinner-button measurements for catalog products. */
+export const productSpinnerButton = pgTable(
+  "product_spinner_button",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .references(() => product.id, { onDelete: "cascade" }),
+    weightG: decimal("weight_g"),
+    diameterMm: decimal("diameter_mm"),
+    thicknessMm: decimal("thickness_mm"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      "product_spinner_button_measurements_positive",
+      sql`${table.weightG} > 0 and ${table.diameterMm} > 0 and ${table.thicknessMm} > 0`,
+    ),
+  ],
+);
 
+/** Catalog spinner-button mappings selected for collection items. */
 export const collectionSpinnerButton = pgTable("collection_spinner_button", {
   id: bigint("id", { mode: "number" })
     .primaryKey()
@@ -582,6 +545,7 @@ export const collectionSpinnerButton = pgTable("collection_spinner_button", {
     .references(() => productSpinnerButton.id, { onDelete: "restrict" }),
 });
 
+/** Catalog spinner mappings and installed-button overrides for collection items. */
 export const collectionSpinner = pgTable(
   "collection_spinner",
   {
@@ -597,6 +561,9 @@ export const collectionSpinner = pgTable(
     bearing: text("bearing"),
   },
   (table) => [
+    uniqueIndex("collection_spinner_installed_button_unique")
+      .on(table.installedButtonId)
+      .where(sql`${table.installedButtonId} is not null`),
     check(
       "collection_spinner_bearing_length_valid",
       sql`${table.bearing} is null or char_length(${table.bearing}) <= 200`,
@@ -604,39 +571,73 @@ export const collectionSpinner = pgTable(
   ],
 );
 
+/** Stored collection item row. */
 export type CollectionItem = typeof collectionItem.$inferSelect;
+/** Values accepted when creating a collection item row. */
 export type NewCollectionItem = typeof collectionItem.$inferInsert;
+/** Stored collection image row. */
 export type CollectionImage = typeof collectionImage.$inferSelect;
+/** Values accepted when creating a collection image row. */
 export type NewCollectionImage = typeof collectionImage.$inferInsert;
+/** Stored user collection row. */
 export type UserCollection = typeof userCollection.$inferSelect;
+/** Values accepted when creating a user collection row. */
 export type NewUserCollection = typeof userCollection.$inferInsert;
+/** Stored product row. */
 export type Product = typeof product.$inferSelect;
+/** Values accepted when creating a product row. */
 export type NewProduct = typeof product.$inferInsert;
+/** Stored product image row. */
 export type ProductImage = typeof productImage.$inferSelect;
+/** Values accepted when creating a product image row. */
 export type NewProductImage = typeof productImage.$inferInsert;
+/** Stored collection item image row. */
 export type CollectionItemImage = typeof collectionItemImage.$inferSelect;
+/** Values accepted when creating a collection item image row. */
 export type NewCollectionItemImage = typeof collectionItemImage.$inferInsert;
+/** Stored product material row. */
 export type ProductMaterial = typeof productMaterial.$inferSelect;
+/** Values accepted when creating a product material row. */
 export type NewProductMaterial = typeof productMaterial.$inferInsert;
+/** Stored finish row. */
 export type Finish = typeof finish.$inferSelect;
+/** Values accepted when creating a finish row. */
 export type NewFinish = typeof finish.$inferInsert;
+/** Stored color row. */
 export type Color = typeof color.$inferSelect;
+/** Values accepted when creating a color row. */
 export type NewColor = typeof color.$inferInsert;
+/** Stored color effect row. */
 export type ColorEffect = typeof colorEffect.$inferSelect;
+/** Values accepted when creating a color effect row. */
 export type NewColorEffect = typeof colorEffect.$inferInsert;
+/** Stored finish option row. */
 export type FinishOption = typeof finishOption.$inferSelect;
+/** Values accepted when creating a finish option row. */
 export type NewFinishOption = typeof finishOption.$inferInsert;
+/** Stored finish option finish row. */
 export type FinishOptionFinish = typeof finishOptionFinish.$inferSelect;
+/** Values accepted when creating a finish option finish row. */
 export type NewFinishOptionFinish = typeof finishOptionFinish.$inferInsert;
+/** Stored finish option color row. */
 export type FinishOptionColor = typeof finishOptionColor.$inferSelect;
+/** Values accepted when creating a finish option color row. */
 export type NewFinishOptionColor = typeof finishOptionColor.$inferInsert;
+/** Stored product spinner row. */
 export type ProductSpinner = typeof productSpinner.$inferSelect;
+/** Values accepted when creating a product spinner row. */
 export type NewProductSpinner = typeof productSpinner.$inferInsert;
+/** Stored product spinner button row. */
 export type ProductSpinnerButton = typeof productSpinnerButton.$inferSelect;
+/** Values accepted when creating a product spinner button row. */
 export type NewProductSpinnerButton = typeof productSpinnerButton.$inferInsert;
+/** Stored collection spinner row. */
 export type CollectionSpinner = typeof collectionSpinner.$inferSelect;
+/** Values accepted when creating a collection spinner row. */
 export type NewCollectionSpinner = typeof collectionSpinner.$inferInsert;
+/** Stored collection spinner button row. */
 export type CollectionSpinnerButton =
   typeof collectionSpinnerButton.$inferSelect;
+/** Values accepted when creating a collection spinner button row. */
 export type NewCollectionSpinnerButton =
   typeof collectionSpinnerButton.$inferInsert;

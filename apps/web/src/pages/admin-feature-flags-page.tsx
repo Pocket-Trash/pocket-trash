@@ -12,7 +12,7 @@ import {
   ToggleLeft,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { AppShell } from "@/components/app-shell";
+import { AdminPageShell } from "@/components/admin-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -117,8 +117,8 @@ export function AdminFeatureFlagsPage() {
   }
 
   return (
-    <AppShell title={t("web.admin.featureFlags.featureFlags")}>
-      <main className="mx-auto grid w-full max-w-6xl gap-5 px-4 py-6 md:grid-cols-[minmax(0,1fr)_360px] md:px-6">
+    <AdminPageShell title={t("web.admin.featureFlags.featureFlags")}>
+      <main className="grid w-full max-w-6xl gap-5 px-4 py-6 md:grid-cols-[minmax(0,1fr)_360px] md:px-6">
         <section className="min-w-0">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -373,6 +373,6 @@ export function AdminFeatureFlagsPage() {
           </section>
         </aside>
       </main>
-    </AppShell>
+    </AdminPageShell>
   );
 }

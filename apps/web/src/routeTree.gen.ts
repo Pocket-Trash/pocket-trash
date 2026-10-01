@@ -10,14 +10,24 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UserRouteImport } from './routes/user'
+import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as ResourcesRouteImport } from './routes/resources'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as FeedbackRouteImport } from './routes/feedback'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AutmogRouteImport } from './routes/autmog'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AccountErasureRouteImport } from './routes/account-erasure'
+import { Route as AccountErasedRouteImport } from './routes/account-erased'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UserIndexRouteImport } from './routes/user.index'
 import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
 import { Route as ProductsIndexRouteImport } from './routes/products.index'
 import { Route as HelpIndexRouteImport } from './routes/help.index'
+import { Route as FeedbackIndexRouteImport } from './routes/feedback.index'
 import { Route as CollectionsIndexRouteImport } from './routes/collections.index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as UserSettingsRouteImport } from './routes/user.settings_'
 import { Route as UserResourcesRouteImport } from './routes/user.resources'
 import { Route as UserCollectionsRouteImport } from './routes/user.collections'
@@ -29,9 +39,17 @@ import { Route as ResourcesResourceIdRouteImport } from './routes/resources.$res
 import { Route as ProductsAddRouteImport } from './routes/products.add'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as HelpSlugRouteImport } from './routes/help.$slug'
+import { Route as FeedbackNewRouteImport } from './routes/feedback.new'
+import { Route as FeedbackMyRequestsRouteImport } from './routes/feedback.my-requests'
+import { Route as FeedbackCompletedRouteImport } from './routes/feedback.completed'
 import { Route as CollectionsAddRouteImport } from './routes/collections.add'
 import { Route as CollectionsUserIdRouteImport } from './routes/collections.$userId'
 import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
+import { Route as AdminAccountErasureRouteImport } from './routes/admin.account-erasure'
+import { Route as AdminTrashIndexRouteImport } from './routes/admin.trash.index'
+import { Route as AdminSettingsIndexRouteImport } from './routes/admin.settings.index'
+import { Route as AdminFeedbackIndexRouteImport } from './routes/admin.feedback.index'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
 import { Route as UserResourcesTrashRouteImport } from './routes/user.resources_.trash'
 import { Route as UserCollectionsAddRouteImport } from './routes/user.collections_.add'
@@ -40,10 +58,15 @@ import { Route as ResourcesResourceIdEditRouteImport } from './routes/resources.
 import { Route as ProductsProductTypeSlugProductSlugRouteImport } from './routes/products.$productTypeSlug.$productSlug'
 import { Route as CollectionsUserIdCollectionIdRouteImport } from './routes/collections_.$userId.$collectionId'
 import { Route as CollectionsEditCollectionItemIdRouteImport } from './routes/collections.edit.$collectionItemId'
+import { Route as AdminTrashResourcesRouteImport } from './routes/admin.trash.resources'
+import { Route as AdminTrashCatalogImagesRouteImport } from './routes/admin.trash.catalog-images'
 import { Route as AdminSettingsFeatureFlagsRouteImport } from './routes/admin.settings.feature-flags'
-import { Route as AdminResourcesTrashRouteImport } from './routes/admin.resources.trash'
-import { Route as AdminResourcesNotificationsRouteImport } from './routes/admin.resources.notifications'
-import { Route as AdminCatalogImagesTrashRouteImport } from './routes/admin.catalog-images.trash'
+import { Route as AdminNotificationsResourcesRouteImport } from './routes/admin.notifications.resources'
+import { Route as AdminNotificationsFeedbackRouteImport } from './routes/admin.notifications.feedback'
+import { Route as AdminFeedbackRequestsRouteImport } from './routes/admin.feedback.requests'
+import { Route as AdminFeedbackPlannedRouteImport } from './routes/admin.feedback.planned'
+import { Route as AdminFeedbackArchiveRouteImport } from './routes/admin.feedback.archive'
+import { Route as AdminAuditExportRouteImport } from './routes/admin.audit.export'
 import { Route as UserCollectionsCollectionIdEditRouteImport } from './routes/user.collections_.$collectionId_.edit'
 import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId_.versions.new'
 import { Route as ProductsProductTypeSlugProductSlugEditRouteImport } from './routes/products.$productTypeSlug.$productSlug_.edit'
@@ -54,14 +77,54 @@ const UserRoute = UserRouteImport.update({
   path: '/user',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
+  id: '/terms-of-service',
+  path: '/terms-of-service',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResourcesRoute = ResourcesRouteImport.update({
   id: '/resources',
   path: '/resources',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackRoute = FeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AutmogRoute = AutmogRouteImport.update({
   id: '/autmog',
   path: '/autmog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountErasureRoute = AccountErasureRouteImport.update({
+  id: '/account-erasure',
+  path: '/account-erasure',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountErasedRoute = AccountErasedRouteImport.update({
+  id: '/account-erased',
+  path: '/account-erased',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -89,10 +152,20 @@ const HelpIndexRoute = HelpIndexRouteImport.update({
   path: '/help/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeedbackIndexRoute = FeedbackIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => FeedbackRoute,
+} as any)
 const CollectionsIndexRoute = CollectionsIndexRouteImport.update({
   id: '/collections/',
   path: '/collections/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const UserSettingsRoute = UserSettingsRouteImport.update({
   id: '/settings_',
@@ -149,6 +222,21 @@ const HelpSlugRoute = HelpSlugRouteImport.update({
   path: '/help/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeedbackNewRoute = FeedbackNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => FeedbackRoute,
+} as any)
+const FeedbackMyRequestsRoute = FeedbackMyRequestsRouteImport.update({
+  id: '/my-requests',
+  path: '/my-requests',
+  getParentRoute: () => FeedbackRoute,
+} as any)
+const FeedbackCompletedRoute = FeedbackCompletedRouteImport.update({
+  id: '/completed',
+  path: '/completed',
+  getParentRoute: () => FeedbackRoute,
+} as any)
 const CollectionsAddRoute = CollectionsAddRouteImport.update({
   id: '/collections/add',
   path: '/collections/add',
@@ -163,6 +251,31 @@ const AutmogPenIdRoute = AutmogPenIdRouteImport.update({
   id: '/$penId',
   path: '/$penId',
   getParentRoute: () => AutmogRoute,
+} as any)
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAccountErasureRoute = AdminAccountErasureRouteImport.update({
+  id: '/account-erasure',
+  path: '/account-erasure',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTrashIndexRoute = AdminTrashIndexRouteImport.update({
+  id: '/trash/',
+  path: '/trash/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsIndexRoute = AdminSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFeedbackIndexRoute = AdminFeedbackIndexRouteImport.update({
+  id: '/feedback/',
+  path: '/feedback/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const UserSettingsBetaFeaturesRoute =
   UserSettingsBetaFeaturesRouteImport.update({
@@ -209,27 +322,53 @@ const CollectionsEditCollectionItemIdRoute =
     path: '/collections/edit/$collectionItemId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AdminTrashResourcesRoute = AdminTrashResourcesRouteImport.update({
+  id: '/trash/resources',
+  path: '/trash/resources',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTrashCatalogImagesRoute = AdminTrashCatalogImagesRouteImport.update({
+  id: '/trash/catalog-images',
+  path: '/trash/catalog-images',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSettingsFeatureFlagsRoute =
   AdminSettingsFeatureFlagsRouteImport.update({
-    id: '/admin/settings/feature-flags',
-    path: '/admin/settings/feature-flags',
-    getParentRoute: () => rootRouteImport,
+    id: '/settings/feature-flags',
+    path: '/settings/feature-flags',
+    getParentRoute: () => AdminRoute,
   } as any)
-const AdminResourcesTrashRoute = AdminResourcesTrashRouteImport.update({
-  id: '/admin/resources/trash',
-  path: '/admin/resources/trash',
-  getParentRoute: () => rootRouteImport,
+const AdminNotificationsResourcesRoute =
+  AdminNotificationsResourcesRouteImport.update({
+    id: '/notifications/resources',
+    path: '/notifications/resources',
+    getParentRoute: () => AdminRoute,
+  } as any)
+const AdminNotificationsFeedbackRoute =
+  AdminNotificationsFeedbackRouteImport.update({
+    id: '/notifications/feedback',
+    path: '/notifications/feedback',
+    getParentRoute: () => AdminRoute,
+  } as any)
+const AdminFeedbackRequestsRoute = AdminFeedbackRequestsRouteImport.update({
+  id: '/feedback/requests',
+  path: '/feedback/requests',
+  getParentRoute: () => AdminRoute,
 } as any)
-const AdminResourcesNotificationsRoute =
-  AdminResourcesNotificationsRouteImport.update({
-    id: '/admin/resources/notifications',
-    path: '/admin/resources/notifications',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const AdminCatalogImagesTrashRoute = AdminCatalogImagesTrashRouteImport.update({
-  id: '/admin/catalog-images/trash',
-  path: '/admin/catalog-images/trash',
-  getParentRoute: () => rootRouteImport,
+const AdminFeedbackPlannedRoute = AdminFeedbackPlannedRouteImport.update({
+  id: '/feedback/planned',
+  path: '/feedback/planned',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFeedbackArchiveRoute = AdminFeedbackArchiveRouteImport.update({
+  id: '/feedback/archive',
+  path: '/feedback/archive',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAuditExportRoute = AdminAuditExportRouteImport.update({
+  id: '/export',
+  path: '/export',
+  getParentRoute: () => AdminAuditRoute,
 } as any)
 const UserCollectionsCollectionIdEditRoute =
   UserCollectionsCollectionIdEditRouteImport.update({
@@ -258,12 +397,25 @@ const CollectionsUserIdCollectionIdCollectionItemIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account-erased': typeof AccountErasedRoute
+  '/account-erasure': typeof AccountErasureRoute
+  '/admin': typeof AdminRouteWithChildren
   '/autmog': typeof AutmogRouteWithChildren
+  '/contact': typeof ContactRoute
+  '/feedback': typeof FeedbackRouteWithChildren
+  '/notifications': typeof NotificationsRoute
+  '/privacy': typeof PrivacyRoute
   '/resources': typeof ResourcesRouteWithChildren
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
+  '/admin/account-erasure': typeof AdminAccountErasureRoute
+  '/admin/audit': typeof AdminAuditRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/feedback/completed': typeof FeedbackCompletedRoute
+  '/feedback/my-requests': typeof FeedbackMyRequestsRoute
+  '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
@@ -275,15 +427,22 @@ export interface FileRoutesByFullPath {
   '/user/collections': typeof UserCollectionsRoute
   '/user/resources': typeof UserResourcesRoute
   '/user/settings': typeof UserSettingsRoute
+  '/admin/': typeof AdminIndexRoute
   '/collections/': typeof CollectionsIndexRoute
+  '/feedback/': typeof FeedbackIndexRoute
   '/help/': typeof HelpIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
-  '/admin/catalog-images/trash': typeof AdminCatalogImagesTrashRoute
-  '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
-  '/admin/resources/trash': typeof AdminResourcesTrashRoute
+  '/admin/audit/export': typeof AdminAuditExportRoute
+  '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
+  '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
+  '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
+  '/admin/notifications/feedback': typeof AdminNotificationsFeedbackRoute
+  '/admin/notifications/resources': typeof AdminNotificationsResourcesRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
+  '/admin/trash/catalog-images': typeof AdminTrashCatalogImagesRoute
+  '/admin/trash/resources': typeof AdminTrashResourcesRoute
   '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
   '/collections/$userId/$collectionId': typeof CollectionsUserIdCollectionIdRoute
   '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
@@ -292,6 +451,9 @@ export interface FileRoutesByFullPath {
   '/user/collections/add': typeof UserCollectionsAddRoute
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/admin/feedback/': typeof AdminFeedbackIndexRoute
+  '/admin/settings/': typeof AdminSettingsIndexRoute
+  '/admin/trash/': typeof AdminTrashIndexRoute
   '/collections/$userId/$collectionId/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
   '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
@@ -299,10 +461,21 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account-erased': typeof AccountErasedRoute
+  '/account-erasure': typeof AccountErasureRoute
   '/autmog': typeof AutmogRouteWithChildren
+  '/contact': typeof ContactRoute
+  '/notifications': typeof NotificationsRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
+  '/admin/account-erasure': typeof AdminAccountErasureRoute
+  '/admin/audit': typeof AdminAuditRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/feedback/completed': typeof FeedbackCompletedRoute
+  '/feedback/my-requests': typeof FeedbackMyRequestsRoute
+  '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
@@ -314,15 +487,22 @@ export interface FileRoutesByTo {
   '/user/collections': typeof UserCollectionsRoute
   '/user/resources': typeof UserResourcesRoute
   '/user/settings': typeof UserSettingsRoute
+  '/admin': typeof AdminIndexRoute
   '/collections': typeof CollectionsIndexRoute
+  '/feedback': typeof FeedbackIndexRoute
   '/help': typeof HelpIndexRoute
   '/products': typeof ProductsIndexRoute
   '/resources': typeof ResourcesIndexRoute
   '/user': typeof UserIndexRoute
-  '/admin/catalog-images/trash': typeof AdminCatalogImagesTrashRoute
-  '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
-  '/admin/resources/trash': typeof AdminResourcesTrashRoute
+  '/admin/audit/export': typeof AdminAuditExportRoute
+  '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
+  '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
+  '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
+  '/admin/notifications/feedback': typeof AdminNotificationsFeedbackRoute
+  '/admin/notifications/resources': typeof AdminNotificationsResourcesRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
+  '/admin/trash/catalog-images': typeof AdminTrashCatalogImagesRoute
+  '/admin/trash/resources': typeof AdminTrashResourcesRoute
   '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
   '/collections/$userId/$collectionId': typeof CollectionsUserIdCollectionIdRoute
   '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
@@ -331,6 +511,9 @@ export interface FileRoutesByTo {
   '/user/collections/add': typeof UserCollectionsAddRoute
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/admin/feedback': typeof AdminFeedbackIndexRoute
+  '/admin/settings': typeof AdminSettingsIndexRoute
+  '/admin/trash': typeof AdminTrashIndexRoute
   '/collections/$userId/$collectionId/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
   '/resources/$resourceId/versions/new': typeof ResourcesResourceIdVersionsNewRoute
@@ -339,12 +522,25 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account-erased': typeof AccountErasedRoute
+  '/account-erasure': typeof AccountErasureRoute
+  '/admin': typeof AdminRouteWithChildren
   '/autmog': typeof AutmogRouteWithChildren
+  '/contact': typeof ContactRoute
+  '/feedback': typeof FeedbackRouteWithChildren
+  '/notifications': typeof NotificationsRoute
+  '/privacy': typeof PrivacyRoute
   '/resources': typeof ResourcesRouteWithChildren
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
+  '/admin/account-erasure': typeof AdminAccountErasureRoute
+  '/admin/audit': typeof AdminAuditRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
+  '/feedback/completed': typeof FeedbackCompletedRoute
+  '/feedback/my-requests': typeof FeedbackMyRequestsRoute
+  '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
@@ -356,15 +552,22 @@ export interface FileRoutesById {
   '/user/collections': typeof UserCollectionsRoute
   '/user/resources': typeof UserResourcesRoute
   '/user/settings_': typeof UserSettingsRoute
+  '/admin/': typeof AdminIndexRoute
   '/collections/': typeof CollectionsIndexRoute
+  '/feedback/': typeof FeedbackIndexRoute
   '/help/': typeof HelpIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
-  '/admin/catalog-images/trash': typeof AdminCatalogImagesTrashRoute
-  '/admin/resources/notifications': typeof AdminResourcesNotificationsRoute
-  '/admin/resources/trash': typeof AdminResourcesTrashRoute
+  '/admin/audit/export': typeof AdminAuditExportRoute
+  '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
+  '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
+  '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
+  '/admin/notifications/feedback': typeof AdminNotificationsFeedbackRoute
+  '/admin/notifications/resources': typeof AdminNotificationsResourcesRoute
   '/admin/settings/feature-flags': typeof AdminSettingsFeatureFlagsRoute
+  '/admin/trash/catalog-images': typeof AdminTrashCatalogImagesRoute
+  '/admin/trash/resources': typeof AdminTrashResourcesRoute
   '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
   '/collections_/$userId/$collectionId': typeof CollectionsUserIdCollectionIdRoute
   '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
@@ -373,6 +576,9 @@ export interface FileRoutesById {
   '/user/collections_/add': typeof UserCollectionsAddRoute
   '/user/resources_/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/admin/feedback/': typeof AdminFeedbackIndexRoute
+  '/admin/settings/': typeof AdminSettingsIndexRoute
+  '/admin/trash/': typeof AdminTrashIndexRoute
   '/collections_/$userId/$collectionId_/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug_/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
   '/resources/$resourceId_/versions/new': typeof ResourcesResourceIdVersionsNewRoute
@@ -382,12 +588,25 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/account-erased'
+    | '/account-erasure'
+    | '/admin'
     | '/autmog'
+    | '/contact'
+    | '/feedback'
+    | '/notifications'
+    | '/privacy'
     | '/resources'
+    | '/terms-of-service'
     | '/user'
+    | '/admin/account-erasure'
+    | '/admin/audit'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/feedback/completed'
+    | '/feedback/my-requests'
+    | '/feedback/new'
     | '/help/$slug'
     | '/pens/$penId'
     | '/products/add'
@@ -399,15 +618,22 @@ export interface FileRouteTypes {
     | '/user/collections'
     | '/user/resources'
     | '/user/settings'
+    | '/admin/'
     | '/collections/'
+    | '/feedback/'
     | '/help/'
     | '/products/'
     | '/resources/'
     | '/user/'
-    | '/admin/catalog-images/trash'
-    | '/admin/resources/notifications'
-    | '/admin/resources/trash'
+    | '/admin/audit/export'
+    | '/admin/feedback/archive'
+    | '/admin/feedback/planned'
+    | '/admin/feedback/requests'
+    | '/admin/notifications/feedback'
+    | '/admin/notifications/resources'
     | '/admin/settings/feature-flags'
+    | '/admin/trash/catalog-images'
+    | '/admin/trash/resources'
     | '/collections/edit/$collectionItemId'
     | '/collections/$userId/$collectionId'
     | '/products/$productTypeSlug/$productSlug'
@@ -416,6 +642,9 @@ export interface FileRouteTypes {
     | '/user/collections/add'
     | '/user/resources/trash'
     | '/user/settings/beta-features'
+    | '/admin/feedback/'
+    | '/admin/settings/'
+    | '/admin/trash/'
     | '/collections/$userId/$collectionId/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug/edit'
     | '/resources/$resourceId/versions/new'
@@ -423,10 +652,21 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/account-erased'
+    | '/account-erasure'
     | '/autmog'
+    | '/contact'
+    | '/notifications'
+    | '/privacy'
+    | '/terms-of-service'
+    | '/admin/account-erasure'
+    | '/admin/audit'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/feedback/completed'
+    | '/feedback/my-requests'
+    | '/feedback/new'
     | '/help/$slug'
     | '/pens/$penId'
     | '/products/add'
@@ -438,15 +678,22 @@ export interface FileRouteTypes {
     | '/user/collections'
     | '/user/resources'
     | '/user/settings'
+    | '/admin'
     | '/collections'
+    | '/feedback'
     | '/help'
     | '/products'
     | '/resources'
     | '/user'
-    | '/admin/catalog-images/trash'
-    | '/admin/resources/notifications'
-    | '/admin/resources/trash'
+    | '/admin/audit/export'
+    | '/admin/feedback/archive'
+    | '/admin/feedback/planned'
+    | '/admin/feedback/requests'
+    | '/admin/notifications/feedback'
+    | '/admin/notifications/resources'
     | '/admin/settings/feature-flags'
+    | '/admin/trash/catalog-images'
+    | '/admin/trash/resources'
     | '/collections/edit/$collectionItemId'
     | '/collections/$userId/$collectionId'
     | '/products/$productTypeSlug/$productSlug'
@@ -455,6 +702,9 @@ export interface FileRouteTypes {
     | '/user/collections/add'
     | '/user/resources/trash'
     | '/user/settings/beta-features'
+    | '/admin/feedback'
+    | '/admin/settings'
+    | '/admin/trash'
     | '/collections/$userId/$collectionId/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug/edit'
     | '/resources/$resourceId/versions/new'
@@ -462,12 +712,25 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/account-erased'
+    | '/account-erasure'
+    | '/admin'
     | '/autmog'
+    | '/contact'
+    | '/feedback'
+    | '/notifications'
+    | '/privacy'
     | '/resources'
+    | '/terms-of-service'
     | '/user'
+    | '/admin/account-erasure'
+    | '/admin/audit'
     | '/autmog/$penId'
     | '/collections/$userId'
     | '/collections/add'
+    | '/feedback/completed'
+    | '/feedback/my-requests'
+    | '/feedback/new'
     | '/help/$slug'
     | '/pens/$penId'
     | '/products/add'
@@ -479,15 +742,22 @@ export interface FileRouteTypes {
     | '/user/collections'
     | '/user/resources'
     | '/user/settings_'
+    | '/admin/'
     | '/collections/'
+    | '/feedback/'
     | '/help/'
     | '/products/'
     | '/resources/'
     | '/user/'
-    | '/admin/catalog-images/trash'
-    | '/admin/resources/notifications'
-    | '/admin/resources/trash'
+    | '/admin/audit/export'
+    | '/admin/feedback/archive'
+    | '/admin/feedback/planned'
+    | '/admin/feedback/requests'
+    | '/admin/notifications/feedback'
+    | '/admin/notifications/resources'
     | '/admin/settings/feature-flags'
+    | '/admin/trash/catalog-images'
+    | '/admin/trash/resources'
     | '/collections/edit/$collectionItemId'
     | '/collections_/$userId/$collectionId'
     | '/products/$productTypeSlug/$productSlug'
@@ -496,6 +766,9 @@ export interface FileRouteTypes {
     | '/user/collections_/add'
     | '/user/resources_/trash'
     | '/user/settings/beta-features'
+    | '/admin/feedback/'
+    | '/admin/settings/'
+    | '/admin/trash/'
     | '/collections_/$userId/$collectionId_/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug_/edit'
     | '/resources/$resourceId_/versions/new'
@@ -504,8 +777,16 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountErasedRoute: typeof AccountErasedRoute
+  AccountErasureRoute: typeof AccountErasureRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AutmogRoute: typeof AutmogRouteWithChildren
+  ContactRoute: typeof ContactRoute
+  FeedbackRoute: typeof FeedbackRouteWithChildren
+  NotificationsRoute: typeof NotificationsRoute
+  PrivacyRoute: typeof PrivacyRoute
   ResourcesRoute: typeof ResourcesRouteWithChildren
+  TermsOfServiceRoute: typeof TermsOfServiceRoute
   UserRoute: typeof UserRouteWithChildren
   CollectionsUserIdRoute: typeof CollectionsUserIdRoute
   CollectionsAddRoute: typeof CollectionsAddRoute
@@ -517,10 +798,6 @@ export interface RootRouteChildren {
   CollectionsIndexRoute: typeof CollectionsIndexRoute
   HelpIndexRoute: typeof HelpIndexRoute
   ProductsIndexRoute: typeof ProductsIndexRoute
-  AdminCatalogImagesTrashRoute: typeof AdminCatalogImagesTrashRoute
-  AdminResourcesNotificationsRoute: typeof AdminResourcesNotificationsRoute
-  AdminResourcesTrashRoute: typeof AdminResourcesTrashRoute
-  AdminSettingsFeatureFlagsRoute: typeof AdminSettingsFeatureFlagsRoute
   CollectionsEditCollectionItemIdRoute: typeof CollectionsEditCollectionItemIdRoute
   CollectionsUserIdCollectionIdRoute: typeof CollectionsUserIdCollectionIdRoute
   ProductsProductTypeSlugProductSlugRoute: typeof ProductsProductTypeSlugProductSlugRoute
@@ -537,6 +814,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/terms-of-service': {
+      id: '/terms-of-service'
+      path: '/terms-of-service'
+      fullPath: '/terms-of-service'
+      preLoaderRoute: typeof TermsOfServiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/resources': {
       id: '/resources'
       path: '/resources'
@@ -544,11 +828,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResourcesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feedback': {
+      id: '/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof FeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/autmog': {
       id: '/autmog'
       path: '/autmog'
       fullPath: '/autmog'
       preLoaderRoute: typeof AutmogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account-erasure': {
+      id: '/account-erasure'
+      path: '/account-erasure'
+      fullPath: '/account-erasure'
+      preLoaderRoute: typeof AccountErasureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account-erased': {
+      id: '/account-erased'
+      path: '/account-erased'
+      fullPath: '/account-erased'
+      preLoaderRoute: typeof AccountErasedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -586,12 +919,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HelpIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/feedback/': {
+      id: '/feedback/'
+      path: '/'
+      fullPath: '/feedback/'
+      preLoaderRoute: typeof FeedbackIndexRouteImport
+      parentRoute: typeof FeedbackRoute
+    }
     '/collections/': {
       id: '/collections/'
       path: '/collections'
       fullPath: '/collections/'
       preLoaderRoute: typeof CollectionsIndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/user/settings_': {
       id: '/user/settings_'
@@ -670,6 +1017,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HelpSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/feedback/new': {
+      id: '/feedback/new'
+      path: '/new'
+      fullPath: '/feedback/new'
+      preLoaderRoute: typeof FeedbackNewRouteImport
+      parentRoute: typeof FeedbackRoute
+    }
+    '/feedback/my-requests': {
+      id: '/feedback/my-requests'
+      path: '/my-requests'
+      fullPath: '/feedback/my-requests'
+      preLoaderRoute: typeof FeedbackMyRequestsRouteImport
+      parentRoute: typeof FeedbackRoute
+    }
+    '/feedback/completed': {
+      id: '/feedback/completed'
+      path: '/completed'
+      fullPath: '/feedback/completed'
+      preLoaderRoute: typeof FeedbackCompletedRouteImport
+      parentRoute: typeof FeedbackRoute
+    }
     '/collections/add': {
       id: '/collections/add'
       path: '/collections/add'
@@ -690,6 +1058,41 @@ declare module '@tanstack/react-router' {
       fullPath: '/autmog/$penId'
       preLoaderRoute: typeof AutmogPenIdRouteImport
       parentRoute: typeof AutmogRoute
+    }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/account-erasure': {
+      id: '/admin/account-erasure'
+      path: '/account-erasure'
+      fullPath: '/admin/account-erasure'
+      preLoaderRoute: typeof AdminAccountErasureRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/trash/': {
+      id: '/admin/trash/'
+      path: '/trash'
+      fullPath: '/admin/trash/'
+      preLoaderRoute: typeof AdminTrashIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings/': {
+      id: '/admin/settings/'
+      path: '/settings'
+      fullPath: '/admin/settings/'
+      preLoaderRoute: typeof AdminSettingsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/feedback/': {
+      id: '/admin/feedback/'
+      path: '/feedback'
+      fullPath: '/admin/feedback/'
+      preLoaderRoute: typeof AdminFeedbackIndexRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/user/settings/beta-features': {
       id: '/user/settings/beta-features'
@@ -747,33 +1150,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CollectionsEditCollectionItemIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/trash/resources': {
+      id: '/admin/trash/resources'
+      path: '/trash/resources'
+      fullPath: '/admin/trash/resources'
+      preLoaderRoute: typeof AdminTrashResourcesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/trash/catalog-images': {
+      id: '/admin/trash/catalog-images'
+      path: '/trash/catalog-images'
+      fullPath: '/admin/trash/catalog-images'
+      preLoaderRoute: typeof AdminTrashCatalogImagesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/settings/feature-flags': {
       id: '/admin/settings/feature-flags'
-      path: '/admin/settings/feature-flags'
+      path: '/settings/feature-flags'
       fullPath: '/admin/settings/feature-flags'
       preLoaderRoute: typeof AdminSettingsFeatureFlagsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
-    '/admin/resources/trash': {
-      id: '/admin/resources/trash'
-      path: '/admin/resources/trash'
-      fullPath: '/admin/resources/trash'
-      preLoaderRoute: typeof AdminResourcesTrashRouteImport
-      parentRoute: typeof rootRouteImport
+    '/admin/notifications/resources': {
+      id: '/admin/notifications/resources'
+      path: '/notifications/resources'
+      fullPath: '/admin/notifications/resources'
+      preLoaderRoute: typeof AdminNotificationsResourcesRouteImport
+      parentRoute: typeof AdminRoute
     }
-    '/admin/resources/notifications': {
-      id: '/admin/resources/notifications'
-      path: '/admin/resources/notifications'
-      fullPath: '/admin/resources/notifications'
-      preLoaderRoute: typeof AdminResourcesNotificationsRouteImport
-      parentRoute: typeof rootRouteImport
+    '/admin/notifications/feedback': {
+      id: '/admin/notifications/feedback'
+      path: '/notifications/feedback'
+      fullPath: '/admin/notifications/feedback'
+      preLoaderRoute: typeof AdminNotificationsFeedbackRouteImport
+      parentRoute: typeof AdminRoute
     }
-    '/admin/catalog-images/trash': {
-      id: '/admin/catalog-images/trash'
-      path: '/admin/catalog-images/trash'
-      fullPath: '/admin/catalog-images/trash'
-      preLoaderRoute: typeof AdminCatalogImagesTrashRouteImport
-      parentRoute: typeof rootRouteImport
+    '/admin/feedback/requests': {
+      id: '/admin/feedback/requests'
+      path: '/feedback/requests'
+      fullPath: '/admin/feedback/requests'
+      preLoaderRoute: typeof AdminFeedbackRequestsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/feedback/planned': {
+      id: '/admin/feedback/planned'
+      path: '/feedback/planned'
+      fullPath: '/admin/feedback/planned'
+      preLoaderRoute: typeof AdminFeedbackPlannedRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/feedback/archive': {
+      id: '/admin/feedback/archive'
+      path: '/feedback/archive'
+      fullPath: '/admin/feedback/archive'
+      preLoaderRoute: typeof AdminFeedbackArchiveRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/audit/export': {
+      id: '/admin/audit/export'
+      path: '/export'
+      fullPath: '/admin/audit/export'
+      preLoaderRoute: typeof AdminAuditExportRouteImport
+      parentRoute: typeof AdminAuditRoute
     }
     '/user/collections_/$collectionId_/edit': {
       id: '/user/collections_/$collectionId_/edit'
@@ -806,6 +1244,54 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminAuditRouteChildren {
+  AdminAuditExportRoute: typeof AdminAuditExportRoute
+}
+
+const AdminAuditRouteChildren: AdminAuditRouteChildren = {
+  AdminAuditExportRoute: AdminAuditExportRoute,
+}
+
+const AdminAuditRouteWithChildren = AdminAuditRoute._addFileChildren(
+  AdminAuditRouteChildren,
+)
+
+interface AdminRouteChildren {
+  AdminAccountErasureRoute: typeof AdminAccountErasureRoute
+  AdminAuditRoute: typeof AdminAuditRouteWithChildren
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminFeedbackArchiveRoute: typeof AdminFeedbackArchiveRoute
+  AdminFeedbackPlannedRoute: typeof AdminFeedbackPlannedRoute
+  AdminFeedbackRequestsRoute: typeof AdminFeedbackRequestsRoute
+  AdminNotificationsFeedbackRoute: typeof AdminNotificationsFeedbackRoute
+  AdminNotificationsResourcesRoute: typeof AdminNotificationsResourcesRoute
+  AdminSettingsFeatureFlagsRoute: typeof AdminSettingsFeatureFlagsRoute
+  AdminTrashCatalogImagesRoute: typeof AdminTrashCatalogImagesRoute
+  AdminTrashResourcesRoute: typeof AdminTrashResourcesRoute
+  AdminFeedbackIndexRoute: typeof AdminFeedbackIndexRoute
+  AdminSettingsIndexRoute: typeof AdminSettingsIndexRoute
+  AdminTrashIndexRoute: typeof AdminTrashIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAccountErasureRoute: AdminAccountErasureRoute,
+  AdminAuditRoute: AdminAuditRouteWithChildren,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminFeedbackArchiveRoute: AdminFeedbackArchiveRoute,
+  AdminFeedbackPlannedRoute: AdminFeedbackPlannedRoute,
+  AdminFeedbackRequestsRoute: AdminFeedbackRequestsRoute,
+  AdminNotificationsFeedbackRoute: AdminNotificationsFeedbackRoute,
+  AdminNotificationsResourcesRoute: AdminNotificationsResourcesRoute,
+  AdminSettingsFeatureFlagsRoute: AdminSettingsFeatureFlagsRoute,
+  AdminTrashCatalogImagesRoute: AdminTrashCatalogImagesRoute,
+  AdminTrashResourcesRoute: AdminTrashResourcesRoute,
+  AdminFeedbackIndexRoute: AdminFeedbackIndexRoute,
+  AdminSettingsIndexRoute: AdminSettingsIndexRoute,
+  AdminTrashIndexRoute: AdminTrashIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 interface AutmogRouteChildren {
   AutmogPenIdRoute: typeof AutmogPenIdRoute
 }
@@ -816,6 +1302,24 @@ const AutmogRouteChildren: AutmogRouteChildren = {
 
 const AutmogRouteWithChildren =
   AutmogRoute._addFileChildren(AutmogRouteChildren)
+
+interface FeedbackRouteChildren {
+  FeedbackCompletedRoute: typeof FeedbackCompletedRoute
+  FeedbackMyRequestsRoute: typeof FeedbackMyRequestsRoute
+  FeedbackNewRoute: typeof FeedbackNewRoute
+  FeedbackIndexRoute: typeof FeedbackIndexRoute
+}
+
+const FeedbackRouteChildren: FeedbackRouteChildren = {
+  FeedbackCompletedRoute: FeedbackCompletedRoute,
+  FeedbackMyRequestsRoute: FeedbackMyRequestsRoute,
+  FeedbackNewRoute: FeedbackNewRoute,
+  FeedbackIndexRoute: FeedbackIndexRoute,
+}
+
+const FeedbackRouteWithChildren = FeedbackRoute._addFileChildren(
+  FeedbackRouteChildren,
+)
 
 interface ResourcesRouteChildren {
   ResourcesResourceIdRoute: typeof ResourcesResourceIdRoute
@@ -867,8 +1371,16 @@ const UserRouteWithChildren = UserRoute._addFileChildren(UserRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountErasedRoute: AccountErasedRoute,
+  AccountErasureRoute: AccountErasureRoute,
+  AdminRoute: AdminRouteWithChildren,
   AutmogRoute: AutmogRouteWithChildren,
+  ContactRoute: ContactRoute,
+  FeedbackRoute: FeedbackRouteWithChildren,
+  NotificationsRoute: NotificationsRoute,
+  PrivacyRoute: PrivacyRoute,
   ResourcesRoute: ResourcesRouteWithChildren,
+  TermsOfServiceRoute: TermsOfServiceRoute,
   UserRoute: UserRouteWithChildren,
   CollectionsUserIdRoute: CollectionsUserIdRoute,
   CollectionsAddRoute: CollectionsAddRoute,
@@ -880,10 +1392,6 @@ const rootRouteChildren: RootRouteChildren = {
   CollectionsIndexRoute: CollectionsIndexRoute,
   HelpIndexRoute: HelpIndexRoute,
   ProductsIndexRoute: ProductsIndexRoute,
-  AdminCatalogImagesTrashRoute: AdminCatalogImagesTrashRoute,
-  AdminResourcesNotificationsRoute: AdminResourcesNotificationsRoute,
-  AdminResourcesTrashRoute: AdminResourcesTrashRoute,
-  AdminSettingsFeatureFlagsRoute: AdminSettingsFeatureFlagsRoute,
   CollectionsEditCollectionItemIdRoute: CollectionsEditCollectionItemIdRoute,
   CollectionsUserIdCollectionIdRoute: CollectionsUserIdCollectionIdRoute,
   ProductsProductTypeSlugProductSlugRoute:

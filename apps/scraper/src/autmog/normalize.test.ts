@@ -49,6 +49,13 @@ describe("normalizeAutmogProduct", () => {
   });
 });
 
+/**
+ * Creates a representative Shopify product with selected overrides.
+ *
+ * @param overrides - Shopify fields that replace fixture defaults.
+ *
+ * @returns A complete Shopify product fixture.
+ */
 function createProduct(overrides: Partial<ShopifyProduct>): ShopifyProduct {
   return {
     available: true,

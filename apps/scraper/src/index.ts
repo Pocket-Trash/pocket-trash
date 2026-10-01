@@ -6,6 +6,9 @@ import { createScraperJobEnv } from "./env.schema.js";
 import { createScraperLogger } from "./lib/logger.js";
 import { type ScraperScheduler, startScraperScheduler } from "./scheduler.js";
 
+/**
+ * Process-wide scraper server logger.
+ */
 const logger = createScraperLogger({
   appEnv: scraperEnv.APP_ENV,
   axiomDataset: scraperEnv.AXIOM_DATASET,
@@ -29,6 +32,9 @@ void main().catch(async (error) => {
   process.exitCode = 1;
 });
 
+/**
+ * Starts the scraper HTTP server and optional in-process scheduler.
+ */
 async function main() {
   let scheduler: ScraperScheduler | undefined;
   const app = createApp({ logger });
@@ -73,13 +79,27 @@ async function main() {
   });
 }
 
+/**
+ * Stops the scheduler and HTTP server, then flushes pending logs.
+ *
+ * @param options - Runtime resources and the process signal requesting shutdown.
+ */
 async function shutdown({
   scheduler,
   server,
   signal,
 }: {
+  /**
+   * Scheduler to stop when one finished starting.
+   */
   scheduler: ScraperScheduler | undefined;
+  /**
+   * Node server returned by Hono's adapter.
+   */
   server: unknown;
+  /**
+   * Process signal that initiated shutdown.
+   */
   signal: string;
 }) {
   logger.info(loggerMessages.scraper.serverStopping, {
@@ -93,6 +113,12 @@ async function shutdown({
   await logger.flush();
 }
 
+/**
+ * Closes a server when it exposes Node's callback-style close contract.
+ *
+ * @param server - Potentially closable server instance.
+ * @rejects When the server reports a shutdown error.
+ */
 async function closeServer(server: unknown) {
   if (!isClosableServer(server)) {
     return;
@@ -110,7 +136,18 @@ async function closeServer(server: unknown) {
   });
 }
 
+/**
+ * Checks whether a value exposes Node's callback-style server close method.
+ *
+ * @param server - Candidate server value.
+ * @returns Whether the value can be closed asynchronously.
+ */
 function isClosableServer(server: unknown): server is {
+  /**
+   * Closes the server and reports any shutdown error.
+   *
+   * @param callback - Receives an optional server shutdown error.
+   */
   close: (callback: (error?: Error) => void) => void;
 } {
   return (

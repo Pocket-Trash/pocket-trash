@@ -1,9 +1,11 @@
 
 # System Instructions
-- Pocket Trash repo skills come from `https://github.com/Pocket-Trash/skills` as the single source of truth for Codex and Claude Code. Run `pnpm agent-skills:check` at repo session start. If it warns, run `pnpm agent-skills:update`. Do not edit local skill copies in this repo; update the shared repo instead.
+- Pocket Trash repo skills come from `https://github.com/Pocket-Trash/skills` as the single source of truth for Codex and Claude Code. New worktrees install them automatically. Do not edit local skill copies directly; update the shared repo instead.
 - Do not add or modify hard-coded user-visible text in UI, components, web flows, API responses, or user-displayed errors. Use localization for any text a user can see, and use `$pocket-trash localize` to track required `@pocket-trash/localizations` keys.
 - Before modifying or creating any frontend layout or UI code, you MUST inject the design guidelines explicitly detailed inside `/docs/design-system.md`.
 - Translate all requested specs using these components directly.
+- Add complete JSDoc to stable named JavaScript and TypeScript declarations you
+  add or modify. Follow `/docs/jsdoc.md`.
 - After implementing features or code changes, always run:
   - Use `$pocket-trash logger` to audit logger usage, centralized logger messages/values,
     and forbidden `console.*` calls before validation.

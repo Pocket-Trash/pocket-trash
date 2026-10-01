@@ -74,6 +74,34 @@ export const AdminModeration: Story = {
   },
 };
 
+/** Staff restoration interaction story. */
+export const AdminRestore: Story = {
+  args: { canAdminister: true, isOwner: false, isPrivate: true },
+  /**
+   * Exercises restoration with a required staff reason.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const originalPrompt = canvasElement.ownerDocument.defaultView?.prompt;
+    if (!canvasElement.ownerDocument.defaultView || !originalPrompt) return;
+    canvasElement.ownerDocument.defaultView.prompt = () => "Review completed";
+    try {
+      await userEvent.click(canvas.getByRole("switch", { name: "Public" }));
+      await expect(setResourceVisibility).toHaveBeenCalledWith({
+        data: {
+          isPublic: true,
+          reason: "Review completed",
+          resourceId: 1000,
+        },
+      });
+    } finally {
+      canvasElement.ownerDocument.defaultView.prompt = originalPrompt;
+    }
+  },
+};
+
 export const BareSwitch: Story = {
   render: () => (
     <PublicResourceSwitch checked onCheckedChange={() => undefined} />

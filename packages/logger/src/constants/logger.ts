@@ -1,6 +1,8 @@
+/** Stable structured logger message names. */
 export const loggerMessages = {
   api: {
     clerkWebhookDelivery: "api.clerkWebhook.delivery",
+    linearWebhookDelivery: "api.linearWebhook.delivery",
     cronHourly: "api.cron.hourly",
     healthChecked: "api.health.checked",
     serverListening: "api.server.listening",
@@ -46,7 +48,29 @@ export const loggerMessages = {
   },
   common: {},
   database: {
+    audit: {
+      redactAccount: "database.audit.redactAccount",
+      write: "database.audit.write",
+    },
+    erasure: {
+      completed: "database.erasure.completed",
+      create: "database.erasure.create",
+      orphanCandidates: "database.erasure.clerkOrphans.detected",
+      stepFailed: "database.erasure.step.failed",
+      unexpectedClerkDeletion: "database.erasure.clerkDeletion.unexpected",
+    },
+    storage: {
+      create: "database.storage.create",
+      upload: "database.storage.upload",
+      completeUpload: "database.storage.completeUpload",
+      deleteFile: "database.storage.deleteFile",
+      cleanupExpired: "database.storage.cleanupExpired",
+      cleanupRetry: "database.storage.cleanupRetry",
+      deletionRetry: "database.storage.deletionRetry",
+    },
     catalog: {
+      attachImages: "database.catalog.attachImages",
+      selectCollectionCover: "database.catalog.selectCollectionCover",
       createColor: "database.catalog.createColor",
       createFinish: "database.catalog.createFinish",
       createMaker: "database.catalog.createMaker",
@@ -62,6 +86,7 @@ export const loggerMessages = {
       addSpinner: "database.collections.addSpinner",
       addSpinnerButton: "database.collections.addSpinnerButton",
       create: "database.collections.create",
+      delete: "database.collections.delete",
       update: "database.collections.update",
       updateItem: "database.collections.updateItem",
     },
@@ -76,6 +101,30 @@ export const loggerMessages = {
       setAdminOverride: "database.featureFlags.setAdminOverride",
       setUserPreference: "database.featureFlags.setUserPreference",
       update: "database.featureFlags.update",
+    },
+    feedback: {
+      approve: "database.feedback.approve",
+      completeLinearPlan: "database.feedback.completeLinearPlan",
+      deny: "database.feedback.deny",
+      findDuplicates: "database.feedback.findDuplicates",
+      getLinearSyncTarget: "database.feedback.getLinearSyncTarget",
+      hasMine: "database.feedback.hasMine",
+      listActive: "database.feedback.listActive",
+      listAdminActive: "database.feedback.listAdminActive",
+      listArchive: "database.feedback.listArchive",
+      listCompleted: "database.feedback.listCompleted",
+      listMergeTargets: "database.feedback.listMergeTargets",
+      listMine: "database.feedback.listMine",
+      listNotifications: "database.feedback.listNotifications",
+      listPending: "database.feedback.listPending",
+      markNotificationRead: "database.feedback.markNotificationRead",
+      mergePending: "database.feedback.mergePending",
+      reserveLinearPlan: "database.feedback.reserveLinearPlan",
+      submit: "database.feedback.submit",
+      syncLinearStatus: "database.feedback.syncLinearStatus",
+      toggleVote: "database.feedback.toggleVote",
+      updateAdmin: "database.feedback.updateAdmin",
+      updatePending: "database.feedback.updatePending",
     },
     userSettings: {
       getByClerkId: "database.userSettings.getByClerkId",
@@ -192,11 +241,13 @@ export const loggerMessages = {
     fxRatesFetchFailed: "web.fxRates.fetch.failed",
     localizationKeyMissing: "web.localization.key.missing",
     localeSyncFailed: "web.locale.sync.failed",
+    routeError: "web.route.error",
     userSettingsFetchFailed: "web.userSettings.fetch.failed",
     userSettingsSaveFailed: "web.userSettings.save.failed",
   },
 } as const;
 
+/** Stable values shared by logger applications and the log proxy protocol. */
 export const loggerValues = {
   apps: {
     api: "api",

@@ -7,12 +7,59 @@ import test from "node:test";
 
 import {
   getChangedFiles,
+  getHighestChangesetBump,
   parseChangesetEntries,
   validateChangesetEntries,
 } from "./check-pr-changeset.mjs";
 
+test("selects the highest Changeset bump for workspace packages", () => {
+  assert.equal(
+    getHighestChangesetBump(
+      [
+        {
+          filename: ".changeset/fix.md",
+          content: '---\n"@app/web": patch\n---\nFix web.',
+        },
+        {
+          filename: ".changeset/add.md",
+          content: '---\n"@app/api": minor\n---\nAdd API.',
+        },
+        {
+          filename: ".changeset/other.md",
+          content: '---\n"other-package": major\n---\nBreak other.',
+        },
+      ],
+      new Set(["@app/api", "@app/web"]),
+    ),
+    "minor",
+  );
+});
+
+test("selects a Changeset bump for a workspace package added by the PR", () => {
+  assert.equal(
+    getHighestChangesetBump(
+      [
+        {
+          filename: ".changeset/lint.md",
+          content: '---\n"@package/lint": patch\n---\nCentralize linting.',
+        },
+      ],
+      new Set(["@package/eslint"]),
+      new Set(["@package/lint"]),
+    ),
+    "patch",
+  );
+});
+
 test("only returns files introduced by the PR branch", (context) => {
   const directory = mkdtempSync(join(tmpdir(), "changeset-git-test-"));
+  /**
+   * Runs Git inside the temporary fixture repository.
+   *
+   * @param args - Git arguments.
+   * @returns Trimmed standard output.
+   * @throws When Git exits unsuccessfully.
+   */
   const git = (...args) =>
     execFileSync("git", args, { cwd: directory, encoding: "utf8" }).trim();
   context.after(() => rmSync(directory, { force: true, recursive: true }));

@@ -6,6 +6,8 @@ import "../src/styles.css";
 sb.mock(import("@clerk/tanstack-react-start"));
 sb.mock(import("../src/lib/locale-api.ts"));
 sb.mock(import("../src/lib/resources.ts"));
+sb.mock(import("../src/lib/feedback.ts"), { spy: true });
+sb.mock(import("../src/lib/account-erasure.ts"), { spy: true });
 
 const preview: Preview = {
   decorators: [

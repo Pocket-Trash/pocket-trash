@@ -18,7 +18,7 @@ No table description has been added yet.
 | `storage_provider` | `text` | yes |  | `'bunny'` |  |  |  |
 | `object_path` | `text` | yes | unique |  |  |  |  |
 | `url` | `text` | yes |  |  |  |  |  |
-| `uploaded_by_clerk_id` | `text` | yes |  |  |  |  |  |
+| `uploaded_by_clerk_id` | `text` | no |  |  |  |  |  |
 | `deleted_at` | `timestamp with time zone` | no |  |  |  |  |  |
 | `deleted_by_clerk_id` | `text` | no |  |  |  |  |  |
 | `deleted_by_role` | `text` | no |  |  |  |  |  |

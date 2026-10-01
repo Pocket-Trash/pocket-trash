@@ -11,7 +11,7 @@ Shared catalog product identity for supported product types.
 | `id` | `bigint` | yes | PK |  |  | Internal product identifier. | `1000` |
 | `product_type_id` | `bigint` | yes | FK |  | `product_types.id` (on delete restrict) | Product type classification. | `1000` |
 | `maker_id` | `bigint` | yes | FK |  | `makers.id` (on delete restrict) | Maker that produced the product. | `1000` |
-| `owner_clerk_id` | `text` | yes |  |  |  |  |  |
+| `owner_clerk_id` | `text` | no |  |  |  |  |  |
 | `name` | `text` | yes |  |  |  | Human-readable product name. | `Standard Katla` |
 | `slug` | `text` | yes |  |  |  | Stable product slug within its type. | `standard-katla` |
 | `description` | `text` | no |  |  |  | Optional product description stored as Markdown. | `A compact tri spinner.` |

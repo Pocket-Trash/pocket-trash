@@ -29,6 +29,9 @@ logger, and Discord jobs. Use `prod` for release and manual main deploy jobs.
 | `AXIOM_TOKEN` | Required | Required |
 | `ASSET_FOLDER_PREFIX` | Required | Required |
 | `BUNNY_CDN_BASE_URL` | Required | Required |
+| `BUNNY_API_KEY` | Required for complete erasure | Required for complete erasure |
+| `BUNNY_CDN_TOKEN_KEY` | Required for complete erasure | Required for complete erasure |
+| `BUNNY_PULL_ZONE_ID` | Required for complete erasure | Required for complete erasure |
 | `BUNNY_STORAGE_ACCESS_KEY` | Required | Required |
 | `BUNNY_STORAGE_ENDPOINT` | Required | Required |
 | `BUNNY_STORAGE_ZONE_NAME` | Required | Required |

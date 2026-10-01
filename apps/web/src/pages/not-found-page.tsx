@@ -2,7 +2,6 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -11,7 +10,7 @@ export function NotFoundPage() {
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-4 py-10 text-foreground">
+    <main className="flex flex-1 items-center justify-center bg-background px-4 py-10 text-foreground">
       <section className="w-full max-w-md rounded-lg border border-border bg-card px-6 py-8 text-center text-card-foreground shadow-sm">
         <p className="text-[12px] font-semibold tracking-[1px] text-muted-foreground uppercase">
           {t("web.page.notFound.title")}
@@ -22,8 +21,8 @@ export function NotFoundPage() {
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           {t("web.page.notFound.description")}
         </p>
-        <Button className="mt-6" nativeButton={false} render={<Link to="/" />}>
-          {t("web.page.notFound.returnToArchive")}
+        <Button className="mt-6" nativeButton={false} render={<a href="/" />}>
+          {t("web.page.notFound.returnHome")}
         </Button>
       </section>
     </main>

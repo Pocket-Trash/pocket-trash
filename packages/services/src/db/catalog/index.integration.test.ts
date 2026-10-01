@@ -53,7 +53,7 @@ describe("catalog product persistence", () => {
         createLogger({ app: "api", environment: "test" }),
       );
       const created = await service.createProduct({
-        actorClerkId: "user-test",
+        actor: { clerkId: "user-test", role: "user" },
         description: "Created description",
         finishOptions: [
           {
@@ -82,11 +82,13 @@ describe("catalog product persistence", () => {
       );
 
       await service.setMakerProductUrlValidity({
+        actor: { clerkId: "admin-test", role: "admin" },
         makerProductUrlValid: false,
         productId: created.id,
+        reason: "Broken source link",
       });
       const updated = await service.updateProduct({
-        actorClerkId: "user-test",
+        actor: { clerkId: "user-test", role: "user" },
         description: "Edited description",
         finishOptions: [
           {

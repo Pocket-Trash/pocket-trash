@@ -161,7 +161,9 @@ set_branch_env_var() {
   local missing_message="$4"
   local removed_message="$5"
 
-  printf '::add-mask::%s\n' "$value"
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    printf '::add-mask::%s\n' "$value"
+  fi
   delete_existing_env_var "$key" "$missing_message" "$removed_message"
 
   local body

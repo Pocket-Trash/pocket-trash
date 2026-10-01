@@ -1,4 +1,8 @@
-import { useClerk, useUser } from "@clerk/tanstack-react-start";
+import { useAuth, useClerk, useUser } from "@clerk/tanstack-react-start";
+import {
+  hasStaffPermission,
+  normalizeActor,
+} from "@package/services/authorization";
 import {
   formatTranslation,
   type TranslationKey,
@@ -10,6 +14,7 @@ import {
   Folder,
   LogOut,
   Settings,
+  Shield,
   User,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -27,6 +32,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/providers/locale-provider";
 
 export function UserMenu() {
+  const { sessionClaims, userId } = useAuth();
   const clerk = useClerk();
   const { locale } = useLocale();
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
@@ -90,6 +96,14 @@ export function UserMenu() {
           <User />
           {t("web.navigation.account")}
         </DropdownMenuItem>
+        {hasStaffPermission(
+          userId ? normalizeActor(userId, sessionClaims) : undefined,
+        ) ? (
+          <DropdownMenuItem render={<Link to="/admin" />}>
+            <Shield />
+            {t("web.admin.hub.title")}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem render={<Link to="/user/collections" />}>
           <Folder />
           {t("web.navigation.collections")}

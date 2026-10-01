@@ -13,128 +13,237 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+/** Normalized source image metadata for autmog pen. */
 export type AutmogPenImageRecord = {
+  /** Alternative text supplied for the source image. */
   altText: string | null;
+  /** Source image height in pixels. */
   height: number | null;
+  /** Stable source ordering position. */
   position: number;
+  /** Hash used to detect changes to the source image. */
   sourceHash: string;
+  /** Source-specific image identifier. */
   sourceImageId: string | null;
+  /** Absolute source image URL. */
   sourceUrl: string;
+  /** Source image width in pixels. */
   width: number | null;
 };
 
+/** Normalized autmog pen payload produced by its source adapter. */
 export type AutmogPenNormalizedData = {
+  /** Whether the source currently offers the item for sale. */
   availableForSale: boolean;
+  /** Normalized construction details for the pen body. */
   bodyDetails: string[];
+  /** Normalized pen-body shape. */
   bodyShape: string | null;
+  /** Normalized source product category. */
   category: string | null;
+  /** Normalized pen-clip description. */
   clip: string | null;
+  /** Normalized overall finish description. */
   finish: string | null;
+  /** Normalized pen-grip description. */
   grip: string | null;
+  /** Hash of the normalized image set used for change detection. */
   imageSetHash: string;
+  /** Normalized source images in display order. */
   images: AutmogPenImageRecord[];
+  /** Normalized materials used by the product. */
   materials: string[];
+  /** Normalized pen mechanism description. */
   mechanism: string | null;
+  /** Normalized pen-nose description. */
   nose: string | null;
+  /** Maximum source price in minor currency units. */
   priceMaxCents: number | null;
+  /** Minimum source price in minor currency units. */
   priceMinCents: number | null;
+  /** Canonical source product URL. */
   productUrl: string;
+  /** Normalized compatible refill description. */
   refill: string | null;
+  /** Normalized product size description. */
   size: string | null;
+  /** Normalized source title. */
   title: string;
+  /** Normalized source variant labels. */
   variants: unknown[];
 };
 
+/** Normalized grimsmo product payload produced by its source adapter. */
 export type GrimsmoProductNormalizedData = {
+  /** Stable source product handle. */
   productHandle: string;
+  /** Canonical source product URL. */
   productUrl: string;
+  /** Normalized source title. */
   title: string;
 };
 
+/** Normalized source image metadata for grimsmo variation. */
 export type GrimsmoVariationImageRecord = {
+  /** Alternative text supplied for the source image. */
   altText: string | null;
+  /** Source image height in pixels. */
   height: number | null;
+  /** Stable source ordering position. */
   position: number;
+  /** Hash used to detect changes to the source image. */
   sourceHash: string;
+  /** Source-specific image identifier. */
   sourceImageId: string | null;
+  /** Absolute source image URL. */
   sourceUrl: string;
+  /** Source image width in pixels. */
   width: number | null;
 };
 
+/** Normalized grimsmo pen variation payload produced by its source adapter. */
 export type GrimsmoPenVariationNormalizedData = {
+  /** Whether the source currently offers the item for sale. */
   availableForSale: boolean;
+  /** Normalized colors applied to the pen body. */
   bodyColors: string[];
+  /** Normalized finishes applied to the pen body. */
   bodyFinishes: string[];
+  /** Normalized materials used for the pen body. */
   bodyMaterials: string[];
+  /** Source production-book designation. */
   book: string | null;
+  /** Normalized source bullet points in display order. */
   bullets: string[];
+  /** Normalized source bullet points grouped by category. */
   bulletsByCategory: Record<string, string[]>;
+  /** Normalized case or packaging description. */
   case: string | null;
+  /** Normalized long-form source description. */
   description: string | null;
+  /** Normalized engraving description. */
   engraving: string | null;
+  /** Hash of the normalized image set used for change detection. */
   imageSetHash: string;
+  /** Normalized source images in display order. */
   images: GrimsmoVariationImageRecord[];
+  /** Maximum source price in minor currency units. */
   priceMaxCents: number | null;
+  /** Minimum source price in minor currency units. */
   priceMinCents: number | null;
+  /** Canonical source product URL. */
   productUrl: string;
+  /** Normalized compatible refill description. */
   refill: string | null;
+  /** Source-assigned Saga pen number. */
   sagaNumber: string | null;
+  /** Normalized colors applied to the pen slider. */
   sliderColors: string[];
+  /** Normalized materials used for the pen slider. */
   sliderMaterials: string[];
+  /** Normalized pen-slider style. */
   sliderStyle: string | null;
+  /** Normalized pen-tip logo description. */
   tipLogo: string | null;
+  /** Normalized source title. */
   title: string;
+  /** Unabridged source title. */
   titleFull: string;
+  /** Normalized source variant labels. */
   variants: unknown[];
+  /** Source bullet points selected for display. */
   visibleBullets: string[];
 };
 
+/** Normalized grimsmo knife variation payload produced by its source adapter. */
 export type GrimsmoKnifeVariationNormalizedData = {
+  /** Whether the source currently offers the item for sale. */
   availableForSale: boolean;
+  /** Normalized finishes applied to the knife blade. */
   bladeFinishes: string[];
+  /** Normalized steel materials used for the knife blade. */
   bladeSteels: string[];
+  /** Source description of the knife body. */
   bodyText: string | null;
+  /** Normalized source bullet points in display order. */
   bullets: string[];
+  /** Normalized source bullet points grouped by category. */
   bulletsByCategory: Record<string, string[]>;
+  /** Normalized case or packaging description. */
   case: string | null;
+  /** Normalized long-form source description. */
   description: string | null;
+  /** Normalized colors applied to the knife handle. */
   handleColors: string[];
+  /** Normalized finishes applied to the knife handle. */
   handleFinishes: string[];
+  /** Normalized materials used for the knife handle. */
   handleMaterials: string[];
+  /** Normalized colors applied to knife hardware. */
   hardwareColors: string[];
+  /** Hash of the normalized image set used for change detection. */
   imageSetHash: string;
+  /** Normalized source images in display order. */
   images: GrimsmoVariationImageRecord[];
+  /** Source-assigned knife serial or production number. */
   knifeNumber: string | null;
+  /** Normalized knife model or type. */
   knifeType: string;
+  /** Normalized mechanisms used by the knife. */
   mechanisms: string[];
+  /** Normalized decorative patterns applied to the knife. */
   patterns: string[];
+  /** Maximum source price in minor currency units. */
   priceMaxCents: number | null;
+  /** Minimum source price in minor currency units. */
   priceMinCents: number | null;
+  /** Canonical source product URL. */
   productUrl: string;
+  /** Normalized source title. */
   title: string;
+  /** Unabridged source title. */
   titleFull: string;
+  /** Normalized source variant labels. */
   variants: unknown[];
 };
 
+/** Aggregate item, image, and dead-letter counts for one scraper run. */
 export type ScraperRunStats = {
+  /** Number of source records archived during the run. */
   archivedCount?: number;
+  /** Failed image jobs found for dead-letter processing. */
   deadLetterFailedImageJobs?: number;
+  /** Failed item jobs found for dead-letter processing. */
   deadLetterFailedItemJobs?: number;
+  /** Image dead-letter jobs whose requeue attempt failed. */
   deadLetterRequeueFailedImageJobs?: number;
+  /** Item dead-letter jobs whose requeue attempt failed. */
   deadLetterRequeueFailedItemJobs?: number;
+  /** Image dead-letter jobs successfully requeued. */
   deadLetterRequeuedImageJobs?: number;
+  /** Item dead-letter jobs successfully requeued. */
   deadLetterRequeuedItemJobs?: number;
+  /** Image jobs enqueued during the run. */
   enqueuedImageJobs?: number;
+  /** Item jobs enqueued during the run. */
   enqueuedItemJobs?: number;
+  /** Image jobs that failed during the run. */
   failedImageJobs?: number;
+  /** Item jobs that failed during the run. */
   failedItemJobs?: number;
+  /** Source records fetched during the run. */
   fetchedCount?: number;
+  /** Image jobs processed during the run. */
   processedImageJobs?: number;
+  /** Item jobs processed during the run. */
   processedItemJobs?: number;
+  /** Image jobs skipped because no work was needed. */
   skippedImageJobs?: number;
+  /** Source records updated during the run. */
   updatedCount?: number;
 };
 
+/** Canonical product makers shared by scraped and user-created products. */
 export const maker = pgTable(
   "makers",
   {
@@ -151,10 +260,14 @@ export const maker = pgTable(
       .notNull(),
   },
   (table) => ({
+    nameCaseInsensitiveUnique: uniqueIndex(
+      "makers_name_case_insensitive_unique",
+    ).on(sql`lower(${table.name})`),
     rootUrlUnique: uniqueIndex("makers_root_url_unique").on(table.rootUrl),
   }),
 );
 
+/** One scraper execution and its processing statistics. */
 export const scraperRuns = pgTable(
   "scraper_runs",
   {
@@ -179,15 +292,14 @@ export const scraperRuns = pgTable(
       .notNull(),
   },
   (table) => ({
-    sourceJobStatusIdx: index("scraper_runs_source_job_status_idx").on(
-      table.source,
-      table.jobType,
-      table.status,
-    ),
+    activeSourceJobUnique: uniqueIndex("scraper_runs_active_source_job_unique")
+      .on(table.source, table.jobType)
+      .where(sql`${table.status} = 'running'`),
     startedAtIdx: index("scraper_runs_started_at_idx").on(table.startedAt),
   }),
 );
 
+/** Canonical materials shared by scraped and user-created products. */
 export const material = pgTable(
   "materials",
   {
@@ -204,10 +316,14 @@ export const material = pgTable(
       .notNull(),
   },
   (table) => ({
+    nameCaseInsensitiveUnique: uniqueIndex(
+      "materials_name_case_insensitive_unique",
+    ).on(sql`lower(${table.name})`),
     slugUnique: uniqueIndex("materials_slug_unique").on(table.slug),
   }),
 );
 
+/** Canonical pen mechanisms shared by scraped and user-created products. */
 export const mechanism = pgTable(
   "mechanisms",
   {
@@ -228,6 +344,7 @@ export const mechanism = pgTable(
   }),
 );
 
+/** Canonical types used to classify catalog products. */
 export const productType = pgTable(
   "product_types",
   {
@@ -250,6 +367,7 @@ export const productType = pgTable(
   }),
 );
 
+/** Staged normalized scraped products. */
 export const tmpProducts = pgTable(
   "tmp_products",
   {
@@ -269,6 +387,7 @@ export const tmpProducts = pgTable(
   }),
 );
 
+/** Staged normalized variations for scraped products. */
 export const tmpProductVariations = pgTable(
   "tmp_product_variations",
   {
@@ -299,6 +418,7 @@ export const tmpProductVariations = pgTable(
   }),
 );
 
+/** Staged source images for scraped products and variations. */
 export const tmpImages = pgTable(
   "tmp_images",
   {
@@ -363,6 +483,7 @@ export const tmpImages = pgTable(
   }),
 );
 
+/** Staged normalized Autmog pen records. */
 export const tmpAutmogPens = pgTable(
   "tmp_autmog_pens",
   {
@@ -430,6 +551,7 @@ export const tmpAutmogPens = pgTable(
   }),
 );
 
+/** Staged Autmog pen material assignments. */
 export const tmpAutmogPenMaterials = pgTable(
   "tmp_autmog_pen_materials",
   {
@@ -454,6 +576,7 @@ export const tmpAutmogPenMaterials = pgTable(
   }),
 );
 
+/** Staged normalized Grimsmo pen products. */
 export const tmpGrimsmoPens = pgTable(
   "tmp_grimsmo_pens",
   {
@@ -491,6 +614,7 @@ export const tmpGrimsmoPens = pgTable(
   }),
 );
 
+/** Staged normalized Grimsmo pen variations. */
 export const tmpGrimsmoPenVariations = pgTable(
   "tmp_grimsmo_pen_variations",
   {
@@ -586,6 +710,7 @@ export const tmpGrimsmoPenVariations = pgTable(
   }),
 );
 
+/** Staged normalized Grimsmo knife products. */
 export const tmpGrimsmoKnives = pgTable(
   "tmp_grimsmo_knives",
   {
@@ -627,6 +752,7 @@ export const tmpGrimsmoKnives = pgTable(
   }),
 );
 
+/** Staged normalized Grimsmo knife variations. */
 export const tmpGrimsmoKnifeVariations = pgTable(
   "tmp_grimsmo_knife_variations",
   {
@@ -728,6 +854,7 @@ export const tmpGrimsmoKnifeVariations = pgTable(
   }),
 );
 
+/** Staged product-type assignments for scraped products. */
 export const tmpProductProductTypes = pgTable(
   "tmp_product_product_types",
   {
@@ -752,6 +879,7 @@ export const tmpProductProductTypes = pgTable(
   }),
 );
 
+/** Versioned snapshots of staged Autmog pens. */
 export const tmpAutmogPenVersions = pgTable(
   "tmp_autmog_pen_versions",
   {
@@ -781,6 +909,7 @@ export const tmpAutmogPenVersions = pgTable(
   }),
 );
 
+/** Versioned snapshots of staged Grimsmo pens. */
 export const tmpGrimsmoPenVersions = pgTable(
   "tmp_grimsmo_pen_versions",
   {
@@ -808,6 +937,7 @@ export const tmpGrimsmoPenVersions = pgTable(
   }),
 );
 
+/** Versioned snapshots of staged Grimsmo pen variations. */
 export const tmpGrimsmoPenVariationVersions = pgTable(
   "tmp_grimsmo_pen_variation_versions",
   {
@@ -841,6 +971,7 @@ export const tmpGrimsmoPenVariationVersions = pgTable(
   }),
 );
 
+/** Versioned snapshots of staged Grimsmo knives. */
 export const tmpGrimsmoKnifeVersions = pgTable(
   "tmp_grimsmo_knife_versions",
   {
@@ -870,6 +1001,7 @@ export const tmpGrimsmoKnifeVersions = pgTable(
   }),
 );
 
+/** Versioned snapshots of staged Grimsmo knife variations. */
 export const tmpGrimsmoKnifeVariationVersions = pgTable(
   "tmp_grimsmo_knife_variation_versions",
   {
@@ -903,54 +1035,94 @@ export const tmpGrimsmoKnifeVariationVersions = pgTable(
   }),
 );
 
+/** Stored maker row. */
 export type Maker = typeof maker.$inferSelect;
+/** Values accepted when creating a maker row. */
 export type NewMaker = typeof maker.$inferInsert;
+/** Stored material row. */
 export type Material = typeof material.$inferSelect;
+/** Values accepted when creating a material row. */
 export type NewMaterial = typeof material.$inferInsert;
+/** Stored mechanism row. */
 export type Mechanism = typeof mechanism.$inferSelect;
+/** Values accepted when creating a mechanism row. */
 export type NewMechanism = typeof mechanism.$inferInsert;
+/** Stored product type row. */
 export type ProductType = typeof productType.$inferSelect;
+/** Values accepted when creating a product type row. */
 export type NewProductType = typeof productType.$inferInsert;
+/** Stored scraper run row. */
 export type ScraperRun = typeof scraperRuns.$inferSelect;
+/** Values accepted when creating a scraper run row. */
 export type NewScraperRun = typeof scraperRuns.$inferInsert;
+/** Stored tmp image row. */
 export type TmpImage = typeof tmpImages.$inferSelect;
+/** Values accepted when creating a tmp image row. */
 export type NewTmpImage = typeof tmpImages.$inferInsert;
+/** Stored tmp autmog pen row. */
 export type TmpAutmogPen = typeof tmpAutmogPens.$inferSelect;
+/** Values accepted when creating a tmp autmog pen row. */
 export type NewTmpAutmogPen = typeof tmpAutmogPens.$inferInsert;
+/** Stored tmp autmog pen material row. */
 export type TmpAutmogPenMaterial = typeof tmpAutmogPenMaterials.$inferSelect;
+/** Values accepted when creating a tmp autmog pen material row. */
 export type NewTmpAutmogPenMaterial = typeof tmpAutmogPenMaterials.$inferInsert;
+/** Stored tmp autmog pen version row. */
 export type TmpAutmogPenVersion = typeof tmpAutmogPenVersions.$inferSelect;
+/** Values accepted when creating a tmp autmog pen version row. */
 export type NewTmpAutmogPenVersion = typeof tmpAutmogPenVersions.$inferInsert;
+/** Stored tmp grimsmo pen row. */
 export type TmpGrimsmoPen = typeof tmpGrimsmoPens.$inferSelect;
+/** Values accepted when creating a tmp grimsmo pen row. */
 export type NewTmpGrimsmoPen = typeof tmpGrimsmoPens.$inferInsert;
+/** Stored tmp grimsmo pen variation row. */
 export type TmpGrimsmoPenVariation =
   typeof tmpGrimsmoPenVariations.$inferSelect;
+/** Values accepted when creating a tmp grimsmo pen variation row. */
 export type NewTmpGrimsmoPenVariation =
   typeof tmpGrimsmoPenVariations.$inferInsert;
+/** Stored tmp grimsmo pen version row. */
 export type TmpGrimsmoPenVersion = typeof tmpGrimsmoPenVersions.$inferSelect;
+/** Values accepted when creating a tmp grimsmo pen version row. */
 export type NewTmpGrimsmoPenVersion = typeof tmpGrimsmoPenVersions.$inferInsert;
+/** Stored tmp grimsmo pen variation version row. */
 export type TmpGrimsmoPenVariationVersion =
   typeof tmpGrimsmoPenVariationVersions.$inferSelect;
+/** Values accepted when creating a tmp grimsmo pen variation version row. */
 export type NewTmpGrimsmoPenVariationVersion =
   typeof tmpGrimsmoPenVariationVersions.$inferInsert;
+/** Stored tmp grimsmo knife row. */
 export type TmpGrimsmoKnife = typeof tmpGrimsmoKnives.$inferSelect;
+/** Values accepted when creating a tmp grimsmo knife row. */
 export type NewTmpGrimsmoKnife = typeof tmpGrimsmoKnives.$inferInsert;
+/** Stored tmp grimsmo knife variation row. */
 export type TmpGrimsmoKnifeVariation =
   typeof tmpGrimsmoKnifeVariations.$inferSelect;
+/** Values accepted when creating a tmp grimsmo knife variation row. */
 export type NewTmpGrimsmoKnifeVariation =
   typeof tmpGrimsmoKnifeVariations.$inferInsert;
+/** Stored tmp grimsmo knife version row. */
 export type TmpGrimsmoKnifeVersion =
   typeof tmpGrimsmoKnifeVersions.$inferSelect;
+/** Values accepted when creating a tmp grimsmo knife version row. */
 export type NewTmpGrimsmoKnifeVersion =
   typeof tmpGrimsmoKnifeVersions.$inferInsert;
+/** Stored tmp grimsmo knife variation version row. */
 export type TmpGrimsmoKnifeVariationVersion =
   typeof tmpGrimsmoKnifeVariationVersions.$inferSelect;
+/** Values accepted when creating a tmp grimsmo knife variation version row. */
 export type NewTmpGrimsmoKnifeVariationVersion =
   typeof tmpGrimsmoKnifeVariationVersions.$inferInsert;
+/** Stored tmp product row. */
 export type TmpProduct = typeof tmpProducts.$inferSelect;
+/** Values accepted when creating a tmp product row. */
 export type NewTmpProduct = typeof tmpProducts.$inferInsert;
+/** Stored tmp product variation row. */
 export type TmpProductVariation = typeof tmpProductVariations.$inferSelect;
+/** Values accepted when creating a tmp product variation row. */
 export type NewTmpProductVariation = typeof tmpProductVariations.$inferInsert;
+/** Stored tmp product product type row. */
 export type TmpProductProductType = typeof tmpProductProductTypes.$inferSelect;
+/** Values accepted when creating a tmp product product type row. */
 export type NewTmpProductProductType =
   typeof tmpProductProductTypes.$inferInsert;

@@ -1,30 +1,29 @@
-import { auth } from "@clerk/tanstack-react-start/server";
 import type { ResourceTrashItem } from "@package/services";
+import { hasPermission } from "@package/services/authorization";
 import { formatTranslation } from "@pocket-trash/localizations";
 import { createServerFn } from "@tanstack/react-start";
+import { activeAuth as auth } from "@/lib/auth";
+import { getActor, requireActor, requirePermission } from "@/lib/authorization";
 
 type ResourceIdInput = { resourceId: number };
 type ResourceDownloadInput = ResourceIdInput & { fileId: number };
+type ResourceVersionDownloadInput = ResourceIdInput & { versionId: number };
 
-type SessionClaimsWithRole = {
-  role?: unknown;
-};
-
-export const isResourceAdmin = createServerFn().handler(async () => {
-  return (await getResourceViewer()).isAdmin;
+export const canManageResources = createServerFn().handler(async () => {
+  return hasPermission(await getResourceViewer(), "resources.manage");
 });
 
 export const createResource = createServerFn({ method: "POST" })
   .validator(parseResourceUpload)
   .handler(async ({ data }) => {
-    const userId = await requireResourceUploader();
+    const actor = await requireResourceUploader();
     const { s } = await import("@/lib/services");
 
     return await s.resources.create({
       ...data,
       files: await Promise.all(data.files.map(toUploadInput)),
       images: await Promise.all(data.images.map(toUploadInput)),
-      uploaderClerkId: userId,
+      actor,
     });
   });
 
@@ -38,9 +37,11 @@ export const getResourceDetail = createServerFn({ method: "GET" })
     const { uploaderClerkId, ...browserDetail } = detail;
     return {
       ...browserDetail,
-      canAdminister: viewer.isAdmin,
-      canEdit: viewer.isAdmin || uploaderClerkId === viewer.clerkId,
-      isOwner: uploaderClerkId === viewer.clerkId,
+      canAdminister: hasPermission(viewer, "resources.manage"),
+      canEdit:
+        uploaderClerkId === viewer?.clerkId ||
+        hasPermission(viewer, "resources.manage"),
+      isOwner: uploaderClerkId === viewer?.clerkId,
     };
   });
 
@@ -48,15 +49,16 @@ export const getEditableResourceDetail = createServerFn({ method: "GET" })
   .validator(parseResourceId)
   .handler(async ({ data }) => {
     const viewer = await getResourceViewer();
-    if (!viewer.clerkId) throw invalidResourceRequest();
+    if (!viewer) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     const detail = await s.resources.getDetail(data.resourceId, viewer);
     if (!detail) return null;
     const { uploaderClerkId, ...browserDetail } = detail;
-    return viewer.isAdmin || uploaderClerkId === viewer.clerkId
+    return uploaderClerkId === viewer.clerkId ||
+      hasPermission(viewer, "resources.manage")
       ? {
           ...browserDetail,
-          canAdminister: viewer.isAdmin,
+          canAdminister: hasPermission(viewer, "resources.manage"),
           isOwner: uploaderClerkId === viewer.clerkId,
         }
       : null;
@@ -65,14 +67,12 @@ export const getEditableResourceDetail = createServerFn({ method: "GET" })
 export const getOwnedResourceDetail = createServerFn({ method: "GET" })
   .validator(parseResourceId)
   .handler(async ({ data }) => {
-    const userId = await requireResourceUploader();
+    const actor = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    const detail = await s.resources.getDetail(data.resourceId, {
-      clerkId: userId,
-    });
+    const detail = await s.resources.getDetail(data.resourceId, actor);
     if (!detail) return null;
     const { uploaderClerkId, ...browserDetail } = detail;
-    if (uploaderClerkId !== userId) return null;
+    if (uploaderClerkId !== actor.clerkId) return null;
     return browserDetail;
   });
 
@@ -107,7 +107,9 @@ export const listResourceDirectory = createServerFn({ method: "GET" })
       resources: directory.resources.map(
         ({ uploaderClerkId, ...resource }) => ({
           ...resource,
-          canEdit: viewer.isAdmin || uploaderClerkId === viewer.clerkId,
+          canEdit:
+            uploaderClerkId === viewer?.clerkId ||
+            hasPermission(viewer, "resources.manage"),
         }),
       ),
     };
@@ -115,22 +117,20 @@ export const listResourceDirectory = createServerFn({ method: "GET" })
 
 export const listOwnedResources = createServerFn({ method: "GET" }).handler(
   async () => {
-    const userId = await requireResourceUploader();
+    const actor = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    const directory = await s.resources.listDirectory([], {
-      clerkId: userId,
-    });
+    const directory = await s.resources.listDirectory([], actor);
     return directory.resources.flatMap(({ uploaderClerkId, ...resource }) =>
-      uploaderClerkId === userId ? [{ ...resource, canEdit: true }] : [],
+      uploaderClerkId === actor.clerkId ? [{ ...resource, canEdit: true }] : [],
     );
   },
 );
 
 export const listOwnerResourceTrash = createServerFn({ method: "GET" }).handler(
   async (): Promise<ResourceTrashItem[]> => {
-    const userId = await requireResourceUploader();
+    const actor = await requireResourceUploader();
     const { s } = await import("@/lib/services");
-    return await s.resources.listOwnerTrash(userId);
+    return await s.resources.listOwnerTrash(actor.clerkId);
   },
 );
 
@@ -153,67 +153,67 @@ export const listResourceNotifications = createServerFn({
 export const markResourceNotificationRead = createServerFn({ method: "POST" })
   .validator(parseNotificationId)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireResourceAdmin();
+    const actor = await requireResourceAdmin();
     const { s } = await import("@/lib/services");
-    await s.resources.markNotificationRead(data.notificationId, actorClerkId);
+    await s.resources.markNotificationRead(data.notificationId, actor.clerkId);
   });
 
+/** Marks a resource private on behalf of staff. */
 export const markResourcePrivate = createServerFn({ method: "POST" })
   .validator(parseMarkPrivate)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireResourceAdmin();
+    const actor = await requireResourceAdmin();
     const { s } = await import("@/lib/services");
-    await s.resources.markPrivate({ ...data, actorClerkId });
+    await s.resources.markPrivate({ ...data, actor });
   });
 
 export const setResourceVisibility = createServerFn({ method: "POST" })
   .validator(parseResourceVisibility)
   .handler(async ({ data }) => {
     const viewer = await getResourceViewer();
-    if (!viewer.clerkId) throw invalidResourceRequest();
+    if (!viewer) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     await s.resources.setVisibility({
       ...data,
-      actorClerkId: viewer.clerkId,
-      actorIsAdmin: viewer.isAdmin,
+      actor: viewer,
     });
   });
 
+/** Soft-deletes a resource with actor provenance. */
 export const softDeleteResource = createServerFn({ method: "POST" })
-  .validator(parseResourceId)
+  .validator(parseResourceMutation)
   .handler(async ({ data }) => {
     const viewer = await getResourceViewer();
-    if (!viewer.clerkId) throw invalidResourceRequest();
+    if (!viewer) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     return await s.resources.softDelete({
-      actorClerkId: viewer.clerkId,
-      actorIsAdmin: viewer.isAdmin,
-      resourceId: data.resourceId,
+      actor: viewer,
+      ...data,
     });
   });
 
+/** Permanently deletes a resource with a required staff reason. */
 export const permanentlyDeleteResource = createServerFn({ method: "POST" })
-  .validator(parseResourceId)
+  .validator(parseRequiredResourceMutation)
   .handler(async ({ data }) => {
-    const actorClerkId = await requireResourceAdmin();
+    const actor = await requirePermission("resources.purge");
     const { s } = await import("@/lib/services");
     await s.resources.permanentlyDelete({
-      actorClerkId,
-      actorIsAdmin: true,
-      resourceId: data.resourceId,
+      actor,
+      ...data,
     });
   });
 
+/** Restores a soft-deleted resource with actor provenance. */
 export const restoreResource = createServerFn({ method: "POST" })
-  .validator(parseResourceId)
+  .validator(parseResourceMutation)
   .handler(async ({ data }) => {
     const viewer = await getResourceViewer();
-    if (!viewer.clerkId) throw invalidResourceRequest();
+    if (!viewer) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     await s.resources.restore({
-      actorClerkId: viewer.clerkId,
-      actorIsAdmin: viewer.isAdmin,
-      resourceId: data.resourceId,
+      actor: viewer,
+      ...data,
     });
   });
 
@@ -221,25 +221,26 @@ export const updateResource = createServerFn({ method: "POST" })
   .validator(parseResourceUpdate)
   .handler(async ({ data }) => {
     const viewer = await getResourceViewer();
-    if (!viewer.clerkId) throw invalidResourceRequest();
+    if (!viewer) throw invalidResourceRequest();
     const { s } = await import("@/lib/services");
     return await s.resources.update({
       ...data,
-      actorClerkId: viewer.clerkId,
-      actorIsAdmin: viewer.isAdmin,
+      actor: viewer,
       images: await Promise.all(data.images.map(toUploadInput)),
     });
   });
 
+/** Uploads a new resource version with actor provenance. */
 export const uploadResourceVersion = createServerFn({ method: "POST" })
   .validator(parseResourceVersionUpload)
   .handler(async ({ data }) => {
-    const userId = await requireResourceUploader();
+    const actor = await requireResourceUploader();
     const { s } = await import("@/lib/services");
     return await s.resources.addVersion({
       files: await Promise.all(data.files.map(toUploadInput)),
       resourceId: data.resourceId,
-      uploaderClerkId: userId,
+      reason: data.reason,
+      actor,
     });
   });
 
@@ -259,41 +260,38 @@ export function parseResourceDirectoryInput(input: unknown) {
   return { categorySlugs: categorySlugs as string[] };
 }
 
-export const downloadResource = createServerFn({ method: "POST" })
+export const downloadResourceFile = createServerFn({ method: "POST" })
   .validator(parseResourceDownload)
   .handler(async ({ data }) => {
     const { s } = await import("@/lib/services");
-    return await s.resources.download(
+    return await s.resources.downloadFile(
       data.resourceId,
       data.fileId,
       await getResourceViewer(),
     );
   });
 
+export const downloadResourceVersion = createServerFn({ method: "POST" })
+  .validator(parseResourceVersionDownload)
+  .handler(async ({ data }) => {
+    const { s } = await import("@/lib/services");
+    return await s.resources.downloadVersion(
+      data.resourceId,
+      data.versionId,
+      await getResourceViewer(),
+    );
+  });
+
 export async function getResourceViewer(getAuth: typeof auth = auth) {
-  const { isAuthenticated, sessionClaims, userId } = await getAuth();
-  return {
-    clerkId: isAuthenticated && userId ? userId : undefined,
-    isAdmin: isAuthenticated && getRole(sessionClaims) === "admin",
-  };
+  return await getActor(getAuth);
 }
 
-export async function requireResourceUploader(
-  getAuth: typeof auth = auth,
-): Promise<string> {
-  const { isAuthenticated, userId } = await getAuth();
-  if (!isAuthenticated || !userId) throw invalidResourceRequest();
-  return userId;
+export async function requireResourceUploader(getAuth: typeof auth = auth) {
+  return await requireActor(getAuth);
 }
 
-export async function requireResourceAdmin(
-  getAuth: typeof auth = auth,
-): Promise<string> {
-  const { isAuthenticated, sessionClaims, userId } = await getAuth();
-  if (!isAuthenticated || !userId || getRole(sessionClaims) !== "admin") {
-    throw invalidResourceRequest();
-  }
-  return userId;
+export async function requireResourceAdmin(getAuth: typeof auth = auth) {
+  return await requirePermission("resources.manage", getAuth);
 }
 
 export function parseResourceUpload(input: unknown) {
@@ -328,6 +326,13 @@ export function parseResourceUpload(input: unknown) {
   };
 }
 
+/**
+ * Parses a resource update form.
+ *
+ * @param input - Untrusted form input.
+ * @returns The validated resource update.
+ * @throws When the input is invalid.
+ */
 export function parseResourceUpdate(input: unknown) {
   if (!(input instanceof FormData)) throw invalidResourceRequest();
   const resourceId = Number(input.get("resourceId"));
@@ -336,6 +341,7 @@ export function parseResourceUpdate(input: unknown) {
   const images = input.getAll("images").filter(isFile);
   const retainedImageIds = input.getAll("retainedImageIds").map(Number);
   const categories = input.getAll("categories");
+  const reason = parseReason(input.get("reason"));
 
   if (
     !Number.isSafeInteger(resourceId) ||
@@ -360,14 +366,23 @@ export function parseResourceUpdate(input: unknown) {
     images: images as File[],
     name,
     retainedImageIds,
+    reason,
     resourceId,
   };
 }
 
+/**
+ * Parses a resource version upload form.
+ *
+ * @param input - Untrusted form input.
+ * @returns The validated version upload.
+ * @throws When the input is invalid.
+ */
 export function parseResourceVersionUpload(input: unknown) {
   if (!(input instanceof FormData)) throw invalidResourceRequest();
   const resourceId = Number(input.get("resourceId"));
   const files = input.getAll("files");
+  const reason = parseReason(input.get("reason"));
   if (
     !Number.isSafeInteger(resourceId) ||
     resourceId <= 0 ||
@@ -377,7 +392,7 @@ export function parseResourceVersionUpload(input: unknown) {
   ) {
     throw invalidResourceRequest();
   }
-  return { files: files as File[], resourceId };
+  return { files: files as File[], reason, resourceId };
 }
 
 function parseResourceId(input: unknown): ResourceIdInput {
@@ -398,6 +413,17 @@ function parseResourceDownload(input: unknown): ResourceDownloadInput {
     throw invalidResourceRequest();
   }
   return { fileId, resourceId };
+}
+
+function parseResourceVersionDownload(
+  input: unknown,
+): ResourceVersionDownloadInput {
+  const { resourceId } = parseResourceId(input);
+  const versionId = Number((input as { versionId?: unknown }).versionId);
+  if (!Number.isSafeInteger(versionId) || versionId <= 0) {
+    throw invalidResourceRequest();
+  }
+  return { resourceId, versionId };
 }
 
 function parseNotificationId(input: unknown) {
@@ -422,16 +448,77 @@ export function parseMarkPrivate(input: unknown) {
   return { reason: reason.trim(), resourceId };
 }
 
+/**
+ * Parses a resource visibility mutation.
+ *
+ * @param input - Untrusted mutation input.
+ * @returns The validated visibility mutation.
+ * @throws When the input is invalid.
+ */
 export function parseResourceVisibility(input: unknown) {
   const { resourceId } = parseResourceId(input);
   const isPublic = (input as { isPublic?: unknown }).isPublic;
   if (typeof isPublic !== "boolean") throw invalidResourceRequest();
-  return { isPublic, resourceId };
+  return {
+    isPublic,
+    reason: parseReason(
+      (
+        input as {
+          /** Optional moderation reason. */
+          reason?: unknown;
+        }
+      ).reason,
+    ),
+    resourceId,
+  };
 }
 
-function getRole(sessionClaims: unknown): string | undefined {
-  const claims = sessionClaims as SessionClaimsWithRole | null | undefined;
-  return typeof claims?.role === "string" ? claims.role : undefined;
+/**
+ * Parses a resource mutation with an optional reason.
+ *
+ * @param input - Untrusted mutation input.
+ * @returns The validated mutation.
+ * @throws When the input is invalid.
+ */
+function parseResourceMutation(input: unknown) {
+  const { resourceId } = parseResourceId(input);
+  const reason = parseReason(
+    (
+      input as {
+        /** Optional moderation reason. */
+        reason?: unknown;
+      }
+    ).reason,
+  );
+  return { reason, resourceId };
+}
+
+/**
+ * Parses a resource mutation with a required reason.
+ *
+ * @param input - Untrusted mutation input.
+ * @returns The validated mutation.
+ * @throws When the input is invalid or lacks a reason.
+ */
+function parseRequiredResourceMutation(input: unknown) {
+  const { reason, resourceId } = parseResourceMutation(input);
+  if (!reason) throw invalidResourceRequest();
+  return { reason, resourceId };
+}
+
+/**
+ * Normalizes an optional moderation reason.
+ *
+ * @param value - Untrusted reason input.
+ * @returns The trimmed reason when supplied.
+ * @throws When the reason is invalid.
+ */
+function parseReason(value: unknown): string | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (typeof value !== "string" || value.length > 1000 || !value.trim()) {
+    throw invalidResourceRequest();
+  }
+  return value.trim();
 }
 
 async function toUploadInput(file: File) {

@@ -2,20 +2,19 @@
 
 # resource_downloads
 
-Append-only download events for resource versions.
+Unique authenticated user downloads per resource version.
 
 ## Columns
 
 | Column | Type | Required | Key | Default | Relation | Description | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | yes | PK |  |  |  |  |
-| `version_id` | `bigint` | no | FK |  | `resource_versions.id` (on delete cascade) |  |  |
-| `file_id` | `bigint` | no | FK |  | `resource_files.id` (on delete cascade) |  |  |
+| `version_id` | `bigint` | yes | FK |  | `resource_versions.id` (on delete cascade) |  |  |
+| `user_clerk_id` | `text` | yes |  |  |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |
 
 ## Indexes
 
 | Name | Unique | Method | Columns |
 | --- | --- | --- | --- |
-| `resource_downloads_file_id_idx` | no | `btree` | `file_id` |
 | `resource_downloads_version_id_idx` | no | `btree` | `version_id` |

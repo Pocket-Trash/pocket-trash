@@ -9,7 +9,7 @@ scope:
   packages:
     - "@package/database"
     - "@package/feature-flags"
-    - "@package/images"
+    - "@package/storage"
     - "@package/json-data"
     - "@package/logger"
     - "@package/markdown"
@@ -17,7 +17,7 @@ scope:
   excludedApps:
     - "@app/autmog"
   excludedPackages:
-    - "@package/eslint"
+    - "@package/lint"
     - "@package/tsconfig"
     - "@package/figjam"
     - "@package/github-discord-notifier"

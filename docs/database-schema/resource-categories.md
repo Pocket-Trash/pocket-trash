@@ -11,5 +11,5 @@ Reusable categories assigned to resources.
 | `id` | `bigint` | yes | PK |  |  |  |  |
 | `name` | `text` | yes |  |  |  |  |  |
 | `slug` | `text` | yes | unique |  |  |  |  |
-| `created_by_clerk_id` | `text` | yes |  |  |  |  |  |
+| `created_by_clerk_id` | `text` | no |  |  |  |  |  |
 | `created_at` | `timestamp with time zone` | yes |  | `now()` |  |  |  |

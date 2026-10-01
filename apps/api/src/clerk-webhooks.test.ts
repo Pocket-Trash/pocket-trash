@@ -1,12 +1,12 @@
 import { createHmac } from "node:crypto";
 import { createNoopLogger } from "@package/logger";
+import { createErasureSubjectHmac } from "@package/services";
 import { describe, expect, it, vi } from "vitest";
 import {
   clerkWebhookPath,
   createClerkWebhookHandler,
-  forwardToTargets,
-  isValidTarget,
 } from "./clerk-webhooks.js";
+import { forwardToTargets, isValidTarget } from "./webhook-forwarding.js";
 
 const secretBytes = "clerk-webhook-test-secret";
 const signingSecret = `whsec_${Buffer.from(secretBytes).toString("base64")}`;
@@ -41,6 +41,34 @@ function signedRequest(type: "user.created" | "user.updated" = "user.created") {
 }
 
 describe("Clerk webhooks", () => {
+  it("resumes erasure for a verified user.deleted event", async () => {
+    const handleClerkDeletion = vi.fn().mockResolvedValue({
+      requestId: "request-id",
+      unexpected: false,
+    });
+    const erasureHmacSecret = "test-erasure-hmac-secret-at-least-32-characters";
+    const response = await createClerkWebhookHandler({
+      erasure: { handleClerkDeletion },
+      erasureHmacSecret,
+      logger: createNoopLogger(),
+      signingSecret,
+      users: { syncFromClerk: vi.fn() },
+      verify: vi.fn().mockResolvedValue({
+        data: { id: "user_secret" },
+        type: "user.deleted",
+      }) as never,
+    })(signedRequest(), "production");
+
+    expect(response.status).toBe(204);
+    expect(handleClerkDeletion).toHaveBeenCalledWith({
+      subjectHmac: await createErasureSubjectHmac(
+        "user_secret",
+        erasureHmacSecret,
+      ),
+      targetClerkId: "user_secret",
+    });
+  });
+
   it.each([
     "user.created",
     "user.updated",
@@ -95,17 +123,19 @@ describe("Clerk webhooks", () => {
       }),
     } as unknown as KVNamespace;
 
-    await forwardToTargets(
-      targets,
-      new Headers({
+    await forwardToTargets({
+      body,
+      fetch: request,
+      headers: new Headers({
         "content-type": "application/json",
         "svix-id": "msg_1",
         "svix-signature": "v1,test",
         "svix-timestamp": "123",
       }),
-      body,
-      request,
-    );
+      provider: "clerk",
+      targets,
+      webhookPath: clerkWebhookPath,
+    });
 
     expect(request).toHaveBeenCalledWith(
       "https://webhooks.clerk.com/in/c_AbCd123456/",
@@ -123,16 +153,26 @@ describe("Clerk webhooks", () => {
 
   it("fails forwarding on invalid targets and non-2xx responses", async () => {
     expect(
-      isValidTarget("target:preview:12", {
-        kind: "preview",
-        url: "https://attacker.example/api/v0/webhooks/clerk",
-      }),
+      isValidTarget(
+        "clerk",
+        "target:preview:12",
+        {
+          kind: "preview",
+          url: "https://attacker.example/api/v0/webhooks/clerk",
+        },
+        clerkWebhookPath,
+      ),
     ).toBe(false);
     expect(
-      isValidTarget("target:preview:12", {
-        kind: "preview",
-        url: "https://pr-12-pocket-trash-api-preview.example.workers.dev/api/v0/webhooks/clerk",
-      }),
+      isValidTarget(
+        "clerk",
+        "target:preview:12",
+        {
+          kind: "preview",
+          url: "https://pr-12-pocket-trash-api-preview.example.workers.dev/api/v0/webhooks/clerk",
+        },
+        clerkWebhookPath,
+      ),
     ).toBe(true);
 
     const targets = {
@@ -152,12 +192,14 @@ describe("Clerk webhooks", () => {
     } as unknown as KVNamespace;
 
     await expect(
-      forwardToTargets(
+      forwardToTargets({
+        body: new ArrayBuffer(0),
+        fetch: vi.fn().mockResolvedValue(new Response(null, { status: 500 })),
+        headers: new Headers(),
+        provider: "clerk",
         targets,
-        new Headers(),
-        new ArrayBuffer(0),
-        vi.fn().mockResolvedValue(new Response(null, { status: 500 })),
-      ),
+        webhookPath: clerkWebhookPath,
+      }),
     ).rejects.toThrow("forwarding failed");
   });
 });

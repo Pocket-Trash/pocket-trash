@@ -1,11 +1,38 @@
 import type { DatabaseConfig } from "@package/database";
 import { createDb } from "@package/database";
-import type { ImageStorageConfig } from "@package/images";
 import { createLogger, type Logger, type LoggerConfig } from "@package/logger";
-import type { ResourceStorageConfig } from "@package/resources";
+import type {
+  RemoteImageStorageConfig,
+  UploadStorageConfig,
+} from "@package/storage";
+import { createUploadStorage, signResourceUrl } from "@package/storage";
 import { createDbServices, type DbServices } from "./db/index.js";
+import { createStorageService, type StorageService } from "./storage/index.js";
 
+export type { Actor, Permission, Role } from "./authorization.js";
+export {
+  hasPermission,
+  hasStaffPermission,
+  normalizeActor,
+  permissions,
+} from "./authorization.js";
+
+export { adminFeedbackArchiveStatuses } from "./db/feedback/index.js";
 export type {
+  AdminFeedbackItem,
+  AdminFeedbackPage,
+  AdminFeedbackSort,
+  AdminFeedbackSortField,
+  ApprovedErasureExceptionCode,
+  AuditEventCursor,
+  AuditEventDefinition,
+  AuditEventPage,
+  AuditExportDownload,
+  AuditExportView,
+  AuditPayload,
+  AuditRedactionContext,
+  AuditService,
+  AuditWriteInput,
   CatalogColor,
   CatalogFinishOption,
   CatalogImage,
@@ -17,8 +44,31 @@ export type {
   CatalogService,
   CatalogViewer,
   CollectionsService,
+  CreateAuditExportInput,
+  DeleteAuditExportInput,
+  DownloadAuditExportInput,
+  ErasureOperationRequest,
+  ErasureOperationResult,
+  ErasureOperations,
+  ErasureReceipt,
+  ErasureService,
+  FeedbackAdminActionInput,
+  FeedbackListItem,
+  FeedbackMergeTarget,
+  FeedbackNotificationItem,
+  FeedbackPage,
+  FeedbackService,
+  LinearFeedbackSyncInput,
+  LinearFeedbackSyncResult,
+  ListAdminFeedbackOptions,
+  ListAuditEventsInput,
+  ListMyFeedbackOptions,
+  MergePendingFeedbackInput,
   ProductWriteInput,
   PublicCollectionOwner,
+  SubmitFeedbackInput,
+  UpdateAdminFeedbackInput,
+  UpdatePendingFeedbackInput,
   UpsertUserSettingsInput,
   UserCollectionItem,
   UserCollectionSummary,
@@ -26,7 +76,23 @@ export type {
   UserSyncResult,
   UsersService,
 } from "./db/index.js";
-export { defaultUserSettings } from "./db/index.js";
+export {
+  AccountErasureInProgressError,
+  AuditEventValidationError,
+  AuditExportDeletionError,
+  AuditExportEmptyError,
+  AuditExportInProgressError,
+  AuditPayloadTooLargeError,
+  CollectionButtonAlreadyInstalledError,
+  createAuditService,
+  createErasureService,
+  createErasureSubjectHmac,
+  defaultUserSettings,
+  ErasureOperationError,
+  FeedbackPlanRecoveryRequiredError,
+  FeedbackStateError,
+  FeedbackSubmissionLimitError,
+} from "./db/index.js";
 
 import {
   createFeatureFlagsService,
@@ -34,7 +100,7 @@ import {
 } from "./flags/index.js";
 import { createImagesService, type ImagesService } from "./images/index.js";
 import {
-  createConfiguredResourcesService,
+  createResourcesService,
   type ResourcesService,
 } from "./resources/index.js";
 
@@ -49,18 +115,27 @@ export type ServicesLoggerConfig = LoggerConfig | Logger;
 
 export type ServicesConfig = {
   db?: DatabaseConfig;
-  images?: ImageStorageConfig;
+  images?: RemoteImageStorageConfig;
   logger?: ServicesLoggerConfig;
-  resources?: ResourceStorageConfig;
+  storage?: UploadStorageConfig;
 };
 
+/** Lazily configured application services. */
 export class Services {
   #db?: DbServices;
   #flags?: FeatureFlagsService;
   #images?: ImagesService;
   #logger?: Logger;
   #resources?: ResourcesService;
+  #storage?: StorageService;
 
+  /**
+   * Configures services from runtime settings.
+   *
+   * @param config - Runtime service configuration.
+   * @returns Nothing.
+   * @throws When required logger or database configuration is missing.
+   */
   configure(config: ServicesConfig): void {
     if (config.db && !config.logger && !this.#logger) {
       throw new Error("Database services require logger configuration.");
@@ -70,8 +145,8 @@ export class Services {
       throw new Error("Image services require logger configuration.");
     }
 
-    if (config.resources && !config.db) {
-      throw new Error("Resource services require database configuration.");
+    if (config.storage && !config.db) {
+      throw new Error("Storage services require database configuration.");
     }
 
     if (config.logger) {
@@ -87,12 +162,27 @@ export class Services {
 
       const db = createDb(config.db);
       this.#db = createDbServices(db, this.#logger);
-      this.#flags = createFeatureFlagsService(db, this.#db.users, this.#logger);
-      if (config.resources) {
-        this.#resources = createConfiguredResourcesService(
+      this.#flags = createFeatureFlagsService(
+        db,
+        this.#db.users,
+        this.#logger,
+        this.#db.audit,
+      );
+      if (config.storage) {
+        const configStorage = config.storage;
+        const storage = createUploadStorage(configStorage);
+        this.#storage = createStorageService({
+          audit: this.#db.audit,
           db,
-          config.resources,
+          storage,
+          logger: this.#logger,
+        });
+        this.#resources = createResourcesService(
+          db,
+          storage,
           this.#logger,
+          (objectPath) => signResourceUrl({ ...configStorage, objectPath }),
+          this.#db.audit,
         );
       }
     }
@@ -146,6 +236,12 @@ export class Services {
     return this.#images;
   }
 
+  get storage(): StorageService {
+    if (!this.#storage)
+      throw new Error("Storage services have not been configured.");
+    return this.#storage;
+  }
+
   get resources(): ResourcesService {
     if (!this.#resources) {
       throw new Error(
@@ -175,18 +271,18 @@ function isLogger(value: ServicesLoggerConfig): value is Logger {
 }
 
 export type {
-  ImageStorageConfig,
   ImageUpdateInput,
   ImageUpdateResult,
   ImageUploadInput,
   ImageUploadResult,
+  RemoteImageStorageConfig,
   RemoteImageUploadInput,
-} from "@package/images";
-export type {
-  ResourceStorageConfig,
-  ResourceUploadInput,
-  ResourceUploadResult,
-} from "@package/resources";
+  UploadInput,
+  UploadResult,
+  UploadStorageConfig,
+} from "@package/storage";
+export { signResourceUrl } from "@package/storage";
+export { signImages } from "./images/sign-images.js";
 export type {
   CreateResourceInput,
   ResourceDetail,
@@ -204,5 +300,7 @@ export {
   createConfiguredResourcesService,
   createResourcesService,
 } from "./resources/index.js";
+
+export * from "./storage/index.js";
 export type { ImagesService };
 export { createImagesService };
