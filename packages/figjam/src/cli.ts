@@ -12,10 +12,14 @@ import type { FigjamSnapshot } from "./types.js";
 import { payloadSchemaVersion } from "./types.js";
 import { assertAllowedFileKey, validatePayload } from "./validation.js";
 
+/** Default directory for payloads awaiting FigJam plugin processing. */
 const defaultOutboxDir = ".figjam/outbox";
+/** Default directory for downloaded snapshots and generated summaries. */
 const defaultCacheDir = ".figjam/cache";
+/** Default localhost port for the outbox bridge. */
 const defaultBridgePort = 4873;
 
+/** Command names recognized by the FigJam CLI. */
 type CliCommand =
   | "comment"
   | "help"
@@ -25,6 +29,13 @@ type CliCommand =
   | "validate-payload"
   | "write-payload";
 
+/**
+ * Dispatches one FigJam CLI command.
+ *
+ * @param argv - Command name followed by its arguments.
+ * @returns Process exit code for a successfully dispatched command.
+ * @rejects When the selected command cannot complete.
+ */
 async function main(argv: readonly string[]): Promise<number> {
   const [rawCommand, ...args] = argv;
   const command = normalizeCommand(rawCommand);
@@ -54,6 +65,13 @@ async function main(argv: readonly string[]): Promise<number> {
   }
 }
 
+/**
+ * Downloads an allowed Figma file and writes its cache artifacts.
+ *
+ * @param args - Optional Figma file key, defaulting to the configured file.
+ * @returns A promise that resolves after all snapshot artifacts are written.
+ * @rejects When configuration, Figma access, or file output fails.
+ */
 async function read(args: readonly string[]): Promise<void> {
   const config = getFigmaConfigFromEnv();
   const fileKey = args[0] ?? config.defaultFileKey;
@@ -71,6 +89,13 @@ async function read(args: readonly string[]): Promise<void> {
   console.log(`Wrote FigJam snapshot cache to ${cacheDir}.`);
 }
 
+/**
+ * Regenerates summary artifacts from a cached FigJam snapshot.
+ *
+ * @param args - Optional snapshot path, defaulting to the configured file's cache.
+ * @returns A promise that resolves after summary artifacts are written.
+ * @rejects When configuration, snapshot parsing, or file output fails.
+ */
 async function summarize(args: readonly string[]): Promise<void> {
   const config = getFigmaConfigFromEnv();
   const snapshotPath =
@@ -88,6 +113,13 @@ async function summarize(args: readonly string[]): Promise<void> {
   console.log(`Wrote FigJam summary to ${outputDir}.`);
 }
 
+/**
+ * Validates a payload file against the configured Figma file allowlist.
+ *
+ * @param args - Payload file path.
+ * @returns A promise that resolves after validation succeeds.
+ * @rejects When the argument, file, JSON, configuration, or payload is invalid.
+ */
 async function validate(args: readonly string[]): Promise<void> {
   const config = getFigmaConfigFromEnv();
   const path = requiredArg(args[0], "validate-payload requires a file path.");
@@ -100,6 +132,13 @@ async function validate(args: readonly string[]): Promise<void> {
   );
 }
 
+/**
+ * Normalizes, validates, and writes a payload into the plugin outbox.
+ *
+ * @param args - Input JSON file path.
+ * @returns A promise that resolves after the payload is written.
+ * @rejects When the argument, file, JSON, configuration, or payload is invalid.
+ */
 async function writePayload(args: readonly string[]): Promise<void> {
   const config = getFigmaConfigFromEnv();
   const inputPath = requiredArg(args[0], "write-payload requires a file path.");
@@ -115,6 +154,13 @@ async function writePayload(args: readonly string[]): Promise<void> {
   console.log(`Wrote FigJam payload to ${outboxPath}.`);
 }
 
+/**
+ * Starts the local FigJam outbox bridge on a requested port.
+ *
+ * @param args - Optional localhost port, defaulting to `4873`.
+ * @returns A promise that resolves after server startup is initiated.
+ * @rejects When the port is not an integer from 1 through 65535.
+ */
 async function serve(args: readonly string[]): Promise<void> {
   const port = Number(args[0] ?? defaultBridgePort);
 
@@ -125,10 +171,23 @@ async function serve(args: readonly string[]): Promise<void> {
   serveOutbox({
     outboxDir: defaultOutboxDir,
     port,
+    /**
+     * Writes a bridge status message to standard output.
+     *
+     * @param message - Status message to print.
+     * @returns Nothing after printing the message.
+     */
     print: (message) => console.log(message),
   });
 }
 
+/**
+ * Posts a message to an allowed Figma or FigJam file.
+ *
+ * @param args - Optional file key, defaulting to the configured file, and required `--message` value.
+ * @returns A promise that resolves after Figma accepts the comment.
+ * @rejects When the message, configuration, file key, or API request is invalid.
+ */
 async function comment(args: readonly string[]): Promise<void> {
   const config = getFigmaConfigFromEnv();
   const messageIndex = args.indexOf("--message");
@@ -145,6 +204,13 @@ async function comment(args: readonly string[]): Promise<void> {
   );
 }
 
+/**
+ * Wraps an operations-only object in a versioned payload envelope.
+ * Existing payloads and non-object values pass through unchanged.
+ *
+ * @param input - Parsed payload or operations-only input.
+ * @returns The original value or a generated payload candidate.
+ */
 function normalizePayloadInput(input: unknown): unknown {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return input;
@@ -170,6 +236,12 @@ function normalizePayloadInput(input: unknown): unknown {
   };
 }
 
+/**
+ * Maps a raw command name to a supported command or the help fallback.
+ *
+ * @param command - Raw first CLI argument.
+ * @returns A supported command name.
+ */
 function normalizeCommand(command: string | undefined): CliCommand {
   if (
     command === "comment" ||
@@ -185,6 +257,14 @@ function normalizeCommand(command: string | undefined): CliCommand {
   return "help";
 }
 
+/**
+ * Requires a positional CLI argument.
+ *
+ * @param value - Candidate argument value.
+ * @param message - Error message used when the argument is absent.
+ * @returns The present argument value.
+ * @throws When the argument is absent or empty.
+ */
 function requiredArg(value: string | undefined, message: string): string {
   if (!value) {
     throw new Error(message);
@@ -193,10 +273,19 @@ function requiredArg(value: string | undefined, message: string): string {
   return value;
 }
 
+/**
+ * Writes an indented JSON value with a trailing newline.
+ *
+ * @param path - Destination file path.
+ * @param value - JSON-serializable value.
+ * @returns A promise that resolves after the file is written.
+ * @rejects When serialization or file output fails.
+ */
 async function writeJson(path: string, value: unknown): Promise<void> {
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+/** Prints FigJam CLI commands and the local Infisical invocation example. */
 function printHelp(): void {
   console.log(
     [
