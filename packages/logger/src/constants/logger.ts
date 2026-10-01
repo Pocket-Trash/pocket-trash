@@ -246,6 +246,7 @@ export const loggerMessages = {
   },
 } as const;
 
+/** Stable values shared by logger applications and the log proxy protocol. */
 export const loggerValues = {
   apps: {
     api: "api",

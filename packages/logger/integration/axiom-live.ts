@@ -14,27 +14,45 @@ import {
   parseClientLogEvents,
 } from "../src/index.js";
 
+/** One tabular Axiom query result keyed by field path. */
 type QueryRow = Record<string, unknown>;
 
+/** A field descriptor returned with an Axiom tabular response. */
 type AxiomField = {
+  /** Field path used as the query-row key. */
   name: string;
 };
 
+/** Columnar values and field descriptors for one Axiom result table. */
 type AxiomTable = {
+  /** Column values aligned with `fields`. */
   columns?: unknown[][];
+  /** Field descriptors aligned with `columns`. */
   fields?: AxiomField[];
 };
 
+/** Tabular response returned by the Axiom query API. */
 type AxiomTabularResponse = {
+  /** Result tables, when the query produced tabular output. */
   tables?: AxiomTable[];
 };
 
+/** Dataset required for the live logger test. */
 const requiredDataset =
   process.env.LOGGER_AXIOM_EXPECTED_DATASET ?? "development";
+/** Minimum level required to exercise every severity. */
 const requiredLogLevel = "trace";
+/** Default live-test deadline in milliseconds. */
 const defaultTimeoutMs = 90_000;
+/** Default delay between Axiom queries in milliseconds. */
 const defaultPollIntervalMs = 5_000;
 
+/**
+ * Emits direct and proxied events, then verifies Axiom ingestion and redaction.
+ *
+ * @returns Completion after every expected event is verified.
+ * @rejects When configuration, delivery, querying, or assertions fail.
+ */
 async function main(): Promise<void> {
   const config = readConfig();
   const startedAt = new Date(Date.now() - 60_000).toISOString();
@@ -154,6 +172,13 @@ async function main(): Promise<void> {
     level: config.logLevel,
     transports: [axiomTransport],
   });
+  /**
+   * Routes proxy transport requests through the in-process proxy handler.
+   *
+   * @param _input - Unused proxy URL.
+   * @param init - Proxy request body and headers.
+   * @returns The simulated proxy response.
+   */
   const proxyFetch: FetchLike = async (_input, init) =>
     handleLogProxyRequest({
       body: init?.body,
@@ -236,17 +261,39 @@ async function main(): Promise<void> {
   console.log(`received ${rows.length} matching Axiom events`);
 }
 
+/**
+ * Authenticates, validates, enriches, and forwards a simulated proxy request.
+ *
+ * @param input - Request body, headers, client key, and server logger.
+ * @returns An HTTP-like response describing acceptance or validation failure.
+ * @rejects When flushing the server logger fails.
+ */
 async function handleLogProxyRequest({
   body,
   clientLogKey,
   headers,
   logger,
 }: {
+  /** Serialized proxy request body. */
   body?: string;
+  /** Expected client authentication key. */
   clientLogKey: string;
+  /** Proxy request headers. */
   headers?: Record<string, string>;
+  /** Server logger that forwards accepted events. */
   logger: Logger;
-}): Promise<{ ok: boolean; status: number; text: () => Promise<string> }> {
+}): Promise<{
+  /** Whether the response status represents success. */
+  ok: boolean;
+  /** Numeric HTTP status. */
+  status: number;
+  /**
+   * Reads the serialized response body.
+   *
+   * @returns JSON response text.
+   */
+  text: () => Promise<string>;
+}> {
   if (headers?.[loggerValues.logProxy.clientKeyHeader] !== clientLogKey) {
     return jsonResponse({ error: "Invalid log client key." }, 401);
   }
@@ -282,24 +329,60 @@ async function handleLogProxyRequest({
   return jsonResponse({ accepted: events.value.length }, 200);
 }
 
+/**
+ * Creates an HTTP-like JSON response for the simulated proxy.
+ *
+ * @param body - Response value to serialize.
+ * @param status - Numeric HTTP status.
+ * @returns A minimal response with deferred JSON serialization.
+ */
 function jsonResponse(
   body: unknown,
   status: number,
-): { ok: boolean; status: number; text: () => Promise<string> } {
+): {
+  /** Whether the response status represents success. */
+  ok: boolean;
+  /** Numeric HTTP status. */
+  status: number;
+  /**
+   * Reads the serialized response body.
+   *
+   * @returns JSON response text.
+   */
+  text: () => Promise<string>;
+} {
   return {
     ok: status >= 200 && status < 300,
     status,
+    /**
+     * Serializes the response body.
+     *
+     * @returns JSON response text.
+     */
     text: async () => JSON.stringify(body),
   };
 }
 
+/**
+ * Reads and validates configuration for the live Axiom logger test.
+ *
+ * @returns Validated credentials, logging level, and polling settings.
+ * @throws When required variables or live-test invariants are invalid.
+ */
 function readConfig(): {
+  /** Axiom dataset queried by the test. */
   dataset: string;
+  /** Optional Axiom API domain override. */
   edgeDomain?: string;
+  /** Logger level used for live emissions. */
   logLevel: LogLevel;
+  /** Client key accepted by the simulated log proxy. */
   logProxyClientKey: string;
+  /** Delay between Axiom query attempts in milliseconds. */
   pollIntervalMs: number;
+  /** Maximum wait for Axiom events in milliseconds. */
   timeoutMs: number;
+  /** Axiom API token. */
   token: string;
 } {
   const token = requiredEnv("AXIOM_TOKEN");
@@ -336,12 +419,26 @@ function readConfig(): {
   };
 }
 
+/**
+ * Validates a configured log level.
+ *
+ * @param value - Candidate log-level name.
+ * @returns The validated log level.
+ * @throws When the value is not supported.
+ */
 function parseLogLevel(value: string): LogLevel {
   assert.ok(isLogLevel(value), `LOG_LEVEL must be a valid log level: ${value}`);
 
   return value;
 }
 
+/**
+ * Reads a required non-empty environment variable.
+ *
+ * @param name - Environment variable name.
+ * @returns The configured value.
+ * @throws When the variable is absent or empty.
+ */
 function requiredEnv(name: string): string {
   const value = process.env[name];
   assert.ok(value, `${name} is required.`);
@@ -349,12 +446,26 @@ function requiredEnv(name: string): string {
   return value;
 }
 
+/**
+ * Reads an optional non-empty environment variable.
+ *
+ * @param name - Environment variable name.
+ * @returns The configured value, or `undefined` when absent or empty.
+ */
 function optionalEnv(name: string): string | undefined {
   const value = process.env[name];
 
   return value ? value : undefined;
 }
 
+/**
+ * Reads an optional positive integer environment variable.
+ *
+ * @param name - Environment variable name.
+ * @param fallback - Value used when the variable is absent or empty.
+ * @returns The parsed positive integer or fallback.
+ * @throws When the configured value is not a positive integer.
+ */
 function parseOptionalPositiveInteger(name: string, fallback: number): number {
   const value = process.env[name];
 
@@ -371,6 +482,12 @@ function parseOptionalPositiveInteger(name: string, fallback: number): number {
   return parsed;
 }
 
+/**
+ * Creates unique sentinel values used to verify redaction.
+ *
+ * @param runPrefix - Unique prefix for this live-test run.
+ * @returns Sentinel values keyed by their test location.
+ */
 function createSecretValues(runPrefix: string): Record<string, string> {
   return {
     directAttributePassword: `${runPrefix}-direct-attribute-password`,
@@ -384,20 +501,43 @@ function createSecretValues(runPrefix: string): Record<string, string> {
   };
 }
 
+/**
+ * Builds a unique structured event name for the live-test run.
+ *
+ * @param runPrefix - Unique prefix for this live-test run.
+ * @param name - Event-specific suffix.
+ * @returns Namespaced event name.
+ */
 function message(runPrefix: string, name: string): string {
   return `${runPrefix}.${name}`;
 }
 
+/**
+ * Polls Axiom until every expected event appears or the deadline expires.
+ *
+ * @param input - Query configuration, expected messages, and time boundary.
+ * @returns All matching rows from the successful query.
+ * @rejects When querying fails or expected events do not arrive before timeout.
+ */
 async function waitForRows(input: {
+  /** Axiom query and polling settings. */
   config: {
+    /** Axiom dataset to query. */
     dataset: string;
+    /** Optional Axiom API domain override. */
     edgeDomain?: string;
+    /** Delay between queries in milliseconds. */
     pollIntervalMs: number;
+    /** Maximum polling duration in milliseconds. */
     timeoutMs: number;
+    /** Axiom API token. */
     token: string;
   };
+  /** Event names that must appear before polling succeeds. */
   expectedMessages: readonly string[];
+  /** Unique prefix used to select this run's events. */
   runPrefix: string;
+  /** Earliest event timestamp included in the query. */
   startedAt: string;
 }): Promise<QueryRow[]> {
   const deadline = Date.now() + input.config.timeoutMs;
@@ -445,13 +585,26 @@ async function waitForRows(input: {
   );
 }
 
+/**
+ * Queries Axiom for events emitted by one live-test run.
+ *
+ * @param input - Dataset credentials, run prefix, and query start time.
+ * @returns Matching Axiom rows.
+ * @rejects When the query request fails or Axiom returns an unsuccessful status.
+ */
 async function queryAxiom(input: {
+  /** Axiom dataset credentials and endpoint settings. */
   config: {
+    /** Axiom dataset to query. */
     dataset: string;
+    /** Optional Axiom API domain override. */
     edgeDomain?: string;
+    /** Axiom API token. */
     token: string;
   };
+  /** Unique prefix used to select this run's events. */
   runPrefix: string;
+  /** Earliest event timestamp included in the query. */
   startedAt: string;
 }): Promise<QueryRow[]> {
   const domain = input.config.edgeDomain ?? "api.axiom.co";
@@ -484,10 +637,23 @@ async function queryAxiom(input: {
   return rowsFromTabular((await response.json()) as unknown);
 }
 
+/**
+ * Quotes a string for safe interpolation into an APL query.
+ *
+ * @param value - Literal string value.
+ * @returns JSON-quoted APL string literal.
+ */
 function quoteAplString(value: string): string {
   return JSON.stringify(value);
 }
 
+/**
+ * Converts the first Axiom tabular result from columns into row records.
+ *
+ * @param body - Parsed Axiom tabular response.
+ * @returns Row records keyed by field name, or an empty array without a table.
+ * @throws When the response is not an object.
+ */
 function rowsFromTabular(body: unknown): QueryRow[] {
   assertRecord(body, "Axiom query response");
   const response = body as AxiomTabularResponse;
@@ -524,13 +690,25 @@ function rowsFromTabular(body: unknown): QueryRow[] {
   return rows;
 }
 
+/**
+ * Verifies event delivery, filtering, metadata, outcomes, and redaction.
+ *
+ * @param rows - Matching rows returned by Axiom.
+ * @param input - Expected event names, identifiers, and secret sentinels.
+ * @throws When any live logger invariant is not satisfied.
+ */
 function assertRows(
   rows: readonly QueryRow[],
   input: {
+    /** Event names expected in Axiom. */
     expectedMessages: readonly string[];
+    /** Info event expected to be filtered out. */
     filteredInfoMessage: string;
+    /** Unique deployment identifier for this run. */
     runId: string;
+    /** Prefix used to build this run's event names. */
     runPrefix: string;
+    /** Sentinel values that must not appear in stored rows. */
     secrets: Record<string, string>;
   },
 ): void {
@@ -628,6 +806,13 @@ function assertRows(
   );
 }
 
+/**
+ * Finds the first Axiom row with a matching event message.
+ *
+ * @param rows - Rows to search.
+ * @param eventMessage - Exact structured event name.
+ * @returns The matching row, or `undefined` when absent.
+ */
 function findRow(
   rows: readonly QueryRow[],
   eventMessage: string,
@@ -635,6 +820,14 @@ function findRow(
   return rows.find((row) => getField(row, "message") === eventMessage);
 }
 
+/**
+ * Returns an Axiom row with a required event message.
+ *
+ * @param rows - Rows to search.
+ * @param eventMessage - Exact structured event name.
+ * @returns The matching row.
+ * @throws When the event is absent.
+ */
 function requireRow(rows: readonly QueryRow[], eventMessage: string): QueryRow {
   const row = findRow(rows, eventMessage);
   assert.ok(row, `Missing ${eventMessage}.`);
@@ -642,6 +835,13 @@ function requireRow(rows: readonly QueryRow[], eventMessage: string): QueryRow {
   return row;
 }
 
+/**
+ * Reads an exact or dot-delimited field path from an Axiom row.
+ *
+ * @param row - Axiom result row.
+ * @param path - Exact key or nested dot path.
+ * @returns The field value, or `undefined` when the path is absent.
+ */
 function getField(row: QueryRow, path: string): unknown {
   if (Object.hasOwn(row, path)) {
     return row[path];
@@ -660,6 +860,13 @@ function getField(row: QueryRow, path: string): unknown {
   return current;
 }
 
+/**
+ * Asserts that a value is a non-array object.
+ *
+ * @param value - Candidate record.
+ * @param label - Human-readable value label used in assertion failures.
+ * @throws When the value is not a record.
+ */
 function assertRecord(
   value: unknown,
   label: string,
@@ -667,10 +874,22 @@ function assertRecord(
   assert.ok(isRecord(value), `${label} must be an object.`);
 }
 
+/**
+ * Checks whether a value is a non-array object.
+ *
+ * @param value - Candidate record.
+ * @returns Whether the value is a record.
+ */
 function isRecord(value: unknown): value is QueryRow {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
+/**
+ * Checks whether a value is a string.
+ *
+ * @param value - Candidate string.
+ * @returns Whether the value is a string.
+ */
 function isString(value: unknown): value is string {
   return typeof value === "string";
 }
