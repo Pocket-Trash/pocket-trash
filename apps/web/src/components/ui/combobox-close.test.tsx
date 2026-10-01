@@ -31,7 +31,7 @@ vi.mock("@base-ui/react/combobox", () => {
       /**
        * Provides the input test double.
        *
-       * @returns The rendered test double.
+       * @returns No rendered output.
        */
       Input: () => null,
       Item: passthrough,
@@ -39,7 +39,7 @@ vi.mock("@base-ui/react/combobox", () => {
       /**
        * Provides the list test double.
        *
-       * @returns The rendered test double.
+       * @returns No rendered output.
        */
       List: () => null,
       Popup: passthrough,
@@ -53,7 +53,7 @@ vi.mock("@base-ui/react/combobox", () => {
        * @param input.onOpenChange - Callback invoked when the open state changes.
        * @param input.onValueChange - Callback invoked when the selection changes.
        * @param input.open - Current controlled open state.
-       * @returns The rendered test double.
+       * @returns The rendered test controls.
        */
       Root: ({
         items,
@@ -110,7 +110,7 @@ vi.mock("@base-ui/react/combobox", () => {
       /**
        * Provides the trigger test double.
        *
-       * @returns The rendered test double.
+       * @returns No rendered output.
        */
       Trigger: () => null,
     },

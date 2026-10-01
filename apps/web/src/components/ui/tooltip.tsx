@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
  * Provides tooltip timing configuration to nested tooltips.
  *
  * @param props - Tooltip provider properties.
- * @param props.delay - Delay before a tooltip opens.
+ * @param props.delay - Delay in milliseconds before a tooltip opens.
  * @returns The rendered tooltip provider UI.
  */
 function TooltipProvider({
@@ -52,7 +52,7 @@ function TooltipTrigger({
  * @param props - Tooltip content properties.
  * @param props.align - Popup alignment relative to its trigger.
  * @param props.className - Additional CSS classes.
- * @param props.sideOffset - Distance between the tooltip and its trigger.
+ * @param props.sideOffset - Distance in pixels, or a resolver returning pixels, between the tooltip and its trigger.
  * @param props.side - Screen edge used to place the panel.
  * @param props.children - Nested content.
  * @returns The rendered tooltip content UI.

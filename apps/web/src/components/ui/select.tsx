@@ -66,7 +66,7 @@ function SelectTrigger({
  * @param props.children - Nested content.
  * @param props.position - Popup positioning strategy.
  * @param props.side - Screen edge used to place the panel.
- * @param props.sideOffset - Distance between the popup and its trigger.
+ * @param props.sideOffset - Distance in pixels, or a resolver returning pixels, between the popup and its trigger; defaults to `4` for popper positioning and `0` for item-aligned positioning.
  * @returns The rendered select content UI.
  */
 function SelectContent({

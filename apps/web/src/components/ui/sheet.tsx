@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 /**
- * Provides the sheet interaction root.
+ * Provides the sheet interaction root, defaulting swipe gestures to the right.
  *
  * @param props - Sheet properties.
  * @returns The rendered sheet UI.
@@ -84,6 +84,7 @@ function SheetOverlay({
  * @param props.children - Nested content.
  * @param props.side - Screen edge used to place the panel.
  * @returns The rendered sheet content UI.
+ * @throws {Error} When rendered outside `LocaleProvider`.
  */
 function SheetContent({
   className,

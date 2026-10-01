@@ -30,7 +30,7 @@ const badgeVariants = cva(
  *
  * @param props - Badge properties.
  * @param props.className - Additional CSS classes.
- * @param props.variant - Visual style variant.
+ * @param props.variant - Visual style variant; defaults to `"default"`.
  * @returns The rendered badge UI.
  */
 function Badge({

@@ -40,8 +40,8 @@ const buttonVariants = cva(
  *
  * @param props - Button properties.
  * @param props.className - Additional CSS classes.
- * @param props.variant - Visual style variant.
- * @param props.size - Visual size variant.
+ * @param props.variant - Visual style variant; defaults to `"default"`.
+ * @param props.size - Visual size variant; defaults to `"default"`.
  * @returns The rendered button UI.
  */
 function Button({

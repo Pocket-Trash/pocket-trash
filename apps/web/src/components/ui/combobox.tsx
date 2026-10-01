@@ -25,8 +25,8 @@ export type ComboboxOption = {
  * @param props.items - Options available for selection.
  * @param props.onValueChange - Callback invoked when the selection changes.
  * @param props.placeholder - Prompt shown when the combobox has no selection.
- * @param props.removeLabel - Accessible label or label builder for removal controls.
- * @param props.showSelectedPill - Whether to render the current selection as a removable pill.
+ * @param props.removeLabel - Accessible label for the optional removal control.
+ * @param props.showSelectedPill - Whether to allow a non-default selection to render as a removable pill when `removeLabel` is provided.
  * @param props.value - Currently selected option.
  * @returns The rendered catalog combobox UI.
  */
@@ -58,11 +58,12 @@ export function CatalogCombobox({
    */
   placeholder: string;
   /**
-   * Accessible label or label builder for removal controls.
+   * Accessible label for the optional removal control.
    */
   removeLabel?: string;
   /**
-   * Whether to render the current selection as a removable pill.
+   * Whether to allow a non-default selection to render as a removable pill when
+   * `removeLabel` is provided.
    *
    * @default false
    */
@@ -108,9 +109,9 @@ export function CatalogCombobox({
  *
  * @param props - Catalog multi combobox properties.
  * @param props.ariaLabel - Accessible label for the combobox input and trigger.
- * @param props.disabled - Whether interaction is disabled.
- * @param props.emptyLabel - Message shown when no combobox options match.
- * @param props.filter - Custom filtering mode, or `null` to disable built-in filtering.
+ * @param props.disabled - Whether the combobox input and selection controls are disabled; removal pills remain interactive unless `removeDisabled` is set.
+ * @param props.emptyLabel - Message shown when no options match; defaults to `placeholder`.
+ * @param props.filter - `null` to disable built-in filtering.
  * @param props.inputValue - Controlled combobox search text.
  * @param props.items - Options available for selection.
  * @param props.onInputValueChange - Callback invoked when the search text changes.
@@ -140,15 +141,16 @@ export function CatalogMultiCombobox({
    */
   ariaLabel: string;
   /**
-   * Whether interaction is disabled.
+   * Whether the combobox input and selection controls are disabled. Removal
+   * pills remain interactive unless `removeDisabled` is set.
    */
   disabled?: boolean;
   /**
-   * Message shown when no combobox options match.
+   * Message shown when no combobox options match. Defaults to `placeholder`.
    */
   emptyLabel?: string;
   /**
-   * Custom filtering mode, or `null` to disable built-in filtering.
+   * Disables built-in filtering when set to `null`.
    */
   filter?: null;
   /**
@@ -162,7 +164,7 @@ export function CatalogMultiCombobox({
   /**
    * Reports controlled combobox search-text changes.
    *
-   * @param value - Next selection value.
+   * @param value - Next search text.
    */
   onInputValueChange?: (value: string) => void;
   /**
@@ -180,7 +182,7 @@ export function CatalogMultiCombobox({
    */
   removeDisabled?: boolean;
   /**
-   * Accessible label or label builder for removal controls.
+   * Accessible label or builder called with the selected option name.
    */
   removeLabel: string | ((name: string) => string);
   /**
@@ -383,7 +385,7 @@ function SelectionPill({
 }
 
 /**
- * Base UI combobox root primitive.
+ * Exposes the root that coordinates composed combobox controls and options.
  */
 const Combobox = ComboboxPrimitive.Root;
 

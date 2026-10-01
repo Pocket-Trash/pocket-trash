@@ -5,7 +5,7 @@ import type * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Maps toggle-group item variants and sizes to CSS classes.
+ * Supplies the shared CSS classes for toggle-group items.
  */
 const toggleGroupItemVariants = cva(
   "inline-flex h-8 flex-1 items-center justify-center rounded-md px-3 text-xs font-medium text-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-[pressed]:bg-primary data-[pressed]:text-primary-foreground",
@@ -34,7 +34,9 @@ type ToggleGroupSingleProps = ToggleGroupBaseProps & {
    */
   onValueChange?: (value: string) => void;
   /**
-   * Toggle selection mode.
+   * Toggle selection mode. Omission selects single-selection mode.
+   *
+   * @default "single"
    */
   type?: "single";
   /**
@@ -73,7 +75,7 @@ type ToggleGroupMultipleProps = ToggleGroupBaseProps & {
 type ToggleGroupProps = ToggleGroupSingleProps | ToggleGroupMultipleProps;
 
 /**
- * Renders a single- or multi-select toggle group.
+ * Renders a toggle group, using single-selection mode unless `type` is `"multiple"`.
  *
  * @param props - Toggle group properties.
  * @returns The rendered toggle group UI.

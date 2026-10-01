@@ -15,17 +15,19 @@ const PLACEHOLDER_KEYS = Array.from(
 // the reserved heights in `product-card.tsx` so there is no layout shift when the
 // real cards swap in. Renders bare cards so the caller keeps them in its grid.
 /**
- * Renders a configurable grid of product-card placeholders.
+ * Renders bare product-card placeholders for placement in a caller-owned grid.
  *
  * @param props - Product grid skeleton properties.
- * @param props.count - Number of product-card placeholders to render.
- * @returns The rendered product grid skeleton UI.
+ * @param props.count - Slice endpoint applied to the fixed set of 48 placeholders.
+ * @returns Up to 48 product-card placeholders without a grid wrapper.
  */
 export function ProductGridSkeleton({
   count = 12,
 }: {
   /**
-   * Number of product-card placeholders to render.
+   * Slice endpoint applied to the fixed set of 48 placeholders. Values above 48
+   * render all placeholders; negative and fractional values follow `Array.slice`
+   * endpoint semantics.
    *
    * @default 12
    */

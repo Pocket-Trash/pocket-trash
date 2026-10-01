@@ -233,6 +233,7 @@ function SidebarProvider({
  * @param props.className - Additional CSS classes.
  * @param props.children - Nested content.
  * @returns The rendered sidebar UI.
+ * @throws {Error} When rendered outside `SidebarProvider` or `LocaleProvider`.
  */
 function Sidebar({
   side = "left",
@@ -364,8 +365,9 @@ function Sidebar({
  *
  * @param props - Sidebar trigger properties.
  * @param props.className - Additional CSS classes.
- * @param props.onClick - Optional click handler invoked after the sidebar toggles.
+ * @param props.onClick - Optional click handler invoked before the sidebar toggles.
  * @returns The rendered sidebar trigger UI.
+ * @throws {Error} When rendered outside `SidebarProvider` or `LocaleProvider`.
  */
 function SidebarTrigger({
   className,
@@ -401,6 +403,7 @@ function SidebarTrigger({
  * @param props - Sidebar rail properties.
  * @param props.className - Additional CSS classes.
  * @returns The rendered sidebar rail UI.
+ * @throws {Error} When rendered outside `SidebarProvider` or `LocaleProvider`.
  */
 function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   const { toggleSidebar } = useSidebar();
@@ -711,6 +714,7 @@ const sidebarMenuButtonVariants = cva(
  * @param props.tooltip - Tooltip content shown for a collapsed sidebar menu button.
  * @param props.className - Additional CSS classes.
  * @returns The rendered sidebar menu button UI.
+ * @throws {Error} When rendered outside `SidebarProvider`.
  */
 function SidebarMenuButton({
   isActive = false,
@@ -930,13 +934,13 @@ function SidebarMenuSubItem({
 }
 
 /**
- * Renders an active-aware button within a sidebar submenu.
+ * Renders an active-aware link within a sidebar submenu.
  *
  * @param props - Sidebar menu sub button properties.
  * @param props.size - Visual size variant.
  * @param props.isActive - Whether the menu item represents the active destination.
  * @param props.className - Additional CSS classes.
- * @returns The rendered sidebar menu sub button UI.
+ * @returns The rendered sidebar submenu link UI.
  */
 function SidebarMenuSubButton({
   size = "md",
