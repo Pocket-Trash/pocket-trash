@@ -66,6 +66,7 @@ import { Route as AdminNotificationsFeedbackRouteImport } from './routes/admin.n
 import { Route as AdminFeedbackRequestsRouteImport } from './routes/admin.feedback.requests'
 import { Route as AdminFeedbackPlannedRouteImport } from './routes/admin.feedback.planned'
 import { Route as AdminFeedbackArchiveRouteImport } from './routes/admin.feedback.archive'
+import { Route as AdminAuditExportRouteImport } from './routes/admin.audit.export'
 import { Route as UserCollectionsCollectionIdEditRouteImport } from './routes/user.collections_.$collectionId_.edit'
 import { Route as ResourcesResourceIdVersionsNewRouteImport } from './routes/resources.$resourceId_.versions.new'
 import { Route as ProductsProductTypeSlugProductSlugEditRouteImport } from './routes/products.$productTypeSlug.$productSlug_.edit'
@@ -364,6 +365,11 @@ const AdminFeedbackArchiveRoute = AdminFeedbackArchiveRouteImport.update({
   path: '/feedback/archive',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAuditExportRoute = AdminAuditExportRouteImport.update({
+  id: '/export',
+  path: '/export',
+  getParentRoute: () => AdminAuditRoute,
+} as any)
 const UserCollectionsCollectionIdEditRoute =
   UserCollectionsCollectionIdEditRouteImport.update({
     id: '/collections_/$collectionId_/edit',
@@ -403,7 +409,7 @@ export interface FileRoutesByFullPath {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
   '/admin/account-erasure': typeof AdminAccountErasureRoute
-  '/admin/audit': typeof AdminAuditRoute
+  '/admin/audit': typeof AdminAuditRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -428,6 +434,7 @@ export interface FileRoutesByFullPath {
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
+  '/admin/audit/export': typeof AdminAuditExportRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
@@ -462,7 +469,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/account-erasure': typeof AdminAccountErasureRoute
-  '/admin/audit': typeof AdminAuditRoute
+  '/admin/audit': typeof AdminAuditRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -487,6 +494,7 @@ export interface FileRoutesByTo {
   '/products': typeof ProductsIndexRoute
   '/resources': typeof ResourcesIndexRoute
   '/user': typeof UserIndexRoute
+  '/admin/audit/export': typeof AdminAuditExportRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
@@ -526,7 +534,7 @@ export interface FileRoutesById {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/user': typeof UserRouteWithChildren
   '/admin/account-erasure': typeof AdminAccountErasureRoute
-  '/admin/audit': typeof AdminAuditRoute
+  '/admin/audit': typeof AdminAuditRouteWithChildren
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/collections/$userId': typeof CollectionsUserIdRoute
   '/collections/add': typeof CollectionsAddRoute
@@ -551,6 +559,7 @@ export interface FileRoutesById {
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
+  '/admin/audit/export': typeof AdminAuditExportRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
@@ -616,6 +625,7 @@ export interface FileRouteTypes {
     | '/products/'
     | '/resources/'
     | '/user/'
+    | '/admin/audit/export'
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
@@ -675,6 +685,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/resources'
     | '/user'
+    | '/admin/audit/export'
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
@@ -738,6 +749,7 @@ export interface FileRouteTypes {
     | '/products/'
     | '/resources/'
     | '/user/'
+    | '/admin/audit/export'
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
@@ -1194,6 +1206,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFeedbackArchiveRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/audit/export': {
+      id: '/admin/audit/export'
+      path: '/export'
+      fullPath: '/admin/audit/export'
+      preLoaderRoute: typeof AdminAuditExportRouteImport
+      parentRoute: typeof AdminAuditRoute
+    }
     '/user/collections_/$collectionId_/edit': {
       id: '/user/collections_/$collectionId_/edit'
       path: '/collections/$collectionId/edit'
@@ -1225,9 +1244,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminAuditRouteChildren {
+  AdminAuditExportRoute: typeof AdminAuditExportRoute
+}
+
+const AdminAuditRouteChildren: AdminAuditRouteChildren = {
+  AdminAuditExportRoute: AdminAuditExportRoute,
+}
+
+const AdminAuditRouteWithChildren = AdminAuditRoute._addFileChildren(
+  AdminAuditRouteChildren,
+)
+
 interface AdminRouteChildren {
   AdminAccountErasureRoute: typeof AdminAccountErasureRoute
-  AdminAuditRoute: typeof AdminAuditRoute
+  AdminAuditRoute: typeof AdminAuditRouteWithChildren
   AdminIndexRoute: typeof AdminIndexRoute
   AdminFeedbackArchiveRoute: typeof AdminFeedbackArchiveRoute
   AdminFeedbackPlannedRoute: typeof AdminFeedbackPlannedRoute
@@ -1244,7 +1275,7 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAccountErasureRoute: AdminAccountErasureRoute,
-  AdminAuditRoute: AdminAuditRoute,
+  AdminAuditRoute: AdminAuditRouteWithChildren,
   AdminIndexRoute: AdminIndexRoute,
   AdminFeedbackArchiveRoute: AdminFeedbackArchiveRoute,
   AdminFeedbackPlannedRoute: AdminFeedbackPlannedRoute,

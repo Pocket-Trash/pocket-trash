@@ -321,12 +321,9 @@ describe("buildInfisicalRunArgs", () => {
     });
 
     expect(args).toEqual([
-      "run",
-      ...quietArgs,
-      "--project-config-dir=/repo",
-      "--env=dev",
-      "--path=/apps/web",
-      "--",
+      ...quietRunArgs("/apps/web"),
+      "infisical",
+      ...quietRunArgs("/local/database"),
       "tsx",
       "/repo/packages/infisical-runner/src/env-alias-runner.ts",
       expect.stringContaining("databaseUrlUserOverride"),
