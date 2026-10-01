@@ -7,20 +7,46 @@ import type {
   AuditService,
 } from "./index.js";
 
+/** Before-and-after product state stored with an audit event. */
 export type ProductAuditData = {
+  /** Product state after the mutation. */
   after?: AuditJsonObject;
+  /** Product state before the mutation. */
   before?: AuditJsonObject;
 };
 
+/**
+ * Creates a product audit-event definition.
+ *
+ * @param action - Namespaced audit action.
+ * @param targetType - Product entity recorded as the event target.
+ * @returns Definition that serializes and redacts product state.
+ */
 function definition(action: string, targetType: string) {
   return {
     action,
     targetType,
+    /**
+     * Serializes product state for persistence.
+     *
+     * @param data - Product state surrounding the mutation.
+     * @returns Serialized before-and-after state.
+     */
     serialize: ({ after, before }: ProductAuditData) => ({ after, before }),
+    /**
+     * Redacts product state associated with an erased account.
+     *
+     * @param payload - Stored audit payload.
+     * @param context - Account-erasure relationship to the event.
+     * @returns State retained for actor erasure, or a redaction marker for owner erasure.
+     */
     redact(
       payload: {
+        /** Stored state after the mutation. */
         afterState?: AuditJsonObject | null;
+        /** Stored state before the mutation. */
         beforeState?: AuditJsonObject | null;
+        /** Stored event metadata. */
         metadata?: AuditJsonObject | null;
       },
       context: AuditRedactionContext,
@@ -35,6 +61,7 @@ function definition(action: string, targetType: string) {
   } satisfies AuditEventDefinition<ProductAuditData>;
 }
 
+/** Audit event definitions for product mutations. */
 export const productAudit = {
   colorCreated: definition("products.color.created", "products.color"),
   finishCreated: definition("products.finish.created", "products.finish"),
@@ -55,22 +82,45 @@ export const productAudit = {
   ),
 } as const;
 
+/** Product audit definitions accepted by the audit service. */
 export const productAuditEvents = Object.values(
   productAudit,
 ) as readonly AuditEventDefinition<never>[];
 
+/**
+ * Authorizes and writes an owner or moderator product audit event.
+ *
+ * @param audit - Audit service used to persist the event.
+ * @param transaction - Transaction containing the product mutation.
+ * @param input - Actor, ownership, target, and state-change details.
+ * @rejects When authorization, validation, serialization, persistence, or operation logging fails.
+ */
 export async function writeProductAudit(
   audit: AuditService,
   transaction: Parameters<AuditService["write"]>[0],
   input: {
+    /** Authenticated actor performing the mutation. */
     actor: Actor;
-    actorUser: { id: number; username: string | null };
+    /** Database identity recorded as the audit actor. */
+    actorUser: {
+      /** Internal user ID. */
+      id: number;
+      /** Username recorded with the event. */
+      username: string | null;
+    };
+    /** Product state after the mutation. */
     after?: AuditJsonObject;
+    /** Product state before the mutation. */
     before?: AuditJsonObject;
+    /** Audit definition for the mutation. */
     definition: AuditEventDefinition<ProductAuditData>;
+    /** Clerk ID of the product owner, or `null` when ownership is absent or erased. */
     ownerClerkId: string | null;
+    /** Database user ID of the product owner, when present. */
     ownerUserId: number | null;
+    /** Required explanation for staff moderation. */
     reason?: string;
+    /** Product-related database ID. */
     targetId: number;
   },
 ) {
@@ -99,17 +149,38 @@ export async function writeProductAudit(
   });
 }
 
+/**
+ * Writes a staff-authorized product administration audit event.
+ *
+ * @param audit - Audit service used to persist the event.
+ * @param transaction - Transaction containing the administrative mutation.
+ * @param input - Administrator, target, and state-change details.
+ * @rejects When authorization, validation, serialization, persistence, or operation logging fails.
+ */
 export async function writeProductAdminAudit(
   audit: AuditService,
   transaction: Parameters<AuditService["write"]>[0],
   input: {
+    /** Authenticated administrator performing the mutation. */
     actor: Actor;
-    actorUser: { id: number; username: string | null };
+    /** Database identity recorded as the audit actor. */
+    actorUser: {
+      /** Internal user ID. */
+      id: number;
+      /** Username recorded with the event. */
+      username: string | null;
+    };
+    /** Product state after the mutation. */
     after?: AuditJsonObject;
+    /** Product state before the mutation. */
     before?: AuditJsonObject;
+    /** Audit definition for the mutation. */
     definition: AuditEventDefinition<ProductAuditData>;
+    /** Database user ID affected by the mutation, when present. */
     ownerUserId?: number | null;
+    /** Optional administrative reason. */
     reason?: string;
+    /** Product-related database ID. */
     targetId: number;
   },
 ) {

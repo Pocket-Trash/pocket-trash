@@ -80,7 +80,7 @@ export const feedbackAuditEvents = Object.values(
  * @param transaction - Caller-owned source transaction.
  * @param input - Actor, owner, target, and allowlisted state.
  * @returns Completion after the event is stored.
- * @rejects When the actor lacks feedback management permission.
+ * @rejects When authorization, validation, serialization, persistence, or operation logging fails.
  */
 export async function writeFeedbackAudit(
   audit: AuditService,

@@ -208,6 +208,7 @@ function file(fileName: string, contentType: string, value: string) {
  *
  * @param client - PGlite client.
  * @returns Completion after all migrations run.
+ * @rejects When a migration cannot be discovered, read, or executed.
  */
 async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
