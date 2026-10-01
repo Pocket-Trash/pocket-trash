@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createImageStorage } from "../index.js";
 import { sha256 } from "../object-paths.js";
 
+/** Bunny configuration fixture used by remote image storage tests. */
 const bunnyConfig = {
   accessKey: "storage-key",
   endpoint: "https://ny.storage.bunnycdn.com",
@@ -27,6 +28,13 @@ describe("createImageStorage", () => {
     const puts: string[] = [];
     const storage = createImageStorage({
       ...bunnyConfig,
+      /**
+       * Serves source bytes and records Bunny upload paths.
+       *
+       * @param input - Requested source or Bunny URL.
+       * @param init - Optional request settings.
+       * @returns A source-image or upload response.
+       */
       fetch: async (input, init) => {
         if (init?.method === "PUT") {
           puts.push(toUrl(input).pathname);
@@ -268,6 +276,11 @@ describe("createImageStorage", () => {
       if (url.href === "https://cdn.example.test/source-image.jpg") {
         return new Response(
           new ReadableStream<Uint8Array>({
+            /**
+             * Enqueues two chunks that exceed the configured byte limit.
+             *
+             * @param controller - Source byte-stream controller.
+             */
             start(controller) {
               controller.enqueue(new Uint8Array(4));
               controller.enqueue(new Uint8Array(4));
@@ -327,6 +340,11 @@ describe("createImageStorage", () => {
       if (url.href === "https://cdn.example.test/source-image.jpg") {
         return new Response(
           new ReadableStream<Uint8Array>({
+            /**
+             * Enqueues one chunk and leaves the stream open for timeout testing.
+             *
+             * @param controller - Source byte-stream controller.
+             */
             start(controller) {
               controller.enqueue(new Uint8Array(1));
             },
@@ -352,6 +370,13 @@ describe("createImageStorage", () => {
   });
 });
 
+/**
+ * Creates a JSON response fixture.
+ *
+ * @param body - Value to serialize.
+ * @param status - HTTP status.
+ * @returns A JSON response.
+ */
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     headers: { "content-type": "application/json" },
@@ -359,6 +384,13 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+/**
+ * Normalizes any fetch input into a URL.
+ *
+ * @param input - Fetch request URL or request object.
+ * @returns The corresponding URL.
+ * @throws When a string or request URL is invalid.
+ */
 function toUrl(input: Parameters<typeof fetch>[0]): URL {
   if (typeof input === "string") {
     return new URL(input);

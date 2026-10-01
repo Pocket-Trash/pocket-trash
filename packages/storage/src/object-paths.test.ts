@@ -4,6 +4,7 @@ import {
   buildResourceFileObjectPath,
 } from "./object-paths.js";
 
+/** Valid lowercase SHA-256 fixture. */
 const hash = "a".repeat(64);
 describe("object paths", () => {
   it.each([

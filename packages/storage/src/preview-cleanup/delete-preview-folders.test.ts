@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { deletePreviewFolders } from "./delete-preview-folders.js";
 
+/** Bunny Storage fixture used by preview-cleanup tests. */
 const config = {
   accessKey: "key",
   endpoint: "https://storage.example",

@@ -5,6 +5,14 @@ import {
   maxImageInputPixels,
 } from "../constants.js";
 
+/**
+ * Validates encoded image size, format, dimensions, and decoded pixel count.
+ *
+ * @param bytes - Encoded image bytes, limited to 25 MiB.
+ * @param maxInputPixels - Maximum decoded width multiplied by height.
+ * @returns Normalized dimensions, MIME type, and extension.
+ * @throws When bytes are empty, oversized, malformed, unsupported, or too large when decoded.
+ */
 export function inspectImage(
   bytes: Uint8Array,
   maxInputPixels = maxImageInputPixels,

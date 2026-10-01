@@ -1,9 +1,20 @@
 import { resourceUrlLifetimeSeconds } from "../constants.js";
 import { buildCdnUrl, normalizeObjectPath } from "../lib/paths.js";
+/**
+ * Creates a short-lived Bunny token-authenticated resource URL.
+ *
+ * @param input - CDN origin, object key, token key, and optional Unix expiry.
+ * @returns The CDN URL with URL-safe HMAC token and expiry query parameters.
+ * @rejects When configuration, object-path validation, URL parsing, or signing fails.
+ */
 export async function signResourceUrl(input: {
+  /** Public Bunny CDN base URL. */
   cdnBaseUrl?: string;
+  /** Optional Unix expiry timestamp in seconds. */
   expiresAt?: number;
+  /** Zone-relative resource object key. */
   objectPath: string;
+  /** Bunny CDN token-authentication key. */
   tokenKey?: string;
 }): Promise<string> {
   const cdnBaseUrl = input.cdnBaseUrl?.trim();
