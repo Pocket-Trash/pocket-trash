@@ -115,13 +115,11 @@ export function classifyChanges(
         enable(result, "web", "safe_e2e", "validation");
         if (!file.startsWith("apps/web/e2e/")) enable(result, "storybook");
         if (
+          file.startsWith("apps/web/src/") ||
           (file.startsWith("apps/web/e2e/") &&
             !file.endsWith("public.spec.ts")) ||
           file === "apps/web/package.json" ||
-          file === "apps/web/playwright.config.ts" ||
-          /(?:collection|storage|upload|auth|sign-in|sign-up|user-settings|theme)/i.test(
-            file,
-          )
+          file === "apps/web/playwright.config.ts"
         ) {
           enable(result, "mutation_e2e");
         }

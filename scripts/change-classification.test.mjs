@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 
 import { classifyChanges } from "./classify-changes.mjs";
@@ -43,7 +45,7 @@ test("classifies application and package changes by affected domain", () => {
     ["apps/scraper/src/index.ts", ["scraper", "validation"]],
     [
       "apps/web/src/components/product-card.tsx",
-      ["web", "storybook", "safe_e2e", "validation"],
+      ["web", "storybook", "safe_e2e", "mutation_e2e", "validation"],
     ],
     [
       "apps/web/e2e/collection-covers.spec.ts",
@@ -83,6 +85,30 @@ test("skips documentation-only changes and fails open for unknown paths", () => 
     classifyChanges([], { diffFailed: true }),
     expected(...domains),
   );
+});
+
+test("CLI fails open when the base commit is missing or malformed", () => {
+  const script = fileURLToPath(
+    new URL("./classify-changes.mjs", import.meta.url),
+  );
+  const allRelevant = `${Object.entries(expected(...domains))
+    .map(([domain, relevant]) => `${domain}=${relevant}`)
+    .join("\n")}\n`;
+
+  for (const baseSha of [undefined, "not-a-commit"]) {
+    assert.equal(
+      execFileSync(process.execPath, [script], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          BASE_SHA: baseSha,
+          HEAD_SHA: "HEAD",
+        },
+        stdio: ["ignore", "pipe", "ignore"],
+      }),
+      allRelevant,
+    );
+  }
 });
 
 test("applies persistent label overrides without rerunning unrelated jobs", () => {
