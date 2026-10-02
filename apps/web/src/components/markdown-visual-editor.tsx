@@ -92,6 +92,7 @@ import {
   type Transaction,
 } from "@milkdown/prose/state";
 import { addRowAfter, goToNextCell, isInTable } from "@milkdown/prose/tables";
+import type { EditorView } from "@milkdown/prose/view";
 import {
   $inputRule,
   $prose,
@@ -349,13 +350,12 @@ export function MarkdownVisualEditor(props: MarkdownVisualEditorProps) {
            * @param transaction - ProseMirror transaction to apply.
            * @returns Nothing.
            */
-          dispatchTransaction(transaction) {
-            const view = ctx.get(editorViewCtx);
-            const result = view.state.applyTransaction(transaction);
+          dispatchTransaction(this: EditorView, transaction) {
+            const result = this.state.applyTransaction(transaction);
             let state = result.state;
             const sanitized = sanitizeLinks(state, linkSchema.type(ctx));
             if (sanitized) state = state.apply(sanitized);
-            view.updateState(state);
+            this.updateState(state);
             propsRef.current.onSelectionChange(activeFormats(state));
             if (
               result.transactions.some((applied) => applied.docChanged) ||
