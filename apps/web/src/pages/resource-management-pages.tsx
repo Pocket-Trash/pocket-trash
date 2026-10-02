@@ -14,7 +14,6 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { FileUp, LoaderCircle, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/app-shell";
 import { ResourceCard } from "@/components/resource-card";
 import { ResourceCategoryInput } from "@/components/resource-category-input";
 import {
@@ -72,7 +71,11 @@ export function ResourceManagementPage({
   ) => formatTranslation(key, params, locale);
 
   return (
-    <AppShell title={t("web.resources.management.title")}>
+    <UserPageShell
+      contentClassName="p-0"
+      section="resources"
+      title={t("web.resources.management.title")}
+    >
       <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 md:px-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="m-0 text-sm text-muted-foreground">
@@ -110,7 +113,7 @@ export function ResourceManagementPage({
           </section>
         )}
       </main>
-    </AppShell>
+    </UserPageShell>
   );
 }
 
@@ -141,7 +144,10 @@ export function ResourceEditPage({
   ) => formatTranslation(key, params, locale);
 
   return (
-    <UserPageShell title={t("web.resources.management.editResources")}>
+    <UserPageShell
+      section="resources"
+      title={t("web.resources.management.editResources")}
+    >
       <Tabs defaultValue="edit">
         <TabsList>
           <TabsTrigger value="edit">
@@ -392,6 +398,7 @@ export function ResourceVersionUploadPage({
 
   return (
     <UserPageShell
+      section="resources"
       title={t("web.resources.upload.newVersionTitle", { name: detail.name })}
     >
       <ResourceVersionUploadForm detail={detail} />

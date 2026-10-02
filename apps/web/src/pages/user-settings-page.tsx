@@ -48,7 +48,7 @@ export function UserSettingsPage() {
     usePenSettings();
 
   return (
-    <UserPageShell title={t("web.settings.settings")}>
+    <UserPageShell section="settings" title={t("web.settings.settings")}>
       <div className="grid w-full max-w-xl gap-6">
         <div className="grid gap-6 rounded-lg border border-border bg-card p-4 sm:p-6">
           <fieldset className="grid gap-2">
