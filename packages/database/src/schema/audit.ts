@@ -227,7 +227,7 @@ export type AuditDelivery = typeof auditDelivery.$inferSelect;
 /** Values accepted when creating an audit-delivery row. */
 export type NewAuditDelivery = typeof auditDelivery.$inferInsert;
 
-/** Durable ranges and completion state for bounded audit exports. */
+/** Bounded audit-event export ranges, completion checksums, and retention-consumption state. */
 const auditExport = pgTable(
   "audit_export",
   {
