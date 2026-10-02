@@ -13,6 +13,7 @@ A named collection owned by one user.
 | `name` | `text` | yes |  |  |  | Display name of the collection. | `Daily Carry` |
 | `normalized_name` | `text` | yes |  |  |  | Canonical per-owner key used to prevent duplicate names. | `dailycarry` |
 | `description` | `text` | no |  |  |  | Optional description of the collection. | `Everyday carry spinners.` |
+| `summary` | `text` | no |  |  |  |  |  |
 | `is_private` | `boolean` | yes |  | `true` |  | Whether public routes hide the collection and its items. | `true` |
 | `private_reason` | `text` | no |  |  |  |  |  |
 | `privated_at` | `timestamp with time zone` | no |  |  |  |  |  |

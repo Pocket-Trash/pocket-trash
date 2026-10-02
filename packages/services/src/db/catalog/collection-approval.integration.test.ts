@@ -33,15 +33,15 @@ describe("collection-item approval", () => {
         ])
         .returning();
       if (!owner || !editor) throw new Error("Users missing.");
-      const [collection] = await db
-        .insert(schema.userCollection)
-        .values({
-          isPrivate: false,
-          name: "Review collection",
-          normalizedName: "reviewcollection",
-          ownerId: owner.id,
-        })
-        .returning();
+      const {
+        rows: [collection],
+      } = await client.query<{
+        /** Identifier inserted before later collection columns existed. */
+        id: number;
+      }>(
+        "INSERT INTO user_collection (owner_id, name, normalized_name, is_private) VALUES ($1, $2, $3, false) RETURNING id::integer AS id",
+        [owner.id, "Review collection", "reviewcollection"],
+      );
       if (!collection) throw new Error("Collection missing.");
       const {
         rows: [legacy],

@@ -35,7 +35,14 @@ describe("collection audit adoption", () => {
         description: "Original",
         isPrivate: false,
         name: "Collection",
+        summary: "Original summary",
       });
+      expect(collection).toEqual(
+        expect.objectContaining({
+          description: "Original",
+          summary: "Original summary",
+        }),
+      );
       await expect(
         services.collections.updateCollection({
           actor: { clerkId: admin.clerkId, role: "admin" },
@@ -43,6 +50,7 @@ describe("collection audit adoption", () => {
           description: "Must roll back",
           isPrivate: false,
           name: "Changed",
+          summary: "Must roll back",
         }),
       ).rejects.toThrow(/reason/i);
 
@@ -52,14 +60,21 @@ describe("collection audit adoption", () => {
         .where(eq(schema.userCollection.id, collection.id));
       expect(unchanged?.name).toBe("Collection");
 
-      await services.collections.updateCollection({
+      const updated = await services.collections.updateCollection({
         actor: { clerkId: admin.clerkId, role: "admin" },
         collectionId: collection.id,
         description: "Reviewed",
         isPrivate: false,
         name: "Changed",
         reason: "Owner requested help",
+        summary: "Reviewed summary",
       });
+      expect(updated).toEqual(
+        expect.objectContaining({
+          description: "Reviewed",
+          summary: "Reviewed summary",
+        }),
+      );
 
       const events = await db
         .select()

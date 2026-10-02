@@ -20,7 +20,6 @@ import {
   slugPattern,
 } from "./catalog";
 import { getResourceViewer } from "./resources";
-import { countWords } from "./text";
 
 /**
  * Localization key used for missing required catalog input.
@@ -271,18 +270,21 @@ const colorSchema = z.object({
 });
 
 /**
- * Schema for collection names, privacy, descriptions, and audit reasons.
+ * Schema for collection names, privacy, summaries, descriptions, and audit reasons.
  */
 export const collectionWriteSchema = z.object({
-  description: z
-    .string()
-    .trim()
-    .nullable()
-    .refine((value) => !value || countWords(value) <= 200, requiredMessage)
-    .transform((value) => value || null),
+  description: optionalDescriptionSchema.nullable(),
   isPrivate: z.boolean(),
   name: z.string().trim().min(2, requiredMessage).max(80, requiredMessage),
   reason: z.string().trim().max(1000).optional(),
+  summary: z
+    .string()
+    .trim()
+    .max(200, requiredMessage)
+    .nullable()
+    .optional()
+    .default(null)
+    .transform((value) => value || null),
 });
 
 /** Validates one administrative product approval decision. */

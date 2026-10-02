@@ -46,6 +46,7 @@ export const userCollection = pgTable(
     name: text("name").notNull(),
     normalizedName: text("normalized_name").notNull(),
     description: text("description"),
+    summary: text("summary"),
     isPrivate: boolean("is_private").default(true).notNull(),
     privateReason: text("private_reason"),
     privatedAt: timestamp("privated_at", { mode: "date", withTimezone: true }),
@@ -70,6 +71,14 @@ export const userCollection = pgTable(
     check(
       "user_collection_name_length_valid",
       sql`char_length(trim(${table.name})) between 2 and 80`,
+    ),
+    check(
+      "user_collection_description_length_valid",
+      sql`${table.description} is null or char_length(${table.description}) <= 5000`,
+    ),
+    check(
+      "user_collection_summary_length_valid",
+      sql`${table.summary} is null or char_length(${table.summary}) <= 200`,
     ),
     check(
       "user_collection_private_metadata_consistent",

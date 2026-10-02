@@ -61,9 +61,9 @@ export function CollectionCard({
         {ownerName ? (
           <p className="text-sm text-muted-foreground">{ownerName}</p>
         ) : null}
-        {collection.description ? (
+        {collection.summary ? (
           <p className="line-clamp-3 text-sm text-muted-foreground">
-            {collection.description}
+            {collection.summary}
           </p>
         ) : null}
         <p className="text-xs text-muted-foreground">{itemCountLabel}</p>

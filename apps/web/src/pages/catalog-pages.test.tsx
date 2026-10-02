@@ -112,6 +112,7 @@ const owners = [
         itemCount: 1,
         name: "Daily Carry",
         ownerUserId: 1002,
+        summary: null,
         updatedAt: new Date("2026-09-02"),
       },
       {
@@ -125,6 +126,7 @@ const owners = [
         itemCount: 0,
         name: "Private collection",
         ownerUserId: 1002,
+        summary: null,
         updatedAt: new Date("2026-09-04"),
       },
     ],
@@ -231,6 +233,28 @@ describe("UserCollectionsPage", () => {
     expect(html).not.toContain("Add to collection");
     expect(html).toContain("Add collection");
   });
+
+  it("shows the plain-text summary instead of the description on cards", () => {
+    const collection = owners[0]?.collections[0];
+    if (!collection) throw new Error("Collection fixture is required.");
+
+    const html = renderToStaticMarkup(
+      <UserCollectionsPage
+        collections={[
+          {
+            ...collection,
+            description: "DETAIL_ONLY_DESCRIPTION",
+            summary: "Card summary with **literal Markdown**",
+          },
+        ]}
+        items={[]}
+      />,
+    );
+
+    expect(html).toContain("Card summary with **literal Markdown**");
+    expect(html).not.toContain("DETAIL_ONLY_DESCRIPTION");
+    expect(html).not.toContain("<strong>literal Markdown</strong>");
+  });
 });
 
 describe("CollectionPage", () => {
@@ -290,13 +314,17 @@ describe("CollectionPage", () => {
           ...collection,
           coverImage: images[7] ?? null,
           coverImages: images,
-          description: "A focused collection summary.",
+          description: "A focused **collection description**.",
+          summary: "CARD_ONLY_SUMMARY",
         }}
         items={owners[0]?.items ?? []}
       />,
     );
 
-    expect(html).toContain("A focused collection summary.");
+    expect(html).toContain(
+      "A focused <strong>collection description</strong>.",
+    );
+    expect(html).not.toContain("CARD_ONLY_SUMMARY");
     expect(html).toContain('src="https://cdn.test/collection-8.webp"');
     expect(html).not.toContain('src="https://cdn.test/collection-1.webp"');
     expect(html).toContain('aria-live="polite"');
