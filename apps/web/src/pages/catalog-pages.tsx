@@ -670,54 +670,57 @@ export function UserCollectionsPage({
     items.map(collectionFilterItem),
     filters.productType,
   );
+  const addCollection = (
+    <Link
+      className={buttonVariants({ variant: "outline" })}
+      to="/user/collections/add"
+    >
+      {t("web.action.addCollection")}
+    </Link>
+  );
   return (
     <UserPageShell
       contentClassName="p-0"
-      headerActions={
-        <>
-          {onFiltersChange ? (
-            <CatalogFilterBar
-              copy={catalogFilterCopy(t)}
-              facets={facets}
-              filters={filters}
-              onChange={onFiltersChange}
-            />
-          ) : null}
-          <Link
-            className={buttonVariants({ variant: "outline" })}
-            to="/user/collections/add"
-          >
-            {t("web.action.addCollection")}
-          </Link>
-        </>
-      }
       section="collections"
       title={t("web.navigation.collections")}
     >
-      <main className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
-        {filtered.length ? (
-          filtered.map((collection) => (
-            <Link
-              className="group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              key={collection.id}
-              params={{ collectionId: collection.id }}
-              to="/user/collections/$collectionId"
-            >
-              <CollectionCard
-                collection={collection}
-                coverAlt={t("web.resources.detail.imageAlt", {
-                  name: collection.name,
-                })}
-                itemCountLabel={t("web.collections.directory.itemCount", {
-                  count: collection.itemCount,
-                })}
-                privateLabel={t("web.resources.visibility.private")}
-              />
-            </Link>
-          ))
+      <main className="grid gap-[18px] p-3 md:p-[18px_22px_22px]">
+        {onFiltersChange ? (
+          <CatalogFilterBar
+            action={addCollection}
+            copy={catalogFilterCopy(t)}
+            facets={facets}
+            filters={filters}
+            onChange={onFiltersChange}
+          />
         ) : (
-          <EmptyState>{t("web.collections.emptyCollections")}</EmptyState>
+          <div className="flex justify-end">{addCollection}</div>
         )}
+        <section className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
+          {filtered.length ? (
+            filtered.map((collection) => (
+              <Link
+                className="group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                key={collection.id}
+                params={{ collectionId: collection.id }}
+                to="/user/collections/$collectionId"
+              >
+                <CollectionCard
+                  collection={collection}
+                  coverAlt={t("web.resources.detail.imageAlt", {
+                    name: collection.name,
+                  })}
+                  itemCountLabel={t("web.collections.directory.itemCount", {
+                    count: collection.itemCount,
+                  })}
+                  privateLabel={t("web.resources.visibility.private")}
+                />
+              </Link>
+            ))
+          ) : (
+            <EmptyState>{t("web.collections.emptyCollections")}</EmptyState>
+          )}
+        </section>
       </main>
     </UserPageShell>
   );
@@ -764,16 +767,17 @@ export function CollectionPage({
     items.map(collectionFilterItem),
     filters.productType,
   );
+  const filterBar = onFiltersChange ? (
+    <CatalogFilterBar
+      copy={catalogFilterCopy(t)}
+      facets={facets}
+      filters={filters}
+      onChange={onFiltersChange}
+    />
+  ) : null;
   const headerActions = (
     <>
-      {onFiltersChange ? (
-        <CatalogFilterBar
-          copy={catalogFilterCopy(t)}
-          facets={facets}
-          filters={filters}
-          onChange={onFiltersChange}
-        />
-      ) : null}
+      {userArea ? null : filterBar}
       {collection.canEdit ? (
         <>
           <Link className={buttonVariants()} to="/collections/add">
@@ -838,6 +842,7 @@ export function CollectionPage({
           ),
         }}
       />
+      {userArea ? filterBar : null}
       <section className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
         {filtered.length ? (
           filtered.map((item) => (
