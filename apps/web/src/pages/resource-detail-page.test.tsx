@@ -4,7 +4,23 @@ import { describe, expect, it, vi } from "vitest";
 import { cycleImageIndex, ResourceDetailPage } from "./resource-detail-page";
 
 vi.mock("@/components/app-shell", () => ({
-  AppShell: ({ children, title }: { children: ReactNode; title: string }) => (
+  /**
+   * Renders a minimal application shell for tests.
+   *
+   * @param props - Shell properties.
+   * @param props.children - Nested page content.
+   * @param props.title - Page title.
+   * @returns The test shell.
+   */
+  AppShell: ({
+    children,
+    title,
+  }: {
+    /** Nested page content. */
+    children: ReactNode;
+    /** Page title. */
+    title: string;
+  }) => (
     <div>
       <h1>{title}</h1>
       {children}
@@ -13,13 +29,37 @@ vi.mock("@/components/app-shell", () => ({
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns the fixed test locale.
+   *
+   * @returns Fixed English locale state.
+   */
   useLocale: () => ({ locale: "en-US" }),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to }: { children: ReactNode; to: string }) => (
-    <a href={to.replace("$resourceId", "1000")}>{children}</a>
-  ),
+  /**
+   * Renders router links as anchors for static markup tests.
+   *
+   * @param props - Link properties.
+   * @param props.children - Linked content.
+   * @param props.to - Route destination.
+   * @returns A test anchor.
+   */
+  Link: ({
+    children,
+    to,
+  }: {
+    /** Linked content. */
+    children: ReactNode;
+    /** Route destination. */
+    to: string;
+  }) => <a href={to.replace("$resourceId", "1000")}>{children}</a>,
+  /**
+   * Returns a navigation spy.
+   *
+   * @returns The navigation spy.
+   */
   useNavigate: () => vi.fn(),
 }));
 

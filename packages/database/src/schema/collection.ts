@@ -26,6 +26,12 @@ export const catalogImageTargetTypes = [
   "collection",
   "collection_item",
 ] as const;
+/** Review states shared by catalog products and collection items. */
+export const productApprovalStatuses = [
+  "pending",
+  "approved",
+  "rejected",
+] as const;
 
 /** Named collections owned by application users. */
 export const userCollection = pgTable(
@@ -101,6 +107,14 @@ export const collectionItem = pgTable(
     ),
     soldToUser: text("sold_to_user"),
     owned: boolean("owned").notNull().default(true),
+    approvalStatus: text("approval_status", { enum: productApprovalStatuses })
+      .default("pending")
+      .notNull(),
+    approvalDecisionReason: text("approval_decision_reason"),
+    approvalDecidedAt: timestamp("approval_decided_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
     isPrivate: boolean("is_private").default(false).notNull(),
     privateReason: text("private_reason"),
     privatedAt: timestamp("privated_at", { mode: "date", withTimezone: true }),
@@ -121,7 +135,20 @@ export const collectionItem = pgTable(
     index("collection_item_collection_visibility_idx").on(
       table.collectionId,
       table.ownerId,
+      table.approvalStatus,
       table.isPrivate,
+    ),
+    check(
+      "collection_item_approval_status_valid",
+      sql`${table.approvalStatus} in ('pending', 'approved', 'rejected')`,
+    ),
+    check(
+      "collection_item_approval_decision_metadata_consistent",
+      sql`num_nonnulls(${table.approvalDecisionReason}, ${table.approvalDecidedAt}) in (0, 2)`,
+    ),
+    check(
+      "collection_item_approval_reason_valid",
+      sql`${table.approvalDecisionReason} is null or char_length(trim(${table.approvalDecisionReason})) between 1 and 1000`,
     ),
     check(
       "collection_item_private_metadata_consistent",
@@ -194,6 +221,16 @@ export const product = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     description: text("description"),
+    approvalStatus: text("approval_status", {
+      enum: productApprovalStatuses,
+    })
+      .default("pending")
+      .notNull(),
+    approvalDecisionReason: text("approval_decision_reason"),
+    approvalDecidedAt: timestamp("approval_decided_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
     makerProductUrl: text("maker_product_url"),
     makerProductUrlValid: boolean("maker_product_url_valid")
       .default(true)
@@ -212,7 +249,19 @@ export const product = pgTable(
   (table) => [
     uniqueIndex("product_type_slug_unique").on(table.productTypeId, table.slug),
     index("product_owner_clerk_id_idx").on(table.ownerClerkId),
-    index("product_visibility_idx").on(table.isPrivate),
+    index("product_visibility_idx").on(table.approvalStatus, table.isPrivate),
+    check(
+      "product_approval_status_valid",
+      sql`${table.approvalStatus} in ('pending', 'approved', 'rejected')`,
+    ),
+    check(
+      "product_approval_decision_metadata_consistent",
+      sql`num_nonnulls(${table.approvalDecisionReason}, ${table.approvalDecidedAt}) in (0, 2)`,
+    ),
+    check(
+      "product_approval_reason_valid",
+      sql`${table.approvalDecisionReason} is null or char_length(trim(${table.approvalDecisionReason})) between 1 and 1000`,
+    ),
     check(
       "product_private_metadata_consistent",
       sql`(not ${table.isPrivate} and num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0) or (${table.isPrivate} and (num_nonnulls(${table.privateReason}, ${table.privatedAt}, ${table.privatedByClerkId}) = 0 or (${table.privateReason} is not null and ${table.privatedAt} is not null)))`,

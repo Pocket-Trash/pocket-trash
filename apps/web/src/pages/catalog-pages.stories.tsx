@@ -7,10 +7,11 @@ import type {
 } from "@package/services";
 import { formatTranslation } from "@pocket-trash/localizations";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { fn } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 import { getHelpDocument } from "@/lib/help-content";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import {
+  CatalogApprovalControls,
   CollectionItemDetailPage,
   CollectionPage,
   HomePage,
@@ -23,14 +24,18 @@ import {
 import { HelpIndexPage, HelpTopicPage } from "./help-pages";
 import { UserIndexPage } from "./user-index-page";
 
+/** Product image used by catalog page stories. */
 const productImage = image(1000, "one.webp", "product-images/one.webp");
+/** Collection image used by catalog page stories. */
 const collectionImage = image(
   1001,
   "thirteen.webp",
   "collection-images/thirteen.webp",
 );
 
+/** Catalog product shared by the stories. */
 const product: CatalogProduct = {
+  approvalStatus: "approved",
   bearing: "R188 hybrid ceramic",
   buttonDiameterMm: null,
   canAdminister: false,
@@ -74,6 +79,7 @@ const product: CatalogProduct = {
   widthMm: null,
 };
 
+/** User collection shared by the stories. */
 const collection: UserCollectionSummary = {
   coverImage: collectionImage,
   coverImages: [collectionImage],
@@ -88,7 +94,9 @@ const collection: UserCollectionSummary = {
   updatedAt: new Date("2026-01-02"),
 };
 
+/** Collection item shared by the stories. */
 const item: UserCollectionItem = {
+  approvalStatus: "approved",
   bearing: "R188 full ceramic",
   bearingOverride: "R188 full ceramic",
   canAdminister: false,
@@ -122,6 +130,7 @@ const item: UserCollectionItem = {
   sourceProductFinishOptionId: product.finishOptions[0]?.id ?? null,
 };
 
+/** Installed spinner button used by the detail story. */
 const installedButton: UserCollectionItem = {
   ...item,
   collectionItemId: 1001,
@@ -134,6 +143,7 @@ const installedButton: UserCollectionItem = {
   productTypeSlug: "spinner-button",
 };
 
+/** Public collection owner shared by the stories. */
 const owner: PublicCollectionOwner = {
   collections: [collection],
   itemCount: 1,
@@ -142,9 +152,11 @@ const owner: PublicCollectionOwner = {
   username: "royanger",
 };
 
+/** Image guide document rendered by the help topic story. */
 const imageGuide = getHelpDocument("en-US", "image-size-and-resolution-guide");
 if (!imageGuide) throw new Error("The image guide story fixture is missing.");
 
+/** Catalog page Storybook configuration. */
 const meta = {
   beforeEach: mockStoryAuth,
   decorators: [
@@ -159,6 +171,7 @@ const meta = {
 } satisfies Meta;
 
 export default meta;
+/** A catalog page story. */
 type Story = StoryObj<typeof meta>;
 
 /** Collection page story. */
@@ -243,6 +256,161 @@ export const ProductDetail: Story = {
   ),
 };
 
+/** Approval-decision spy returning the approved state for story interactions. */
+const decideApproval = fn(async () => "approved" as const);
+
+/** Product approval state and interaction story. */
+export const ProductApproval: Story = {
+  /**
+   * Exercises each approval state and one successful decision.
+   *
+   * @param root0 - Storybook play context.
+   * @param root0.canvasElement - Rendered story root element.
+   */
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(
+      canvas.getAllByLabelText("Decision reason")[0] as HTMLTextAreaElement,
+      "Ready for the catalog",
+    );
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Approve product" }),
+    );
+    await expect(decideApproval).toHaveBeenCalledWith({
+      action: "approve",
+      reason: "Ready for the catalog",
+    });
+  },
+  /**
+   * Renders every approval state.
+   * @returns Product approval controls for visual review.
+   */
+  render: () => (
+    <main className="grid max-w-3xl gap-6 p-6">
+      <CatalogApprovalControls
+        initialStatus="pending"
+        onDecide={decideApproval}
+      />
+      <CatalogApprovalControls
+        initialStatus="approved"
+        onDecide={async () => "pending"}
+      />
+      <CatalogApprovalControls
+        initialStatus="rejected"
+        onDecide={async () => "pending"}
+      />
+    </main>
+  ),
+};
+
+/** Collection-item approval states, validation, reversal, and failure recovery. */
+export const CollectionItemApproval: Story = {
+  /**
+   * Exercises required reasons, rejection, reversal, and a failed decision.
+   *
+   * @param root0 - Storybook play context.
+   * @param root0.canvasElement - Rendered story root element.
+   */
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const groups = canvas.getAllByRole("group", {
+      name: "Collection item approval",
+    });
+    const pending = within(groups[0] as HTMLElement);
+    await expect(
+      pending.getByRole("button", { name: "Approve collection item" }),
+    ).toBeDisabled();
+    await userEvent.type(pending.getByLabelText("Decision reason"), "   ");
+    await expect(
+      pending.getByRole("button", { name: "Reject collection item" }),
+    ).toBeDisabled();
+    await userEvent.type(
+      pending.getByLabelText("Decision reason"),
+      "Needs changes",
+    );
+    await userEvent.click(
+      pending.getByRole("button", { name: "Reject collection item" }),
+    );
+    await expect(pending.getByText("Rejected")).toBeVisible();
+    await expect(pending.getByLabelText("Decision reason")).toHaveValue("");
+
+    for (const group of groups.slice(1, 3)) {
+      const decided = within(group);
+      await userEvent.type(
+        decided.getByLabelText("Decision reason"),
+        "Review again",
+      );
+      await userEvent.click(
+        decided.getByRole("button", { name: "Return to pending" }),
+      );
+      await expect(decided.getByText("Pending review")).toBeVisible();
+    }
+    const failure = within(groups[3] as HTMLElement);
+    await userEvent.type(failure.getByLabelText("Decision reason"), "Ready");
+    await userEvent.click(
+      failure.getByRole("button", { name: "Approve collection item" }),
+    );
+    await expect(failure.getByRole("alert")).toBeVisible();
+    await expect(failure.getByText("Pending review")).toBeVisible();
+    await expect(failure.getByLabelText("Decision reason")).toHaveValue(
+      "Ready",
+    );
+    await expect(
+      failure.getByRole("button", { name: "Approve collection item" }),
+    ).toBeEnabled();
+  },
+  /**
+   * Renders collection-item approval states and a persistence failure.
+   *
+   * @returns Collection-item review controls for visual and accessibility checks.
+   */
+  render: () => (
+    <main className="grid max-w-3xl gap-6 p-6">
+      <CatalogApprovalControls
+        target="collectionItem"
+        initialStatus="pending"
+        onDecide={async () => "rejected"}
+      />
+      <CatalogApprovalControls
+        target="collectionItem"
+        initialStatus="approved"
+        onDecide={async () => "pending"}
+      />
+      <CatalogApprovalControls
+        target="collectionItem"
+        initialStatus="rejected"
+        onDecide={async () => "pending"}
+      />
+      <CatalogApprovalControls
+        target="collectionItem"
+        initialStatus="pending"
+        onDecide={async () => {
+          throw new Error("Persistence failed");
+        }}
+      />
+    </main>
+  ),
+};
+
+/** Pending collection item retained in its owner's collection. */
+export const PendingCollectionItem: Story = {
+  /**
+   * Renders the owner-facing review state without administrative controls.
+   *
+   * @returns A pending collection item detail page.
+   */
+  render: () => (
+    <CollectionItemDetailPage
+      item={{
+        ...item,
+        approvalStatus: "pending",
+        canEdit: true,
+        isOwner: true,
+      }}
+    />
+  ),
+};
+
 /** Product index page story. */
 export const Products: Story = {
   /**
@@ -296,6 +464,14 @@ export const User: Story = {
   render: () => <UserIndexPage hasFeedback />,
 };
 
+/**
+ * Creates a catalog image story fixture.
+ *
+ * @param id - Image identifier.
+ * @param fileName - Image file name.
+ * @param path - CDN path below the storybook asset prefix.
+ * @returns The catalog image fixture.
+ */
 function image(id: number, fileName: string, path: string): CatalogImage {
   return {
     contentType: "image/webp",

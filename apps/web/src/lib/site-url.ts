@@ -11,6 +11,8 @@
  *
  * Deriving an absolute dev origin from the request `Host` header is a possible
  * follow-up; relative URLs are fine in dev, where no crawler consumes them.
+ *
+ * @returns The configured canonical server origin without a trailing slash, or an empty string.
  */
 function serverOrigin(): string {
   const env = typeof process !== "undefined" ? process.env : undefined;
@@ -26,11 +28,20 @@ function serverOrigin(): string {
   return "";
 }
 
+/** Resolves the current browser or canonical server origin.
+ *
+ * @returns The active origin, or an empty string during unconfigured local SSR.
+ */
 export function getOrigin(): string {
   if (typeof window !== "undefined") return window.location.origin;
   return serverOrigin();
 }
 
+/** Converts an application path to an absolute canonical URL when possible.
+ *
+ * @param path - Relative application path or existing absolute URL.
+ * @returns The unchanged absolute URL, canonical URL, or local relative path.
+ */
 export function absoluteUrl(path: string): string {
   if (path.startsWith("http")) return path;
   const origin = getOrigin();

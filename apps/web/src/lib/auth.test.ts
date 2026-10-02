@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+/** Hoisted authentication and erasure doubles shared by the module mocks. */
 const mocks = vi.hoisted(() => {
+  /** Test error representing an account erasure already in progress. */
   class AccountErasureInProgressError extends Error {}
   return {
     AccountErasureInProgressError,

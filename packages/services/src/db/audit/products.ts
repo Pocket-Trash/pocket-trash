@@ -63,6 +63,12 @@ function definition(action: string, targetType: string) {
 
 /** Audit event definitions for product mutations. */
 export const productAudit = {
+  productApproved: definition("products.product.approved", "products.product"),
+  productRejected: definition("products.product.rejected", "products.product"),
+  productApprovalReversed: definition(
+    "products.product.approval_reversed",
+    "products.product",
+  ),
   colorCreated: definition("products.color.created", "products.color"),
   finishCreated: definition("products.finish.created", "products.finish"),
   imageAdded: definition("products.image.added", "products.product"),
@@ -178,6 +184,8 @@ export async function writeProductAdminAudit(
     definition: AuditEventDefinition<ProductAuditData>;
     /** Database user ID affected by the mutation, when present. */
     ownerUserId?: number | null;
+    /** Source mutation time, defaulting to the time of the audit write. */
+    occurredAt?: Date;
     /** Optional administrative reason. */
     reason?: string;
     /** Product-related database ID. */
@@ -196,7 +204,7 @@ export async function writeProductAdminAudit(
     authorization: { permission: "products.manage", type: "permission" },
     data: { after: input.after, before: input.before },
     definition: input.definition,
-    occurredAt: new Date(),
+    occurredAt: input.occurredAt ?? new Date(),
     ownerUserId: input.ownerUserId,
     reason: input.reason?.trim(),
     targetId: String(input.targetId),

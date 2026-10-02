@@ -16,37 +16,101 @@ import {
 import { MarkdownContent } from "@/components/markdown-content";
 import { Button } from "@/components/ui/button";
 
+/**
+ * Responsive pagination behavior for non-cover collection images.
+ */
 const paginationFeatures = tableFeatures({
   rowPaginationFeature,
   paginatedRowModel: createPaginatedRowModel(),
 });
+/**
+ * Column builder for gallery images.
+ */
 const columnHelper = createColumnHelper<
   typeof paginationFeatures,
   GalleryImage
 >();
+/**
+ * Minimal columns required to paginate gallery images.
+ */
 const columns = columnHelper.columns([
   columnHelper.accessor("id", { header: "id" }),
 ]);
 
+/**
+ * Localized labels displayed by a collection gallery.
+ */
 export type CollectionGalleryCopy = {
+  /**
+   * Accessible label for closing the lightbox.
+   */
   closeImage: string;
+  /**
+   * Gallery heading and accessible label.
+   */
   gallery: string;
+  /**
+   * Alternative text shared by collection images.
+   */
   imageAlt: string;
+  /**
+   * Formatted collection item count.
+   */
   itemCount: string;
+  /**
+   * Accessible label for the next lightbox image.
+   */
   nextImage: string;
+  /**
+   * Accessible label for the next gallery page.
+   */
   nextPage: string;
+  /**
+   * Optional formatted owner attribution.
+   */
   owner?: string;
+  /**
+   * Formats the visible gallery page position.
+   *
+   * @param page - Current one-based page number.
+   * @param pageCount - Total number of pages.
+   * @returns Localized pagination status text.
+   */
   pageStatus(page: number, pageCount: number): string;
+  /**
+   * Accessible label for the previous lightbox image.
+   */
   previousImage: string;
+  /**
+   * Accessible label for the previous gallery page.
+   */
   previousPage: string;
+  /**
+   * Formatted collection visibility text.
+   */
   visibility: string;
 };
 
+/**
+ * Renders collection details, a responsive image grid, and a shared lightbox.
+ * The cover leads the lightbox; remaining images sort by descending position, then ID, in pages of six below 64rem and nine otherwise.
+ *
+ * @param props - Collection gallery properties.
+ * @param props.collection - Collection summary and cover images to present.
+ * @param props.copy - Localized labels and formatted collection metadata.
+ * @returns The collection gallery UI.
+ */
 export function CollectionGallery({
   collection,
   copy,
 }: {
+  /**
+   * Collection summary and cover images to present.
+   */
   collection: UserCollectionSummary;
+  /**
+   * Localized labels and formatted collection metadata.
+   */
   copy: CollectionGalleryCopy;
 }) {
   const nonCoverImages = useMemo(
@@ -83,7 +147,12 @@ export function CollectionGallery({
   const setPageSize = table.setPageSize;
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 64rem)");
-    const updatePageSize = () => setPageSize(desktop.matches ? 9 : 6);
+    /**
+     * Uses nine gallery images on desktop and six on smaller viewports.
+     */
+    const updatePageSize = () => {
+      setPageSize(desktop.matches ? 9 : 6);
+    };
     updatePageSize();
     desktop.addEventListener("change", updatePageSize);
     return () => desktop.removeEventListener("change", updatePageSize);

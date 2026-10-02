@@ -4,30 +4,91 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+/**
+ * Mutable combobox state exposed to close-behavior tests.
+ */
 const states = vi.hoisted(() => ({ open: [] as boolean[] }));
 
 vi.mock("@base-ui/react/combobox", () => {
-  const passthrough = ({ children }: { children?: React.ReactNode }) =>
-    children;
+  /**
+   * Returns nested test content without adding markup.
+   *
+   * @param input - Passthrough test-double properties.
+   * @param input.children - Nested content.
+   * @returns The nested test content.
+   */
+  const passthrough = ({
+    children,
+  }: {
+    /**
+     * Nested content.
+     */
+    children?: React.ReactNode;
+  }) => children;
   return {
     Combobox: {
       Empty: passthrough,
+      /**
+       * Provides the input test double.
+       *
+       * @returns No rendered output.
+       */
       Input: () => null,
       Item: passthrough,
       ItemIndicator: passthrough,
+      /**
+       * Provides the list test double.
+       *
+       * @returns No rendered output.
+       */
       List: () => null,
       Popup: passthrough,
       Portal: passthrough,
       Positioner: passthrough,
+      /**
+       * Provides the root test double.
+       *
+       * @param input - Combobox root test-double properties.
+       * @param input.items - Options available for selection.
+       * @param input.onOpenChange - Callback invoked when the open state changes.
+       * @param input.onValueChange - Callback invoked when the selection changes.
+       * @param input.open - Current controlled open state.
+       * @returns The rendered test controls.
+       */
       Root: ({
         items,
         onOpenChange,
         onValueChange,
         open,
       }: {
-        items: Array<{ id: number; name: string }>;
+        /**
+         * Options available for selection.
+         */
+        items: Array<{
+          /**
+           * Stable option identifier.
+           */
+          id: number;
+          /**
+           * Display label for the option.
+           */
+          name: string;
+        }>;
+        /**
+         * Reports combobox open-state changes.
+         *
+         * @param open - Next open state.
+         */
         onOpenChange: (open: boolean) => void;
+        /**
+         * Reports selection changes.
+         *
+         * @param value - Next selection value.
+         */
         onValueChange: (value: unknown) => void;
+        /**
+         * Whether the combobox root is open.
+         */
         open: boolean;
       }) => {
         states.open.push(open);
@@ -46,6 +107,11 @@ vi.mock("@base-ui/react/combobox", () => {
           </>
         );
       },
+      /**
+       * Provides the trigger test double.
+       *
+       * @returns No rendered output.
+       */
       Trigger: () => null,
     },
   };

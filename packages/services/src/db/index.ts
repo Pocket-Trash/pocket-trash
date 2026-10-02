@@ -104,6 +104,8 @@ export {
 } from "./audit/index.js";
 
 export type {
+  CatalogApprovalAction,
+  CatalogApprovalStatus,
   CatalogColor,
   CatalogFinishOption,
   CatalogImage,
@@ -115,6 +117,8 @@ export type {
   CatalogService,
   CatalogViewer,
   CollectionsService,
+  ProductApprovalAction,
+  ProductApprovalStatus,
   ProductWriteInput,
   PublicCollectionOwner,
   UserCollectionItem,

@@ -2,6 +2,42 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("schema repair migrations", () => {
+  it("preserves the journaled 0031 → 0032 → 0033 snapshot lineage", () => {
+    const journal = JSON.parse(
+      readFileSync(
+        new URL("../drizzle/meta/_journal.json", import.meta.url),
+        "utf8",
+      ),
+    );
+    const previous = JSON.parse(
+      readFileSync(
+        new URL("../drizzle/meta/0031_snapshot.json", import.meta.url),
+        "utf8",
+      ),
+    );
+    const restored = JSON.parse(
+      readFileSync(
+        new URL("../drizzle/meta/0032_snapshot.json", import.meta.url),
+        "utf8",
+      ),
+    );
+    const next = JSON.parse(
+      readFileSync(
+        new URL("../drizzle/meta/0033_snapshot.json", import.meta.url),
+        "utf8",
+      ),
+    );
+
+    expect(journal.entries[32]).toMatchObject({
+      idx: 32,
+      tag: "0032_loose_captain_britain",
+      version: restored.version,
+    });
+    expect(restored.id).toBe("4d4280ac-0680-495a-9110-768ac4f0b108");
+    expect(restored.prevId).toBe(previous.id);
+    expect(next.prevId).toBe(restored.id);
+  });
+
   it("renames the legacy user table only when users is absent", () => {
     const migration = readFileSync(
       new URL("../drizzle/0024_repair_users_table_name.sql", import.meta.url),

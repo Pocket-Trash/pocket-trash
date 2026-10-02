@@ -1,5 +1,6 @@
 import type { StorybookConfig } from "@storybook/tanstack-react";
 
+/** Story discovery, framework, builder, and addon configuration. */
 const config: StorybookConfig = {
   addons: ["@storybook/addon-a11y", "@storybook/addon-vitest"],
   core: {

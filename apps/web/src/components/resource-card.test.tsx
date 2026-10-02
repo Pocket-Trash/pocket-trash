@@ -4,13 +4,33 @@ import { describe, expect, it, vi } from "vitest";
 import { ResourceCard, type ResourceCardItem } from "./resource-card";
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns the fixed English locale used by resource-card assertions.
+   *
+   * @returns The mocked locale context.
+   */
   useLocale: () => ({ locale: "en-US" }),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children }: { children: ReactNode }) => <a href="/">{children}</a>,
+  /**
+   * Renders router links as plain anchors for static markup assertions.
+   *
+   * @param input - Mock link properties.
+   * @param input.children - Nested content.
+   * @returns The anchor test double.
+   */
+  Link: ({
+    children,
+  }: {
+    /** Nested link content. */
+    children: ReactNode;
+  }) => <a href="/">{children}</a>,
 }));
 
+/**
+ * Single-file public resource fixture used by card tests.
+ */
 const resource = {
   canEdit: false,
   categories: [],

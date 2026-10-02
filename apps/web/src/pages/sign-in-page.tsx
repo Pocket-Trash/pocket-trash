@@ -2,6 +2,11 @@ import { ClerkLoaded, ClerkLoading, SignIn } from "@clerk/tanstack-react-start";
 import { AuthPageSkeleton } from "@/components/skeletons/auth-page-skeleton";
 import { clientEnv } from "@/env/client";
 
+/**
+ * Renders Clerk's sign-in flow with its loading placeholder.
+ *
+ * @returns The sign-in page.
+ */
 export function SignInPage() {
   return (
     <main className="flex flex-1 items-center justify-center bg-background px-4 py-10 text-foreground">

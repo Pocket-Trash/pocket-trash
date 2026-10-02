@@ -22,8 +22,27 @@ import {
 } from "@/lib/pen-formatters";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Formats one settings translation key.
+ *
+ * @param key - Translation key to format.
+ * @returns The localized message.
+ */
+type SettingsTranslationFormatter = (key: TranslationKey) => string;
+
+/**
+ * Renders the user's measurement and currency display preferences.
+ *
+ * @returns The user settings page.
+ */
 export function UserSettingsPage() {
   const { locale } = useLocale();
+  /**
+   * Formats localized settings copy.
+   *
+   * @param key - Translation key.
+   * @returns The localized message.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const { currency, saving, setCurrency, setUnits, setWeight, units, weight } =
     usePenSettings();
@@ -117,7 +136,14 @@ export function UserSettingsPage() {
   );
 }
 
-function currencyLabel(code: CurrencyCode, t: (key: TranslationKey) => string) {
+/**
+ * Resolves a supported currency code to its localized display label.
+ *
+ * @param code - Supported display currency.
+ * @param t - Translation formatter.
+ * @returns The localized currency label.
+ */
+function currencyLabel(code: CurrencyCode, t: SettingsTranslationFormatter) {
   switch (code) {
     case "CAD":
       return t("web.currency.cad");

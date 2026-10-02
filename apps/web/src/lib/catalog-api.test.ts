@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { collectionWriteSchema, productFormSchema } from "./catalog-api";
+import {
+  collectionItemApprovalSchema,
+  collectionWriteSchema,
+  productApprovalSchema,
+  productFormSchema,
+} from "./catalog-api";
 
+/**
+ * Baseline product-form fields combined with finish options by schema tests.
+ */
 const base = {
   bearing: "",
   buttonDiameterMm: null,
@@ -21,6 +29,9 @@ const base = {
   widthMm: null,
 };
 
+/**
+ * Valid finish-option fixtures reused by schema tests.
+ */
 const validFinishOptions = [
   {
     colorEffectId: null,
@@ -29,6 +40,39 @@ const validFinishOptions = [
     finishIds: [1000],
   },
 ];
+
+describe("collection-item approval decisions", () => {
+  it("requires an item, a supported action, and a bounded nonblank reason", () => {
+    const decision = {
+      action: "approve",
+      collectionItemId: 1000,
+      reason: " Ready ",
+    };
+    expect(collectionItemApprovalSchema.parse(decision)).toEqual({
+      ...decision,
+      reason: "Ready",
+    });
+    for (const invalid of [
+      { ...decision, reason: " " },
+      { ...decision, reason: "x".repeat(1001) },
+      { ...decision, action: "delete" },
+      { ...decision, collectionItemId: 0 },
+      { ...decision, collectionItemId: undefined, productId: 1000 },
+    ]) {
+      expect(collectionItemApprovalSchema.safeParse(invalid).success).toBe(
+        false,
+      );
+    }
+    expect(
+      collectionItemApprovalSchema.parse({ ...decision, action: "reject" })
+        .action,
+    ).toBe("reject");
+    expect(
+      collectionItemApprovalSchema.parse({ ...decision, action: "reverse" })
+        .action,
+    ).toBe("reverse");
+  });
+});
 
 describe("product finish options", () => {
   it("requires one option with at least one finish", () => {
@@ -206,6 +250,32 @@ describe("product source details", () => {
   });
 });
 
+describe("product approval", () => {
+  it("requires a bounded nonblank reason", () => {
+    expect(
+      productApprovalSchema.parse({
+        action: "approve",
+        productId: 1000,
+        reason: "  Ready  ",
+      }),
+    ).toEqual({ action: "approve", productId: 1000, reason: "Ready" });
+    expect(
+      productApprovalSchema.safeParse({
+        action: "reject",
+        productId: 1000,
+        reason: " ",
+      }).success,
+    ).toBe(false);
+    expect(
+      productApprovalSchema.safeParse({
+        action: "reverse",
+        productId: 1000,
+        reason: "x".repeat(1001),
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe("collection writes", () => {
   it("accepts the null description sent by the combined collection flow", () => {
     const result = collectionWriteSchema.safeParse({
@@ -215,5 +285,25 @@ describe("collection writes", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("accepts 200 description words and rejects 201", () => {
+    const input = {
+      isPrivate: true,
+      name: "New collection",
+    };
+
+    expect(
+      collectionWriteSchema.safeParse({
+        ...input,
+        description: Array.from({ length: 200 }, () => "word").join(" \n"),
+      }).success,
+    ).toBe(true);
+    expect(
+      collectionWriteSchema.safeParse({
+        ...input,
+        description: Array.from({ length: 201 }, () => "word").join("\t"),
+      }).success,
+    ).toBe(false);
   });
 });

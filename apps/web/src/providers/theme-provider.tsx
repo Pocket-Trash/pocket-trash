@@ -18,18 +18,34 @@ import {
 } from "@/lib/user-settings";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Active theme, persistence state, and theme update operation. */
 export type ThemeProviderValue = {
+  /** Whether an authenticated theme update is pending. */
   saving: boolean;
+  /**
+   * Applies and persists a theme preference.
+   *
+   * @param theme - Theme selected by the user.
+   */
   setTheme: (theme: ThemeMode) => void;
+  /** Active explicit or system-following theme. */
   theme: ThemeMode;
 };
 
+/** Theme context, or `null` outside the provider. */
 export const ThemeContext = React.createContext<ThemeProviderValue | null>(
   null,
 );
+/** Layout effect in browsers and passive effect during server rendering. */
 const useIsomorphicLayoutEffect =
   typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
 
+/**
+ * Resolves the initial theme from server settings or local storage.
+ *
+ * @param initialSettingsState - Server-loaded user settings, when available.
+ * @returns Saved theme or the system-following fallback.
+ */
 function readTheme(initialSettingsState: UserSettingsState | null): ThemeMode {
   if (initialSettingsState?.hasSavedSettings) {
     return initialSettingsState.settings.theme;
@@ -41,11 +57,20 @@ function readTheme(initialSettingsState: UserSettingsState | null): ThemeMode {
   return isThemeMode(stored) ? stored : "system";
 }
 
+/**
+ * Applies theme state and reconciles it with authenticated user settings.
+ *
+ * @param props - Application content and server-loaded settings.
+ * @returns Theme context provider around the application content.
+ * @throws When rendered outside `LocaleProvider`.
+ */
 export function ThemeProvider({
   children,
   initialSettingsState,
 }: {
+  /** Application content. */
   children: React.ReactNode;
+  /** Server-loaded settings, or `null` when unavailable. */
   initialSettingsState: UserSettingsState | null;
 }) {
   const { isLoaded, isSignedIn } = useAuth();
@@ -67,7 +92,10 @@ export function ThemeProvider({
     if (theme !== "system") return undefined;
 
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => applyTheme("system");
+    /** Reapplies system theme after the preferred color scheme changes. */
+    const onChange = () => {
+      applyTheme("system");
+    };
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);
   }, [theme]);
@@ -203,6 +231,12 @@ export function ThemeProvider({
   );
 }
 
+/**
+ * Reads the required theme provider value.
+ *
+ * @returns Active theme, update operation, and persistence state.
+ * @throws When called outside {@link ThemeProvider}.
+ */
 export function useTheme() {
   const context = React.useContext(ThemeContext);
 

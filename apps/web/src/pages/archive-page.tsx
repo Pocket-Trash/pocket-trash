@@ -34,7 +34,13 @@ import {
 import { decodePenParam, penParam } from "@/lib/pen-links";
 import { useLocale } from "@/providers/locale-provider";
 
-const sortOptions: Array<{ labelKey: TranslationKey; value: SortKey }> = [
+/** Sort choices displayed by the archive toolbar. */
+const sortOptions: Array<{
+  /** Localization key for the visible label. */
+  labelKey: TranslationKey;
+  /** Sort applied when the option is selected. */
+  value: SortKey;
+}> = [
   { labelKey: "web.archive.sort.newestDrop", value: "date_desc" },
   { labelKey: "web.archive.sort.oldestDrop", value: "date_asc" },
   { labelKey: "web.archive.sort.priceLowToHigh", value: "price_asc" },
@@ -50,6 +56,7 @@ const sortOptions: Array<{ labelKey: TranslationKey; value: SortKey }> = [
 // (which remounts this page) does not reset the active filters/search/sort.
 // The real implementation would keep the grid mounted via a shared layout
 // route; this keeps the spike small.
+/** Archive browsing state retained while product routes remount the page. */
 const browseState = {
   query: "",
   sort: "date_desc" as SortKey,
@@ -57,9 +64,21 @@ const browseState = {
   matchModes: createDefaultMatchModes(),
 };
 
+/**
+ * Renders the searchable and filterable pen archive.
+ *
+ * @returns The pen archive page.
+ */
 export function ArchivePage() {
   const navigate = useNavigate();
   const { locale } = useLocale();
+  /**
+   * Formats localized archive copy.
+   *
+   * @param key - Localization key.
+   * @param values - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   const t = (
     key: TranslationKey,
     values: Readonly<Record<string, unknown>> = {},
@@ -67,7 +86,10 @@ export function ArchivePage() {
   // `/autmog` and `/autmog/$penId` both render this page, so the open pen is read from
   // the URL rather than local state — that is what makes each pen shareable.
   const { penId } = useParams({ strict: false });
-  const { img } = useSearch({ strict: false }) as { img?: number };
+  const { img } = useSearch({ strict: false }) as {
+    /** One-based image index selected in the lightbox. */
+    img?: number;
+  };
 
   const { currency, units, weight } = usePenSettings();
   const { rates, refreshRates } = useCurrencyRates();

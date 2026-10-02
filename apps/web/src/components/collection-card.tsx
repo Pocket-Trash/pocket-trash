@@ -1,6 +1,17 @@
 import type { UserCollectionSummary } from "@package/services";
 import { Badge } from "@/components/ui/badge";
 
+/**
+ * Renders a collection summary with its optional cover, owner, item count, and privacy badge.
+ *
+ * @param props - Collection card properties.
+ * @param props.collection - Collection summary to present.
+ * @param props.coverAlt - Alternative text for the cover image.
+ * @param props.itemCountLabel - Localized item-count text.
+ * @param props.ownerName - Optional collection owner name.
+ * @param props.privateLabel - Localized label for private collections.
+ * @returns The collection card UI.
+ */
 export function CollectionCard({
   collection,
   coverAlt,
@@ -8,10 +19,25 @@ export function CollectionCard({
   ownerName,
   privateLabel,
 }: {
+  /**
+   * Collection summary to present.
+   */
   collection: UserCollectionSummary;
+  /**
+   * Alternative text for the cover image.
+   */
   coverAlt: string;
+  /**
+   * Localized item-count text.
+   */
   itemCountLabel: string;
+  /**
+   * Optional collection owner name.
+   */
   ownerName?: string;
+  /**
+   * Localized label for private collections.
+   */
   privateLabel: string;
 }) {
   return (

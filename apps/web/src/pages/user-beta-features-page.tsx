@@ -12,15 +12,28 @@ import {
 } from "@/lib/feature-flags";
 import { useLocale } from "@/providers/locale-provider";
 
+/** User-visible beta feature and its current opt-in state. */
 type BetaFlag = Awaited<ReturnType<typeof listUserBetaFeatureFlags>>[number];
 
+/**
+ * Renders controls for the current user's beta-feature opt-ins.
+ *
+ * @returns The beta-features settings page.
+ */
 export function UserBetaFeaturesPage() {
   const { locale } = useLocale();
+  /**
+   * Formats localized beta-feature copy.
+   *
+   * @param key - Translation key.
+   * @returns The localized message.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const [flags, setFlags] = useState<BetaFlag[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const failedToLoadText = t("web.status.failedToLoad");
 
+  /** Reloads the current user's beta-feature flags. */
   async function loadFlags() {
     setFlags(await listUserBetaFeatureFlags());
   }

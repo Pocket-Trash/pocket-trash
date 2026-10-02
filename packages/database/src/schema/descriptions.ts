@@ -221,6 +221,18 @@ const schemaDescriptions = {
         description: "Whether the item is currently owned by the owner.",
         example: true,
       },
+      approval_status: {
+        description: "Review state: pending, approved, or rejected.",
+        example: "pending",
+      },
+      approval_decision_reason: {
+        description: "Nonblank reason for the latest administrative decision.",
+        example: "Ready for public collections.",
+      },
+      approval_decided_at: {
+        description: "Timestamp of the latest administrative review decision.",
+        example: "2026-10-01T20:45:00.000Z",
+      },
     },
   },
   user_collection: {
@@ -316,6 +328,17 @@ const schemaDescriptions = {
       description: {
         description: "Optional product description stored as Markdown.",
         example: "A compact tri spinner.",
+      },
+      approval_status: {
+        description: "Current product review state.",
+        example: "approved",
+      },
+      approval_decision_reason: {
+        description: "Reason supplied for the latest review transition.",
+        example: "Product details verified.",
+      },
+      approval_decided_at: {
+        description: "Timestamp of the latest review transition.",
       },
       maker_product_url: {
         description: "Direct URL to the maker's product page.",

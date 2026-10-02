@@ -1,4 +1,6 @@
 import type {
+  CatalogApprovalAction,
+  CatalogApprovalStatus,
   CatalogFinishOption,
   CatalogProduct,
   PublicCollectionOwner,
@@ -7,7 +9,7 @@ import type {
 } from "@package/services";
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
   CatalogFilterBar,
@@ -21,9 +23,11 @@ import { MarkdownContent } from "@/components/markdown-content";
 import { ProductCard } from "@/components/product-card";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { finishOptionLabel } from "@/lib/catalog";
 import {
+  decideCatalogProductApproval,
+  decideCollectionItemApproval,
   setCollectionItemVisibility,
   setCollectionVisibility,
   setProductVisibility,
@@ -40,6 +44,12 @@ import {
 } from "@/lib/catalog-filters";
 import { cn } from "@/lib/utils";
 
+/**
+ * Builds localized copy for catalog filters.
+ *
+ * @param t - Catalog translation formatter.
+ * @returns Localized catalog filter copy.
+ */
 function catalogFilterCopy(
   t: ReturnType<typeof useCatalogCopy>,
 ): CatalogFilterCopy {
@@ -51,6 +61,12 @@ function catalogFilterCopy(
     close: t("web.action.close"),
     colors: t("web.catalog.field.colors"),
     description: t("web.catalog.filter.description"),
+    /**
+     * Formats a fade option name.
+     *
+     * @param colors - Colors included in the fade.
+     * @returns The localized fade name.
+     */
     fadeName: (colors) => t("web.catalog.filter.fadeName", { colors }),
     filters: t("web.archive.filters"),
     finishes: t("web.catalog.field.finishes"),
@@ -59,6 +75,12 @@ function catalogFilterCopy(
     materials: t("web.catalog.field.materials"),
     more: t("web.action.more"),
     moreFilters: t("web.action.moreFilters"),
+    /**
+     * Formats the label for additional filter options.
+     *
+     * @param label - Filter label receiving additional options.
+     * @returns The localized additional-options label.
+     */
     moreOptions: (label) => t("web.catalog.filter.moreOptions", { label }),
     productType: t("web.catalog.field.productType"),
     productTypeAll: t("web.catalog.filter.productTypeAll"),
@@ -67,6 +89,11 @@ function catalogFilterCopy(
   };
 }
 
+/**
+ * Renders the primary catalog navigation cards.
+ *
+ * @returns The home page.
+ */
 export function HomePage() {
   const t = useCatalogCopy();
   const cards = [
@@ -114,6 +141,11 @@ export function HomePage() {
   );
 }
 
+/**
+ * Renders the resources placeholder page.
+ *
+ * @returns The resources page.
+ */
 export function ResourcesPage() {
   const t = useCatalogCopy();
   return (
@@ -125,13 +157,25 @@ export function ResourcesPage() {
   );
 }
 
+/**
+ * Renders the filterable catalog product index.
+ *
+ * @param props - Product index properties.
+ * @param props.filters - Active catalog filters.
+ * @param props.onFiltersChange - Optional filter state updater.
+ * @param props.products - Catalog products to display.
+ * @returns The product index page.
+ */
 export function ProductsPage({
   filters = emptyCatalogFilters(),
   onFiltersChange,
   products,
 }: {
+  /** Active catalog filters. */
   filters?: CatalogFilters;
+  /** Optional filter state updater. */
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
+  /** Catalog products to display. */
   products: CatalogProduct[];
 }) {
   const t = useCatalogCopy();
@@ -173,13 +217,17 @@ export function ProductsPage({
  * Renders a catalog product and its matching collection items.
  *
  * @param props - Product detail data and related collection items.
+ * @param props.collectionItems - Collection items matching the product.
+ * @param props.product - Catalog product to display.
  * @returns The catalog product detail page.
  */
 export function ProductDetailPage({
   collectionItems = [],
   product,
 }: {
+  /** Collection items matching the product. */
   collectionItems?: UserCollectionItem[];
+  /** Catalog product to display. */
   product: CatalogProduct;
 }) {
   const t = useCatalogCopy();
@@ -266,6 +314,22 @@ export function ProductDetailPage({
       title={product.name}
     >
       <main className="mx-auto grid max-w-5xl gap-6 p-6">
+        {product.canAdminister ? (
+          <CatalogApprovalControls
+            initialStatus={product.approvalStatus}
+            onDecide={async ({ action, reason }) => {
+              const result = await decideCatalogProductApproval({
+                data: { action, productId: product.id, reason },
+              });
+              if (!result.ok) throw new Error(result.formError);
+              return result.approvalStatus;
+            }}
+          />
+        ) : product.approvalStatus !== "approved" ? (
+          <Badge className="w-fit" variant="secondary">
+            {approvalStatusLabel(t, product.approvalStatus)}
+          </Badge>
+        ) : null}
         {product.isPrivate ? (
           <Badge className="w-fit" variant="secondary">
             {t("web.resources.moderation.privateBadge")}
@@ -404,20 +468,32 @@ export function ProductDetailPage({
   );
 }
 
+/**
+ * Renders public collections with optional catalog filtering.
+ *
+ * @param props - Public collection directory properties.
+ * @param props.filters - Active catalog filters.
+ * @param props.onFiltersChange - Optional filter state updater.
+ * @param props.owners - Owners and public collections to display.
+ * @returns The public collection directory.
+ */
 export function PublicCollectionsPage({
   filters = emptyCatalogFilters(),
   onFiltersChange,
   owners,
 }: {
+  /** Active catalog filters. */
   filters?: CatalogFilters;
+  /** Optional filter state updater. */
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
+  /** Owners and public collections to display. */
   owners: PublicCollectionOwner[];
 }) {
   const t = useCatalogCopy();
   const publicItems = owners.flatMap(({ items }) =>
     items.filter(
-      ({ collectionIsPrivate, isPrivate }) =>
-        !(collectionIsPrivate || isPrivate),
+      ({ approvalStatus, collectionIsPrivate, isPrivate }) =>
+        approvalStatus === "approved" && !(collectionIsPrivate || isPrivate),
     ),
   );
   const matchingCollectionIds = new Set(
@@ -490,9 +566,17 @@ export function PublicCollectionsPage({
   );
 }
 
+/**
+ * Renders one owner's public collection cards.
+ *
+ * @param props - Public collection owner properties.
+ * @param props.owner - Owner and collections to display.
+ * @returns The public collection owner page.
+ */
 export function PublicCollectionPage({
   owner,
 }: {
+  /** Owner and collections to display. */
   owner: PublicCollectionOwner;
 }) {
   const t = useCatalogCopy();
@@ -531,15 +615,29 @@ export function PublicCollectionPage({
   );
 }
 
+/**
+ * Renders the signed-in user's collection directory.
+ *
+ * @param props - User collection directory properties.
+ * @param props.collections - User collections to display.
+ * @param props.filters - Active catalog filters.
+ * @param props.items - Collection items used for filtering.
+ * @param props.onFiltersChange - Optional filter state updater.
+ * @returns The user collection directory.
+ */
 export function UserCollectionsPage({
   collections,
   filters = emptyCatalogFilters(),
   items,
   onFiltersChange,
 }: {
+  /** User collections to display. */
   collections: UserCollectionSummary[];
+  /** Active catalog filters. */
   filters?: CatalogFilters;
+  /** Collection items used for filtering. */
   items: UserCollectionItem[];
+  /** Optional filter state updater. */
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
 }) {
   const t = useCatalogCopy();
@@ -609,6 +707,17 @@ export function UserCollectionsPage({
   );
 }
 
+/**
+ * Renders a collection summary, gallery, and filtered items.
+ *
+ * @param props - Collection page properties.
+ * @param props.collection - Collection to display.
+ * @param props.filters - Active catalog filters.
+ * @param props.items - Collection items to display.
+ * @param props.onFiltersChange - Optional filter state updater.
+ * @param props.ownerUsername - Public owner username shown in navigation.
+ * @returns The collection page.
+ */
 export function CollectionPage({
   collection,
   filters = emptyCatalogFilters(),
@@ -616,10 +725,15 @@ export function CollectionPage({
   onFiltersChange,
   ownerUsername,
 }: {
+  /** Collection to display. */
   collection: UserCollectionSummary;
+  /** Active catalog filters. */
   filters?: CatalogFilters;
+  /** Collection items to display. */
   items: UserCollectionItem[];
+  /** Optional filter state updater. */
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
+  /** Public owner username shown in navigation. */
   ownerUsername?: string;
 }) {
   const t = useCatalogCopy();
@@ -707,6 +821,13 @@ export function CollectionPage({
             owner: ownerUsername
               ? t("web.collections.gallery.owner", { owner: ownerUsername })
               : undefined,
+            /**
+             * Formats collection gallery pagination status.
+             *
+             * @param page - Current page number.
+             * @param pageCount - Total page count.
+             * @returns The localized pagination status.
+             */
             pageStatus: (page, pageCount) =>
               t("web.collections.gallery.pageStatus", { page, pageCount }),
             previousImage: t("web.resources.action.previousImage"),
@@ -753,6 +874,11 @@ export function CollectionPage({
                 ) : null}
                 <div className="p-5">
                   <h2 className="font-semibold">{item.displayName}</h2>
+                  {item.approvalStatus !== "approved" ? (
+                    <Badge className="mt-2" variant="secondary">
+                      {approvalStatusLabel(t, item.approvalStatus)}
+                    </Badge>
+                  ) : null}
                   <p className="mt-1 text-xs text-muted-foreground">
                     {item.productTypeName} · {item.makerName}
                   </p>
@@ -778,7 +904,19 @@ export function CollectionPage({
   );
 }
 
-export function ProductGrid({ products }: { products: CatalogProduct[] }) {
+/**
+ * Renders catalog products as a responsive card grid.
+ *
+ * @param props - Product grid properties.
+ * @param props.products - Catalog products to display.
+ * @returns The product grid or its empty state.
+ */
+export function ProductGrid({
+  products,
+}: {
+  /** Catalog products to display. */
+  products: CatalogProduct[];
+}) {
   const t = useCatalogCopy();
   if (!products.length) {
     return <EmptyState>{t("web.catalog.noProducts")}</EmptyState>;
@@ -801,6 +939,11 @@ export function ProductGrid({ products }: { products: CatalogProduct[] }) {
             <span className="sr-only">{product.name}</span>
           </Link>
           <ProductCard
+            approvalLabel={
+              product.approvalStatus === "approved"
+                ? undefined
+                : approvalStatusLabel(t, product.approvalStatus)
+            }
             finishOptionCountLabel={t("web.catalog.finishOptionCount", {
               count: product.finishOptions.length,
             })}
@@ -821,16 +964,159 @@ export function ProductGrid({ products }: { products: CatalogProduct[] }) {
 }
 
 /**
+ * Renders shared administrative product and collection-item approval controls.
+ *
+ * @param props - Current approval state and persistence callback.
+ * @returns An accessible approval decision fieldset.
+ */
+export function CatalogApprovalControls({
+  initialStatus,
+  onDecide,
+  target = "product",
+}: {
+  /** Entity type used for localized action labels and the legend. */
+  target?: "product" | "collectionItem";
+  /** Initial durable approval state. */
+  initialStatus: CatalogApprovalStatus;
+  /**
+   * Persists one approval decision.
+   *
+   * @param input - Administrative action and its nonblank reason.
+   * @returns The resulting durable approval state.
+   * @rejects When the decision cannot be persisted.
+   */
+  onDecide(input: {
+    /** Requested approval transition. */
+    action: CatalogApprovalAction;
+    /** Nonblank reason supplied by the administrator. */
+    reason: string;
+  }): Promise<CatalogApprovalStatus>;
+}) {
+  const t = useCatalogCopy();
+  const reasonId = useId();
+  const [error, setError] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [reason, setReason] = useState("");
+  const [status, setStatus] = useState(initialStatus);
+
+  /**
+   * Submits one approval action using the current reason.
+   *
+   * @param action - Requested approval transition.
+   * @returns Completion after the UI state settles.
+   */
+  const decide = async (action: CatalogApprovalAction) => {
+    const normalizedReason = reason.trim();
+    if (!normalizedReason || pending) return;
+    setError(false);
+    setPending(true);
+    try {
+      setStatus(await onDecide({ action, reason: normalizedReason }));
+      setReason("");
+    } catch {
+      setError(true);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <fieldset className="grid gap-3 rounded-xl border border-border bg-card p-4">
+      <legend className="px-1 font-semibold">
+        {target === "collectionItem"
+          ? t("web.catalog.approval.collectionItem.title")
+          : t("web.catalog.approval.title")}
+      </legend>
+      <Badge aria-live="polite" className="w-fit" variant="secondary">
+        {approvalStatusLabel(t, status)}
+      </Badge>
+      <label className="text-sm font-medium" htmlFor={reasonId}>
+        {t("web.catalog.approval.reasonLabel")}
+      </label>
+      <textarea
+        className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        disabled={pending}
+        id={reasonId}
+        maxLength={1000}
+        onChange={(event) => setReason(event.target.value)}
+        placeholder={t("web.catalog.approval.reasonPlaceholder")}
+        required
+        value={reason}
+      />
+      <div className="flex flex-wrap gap-2">
+        {status === "pending" ? (
+          <>
+            <Button
+              disabled={!reason.trim() || pending}
+              onClick={() => void decide("approve")}
+              type="button"
+            >
+              {target === "collectionItem"
+                ? t("web.catalog.approval.collectionItem.approve")
+                : t("web.catalog.approval.approve")}
+            </Button>
+            <Button
+              disabled={!reason.trim() || pending}
+              onClick={() => void decide("reject")}
+              type="button"
+              variant="destructive"
+            >
+              {target === "collectionItem"
+                ? t("web.catalog.approval.collectionItem.reject")
+                : t("web.catalog.approval.reject")}
+            </Button>
+          </>
+        ) : (
+          <Button
+            disabled={!reason.trim() || pending}
+            onClick={() => void decide("reverse")}
+            type="button"
+            variant="outline"
+          >
+            {t("web.catalog.approval.reverse")}
+          </Button>
+        )}
+      </div>
+      {error ? (
+        <p className="text-sm text-destructive" role="alert">
+          {t("web.catalog.error.form")}
+        </p>
+      ) : null}
+    </fieldset>
+  );
+}
+
+/**
+ * Localizes a product or collection-item approval state.
+ *
+ * @param t - Catalog translation function.
+ * @param status - Approval state to label.
+ * @returns The localized state label.
+ */
+function approvalStatusLabel(
+  t: ReturnType<typeof useCatalogCopy>,
+  status: CatalogApprovalStatus,
+) {
+  if (status === "approved") return t("web.catalog.approval.status.approved");
+  if (status === "rejected") return t("web.catalog.approval.status.rejected");
+  return t("web.catalog.approval.status.pending");
+}
+
+/**
  * Renders one collection item with its effective product details.
  *
  * @param props - Collection item data and its installed button, when present.
+ * @param props.installedButton - Installed spinner button, when present.
+ * @param props.item - Collection item to display.
  * @returns The collection item detail page.
  */
 export function CollectionItemDetailPage({
   installedButton = null,
   item,
 }: {
+  /** Installed spinner button, when present. */
   installedButton?: UserCollectionItem | null;
+  /** Collection item to display. */
   item: UserCollectionItem;
 }) {
   const t = useCatalogCopy();
@@ -886,6 +1172,27 @@ export function CollectionItemDetailPage({
       title={item.displayName}
     >
       <main className="mx-auto grid w-full max-w-5xl gap-6 p-6">
+        {item.canAdminister ? (
+          <CatalogApprovalControls
+            initialStatus={item.approvalStatus}
+            target="collectionItem"
+            onDecide={async ({ action, reason }) => {
+              const result = await decideCollectionItemApproval({
+                data: {
+                  action,
+                  collectionItemId: item.collectionItemId,
+                  reason,
+                },
+              });
+              if (!result.ok) throw new Error(result.formError);
+              return result.approvalStatus;
+            }}
+          />
+        ) : item.approvalStatus !== "approved" ? (
+          <Badge className="w-fit" variant="secondary">
+            {approvalStatusLabel(t, item.approvalStatus)}
+          </Badge>
+        ) : null}
         {item.isPrivate || item.collectionIsPrivate ? (
           <Badge className="w-fit" variant="secondary">
             {t("web.resources.moderation.privateBadge")}
@@ -979,6 +1286,19 @@ export function CollectionItemDetailPage({
   );
 }
 
+/**
+ * Renders owner or administrator visibility controls.
+ *
+ * @param props - Visibility control properties.
+ * @param props.canAdminister - Whether the viewer can moderate visibility.
+ * @param props.disabled - Whether visibility changes are disabled.
+ * @param props.initialPrivate - Initial private state.
+ * @param props.isAdminPrivate - Whether moderation forced privacy.
+ * @param props.isOwner - Whether the viewer owns the resource.
+ * @param props.onChange - Persists a visibility change.
+ * @param props.t - Catalog translation formatter.
+ * @returns The visibility control.
+ */
 function VisibilityButton({
   canAdminister,
   disabled = false,
@@ -988,12 +1308,25 @@ function VisibilityButton({
   onChange,
   t,
 }: {
+  /** Whether the viewer can moderate visibility. */
   canAdminister: boolean;
+  /** Whether visibility changes are disabled. */
   disabled?: boolean;
+  /** Initial private state. */
   initialPrivate: boolean;
+  /** Whether moderation forced privacy. */
   isAdminPrivate: boolean;
+  /** Whether the viewer owns the resource. */
   isOwner: boolean;
+  /**
+   * Persists a visibility change.
+   *
+   * @param isPrivate - Next private state.
+   * @param reason - Optional moderation reason.
+   * @returns A promise that resolves after persistence.
+   */
   onChange(isPrivate: boolean, reason?: string): Promise<unknown>;
+  /** Catalog translation formatter. */
   t: ReturnType<typeof useCatalogCopy>;
 }) {
   const [isPrivate, setIsPrivate] = useState(initialPrivate);
@@ -1044,11 +1377,21 @@ function VisibilityButton({
   );
 }
 
+/**
+ * Renders one labeled detail-list value.
+ *
+ * @param props - Detail properties.
+ * @param props.children - Detail value.
+ * @param props.label - Detail label.
+ * @returns The detail-list entry.
+ */
 function Detail({
   children,
   label,
 }: {
+  /** Detail value. */
   children: React.ReactNode;
+  /** Detail label. */
   label: string;
 }) {
   return (
@@ -1061,7 +1404,19 @@ function Detail({
   );
 }
 
-function EmptyState({ children }: { children: React.ReactNode }) {
+/**
+ * Renders an empty catalog result state.
+ *
+ * @param props - Empty-state properties.
+ * @param props.children - Empty-state copy.
+ * @returns The empty-state panel.
+ */
+function EmptyState({
+  children,
+}: {
+  /** Empty-state copy. */
+  children: React.ReactNode;
+}) {
   return (
     <div
       className={cn(
@@ -1073,6 +1428,13 @@ function EmptyState({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Formats a finish option with localized built-in color effects.
+ *
+ * @param option - Finish option to format.
+ * @param t - Catalog translation formatter.
+ * @returns The localized finish label.
+ */
 function localizedFinishLabel(
   option: CatalogFinishOption,
   t: ReturnType<typeof useCatalogCopy>,

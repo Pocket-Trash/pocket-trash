@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+/** Permission-check spy controlling the actor authorized for an export. */
 const requirePermission = vi.hoisted(() => vi.fn());
+/** Export-creation spy used to verify requested audit ranges. */
 const createExport = vi.hoisted(() => vi.fn());
+/** Export-deletion spy used to verify confirmed administrator requests. */
 const deleteExport = vi.hoisted(() => vi.fn());
+/** Download spy supplying audit-export streams to the route. */
 const downloadExport = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/authorization", () => ({

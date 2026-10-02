@@ -9,7 +9,13 @@ import {
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { CatalogFilterBar, type CatalogFilterCopy } from "./catalog-filter-bar";
 
+/**
+ * Blue catalog color fixture used by solid and fade stories.
+ */
 const blue = { count: 8, hex: "#2563eb", id: 1, name: "Blue", slug: "blue" };
+/**
+ * Purple catalog color fixture used by solid and fade stories.
+ */
 const purple = {
   count: 5,
   hex: "#9333ea",
@@ -17,6 +23,9 @@ const purple = {
   name: "Purple",
   slug: "purple",
 };
+/**
+ * Catalog color fixtures ordered by descending product count.
+ */
 const colors = [
   blue,
   purple,
@@ -25,6 +34,9 @@ const colors = [
   { count: 2, hex: "#111827", id: 5, name: "Black", slug: "black" },
   { count: 1, hex: "#e5e7eb", id: 6, name: "Silver", slug: "silver" },
 ];
+/**
+ * Catalog facet fixtures covering quick and overflow controls.
+ */
 const facets = {
   colors,
   fades: [{ colors: [blue, purple], count: 6, key: "1.2" }],
@@ -50,6 +62,9 @@ const facets = {
     { count: 8, name: "Spinner button", slug: "spinner-button" },
   ],
 } satisfies CatalogFacets;
+/**
+ * English filter labels used by the stories.
+ */
 const copy = {
   all: "All",
   any: "Any",
@@ -58,6 +73,12 @@ const copy = {
   close: "Remove",
   colors: "Colour",
   description: "Filter the catalog",
+  /**
+   * Builds a story label for a color fade.
+   *
+   * @param value - Arrow-separated color names.
+   * @returns The fade label.
+   */
   fadeName: (value) => `${value} fade`,
   filters: "Filters",
   finishes: "Finish",
@@ -66,6 +87,12 @@ const copy = {
   materials: "Material",
   more: "More",
   moreFilters: "More filters",
+  /**
+   * Builds an accessible overflow-options label.
+   *
+   * @param label - Facet label.
+   * @returns The overflow-options label.
+   */
   moreOptions: (label) => `More ${label}`,
   productType: "Product type",
   productTypeAll: "All product types",
@@ -73,11 +100,19 @@ const copy = {
   selectProductType: "Select product type",
 } satisfies CatalogFilterCopy;
 
+/**
+ * Configures Storybook coverage for the catalog filter bar examples.
+ */
 const meta = {
   args: {
     copy,
     facets,
     filters: emptyCatalogFilters(),
+    /**
+     * Supplies a no-op controlled-change handler for default story arguments.
+     *
+     * @returns No value.
+     */
     onChange: () => undefined,
   },
   component: CatalogFilterBar,
@@ -95,13 +130,34 @@ const meta = {
 } satisfies Meta<typeof CatalogFilterBar>;
 
 export default meta;
+/**
+ * Storybook story contract for the catalog filter bar examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Defines the default catalog filter bar story.
+ */
 export const Default: Story = {
+  /**
+   * Renders the catalog filter bar story example.
+   *
+   * @param args - Current Storybook story arguments.
+   * @returns The rendered story example.
+   */
   render: (args) => <FilterExample {...args} />,
 };
 
+/**
+ * Defines the active filters catalog filter bar story.
+ */
 export const ActiveFilters: Story = {
+  /**
+   * Renders the catalog filter bar story example.
+   *
+   * @param args - Current Storybook story arguments.
+   * @returns The rendered story example.
+   */
   render: (args) => (
     <FilterExample
       {...args}
@@ -115,8 +171,25 @@ export const ActiveFilters: Story = {
   ),
 };
 
+/**
+ * Defines the filter interaction catalog filter bar story.
+ */
 export const FilterInteraction: Story = {
+  /**
+   * Renders the catalog filter bar story example.
+   *
+   * @param args - Current Storybook story arguments.
+   * @returns The rendered story example.
+   */
   render: (args) => <FilterExample {...args} />,
+  /**
+   * Exercises the catalog filter bar story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.canvasElement - Rendered Storybook canvas element.
+   * @param context.userEvent - Storybook interaction driver.
+   */
   play: async ({ canvas, canvasElement, userEvent }) => {
     await userEvent.click(canvas.getByLabelText("Titanium"));
     await userEvent.click(canvas.getByRole("button", { name: "Blue" }));
@@ -132,10 +205,20 @@ export const FilterInteraction: Story = {
   },
 };
 
+/**
+ * Renders a stateful catalog filter bar for story interactions.
+ *
+ * @param props - Filter example properties.
+ * @param props.initialFilters - Initial uncontrolled filter state; defaults to empty filters.
+ * @returns The stateful filter example.
+ */
 function FilterExample({
   initialFilters,
   ...args
 }: React.ComponentProps<typeof CatalogFilterBar> & {
+  /**
+   * Initial uncontrolled filter state; omission starts with empty filters.
+   */
   initialFilters?: CatalogFilters;
 }) {
   const [filters, setFilters] = useState(

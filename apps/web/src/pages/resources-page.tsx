@@ -11,23 +11,46 @@ import { Button } from "@/components/ui/button";
 import type { listResourceDirectory } from "@/lib/resources";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Resource directory data returned by the resource service. */
 type ResourceDirectory = Awaited<ReturnType<typeof listResourceDirectory>>;
 
+/**
+ * Renders the public resource directory and category filters.
+ *
+ * @param props - Resource directory properties.
+ * @param props.directory - Resources, categories, and invalid filters.
+ * @param props.selectedCategorySlugs - Active category filter slugs.
+ * @returns The resource directory page.
+ */
 export function ResourcesPage({
   directory,
   selectedCategorySlugs,
 }: {
+  /** Resources, categories, and invalid filters. */
   directory: ResourceDirectory;
+  /** Active category filter slugs. */
   selectedCategorySlugs: string[];
 }) {
   const { isSignedIn } = useAuth();
   const { locale } = useLocale();
   const navigate = useNavigate();
+  /**
+   * Formats localized resource directory copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
   ) => formatTranslation(key, params, locale);
 
+  /**
+   * Writes selected resource categories to route search state.
+   *
+   * @param categorySlugs - Selected category slugs.
+   */
   function setCategoryFilters(categorySlugs: string[]) {
     void navigate({
       search: categorySlugs.length > 0 ? { category: categorySlugs } : {},
@@ -89,9 +112,17 @@ export function ResourcesPage({
   );
 }
 
+/**
+ * Renders a loading or failure status for the resource directory.
+ *
+ * @param props - Directory status properties.
+ * @param props.messageKey - Localization key for the status message.
+ * @returns The resource directory status page.
+ */
 export function ResourceDirectoryStatusPage({
   messageKey,
 }: {
+  /** Localization key for the status message. */
   messageKey:
     | "web.resources.directory.loading"
     | "web.resources.error.loadDirectory";
@@ -110,15 +141,39 @@ export function ResourceDirectoryStatusPage({
   );
 }
 
+/**
+ * Renders resource category filter controls.
+ *
+ * @param props - Resource filter properties.
+ * @param props.categories - Categories available for filtering.
+ * @param props.onChange - Receives selected category slugs.
+ * @param props.selectedCategorySlugs - Currently selected category slugs.
+ * @param props.t - Resource translation formatter.
+ * @returns The resource category filters.
+ */
 function ResourceFilters({
   categories,
   onChange,
   selectedCategorySlugs,
   t,
 }: {
+  /** Categories available for filtering. */
   categories: ResourceDirectory["categories"];
+  /**
+   * Receives selected category slugs.
+   *
+   * @param categorySlugs - Selected category slugs.
+   */
   onChange: (categorySlugs: string[]) => void;
+  /** Currently selected category slugs. */
   selectedCategorySlugs: string[];
+  /**
+   * Formats localized resource copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   t: (key: TranslationKey, params?: Record<string, number | string>) => string;
 }) {
   return (

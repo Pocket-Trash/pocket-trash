@@ -2,12 +2,26 @@ import { Separator as SeparatorPrimitive } from "@base-ui/react/separator";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Renders a horizontal or vertical visual separator.
+ *
+ * @param props - Separator properties.
+ * @param props.className - Additional CSS classes.
+ * @param props.decorative - Whether assistive technologies should ignore the separator.
+ * @param props.orientation - Horizontal or vertical separator axis.
+ * @returns The rendered separator UI.
+ */
 function Separator({
   className,
   decorative = true,
   orientation = "horizontal",
   ...props
 }: React.ComponentProps<typeof SeparatorPrimitive> & {
+  /**
+   * Whether assistive technologies should ignore the separator.
+   *
+   * @default true
+   */
   decorative?: boolean;
 }) {
   if (decorative) {

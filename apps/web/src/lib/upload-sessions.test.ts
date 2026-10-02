@@ -71,7 +71,14 @@ describe("resource upload sessions", () => {
 
   it("normalizes an STL with no browser MIME type to octet-stream", async () => {
     const stl = file("GUIDE TRIM TOOL_No-Text.stl", 3, "");
-    const requests: Array<{ init?: RequestInit; url: string }> = [];
+    const requests: Array<{
+      /**
+       * Request options captured by the test double.
+       */
+      init?: RequestInit;
+      /** Request URL captured by the test double. */
+      url: string;
+    }> = [];
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const url = typeof input === "string" ? input : input.toString();
       requests.push({ init, url });
@@ -102,6 +109,11 @@ describe("resource upload sessions", () => {
       description: "Description",
       fetch: fetchMock,
       files: [stl],
+      /**
+       * Supplies authentication for the upload request.
+       *
+       * @returns A test authentication token.
+       */
       getToken: async () => "token",
       isPrivate: true,
       name: "Tool",
@@ -148,7 +160,14 @@ describe("resource upload sessions", () => {
   it("uses one raw PUT per file before idempotent completion", async () => {
     const files = [file("one.stl", 3), file("two.stl", 3)];
     const preview = file("preview.webp", 3, "image/webp");
-    const requests: Array<{ init?: RequestInit; url: string }> = [];
+    const requests: Array<{
+      /**
+       * Request options captured by the test double.
+       */
+      init?: RequestInit;
+      /** Request URL captured by the test double. */
+      url: string;
+    }> = [];
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const url = typeof input === "string" ? input : input.toString();
       requests.push({ init, url });
@@ -185,6 +204,11 @@ describe("resource upload sessions", () => {
         description: "Description",
         fetch: fetchMock,
         files,
+        /**
+         * Supplies authentication for the upload request.
+         *
+         * @returns A test authentication token.
+         */
         getToken: async () => "token",
         images: [preview],
         name: "Tool",
@@ -229,10 +253,28 @@ describe("resource upload sessions", () => {
     await uploadResourceSession({
       fetch: fetchMock,
       files: [stl],
+      /**
+       * Supplies authentication for the upload request.
+       *
+       * @returns A test authentication token.
+       */
       getToken: async () => "token",
+      /**
+       * Records progress percentages reported by the transport.
+       *
+       * @param _fileName - File whose progress changed.
+       * @param percent - Upload completion percentage.
+       * @returns The number of recorded progress updates.
+       */
       onProgress: (_fileName, percent) => progress.push(percent),
       operation: "version",
       resourceId: 1000,
+      /**
+       * Simulates a successful transfer with two measured progress updates.
+       *
+       * @param request - Upload request whose listener receives progress.
+       * @returns A successful empty upload response.
+       */
       uploadFile: async ({ onProgress }) => {
         onProgress(25);
         onProgress(75);
@@ -276,6 +318,11 @@ describe("resource upload sessions", () => {
       uploadResourceSession({
         fetch: fetchMock,
         files: [stl],
+        /**
+         * Supplies authentication for the upload request.
+         *
+         * @returns A test authentication token.
+         */
         getToken: async () => "token",
         operation: "version",
         resourceId: 1001,
@@ -301,15 +348,35 @@ describe("resource upload sessions", () => {
   });
 });
 
+/**
+ * Builds a lightweight browser-file test fixture.
+ *
+ * @param name - Fixture filename.
+ * @param size - Fixture size in bytes.
+ * @param type - Fixture MIME type.
+ * @returns A browser-file test fixture.
+ */
 function file(name: string, size: number, type = "application/octet-stream") {
   return {
     name,
     size,
     type,
+    /**
+     * Reads zero-filled bytes matching the fixture's declared size.
+     *
+     * @returns A buffer containing the fixture bytes.
+     */
     arrayBuffer: async () => new Uint8Array(size).buffer,
   } as File;
 }
 
+/**
+ * Builds a JSON response test fixture.
+ *
+ * @param body - JSON response body.
+ * @param status - HTTP response status.
+ * @returns A JSON response fixture.
+ */
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { "content-type": "application/json" },
@@ -349,6 +416,13 @@ describe("image uploads", () => {
   });
 
   it("enforces the per-operation image limits", () => {
+    /**
+     * Builds a lightweight WebP file fixture.
+     *
+     * @param size - Fixture size in bytes.
+     * @param name - Fixture filename.
+     * @returns A WebP browser-file fixture.
+     */
     const image = (size: number, name = "image.webp") =>
       ({ name, size, type: "image/webp" }) as File;
 

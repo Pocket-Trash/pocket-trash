@@ -2,6 +2,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { CatalogCombobox, CatalogMultiCombobox } from "./combobox";
 
+/**
+ * Shared catalog option used by combobox tests.
+ */
 const bronze = { id: 1, name: "Bronze" };
 
 describe("catalog combobox selections", () => {

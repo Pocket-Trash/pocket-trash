@@ -9,7 +9,7 @@ export const Route = createFileRoute("/admin/users")({
    * Requires user-management permission.
    *
    * @returns Completion when the requester is authorized.
-   * @rejects When the requester lacks user-management permission.
+   * @rejects When authorization cannot be checked or the requester lacks user-management permission.
    */
   beforeLoad: async () => {
     if (!(await canManageUsers())) throw notFound();

@@ -16,8 +16,18 @@ import {
 } from "@/lib/account-erasure";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Renders account-erasure lookup, request, and retry controls.
+ *
+ * @returns The account-erasure administration page.
+ */
 export function AdminAccountErasurePage() {
   const { locale } = useLocale();
+  /** Formats account-erasure copy for the active locale.
+   *
+   * @param key - Translation key to format.
+   * @param params - Values interpolated into the translation.
+   * @returns Localized account-erasure copy.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -197,6 +207,18 @@ export function AdminAccountErasurePage() {
   );
 }
 
+/** Renders the verified erasure-request form for a selected account.
+ *
+ * @param props - Target form properties.
+ * @param props.email - Verified target email address.
+ * @param props.onCreated - Receives the newly created erasure request.
+ * @param props.onFailed - Reports request creation failure.
+ * @param props.saving - Whether an erasure request is being created.
+ * @param props.setSaving - Updates the shared saving state.
+ * @param props.t - Localizes form copy.
+ * @param props.target - Clerk account selected for erasure.
+ * @returns The administrator erasure-request form.
+ */
 function AdminTargetForm({
   email,
   onCreated,
@@ -206,12 +228,30 @@ function AdminTargetForm({
   t,
   target,
 }: {
+  /** Verified target email address. */
   email: string;
+  /** Reports a newly created erasure request.
+   *
+   * @param request - Created request status.
+   */
   onCreated: (request: AdminErasureStatusView) => void;
+  /** Reports that erasure request creation failed. */
   onFailed: () => void;
+  /** Whether an erasure request is being created. */
   saving: boolean;
+  /** Updates the shared saving state.
+   *
+   * @param saving - Next saving state.
+   */
   setSaving: (saving: boolean) => void;
+  /** Formats account-erasure copy.
+   *
+   * @param key - Translation key to format.
+   * @param params - Values interpolated into the translation.
+   * @returns Localized account-erasure copy.
+   */
   t: (key: TranslationKey, params?: Record<string, number | string>) => string;
+  /** Clerk account selected for erasure. */
   target: ErasureTarget;
 }) {
   const [method, setMethod] = useState<

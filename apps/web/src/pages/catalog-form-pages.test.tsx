@@ -17,17 +17,37 @@ import {
 } from "./catalog-form-pages";
 
 vi.mock("@tanstack/react-router", () => ({
+  /**
+   * Returns a navigation spy.
+   *
+   * @returns The navigation spy.
+   */
   useNavigate: () => vi.fn(),
 }));
 
 vi.mock("@clerk/tanstack-react-start", () => ({
+  /**
+   * Returns test authentication helpers.
+   *
+   * @returns Authentication state with a token spy.
+   */
   useAuth: () => ({ getToken: vi.fn() }),
 }));
 
 vi.mock("@/components/app-shell", () => ({
-  AppShell: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  /**
+   * Renders a minimal application shell for tests.
+   *
+   * @param props - Shell properties.
+   * @param props.children - Nested page content.
+   * @returns The test shell.
+   */
+  AppShell: ({
+    children,
+  }: {
+    /** Nested page content. */
+    children: React.ReactNode;
+  }) => <div>{children}</div>,
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
@@ -45,14 +65,23 @@ vi.mock("@/providers/locale-provider", () => ({
   useOptionalLocale: () => "en-US",
 }));
 
+/**
+ * Formats stable test copy.
+ *
+ * @param key - Localization key.
+ * @param values - Values interpolated into the copy.
+ * @returns The localized test copy.
+ */
 const t = (key: string, values: Readonly<Record<string, unknown>> = {}) =>
   key === "web.catalog.finishPreview" ? String(values.finish) : key;
+/** Empty custom-finish selection used by form tests. */
 const emptyCustomFinish = {
   colorEffectId: null,
   colorEffectSlug: null,
   colorIds: [],
   finishIds: [],
 };
+/** Empty catalog option lists used by form tests. */
 const emptyCatalogOptions = {
   colorEffects: [],
   colors: [],
@@ -141,6 +170,7 @@ describe("finish option editor", () => {
 
   it("renders the owned material and product finish choices", () => {
     const product: CatalogProduct = {
+      approvalStatus: "approved",
       bearing: null,
       buttonDiameterMm: null,
       canAdminister: false,
@@ -356,6 +386,23 @@ describe("collection edit conditional fields", () => {
 });
 
 describe("collection add form", () => {
+  it.each([
+    undefined,
+    9999,
+  ])("retains product selection without a valid preselected product (%s)", (initialProductId) => {
+    const html = renderToStaticMarkup(
+      createElement(CollectionAddPage, {
+        collections: [],
+        defaultCollectionName: null,
+        initialProductId,
+        options: emptyCatalogOptions,
+        products: [],
+      }),
+    );
+    expect(html).toContain('aria-label="Product type"');
+    expect(html).toMatch(/<details[^>]* open=""/u);
+  });
+
   it("renders localized collection copy and a disabled primary action", () => {
     const product = productFixture(1003, "Zoom Zoom", "spinner");
     const html = renderToStaticMarkup(
@@ -386,6 +433,11 @@ describe("collection add form", () => {
     );
 
     expect(html).not.toContain("Something went wrong");
+    expect(html).toContain('aria-label="Product type"');
+    expect(html).toContain(">Zoom Zoom</span>");
+    expect(html).toMatch(/<details[^>]*>/u);
+    expect(html).not.toMatch(/<details[^>]* open=/u);
+    expect(html).toMatch(/<summary[^>]*>Products<\/summary>/u);
     expect(html).toContain(">Collection<");
     expect(html).toContain(">Add new collection<");
     expect(html).toContain(">Add to collection<");
@@ -424,12 +476,21 @@ describe("collection add form", () => {
   });
 });
 
+/**
+ * Creates a catalog product fixture.
+ *
+ * @param id - Product identifier.
+ * @param name - Product name.
+ * @param productTypeSlug - Product type slug.
+ * @returns The catalog product fixture.
+ */
 function productFixture(
   id: number,
   name: string,
   productTypeSlug: "spinner" | "spinner-button",
 ): CatalogProduct {
   return {
+    approvalStatus: "approved",
     bearing: null,
     buttonDiameterMm: null,
     canAdminister: false,
@@ -474,12 +535,21 @@ function productFixture(
   };
 }
 
+/**
+ * Creates a collection item fixture for a catalog product.
+ *
+ * @param collectionItemId - Collection item identifier.
+ * @param product - Source catalog product.
+ * @param sourceProductFinishOptionId - Source finish option identifier.
+ * @returns The collection item fixture.
+ */
 function collectionFixture(
   collectionItemId: number,
   product: CatalogProduct,
   sourceProductFinishOptionId: number,
 ): UserCollectionItem {
   return {
+    approvalStatus: "approved",
     bearing: null,
     bearingOverride: null,
     canAdminister: false,

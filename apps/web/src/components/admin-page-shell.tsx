@@ -35,11 +35,25 @@ type AdminPath =
   | "/admin/users"
   | "/notifications";
 
+/** Content and active navigation state for an administrator page. */
 type AdminPageShellProps = Pick<AppShellProps, "breadcrumbItems" | "title"> & {
+  /** Page content rendered beside the administrator navigation. */
   children: ReactNode;
+  /** Navigation group to highlight, when the page belongs to one. */
   section?: AdminSection;
 };
 
+/**
+ * Renders a standard application shell with permission-filtered admin navigation.
+ *
+ * @param props - Admin page shell properties.
+ * @param props.breadcrumbItems - Breadcrumbs displayed above the page title.
+ * @param props.children - Page content rendered beside the admin navigation.
+ * @param props.section - Navigation group to highlight.
+ * @param props.title - Current page title.
+ * @returns The administrator page layout.
+ * @throws {Error} If the required locale provider is missing.
+ */
 export function AdminPageShell({
   breadcrumbItems,
   children,
@@ -56,7 +70,20 @@ export function AdminPageShell({
   );
 }
 
-function AdminSidebar({ section }: { section?: AdminSection }) {
+/**
+ * Renders the navigation entries allowed by the current actor's permissions.
+ *
+ * @param props - Admin sidebar properties.
+ * @param props.section - Navigation group to highlight.
+ * @returns The permission-filtered administrator navigation.
+ * @throws {Error} If the required locale provider is missing.
+ */
+function AdminSidebar({
+  section,
+}: {
+  /** Navigation group to highlight. */
+  section?: AdminSection;
+}) {
   const { sessionClaims, userId } = useAuth();
   const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
   const canManageFeedback = hasPermission(actor, "feedback.manage");
@@ -68,6 +95,12 @@ function AdminSidebar({ section }: { section?: AdminSection }) {
   const canReadAudit = hasPermission(actor, "audit.read");
   const canManageUsers = hasPermission(actor, "users.manage");
   const { locale } = useLocale();
+  /**
+   * Formats a sidebar translation for the active locale.
+   *
+   * @param key - Administrator-navigation localization key.
+   * @returns The localized sidebar text.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const primaryLinks = [
     ...(canManageUsers
@@ -216,6 +249,17 @@ function AdminSidebar({ section }: { section?: AdminSection }) {
   );
 }
 
+/**
+ * Renders a top-level administrator link and its active child links.
+ *
+ * @param props - Admin sidebar group properties.
+ * @param props.active - Whether this navigation group is active.
+ * @param props.icon - Icon rendered with the top-level link.
+ * @param props.label - Localized top-level link label.
+ * @param props.links - Child links shown only while the group is active.
+ * @param props.to - Top-level destination.
+ * @returns The administrator navigation group.
+ */
 function AdminSidebarGroup({
   active,
   icon: Icon,
@@ -223,10 +267,20 @@ function AdminSidebarGroup({
   links,
   to,
 }: {
+  /** Whether this navigation group is active. */
   active: boolean;
+  /** Icon rendered with the top-level link. */
   icon: typeof Bell;
+  /** Localized top-level link label. */
   label: string;
-  links?: Array<{ label: string; to: AdminPath }>;
+  /** Child links shown only while this group is active. */
+  links?: Array<{
+    /** Localized child link label. */
+    label: string;
+    /** Child destination. */
+    to: AdminPath;
+  }>;
+  /** Top-level destination. */
   to: AdminPath;
 }) {
   return (

@@ -15,7 +15,10 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
+/** An audit event displayed in the results table. */
 type AuditEvent = AuditEventPage["items"][number];
+
+/** A recorded audit state keyed by field name. */
 type AuditState = NonNullable<AuditEvent["beforeState"]>;
 
 /**
@@ -43,6 +46,13 @@ export function AdminAuditPage({
   search: AuditSearch;
 }) {
   const { locale } = useLocale();
+  /**
+   * Formats localized admin audit copy.
+   *
+   * @param key - Localization key.
+   * @param values - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   const t = (key: TranslationKey, values: Record<string, unknown> = {}) =>
     formatTranslation(key, values, locale);
   const dateTime = new Intl.DateTimeFormat(locale, {
@@ -403,11 +413,21 @@ export function AdminAuditPage({
   );
 }
 
+/**
+ * Renders a labeled audit-search input.
+ *
+ * @param props - Input and label properties.
+ * @param props.label - Visible input label.
+ * @returns The labeled input.
+ */
 function AuditFilter({
   label,
   id,
   ...props
-}: React.ComponentProps<typeof Input> & { label: string }) {
+}: React.ComponentProps<typeof Input> & {
+  /** Visible input label. */
+  label: string;
+}) {
   return (
     <label className="grid gap-1.5 text-sm font-medium" htmlFor={id}>
       {label}
@@ -416,11 +436,26 @@ function AuditFilter({
   );
 }
 
+/**
+ * Renders state changes and metadata for an audit event.
+ *
+ * @param props - Audit event detail properties.
+ * @param props.event - Event whose details are displayed.
+ * @param props.t - Translation formatter.
+ * @returns Expandable audit event details.
+ */
 function AuditEventDetails({
   event,
   t,
 }: {
+  /** Event whose details are displayed. */
   event: AuditEvent;
+  /**
+   * Formats localized copy.
+   *
+   * @param key - Localization key.
+   * @returns The formatted translation.
+   */
   t: (key: TranslationKey) => string;
 }) {
   const keys = [
@@ -484,7 +519,19 @@ function AuditEventDetails({
   );
 }
 
-function AuditValue({ value }: { value: AuditState[string] | undefined }) {
+/**
+ * Renders one audit state value as formatted JSON.
+ *
+ * @param props - Audit value properties.
+ * @param props.value - State value to display.
+ * @returns A table cell containing the value.
+ */
+function AuditValue({
+  value,
+}: {
+  /** State value to display. */
+  value: AuditState[string] | undefined;
+}) {
   return (
     <td className="p-1 align-top">
       <pre className="m-0 overflow-auto whitespace-pre-wrap break-words">

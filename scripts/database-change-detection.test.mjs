@@ -115,3 +115,9 @@ test("schema-changing main deploys refresh preview after development", () => {
   assert.equal(refresh.uses, "./.github/workflows/preview-refresh.yml");
   assert.ok(Object.hasOwn(refreshWorkflow.on, "workflow_call"));
 });
+
+test("PR previews isolate only database-changing pull requests", () => {
+  const preview = deployWorkflow.jobs.preview;
+
+  assert.equal(preview.env.E2E_MUTATION, undefined);
+});

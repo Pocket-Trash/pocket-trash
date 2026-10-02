@@ -2,6 +2,13 @@ import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Provides the tabs interaction root.
+ *
+ * @param props - Tabs properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered tabs UI.
+ */
 function Tabs({
   className,
   ...props
@@ -14,6 +21,13 @@ function Tabs({
   );
 }
 
+/**
+ * Renders the accessible tab list.
+ *
+ * @param props - Tabs list properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered tabs list UI.
+ */
 function TabsList({
   className,
   ...props
@@ -29,6 +43,13 @@ function TabsList({
   );
 }
 
+/**
+ * Renders a control that selects its associated tab panel.
+ *
+ * @param props - Tabs trigger properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered tabs trigger UI.
+ */
 function TabsTrigger({
   className,
   ...props
@@ -44,6 +65,13 @@ function TabsTrigger({
   );
 }
 
+/**
+ * Renders the content panel associated with a tab.
+ *
+ * @param props - Tabs content properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered tabs content UI.
+ */
 function TabsContent({
   className,
   ...props

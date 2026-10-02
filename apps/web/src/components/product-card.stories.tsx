@@ -2,7 +2,11 @@ import type { CatalogImage, CatalogProduct } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { ProductCard } from "./product-card";
 
+/**
+ * Catalog product fixture without images.
+ */
 const product: CatalogProduct = {
+  approvalStatus: "approved",
   bearing: null,
   buttonDiameterMm: null,
   canAdminister: false,
@@ -51,6 +55,9 @@ const product: CatalogProduct = {
   widthMm: null,
 };
 
+/**
+ * Active catalog image fixture added by the image story.
+ */
 const image: CatalogImage = {
   contentType: "image/webp",
   createdAt: new Date("2026-01-01"),
@@ -65,6 +72,9 @@ const image: CatalogImage = {
   url: "https://cdn.pocket-trash.app/assets/storybook/product-images/one.webp",
 };
 
+/**
+ * Configures Storybook coverage for the product card examples.
+ */
 const meta = {
   args: {
     finishOptionCountLabel: "Finish options: 1",
@@ -86,10 +96,19 @@ const meta = {
 } satisfies Meta<typeof ProductCard>;
 
 export default meta;
+/**
+ * Storybook story contract for the product card examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Defines the without image product card story.
+ */
 export const WithoutImage: Story = {};
 
+/**
+ * Defines the with image product card story.
+ */
 export const WithImage: Story = {
   args: {
     imageCountLabel: "Images: 1",

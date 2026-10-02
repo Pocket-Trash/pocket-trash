@@ -9,6 +9,7 @@ import {
   eq,
   inArray,
   isNotNull,
+  or,
   sql,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -96,6 +97,14 @@ function mapCatalogNameConflict(error: unknown): never {
  * Product category supported by the spinner catalog.
  */
 export type CatalogProductType = "spinner" | "spinner-button";
+/** Durable review state for a catalog product or collection item. */
+export type CatalogApprovalStatus = "approved" | "pending" | "rejected";
+/** Administrative transition accepted by a catalog approval workflow. */
+export type CatalogApprovalAction = "approve" | "reject" | "reverse";
+/** Product approval state retained for existing service consumers. */
+export type ProductApprovalStatus = CatalogApprovalStatus;
+/** Product approval action retained for existing service consumers. */
+export type ProductApprovalAction = CatalogApprovalAction;
 
 /**
  * Shared identity and routing fields for catalog reference data.
@@ -253,6 +262,10 @@ export type ProductWriteFinishOption = {
  * Fully hydrated catalog product returned to callers.
  */
 export type CatalogProduct = {
+  /**
+   * Durable product review state.
+   */
+  approvalStatus: CatalogApprovalStatus;
   /**
    * Bearing model or designation, or `null` when unspecified.
    */
@@ -676,6 +689,23 @@ export type CatalogService = {
    */
   createProduct(input: ProductWriteInput): Promise<CatalogProduct>;
   /**
+   * Applies one authorized product approval transition.
+   *
+   * @param input - Product decision, actor, and nonblank reason.
+   * @returns The resulting durable approval state.
+   * @rejects When authorization, validation, lookup, persistence, or auditing fails.
+   */
+  decideProductApproval(input: {
+    /** Requested approval transition. */
+    action: CatalogApprovalAction;
+    /** Staff actor making the decision. */
+    actor: Actor;
+    /** Product receiving the decision. */
+    productId: number;
+    /** Nonblank reason for the decision. */
+    reason: string;
+  }): Promise<CatalogApprovalStatus>;
+  /**
    * Returns product.
    *
    * @param productTypeSlug - Product type slug.
@@ -934,6 +964,8 @@ export type CatalogService = {
  * Owned collection item with its product snapshot and visibility state.
  */
 export type UserCollectionItem = {
+  /** Durable administrative review state, independent of privacy. */
+  approvalStatus: CatalogApprovalStatus;
   /**
    * Effective bearing after applying the collection-item override.
    */
@@ -1177,6 +1209,23 @@ export type CollectionWriteInput = {
 /** Database operations for user collections and their catalog items. */
 export type CollectionsService = {
   /**
+   * Applies a serialized collection-item approval decision with transactional auditing.
+   *
+   * @param input - Authenticated staff action, target, and nonblank reason.
+   * @returns The resulting durable approval state.
+   * @rejects When authorization, validation, lookup, persistence, or auditing fails.
+   */
+  decideItemApproval(input: {
+    /** Requested approval transition. */
+    action: CatalogApprovalAction;
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** Collection item being reviewed. */
+    collectionItemId: number;
+    /** Nonblank reason for the decision. */
+    reason: string;
+  }): Promise<CatalogApprovalStatus>;
+  /**
    * Adds a spinner and optional button to a collection.
    *
    * @param input - Collection, spinner, optional button, overrides, and actor.
@@ -1416,6 +1465,21 @@ export type CollectionsService = {
     viewer?: CatalogViewer;
   }): Promise<UserCollectionSummary | null>;
   /**
+   * Lists one collection's items using owner, staff, and public visibility rules.
+   *
+   * @param input - Collection, owner, and optional authenticated viewer.
+   * @returns Collection items visible to the viewer.
+   * @rejects When the required catalog data cannot be queried.
+   */
+  listCollectionItems(input: {
+    /** Parent collection identifier. */
+    collectionId: number;
+    /** Collection owner's database identifier. */
+    ownerUserId: number;
+    /** Optional authenticated viewer. */
+    viewer?: CatalogViewer;
+  }): Promise<UserCollectionItem[]>;
+  /**
    * Returns public item.
    *
    * @param input - Owner, collection item, collection, and optional viewer context.
@@ -1619,13 +1683,13 @@ export type CollectionsService = {
 };
 
 /**
- * Creates catalog service.
+ * Creates catalog and collection operations backed by the database.
  *
- * @param db - Application database.
- * @param logger - Application logger.
- * @param users - User service.
- * @param audit - Audit service.
- * @returns Created catalog service.
+ * @param db - Database used for catalog persistence.
+ * @param logger - Structured operation logger.
+ * @param users - Optional user service required by audited mutations.
+ * @param audit - Optional audit service required by audited mutations.
+ * @returns Catalog operations bound to the supplied dependencies.
  */
 export function createCatalogService(
   db: Database,
@@ -2090,6 +2154,93 @@ export function createCatalogService(
         viewer,
       );
       return products[0] ?? null;
+    },
+    /**
+     * Applies one serialized product approval transition.
+     *
+     * @param input - Authorized approval decision.
+     * @returns The resulting durable approval state.
+     * @rejects When authorization, validation, lookup, persistence, or auditing fails.
+     */
+    async decideProductApproval(input) {
+      if (!hasPermission(input.actor, "products.manage")) {
+        throw new Error("Product does not exist.");
+      }
+      const reason = input.reason.trim();
+      if (!reason || reason.length > 1000) {
+        throw new Error("A decision reason is required.");
+      }
+      if (!users || !audit) throw new Error("Product audit is not configured.");
+      return await loggedMutation(
+        logger,
+        loggerMessages.database.catalog.updateProduct,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [product] = await tx
+              .select({
+                approvalStatus: schema.product.approvalStatus,
+                approvalDecidedAt: schema.product.approvalDecidedAt,
+                ownerClerkId: schema.product.ownerClerkId,
+              })
+              .from(schema.product)
+              .where(eq(schema.product.id, input.productId))
+              .limit(1)
+              .for("update");
+            if (!product) throw new Error("Product does not exist.");
+            const approvalStatus = nextApprovalStatus(
+              product.approvalStatus,
+              input.action,
+            );
+            const [actorUser] = await tx
+              .select({ id: schema.user.id, username: schema.user.username })
+              .from(schema.user)
+              .where(eq(schema.user.clerkId, input.actor.clerkId))
+              .limit(1);
+            if (!actorUser) throw new Error("Product does not exist.");
+            const [ownerUser] = product.ownerClerkId
+              ? await tx
+                  .select({ id: schema.user.id })
+                  .from(schema.user)
+                  .where(eq(schema.user.clerkId, product.ownerClerkId))
+                  .limit(1)
+              : [];
+            const occurredAt = new Date();
+            await tx
+              .update(schema.product)
+              .set({
+                approvalDecidedAt: occurredAt,
+                approvalDecisionReason: reason,
+                approvalStatus,
+                updatedAt: occurredAt,
+              })
+              .where(eq(schema.product.id, input.productId));
+            await writeProductAdminAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: {
+                approvalStatus,
+                approvalDecidedAt: occurredAt.toISOString(),
+              },
+              before: {
+                approvalStatus: product.approvalStatus,
+                approvalDecidedAt:
+                  product.approvalDecidedAt?.toISOString() ?? null,
+              },
+              definition:
+                input.action === "approve"
+                  ? productAudit.productApproved
+                  : input.action === "reject"
+                    ? productAudit.productRejected
+                    : productAudit.productApprovalReversed,
+              occurredAt,
+              ownerUserId: ownerUser?.id ?? null,
+              reason,
+              targetId: input.productId,
+            });
+            return approvalStatus;
+          }),
+        actorAttributes(input.actor.clerkId, { productId: input.productId }),
+      );
     },
     /**
      * Lists makers.
@@ -2672,6 +2823,88 @@ export function createCollectionsService(
 ): CollectionsService {
   return {
     /**
+     * Applies one serialized collection-item approval transition with transactional auditing.
+     *
+     * @param input - Authorized approval decision.
+     * @returns The resulting durable approval state.
+     * @rejects When authorization, validation, lookup, persistence, or auditing fails.
+     */
+    async decideItemApproval(input) {
+      if (!hasPermission(input.actor, "collections.manage")) {
+        throw new Error("Collection item does not exist.");
+      }
+      const reason = input.reason.trim();
+      if (!reason || reason.length > 1000) {
+        throw new Error("A decision reason is required.");
+      }
+      return await loggedMutation(
+        logger,
+        loggerMessages.database.collections.updateItem,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [item] = await tx
+              .select({
+                approvalStatus: schema.collectionItem.approvalStatus,
+                approvalDecidedAt: schema.collectionItem.approvalDecidedAt,
+                ownerId: schema.collectionItem.ownerId,
+              })
+              .from(schema.collectionItem)
+              .where(eq(schema.collectionItem.id, input.collectionItemId))
+              .limit(1)
+              .for("update");
+            if (!item) throw new Error("Collection item does not exist.");
+            const approvalStatus = nextApprovalStatus(
+              item.approvalStatus,
+              input.action,
+            );
+            const [actorUser] = await tx
+              .select({ id: schema.user.id, username: schema.user.username })
+              .from(schema.user)
+              .where(eq(schema.user.clerkId, input.actor.clerkId))
+              .limit(1);
+            if (!actorUser) throw new Error("Collection item does not exist.");
+            const occurredAt = new Date();
+            await tx
+              .update(schema.collectionItem)
+              .set({
+                approvalDecidedAt: occurredAt,
+                approvalDecisionReason: reason,
+                approvalStatus,
+                updatedAt: occurredAt,
+              })
+              .where(eq(schema.collectionItem.id, input.collectionItemId));
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: {
+                approvalStatus,
+                approvalDecidedAt: occurredAt.toISOString(),
+              },
+              before: {
+                approvalStatus: item.approvalStatus,
+                approvalDecidedAt:
+                  item.approvalDecidedAt?.toISOString() ?? null,
+              },
+              definition:
+                input.action === "approve"
+                  ? collectionAudit.itemApproved
+                  : input.action === "reject"
+                    ? collectionAudit.itemRejected
+                    : collectionAudit.itemApprovalReversed,
+              occurredAt,
+              ownerUserId: item.ownerId,
+              permissionRequired: true,
+              reason,
+              targetId: input.collectionItemId,
+            });
+            return approvalStatus;
+          }),
+        actorAttributes(input.actor.clerkId, {
+          collectionItemId: input.collectionItemId,
+        }),
+      );
+    },
+    /**
      * Creates collection.
      *
      * @param input - Collection values and authenticated actor.
@@ -3237,6 +3470,22 @@ export function createCollectionsService(
           })
         )[0] ?? null
       );
+    },
+    /**
+     * Lists collection items without excluding an owner's or staff's pending items.
+     *
+     * @param input - Collection, owner, and optional authenticated viewer.
+     * @returns Items visible to the viewer.
+     * @rejects When the required catalog data cannot be queried.
+     */
+    async listCollectionItems(input) {
+      return await queryOwnedItems(db, undefined, undefined, {
+        collectionId: input.collectionId,
+        ownerUserId: input.ownerUserId,
+        includePrivate: hasPermission(input.viewer, "collections.manage"),
+        viewerClerkId: input.viewer?.clerkId,
+        viewerCanManage: hasPermission(input.viewer, "collections.manage"),
+      });
     },
     /**
      * Returns public item.
@@ -4315,6 +4564,15 @@ async function queryCollections(
   );
   if (!visibleRows.length) return [];
   const collectionIds = visibleRows.map(({ id }) => id);
+  const unrestrictedCollectionIds = options.publicOnly
+    ? []
+    : visibleRows
+        .filter(
+          (row) =>
+            options.includePrivate ||
+            row.ownerClerkId === options.viewerClerkId,
+        )
+        .map(({ id }) => id);
   const [counts, covers] = await Promise.all([
     db
       .select({
@@ -4326,9 +4584,18 @@ async function queryCollections(
         and(
           inArray(schema.collectionItem.collectionId, collectionIds),
           eq(schema.collectionItem.owned, true),
-          options.includePrivate
-            ? undefined
-            : eq(schema.collectionItem.isPrivate, false),
+          or(
+            and(
+              eq(schema.collectionItem.isPrivate, false),
+              eq(schema.collectionItem.approvalStatus, "approved"),
+            ),
+            unrestrictedCollectionIds.length
+              ? inArray(
+                  schema.collectionItem.collectionId,
+                  unrestrictedCollectionIds,
+                )
+              : undefined,
+          ),
         ),
       )
       .groupBy(schema.collectionItem.collectionId),
@@ -4461,13 +4728,13 @@ async function updateCollectionItemSnapshot(
 }
 
 /**
- * Lists catalog products visible to the requested viewer.
+ * Loads visible catalog products and their related display data.
  *
- * @param db - Application database.
- * @param productTypeSlug - Product type slug.
- * @param productSlug - Product slug.
- * @param viewer - Optional catalog viewer.
- * @returns Catalog products visible to the viewer.
+ * @param db - Database used for the query.
+ * @param productTypeSlug - Optional product type filter.
+ * @param productSlug - Optional product slug filter.
+ * @param viewer - Optional viewer controlling private and review visibility.
+ * @returns Visible catalog products in display order.
  * @rejects When the database query fails.
  */
 async function queryProducts(
@@ -4488,13 +4755,17 @@ async function queryProducts(
   if (!hasPermission(viewer, "products.manage")) {
     conditions.push(
       viewer?.clerkId
-        ? sql`(${schema.product.isPrivate} = false or ${schema.product.ownerClerkId} = ${viewer.clerkId})`
-        : eq(schema.product.isPrivate, false),
+        ? sql`((${schema.product.approvalStatus} = 'approved' and ${schema.product.isPrivate} = false) or ${schema.product.ownerClerkId} = ${viewer.clerkId})`
+        : and(
+            eq(schema.product.approvalStatus, "approved"),
+            eq(schema.product.isPrivate, false),
+          ),
     );
   }
 
   const rows = await db
     .select({
+      approvalStatus: schema.product.approvalStatus,
       bearing: schema.productSpinner.bearing,
       buttonDiameterMm: schema.productSpinner.buttonDiameterMm,
       compatibleButtonId: schema.productSpinner.compatibleButtonId,
@@ -4574,6 +4845,7 @@ async function queryProducts(
       continue;
     }
     products.set(row.id, {
+      approvalStatus: row.approvalStatus,
       bearing: row.bearing,
       buttonDiameterMm: row.buttonDiameterMm,
       compatibleButtonId: row.compatibleButtonId,
@@ -4825,13 +5097,13 @@ async function loadFinishOptionComponents(
 }
 
 /**
- * Lists collection items owned by the requested user.
+ * Loads owned collection items subject to visibility and identity filters.
  *
- * @param db - Application database.
- * @param actorClerkId - Actor clerk identifier.
- * @param collectionItemId - Collection item identifier.
- * @param options - Ownership, product, privacy, and viewer filters.
- * @returns Owned collection items matching the filters.
+ * @param db - Database used for the query.
+ * @param actorClerkId - Optional collection owner Clerk identifier.
+ * @param collectionItemId - Optional collection item identifier.
+ * @param options - Visibility, owner, collection, and product filters.
+ * @returns Matching collection items with effective product data.
  * @rejects When the database query fails.
  */
 async function queryOwnedItems(
@@ -4887,7 +5159,7 @@ async function queryOwnedItems(
   if (options.productId !== undefined) {
     conditions.push(eq(schema.product.id, options.productId));
   }
-  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false)`;
+  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false and ${schema.collectionItem.approvalStatus} = 'approved' and ${schema.product.approvalStatus} = 'approved')`;
   if (options.publicOnly) {
     conditions.push(publicItem);
   } else if (!options.includePrivate) {
@@ -4899,6 +5171,7 @@ async function queryOwnedItems(
   }
   const rows = await db
     .select({
+      approvalStatus: schema.collectionItem.approvalStatus,
       bearingOverride: schema.collectionSpinner.bearing,
       productBearing: schema.productSpinner.bearing,
       collectionId: schema.userCollection.id,
@@ -5001,6 +5274,7 @@ async function queryOwnedItems(
     ),
   );
   const items: UserCollectionItem[] = visibleRows.map((row) => ({
+    approvalStatus: row.approvalStatus,
     bearing: row.bearingOverride ?? row.productBearing,
     bearingOverride: row.bearingOverride,
     canAdminister: Boolean(options.viewerCanManage),
@@ -5917,6 +6191,24 @@ function normalizeOptionalUrl(value: string | null | undefined) {
  */
 function normalizeOptionalDescription(value: string | null | undefined) {
   return value?.trim() ? value : null;
+}
+
+/**
+ * Resolves a valid product or collection-item approval transition.
+ *
+ * @param current - Current durable approval state.
+ * @param action - Requested administrative action.
+ * @returns The resulting approval state.
+ * @throws When the requested transition is not allowed.
+ */
+function nextApprovalStatus(
+  current: CatalogApprovalStatus,
+  action: CatalogApprovalAction,
+): CatalogApprovalStatus {
+  if (current === "pending" && action === "approve") return "approved";
+  if (current === "pending" && action === "reject") return "rejected";
+  if (current !== "pending" && action === "reverse") return "pending";
+  throw new Error("Approval transition is invalid.");
 }
 
 /**

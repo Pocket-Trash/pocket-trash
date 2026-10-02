@@ -108,6 +108,12 @@ describe("Linear feedback planning", () => {
   });
 });
 
+/**
+ * Wraps operation data in a successful Linear GraphQL response fixture.
+ *
+ * @param data - Operation result placed in the GraphQL data envelope.
+ * @returns A JSON HTTP response containing the supplied result.
+ */
 function jsonResponse(data: unknown) {
   return new Response(JSON.stringify({ data }), {
     headers: { "Content-Type": "application/json" },

@@ -2,30 +2,61 @@ import type * as React from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 import { cn } from "@/lib/utils";
 
+/**
+ * Provides the drawer interaction root.
+ *
+ * @param props - Drawer properties.
+ * @returns The rendered drawer UI.
+ */
 function Drawer({
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
   return <DrawerPrimitive.Root data-slot="drawer" {...props} />;
 }
 
+/**
+ * Renders the control that opens the drawer.
+ *
+ * @param props - Drawer trigger properties.
+ * @returns The rendered drawer trigger UI.
+ */
 function DrawerTrigger({
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Trigger>) {
   return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />;
 }
 
+/**
+ * Portals the floating drawer layer.
+ *
+ * @param props - Drawer portal properties.
+ * @returns The rendered drawer portal UI.
+ */
 function DrawerPortal({
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Portal>) {
   return <DrawerPrimitive.Portal data-slot="drawer-portal" {...props} />;
 }
 
+/**
+ * Renders a control that closes the drawer.
+ *
+ * @param props - Drawer close properties.
+ * @returns The rendered drawer close UI.
+ */
 function DrawerClose({
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Close>) {
   return <DrawerPrimitive.Close data-slot="drawer-close" {...props} />;
 }
 
+/**
+ * Renders the backdrop behind the drawer.
+ *
+ * @param props - Drawer overlay properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered drawer overlay UI.
+ */
 function DrawerOverlay({
   className,
   ...props
@@ -42,6 +73,14 @@ function DrawerOverlay({
   );
 }
 
+/**
+ * Renders the positioned drawer panel.
+ *
+ * @param props - Drawer content properties.
+ * @param props.className - Additional CSS classes.
+ * @param props.children - Nested content.
+ * @returns The rendered drawer content UI.
+ */
 function DrawerContent({
   className,
   children,
@@ -71,6 +110,13 @@ function DrawerContent({
   );
 }
 
+/**
+ * Renders the header region of the drawer.
+ *
+ * @param props - Drawer header properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered drawer header UI.
+ */
 function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -84,6 +130,13 @@ function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/**
+ * Renders the accessible title of the drawer.
+ *
+ * @param props - Drawer title properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered drawer title UI.
+ */
 function DrawerTitle({
   className,
   ...props
@@ -100,6 +153,13 @@ function DrawerTitle({
   );
 }
 
+/**
+ * Renders the accessible description of the drawer.
+ *
+ * @param props - Drawer description properties.
+ * @param props.className - Additional CSS classes.
+ * @returns The rendered drawer description UI.
+ */
 function DrawerDescription({
   className,
   ...props

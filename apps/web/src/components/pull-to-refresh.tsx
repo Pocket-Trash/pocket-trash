@@ -2,22 +2,44 @@ import { RefreshCw } from "lucide-react";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-const TRIGGER_DISTANCE = 72; // px of pull needed to fire a refresh
-const MAX_PULL = 96; // clamp so the indicator never runs away
+/**
+ * Resisted indicator distance, in CSS pixels, required to request a refresh.
+ * This corresponds to 144 CSS pixels of finger travel at the 0.5 resistance.
+ */
+const TRIGGER_DISTANCE = 72;
+/**
+ * Maximum resisted pull distance, in pixels, shown by the indicator.
+ */
+const MAX_PULL = 96;
 
+/**
+ * Content and controlled refresh state for the compact pull gesture.
+ */
 type PullToRefreshProps = {
+  /**
+   * Nested content.
+   */
   children: React.ReactNode;
+  /**
+   * Requests a refresh after a qualifying pull is released.
+   */
   onRefresh: () => void;
+  /**
+   * Whether a refresh is running and new pull gestures are disabled.
+   */
   refreshing: boolean;
 };
 
 /**
- * Compact-only pull-to-refresh for the document-scrolled archive. It only
- * engages when the page is already scrolled to the top and the finger drags
- * down, so it never fights normal scrolling. The indicator follows the pull and
- * spins while `refreshing`; it is hidden at `md`+ where the wrapper collapses to
- * `display: contents` and adds no box. Untested on a real touch device — verify
- * the feel on-device.
+ * Adds a resisted pull-to-refresh gesture while the document is scrolled to the
+ * top. The indicator follows the pull and spins while `refreshing`; at `md` and
+ * above it is hidden and the wrapper uses `display: contents`.
+ *
+ * @param props - Pull-to-refresh properties.
+ * @param props.children - Content wrapped by the compact gesture surface.
+ * @param props.onRefresh - Callback invoked after a qualifying pull is released.
+ * @param props.refreshing - Whether a refresh is running.
+ * @returns The responsive pull-to-refresh wrapper and indicator.
  */
 export function PullToRefresh({
   children,
@@ -27,6 +49,9 @@ export function PullToRefresh({
   const [pull, setPull] = React.useState(0);
   const startYRef = React.useRef<number | null>(null);
 
+  /**
+   * Clears the visible pull distance and recorded touch origin.
+   */
   const reset = () => {
     setPull(0);
     startYRef.current = null;

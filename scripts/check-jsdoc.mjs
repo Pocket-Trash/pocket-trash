@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -8,7 +8,7 @@ import jsdoc from "eslint-plugin-jsdoc";
 import ts from "typescript";
 import tseslint from "typescript-eslint";
 
-/** Generated source files excluded from changed-declaration enforcement. */
+/** Generated source files excluded from repository-wide enforcement. */
 const generatedFiles = new Set([
   "apps/api/src/worker-configuration.d.ts",
   "apps/web/src/routeTree.gen.ts",
@@ -25,12 +25,14 @@ const jsdocContexts = [
   "TSPropertySignature",
   "TSMethodSignature",
   "TSCallSignatureDeclaration",
+  "TSConstructSignatureDeclaration",
+  "TSIndexSignature",
   "TSEnumDeclaration",
   "TSModuleDeclaration",
   "Program > VariableDeclaration",
   "ExportNamedDeclaration[declaration.type='VariableDeclaration']",
-  "VariableDeclaration[parent.type!='ExportNamedDeclaration']:has(VariableDeclarator[init.type='ArrowFunctionExpression'])",
-  "VariableDeclaration[parent.type!='ExportNamedDeclaration']:has(VariableDeclarator[init.type='FunctionExpression'])",
+  "VariableDeclaration[parent.type!='ExportNamedDeclaration']:has(> VariableDeclarator[init.type='ArrowFunctionExpression'])",
+  "VariableDeclaration[parent.type!='ExportNamedDeclaration']:has(> VariableDeclarator[init.type='FunctionExpression'])",
   "Property[method=true]",
   "Property[value.type='ArrowFunctionExpression']",
   "Property[value.type='FunctionExpression']",
@@ -47,6 +49,8 @@ const callableContexts = [
   "PropertyDefinition > FunctionExpression",
   "TSMethodSignature",
   "TSCallSignatureDeclaration",
+  "TSConstructSignatureDeclaration",
+  "TSIndexSignature",
   "TSFunctionType",
   "TSEmptyBodyFunctionExpression",
   "TSDeclareFunction",
@@ -73,118 +77,24 @@ const scriptKinds = new Map([
 ]);
 
 /**
- * Runs Git and returns its UTF-8 output.
+ * Lists existing tracked, hand-authored JavaScript and TypeScript source files.
  *
- * @param cwd - Repository working directory.
- * @param args - Git command arguments.
- * @returns Git standard output.
- */
-function git(cwd, args) {
-  return execFileSync("git", args, { cwd, encoding: "utf8" });
-}
-
-/**
- * Lists changed JavaScript and TypeScript files from a Git diff.
- *
- * @param cwd - Repository working directory.
- * @param diffArgs - Arguments selecting the Git diff range.
- * @returns Changed source files and their Git statuses.
- */
-function diffFiles(cwd, diffArgs) {
-  const fields = git(cwd, [
-    "diff",
-    ...diffArgs,
-    "--name-status",
-    "-z",
-    "--diff-filter=ACMR",
-    "--find-renames",
-  ]).split("\0");
-  const files = [];
-
-  for (let index = 0; index < fields.length - 1; ) {
-    const status = fields[index++];
-    const renamed = status.startsWith("R") || status.startsWith("C");
-    const oldPath = renamed ? fields[index++] : undefined;
-    const path = fields[index++];
-    if (/\.[cm]?[jt]sx?$/.test(path)) {
-      files.push({ oldPath, path, status: status[0] });
-    }
-  }
-
-  return files;
-}
-
-/**
- * Extracts changed target lines for one file.
- *
- * @param cwd - Repository working directory.
- * @param diffArgs - Arguments selecting the Git diff range.
- * @param file - Current path and optional pre-rename path.
- * @param file.oldPath - Path before a detected rename.
- * @param file.path - Current source path.
- * @returns Changed line numbers in the current and previous file versions.
- */
-function changedLinesForFile(cwd, diffArgs, { oldPath, path }) {
-  const patch = git(cwd, [
-    "diff",
-    ...diffArgs,
-    "--unified=0",
-    "--no-ext-diff",
-    "--",
-    ...[oldPath, path].filter(Boolean),
-  ]);
-  const changedLines = new Set();
-  const deletedLines = new Set();
-
-  for (const line of patch.split("\n")) {
-    const hunk = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
-    if (!hunk) {
-      continue;
-    }
-    const oldStart = Number(hunk[1]);
-    const oldCount = hunk[2] === undefined ? 1 : Number(hunk[2]);
-    const newStart = Number(hunk[3]);
-    const newCount = hunk[4] === undefined ? 1 : Number(hunk[4]);
-    for (let offset = 0; offset < oldCount; offset += 1) {
-      deletedLines.add(oldStart + offset);
-    }
-    for (let offset = 0; offset < newCount; offset += 1) {
-      changedLines.add(newStart + offset);
-    }
-  }
-
-  return { changedLines, deletedLines };
-}
-
-/**
- * Finds changed source lines in the staged or merge-base diff.
- *
- * @param options - Diff selection options.
- * @param options.baseRef - PR base ref; omit to inspect staged changes.
+ * @param options - Repository selection.
  * @param options.cwd - Repository working directory.
- * @returns Changed lines and new-file status keyed by current path.
+ * @returns Repository-relative source paths, including staged additions.
  */
-export function getChangedFileLines({ baseRef, cwd = process.cwd() } = {}) {
-  const baseCommit = baseRef
-    ? git(cwd, ["merge-base", "HEAD", baseRef]).trim()
-    : "HEAD";
-  const diffArgs = baseRef ? [baseCommit, "HEAD"] : ["--cached"];
-
-  return new Map(
-    diffFiles(cwd, diffArgs).map((file) => {
-      const isNewFile = file.status === "A" || file.status === "C";
-      return [
-        file.path,
-        {
-          ...changedLinesForFile(cwd, diffArgs, file),
-          isNewFile,
-          previousSourceText: isNewFile
-            ? undefined
-            : git(cwd, ["show", `${baseCommit}:${file.oldPath ?? file.path}`]),
-        },
-      ];
-    }),
-  );
+export function getTrackedSourceFiles({ cwd = process.cwd() } = {}) {
+  return execFileSync("git", ["ls-files", "--cached", "--deduplicate", "-z"], {
+    cwd,
+    encoding: "utf8",
+  })
+    .split("\0")
+    .filter(
+      (filePath) =>
+        /\.[cm]?[jt]sx?$/.test(filePath) &&
+        !generatedFiles.has(filePath) &&
+        existsSync(resolve(cwd, filePath)),
+    );
 }
 
 /**
@@ -301,13 +211,14 @@ function declarationFor(node, sourceFile) {
 
   return {
     end: owner.end,
+    endColumn:
+      sourceFile.getLineAndCharacterOfPosition(owner.end).character + 1,
     endLine: lineAt(sourceFile, owner.end),
     eligible,
     functionType,
-    id: `${node.kind}:${start}:${owner.end}`,
-    key: `${node.kind}:${name}`,
     name,
     start,
+    startColumn: sourceFile.getLineAndCharacterOfPosition(start).character + 1,
     startLine: lineAt(sourceFile, start),
     tags: functionType ? ts.getJSDocTags(owner) : undefined,
   };
@@ -432,7 +343,7 @@ function functionTypeAliasDiagnostics(declaration, filePath) {
  * @param input.sourceText - Current source contents.
  * @returns Eligible declarations and excluded callback ranges.
  */
-function declarationsIn({ filePath, sourceText }) {
+export function declarationsIn({ filePath, sourceText }) {
   const extension = filePath.slice(filePath.lastIndexOf("."));
   const sourceFile = ts.createSourceFile(
     filePath,
@@ -462,105 +373,22 @@ function declarationsIn({ filePath, sourceText }) {
 }
 
 /**
- * Selects declarations affected by changed source lines.
+ * Checks every eligible declaration in tracked source, excluding contextual callbacks.
  *
- * @param input - Source and Git change metadata.
- * @param input.changedLines - Added and modified source lines.
- * @param input.deletedLines - Deleted source lines from the previous version.
- * @param input.filePath - Repository-relative source path.
- * @param input.isNewFile - Whether Git reports an added or copied file.
- * @param input.previousSourceText - Source contents before the change.
- * @param input.sourceText - Current source contents.
- * @returns Changed eligible declarations.
+ * @param options - Repository selection.
+ * @param options.cwd - Repository working directory.
+ * @returns JSDoc diagnostics for all tracked, hand-authored declarations.
  */
-export function selectChangedDeclarations({
-  changedLines,
-  deletedLines = new Set(),
-  filePath,
-  isNewFile = false,
-  previousSourceText,
-  sourceText,
-}) {
-  if (generatedFiles.has(filePath)) {
-    return [];
-  }
-
-  const declarations = declarationsIn({ filePath, sourceText });
-  const selected = declarations.filter(
-    (declaration) =>
-      declaration.eligible &&
-      (isNewFile ||
-        [...changedLines].some(
-          (line) =>
-            line >= declaration.startLine && line <= declaration.endLine,
-        )),
-  );
-  if (!previousSourceText || deletedLines.size === 0) {
-    return selected;
-  }
-
-  const selectedIds = new Set(selected.map(({ id }) => id));
-  const previousDeclarations = declarationsIn({
-    filePath,
-    sourceText: previousSourceText,
-  });
-  for (const line of deletedLines) {
-    const previousOwner = previousDeclarations
-      .filter(
-        ({ eligible, endLine, startLine }) =>
-          eligible && line >= startLine && line <= endLine,
-      )
-      .sort(
-        (left, right) => left.end - left.start - (right.end - right.start),
-      )[0];
-    if (!previousOwner) {
-      continue;
-    }
-    for (const declaration of declarations) {
-      if (
-        declaration.eligible &&
-        declaration.key === previousOwner.key &&
-        !selectedIds.has(declaration.id)
-      ) {
-        selected.push(declaration);
-        selectedIds.add(declaration.id);
-      }
-    }
-  }
-  return selected;
-}
-
-/**
- * Runs JSDoc rules and retains diagnostics owned by changed declarations.
- *
- * @param input - Lint inputs.
- * @param input.changes - Changed lines keyed by repository-relative path.
- * @param input.cwd - Repository working directory.
- * @returns JSDoc diagnostics for changed declarations.
- */
-export async function lintChangedDeclarations({
-  changes,
-  cwd = process.cwd(),
-}) {
+export async function lintJsdoc({ cwd = process.cwd() } = {}) {
   const declarationsByPath = new Map(
-    [...changes].map(([filePath, change]) => {
+    getTrackedSourceFiles({ cwd }).map((filePath) => {
       const absolutePath = resolve(cwd, filePath);
       const sourceText = readFileSync(absolutePath, "utf8");
-      const all = generatedFiles.has(filePath)
-        ? []
-        : declarationsIn({ filePath, sourceText });
-      const selected = selectChangedDeclarations({
-        ...change,
-        filePath,
-        sourceText,
-      });
-      return [absolutePath, { all, selected }];
+      return [absolutePath, declarationsIn({ filePath, sourceText })];
     }),
   );
-  const selectedPaths = [...declarationsByPath]
-    .filter(([, { selected }]) => selected.length > 0)
-    .map(([filePath]) => filePath);
-  if (selectedPaths.length === 0) {
+  const sourcePaths = [...declarationsByPath.keys()];
+  if (sourcePaths.length === 0) {
     return [];
   }
 
@@ -623,32 +451,35 @@ export async function lintChangedDeclarations({
       },
     ],
   });
-  const results = await eslint.lintFiles(selectedPaths);
+  const results = await eslint.lintFiles(sourcePaths);
 
   return results.flatMap((result) => {
-    const { all = [], selected = [] } =
-      declarationsByPath.get(result.filePath) ?? {};
-    const selectedIds = new Set(selected.map(({ id }) => id));
+    const declarations = declarationsByPath.get(result.filePath) ?? [];
     const messages = result.messages
-      .filter(({ line, ruleId }) => {
-        const owner = all
+      .filter(({ column, line, ruleId }) => {
+        const owner = declarations
           .filter(
-            ({ endLine, startLine }) => line >= startLine && line <= endLine,
+            ({ endColumn, endLine, startColumn, startLine }) =>
+              (line > startLine ||
+                (line === startLine && column >= startColumn)) &&
+              (line < endLine || (line === endLine && column <= endColumn)),
           )
           .sort(
             (left, right) => left.end - left.start - (right.end - right.start),
           )[0];
         return (
           owner &&
-          selectedIds.has(owner.id) &&
+          owner.eligible &&
           !(owner.functionType && ruleId === "jsdoc/check-template-names")
         );
       })
       .map((message) => ({ ...message, filePath: result.filePath }));
     return [
-      ...selected.flatMap((declaration) =>
-        functionTypeAliasDiagnostics(declaration, result.filePath),
-      ),
+      ...declarations
+        .filter(({ eligible }) => eligible)
+        .flatMap((declaration) =>
+          functionTypeAliasDiagnostics(declaration, result.filePath),
+        ),
       ...new Map(
         messages.map((message) => [
           [message.line, message.column, message.ruleId, message.message].join(
@@ -662,24 +493,14 @@ export async function lintChangedDeclarations({
 }
 
 /**
- * Checks the current staged diff or pull-request merge-base for JSDoc errors.
+ * Checks all tracked source and prints any JSDoc errors.
  *
- * @param options - Command options.
- * @param options.baseRef - PR base ref; omit to inspect staged changes.
+ * @param options - Repository selection.
  * @param options.cwd - Repository working directory.
- * @returns Process exit code for the changed-declaration check.
+ * @returns Zero for complete coverage, or one when JSDoc diagnostics are found.
  */
-export async function runChangedJsdoc({
-  baseRef = process.env.JSDOC_BASE_REF ||
-    (process.env.GITHUB_BASE_REF
-      ? `origin/${process.env.GITHUB_BASE_REF}`
-      : undefined),
-  cwd = process.cwd(),
-} = {}) {
-  const diagnostics = await lintChangedDeclarations({
-    changes: getChangedFileLines({ baseRef, cwd }),
-    cwd,
-  });
+export async function runJsdoc({ cwd = process.cwd() } = {}) {
+  const diagnostics = await lintJsdoc({ cwd });
   if (diagnostics.length === 0) {
     return 0;
   }
@@ -689,9 +510,7 @@ export async function runChangedJsdoc({
       `${relative(cwd, filePath)}:${line}:${column} error ${message} ${ruleId}`,
     );
   }
-  console.error(
-    `\n${diagnostics.length} JSDoc error(s) in changed declarations.`,
-  );
+  console.error(`\n${diagnostics.length} JSDoc error(s) in tracked source.`);
   return 1;
 }
 
@@ -699,5 +518,5 @@ if (
   process.argv[1] &&
   pathToFileURL(resolve(process.argv[1])).href === import.meta.url
 ) {
-  process.exitCode = await runChangedJsdoc();
+  process.exitCode = await runJsdoc();
 }

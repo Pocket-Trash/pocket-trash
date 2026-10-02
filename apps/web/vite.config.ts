@@ -7,14 +7,29 @@ import { defineConfig } from "vite";
 import { createWebClientEnv } from "./src/env/client.schema";
 import { createWebServerEnv } from "./src/env/server.schema";
 
+/** Mutable environment map used while applying Vite aliases. */
 type MutableEnv = Record<string, string | undefined>;
 
+/**
+ * Reads an environment value while treating an empty string as absent.
+ *
+ * @param env - Environment map to read.
+ * @param key - Environment variable name.
+ * @returns Non-empty value, or `undefined` when absent or empty.
+ */
 function envValue(env: MutableEnv, key: string) {
   const value = env[key];
 
   return value === "" ? undefined : value;
 }
 
+/**
+ * Copies shared server environment values into unset Vite client aliases.
+ *
+ * Existing non-empty client values are preserved.
+ *
+ * @param env - Mutable environment map; defaults to the current process environment.
+ */
 export function applyWebClientEnvAliases(env: MutableEnv = process.env) {
   const assetFolderPrefix = envValue(env, "ASSET_FOLDER_PREFIX");
   const cdnBaseUrl = envValue(env, "BUNNY_CDN_BASE_URL");

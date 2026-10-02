@@ -13,10 +13,20 @@ import type { LinearPlanningOptions } from "@/lib/linear";
 import { getResourceViewer, requireResourceUploader } from "@/lib/resources";
 import { localizedServerError } from "@/lib/server-errors";
 
+/** Reports whether the current actor may administer feedback.
+ *
+ * @returns Whether the actor has feedback management permission.
+ * @rejects When authentication or actor resolution fails.
+ */
 export const canManageFeedback = createServerFn().handler(async () => {
   return hasPermission(await getResourceViewer(), "feedback.manage");
 });
 
+/** Submits feedback or returns a localized submission failure.
+ *
+ * @returns The new feedback ID or a localized failure key.
+ * @rejects When validation, authentication, or service loading fails.
+ */
 export const submitFeedback = createServerFn({ method: "POST" })
   .validator(parseFeedbackInput)
   .handler(async ({ data }) => {
@@ -40,6 +50,11 @@ export const submitFeedback = createServerFn({ method: "POST" })
     }
   });
 
+/** Finds feedback titles resembling a proposed submission.
+ *
+ * @returns Potential duplicate feedback visible to the current user.
+ * @rejects When validation, authentication, or lookup fails.
+ */
 export const findDuplicateFeedback = createServerFn({ method: "POST" })
   .validator(parseFeedbackTitleInput)
   .handler(async ({ data }) => {
@@ -48,6 +63,11 @@ export const findDuplicateFeedback = createServerFn({ method: "POST" })
     return await s.db.feedback.findDuplicates(viewer.clerkId, data.title);
   });
 
+/** Reports whether the current user has visible submitted feedback.
+ *
+ * @returns Whether the current user owns feedback that is not merged, denied, or canceled.
+ * @rejects When authentication or lookup fails.
+ */
 export const hasMyFeedback = createServerFn({ method: "GET" }).handler(
   async () => {
     const submitter = await requireResourceUploader();
@@ -56,6 +76,11 @@ export const hasMyFeedback = createServerFn({ method: "GET" }).handler(
   },
 );
 
+/** Lists searchable active feedback visible to the current user.
+ *
+ * @returns Active feedback matching the search text.
+ * @rejects When validation, authentication, or lookup fails.
+ */
 export const listActiveFeedback = createServerFn({ method: "GET" })
   .validator(parseFeedbackListInput)
   .handler(async ({ data }) => {
@@ -64,7 +89,11 @@ export const listActiveFeedback = createServerFn({ method: "GET" })
     return await s.db.feedback.listActive(viewer.clerkId, data.search);
   });
 
-/** Lists completed feedback for the public completed page. */
+/** Lists completed feedback for the public completed page.
+ *
+ * @returns Completed feedback matching the search text.
+ * @rejects When validation, authentication, or lookup fails.
+ */
 export const listCompletedFeedback = createServerFn({ method: "GET" })
   .validator(parseFeedbackListInput)
   .handler(async ({ data }) => {
@@ -73,6 +102,11 @@ export const listCompletedFeedback = createServerFn({ method: "GET" })
     return await s.db.feedback.listCompleted(viewer.clerkId, data.search);
   });
 
+/** Lists the current user's feedback with search and pagination.
+ *
+ * @returns The current user's matching feedback page.
+ * @rejects When validation, authentication, or lookup fails.
+ */
 export const listMyFeedback = createServerFn({ method: "GET" })
   .validator(parseFeedbackListInput)
   .handler(async ({ data }) => {
@@ -81,6 +115,11 @@ export const listMyFeedback = createServerFn({ method: "GET" })
     return await s.db.feedback.listMine(submitter.clerkId, data);
   });
 
+/** Lists pending feedback for an authorized administrator.
+ *
+ * @returns A filtered and sorted page of pending feedback.
+ * @rejects When validation, authorization, or lookup fails.
+ */
 export const listPendingFeedback = createServerFn({ method: "GET" })
   .validator((input) => parseAdminFeedbackListInput(input, "pending"))
   .handler(async ({ data }) => {
@@ -89,6 +128,11 @@ export const listPendingFeedback = createServerFn({ method: "GET" })
     return await s.db.feedback.listPending(data);
   });
 
+/** Lists requested, planned, and in-progress feedback for administrators.
+ *
+ * @returns A filtered and sorted page of administrator-active feedback.
+ * @rejects When validation, authorization, or lookup fails.
+ */
 export const listAdminActiveFeedback = createServerFn({ method: "GET" })
   .validator((input) => parseAdminFeedbackListInput(input, "active"))
   .handler(async ({ data }) => {
@@ -100,6 +144,11 @@ export const listAdminActiveFeedback = createServerFn({ method: "GET" })
     });
   });
 
+/** Lists all active feedback statuses for administrators.
+ *
+ * @returns A filtered and sorted page of all active feedback.
+ * @rejects When validation, authorization, or lookup fails.
+ */
 export const listAdminAllActiveFeedback = createServerFn({ method: "GET" })
   .validator((input) => parseAdminFeedbackListInput(input, "active"))
   .handler(async ({ data }) => {
@@ -108,6 +157,11 @@ export const listAdminAllActiveFeedback = createServerFn({ method: "GET" })
     return await s.db.feedback.listAdminActive(data);
   });
 
+/** Lists filtered archived feedback for administrators.
+ *
+ * @returns A filtered and sorted page of archived feedback.
+ * @rejects When validation, authorization, or lookup fails.
+ */
 export const listArchivedFeedback = createServerFn({ method: "GET" })
   .validator((input) => parseAdminFeedbackListInput(input, "archive"))
   .handler(async ({ data }) => {
@@ -116,6 +170,11 @@ export const listArchivedFeedback = createServerFn({ method: "GET" })
     return await s.db.feedback.listArchive(data);
   });
 
+/** Lists statuses accepted by the administrator feedback archive.
+ *
+ * @returns Available archived feedback statuses.
+ * @rejects When authorization or service loading fails.
+ */
 export const listFeedbackArchiveStatuses = createServerFn({
   method: "GET",
 }).handler(async () => {
@@ -124,6 +183,11 @@ export const listFeedbackArchiveStatuses = createServerFn({
   return adminFeedbackArchiveStatuses;
 });
 
+/** Lists active feedback eligible to receive a pending merge.
+ *
+ * @returns Eligible merge target summaries.
+ * @rejects When authorization or lookup fails.
+ */
 export const listFeedbackMergeTargets = createServerFn({
   method: "GET",
 }).handler(async () => {
@@ -132,6 +196,11 @@ export const listFeedbackMergeTargets = createServerFn({
   return await s.db.feedback.listMergeTargets();
 });
 
+/** Lists feedback notifications for an authorized administrator.
+ *
+ * @returns Feedback notifications visible to the administrator.
+ * @rejects When authorization or lookup fails.
+ */
 export const listFeedbackNotifications = createServerFn({
   method: "GET",
 }).handler(async () => {
@@ -140,6 +209,10 @@ export const listFeedbackNotifications = createServerFn({
   return await s.db.feedback.listNotifications();
 });
 
+/** Marks one feedback notification read for the current administrator.
+ *
+ * @rejects When validation, authorization, or persistence fails.
+ */
 export const markFeedbackNotificationRead = createServerFn({ method: "POST" })
   .validator(parseNotificationId)
   .handler(async ({ data }) => {
@@ -151,7 +224,10 @@ export const markFeedbackNotificationRead = createServerFn({ method: "POST" })
     );
   });
 
-/** Updates editable feedback as an authorized administrator. */
+/** Updates editable feedback as an authorized administrator.
+ *
+ * @rejects When validation, authorization, or persistence fails.
+ */
 export const updateAdminFeedback = createServerFn({ method: "POST" })
   .validator(parseAdminFeedbackInput)
   .handler(async ({ data }) => {
@@ -160,7 +236,10 @@ export const updateAdminFeedback = createServerFn({ method: "POST" })
     await s.db.feedback.updateAdmin({ ...data, actor });
   });
 
-/** Merges pending feedback into an active request. */
+/** Merges pending feedback into an active request.
+ *
+ * @rejects When validation, authorization, or persistence fails.
+ */
 export const mergePendingFeedback = createServerFn({ method: "POST" })
   .validator(parseMergeFeedbackInput)
   .handler(async ({ data }) => {
@@ -169,7 +248,10 @@ export const mergePendingFeedback = createServerFn({ method: "POST" })
     await s.db.feedback.mergePending({ ...data, actor });
   });
 
-/** Approves categorized feedback for planning. */
+/** Approves categorized feedback for planning.
+ *
+ * @rejects When validation, authorization, or persistence fails.
+ */
 export const approveFeedback = createServerFn({ method: "POST" })
   .validator(parseFeedbackId)
   .handler(async ({ data }) => {
@@ -178,7 +260,11 @@ export const approveFeedback = createServerFn({ method: "POST" })
     await s.db.feedback.approve({ ...data, actor });
   });
 
-/** Denies eligible feedback or reports required plan recovery. */
+/** Denies eligible feedback or reports required plan recovery.
+ *
+ * @returns Success or a localized plan-recovery failure.
+ * @rejects When validation, authorization, or an unrelated persistence failure occurs.
+ */
 export const denyFeedback = createServerFn({ method: "POST" })
   .validator(parseFeedbackId)
   .handler(async ({ data }) => {
@@ -201,6 +287,11 @@ export const denyFeedback = createServerFn({ method: "POST" })
     }
   });
 
+/** Loads Linear planning choices or a connection-required result.
+ *
+ * @returns Planning labels and viewer name, or a localized connection failure.
+ * @rejects When feedback authorization fails.
+ */
 export const getLinearPlanOptions = createServerFn({ method: "GET" }).handler(
   async () => {
     const actor = await requireFeedbackAdmin();
@@ -222,6 +313,11 @@ export const getLinearPlanOptions = createServerFn({ method: "GET" }).handler(
   },
 );
 
+/** Plans feedback as an idempotent Linear issue or project.
+ *
+ * @returns Success or a localized Linear planning failure.
+ * @rejects When validation, authorization, or submitted label validation fails.
+ */
 export const planFeedback = createServerFn({ method: "POST" })
   .validator(parsePlanFeedbackInput)
   .handler(async ({ data }) => {
@@ -287,7 +383,11 @@ export const planFeedback = createServerFn({ method: "POST" })
     }
   });
 
-/** Synchronizes a linked feedback item with its current Linear status. */
+/** Synchronizes a linked feedback item with its current Linear status.
+ *
+ * @returns Success or a localized connection or synchronization failure.
+ * @rejects When validation or feedback authorization fails.
+ */
 export const syncFeedbackStatus = createServerFn({ method: "POST" })
   .validator(parseFeedbackId)
   .handler(async ({ data }) => {
@@ -321,6 +421,11 @@ export const syncFeedbackStatus = createServerFn({ method: "POST" })
     }
   });
 
+/** Toggles the current user's vote on a feedback item.
+ *
+ * @returns The feedback item's updated vote state.
+ * @rejects When validation, authentication, or persistence fails.
+ */
 export const toggleFeedbackVote = createServerFn({ method: "POST" })
   .validator(parseFeedbackId)
   .handler(async ({ data }) => {
@@ -329,10 +434,21 @@ export const toggleFeedbackVote = createServerFn({ method: "POST" })
     return await s.db.feedback.toggleVote(data.feedbackId, voter.clerkId);
   });
 
+/** Requires the current actor to administer feedback.
+ *
+ * @returns The authorized service actor.
+ * @rejects When authentication fails or feedback permission is absent.
+ */
 async function requireFeedbackAdmin() {
   return await requirePermission("feedback.manage");
 }
 
+/** Returns a Linear OAuth token with write access for a Clerk user.
+ *
+ * @param clerkId - Clerk user ID whose OAuth grants are queried.
+ * @returns The Linear access token.
+ * @rejects When Clerk token lookup fails or no grant includes Linear write access.
+ */
 async function getLinearToken(clerkId: string) {
   const { clerkClient } = await import("@clerk/tanstack-react-start/server");
   const tokens = await clerkClient().users.getUserOauthAccessToken(
@@ -344,6 +460,12 @@ async function getLinearToken(clerkId: string) {
   return token.token;
 }
 
+/** Normalizes a feedback submission payload.
+ *
+ * @param input - Untrusted request payload.
+ * @returns Validated category, description, and title fields.
+ * @throws When the payload or any feedback field is invalid.
+ */
 export function parseFeedbackInput(input: unknown) {
   const value = parseRecord(input);
   const title = parseString(value.title, 120);
@@ -352,6 +474,12 @@ export function parseFeedbackInput(input: unknown) {
   return { category, description, title };
 }
 
+/** Normalizes public feedback search and pagination input.
+ *
+ * @param input - Untrusted request payload, or `undefined` for defaults.
+ * @returns Search text and a non-negative offset.
+ * @throws When the payload, search text, or offset is invalid.
+ */
 export function parseFeedbackListInput(input: unknown) {
   if (input === undefined) return { offset: 0, search: "" };
   const value = parseRecord(input);
@@ -361,14 +489,33 @@ export function parseFeedbackListInput(input: unknown) {
   return { offset, search };
 }
 
+/** Normalizes a proposed feedback title for duplicate lookup.
+ *
+ * @param input - Untrusted request payload.
+ * @returns The validated title field.
+ * @throws When the payload or title is invalid.
+ */
 export function parseFeedbackTitleInput(input: unknown) {
   return { title: parseString(parseRecord(input).title, 120) };
 }
 
+/** Parses editable feedback fields with a feedback identifier.
+ *
+ * @param input - Untrusted request payload.
+ * @returns Validated feedback fields and identifier.
+ * @throws When the payload, fields, or identifier is invalid.
+ */
 function parseAdminFeedbackInput(input: unknown) {
   return { ...parseFeedbackInput(input), ...parseFeedbackId(input) };
 }
 
+/** Normalizes administrator filters and scope-specific sorting.
+ *
+ * @param input - Untrusted request payload, or `undefined` for defaults.
+ * @param scope - Administrator list whose filters are being parsed.
+ * @returns Validated search, pagination, sort, and optional status filters.
+ * @throws When the payload, filters, sorting, or archive status values are invalid; archive values reject active statuses but otherwise pass through.
+ */
 export function parseAdminFeedbackListInput(
   input: unknown,
   scope: "active" | "archive" | "pending",
@@ -410,21 +557,30 @@ export function parseAdminFeedbackListInput(
   return { ...base, sort, statuses };
 }
 
+/** Sort fields allowed by each administrator feedback view. */
 const adminSortFields = {
   active: ["title", "status", "category", "votes", "submitter", "updated"],
   archive: ["title", "status", "category", "submitter"],
   pending: ["title", "category", "submitter", "submitted"],
 } as const satisfies Record<string, readonly AdminFeedbackSortField[]>;
 
+/** Statuses excluded from feedback archive filtering. */
 const activeFeedbackStatuses: readonly string[] = [
   "pending",
   "requested",
   "planned",
   "in_progress",
 ];
+/** Canonical UUID shape accepted for Linear client and label IDs. */
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** Parses positive source and target IDs for a feedback merge.
+ *
+ * @param input - Untrusted request payload.
+ * @returns The validated feedback and target identifiers.
+ * @throws When either identifier is not a positive safe integer.
+ */
 function parseMergeFeedbackInput(input: unknown) {
   const value = parseRecord(input);
   const targetId = value.targetId;
@@ -434,6 +590,12 @@ function parseMergeFeedbackInput(input: unknown) {
   return { ...parseFeedbackId(input), targetId: Number(targetId) };
 }
 
+/** Parses a positive feedback identifier.
+ *
+ * @param input - Untrusted request payload.
+ * @returns The numeric feedback identifier.
+ * @throws When the identifier is not a positive safe integer.
+ */
 function parseFeedbackId(input: unknown) {
   const feedbackId = parseRecord(input).feedbackId;
   if (!Number.isSafeInteger(feedbackId) || Number(feedbackId) <= 0) {
@@ -442,6 +604,12 @@ function parseFeedbackId(input: unknown) {
   return { feedbackId: Number(feedbackId) };
 }
 
+/** Parses a positive feedback-notification identifier.
+ *
+ * @param input - Untrusted request payload.
+ * @returns The numeric notification identifier.
+ * @throws When the identifier is not a positive safe integer.
+ */
 function parseNotificationId(input: unknown) {
   const notificationId = parseRecord(input).notificationId;
   if (!Number.isSafeInteger(notificationId) || Number(notificationId) <= 0) {
@@ -450,6 +618,12 @@ function parseNotificationId(input: unknown) {
   return { notificationId: Number(notificationId) };
 }
 
+/** Validates an idempotent Linear planning request.
+ *
+ * @param input - Untrusted request payload.
+ * @returns The validated planning kind, UUIDs, assignment choices, and feedback ID.
+ * @throws When a field is malformed or more than 100 labels are supplied.
+ */
 export function parsePlanFeedbackInput(input: unknown) {
   const value = parseRecord(input);
   if (value.kind !== "issue" && value.kind !== "project") {
@@ -476,6 +650,12 @@ export function parsePlanFeedbackInput(input: unknown) {
   };
 }
 
+/** Requires a non-null object request payload.
+ *
+ * @param input - Untrusted request payload.
+ * @returns The payload as a string-keyed record.
+ * @throws When the payload is not an object.
+ */
 function parseRecord(input: unknown): Record<string, unknown> {
   if (typeof input !== "object" || input === null) {
     throw invalidFeedbackRequest();
@@ -483,6 +663,13 @@ function parseRecord(input: unknown): Record<string, unknown> {
   return input as Record<string, unknown>;
 }
 
+/** Normalizes a required string within a maximum length.
+ *
+ * @param value - Untrusted field value.
+ * @param maxLength - Maximum accepted character count.
+ * @returns The trimmed non-empty string.
+ * @throws When the value is missing, empty, non-string, or too long.
+ */
 function parseString(value: unknown, maxLength: number) {
   if (typeof value !== "string") throw invalidFeedbackRequest();
   const normalized = value.trim();
@@ -492,6 +679,12 @@ function parseString(value: unknown, maxLength: number) {
   return normalized;
 }
 
+/** Parses a non-negative pagination offset.
+ *
+ * @param value - Untrusted offset value.
+ * @returns The numeric offset.
+ * @throws When the value is not a non-negative safe integer.
+ */
 function parseOffsetValue(value: unknown) {
   if (!Number.isSafeInteger(value) || Number(value) < 0) {
     throw invalidFeedbackRequest();
@@ -499,6 +692,12 @@ function parseOffsetValue(value: unknown) {
   return Number(value);
 }
 
+/** Normalizes search text to at most 120 characters.
+ *
+ * @param value - Untrusted search value.
+ * @returns Trimmed search text, including an empty string.
+ * @throws When the value is not a string or exceeds the limit.
+ */
 function parseSearch(value: unknown) {
   if (typeof value !== "string") throw invalidFeedbackRequest();
   const search = value.trim();
@@ -506,6 +705,12 @@ function parseSearch(value: unknown) {
   return search;
 }
 
+/** Parses an optional feedback category.
+ *
+ * @param value - Untrusted category value.
+ * @returns A supported category, or `undefined` for an empty value.
+ * @throws When a non-empty category is unsupported.
+ */
 function parseCategory(value: unknown): FeedbackCategory | undefined {
   if (value === undefined || value === null || value === "") return undefined;
   if (!feedbackCategories.includes(value as FeedbackCategory)) {
@@ -514,6 +719,10 @@ function parseCategory(value: unknown): FeedbackCategory | undefined {
   return value as FeedbackCategory;
 }
 
+/** Creates the localized generic feedback validation error.
+ *
+ * @returns The error used for invalid feedback requests.
+ */
 function invalidFeedbackRequest() {
   return localizedServerError("web.feedback.new.failure");
 }

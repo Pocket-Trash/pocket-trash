@@ -3,16 +3,44 @@ import { describe, expect, it, vi } from "vitest";
 import { UserIndexPage } from "./user-index-page";
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
-    <a href={to}>{children}</a>
-  ),
+  /**
+   * Renders router links as native anchors.
+   *
+   * @param root0 - Link properties.
+   * @returns The anchor fixture.
+   */
+  Link: ({
+    children,
+    to,
+  }: {
+    /** Link content. */
+    children: React.ReactNode;
+    /** Link destination. */
+    to: string;
+  }) => <a href={to}>{children}</a>,
 }));
 
 vi.mock("@/components/app-shell", () => ({
-  AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  /**
+   * Renders only the shell content under test.
+   *
+   * @param root0 - Shell properties.
+   * @returns The nested page content.
+   */
+  AppShell: ({
+    children,
+  }: {
+    /** Nested page content. */
+    children: React.ReactNode;
+  }) => <>{children}</>,
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns the English locale fixture.
+   *
+   * @returns The English locale fixture.
+   */
   useLocale: () => ({ locale: "en-US" }),
 }));
 

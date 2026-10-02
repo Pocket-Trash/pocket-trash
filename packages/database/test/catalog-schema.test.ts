@@ -5,6 +5,14 @@ import { schema } from "../src/index";
 describe("catalog schema", () => {
   it("exports generic products, shared materials, and nullable lookup fields", () => {
     const collectionItem = getTableConfig(schema.collectionItem);
+    expect(schema.collectionItem.approvalStatus.default).toBe("pending");
+    expect(collectionItem.checks.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "collection_item_approval_status_valid",
+        "collection_item_approval_decision_metadata_consistent",
+        "collection_item_approval_reason_valid",
+      ]),
+    );
     const product = getTableConfig(schema.product);
     const productMaterial = getTableConfig(schema.productMaterial);
     const maker = getTableConfig(schema.maker);
@@ -20,6 +28,9 @@ describe("catalog schema", () => {
       "name",
       "slug",
       "description",
+      "approval_status",
+      "approval_decision_reason",
+      "approval_decided_at",
       "maker_product_url",
       "maker_product_url_valid",
       "is_private",
@@ -71,6 +82,17 @@ describe("catalog schema", () => {
       product.columns.find(({ name }) => name === "maker_product_url_valid")
         ?.hasDefault,
     ).toBe(true);
+    expect(
+      product.columns.find(({ name }) => name === "approval_status")
+        ?.hasDefault,
+    ).toBe(true);
+    expect(product.checks.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "product_approval_status_valid",
+        "product_approval_decision_metadata_consistent",
+        "product_approval_reason_valid",
+      ]),
+    );
     expect(
       getTableConfig(schema.collectionSpinner).columns.map(({ name }) => name),
     ).toEqual(expect.arrayContaining(["bearing"]));

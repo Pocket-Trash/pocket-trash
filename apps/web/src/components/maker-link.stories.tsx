@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { MakerLink } from "./maker-link";
 
+/**
+ * Configures Storybook coverage for the maker link examples.
+ */
 const meta = {
   args: { name: "KAP EDC", url: "https://www.kapedc.com" },
   component: MakerLink,
@@ -8,8 +11,17 @@ const meta = {
 } satisfies Meta<typeof MakerLink>;
 
 export default meta;
+/**
+ * Storybook story contract for the maker link examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Defines the with url maker link story.
+ */
 export const WithUrl: Story = {};
 
+/**
+ * Defines the without url maker link story.
+ */
 export const WithoutUrl: Story = { args: { url: null } };

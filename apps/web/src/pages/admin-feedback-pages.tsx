@@ -40,23 +40,48 @@ import {
 } from "@/lib/feedback-shared";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Feedback collection displayed by the shared admin page. */
 type Scope = "allActive" | "archive" | "pending" | "planned";
+/** A page of admin feedback results. */
 type Page = Awaited<ReturnType<typeof listPendingFeedback>>;
+/** One feedback item displayed in the admin table. */
 type Item = Page["items"][number];
+/** A feedback item available as a merge target. */
 type MergeTarget = Awaited<ReturnType<typeof listFeedbackMergeTargets>>[number];
+/** One feedback table sort entry. */
 type Sort = AdminFeedbackSort;
+/** A sortable feedback table field. */
 type SortField = Sort["field"];
 
+/** TanStack Table features used by the feedback table. */
 const features = tableFeatures({});
+/** Column builder configured for admin feedback items. */
 const columnHelper = createColumnHelper<typeof features, Item>();
+/** A terminal feedback status available to archive filters. */
 type ArchiveStatus = NonNullable<ListAdminFeedbackOptions["statuses"]>[number];
+/** Archive statuses available to the current administrator. */
 type ArchiveStatuses = Awaited<ReturnType<typeof listFeedbackArchiveStatuses>>;
+/** Successfully loaded Linear planning options. */
+type LinearPlanOptions = Extract<
+  Awaited<ReturnType<typeof getLinearPlanOptions>>,
+  Record<"ok", true>
+>;
 
+/**
+ * Renders pending feedback requests.
+ *
+ * @param props - Pending feedback page properties.
+ * @param props.initialPage - Initial page of feedback.
+ * @param props.mergeTargets - Feedback items available for merging.
+ * @returns The pending feedback page.
+ */
 export function AdminFeedbackRequestsPage({
   initialPage,
   mergeTargets,
 }: {
+  /** Initial page of feedback. */
   initialPage: Page;
+  /** Feedback items available for merging. */
   mergeTargets: MergeTarget[];
 }) {
   return (
@@ -68,27 +93,53 @@ export function AdminFeedbackRequestsPage({
   );
 }
 
+/**
+ * Renders planned feedback.
+ *
+ * @param props - Planned feedback page properties.
+ * @param props.initialPage - Initial page of feedback.
+ * @returns The planned feedback page.
+ */
 export function AdminActiveFeedbackPage({
   initialPage,
 }: {
+  /** Initial page of feedback. */
   initialPage: Page;
 }) {
   return <AdminFeedbackPage initialPage={initialPage} scope="planned" />;
 }
 
+/**
+ * Renders all active feedback.
+ *
+ * @param props - Active feedback page properties.
+ * @param props.initialPage - Initial page of feedback.
+ * @returns The active feedback page.
+ */
 export function AdminAllActiveFeedbackPage({
   initialPage,
 }: {
+  /** Initial page of feedback. */
   initialPage: Page;
 }) {
   return <AdminFeedbackPage initialPage={initialPage} scope="allActive" />;
 }
 
+/**
+ * Renders archived feedback.
+ *
+ * @param props - Archived feedback page properties.
+ * @param props.archiveStatuses - Statuses available to the archive filter.
+ * @param props.initialPage - Initial page of feedback.
+ * @returns The feedback archive page.
+ */
 export function AdminFeedbackArchivePage({
   archiveStatuses,
   initialPage,
 }: {
+  /** Statuses available to the archive filter. */
   archiveStatuses: ArchiveStatuses;
+  /** Initial page of feedback. */
   initialPage: Page;
 }) {
   return (
@@ -104,6 +155,10 @@ export function AdminFeedbackArchivePage({
  * Renders the shared admin feedback table.
  *
  * @param props - Feedback table configuration and initial data.
+ * @param props.archiveStatuses - Statuses available to archive filters.
+ * @param props.initialPage - Initial page of feedback.
+ * @param props.mergeTargets - Feedback items available for merging.
+ * @param props.scope - Feedback collection to display.
  * @returns The admin feedback page.
  */
 function AdminFeedbackPage({
@@ -112,9 +167,13 @@ function AdminFeedbackPage({
   mergeTargets = [],
   scope,
 }: {
+  /** Statuses available to archive filters. */
   archiveStatuses?: ArchiveStatuses;
+  /** Initial page of feedback. */
   initialPage: Page;
+  /** Feedback items available for merging. */
   mergeTargets?: MergeTarget[];
+  /** Feedback collection to display. */
   scope: Scope;
 }) {
   const [error, setError] = useState(false);
@@ -140,6 +199,15 @@ function AdminFeedbackPage({
 
   useEffect(() => () => clearTimeout(searchTimerRef.current), []);
 
+  /**
+   * Loads one page using the current scope and filters.
+   *
+   * @param nextOffset - Result offset to load.
+   * @param nextSort - Sort entries to apply.
+   * @param nextStatus - Archive status to apply.
+   * @param nextSearch - Search text to apply.
+   * @returns A promise that resolves after page state is updated.
+   */
   async function load(
     nextOffset: number,
     nextSort = sort,
@@ -177,11 +245,22 @@ function AdminFeedbackPage({
     }
   }
 
+  /**
+   * Opens the management dialog for a feedback item.
+   *
+   * @param item - Feedback item to manage.
+   * @param opener - Element that opened the dialog.
+   */
   function open(item: Item, opener: HTMLElement) {
     openerRef.current = opener;
     setSelected(item);
   }
 
+  /**
+   * Advances sorting for a feedback field.
+   *
+   * @param field - Field whose sorting changes.
+   */
   function changeSort(field: SortField) {
     const current = sort.find(
       ({ field: sortedField }) => sortedField === field,
@@ -221,6 +300,11 @@ function AdminFeedbackPage({
           {row.original.title}
         </button>
       ),
+      /**
+       * Renders the title column header.
+       *
+       * @returns The sortable title header.
+       */
       header: () => (
         <SortButton field="title" onChange={changeSort} sort={sort}>
           {t("web.feedback.admin.table.title")}
@@ -238,6 +322,11 @@ function AdminFeedbackPage({
         row.original.category
           ? t(feedbackCategoryKey(row.original.category))
           : t("web.feedback.category.unset"),
+      /**
+       * Renders the category column header.
+       *
+       * @returns The sortable category header.
+       */
       header: () => (
         <SortButton field="category" onChange={changeSort} sort={sort}>
           {t("web.feedback.admin.table.category")}
@@ -391,6 +480,11 @@ function AdminFeedbackPage({
          * @returns The vote count.
          */
         cell: ({ row }) => row.original.voteCount,
+        /**
+         * Renders the vote-count column header.
+         *
+         * @returns The sortable vote-count header.
+         */
         header: () => (
           <SortButton field="votes" onChange={changeSort} sort={sort}>
             {t("web.feedback.admin.table.votes")}
@@ -408,6 +502,11 @@ function AdminFeedbackPage({
          */
         cell: ({ row }) =>
           formatDate(row.original.updatedAt ?? row.original.createdAt, locale),
+        /**
+         * Renders the update-date column header.
+         *
+         * @returns The sortable update-date header.
+         */
         header: () => (
           <SortButton field="updated" onChange={changeSort} sort={sort}>
             {t("web.feedback.admin.table.updated")}
@@ -643,6 +742,17 @@ function AdminFeedbackPage({
   );
 }
 
+/**
+ * Renders feedback details and management actions.
+ *
+ * @param props - Feedback dialog properties.
+ * @param props.dialogRef - Reference to the native dialog.
+ * @param props.item - Feedback item being managed.
+ * @param props.mergeTargets - Feedback items available for merging.
+ * @param props.onChanged - Called after feedback changes.
+ * @param props.onClosed - Called when the dialog closes.
+ * @returns The admin feedback dialog.
+ */
 function AdminFeedbackDialog({
   dialogRef,
   item,
@@ -650,21 +760,29 @@ function AdminFeedbackDialog({
   onChanged,
   onClosed,
 }: {
+  /** Reference to the native dialog. */
   dialogRef: React.RefObject<HTMLDialogElement | null>;
+  /** Feedback item being managed. */
   item?: Item;
+  /** Feedback items available for merging. */
   mergeTargets: MergeTarget[];
+  /**
+   * Handles completed feedback changes.
+   *
+   * @returns A promise that resolves after parent state is refreshed.
+   */
   onChanged: () => Promise<void>;
+  /** Handles the dialog closing. */
   onClosed: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [planError, setPlanError] = useState<TranslationKey>();
   const [planKind, setPlanKind] = useState<"issue" | "project">("issue");
-  const [planOptions, setPlanOptions] =
-    useState<
-      Extract<Awaited<ReturnType<typeof getLinearPlanOptions>>, { ok: true }>
-    >();
+  const [planOptions, setPlanOptions] = useState<LinearPlanOptions>();
   const [planReservation, setPlanReservation] = useState<{
+    /** Feedback item associated with the reservation. */
     feedbackId: number;
+    /** Stable client identifier used when creating the Linear work item. */
     uuid: string;
   }>();
   const [planning, setPlanning] = useState(false);
@@ -674,6 +792,11 @@ function AdminFeedbackDialog({
   const current = item;
   const editable = !["merged", "denied", "canceled"].includes(current.status);
 
+  /**
+   * Opens the Linear planning flow and loads its options.
+   *
+   * @returns A promise that resolves after planning options are loaded.
+   */
   async function openPlanning() {
     setPlanning(true);
     setPlanKind("issue");
@@ -699,6 +822,13 @@ function AdminFeedbackDialog({
     }
   }
 
+  /**
+   * Performs a moderation action for the current feedback item.
+   *
+   * @param action - Moderation action to perform.
+   * @param form - Merge form containing the target feedback item.
+   * @returns A promise that resolves after the action completes.
+   */
   async function act(
     action: "approve" | "deny" | "merge",
     form?: HTMLFormElement,
@@ -1099,15 +1229,33 @@ function AdminFeedbackDialog({
   );
 }
 
+/**
+ * Renders a button that advances sorting for one column.
+ *
+ * @param props - Sort button properties.
+ * @param props.children - Visible column label.
+ * @param props.field - Field controlled by the button.
+ * @param props.onChange - Called with the selected field.
+ * @param props.sort - Current table sorting.
+ * @returns The sort button.
+ */
 function SortButton({
   children,
   field,
   onChange,
   sort,
 }: {
+  /** Visible column label. */
   children: string;
+  /** Field controlled by the button. */
   field: SortField;
+  /**
+   * Changes sorting for a field.
+   *
+   * @param field - Field whose sorting changes.
+   */
   onChange: (field: SortField) => void;
+  /** Current table sorting. */
   sort: Sort[];
 }) {
   const current = sort.find(({ field: sortedField }) => sortedField === field);
@@ -1130,6 +1278,13 @@ function SortButton({
   );
 }
 
+/**
+ * Resolves the accessible sort direction for a column.
+ *
+ * @param sort - Current table sorting.
+ * @param id - Column identifier.
+ * @returns The column's accessible sort direction.
+ */
 function sortDirection(
   sort: Sort[],
   id: string,
@@ -1142,12 +1297,26 @@ function sortDirection(
       : "none";
 }
 
+/**
+ * Formats a feedback date for the current locale.
+ *
+ * @param value - Date to format.
+ * @param locale - Locale used for formatting.
+ * @returns The localized date.
+ */
 function formatDate(value: Date, locale: string) {
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
     new Date(value),
   );
 }
 
+/**
+ * Replaces an existing admin search debounce timer.
+ *
+ * @param current - Existing timer to clear.
+ * @param search - Search callback to schedule.
+ * @returns The new debounce timer.
+ */
 export function scheduleAdminSearch(
   current: ReturnType<typeof setTimeout> | undefined,
   search: () => void,
@@ -1156,10 +1325,21 @@ export function scheduleAdminSearch(
   return setTimeout(search, 150);
 }
 
+/**
+ * Resolves the localization key for a feedback status.
+ *
+ * @param status - Feedback status.
+ * @returns The status localization key.
+ */
 function statusKey(status: Item["status"]): TranslationKey {
   return `web.feedback.status.${status === "in_progress" ? "inProgress" : status}`;
 }
 
+/**
+ * Creates a localized feedback copy formatter.
+ *
+ * @returns A formatter for feedback translations.
+ */
 function useCopy() {
   const { locale } = useLocale();
   return useCallback(

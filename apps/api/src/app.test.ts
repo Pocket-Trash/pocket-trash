@@ -32,6 +32,7 @@ describe("api", () => {
 
     const openApiResponse = await app.request(openApiJsonPath);
     const document = (await openApiResponse.json()) as {
+      /** OpenAPI operations keyed by route path. */
       paths: Record<string, unknown>;
     };
     expect(document.paths).toHaveProperty(healthPath);
@@ -59,6 +60,11 @@ describe("api", () => {
           environment: "test",
           transports: [
             {
+              /**
+               * Captures a structured event for assertions.
+               *
+               * @param event - Sanitized log event.
+               */
               log(event) {
                 events.push(event);
               },
@@ -163,7 +169,18 @@ describe("api", () => {
     const service = createUploadServiceMock();
     const app = createApp({
       uploadRuntime: {
+        /**
+         * Returns the authenticated upload owner.
+         *
+         * @returns Authenticated test actor.
+         */
         authenticate: async () => ({ clerkId: "user_123", role: "user" }),
+        /**
+         * Accepts only the preview origin used by this request.
+         *
+         * @param origin - Candidate request origin.
+         * @returns Whether the origin matches the test preview deployment.
+         */
         isAllowedOrigin: (origin) => origin === "https://preview.vercel.app",
         service,
       },
@@ -242,7 +259,17 @@ describe("api", () => {
   it("rejects unauthenticated resource upload sessions", async () => {
     const app = createApp({
       uploadRuntime: {
+        /**
+         * Returns no actor to exercise the unauthorized response.
+         *
+         * @returns No authenticated actor.
+         */
         authenticate: async () => null,
+        /**
+         * Allows every origin so authentication remains the tested failure.
+         *
+         * @returns Always `true`.
+         */
         isAllowedOrigin: () => true,
         service: createUploadServiceMock(),
       },
@@ -264,7 +291,17 @@ describe("api", () => {
     );
     const app = createApp({
       uploadRuntime: {
+        /**
+         * Returns the authenticated upload owner.
+         *
+         * @returns Authenticated test actor.
+         */
         authenticate: async () => ({ clerkId: "user_123", role: "user" }),
+        /**
+         * Allows every origin for the completion-error test.
+         *
+         * @returns Always `true`.
+         */
         isAllowedOrigin: () => true,
         service,
       },
@@ -288,7 +325,17 @@ describe("api", () => {
     const service = createUploadServiceMock();
     const app = createApp({
       uploadRuntime: {
+        /**
+         * Returns the authenticated upload owner.
+         *
+         * @returns Authenticated test actor.
+         */
         authenticate: async () => ({ clerkId: "user_123", role: "user" }),
+        /**
+         * Allows every origin for deletion-target validation.
+         *
+         * @returns Always `true`.
+         */
         isAllowedOrigin: () => true,
         service,
       },
@@ -322,6 +369,11 @@ describe("api", () => {
   });
 });
 
+/**
+ * Creates a minimal storage service double for API route tests.
+ *
+ * @returns Storage service with inspectable Vitest methods.
+ */
 function createUploadServiceMock() {
   return {
     eraseAccountObjects: vi.fn(async () => ({ exceptions: [] })),
@@ -361,7 +413,17 @@ describe("upload runtime lifecycle", () => {
     const getUploadRuntime = vi.fn(() => ({
       logger,
       service,
+      /**
+       * Returns the authenticated owner used by the lifecycle request.
+       *
+       * @returns Authenticated test actor.
+       */
       authenticate: async () => ({ clerkId: "owner", role: "user" as const }),
+      /**
+       * Allows every origin for the runtime lifecycle test.
+       *
+       * @returns Always `true`.
+       */
       isAllowedOrigin: () => true,
     }));
     const app = createApp({ getUploadRuntime });

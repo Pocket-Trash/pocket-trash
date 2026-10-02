@@ -1,6 +1,12 @@
 import { type PenProduct, products } from "@/lib/pen-data";
 import { normalizedHeadline } from "@/lib/pen-filters";
 
+/**
+ * Converts text to a lowercase hyphenated ASCII slug.
+ *
+ * @param value - Text to normalize.
+ * @returns The normalized slug, possibly empty.
+ */
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -9,12 +15,15 @@ function slugify(value: string): string {
 }
 
 /**
- * Build a `<slug>-<code>` route param from human-readable name parts and a
- * numeric id. The trailing base36 `code` is the unique, authoritative part; the
- * leading slug is decorative (many items share one, so a slug can't identify on
- * its own). Collection-agnostic: pens use it today, and future entity types
- * (fidgets / knives / journals / refills) can reuse it once they land in the DB
- * so every collection shares one shape — `/<collection>/<slug>-<code>`.
+ * Encodes human-readable name parts and an ID as a shared entity route parameter.
+ * The slug is decorative; the trailing base36 code is authoritative, so every collection can use the same route shape.
+ * Callers must supply a positive safe integer ID for the route to round-trip.
+ *
+ * @param nameParts - Human-readable parts used for the decorative slug.
+ * @param id - Positive safe integer entity identifier encoded in base36.
+ * @returns A decorative slug followed by the authoritative base36 code, or the code alone.
+ * @example
+ * entityParam(["Orbit", "Titanium"], 42); // "orbit-titanium-16"
  */
 export function entityParam(
   nameParts: Array<string | null | undefined>,
@@ -26,9 +35,13 @@ export function entityParam(
 }
 
 /**
- * Reverse of {@link entityParam}: read the trailing base36 code from a route
- * param back to its numeric id, ignoring the decorative slug so edited / short
- * links (or a bare `<code>`) still resolve. Returns null for a malformed code.
+ * Decodes the trailing base36 segment while ignoring the decorative slug.
+ * Edited slugs, short links, and bare codes therefore resolve to the same entity.
+ *
+ * @param param - Entity route parameter.
+ * @returns The decoded positive ID, or `null` when the trailing segment is empty or has no positive base36 prefix.
+ * @example
+ * entityIdFromParam("edited-slug-16"); // 42
  */
 export function entityIdFromParam(param: string): number | null {
   const code = param.split("-").pop();
@@ -40,9 +53,13 @@ export function entityIdFromParam(param: string): number | null {
 // --- Pens -------------------------------------------------------------------
 
 /**
- * The `/pens/$penId` route param for a pen: `<name-slug>-<short-code>`, e.g.
- * `38-clipless-click-pen-bronze-titanium-conical-2zmtshtq3`. Slug is headline +
- * material(s) + tip (nose); the trailing code is the unique Shopify id.
+ * Builds a `/pens/$penId` route parameter from a pen's headline, materials, noses, and Shopify ID.
+ *
+ * @param product - Archive product to encode.
+ * @returns The decorative pen slug followed by the authoritative base36 Shopify code.
+ * @example
+ * // "38-clipless-click-pen-bronze-titanium-conical-2zmtshtq3"
+ * penParam(product);
  */
 export function penParam(product: PenProduct): string {
   return entityParam(
@@ -55,7 +72,12 @@ export function penParam(product: PenProduct): string {
   );
 }
 
-/** Resolve a `/pens/$penId` param back to a pen via its trailing short code. */
+/**
+ * Resolves a pen route parameter to the matching imported product or `null`.
+ *
+ * @param penId - Pen route parameter.
+ * @returns The matching imported product, or `null` for an invalid or unknown code.
+ */
 export function decodePenParam(penId: string): PenProduct | null {
   const id = entityIdFromParam(penId);
   if (id === null) return null;

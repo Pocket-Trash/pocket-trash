@@ -62,12 +62,14 @@ describe("collection deletion", () => {
         .insert(schema.product)
         .values([
           {
+            approvalStatus: "approved",
             makerId: maker.id,
             name: "Test spinner",
             productTypeId: spinnerType.id,
             slug: "test-spinner",
           },
           {
+            approvalStatus: "approved",
             makerId: maker.id,
             name: "Test button",
             productTypeId: buttonType.id,

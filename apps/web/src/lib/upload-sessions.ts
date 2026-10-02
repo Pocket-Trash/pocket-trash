@@ -18,9 +18,19 @@ import {
 } from "@pocket-trash/localizations";
 import { clientEnv } from "@/env/client";
 
+/**
+ * Accepted MIME types for image upload sessions.
+ */
 const imageTypes = new Set<string>(
   Object.values(imageMimeTypesByExtension).flat(),
 );
+/**
+ * Formats a byte count as localized mebibytes.
+ *
+ * @param bytes - Byte count to format.
+ * @param locale - Locale used to format values and messages.
+ * @returns Localized mebibyte text.
+ */
 export function formatMiB(
   bytes: number,
   locale: SupportedLocale = DEFAULT_LOCALE,
@@ -34,38 +44,113 @@ export function formatMiB(
   );
 }
 
+/**
+ * Metadata sent when creating an upload session.
+ */
 type UploadMetadata = {
+  /**
+   * MIME type sent for the upload.
+   */
   contentType: string;
+  /**
+   * Original browser filename.
+   */
   fileName: string;
+  /**
+   * File size in bytes.
+   */
   size: number;
 };
 
+/**
+ * Request passed to an upload transport for one file.
+ */
 type FileUploadRequest = {
+  /**
+   * Browser file to upload.
+   */
   file: File;
+  /**
+   * HTTP headers required by the upload endpoint.
+   */
   headers: Record<string, string>;
+  /**
+   * Reports progress for one upload.
+   *
+   * @param percent - Upload completion percentage.
+   */
   onProgress(percent: number): void;
+  /**
+   * Upload endpoint URL.
+   */
   url: string;
 };
 
+/**
+ * Transport that uploads one file for an active session.
+ *
+ * @param request - File upload request.
+ * @returns The upload endpoint response.
+ * @rejects If the file transport fails.
+ */
 type FileUploader = (request: FileUploadRequest) => Promise<Response>;
 
+/**
+ * Upload-session metadata returned by the storage API.
+ */
 type SessionResponse = {
+  /**
+   * Upload-session expiry timestamp.
+   */
   expiresAt: string;
+  /**
+   * Opaque upload-session identifier.
+   */
   id: string;
+  /**
+   * Files authorized for this upload session.
+   */
   uploads: Array<
     UploadMetadata & {
+      /**
+       * Opaque file-upload identifier within the session.
+       */
       id: string;
+      /**
+       * Whether the upload is a resource file or image.
+       */
       kind: "image" | "file";
     }
   >;
 };
 
+/**
+ * Localized resource-upload validation failure.
+ */
 export type ResourceUploadValidationError = {
+  /**
+   * Localization key describing the failure.
+   */
   key: TranslationKey;
+  /**
+   * Values interpolated into the localized failure message.
+   */
   params?: Record<string, number | string>;
 };
 
+/**
+ * Failure raised for a specific upload-session stage.
+ */
 export class UploadRequestError extends Error {
+  /**
+   * Creates an upload failure with optional API and file context.
+   *
+   * @param stage - Upload stage that failed.
+   * @param code - Stable API error code.
+   * @param fileName - File associated with the failure.
+   * @param imageId - Existing duplicate image identifier.
+   * @param sha256 - Duplicate file digest.
+   */
   constructor(
     readonly stage: "complete" | "file" | "session",
     readonly code?: string,
@@ -78,6 +163,13 @@ export class UploadRequestError extends Error {
   }
 }
 
+/**
+ * Appends newly selected files without discarding earlier selections.
+ *
+ * @param current - Files already selected.
+ * @param additions - Newly selected files to append.
+ * @returns A new array containing current and added files.
+ */
 export function appendResourceUploadFiles(
   current: File[],
   additions: Iterable<File>,
@@ -85,6 +177,12 @@ export function appendResourceUploadFiles(
   return [...current, ...additions];
 }
 
+/**
+ * Maps upload failures to stable localization keys and parameters.
+ *
+ * @param error - Failure to translate.
+ * @returns The localized validation error payload.
+ */
 export function getUploadErrorTranslation(
   error: unknown,
 ): ResourceUploadValidationError {
@@ -106,6 +204,15 @@ export function getUploadErrorTranslation(
   return { key: "web.resources.upload.sessionFailure" };
 }
 
+/**
+ * Validates resource files, images, per-group case-insensitive duplicate names, and aggregate size.
+ *
+ * @param files - Files to validate.
+ * @param images - Images to validate.
+ * @param requireImages - Whether at least one image is required.
+ * @param locale - Locale used to format values and messages.
+ * @returns The first validation failure, or `undefined` when valid.
+ */
 export function validateResourceUpload(
   files: File[],
   images: File[] = [],
@@ -162,6 +269,15 @@ export function validateResourceUpload(
   }
 }
 
+/**
+ * Validates required resource images, case-insensitive duplicate names, types, counts, and sizes.
+ *
+ * @param images - Images to validate.
+ * @param totalCount - Total retained and newly selected image count.
+ * @param required - Whether at least one retained or new image is required.
+ * @param locale - Locale used to format values and messages.
+ * @returns The first image validation failure, or `undefined` when valid.
+ */
 export function validateResourceImages(
   images: File[],
   totalCount = images.length,
@@ -219,28 +335,83 @@ export function validateResourceImages(
 
 /**
  * Uploads a resource creation or version session.
+ * Completion is retried once after a server error.
  *
  * @param input - Resource upload files, metadata, and callbacks.
  * @returns The created resource and version identifiers.
- * @rejects When validation or upload fails.
+ * @rejects If authentication, hashing, session creation, file transfer, or completion fails.
  */
 export async function uploadResourceSession(input: {
+  /**
+   * Categories assigned when creating a resource.
+   */
   categories?: string[];
+  /**
+   * Description assigned when creating a resource.
+   */
   description?: string;
+  /**
+   * Optional fetch implementation used for requests and tests.
+   */
   fetch?: typeof fetch;
+  /**
+   * Files uploaded for the resource or new version.
+   */
   files: File[];
+  /**
+   * Returns the current authentication token.
+   *
+   * @returns An authentication token, or `null` when signed out.
+   * @rejects If token lookup fails.
+   */
   getToken(): Promise<string | null>;
+  /**
+   * Preview images included in the operation.
+   */
   images?: File[];
+  /**
+   * Whether a newly created resource is private.
+   */
   isPrivate?: boolean;
+  /**
+   * Resource display name.
+   */
   name?: string;
+  /**
+   * Reports progress for one upload.
+   *
+   * @param fileName - File whose progress changed.
+   * @param percent - Upload completion percentage.
+   */
   onProgress?(fileName: string, percent: number): void;
+  /**
+   * Reports the active upload-session stage.
+   *
+   * @param stage - Stage that has started.
+   */
   onStage?(stage: "complete" | "upload"): void;
+  /**
+   * Whether to create a resource or add a version.
+   */
   operation: "create" | "version";
   /** Staff reason for a cross-owner version upload. */
   reason?: string;
+  /**
+   * Existing resource identifier required for version uploads.
+   */
   resourceId?: number;
+  /**
+   * Optional per-file upload transport.
+   */
   uploadFile?: FileUploader;
-}): Promise<{ resourceId: number; version: number }> {
+}): Promise<{
+  /**
+   * Stable resource identifier.
+   */
+  resourceId: number;
+  /** Created resource version number. */
+  version: number;
+}> {
   return (await uploadSession({
     ...input,
     target: {
@@ -257,23 +428,88 @@ export async function uploadResourceSession(input: {
             name: input.name,
           }
         : { operation: "version", reason: input.reason },
-  })) as { resourceId: number; version: number };
+  })) as {
+    /**
+     * Stable resource identifier.
+     */
+    resourceId: number;
+    /** Created resource version number. */
+    version: number;
+  };
 }
 
+/**
+ * Creates an authenticated upload session, transfers every file, and completes it.
+ * Completion is retried once after a server error.
+ *
+ * @param input - Target, files, authentication, transport, and progress callbacks.
+ * @returns Identifiers returned by the completed target operation.
+ * @rejects If authentication, hashing, session creation, file transfer, or completion fails.
+ */
 async function uploadSession(input: {
+  /**
+   * Storage target receiving uploaded files.
+   */
   target: {
+    /**
+     * Storage target type.
+     */
     type: UploadTargetType;
+    /**
+     * Existing target identifier, omitted when the operation creates it.
+     */
     id?: number;
   };
+  /**
+   * Target-specific metadata committed with the upload.
+   */
   payload?: Record<string, unknown>;
+  /**
+   * Optional fetch implementation used for requests and tests.
+   */
   fetch?: typeof fetch;
+  /**
+   * Resource files included in the operation.
+   */
   files: File[];
+  /**
+   * Preview images included in the operation.
+   */
   images?: File[];
+  /**
+   * Returns the current authentication token.
+   *
+   * @returns An authentication token, or `null` when signed out.
+   * @rejects If token lookup fails.
+   */
   getToken(): Promise<string | null>;
+  /**
+   * Reports progress for one upload.
+   *
+   * @param fileName - File whose progress changed.
+   * @param percent - Upload completion percentage.
+   */
   onProgress?(fileName: string, percent: number): void;
+  /**
+   * Reports the active upload-session stage.
+   *
+   * @param stage - Stage that has started.
+   */
   onStage?(stage: "complete" | "upload"): void;
+  /**
+   * Optional per-file upload transport.
+   */
   uploadFile?: FileUploader;
-}): Promise<{ resourceId?: number; version?: number; targetId?: number }> {
+}): Promise<{
+  /**
+   * Stable resource identifier.
+   */
+  resourceId?: number;
+  /** Created resource version number. */
+  version?: number;
+  /** Identifier produced for a non-resource upload target. */
+  targetId?: number;
+}> {
   const fetcher = input.fetch ?? fetch;
   const uploadFile =
     input.uploadFile ??
@@ -312,8 +548,17 @@ async function uploadSession(input: {
   );
   if (!response.ok) {
     const error = (await response.json().catch(() => ({}))) as {
+      /**
+       * Stable storage API error code.
+       */
       error?: string;
+      /**
+       * Existing image identifier associated with a duplicate.
+       */
       imageId?: number;
+      /**
+       * SHA-256 digest associated with a duplicate.
+       */
       sha256?: string;
     };
     throw new UploadRequestError(
@@ -341,6 +586,12 @@ async function uploadSession(input: {
         authorization: `Bearer ${token}`,
         "content-type": upload.contentType,
       },
+      /**
+       * Forwards this file's transport progress to the session listener.
+       *
+       * @param percent - Upload completion percentage.
+       * @returns The listener's result, or `undefined` when no listener is provided.
+       */
       onProgress: (percent) => input.onProgress?.(file.name, percent),
       url: `${trimTrailingSlash(clientEnv.VITE_API_URL)}/api/v0/storage/upload-sessions/${encodeURIComponent(session.id)}/files/${encodeURIComponent(upload.id)}`,
     });
@@ -354,6 +605,12 @@ async function uploadSession(input: {
   }
 
   input.onStage?.("complete");
+  /**
+   * Sends the idempotent session-completion request.
+   *
+   * @returns The completion response.
+   * @rejects If the completion request fails.
+   */
   const complete = () =>
     fetcher(
       `${trimTrailingSlash(clientEnv.VITE_API_URL)}/api/v0/storage/upload-sessions/${encodeURIComponent(session.id)}/complete`,
@@ -373,11 +630,25 @@ async function uploadSession(input: {
     );
   }
   return (await completeResponse.json()) as {
+    /**
+     * Stable resource identifier.
+     */
     resourceId: number;
+    /**
+     * Created resource version number.
+     */
     version: number;
   };
 }
 
+/**
+ * Uploads one file with fetch and reports start and completion progress.
+ *
+ * @param fetcher - Fetch implementation used to send the request.
+ * @param input - File, endpoint, headers, and progress callback.
+ * @returns The upload endpoint response.
+ * @rejects If fetch rejects.
+ */
 async function uploadFileWithFetch(
   fetcher: typeof fetch,
   input: FileUploadRequest,
@@ -392,10 +663,22 @@ async function uploadFileWithFetch(
   return response;
 }
 
+/**
+ * Uploads one file with XMLHttpRequest progress events.
+ *
+ * @param input - File, endpoint, headers, and progress callback.
+ * @returns The upload endpoint response.
+ * @rejects If the request is aborted or encounters a network error.
+ */
 function uploadFileWithProgress(input: FileUploadRequest): Promise<Response> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve, rejectPromise) => {
     const request = new XMLHttpRequest();
     let lastPercent = -1;
+    /**
+     * Reports a new rounded and clamped progress percentage once.
+     *
+     * @param percent - Upload completion percentage.
+     */
     const report = (percent: number) => {
       const nextPercent = Math.max(0, Math.min(100, Math.round(percent)));
       if (nextPercent === lastPercent) return;
@@ -423,8 +706,14 @@ function uploadFileWithProgress(input: FileUploadRequest): Promise<Response> {
         ),
       );
     });
-    const rejectUpload = () =>
-      reject(new UploadRequestError("file", "upload_failed", input.file.name));
+    /**
+     * Rejects the pending upload after a transport abort or error.
+     */
+    const rejectUpload = () => {
+      rejectPromise(
+        new UploadRequestError("file", "upload_failed", input.file.name),
+      );
+    };
     request.addEventListener("abort", rejectUpload);
     request.addEventListener("error", rejectUpload);
     report(0);
@@ -432,6 +721,16 @@ function uploadFileWithProgress(input: FileUploadRequest): Promise<Response> {
   });
 }
 
+/**
+ * Validates a file name, size, extension, and content type.
+ *
+ * @param file - Browser file to validate.
+ * @param allowedTypes - Allowed MIME types keyed by lowercase extension.
+ * @param contentType - MIME type to validate against the file extension.
+ * @param maxBytes - Maximum permitted file size in bytes.
+ * @param locale - Locale used to format values and messages.
+ * @returns The validation failure, or `undefined` when valid.
+ */
 function validateFile(
   file: File,
   allowedTypes: Readonly<Record<string, readonly string[]>>,
@@ -471,6 +770,12 @@ function validateFile(
   }
 }
 
+/**
+ * Selects the canonical resource MIME type from its filename extension.
+ *
+ * @param fileName - Filename whose extension selects a content type.
+ * @returns The configured MIME type, or `application/octet-stream` when unknown.
+ */
 function resourceContentType(fileName: string): string {
   const extension = fileName.slice(fileName.lastIndexOf(".")).toLowerCase();
   const allowedTypes: Readonly<Record<string, readonly string[]>> =
@@ -478,6 +783,13 @@ function resourceContentType(fileName: string): string {
   return allowedTypes[extension]?.[0] ?? "application/octet-stream";
 }
 
+/**
+ * Builds storage upload metadata for a browser file.
+ *
+ * @param file - Browser file whose metadata is needed.
+ * @param contentType - MIME type sent to storage.
+ * @returns Upload metadata for the file.
+ */
 function toMetadata(file: File, contentType = file.type): UploadMetadata {
   return {
     contentType,
@@ -486,21 +798,48 @@ function toMetadata(file: File, contentType = file.type): UploadMetadata {
   };
 }
 
+/**
+ * Reads an optional stable error code from an API response.
+ *
+ * @param response - API response whose error body may be parsed.
+ * @returns The stable error code, or `undefined` when absent or unreadable.
+ */
 async function readErrorCode(response: Response): Promise<string | undefined> {
   try {
-    const body = (await response.json()) as { error?: unknown };
+    const body = (await response.json()) as {
+      /**
+       * Stable storage API error code.
+       */
+      error?: unknown;
+    };
     return typeof body.error === "string" ? body.error : undefined;
   } catch {
     return undefined;
   }
 }
 
+/**
+ * Removes trailing slashes from a URL base.
+ *
+ * @param value - URL base to normalize.
+ * @returns The URL base without trailing slashes.
+ */
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/u, "");
 }
 
+/**
+ * Localized image-upload validation failure.
+ */
 export type ImageUploadError = ResourceUploadValidationError;
 
+/**
+ * Validates catalog image count, aggregate size, type, and per-file size.
+ *
+ * @param files - Files to validate.
+ * @param locale - Locale used to format values and messages.
+ * @returns The validation failure, or `undefined` when valid.
+ */
 export function validateImages(
   files: File[],
   locale: SupportedLocale = DEFAULT_LOCALE,
@@ -533,20 +872,56 @@ export function validateImages(
 
 /**
  * Uploads catalog images while reusing exact-byte active images.
+ * Session completion is retried once after a response with status 500 or higher.
  *
  * @param input - Images, target, authentication, locale, and restore callback.
- * @returns Uploaded or reused files and any files that failed to upload.
- * @rejects When validation, authentication, or storage fails.
+ * @returns Successfully uploaded, restored, or reused files and an empty failure list.
+ * @rejects If validation, authentication, hashing, restoration, or storage fails.
  */
 export async function uploadImages(input: {
+  /**
+   * Locale used for validation messages.
+   */
   locale: SupportedLocale;
+  /**
+   * Images to upload or reuse.
+   */
   files: File[];
+  /**
+   * Returns the current authentication token.
+   *
+   * @returns An authentication token, or `null` when signed out.
+   * @rejects If token lookup fails.
+   */
   getToken(): Promise<string | null>;
+  /**
+   * Attempts to restore an owner-deleted duplicate image.
+   *
+   * @param imageId - Existing duplicate image identifier.
+   * @returns Whether the deleted duplicate was restored.
+   * @rejects If restoring the deleted duplicate fails.
+   */
   onOwnerDeletedDuplicate?(imageId: number): Promise<boolean>;
+  /**
+   * Optional moderation or audit reason.
+   */
   reason?: string;
+  /**
+   * Identifier of the upload target.
+   */
   targetId: number;
+  /**
+   * Non-resource image target type.
+   */
   targetType: Exclude<UploadTargetType, "resource">;
-}): Promise<{ uploaded: File[]; failed: File[] }> {
+}): Promise<{
+  /**
+   * Files uploaded, restored, or reused successfully.
+   */
+  uploaded: File[];
+  /** Files that could not be uploaded. */
+  failed: File[];
+}> {
   if (!input.files.length) return { uploaded: [], failed: [] };
   const validation = validateImages(input.files, input.locale);
   if (validation) throw validation;
@@ -584,9 +959,27 @@ export async function uploadImages(input: {
     throw getUploadErrorTranslation(error);
   }
 }
+/**
+ * Deletes a collection cover image with optional moderation context.
+ *
+ * @param input - Cover identifier, authentication callback, and optional moderation reason.
+ * @rejects If authentication is unavailable, the request fails, or the API rejects deletion.
+ */
 export async function deleteCollectionCover(input: {
+  /**
+   * Collection-cover image identifier to delete.
+   */
   imageId: number;
+  /**
+   * Returns the current authentication token.
+   *
+   * @returns An authentication token, or `null` when signed out.
+   * @rejects If token lookup fails.
+   */
   getToken(): Promise<string | null>;
+  /**
+   * Optional moderation or audit reason.
+   */
   reason?: string;
 }) {
   const token = await input.getToken();
@@ -604,6 +997,13 @@ export async function deleteCollectionCover(input: {
   );
   if (!response.ok) throw { key: "error.generic" } satisfies ImageUploadError;
 }
+/**
+ * Computes a lowercase hexadecimal SHA-256 digest for a browser file.
+ *
+ * @param file - Browser file to hash.
+ * @returns The file's lowercase hexadecimal SHA-256 digest.
+ * @rejects If file reading or Web Crypto hashing fails.
+ */
 async function hashFile(file: File) {
   const digest = await crypto.subtle.digest(
     "SHA-256",
