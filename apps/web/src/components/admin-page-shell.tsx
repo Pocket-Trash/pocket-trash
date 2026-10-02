@@ -48,10 +48,13 @@ export function AdminPageShell({
   section,
   title,
 }: AdminPageShellProps) {
+  const { locale } = useLocale();
+
   return (
     <SidebarPageShell
       breadcrumbItems={breadcrumbItems}
       sidebar={<AdminSidebar section={section} />}
+      sidebarTitle={formatTranslation("web.sidebar.adminMenu", {}, locale)}
       title={title}
     >
       {children}
