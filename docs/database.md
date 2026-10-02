@@ -80,7 +80,7 @@ Committed Drizzle migrations are the source of truth for the production schema.
 | `development` | Permanent | Root | Shared non-production baseline |
 | `preview` | Permanent | `development` | Shared previews without database changes |
 | Developer branch | Permanent | `development` | Optional personal local work |
-| `preview-pr-<number>` | Ephemeral | `development` | Isolated database-changing PR |
+| `preview-pr-<number>` | Ephemeral | `development` | Isolated mutation-relevant PR |
 
 Database-changing PRs use an isolated `preview-pr-<number>` branch. The Deploy
 workflow creates it from `development`, runs committed migrations, and sends
@@ -91,9 +91,10 @@ PR updates reuse the branch and refresh its expiration. The default lifetime is
 14 days; `NEON_PREVIEW_BRANCH_EXPIRES_DAYS` may set 1–30 days. Closing the PR
 is the primary cleanup path and expiration is the fallback.
 
-PRs without database changes use the shared `preview` branch and skip
-Playwright mutation fixtures. See [Image CDN](./image-cdn.md) for the matching
-preview storage namespace.
+PRs without mutation-relevant changes use the shared `preview` branch and skip
+Playwright mutation fixtures. Database-changing PRs also run committed
+migrations. See [Image CDN](./image-cdn.md) for the matching preview storage
+namespace.
 
 ## Neon Compute Caps
 

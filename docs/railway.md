@@ -103,6 +103,11 @@ the workflow:
    `--skip-deploys`.
 3. Redeploys `scraper-queue` from its configured image source so Redis is online.
 
+- Mutation-relevant PRs use the isolated `preview-pr-<number>` branch;
+  DB-changing PRs also apply committed migrations before deployment.
+- Other PRs use the shared `preview` branch.
+- The selected `DATABASE_URL` is upserted into the Railway scraper preview
+  service through the Railway CLI.
 Only the external Neon URL is copied into Railway. Keep `REDIS_URL` as the
 Railway service reference so it resolves inside the preview environment.
 

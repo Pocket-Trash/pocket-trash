@@ -116,8 +116,21 @@ test("schema-changing main deploys refresh preview after development", () => {
   assert.ok(Object.hasOwn(refreshWorkflow.on, "workflow_call"));
 });
 
-test("PR previews isolate only database-changing pull requests", () => {
+test("PR mutation isolation is independent of migration detection", () => {
   const preview = deployWorkflow.jobs.preview;
+  const prepareDatabase = preview.steps.find(
+    (step) => step.name === "Prepare Neon preview database",
+  );
+  const readyComment = preview.steps.find(
+    (step) => step.name === "Comment on ready DB preview",
+  );
 
-  assert.equal(preview.env.E2E_MUTATION, undefined);
+  assert.match(
+    prepareDatabase.env.ISOLATION_REQUIRED,
+    /outputs\.mutation_e2e/u,
+  );
+  assert.equal(
+    readyComment.env.DB_CHANGING,
+    "${{ steps.db_changes.outputs.database }}",
+  );
 });

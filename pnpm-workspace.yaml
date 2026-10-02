@@ -16,6 +16,10 @@ minimumReleaseAgeExclude:
   - "@pocket-trash/cli"
   - "@pocket-trash/localizations"
   - "@pocket-trash/skills"
+  # ENG-332: accept the reviewed Clerk security fix; remove after all versions mature by 2026-10-08T20:48:58.312Z.
+  - "@clerk/localizations@4.21.2"
+  - "@clerk/shared@4.38.0"
+  - "@clerk/ui@1.38.1"
   # ENG-299: retain the patched TanStack release; remove after 2026-10-07T17:48:34.385Z.
   - "@tanstack/react-start@1.168.60"
   # ENG-299: retain the patched TanStack release; remove after 2026-10-07T17:48:11.683Z.

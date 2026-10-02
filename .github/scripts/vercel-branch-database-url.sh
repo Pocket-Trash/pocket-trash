@@ -268,6 +268,29 @@ latest_preview_url() {
   fi
 }
 
+deployment_url() {
+  require_env DEPLOYMENT_ID
+
+  local response
+  response="$(api GET "/v13/deployments/${DEPLOYMENT_ID}$(team_query_prefix)")"
+
+  local state
+  state="$(jq -er '.readyState' <<< "$response")"
+  if [[ "$state" != "READY" ]]; then
+    echo "Vercel deployment ${DEPLOYMENT_ID} is not ready: ${state}." >&2
+    return 1
+  fi
+
+  local url
+  url="https://$(jq -er '.url' <<< "$response")"
+  write_output web_preview_url "$url"
+  emit_ci_log info "ci.vercel.preview.deployment.resolved" "$(jq -n \
+    --arg branch_name "$BRANCH_NAME" \
+    --arg deployment_id "$DEPLOYMENT_ID" \
+    --arg url "$url" \
+    '{branchName: $branch_name, deploymentId: $deployment_id, webPreviewUrl: $url}')"
+}
+
 deploy_preview() {
   require_env COMMIT_SHA
   require_env REPOSITORY_ID
@@ -361,6 +384,9 @@ case "${1:-}" in
   deploy-preview)
     deploy_preview
     ;;
+  deployment-url)
+    deployment_url
+    ;;
   set)
     set_database_url
     latest_preview_url
@@ -394,7 +420,7 @@ case "${1:-}" in
     latest_preview_url
     ;;
   *)
-    echo "Usage: $0 {deploy-preview|set|remove|set-image-folder-prefix|remove-image-folder-prefix|set-resource-folder-prefix|remove-resource-folder-prefix|set-resource-api-base-url|remove-resource-api-base-url}" >&2
+    echo "Usage: $0 {deploy-preview|deployment-url|set|remove|set-image-folder-prefix|remove-image-folder-prefix|set-resource-folder-prefix|remove-resource-folder-prefix|set-resource-api-base-url|remove-resource-api-base-url}" >&2
     exit 1
     ;;
 esac
