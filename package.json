@@ -54,7 +54,7 @@
     "test": "pnpm test:jsdoc && pnpm test:workflows && pnpm infisical:check && turbo run test",
     "test:ci": "pnpm test:jsdoc && pnpm test:workflows && turbo run test:ci",
     "test:jsdoc": "node --test scripts/check-jsdoc.test.mjs",
-    "test:workflows": "node --test scripts/database-change-detection.test.mjs scripts/check-changelog-reminder.test.mjs",
+    "test:workflows": "node --test scripts/change-classification.test.mjs scripts/database-change-detection.test.mjs scripts/check-changelog-reminder.test.mjs",
     "test:logger:axiom": "tsx packages/infisical-runner/src/cli.ts logger test:axiom -- tsx packages/logger/integration/axiom-live.ts",
     "test:watch": "turbo run test:watch",
     "test:watch:no-infisical": "turbo run test:watch:no-infisical"
