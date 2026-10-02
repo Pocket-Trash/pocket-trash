@@ -183,23 +183,26 @@ export const seedColorEffects = [
   { name: "Fade", slug: "fade" },
 ] as const;
 
-/** One reviewed KAP product and its cached primary image. */
+/** One cached KAP image. */
+type KapedcSeedImage = {
+  /** Bunny object path holding the reviewed import. */
+  cacheObjectPath: string;
+  /** Validated image media type. */
+  contentType: "image/jpeg" | "image/png" | "image/webp";
+  /** Original image file name. */
+  fileName: string;
+  /** Expected image SHA-256 digest. */
+  sha256: string;
+  /** Expected image size in bytes. */
+  size: number;
+};
+
+/** One reviewed KAP product and its cached image gallery. */
 type KapedcSeedProduct = {
   /** Product description from the reviewed source snapshot. */
   description: string;
-  /** Cached primary image metadata. */
-  image: {
-    /** Bunny object path holding the reviewed import. */
-    cacheObjectPath: string;
-    /** Validated image media type. */
-    contentType: "image/jpeg" | "image/png" | "image/webp";
-    /** Original image file name. */
-    fileName: string;
-    /** Expected image SHA-256 digest. */
-    sha256: string;
-    /** Expected image size in bytes. */
-    size: number;
-  };
+  /** Cached images in source order. */
+  images: KapedcSeedImage[];
   /** Reviewed material labels for the product. */
   materialTerms: string[];
   /** Display name from the source catalog. */
@@ -493,7 +496,7 @@ export async function seedKapedcProducts(
 }
 
 /**
- * Copies each cached KAP primary image into the selected environment prefix.
+ * Copies each cached KAP image into the selected environment prefix.
  *
  * @param db - Database client receiving image records.
  * @param config - Bunny storage settings for the selected environment.
@@ -515,7 +518,6 @@ export async function seedKapedcImages(
   });
 
   for (const seeded of seededProducts) {
-    const source = seeded.product.image;
     const images = await db
       .select({
         deletedAt: productImage.deletedAt,
@@ -526,67 +528,74 @@ export async function seedKapedcImages(
       })
       .from(productImage)
       .where(eq(productImage.productId, seeded.productId));
-    const matching = images.find(({ sha256 }) => sha256 === source.sha256);
-    if (
-      matching?.deletedAt === null &&
-      isSeedImageInTargetPrefix(matching.objectPath, config.imageFolderPrefix)
-    ) {
-      continue;
-    }
-
-    const bytes = await downloadCacheObject(config, source.cacheObjectPath);
-    if (
-      bytes.byteLength !== source.size ||
-      createHash("sha256").update(bytes).digest("hex") !== source.sha256
-    ) {
-      throw new Error(
-        `Cached image verification failed for ${seeded.product.name}.`,
-      );
-    }
-    const target = storage.createImageTarget(source, {
-      entity: "products",
-      entityId: seeded.productId,
-    });
-    const targetAlreadyReferenced = images.some(
-      ({ objectPath }) => objectPath === target.objectPath,
-    );
-
-    try {
-      await storage.putImage({
-        body: bytes,
-        contentLength: target.size,
-        contentType: target.contentType,
-        objectPath: target.objectPath,
-      });
-      const imageValues = {
-        contentType: target.contentType,
-        deletedAt: null,
-        deletedByClerkId: null,
-        deletedByRole: null,
-        fileName: target.fileName,
-        objectPath: target.objectPath,
-        sha256: target.sha256,
-        size: target.size,
-        storageProvider: "bunny",
-        uploadedByClerkId: seedOwnerClerkId,
-        url: target.url,
-      };
-      if (matching) {
-        await db
-          .update(productImage)
-          .set(imageValues)
-          .where(eq(productImage.id, matching.id));
-      } else {
-        await db.insert(productImage).values({
-          ...imageValues,
-          position: Math.max(-1, ...images.map(({ position }) => position)) + 1,
-          productId: seeded.productId,
-        });
+    for (const [position, source] of seeded.product.images.entries()) {
+      const matching = images.find(({ sha256 }) => sha256 === source.sha256);
+      if (
+        matching?.deletedAt === null &&
+        isSeedImageInTargetPrefix(matching.objectPath, config.imageFolderPrefix)
+      ) {
+        if (matching.position !== position)
+          await db
+            .update(productImage)
+            .set({ position })
+            .where(eq(productImage.id, matching.id));
+        continue;
       }
-    } catch (error) {
-      if (!targetAlreadyReferenced)
-        await storage.delete(target.objectPath).catch(() => undefined);
-      throw error;
+
+      const bytes = await downloadCacheObject(config, source.cacheObjectPath);
+      if (
+        bytes.byteLength !== source.size ||
+        createHash("sha256").update(bytes).digest("hex") !== source.sha256
+      ) {
+        throw new Error(
+          `Cached image verification failed for ${seeded.product.name}.`,
+        );
+      }
+      const target = storage.createImageTarget(source, {
+        entity: "products",
+        entityId: seeded.productId,
+      });
+      const targetAlreadyReferenced = images.some(
+        ({ objectPath }) => objectPath === target.objectPath,
+      );
+
+      try {
+        await storage.putImage({
+          body: bytes,
+          contentLength: target.size,
+          contentType: target.contentType,
+          objectPath: target.objectPath,
+        });
+        const imageValues = {
+          contentType: target.contentType,
+          deletedAt: null,
+          deletedByClerkId: null,
+          deletedByRole: null,
+          fileName: target.fileName,
+          objectPath: target.objectPath,
+          position,
+          sha256: target.sha256,
+          size: target.size,
+          storageProvider: "bunny",
+          uploadedByClerkId: seedOwnerClerkId,
+          url: target.url,
+        };
+        if (matching) {
+          await db
+            .update(productImage)
+            .set(imageValues)
+            .where(eq(productImage.id, matching.id));
+        } else {
+          await db.insert(productImage).values({
+            ...imageValues,
+            productId: seeded.productId,
+          });
+        }
+      } catch (error) {
+        if (!targetAlreadyReferenced)
+          await storage.delete(target.objectPath).catch(() => undefined);
+        throw error;
+      }
     }
   }
 }

@@ -2,4 +2,4 @@
 "@package/database": patch
 ---
 
-Seed KAP EDC products and primary images in non-production databases.
+Seed KAP EDC products and complete image galleries in non-production databases.

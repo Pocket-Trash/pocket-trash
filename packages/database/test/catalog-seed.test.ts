@@ -218,7 +218,7 @@ describe("catalog seed", () => {
     expect(state.makers.get("kap edc")?.rootUrl).toBe("https://www.kapedc.com");
   });
 
-  it("contains every approved KAP product and primary image", async () => {
+  it("contains every approved KAP product and unique gallery image", async () => {
     const snapshot = await loadKapedcSeedData();
 
     expect(snapshot.products).toHaveLength(71);
@@ -232,7 +232,12 @@ describe("catalog seed", () => {
       snapshot.products.filter(({ slug }) => slug.includes("katla")),
     ).toHaveLength(2);
     expect(
-      snapshot.products.every(({ image }) => image.sha256.length === 64),
+      snapshot.products.reduce((count, { images }) => count + images.length, 0),
+    ).toBe(271);
+    expect(
+      snapshot.products.every(({ images }) =>
+        images.every(({ sha256 }) => sha256.length === 64),
+      ),
     ).toBe(true);
     expect(
       snapshot.products
