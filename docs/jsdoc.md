@@ -2,8 +2,9 @@
 
 Pocket Trash uses concise JSDoc to describe stable JavaScript and TypeScript
 contracts for developers and coding agents. `pnpm lint:jsdoc` enforces this
-standard on declarations changed by the staged diff or CI merge base. Untouched
-legacy declarations do not fail the check.
+standard on every eligible declaration in tracked, hand-authored JS/TS-family
+source, including untouched declarations. Git diffs and base refs do not restrict
+coverage.
 
 ## Targets
 
@@ -14,8 +15,15 @@ Add JSDoc when you add or modify a stable named declaration:
 - interfaces, type aliases, callable type members, and declared properties
 - exported or module-level values such as schemas, constants, and service objects
 
-Skip anonymous callbacks, imports, re-exports, generated files, and comments
-that would only repeat a filename or expression.
+Skip anonymous/contextual callbacks, imports, and re-exports. The generated
+exclusions are:
+
+- `apps/api/src/worker-configuration.d.ts`
+- `apps/web/src/routeTree.gen.ts`
+- `apps/web/src/vite-env.d.ts`
+
+Dependencies, build output, and other untracked files are outside the scan. Do
+not add file-overview comments that would only repeat a filename or expression.
 
 ## Style
 
@@ -85,10 +93,14 @@ export function CatalogToolbar(props: CatalogToolbarProps) {
 
 ## Run the check
 
-Stage the changed files before running the local check:
+Run the full-repository check from the repository root; no staged diff is needed:
 
 ```sh
 pnpm lint:jsdoc
 ```
 
-`pnpm lint` runs the same JSDoc check after the repository ESLint pass.
+`pnpm lint`, the pre-commit hook, and CI run the same full-source JSDoc check.
+The checker reads working-tree contents for paths listed by `git ls-files`.
+Stage new source files to include them; modified tracked files are checked even
+when unstaged. Deleted files are skipped. No changed-only mode or baseline is
+supported.

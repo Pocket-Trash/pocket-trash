@@ -3,16 +3,14 @@ set -eu
 
 staged_files=$(git diff --cached --name-only --diff-filter=ACMR)
 
-if [ -z "$staged_files" ]; then
-  exit 0
+if [ -n "$staged_files" ]; then
+  pnpm exec biome format --write --staged --no-errors-on-unmatched
+
+  printf "%s\n" "$staged_files" | while IFS= read -r file; do
+    if [ -e "$file" ]; then
+      git add -- "$file"
+    fi
+  done
 fi
-
-pnpm exec biome format --write --staged --no-errors-on-unmatched
-
-printf "%s\n" "$staged_files" | while IFS= read -r file; do
-  if [ -e "$file" ]; then
-    git add -- "$file"
-  fi
-done
 
 pnpm lint

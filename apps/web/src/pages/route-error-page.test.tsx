@@ -9,6 +9,7 @@ import {
   resolveRouteErrorLocale,
 } from "./route-error-page";
 
+/** Mutable locale, router, and logger fixtures for route-error tests. */
 const mocks = vi.hoisted(() => ({
   activeLocale: null as "en-US" | "es-MX" | null,
   invalidate: vi.fn(),
