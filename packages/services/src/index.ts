@@ -121,7 +121,13 @@ export type {
 /** Logger configuration or an existing logger accepted by the service registry. */
 export type ServicesLoggerConfig = LoggerConfig | Logger;
 
-/** Optional dependencies used to configure the application service registry. */
+/**
+ * Environment-neutral dependencies for an application service registry.
+ *
+ * Logger configuration may stand alone. Database and image services require a
+ * logger. Storage must be configured with a database in the same call and also
+ * requires a configured or supplied logger.
+ */
 export type ServicesConfig = {
   /** Database client configuration for database-backed services. */
   db?: DatabaseConfig;
@@ -133,7 +139,11 @@ export type ServicesConfig = {
   storage?: UploadStorageConfig;
 };
 
-/** Lazily configured application services. */
+/**
+ * App-facing database, feature-flag, image, logger, resource, and storage
+ * namespaces. Each getter fails until its namespace has been configured by the
+ * importing server application.
+ */
 export class Services {
   /** Configured database-backed services. */
   #db?: DbServices;
@@ -149,7 +159,8 @@ export class Services {
   #storage?: StorageService;
 
   /**
-   * Configures services from runtime settings.
+   * Configures namespaces from app-supplied runtime settings without reading
+   * environment variables.
    *
    * @param config - Runtime service configuration.
    * @throws When dependencies are missing or database, storage, or image configuration is invalid.
@@ -308,7 +319,7 @@ export class Services {
 }
 
 /**
- * Creates an unconfigured application service registry.
+ * Creates an isolated, unconfigured application service registry.
  *
  * @returns New service registry.
  */
