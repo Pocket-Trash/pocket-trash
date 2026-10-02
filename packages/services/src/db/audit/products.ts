@@ -81,6 +81,7 @@ export const productAudit = {
   ),
   materialCreated: definition("products.material.created", "products.material"),
   productCreated: definition("products.product.created", "products.product"),
+  productDeleted: definition("products.product.deleted", "products.product"),
   productUpdated: definition("products.product.updated", "products.product"),
   productVisibilityChanged: definition(
     "products.product.visibility_changed",
