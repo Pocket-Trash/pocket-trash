@@ -100,6 +100,33 @@ test("@mutation collection lifecycle and deletion choices persist through the pu
       page.getByRole("link", { exact: true, name: fixture.archive.itemName }),
     ).toBeVisible();
 
+    await page.goto(`/collections/edit/${fixture.archive.itemId}`);
+    await waitForHydration(page);
+    await page
+      .getByRole("button", { exact: true, name: "Delete permanently" })
+      .click();
+    const itemDeletionDialog = page.getByRole("dialog", {
+      name: "Delete permanently",
+    });
+    await itemDeletionDialog
+      .getByRole("checkbox", {
+        name: "I understand that this is permanent and cannot be canceled.",
+      })
+      .check();
+    await itemDeletionDialog
+      .getByRole("button", { exact: true, name: "Delete permanently" })
+      .click();
+    await expect(page).toHaveURL(
+      new RegExp(`/user/collections/${fixture.archive.id}$`, "u"),
+    );
+    await expect(
+      page.getByRole("link", { exact: true, name: fixture.archive.itemName }),
+    ).toHaveCount(0);
+    await page.reload();
+    await expect(
+      page.getByRole("link", { exact: true, name: fixture.archive.itemName }),
+    ).toHaveCount(0);
+
     await openDeletionDialog(page, fixture.deleted.id);
     await page
       .getByRole("radio", {
@@ -175,6 +202,8 @@ test("@mutation collection lifecycle and deletion choices persist through the pu
 type CollectionScenario = {
   /** Database collection identifier. */
   id: number;
+  /** Browser-editable collection-item identifier. */
+  itemId: number;
   /** Browser-visible item name. */
   itemName: string;
   /** Browser-visible collection name. */
@@ -278,7 +307,10 @@ async function createCollectionLifecycleFixture(
           ownerId: owner.id,
         })),
       )
-      .returning({ id: schema.collectionItem.id });
+      .returning({
+        collectionId: schema.collectionItem.collectionId,
+        id: schema.collectionItem.id,
+      });
     if (items.length !== collectionScenarios.length) {
       throw new Error("Failed to seed collection lifecycle items.");
     }
@@ -288,7 +320,13 @@ async function createCollectionLifecycleFixture(
         productSpinnerId: productId,
       })),
     );
-    return collectionScenarios;
+    return collectionScenarios.map((scenario) => {
+      const item = items.find(
+        ({ collectionId }) => collectionId === scenario.id,
+      );
+      if (!item) throw new Error("A lifecycle collection item is missing.");
+      return { ...scenario, itemId: item.id };
+    });
   });
 
   const [archive, deleted, moved] = seeded;
