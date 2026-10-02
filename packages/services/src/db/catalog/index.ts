@@ -1419,7 +1419,7 @@ export type CollectionsService = {
   }): Promise<void>;
 
   /**
-   * Deletes only the selected item and its images, retaining linked items and catalog products.
+   * Deletes only a currently owned selected item and its images, retaining linked items and catalog products.
    *
    * @param input - Confirmed owner or staff request with a reason for cross-owner intervention.
    * @returns Completion after the deletion and audit event commit.
@@ -3606,7 +3606,7 @@ export function createCollectionsService(
       if (input.confirmed !== true)
         throw new Error("Collection item deletion confirmation is required.");
       await logger.operation(
-        loggerMessages.database.collections.delete,
+        loggerMessages.database.collections.deleteItem,
         async () => {
           await db.transaction(async (tx) => {
             await tx.execute(
@@ -3641,11 +3641,13 @@ export function createCollectionsService(
                 id: schema.collectionItem.id,
                 collectionId: schema.collectionItem.collectionId,
                 ownerId: schema.collectionItem.ownerId,
+                owned: schema.collectionItem.owned,
               })
               .from(schema.collectionItem)
               .where(eq(schema.collectionItem.id, input.collectionItemId))
               .for("update");
             if (
+              item?.owned !== true ||
               item?.collectionId !== current.collectionId ||
               (item.ownerId !== actorUser.id &&
                 !hasPermission(input.actor, "collections.manage"))
