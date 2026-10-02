@@ -102,6 +102,7 @@ test("CLI fails open when the base commit is missing or malformed", () => {
         env: {
           ...process.env,
           BASE_SHA: baseSha,
+          GITHUB_OUTPUT: "",
           HEAD_SHA: "HEAD",
         },
         stdio: ["ignore", "pipe", "ignore"],
