@@ -9,6 +9,7 @@ import {
   eq,
   inArray,
   isNotNull,
+  or,
   sql,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -96,10 +97,14 @@ function mapCatalogNameConflict(error: unknown): never {
  * Product category supported by the spinner catalog.
  */
 export type CatalogProductType = "spinner" | "spinner-button";
-/** Durable review state for a catalog product. */
-export type ProductApprovalStatus = "approved" | "pending" | "rejected";
-/** Administrative transition accepted by the product approval workflow. */
-export type ProductApprovalAction = "approve" | "reject" | "reverse";
+/** Durable review state for a catalog product or collection item. */
+export type CatalogApprovalStatus = "approved" | "pending" | "rejected";
+/** Administrative transition accepted by a catalog approval workflow. */
+export type CatalogApprovalAction = "approve" | "reject" | "reverse";
+/** Product approval state retained for existing service consumers. */
+export type ProductApprovalStatus = CatalogApprovalStatus;
+/** Product approval action retained for existing service consumers. */
+export type ProductApprovalAction = CatalogApprovalAction;
 
 /**
  * Shared identity and routing fields for catalog reference data.
@@ -260,7 +265,7 @@ export type CatalogProduct = {
   /**
    * Durable product review state.
    */
-  approvalStatus: ProductApprovalStatus;
+  approvalStatus: CatalogApprovalStatus;
   /**
    * Bearing model or designation, or `null` when unspecified.
    */
@@ -692,14 +697,14 @@ export type CatalogService = {
    */
   decideProductApproval(input: {
     /** Requested approval transition. */
-    action: ProductApprovalAction;
+    action: CatalogApprovalAction;
     /** Staff actor making the decision. */
     actor: Actor;
     /** Product receiving the decision. */
     productId: number;
     /** Nonblank reason for the decision. */
     reason: string;
-  }): Promise<ProductApprovalStatus>;
+  }): Promise<CatalogApprovalStatus>;
   /**
    * Returns product.
    *
@@ -959,6 +964,8 @@ export type CatalogService = {
  * Owned collection item with its product snapshot and visibility state.
  */
 export type UserCollectionItem = {
+  /** Durable administrative review state, independent of privacy. */
+  approvalStatus: CatalogApprovalStatus;
   /**
    * Effective bearing after applying the collection-item override.
    */
@@ -1202,6 +1209,23 @@ export type CollectionWriteInput = {
 /** Database operations for user collections and their catalog items. */
 export type CollectionsService = {
   /**
+   * Applies a serialized collection-item approval decision.
+   *
+   * @param input - Authenticated staff action, target, and nonblank reason.
+   * @returns The resulting durable approval state.
+   * @rejects When authorization, validation, lookup, or persistence fails.
+   */
+  decideItemApproval(input: {
+    /** Requested approval transition. */
+    action: CatalogApprovalAction;
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** Collection item being reviewed. */
+    collectionItemId: number;
+    /** Nonblank reason for the decision. */
+    reason: string;
+  }): Promise<CatalogApprovalStatus>;
+  /**
    * Adds a spinner and optional button to a collection.
    *
    * @param input - Collection, spinner, optional button, overrides, and actor.
@@ -1440,6 +1464,21 @@ export type CollectionsService = {
      */
     viewer?: CatalogViewer;
   }): Promise<UserCollectionSummary | null>;
+  /**
+   * Lists one collection's items using owner, staff, and public visibility rules.
+   *
+   * @param input - Collection, owner, and optional authenticated viewer.
+   * @returns Collection items visible to the viewer.
+   * @rejects When the required catalog data cannot be queried.
+   */
+  listCollectionItems(input: {
+    /** Parent collection identifier. */
+    collectionId: number;
+    /** Collection owner's database identifier. */
+    ownerUserId: number;
+    /** Optional authenticated viewer. */
+    viewer?: CatalogViewer;
+  }): Promise<UserCollectionItem[]>;
   /**
    * Returns public item.
    *
@@ -2142,7 +2181,7 @@ export function createCatalogService(
               .limit(1)
               .for("update");
             if (!product) throw new Error("Product does not exist.");
-            const approvalStatus = nextProductApprovalStatus(
+            const approvalStatus = nextApprovalStatus(
               product.approvalStatus,
               input.action,
             );
@@ -2741,6 +2780,52 @@ export function createCollectionsService(
 ): CollectionsService {
   return {
     /**
+     * Applies one serialized collection-item approval transition.
+     *
+     * @param input - Authorized approval decision.
+     * @returns The resulting durable approval state.
+     * @rejects When authorization, validation, lookup, or persistence fails.
+     */
+    async decideItemApproval(input) {
+      if (!hasPermission(input.actor, "collections.manage")) {
+        throw new Error("Collection item does not exist.");
+      }
+      const reason = input.reason.trim();
+      if (!reason || reason.length > 1000) {
+        throw new Error("A decision reason is required.");
+      }
+      return await logger.operation(
+        loggerMessages.database.collections.updateItem,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [item] = await tx
+              .select({ approvalStatus: schema.collectionItem.approvalStatus })
+              .from(schema.collectionItem)
+              .where(eq(schema.collectionItem.id, input.collectionItemId))
+              .limit(1)
+              .for("update");
+            if (!item) throw new Error("Collection item does not exist.");
+            const approvalStatus = nextApprovalStatus(
+              item.approvalStatus,
+              input.action,
+            );
+            await tx
+              .update(schema.collectionItem)
+              .set({
+                approvalDecidedAt: new Date(),
+                approvalDecisionReason: reason,
+                approvalStatus,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.collectionItem.id, input.collectionItemId));
+            return approvalStatus;
+          }),
+        actorAttributes(input.actor.clerkId, {
+          collectionItemId: input.collectionItemId,
+        }),
+      );
+    },
+    /**
      * Creates collection.
      *
      * @param input - Collection values and authenticated actor.
@@ -3306,6 +3391,22 @@ export function createCollectionsService(
           })
         )[0] ?? null
       );
+    },
+    /**
+     * Lists collection items without excluding an owner's or staff's pending items.
+     *
+     * @param input - Collection, owner, and optional authenticated viewer.
+     * @returns Items visible to the viewer.
+     * @rejects When the required catalog data cannot be queried.
+     */
+    async listCollectionItems(input) {
+      return await queryOwnedItems(db, undefined, undefined, {
+        collectionId: input.collectionId,
+        ownerUserId: input.ownerUserId,
+        includePrivate: hasPermission(input.viewer, "collections.manage"),
+        viewerClerkId: input.viewer?.clerkId,
+        viewerCanManage: hasPermission(input.viewer, "collections.manage"),
+      });
     },
     /**
      * Returns public item.
@@ -4384,6 +4485,15 @@ async function queryCollections(
   );
   if (!visibleRows.length) return [];
   const collectionIds = visibleRows.map(({ id }) => id);
+  const unrestrictedCollectionIds = options.publicOnly
+    ? []
+    : visibleRows
+        .filter(
+          (row) =>
+            options.includePrivate ||
+            row.ownerClerkId === options.viewerClerkId,
+        )
+        .map(({ id }) => id);
   const [counts, covers] = await Promise.all([
     db
       .select({
@@ -4395,9 +4505,18 @@ async function queryCollections(
         and(
           inArray(schema.collectionItem.collectionId, collectionIds),
           eq(schema.collectionItem.owned, true),
-          options.includePrivate
-            ? undefined
-            : eq(schema.collectionItem.isPrivate, false),
+          or(
+            and(
+              eq(schema.collectionItem.isPrivate, false),
+              eq(schema.collectionItem.approvalStatus, "approved"),
+            ),
+            unrestrictedCollectionIds.length
+              ? inArray(
+                  schema.collectionItem.collectionId,
+                  unrestrictedCollectionIds,
+                )
+              : undefined,
+          ),
         ),
       )
       .groupBy(schema.collectionItem.collectionId),
@@ -4961,7 +5080,7 @@ async function queryOwnedItems(
   if (options.productId !== undefined) {
     conditions.push(eq(schema.product.id, options.productId));
   }
-  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false and ${schema.product.approvalStatus} = 'approved')`;
+  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false and ${schema.collectionItem.approvalStatus} = 'approved' and ${schema.product.approvalStatus} = 'approved')`;
   if (options.publicOnly) {
     conditions.push(publicItem);
   } else if (!options.includePrivate) {
@@ -4973,6 +5092,7 @@ async function queryOwnedItems(
   }
   const rows = await db
     .select({
+      approvalStatus: schema.collectionItem.approvalStatus,
       bearingOverride: schema.collectionSpinner.bearing,
       productBearing: schema.productSpinner.bearing,
       collectionId: schema.userCollection.id,
@@ -5075,6 +5195,7 @@ async function queryOwnedItems(
     ),
   );
   const items: UserCollectionItem[] = visibleRows.map((row) => ({
+    approvalStatus: row.approvalStatus,
     bearing: row.bearingOverride ?? row.productBearing,
     bearingOverride: row.bearingOverride,
     canAdminister: Boolean(options.viewerCanManage),
@@ -5994,21 +6115,21 @@ function normalizeOptionalDescription(value: string | null | undefined) {
 }
 
 /**
- * Resolves a valid product approval transition.
+ * Resolves a valid product or collection-item approval transition.
  *
  * @param current - Current durable approval state.
  * @param action - Requested administrative action.
  * @returns The resulting approval state.
  * @throws When the requested transition is not allowed.
  */
-function nextProductApprovalStatus(
-  current: ProductApprovalStatus,
-  action: ProductApprovalAction,
-): ProductApprovalStatus {
+function nextApprovalStatus(
+  current: CatalogApprovalStatus,
+  action: CatalogApprovalAction,
+): CatalogApprovalStatus {
   if (current === "pending" && action === "approve") return "approved";
   if (current === "pending" && action === "reject") return "rejected";
   if (current !== "pending" && action === "reverse") return "pending";
-  throw new Error("Product approval transition is invalid.");
+  throw new Error("Approval transition is invalid.");
 }
 
 /**

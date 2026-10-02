@@ -221,6 +221,18 @@ const schemaDescriptions = {
         description: "Whether the item is currently owned by the owner.",
         example: true,
       },
+      approval_status: {
+        description: "Review state: pending, approved, or rejected.",
+        example: "pending",
+      },
+      approval_decision_reason: {
+        description: "Nonblank reason for the latest administrative decision.",
+        example: "Ready for public collections.",
+      },
+      approval_decided_at: {
+        description: "Timestamp of the latest administrative review decision.",
+        example: "2026-10-01T20:45:00.000Z",
+      },
     },
   },
   user_collection: {
