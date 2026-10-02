@@ -130,7 +130,10 @@ export type CatalogFilterCopy = {
 };
 
 /**
- * Renders responsive quick and advanced controls for catalog filters.
+ * Renders quick catalog facets in route flow and advanced facets in a desktop
+ * overlay or mobile sheet. The controlled state is pruned against the supplied
+ * facets, and color controls expose tooltips, pressed state, and a visible
+ * selection border.
  *
  * @param props - Catalog filter bar properties.
  * @param props.action - Optional trailing action beside the filter controls.
