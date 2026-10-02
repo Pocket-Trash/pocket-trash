@@ -399,6 +399,7 @@ describe("collection add form", () => {
       }),
     );
     expect(html).toContain('aria-label="Product type"');
+    expect(html).toMatch(/<details[^>]* open=""/u);
   });
 
   it("renders localized collection copy and a disabled primary action", () => {
@@ -431,8 +432,11 @@ describe("collection add form", () => {
     );
 
     expect(html).not.toContain("Something went wrong");
-    expect(html).not.toContain('aria-label="Product type"');
-    expect(html).not.toContain(">Zoom Zoom</button>");
+    expect(html).toContain('aria-label="Product type"');
+    expect(html).toContain(">Zoom Zoom</span>");
+    expect(html).toMatch(/<details[^>]*>/u);
+    expect(html).not.toMatch(/<details[^>]* open=/u);
+    expect(html).toMatch(/<summary[^>]*>Products<\/summary>/u);
     expect(html).toContain(">Collection<");
     expect(html).toContain(">Add new collection<");
     expect(html).toContain(">Add to collection<");

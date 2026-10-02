@@ -1,12 +1,17 @@
 import { z } from "zod";
 
+/** Feature-request project receiving feedback planned as issues. */
 export const LINEAR_FEATURE_REQUESTS_PROJECT_ID =
   "e3e317c2-785e-4ee2-ac4d-e1d77009e2e7";
+/** Engineering team owning feedback issues and newly planned projects. */
 export const LINEAR_ENGINEERING_TEAM_ID =
   "dc9ab7b9-9d16-4ba4-a0a5-ea3d912acd18";
 
+/** Linear GraphQL endpoint used for authenticated feedback planning. */
 const linearEndpoint = "https://api.linear.app/graphql";
+/** Identifier and display name returned for a Linear planning choice. */
 const entitySchema = z.object({ id: z.string(), name: z.string() });
+/** Workspace entities and lifecycle choices required to plan feedback. */
 const planningContextSchema = z.object({
   project: z.object({ id: z.string() }),
   projectStatuses: z.object({ nodes: z.array(entitySchema) }),
@@ -17,12 +22,14 @@ const planningContextSchema = z.object({
   }),
   viewer: entitySchema,
 });
+/** Issue creation result, including the reserved identifier when successful. */
 const issueMutationSchema = z.object({
   issueCreate: z.object({
     issue: z.object({ id: z.string() }).nullable(),
     success: z.boolean(),
   }),
 });
+/** Project creation result, including the reserved identifier when successful. */
 const projectMutationSchema = z.object({
   projectCreate: z.object({
     project: z.object({ id: z.string() }).nullable(),
@@ -48,15 +55,39 @@ const projectStatusSchema = z.object({
   }),
 });
 
+/** Validated lifecycle defaults, labels, and viewer for feedback planning. */
 export type LinearPlanningOptions = {
+  /** Engineering Todo state identifier for new feedback issues. */
   issueStateId: string;
-  labels: Array<{ id: string; name: string }>;
+  /** Engineering labels sorted by display name. */
+  labels: Array<{
+    /** Linear label identifier. */
+    id: string;
+    /** Label display name. */
+    name: string;
+  }>;
+  /** Planned status identifier for new feedback projects. */
   projectStatusId: string;
-  viewer: { id: string; name: string };
+  /** OAuth viewer available as an issue assignee or project lead. */
+  viewer: {
+    /** Linear user identifier. */
+    id: string;
+    /** Viewer display name. */
+    name: string;
+  };
 };
 
+/** Failure to request, validate, or create a Linear feedback entity. */
 export class LinearApiError extends Error {}
 
+/**
+ * Loads planning defaults and labels for the configured Engineering team.
+ *
+ * @param token - Linear OAuth token.
+ * @param request - HTTP request implementation.
+ * @returns Todo and Planned identifiers, sorted labels, and the OAuth viewer.
+ * @rejects When the request fails or configured entities or required states are unavailable.
+ */
 export async function getLinearPlanningOptions(
   token: string,
   request: typeof fetch = fetch,
@@ -104,14 +135,28 @@ export async function getLinearPlanningOptions(
   };
 }
 
+/**
+ * Creates a feedback issue in Engineering and the feature-request project.
+ *
+ * @param token - Linear OAuth token.
+ * @param input - Reserved issue identifier, content, labels, and planning choices.
+ * @param request - HTTP request implementation.
+ * @rejects When the request fails or Linear does not confirm the reserved identifier.
+ */
 export async function createLinearIssue(
   token: string,
   input: {
+    /** Optional Linear user assigned to the issue. */
     assigneeId?: string;
+    /** Feedback description sent to Linear. */
     description: string;
+    /** Reserved UUID used to identify the created issue. */
     id: string;
+    /** Engineering label identifiers applied to the issue. */
     labelIds: string[];
+    /** Workflow state identifier selected for the issue. */
     stateId: string;
+    /** Feedback title sent to Linear. */
     title: string;
   },
   request: typeof fetch = fetch,
@@ -140,13 +185,26 @@ export async function createLinearIssue(
   }
 }
 
+/**
+ * Creates a feedback project owned by the Engineering team.
+ *
+ * @param token - Linear OAuth token.
+ * @param input - Reserved project identifier, content, and planning choices.
+ * @param request - HTTP request implementation.
+ * @rejects When the request fails or Linear does not confirm the reserved identifier.
+ */
 export async function createLinearProject(
   token: string,
   input: {
+    /** Feedback description sent to Linear. */
     description: string;
+    /** Reserved UUID used to identify the created project. */
     id: string;
+    /** Optional Linear user leading the project. */
     leadId?: string;
+    /** Feedback title used as the project name. */
     name: string;
+    /** Lifecycle status identifier selected for the project. */
     statusId: string;
   },
   request: typeof fetch = fetch,
@@ -282,6 +340,18 @@ function linearSyncInput(
   };
 }
 
+/**
+ * Executes a Linear GraphQL operation and validates its response data.
+ *
+ * @template T - Data contract accepted by the response schema.
+ * @param token - Linear OAuth token.
+ * @param query - GraphQL query or mutation text.
+ * @param variables - Variables supplied to the operation.
+ * @param schema - Validator for the response data envelope.
+ * @param request - HTTP request implementation.
+ * @returns Validated operation data.
+ * @rejects When transport, JSON parsing, GraphQL errors, or schema validation fails.
+ */
 async function linearGraphql<T>(
   token: string,
   query: string,

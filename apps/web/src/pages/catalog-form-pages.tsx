@@ -1698,10 +1698,22 @@ export function CollectionAddPage({
     Record<number, number>
   >({});
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [productQuery, setProductQuery] = React.useState("");
+  const [productPage, setProductPage] = React.useState(0);
   const slug = options.productTypes.find(({ id }) => id === type?.id)?.slug;
-  const matchingProducts = initialProduct
-    ? []
-    : products.filter(({ productTypeSlug }) => productTypeSlug === slug);
+  const matchingProducts = products.filter(
+    (candidate) =>
+      candidate.productTypeSlug === slug &&
+      `${candidate.name} ${candidate.makerName}`
+        .toLocaleLowerCase(locale)
+        .includes(productQuery.trim().toLocaleLowerCase(locale)),
+  );
+  const productPageCount = Math.max(1, Math.ceil(matchingProducts.length / 12));
+  const currentProductPage = Math.min(productPage, productPageCount - 1);
+  const visibleProducts = matchingProducts.slice(
+    currentProductPage * 12,
+    (currentProductPage + 1) * 12,
+  );
   const selectedButton =
     typeof button?.id === "number"
       ? (options.spinnerButtons.find(({ id }) => id === button.id) ?? null)
@@ -1920,6 +1932,7 @@ export function CollectionAddPage({
       <main className="grid max-w-5xl gap-6 p-6">
         <Field label={displayNameLabel}>
           <Input
+            aria-label={displayNameLabel}
             disabled={!product}
             onChange={(event) => setDisplayName(event.target.value)}
             required
@@ -2006,62 +2019,126 @@ export function CollectionAddPage({
             </Button>
           </div>
         </dialog>
-        {!initialProduct ? (
-          <Field label={t("web.catalog.field.productType")}>
-            <CatalogCombobox
-              ariaLabel={t("web.catalog.field.productType")}
-              items={options.productTypes}
-              onValueChange={(value) => {
-                setType(value);
-                setProduct(null);
-                setDisplayName("");
-                setDescription("");
-                setBearing("");
-                setMaterial(null);
-                setFinish(null);
-                setCustomFinish(emptyFinishOption());
-                setButton(null);
-                setButtonMaterial(null);
-                setButtonFinish(null);
-                setButtonCustomFinish(emptyFinishOption());
-                setDuplicateCounts({});
-                setFormError(null);
+        <details open={!initialProduct}>
+          <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+            {t("web.navigation.products")}
+          </summary>
+          <div className="mt-4 grid gap-4">
+            <Field label={t("web.catalog.field.productType")}>
+              <CatalogCombobox
+                ariaLabel={t("web.catalog.field.productType")}
+                items={options.productTypes}
+                onValueChange={(value) => {
+                  setType(value);
+                  setProductPage(0);
+                  setProductQuery("");
+                  setProduct(null);
+                  setDisplayName("");
+                  setDescription("");
+                  setBearing("");
+                  setMaterial(null);
+                  setFinish(null);
+                  setCustomFinish(emptyFinishOption());
+                  setButton(null);
+                  setButtonMaterial(null);
+                  setButtonFinish(null);
+                  setButtonCustomFinish(emptyFinishOption());
+                  setDuplicateCounts({});
+                  setFormError(null);
+                }}
+                placeholder={t("web.catalog.selectProductType")}
+                value={type}
+              />
+            </Field>
+            {slug && !productTypeIsSupported(slug) ? (
+              <Notice>{t("web.catalog.notImplemented")}</Notice>
+            ) : null}
+            <Input
+              aria-label={t("web.action.search")}
+              onChange={(event) => {
+                setProductQuery(event.target.value);
+                setProductPage(0);
               }}
-              placeholder={t("web.catalog.selectProductType")}
-              value={type}
+              placeholder={t("web.archive.searchPlaceholder")}
+              type="search"
+              value={productQuery}
             />
-          </Field>
-        ) : null}
-        {slug && !productTypeIsSupported(slug) ? (
-          <Notice>{t("web.catalog.notImplemented")}</Notice>
-        ) : null}
-        <div className="grid grid-cols-1 gap-[18px] empty:hidden min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
-          {matchingProducts.map((candidate) => (
-            <Button
-              className="h-auto justify-start p-5 text-left"
-              key={candidate.id}
-              onClick={() => {
-                setProduct(candidate);
-                setDisplayName(candidate.name);
-                setDescription("");
-                setBearing("");
-                setMaterial(null);
-                setFinish(null);
-                setCustomFinish(emptyFinishOption());
-                setButton(null);
-                setButtonMaterial(null);
-                setButtonFinish(null);
-                setButtonCustomFinish(emptyFinishOption());
-                setDuplicateCounts({});
-                setFormError(null);
-              }}
-              type="button"
-              variant={candidate.id === product?.id ? "default" : "outline"}
-            >
-              {candidate.name}
-            </Button>
-          ))}
-        </div>
+            <div className="grid grid-cols-1 gap-[18px] empty:hidden min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
+              {visibleProducts.map((candidate) => {
+                const image = candidate.images.find(
+                  ({ deletedAt }) => !deletedAt,
+                );
+                return (
+                  <Button
+                    aria-pressed={candidate.id === product?.id}
+                    className="h-full min-w-0 flex-col items-stretch justify-start gap-0 overflow-hidden p-0 text-left wrap-anywhere whitespace-normal"
+                    key={candidate.id}
+                    onClick={() => {
+                      setProduct(candidate);
+                      setDisplayName(candidate.name);
+                      setDescription("");
+                      setBearing("");
+                      setMaterial(null);
+                      setFinish(null);
+                      setCustomFinish(emptyFinishOption());
+                      setButton(null);
+                      setButtonMaterial(null);
+                      setButtonFinish(null);
+                      setButtonCustomFinish(emptyFinishOption());
+                      setDuplicateCounts({});
+                      setFormError(null);
+                    }}
+                    type="button"
+                    variant={
+                      candidate.id === product?.id ? "default" : "outline"
+                    }
+                  >
+                    <span className="aspect-4/3 w-full shrink-0 overflow-hidden bg-muted">
+                      {image ? (
+                        <img
+                          alt=""
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          src={image.url}
+                        />
+                      ) : null}
+                    </span>
+                    <span className="p-3 text-sm font-semibold">
+                      {candidate.name}
+                    </span>
+                  </Button>
+                );
+              })}
+            </div>
+            {slug && matchingProducts.length === 0 ? (
+              <Notice>{t("web.archive.noItems")}</Notice>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Button
+                disabled={currentProductPage === 0}
+                onClick={() => setProductPage(currentProductPage - 1)}
+                type="button"
+                variant="outline"
+              >
+                {t("web.collections.gallery.previousPage")}
+              </Button>
+              <span aria-live="polite" className="text-sm">
+                {t("web.collections.gallery.pageStatus", {
+                  page: currentProductPage + 1,
+                  pageCount: productPageCount,
+                })}
+              </span>
+              <Button
+                disabled={currentProductPage + 1 === productPageCount}
+                onClick={() => setProductPage(currentProductPage + 1)}
+                type="button"
+                variant="outline"
+              >
+                {t("web.collections.gallery.nextPage")}
+              </Button>
+            </div>
+          </div>
+        </details>
         {product ? (
           <CollectionProductFields
             customFinish={customFinish}

@@ -5,13 +5,21 @@ import { createServerFn } from "@tanstack/react-start";
 import { getActor, requirePermission } from "@/lib/authorization";
 import { localizedServerError } from "@/lib/server-errors";
 
+/** Validated URL filters and pagination for the admin audit list. */
 export type AuditSearch = {
+  /** Audit action filter, trimmed to at most 120 characters. */
   action?: string;
+  /** Positive safe-integer actor user identifier. */
   actor?: number;
+  /** Canonical timestamp and event identifier for pagination. */
   cursor?: string;
+  /** Inclusive starting calendar date in YYYY-MM-DD form. */
   from?: string;
+  /** Audit target identifier, trimmed to at most 200 characters. */
   target?: string;
+  /** Target kind filter, trimmed to at most 120 characters. */
   targetType?: string;
+  /** Inclusive ending calendar date in YYYY-MM-DD form. */
   to?: string;
 };
 
@@ -131,6 +139,12 @@ export async function handleAuditExportRequest(request: Request) {
   }
 }
 
+/**
+ * Normalizes audit URL filters, dropping invalid or unknown values.
+ *
+ * @param search - Untrusted route search parameters.
+ * @returns Valid filters with invalid fields set to `undefined`.
+ */
 export function parseAuditSearch(search: Record<string, unknown>): AuditSearch {
   return {
     action: searchString(search.action, 120),
@@ -143,10 +157,25 @@ export function parseAuditSearch(search: Record<string, unknown>): AuditSearch {
   };
 }
 
+/**
+ * Serializes an audit event's timestamp and identifier for pagination.
+ *
+ * @param recordedAt - Event recording timestamp.
+ * @param id - Audit event identifier.
+ * @returns The canonical ISO timestamp and identifier separated by a pipe.
+ * @throws When the timestamp is invalid.
+ */
 export function auditCursor(recordedAt: Date, id: number) {
   return `${recordedAt.toISOString()}|${id}`;
 }
 
+/**
+ * Validates audit list input and expands calendar dates to UTC day boundaries.
+ *
+ * @param input - Untrusted server-function filter payload.
+ * @returns Service filters with parsed dates and pagination cursor.
+ * @throws When the payload is not an object or contains unknown or invalid fields.
+ */
 function parseAuditListInput(input: unknown) {
   if (typeof input !== "object" || input === null) throw invalidAuditRequest();
   const value = input as Record<string, unknown>;
@@ -171,12 +200,25 @@ function parseAuditListInput(input: unknown) {
   };
 }
 
+/**
+ * Trims a nonempty string within the permitted character limit.
+ *
+ * @param value - Untrusted search value.
+ * @param maximum - Maximum trimmed length in characters.
+ * @returns The trimmed string, or `undefined` when invalid.
+ */
 function searchString(value: unknown, maximum: number) {
   if (typeof value !== "string") return undefined;
   const normalized = value.trim();
   return normalized && normalized.length <= maximum ? normalized : undefined;
 }
 
+/**
+ * Accepts a positive safe integer or its unsigned decimal spelling.
+ *
+ * @param value - Untrusted actor identifier.
+ * @returns The numeric identifier, or `undefined` when invalid.
+ */
 function searchInteger(value: unknown) {
   if (typeof value === "string" && !/^[1-9]\d*$/u.test(value)) {
     return undefined;
@@ -187,6 +229,12 @@ function searchInteger(value: unknown) {
     : undefined;
 }
 
+/**
+ * Accepts a calendar date only when its UTC interpretation preserves the date.
+ *
+ * @param value - Untrusted date filter.
+ * @returns The YYYY-MM-DD value, or `undefined` when invalid.
+ */
 function searchDate(value: unknown) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
     return undefined;
@@ -197,6 +245,12 @@ function searchDate(value: unknown) {
     : undefined;
 }
 
+/**
+ * Accepts a canonical audit pagination cursor without changing its spelling.
+ *
+ * @param value - Untrusted cursor filter.
+ * @returns The serialized cursor, or `undefined` when invalid.
+ */
 function searchCursor(value: unknown) {
   if (typeof value !== "string") return undefined;
   try {
@@ -231,6 +285,11 @@ function parseCursor(value: string) {
   return { id, recordedAt };
 }
 
+/**
+ * Creates the localized generic failure used for invalid audit input.
+ *
+ * @returns An error suitable for the server-function boundary.
+ */
 function invalidAuditRequest() {
   return localizedServerError("error.generic");
 }

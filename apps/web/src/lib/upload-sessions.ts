@@ -586,6 +586,12 @@ async function uploadSession(input: {
         authorization: `Bearer ${token}`,
         "content-type": upload.contentType,
       },
+      /**
+       * Forwards this file's transport progress to the session listener.
+       *
+       * @param percent - Upload completion percentage.
+       * @returns The listener's result, or `undefined` when no listener is provided.
+       */
       onProgress: (percent) => input.onProgress?.(file.name, percent),
       url: `${trimTrailingSlash(clientEnv.VITE_API_URL)}/api/v0/storage/upload-sessions/${encodeURIComponent(session.id)}/files/${encodeURIComponent(upload.id)}`,
     });
