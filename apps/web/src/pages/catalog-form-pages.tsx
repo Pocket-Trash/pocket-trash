@@ -2036,7 +2036,7 @@ export function CollectionAddPage({
         <div className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
           {matchingProducts.map((candidate) => (
             <Button
-              className="h-auto justify-start p-5 text-left"
+              className="h-auto min-w-0 justify-start p-5 text-left wrap-anywhere whitespace-normal"
               key={candidate.id}
               onClick={() => {
                 setProduct(candidate);
