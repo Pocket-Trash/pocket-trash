@@ -20,8 +20,8 @@ import { CollectionGallery } from "@/components/collection-gallery";
 import { ImageGallery } from "@/components/image-gallery";
 import { MakerLink } from "@/components/maker-link";
 import { MarkdownContent } from "@/components/markdown-content";
+import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
 import { ProductCard } from "@/components/product-card";
-import { ProductDeletionControls } from "@/components/product-deletion-controls";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -311,7 +311,7 @@ export function ProductDetailPage({
                 }
                 t={t}
               />
-              <ProductDeletionControls
+              <PermanentDeletionControls
                 name={product.name}
                 reasonRequired={!product.isOwner}
                 onDelete={async (reason) => {
