@@ -16,8 +16,25 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { useLocale } from "@/providers/locale-provider";
 
-export function UserIndexPage({ hasFeedback }: { hasFeedback: boolean }) {
+/**
+ * Renders the user navigation hub with eligible feedback links.
+ *
+ * @param root0 - User navigation state.
+ * @returns The user index page.
+ */
+export function UserIndexPage({
+  hasFeedback,
+}: {
+  /** Whether the user has feedback eligible for the request-history link. */
+  hasFeedback: boolean;
+}) {
   const { locale } = useLocale();
+  /**
+   * Formats localized user-navigation copy.
+   *
+   * @param key - Translation key.
+   * @returns The localized message.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const links = [
     {

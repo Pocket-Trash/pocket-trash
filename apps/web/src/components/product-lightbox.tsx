@@ -37,14 +37,45 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Controlled product-detail state and display preferences for the lightbox.
+ */
 type ProductLightboxProps = {
+  /**
+   * Currency used to display the product price.
+   */
   currency: CurrencyCode;
+  /**
+   * Zero-based image index. Out-of-range values display the first image.
+   */
   imageIndex: number;
+  /**
+   * Requests that the product detail view close.
+   */
   onClose: () => void;
+  /**
+   * Requests a different displayed image.
+   *
+   * @param nextIndex - Next zero-based image index, already wrapped to the image list.
+   */
   onImageChange: (nextIndex: number) => void;
+  /**
+   * Current product. Before any selection, `null` renders no output; after a
+   * selection, `null` retains the last product content and closes only the
+   * mobile drawer.
+   */
   product: PenProduct | null;
+  /**
+   * Exchange rates used to convert the product price.
+   */
   rates: CurrencyRates;
+  /**
+   * Unit used to display product dimensions.
+   */
   units: DimensionUnit;
+  /**
+   * Unit used to display product weight.
+   */
   weight: WeightUnit;
 };
 
@@ -54,6 +85,18 @@ type ProductLightboxProps = {
  * bottom sheet, which owns swipe-to-dismiss, the scroll lock, and focus — so
  * there is no hand-rolled drag gesture here. Image paging uses the on-image
  * buttons (and arrow keys on desktop) on both tiers.
+ *
+ * @param props - Product lightbox properties.
+ * @param props.currency - Currency used to display the price.
+ * @param props.imageIndex - Zero-based image index; out-of-range values fall back to the first image.
+ * @param props.onClose - Callback that requests closure.
+ * @param props.onImageChange - Callback that requests another image.
+ * @param props.product - Current product; `null` retains prior content after a selection and closes the mobile drawer.
+ * @param props.rates - Exchange rates used for price conversion.
+ * @param props.units - Unit used for dimensions.
+ * @param props.weight - Unit used for weight.
+ * @returns The responsive product detail view, or no output when no product has ever been provided.
+ * @throws {Error} When rendered outside `LocaleProvider`.
  */
 export function ProductLightbox({
   currency,
@@ -67,6 +110,13 @@ export function ProductLightbox({
 }: ProductLightboxProps) {
   const isMobile = useIsMobile();
   const { locale } = useLocale();
+  /**
+   * Formats a product-detail translation for the active locale.
+   *
+   * @param key - Translation key to format.
+   * @param values - Placeholder values interpolated into the translation.
+   * @returns The localized product-detail text.
+   */
   const t = (
     key: TranslationKey,
     values: Readonly<Record<string, unknown>> = {},
@@ -108,6 +158,11 @@ export function ProductLightbox({
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
+    /**
+     * Closes the desktop lightbox or pages its images for supported keys.
+     *
+     * @param event - Document keyboard event.
+     */
     const onKeyDown = (event: KeyboardEvent) => {
       const s = stateRef.current;
       if (event.key === "Escape") s.onClose();
@@ -130,9 +185,21 @@ export function ProductLightbox({
 
   const image = images[imageIndex] ?? images[0] ?? "";
 
+  /**
+   * One optional product specification displayed in the details grid.
+   */
   type LightboxSpec = {
+    /**
+     * Optional icon displayed beside the value.
+     */
     icon?: typeof Scale;
+    /**
+     * Localized specification label.
+     */
     label: string;
+    /**
+     * Formatted value, or `null` when the specification is unavailable.
+     */
     value: string | null;
   };
 
@@ -163,7 +230,12 @@ export function ProductLightbox({
   ];
 
   const specs = allSpecs.filter(
-    (spec): spec is LightboxSpec & { value: string } => Boolean(spec.value),
+    (
+      spec,
+    ): spec is LightboxSpec & {
+      /** Formatted non-empty specification value. */
+      value: string;
+    } => Boolean(spec.value),
   );
 
   const imagePane = (
@@ -337,6 +409,13 @@ export function ProductLightbox({
   );
 }
 
+/**
+ * Wraps an adjacent image index around the available image list.
+ *
+ * @param index - Candidate image index.
+ * @param length - Number of available images.
+ * @returns The wrapped index, or `0` when no images are available.
+ */
 function wrapIndex(index: number, length: number) {
   if (length <= 0) return 0;
   return (index + length) % length;

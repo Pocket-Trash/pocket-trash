@@ -13,8 +13,19 @@ import { UserPageShell } from "@/components/user-page-shell";
 import { DeleteAccountSection } from "@/pages/delete-account-section";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Renders Clerk account controls and Pocket Trash account deletion.
+ *
+ * @returns The user account page.
+ */
 export function UserAccountPage() {
   const { locale } = useLocale();
+  /**
+   * Formats localized account copy.
+   *
+   * @param key - Translation key.
+   * @returns The localized message.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   return (
@@ -35,6 +46,11 @@ export function UserAccountPage() {
   );
 }
 
+/**
+ * Renders the placeholder shown while Clerk loads the user profile.
+ *
+ * @returns The user-profile loading skeleton.
+ */
 function UserProfileSkeleton() {
   return (
     <div className="w-full max-w-4xl rounded-lg border border-border bg-card p-6 shadow-sm">

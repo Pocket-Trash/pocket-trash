@@ -6,6 +6,13 @@ import {
   filtersToSearch,
 } from "./catalog-filters";
 
+/**
+ * Synchronizes catalog filters with URL search and debounces local commits by 300 milliseconds.
+ *
+ * @param search - Current URL-search values.
+ * @param commit - Receives debounced URL-search updates.
+ * @returns Current filters and their React state dispatcher.
+ */
 export function useCatalogFilters(
   search: CatalogFilterSearch,
   commit: (search: CatalogFilterSearch) => void,

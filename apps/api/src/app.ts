@@ -17,61 +17,108 @@ import { Scalar } from "@scalar/hono-api-reference";
 import { clerkWebhookPath } from "./clerk-webhooks.js";
 import { linearWebhookPath } from "./linear-webhooks.js";
 
+/** OpenAPI schema for storage upload error codes. */
 const uploadErrorSchema = z.object({ error: z.string() });
 
+/** Versioned prefix for public API routes. */
 export const apiPrefix = "/api/v0";
+/** Public health-check endpoint. */
 export const healthPath = `${apiPrefix}/health`;
+/** Client log-ingestion endpoint. */
 export const logsPath = `${apiPrefix}/logs`;
+/** Base endpoint for resumable storage sessions. */
 export const uploadSessionsPath = `${apiPrefix}/storage/upload-sessions`;
+/** Generated OpenAPI document endpoint. */
 export const openApiJsonPath = `${apiPrefix}/openapi.json`;
+/** Interactive API reference endpoint. */
 export const apiDocsPath = `${apiPrefix}/docs`;
 export { clerkWebhookPath, linearWebhookPath };
 
 /** Cloudflare bindings used by the API worker. */
 export type ApiBindings = Omit<Env, "APP_ENV" | "BUNNY_IMAGE_FOLDER_PREFIX"> & {
+  /** Deployment environment name. */
   APP_ENV?: string;
+  /** Axiom dataset receiving API logs. */
   AXIOM_DATASET?: string;
+  /** Optional Axiom edge-ingestion domain. */
   AXIOM_EDGE_DOMAIN?: string;
+  /** Axiom ingestion token. */
   AXIOM_TOKEN?: string;
+  /** Clerk backend secret key. */
   CLERK_SECRET_KEY?: string;
+  /** Secret used to verify Clerk webhook signatures. */
   CLERK_WEBHOOK_SIGNING_SECRET?: string;
+  /** KV registry of downstream webhook forwarding targets. */
   CLERK_WEBHOOK_TARGETS?: KVNamespace;
+  /** PostgreSQL connection string. */
   DATABASE_URL?: string;
+  /** Secret used to pseudonymize erasure subjects. */
   ERASURE_HMAC_SECRET?: string;
+  /** Console transport output mode. */
   LOGGER?: string;
+  /** Deployment identifier attached to logs. */
   LOG_DEPLOYMENT_ID?: string;
+  /** Deployment platform attached to logs. */
   LOG_DEPLOYMENT_TARGET?: string;
+  /** Minimum emitted log level. */
   LOG_LEVEL?: string;
   /** Shared key accepted by the client log proxy. */
   LOG_PROXY_CLIENT_KEY?: string;
   /** Secret used to verify Linear webhook signatures. */
   LINEAR_WEBHOOK_SIGNING_SECRET?: string;
+  /** Initials required for local webhook forwarding targets. */
   URL_INITIALS?: string;
+  /** Bunny API key used for pull-zone operations. */
   BUNNY_API_KEY?: string;
+  /** Public Bunny CDN base URL. */
   BUNNY_CDN_BASE_URL?: string;
+  /** Bunny token-authentication key. */
   BUNNY_CDN_TOKEN_KEY?: string;
+  /** Object prefix for resource files. */
   BUNNY_RESOURCE_FOLDER_PREFIX?: string;
+  /** Object prefix for image files. */
   BUNNY_IMAGE_FOLDER_PREFIX?: string;
+  /** Bunny storage-zone access key. */
   BUNNY_STORAGE_ACCESS_KEY?: string;
+  /** Bunny storage API endpoint. */
   BUNNY_STORAGE_ENDPOINT?: string;
+  /** Bunny storage-zone name. */
   BUNNY_STORAGE_ZONE_NAME?: string;
+  /** Bunny pull-zone identifier. */
   BUNNY_PULL_ZONE_ID?: string;
 };
 
+/** Per-request logging configuration. */
 type RuntimeConfig = {
+  /** Shared key accepted by the client log proxy. */
   clientLogKey?: string;
+  /** API request logger. */
   logger: Logger;
 };
 
 /** Injectable API application dependencies. */
 type AppDependencies = {
+  /**
+   * Resolves request logging configuration from environment bindings.
+   *
+   * @param bindings - Cloudflare request bindings.
+   * @returns Request logging configuration.
+   */
   getRuntimeConfig?: (
     bindings: ApiBindings,
   ) => Promise<RuntimeConfig> | RuntimeConfig;
+  /** Fixed request logging configuration used by tests. */
   runtimeConfig?: RuntimeConfig;
+  /**
+   * Resolves storage upload dependencies from environment bindings.
+   *
+   * @param bindings - Cloudflare request bindings.
+   * @returns Upload runtime for the request.
+   */
   getUploadRuntime?: (
     bindings: ApiBindings,
   ) => Promise<UploadRuntime> | UploadRuntime;
+  /** Fixed upload runtime used by tests. */
   uploadRuntime?: UploadRuntime;
   /**
    * Resolves the Clerk webhook runtime for a request.
@@ -125,17 +172,40 @@ export type LinearWebhookRuntime = {
   handle(request: Request, targetKind: "local" | "primary"): Promise<Response>;
 };
 
+/** Authentication, origin policy, logging, and storage operations for upload routes. */
 export type UploadRuntime = {
+  /** Optional upload logger used for request flushing. */
   logger?: Logger;
+  /**
+   * Authenticates an upload request and verifies the account is active.
+   *
+   * @param request - Incoming upload request.
+   * @returns Authenticated actor, or `null` when credentials or origin are invalid.
+   * @rejects When authentication infrastructure fails without converting the result to `null`.
+   */
   authenticate(request: Request): Promise<UploadActor | null>;
+  /**
+   * Checks whether an origin may call upload routes.
+   *
+   * @param origin - Request origin URL.
+   * @returns Whether the origin is allowed for the deployment.
+   */
   isAllowedOrigin(origin: string): boolean;
+  /** Storage session service. */
   service: StorageService;
 };
 
+/**
+ * Wraps a schema as OpenAPI JSON response content.
+ *
+ * @param schema - Response body schema.
+ * @returns OpenAPI content map for `application/json`.
+ */
 const jsonContent = (schema: z.ZodType) => ({
   "application/json": { schema },
 });
 
+/** OpenAPI schema returned by the health endpoint. */
 const HealthResponseSchema = z
   .object({
     ok: z.boolean().openapi({ example: true }),
@@ -143,12 +213,14 @@ const HealthResponseSchema = z
   })
   .openapi("HealthResponse");
 
+/** OpenAPI schema for a caller-visible API error. */
 const ErrorResponseSchema = z
   .object({
     error: z.string().openapi({ example: "Expected a JSON request body." }),
   })
   .openapi("ErrorResponse");
 
+/** Validates one structured client log event. */
 const ClientLogEventSchema = z
   .object({
     app: z.string().min(1).max(64),
@@ -165,6 +237,7 @@ const ClientLogEventSchema = z
   })
   .openapi("ClientLogEvent");
 
+/** Accepts one event, an event array, or an event-envelope for log ingestion. */
 const ClientLogRequestSchema = z
   .union([
     ClientLogEventSchema,
@@ -203,10 +276,18 @@ const HealthRoute = createRoute({
  * @returns The configured API application.
  */
 export function createApp(dependencies: AppDependencies = {}) {
-  const app = new OpenAPIHono<{ Bindings: ApiBindings }>();
-  const api = new OpenAPIHono<{
+  const app = new OpenAPIHono<{
+    /** Cloudflare environment bindings. */
     Bindings: ApiBindings;
-    Variables: { uploadRuntime: UploadRuntime };
+  }>();
+  const api = new OpenAPIHono<{
+    /** Cloudflare environment bindings. */
+    Bindings: ApiBindings;
+    /** Request-local Hono variables. */
+    Variables: {
+      /** Authenticated storage runtime attached by upload middleware. */
+      uploadRuntime: UploadRuntime;
+    };
   }>();
 
   api.openapi(HealthRoute, (context) =>
@@ -543,6 +624,13 @@ async function requireLinearWebhookRuntime(
   return runtime;
 }
 
+/**
+ * Converts a storage-session failure into its caller-visible JSON response.
+ *
+ * @param error - Candidate error.
+ * @returns Upload error body with the operation's HTTP status.
+ * @throws When the failure is not an {@link UploadSessionError}.
+ */
 function uploadErrorResponse(error: unknown): Response {
   if (error instanceof UploadSessionError)
     return Response.json(

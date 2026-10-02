@@ -22,12 +22,19 @@ import {
 } from "@/lib/user-settings";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Local-storage key for cached CAD exchange rates. */
 const rateStorageKey = `pocket-trash.fxRates.${baseCurrency}`;
+/** User-selectable pen measurement and display preferences. */
 type PenSettings = Pick<
   typeof defaultUserSettings,
   "currencyCode" | "dimensionUnit" | "weightUnit"
 >;
 
+/**
+ * Reads valid pen display settings from local storage.
+ *
+ * @returns Stored settings with invalid or unavailable values replaced by defaults.
+ */
 function readStoredPenSettings(): PenSettings {
   if (typeof window === "undefined") {
     return {
@@ -65,6 +72,11 @@ function readStoredPenSettings(): PenSettings {
   }
 }
 
+/**
+ * Persists pen display settings on a best-effort basis.
+ *
+ * @param settings - Valid display preferences to serialize.
+ */
 function writeStoredPenSettings(settings: PenSettings): void {
   try {
     window.localStorage.setItem(
@@ -76,6 +88,12 @@ function writeStoredPenSettings(settings: PenSettings): void {
   }
 }
 
+/**
+ * Synchronizes pen display settings across local storage and the signed-in account.
+ *
+ * @returns Current units and currency, optimistic setters, and save state.
+ * @throws When called outside `LocaleProvider`.
+ */
 export function usePenSettings() {
   const { isLoaded, isSignedIn } = useAuth();
   const { locale } = useLocale();
@@ -211,6 +229,11 @@ export function usePenSettings() {
   };
 }
 
+/**
+ * Loads and caches CAD-based exchange rates for pen price formatting.
+ *
+ * @returns Current exchange rates and a forced-refresh callback.
+ */
 export function useCurrencyRates() {
   const [rates, setRates] = React.useState<CurrencyRates>({
     [baseCurrency]: 1,
@@ -225,7 +248,12 @@ export function useCurrencyRates() {
       try {
         const cached = JSON.parse(
           window.localStorage.getItem(rateStorageKey) ?? "null",
-        ) as { date?: string; rates?: CurrencyRates } | null;
+        ) as {
+          /** UTC date on which the rates were fetched. */
+          date?: string;
+          /** Cached rates keyed by target currency. */
+          rates?: CurrencyRates;
+        } | null;
 
         if (cached?.date === today && cached.rates) {
           setRates({ [baseCurrency]: 1, ...cached.rates });
@@ -247,7 +275,10 @@ export function useCurrencyRates() {
 
         if (!response.ok) throw new Error(`FX ${response.status}`);
 
-        const data = (await response.json()) as { rates?: CurrencyRates };
+        const data = (await response.json()) as {
+          /** Provider rates keyed by target currency. */
+          rates?: CurrencyRates;
+        };
         if (data.rates) {
           const nextRates = { [baseCurrency]: 1, ...data.rates };
           setRates(nextRates);
@@ -278,7 +309,10 @@ export function useCurrencyRates() {
 
       if (!response.ok) throw new Error(`FX ${response.status}`);
 
-      const data = (await response.json()) as { rates?: CurrencyRates };
+      const data = (await response.json()) as {
+        /** Provider rates keyed by target currency. */
+        rates?: CurrencyRates;
+      };
       if (data.rates) {
         setRates({ [baseCurrency]: 1, ...data.rates });
         window.localStorage.setItem(

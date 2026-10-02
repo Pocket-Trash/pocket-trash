@@ -3,6 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import { ResourceVisibilityToggle } from "./resource-visibility-toggle";
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns the fixed English locale used by visibility-control assertions.
+   *
+   * @returns The mocked locale context.
+   */
   useLocale: () => ({ locale: "en-US" }),
 }));
 

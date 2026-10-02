@@ -17,17 +17,37 @@ import {
 } from "./catalog-form-pages";
 
 vi.mock("@tanstack/react-router", () => ({
+  /**
+   * Returns a navigation spy.
+   *
+   * @returns The navigation spy.
+   */
   useNavigate: () => vi.fn(),
 }));
 
 vi.mock("@clerk/tanstack-react-start", () => ({
+  /**
+   * Returns test authentication helpers.
+   *
+   * @returns Authentication state with a token spy.
+   */
   useAuth: () => ({ getToken: vi.fn() }),
 }));
 
 vi.mock("@/components/app-shell", () => ({
-  AppShell: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  /**
+   * Renders a minimal application shell for tests.
+   *
+   * @param props - Shell properties.
+   * @param props.children - Nested page content.
+   * @returns The test shell.
+   */
+  AppShell: ({
+    children,
+  }: {
+    /** Nested page content. */
+    children: React.ReactNode;
+  }) => <div>{children}</div>,
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
@@ -45,14 +65,23 @@ vi.mock("@/providers/locale-provider", () => ({
   useOptionalLocale: () => "en-US",
 }));
 
+/**
+ * Formats stable test copy.
+ *
+ * @param key - Localization key.
+ * @param values - Values interpolated into the copy.
+ * @returns The localized test copy.
+ */
 const t = (key: string, values: Readonly<Record<string, unknown>> = {}) =>
   key === "web.catalog.finishPreview" ? String(values.finish) : key;
+/** Empty custom-finish selection used by form tests. */
 const emptyCustomFinish = {
   colorEffectId: null,
   colorEffectSlug: null,
   colorIds: [],
   finishIds: [],
 };
+/** Empty catalog option lists used by form tests. */
 const emptyCatalogOptions = {
   colorEffects: [],
   colors: [],
@@ -426,12 +455,12 @@ describe("collection add form", () => {
 });
 
 /**
- * Builds a catalog product fixture for form rendering tests.
+ * Creates a catalog product fixture.
  *
  * @param id - Product identifier.
- * @param name - Product display name.
- * @param productTypeSlug - Catalog product type.
- * @returns A complete catalog product fixture.
+ * @param name - Product name.
+ * @param productTypeSlug - Product type slug.
+ * @returns The catalog product fixture.
  */
 function productFixture(
   id: number,
@@ -484,6 +513,14 @@ function productFixture(
   };
 }
 
+/**
+ * Creates a collection item fixture for a catalog product.
+ *
+ * @param collectionItemId - Collection item identifier.
+ * @param product - Source catalog product.
+ * @param sourceProductFinishOptionId - Source finish option identifier.
+ * @returns The collection item fixture.
+ */
 function collectionFixture(
   collectionItemId: number,
   product: CatalogProduct,

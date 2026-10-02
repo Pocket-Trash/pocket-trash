@@ -5,8 +5,25 @@ import {
 } from "@/components/ui/combobox";
 import { listResourceCategories } from "@/lib/resources";
 
+/**
+ * Resource category returned by category search.
+ */
 type Category = Awaited<ReturnType<typeof listResourceCategories>>[number];
 
+/**
+ * Renders a searchable category picker that emits at most ten case-insensitive unique names.
+ * Searches are debounced by 150 ms; failures clear fetched results, while a nonblank unmatched query remains selectable as a custom category.
+ *
+ * @param props - Resource category input properties.
+ * @param props.disabled - Whether interaction is disabled.
+ * @param props.label - Visible field label.
+ * @param props.noResultsLabel - Message shown when there are no selectable options.
+ * @param props.onChange - Receives the normalized selected category names.
+ * @param props.placeholder - Prompt shown when the combobox has no selection.
+ * @param props.removeLabel - Builds an accessible removal label for a category.
+ * @param props.selected - Currently selected category names.
+ * @returns The resource category picker UI.
+ */
 export function ResourceCategoryInput({
   disabled,
   label,
@@ -16,12 +33,38 @@ export function ResourceCategoryInput({
   removeLabel,
   selected,
 }: {
+  /**
+   * Whether interaction is disabled.
+   */
   disabled?: boolean;
+  /**
+   * Visible field label.
+   */
   label: string;
+  /**
+   * Message shown when there are no selectable options.
+   */
   noResultsLabel: string;
+  /**
+   * Reports the normalized selected category names.
+   *
+   * @param categories - At most ten case-insensitive unique category names.
+   */
   onChange(categories: string[]): void;
+  /**
+   * Prompt shown when the combobox has no selection.
+   */
   placeholder: string;
+  /**
+   * Builds an accessible removal label for a category.
+   *
+   * @param category - Category name being removed.
+   * @returns The accessible removal label.
+   */
   removeLabel(category: string): string;
+  /**
+   * Currently selected category names.
+   */
   selected: string[];
 }) {
   const [categories, setCategories] = useState<Category[]>([]);

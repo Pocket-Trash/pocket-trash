@@ -205,7 +205,7 @@ for production:
 | `preview` | permanent | `development` | Shared non-production baseline for preview refreshes. |
 | `development` | permanent | root | Shared non-production database for local development. |
 | Developer-specific | permanent | `development` | Optional personal local work branch selected through `.env.local`. |
-| `preview-pr-<number>` | ephemeral | `development` | Isolated non-production database for each PR preview. |
+| `preview-pr-<number>` | ephemeral | `development` | Isolated non-production database for database-changing PR previews. |
 
 Local development uses `development` unless repository-root `.env.local` or
 `.env` selects a personal Infisical secret with `URL_INITIALS`. Before opening
@@ -225,10 +225,10 @@ scraper preview environment so scraper cron executions use the same database
 branch as the web preview. See [Image CDN](./image-cdn.md) for the matching
 preview image folder namespace.
 
-PRs without schema changes still use an isolated branch so Playwright mutation
-fixtures cannot write to the shared preview database. The close workflow is the
-primary cleanup path; Neon branch expiration is the backup when a close event
-or cleanup run is missed.
+PRs without schema changes use the shared `preview` branch and skip Playwright
+mutation fixtures. The close workflow is the primary cleanup path for isolated
+branches; Neon branch expiration is the backup when a close event or cleanup
+run is missed.
 
 ENG-69 operational status: this repo change adds the backup expiration path, but
 `preview-pr-63` was not deleted from this worktree. The blocker is that Neon

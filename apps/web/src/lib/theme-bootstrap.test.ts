@@ -5,6 +5,7 @@ import {
 } from "./theme-bootstrap";
 import type { UserSettingsState } from "./user-settings";
 
+/** Unsaved server defaults used to test local theme adoption. */
 const defaultSettingsState: UserSettingsState = {
   hasSavedSettings: false,
   settings: {

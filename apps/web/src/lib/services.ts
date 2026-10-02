@@ -9,12 +9,16 @@ import {
 import services from "@package/services";
 import { serverEnv } from "@/env/server";
 
+/** Active server runtime environment. */
 const environment = process.env.NODE_ENV ?? "development";
+/** Whether the web server is running in development mode. */
 const isDevelopment = environment === "development";
+/** Console transport configured from the server logger mode. */
 const consoleTransport = createConsoleTransport({
   mode: normalizeConsoleTransportMode(serverEnv.LOGGER),
 });
 
+/** Server log transports with Axiom preferred and console fallback. */
 const transports = [
   ...(serverEnv.AXIOM_TOKEN && serverEnv.AXIOM_DATASET
     ? [
@@ -30,6 +34,7 @@ const transports = [
     : []),
 ];
 
+/** Logger configuration supplied to the shared services package. */
 const logger = {
   app: loggerValues.apps.web,
   deploymentId: serverEnv.LOG_DEPLOYMENT_ID ?? environment,

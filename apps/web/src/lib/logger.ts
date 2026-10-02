@@ -5,6 +5,7 @@ import {
 } from "@package/logger";
 import { clientEnv } from "@/env/client";
 
+/** Browser logger configured to forward events through the web log proxy. */
 export const logger = createLogger({
   app: loggerValues.apps.web,
   deploymentId: clientEnv.VITE_LOG_DEPLOYMENT_ID ?? import.meta.env.MODE,

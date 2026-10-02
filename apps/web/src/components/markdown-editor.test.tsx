@@ -364,6 +364,11 @@ describe("MarkdownEditor", () => {
     });
     expect(status?.textContent).toContain("4 / 5");
     expect(status?.textContent).toContain("approaching limit");
+    expect(
+      container
+        .querySelector(`#${textarea?.getAttribute("aria-describedby")}`)
+        ?.classList.contains("text-primary"),
+    ).toBe(true);
   });
 });
 

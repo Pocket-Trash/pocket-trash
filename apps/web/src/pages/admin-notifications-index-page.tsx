@@ -7,10 +7,19 @@ import { Bell } from "lucide-react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
+/** Renders notification categories available to the current administrator.
+ *
+ * @returns The permission-filtered notification navigation page.
+ */
 export function AdminNotificationsIndexPage() {
   const { sessionClaims, userId } = useAuth();
   const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
   const { locale } = useLocale();
+  /** Formats notification navigation copy for the active locale.
+   *
+   * @param key - Translation key to format.
+   * @returns Localized notification copy.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const links = [
     ...(hasPermission(actor, "feedback.manage")

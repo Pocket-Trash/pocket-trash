@@ -1,7 +1,9 @@
 import type { FeedbackListItem, SubmitFeedbackInput } from "@package/services";
 import type { TranslationKey } from "@pocket-trash/localizations";
 
+/** Category accepted for a feedback submission. */
 export type FeedbackCategory = NonNullable<SubmitFeedbackInput["category"]>;
+/** Feedback status displayed outside administrator-only archive views. */
 export type VisibleFeedbackStatus = Exclude<
   FeedbackListItem["status"],
   "canceled" | "denied" | "merged"
@@ -9,6 +11,7 @@ export type VisibleFeedbackStatus = Exclude<
 /** Feedback lifecycle status rendered by shared UI. */
 type FeedbackStatus = FeedbackListItem["status"];
 
+/** Feedback categories in their shared display order. */
 export const feedbackCategories: FeedbackCategory[] = [
   "product_type",
   "feature",
@@ -16,6 +19,11 @@ export const feedbackCategories: FeedbackCategory[] = [
   "bug",
 ];
 
+/** Resolves the translation key for a feedback category.
+ *
+ * @param category - Feedback category to label.
+ * @returns The category's localization key.
+ */
 export function feedbackCategoryKey(
   category: FeedbackCategory,
 ): TranslationKey {
@@ -30,7 +38,9 @@ export function feedbackCategoryKey(
  * @returns The status icon and translation key.
  */
 export function feedbackStatus(status: FeedbackStatus): {
+  /** Status icon asset name. */
   icon: string;
+  /** Localized status label key. */
   key: TranslationKey;
 } {
   if (status === "pending") {

@@ -12,23 +12,59 @@ import {
   pruneCatalogFilters,
 } from "./catalog-filters";
 
+/**
+ * Builds a color lookup test fixture.
+ *
+ * @param id - Positive numeric entity identifier.
+ * @param name - Human-readable name.
+ * @returns A color lookup fixture.
+ */
 const color = (id: number, name: string): CatalogColor => ({
   hex: "#808080",
   id,
   name,
   slug: name.toLowerCase(),
 });
+/**
+ * Builds a catalog lookup test fixture.
+ *
+ * @param id - Positive numeric entity identifier.
+ * @param name - Human-readable name.
+ * @returns A catalog lookup fixture.
+ */
 const lookup = (id: number, name: string) => ({
   id,
   name,
   slug: name.toLowerCase(),
 });
+/**
+ * Blue color lookup fixture.
+ */
 const blue = color(1, "Blue");
+/**
+ * Purple color lookup fixture.
+ */
 const purple = color(2, "Purple");
+/**
+ * Burple color lookup fixture.
+ */
 const burple = color(3, "Burple");
+/**
+ * Polished finish lookup fixture.
+ */
 const polished = lookup(11, "Polished");
+/**
+ * Blackened finish lookup fixture.
+ */
 const blackened = lookup(12, "Blackened");
 
+/**
+ * Builds a finish-option test fixture.
+ *
+ * @param colors - Colors assigned to the fixture finish option.
+ * @param finishes - Finishes assigned to the fixture finish option.
+ * @returns A finish-option fixture.
+ */
 function option(
   colors: CatalogColor[],
   finishes = [polished],
@@ -41,6 +77,12 @@ function option(
   };
 }
 
+/**
+ * Builds a filterable catalog-item test fixture.
+ *
+ * @param finishOptions - Finish options assigned to the fixture item.
+ * @returns A filterable item fixture.
+ */
 function item(finishOptions: CatalogFinishOption[]): FilterableCatalogItem {
   return {
     finishOptions,

@@ -3,6 +3,7 @@ import { expect } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { AccountErasureState } from "./account-erasure-pages";
 
+/** Storybook metadata for account-erasure states. */
 const meta = {
   args: {
     status: {
@@ -10,6 +11,11 @@ const meta = {
       status: "processing",
     },
   },
+  /**
+   * Installs the authenticated story fixture.
+   *
+   * @returns The fixture cleanup callback.
+   */
   beforeEach: () => mockStoryAuth(),
   component: AccountErasureState,
   decorators: [
@@ -24,9 +30,16 @@ const meta = {
 } satisfies Meta<typeof AccountErasureState>;
 
 export default meta;
+/** Account-erasure story shape. */
 type Story = StoryObj<typeof meta>;
 
+/** Processing account-erasure state. */
 export const Processing: Story = {
+  /**
+   * Verifies the processing status and request identifier.
+   *
+   * @param root0 - Story interaction context.
+   */
   play: async ({ canvas }) => {
     await expect(
       canvas.getByRole("heading", { name: "Erasure in progress" }),
@@ -35,6 +48,7 @@ export const Processing: Story = {
   },
 };
 
+/** Account-erasure state that directs the user to support. */
 export const NeedsSupport: Story = {
   args: {
     status: {
@@ -42,6 +56,11 @@ export const NeedsSupport: Story = {
       status: "needs_support",
     },
   },
+  /**
+   * Verifies the support status and contact action.
+   *
+   * @param root0 - Story interaction context.
+   */
   play: async ({ canvas }) => {
     await expect(
       canvas.getByRole("heading", { name: "Erasure needs support" }),

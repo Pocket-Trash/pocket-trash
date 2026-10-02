@@ -41,10 +41,11 @@ Mutation fixtures stay disabled unless `E2E_RUN_MUTATIONS=true`.
 
 ## CI
 
-The Deploy workflow creates or reuses `preview-pr-<number>`, configures the
-matching Vercel database override, and assigns both Bunny prefixes before it
-runs Playwright. The workflow runs the read-only smoke suite first. It runs the
-mutation fixture only after Neon reports an isolated branch.
+For database-changing PRs, the Deploy workflow creates or reuses
+`preview-pr-<number>`, configures the matching Vercel database override, and
+assigns both Bunny prefixes before it runs Playwright. Other PRs use the shared
+preview database and run only the read-only smoke suite. The mutation fixture
+runs only after Neon reports an isolated branch.
 
 Before any mutation, the guard verifies these exact boundaries:
 

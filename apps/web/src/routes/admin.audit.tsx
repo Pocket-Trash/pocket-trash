@@ -14,7 +14,7 @@ const Route = createFileRoute("/admin/audit")({
   /**
    * Verifies that the actor may read the audit log.
    *
-   * @rejects When the actor lacks audit access.
+   * @rejects When authorization cannot be checked or the actor lacks audit access.
    */
   beforeLoad: async () => {
     if (!(await canReadAudit())) throw notFound();
@@ -37,11 +37,12 @@ const Route = createFileRoute("/admin/audit")({
    */
   loaderDeps: ({ search }) => search,
   /**
-   * Loads audit events and export state.
+   * Loads audit events, export state, and delivery failures.
    *
    * @param context - Route loader context.
    * @param context.deps - Validated audit search filters.
-   * @returns Audit page data.
+   * @returns The filtered audit page, export state, and delivery failures.
+   * @rejects When audit events, export state, or delivery failures cannot be loaded.
    */
   loader: async ({ deps }) => {
     const [page, exportState, deliveryFailures] = await Promise.all([

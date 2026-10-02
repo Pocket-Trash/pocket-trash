@@ -71,11 +71,21 @@ import {
 } from "@/lib/upload-sessions";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Renders the product create or edit page.
+ *
+ * @param props - Product form page properties.
+ * @param props.initialProduct - Existing product being edited.
+ * @param props.options - Catalog lookup options.
+ * @returns The product form page.
+ */
 export function ProductFormPage({
   initialProduct,
   options: initialOptions,
 }: {
+  /** Existing product being edited. */
   initialProduct?: CatalogProduct;
+  /** Catalog lookup options. */
   options: CatalogOptions;
 }) {
   const t = useCatalogCopy();
@@ -130,6 +140,9 @@ export function ProductFormPage({
  * Renders the product fields shared by add and edit flows.
  *
  * @param props - Product type, catalog options, and optional existing product.
+ * @param props.initialProduct - Existing product being edited.
+ * @param props.options - Catalog lookup options.
+ * @param props.productTypeSlug - Product type being edited.
  * @returns The product editor form.
  */
 export function ProductEditor({
@@ -137,8 +150,11 @@ export function ProductEditor({
   options: initialOptions,
   productTypeSlug,
 }: {
+  /** Existing product being edited. */
   initialProduct?: CatalogProduct;
+  /** Catalog lookup options. */
   options: CatalogOptions;
+  /** Product type being edited. */
   productTypeSlug: CatalogProductType;
 }) {
   const t = useCatalogCopy();
@@ -250,6 +266,12 @@ export function ProductEditor({
             locale,
             files: images,
             getToken,
+            /**
+             * Offers to restore an owner-deleted duplicate image.
+             *
+             * @param imageId - Duplicate image identifier.
+             * @returns Whether the duplicate was restored.
+             */
             onOwnerDeletedDuplicate: async (imageId) => {
               if (
                 !window.confirm(
@@ -625,8 +647,22 @@ export function ProductEditor({
   );
 }
 
+/** Editable finish option value used by product and collection forms. */
 type FinishOptionFormValue = ProductFormInput["finishOptions"][number];
 
+/**
+ * Performs a collection cover change.
+ *
+ * @param reason - Optional moderation reason.
+ * @returns A promise that resolves after the cover changes.
+ */
+type CollectionCoverAction = (reason?: string) => Promise<void>;
+
+/**
+ * Creates an empty editable finish option.
+ *
+ * @returns A finish option without selected values.
+ */
 const emptyFinishOption = (): FinishOptionFormValue => ({
   colorEffectId: null,
   colorEffectSlug: null,
@@ -669,10 +705,23 @@ export function FinishOptionsEditor({
   /** Current ordered finish options. */
   value: FinishOptionFormValue[];
 }) {
+  /**
+   * Replaces one finish option.
+   *
+   * @param index - Position to update.
+   * @param option - Replacement finish option.
+   * @returns Nothing.
+   */
   const update = (index: number, option: FinishOptionFormValue) =>
     onChange(
       value.map((current, position) => (position === index ? option : current)),
     );
+  /**
+   * Moves one finish option by a relative offset.
+   *
+   * @param index - Current option position.
+   * @param offset - Relative destination offset.
+   */
   const move = (index: number, offset: number) => {
     const next = [...value];
     const target = index + offset;
@@ -927,6 +976,11 @@ function LookupDialog(props: LookupDialogProps) {
     material: "web.action.addMaterial",
   }[kind] as TranslationKey;
 
+  /**
+   * Creates the configured lookup and closes the dialog on success.
+   *
+   * @returns A promise that resolves after creation is attempted.
+   */
   const create = async () => {
     if (props.kind === "maker") {
       const result = await createCatalogMaker({ data: { name, rootUrl } });
@@ -1100,6 +1154,13 @@ export function CollectionFormPage({
     submit: t("action.save"),
   };
 
+  /**
+   * Saves the collection and uploads its initial images.
+   *
+   * @param value - Collection form values.
+   * @param images - Initial collection images.
+   * @returns A promise that resolves after the save flow completes.
+   */
   async function submit(value: CollectionFormValue, images: File[]) {
     setSaving(true);
     setError(null);
@@ -1153,7 +1214,13 @@ export function CollectionFormPage({
     });
   }
 
-  async function updateCover(action: (reason?: string) => Promise<void>) {
+  /**
+   * Runs a collection cover action with any required moderation reason.
+   *
+   * @param action - Cover action to perform.
+   * @returns A promise that resolves after the action completes.
+   */
+  async function updateCover(action: CollectionCoverAction) {
     if (!current) return;
     const moderating = Boolean(current.canAdminister && !current.isOwner);
     const reason = moderating
@@ -1257,6 +1324,13 @@ export function CollectionFormPage({
               ),
               history: t("web.collections.gallery.title"),
               nextPage: t("web.collections.gallery.nextPage"),
+              /**
+               * Formats collection cover pagination status.
+               *
+               * @param page - Current page number.
+               * @param pageCount - Total page count.
+               * @returns The localized pagination status.
+               */
               pageStatus: (page, pageCount) =>
                 t("web.collections.gallery.pageStatus", { page, pageCount }),
               previousPage: t("web.collections.gallery.previousPage"),
@@ -1527,6 +1601,12 @@ function CollectionDeletionSection({
  * Renders the form for adding a product to a collection.
  *
  * @param root0 - Collection-item creation properties.
+ * @param root0.collections - Collections available as destinations.
+ * @param root0.defaultCollectionName - Suggested name for a new collection.
+ * @param root0.initialProductId - Initially selected product identifier.
+ * @param root0.options - Catalog lookup options.
+ * @param root0.products - Products available to add.
+ * @param root0.syncIncomplete - Whether catalog synchronization is incomplete.
  * @returns The collection-item creation page.
  */
 export function CollectionAddPage({
@@ -1537,11 +1617,17 @@ export function CollectionAddPage({
   options: initialOptions,
   products,
 }: {
+  /** Collections available as destinations. */
   collections: UserCollectionSummary[];
+  /** Suggested name for a new collection. */
   defaultCollectionName: string | null;
+  /** Initially selected product identifier. */
   initialProductId?: number;
+  /** Catalog lookup options. */
   options: CatalogOptions;
+  /** Products available to add. */
   products: CatalogProduct[];
+  /** Whether catalog synchronization is incomplete. */
   syncIncomplete?: boolean;
 }) {
   const t = useCatalogCopy();
@@ -1767,6 +1853,12 @@ export function CollectionAddPage({
           locale,
           files: images,
           getToken,
+          /**
+           * Offers to restore an owner-deleted duplicate image.
+           *
+           * @param imageId - Duplicate image identifier.
+           * @returns Whether the duplicate was restored.
+           */
           onOwnerDeletedDuplicate: async (imageId) => {
             if (
               !window.confirm(
@@ -1944,7 +2036,7 @@ export function CollectionAddPage({
         <div className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
           {matchingProducts.map((candidate) => (
             <Button
-              className="h-auto justify-start p-5 text-left"
+              className="h-auto min-w-0 justify-start p-5 text-left wrap-anywhere whitespace-normal"
               key={candidate.id}
               onClick={() => {
                 setProduct(candidate);
@@ -2232,6 +2324,13 @@ export function CollectionProductFields({
   );
 }
 
+/**
+ * Formats a finish option with localized built-in color effects.
+ *
+ * @param option - Finish option to format.
+ * @param t - Catalog translation formatter.
+ * @returns The localized finish label.
+ */
 function localizedFinishLabel(
   option: CatalogFinishOption,
   t: ReturnType<typeof useCatalogCopy>,
@@ -2256,6 +2355,12 @@ function localizedFinishLabel(
  * Renders the collection-item edit page.
  *
  * @param root0 - Existing item, product, and lookup values.
+ * @param root0.buttonProducts - Catalog products for owned spinner buttons.
+ * @param root0.collections - Collections available as destinations.
+ * @param root0.item - Collection item being edited.
+ * @param root0.options - Catalog lookup options.
+ * @param root0.ownedButtons - Owned spinner buttons available to install.
+ * @param root0.product - Source catalog product.
  * @returns The collection-item edit page.
  */
 export function CollectionEditPage({
@@ -2266,11 +2371,17 @@ export function CollectionEditPage({
   ownedButtons,
   product,
 }: {
+  /** Catalog products for owned spinner buttons. */
   buttonProducts: CatalogProduct[];
+  /** Collections available as destinations. */
   collections: UserCollectionSummary[];
+  /** Collection item being edited. */
   item: UserCollectionItem;
+  /** Catalog lookup options. */
   options: CatalogOptions;
+  /** Owned spinner buttons available to install. */
   ownedButtons: UserCollectionItem[];
+  /** Source catalog product. */
   product: CatalogProduct;
 }) {
   const t = useCatalogCopy();
@@ -2538,6 +2649,12 @@ export function CollectionEditPage({
                   files: images,
                   getToken,
                   reason,
+                  /**
+                   * Offers to restore an owner-deleted duplicate image.
+                   *
+                   * @param imageId - Duplicate image identifier.
+                   * @returns Whether the duplicate was restored.
+                   */
                   onOwnerDeletedDuplicate: async (imageId) => {
                     if (
                       !window.confirm(
@@ -2582,9 +2699,13 @@ export function CollectionEditPage({
             if (!material || !finish) return;
             let installedButton:
               | {
+                  /** Installed collection item identifier. */
                   collectionItemId: number;
+                  /** Custom finish applied to the installed button. */
                   customFinish: FinishOptionFormValue | null;
+                  /** Catalog finish option applied to the installed button. */
                   finishOptionId: number | null;
+                  /** Material applied to the installed button. */
                   materialId: number;
                 }
               | null
@@ -2652,6 +2773,13 @@ export function CollectionEditPage({
   );
 }
 
+/**
+ * Selects whether a collection-item edit can save details or only upload images.
+ *
+ * @param detailsAreValid - Whether all detail fields can be saved.
+ * @param pendingImageCount - Number of images waiting to upload.
+ * @returns The permitted submission mode.
+ */
 export function collectionEditSubmissionMode(
   detailsAreValid: boolean,
   pendingImageCount: number,
@@ -2815,9 +2943,15 @@ function FieldError({
  * Renders a catalog form status notice.
  *
  * @param root0 - Notice content.
+ * @param root0.children - Notice content.
  * @returns The status notice.
  */
-function Notice({ children }: { children: React.ReactNode }) {
+function Notice({
+  children,
+}: {
+  /** Notice content. */
+  children: React.ReactNode;
+}) {
   return (
     <div
       className="rounded-lg border border-border bg-secondary p-4 text-secondary-foreground"

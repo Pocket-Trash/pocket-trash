@@ -119,6 +119,11 @@ describe("api worker", () => {
       { cron: "15 * * * *", scheduledTime: 3_600_000 } as ScheduledController,
       bindings,
       {
+        /**
+         * Captures background work scheduled by the worker.
+         *
+         * @param task - Background task promise.
+         */
         waitUntil(task: Promise<unknown>) {
           tasks.push(task);
         },

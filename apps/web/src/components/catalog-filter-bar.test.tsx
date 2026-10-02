@@ -7,45 +7,241 @@ import type { CatalogFilterCopy } from "./catalog-filter-bar";
 import { CatalogFilterBar } from "./catalog-filter-bar";
 
 (
-  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+  globalThis as {
+    /**
+     * Signals that the test environment supports React `act`.
+     */
+    IS_REACT_ACT_ENVIRONMENT?: boolean;
+  }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("@/components/ui/combobox", () => ({
+  /**
+   * Removes the single-select combobox from focused filter-bar tests.
+   *
+   * @returns No rendered output.
+   */
   CatalogCombobox: () => null,
+  /**
+   * Removes the multi-select combobox from focused filter-bar tests.
+   *
+   * @returns No rendered output.
+   */
   CatalogMultiCombobox: () => null,
 }));
 
 vi.mock("@/components/ui/dropdown-menu", () => ({
-  DropdownMenu: ({ children }: { children: React.ReactNode }) => children,
+  /**
+   * Passes dropdown-menu children through without wrapper markup.
+   *
+   * @param input - Test-double properties.
+   * @param input.children - Nested content.
+   * @returns The nested test content.
+   */
+  DropdownMenu: ({
+    children,
+  }: {
+    /**
+     * Nested content.
+     */
+    children: React.ReactNode;
+  }) => children,
+  /**
+   * Removes dropdown checkbox items from focused filter-bar tests.
+   *
+   * @returns No rendered output.
+   */
   DropdownMenuCheckboxItem: () => null,
+  /**
+   * Removes dropdown content from focused filter-bar tests.
+   *
+   * @returns No rendered output.
+   */
   DropdownMenuContent: () => null,
+  /**
+   * Removes dropdown triggers from focused filter-bar tests.
+   *
+   * @returns No rendered output.
+   */
   DropdownMenuTrigger: () => null,
 }));
 
 vi.mock("@/components/ui/sheet", () => ({
-  Sheet: ({ children, open }: { children: React.ReactNode; open: boolean }) => (
+  /**
+   * Exposes sheet open state while rendering its children inline.
+   *
+   * @param input - Test-double properties.
+   * @param input.children - Nested content.
+   * @param input.open - Controlled sheet open state.
+   * @returns The state-marked sheet test wrapper.
+   */
+  Sheet: ({
+    children,
+    open,
+  }: {
+    /**
+     * Nested sheet content.
+     */
+    children: React.ReactNode;
+    /** Controlled sheet open state. */
+    open: boolean;
+  }) => (
     <div data-open={String(open)} data-testid="mobile-filter-sheet">
       {children}
     </div>
   ),
-  SheetContent: ({ children }: { children: React.ReactNode }) => children,
-  SheetDescription: ({ children }: { children: React.ReactNode }) => children,
-  SheetHeader: ({ children }: { children: React.ReactNode }) => children,
-  SheetTitle: ({ children }: { children: React.ReactNode }) => children,
+  /**
+   * Provides the sheet content test double.
+   *
+   * @param input - Test-double properties.
+   * @param input.children - Nested content.
+   * @returns The nested sheet content.
+   */
+  SheetContent: ({
+    children,
+  }: {
+    /**
+     * Nested content.
+     */
+    children: React.ReactNode;
+  }) => children,
+  /**
+   * Provides the sheet description test double.
+   *
+   * @param input - Test-double properties.
+   * @param input.children - Nested content.
+   * @returns The nested sheet description.
+   */
+  SheetDescription: ({
+    children,
+  }: {
+    /**
+     * Nested content.
+     */
+    children: React.ReactNode;
+  }) => children,
+  /**
+   * Provides the sheet header test double.
+   *
+   * @param input - Test-double properties.
+   * @param input.children - Nested content.
+   * @returns The nested sheet header.
+   */
+  SheetHeader: ({
+    children,
+  }: {
+    /**
+     * Nested content.
+     */
+    children: React.ReactNode;
+  }) => children,
+  /**
+   * Provides the sheet title test double.
+   *
+   * @param input - Test-double properties.
+   * @param input.children - Nested content.
+   * @returns The nested sheet title.
+   */
+  SheetTitle: ({
+    children,
+  }: {
+    /**
+     * Nested content.
+     */
+    children: React.ReactNode;
+  }) => children,
+  /**
+   * Removes the sheet trigger from focused filter-bar tests.
+   *
+   * @returns No rendered output.
+   */
   SheetTrigger: () => null,
 }));
 
 vi.mock("@/components/ui/toggle-group", () => ({
-  ToggleGroup: ({ children }: { children: React.ReactNode }) => children,
-  ToggleGroupItem: ({ children }: { children: React.ReactNode }) => children,
+  /**
+   * Provides the toggle group test double.
+   *
+   * @param input - Test-double properties.
+   * @param input.children - Nested content.
+   * @returns The nested toggle-group content.
+   */
+  ToggleGroup: ({
+    children,
+  }: {
+    /**
+     * Nested content.
+     */
+    children: React.ReactNode;
+  }) => children,
+  /**
+   * Provides the toggle group item test double.
+   *
+   * @param input - Test-double properties.
+   * @param input.children - Nested content.
+   * @returns The nested toggle item content.
+   */
+  ToggleGroupItem: ({
+    children,
+  }: {
+    /**
+     * Nested content.
+     */
+    children: React.ReactNode;
+  }) => children,
 }));
 
 vi.mock("@/components/ui/tooltip", () => ({
-  Tooltip: ({ children }: { children: React.ReactNode }) => children,
-  TooltipContent: ({ children }: { children: React.ReactNode }) => children,
-  TooltipTrigger: ({ children }: { children: React.ReactNode }) => children,
+  /**
+   * Provides the tooltip test double.
+   *
+   * @param input - Test-double properties.
+   * @param input.children - Nested content.
+   * @returns The nested tooltip content.
+   */
+  Tooltip: ({
+    children,
+  }: {
+    /**
+     * Nested content.
+     */
+    children: React.ReactNode;
+  }) => children,
+  /**
+   * Provides the tooltip content test double.
+   *
+   * @param input - Test-double properties.
+   * @param input.children - Nested content.
+   * @returns The nested tooltip panel content.
+   */
+  TooltipContent: ({
+    children,
+  }: {
+    /**
+     * Nested content.
+     */
+    children: React.ReactNode;
+  }) => children,
+  /**
+   * Provides the tooltip trigger test double.
+   *
+   * @param input - Test-double properties.
+   * @param input.children - Nested content.
+   * @returns The nested tooltip trigger content.
+   */
+  TooltipTrigger: ({
+    children,
+  }: {
+    /**
+     * Nested content.
+     */
+    children: React.ReactNode;
+  }) => children,
 }));
 
+/**
+ * English labels used by filter-bar unit tests.
+ */
 const copy = {
   all: "All",
   any: "Any",
@@ -54,6 +250,12 @@ const copy = {
   close: "Close",
   colors: "Colour",
   description: "Filter the catalog",
+  /**
+   * Provides the fade name test double.
+   *
+   * @param colors - Arrow-separated color names.
+   * @returns The test fade label.
+   */
   fadeName: (colors) => `${colors} fade`,
   filters: "Filters",
   finishes: "Finish",
@@ -62,6 +264,12 @@ const copy = {
   materials: "Material",
   more: "More",
   moreFilters: "More filters",
+  /**
+   * Provides the more options test double.
+   *
+   * @param label - Facet label.
+   * @returns The test overflow-options label.
+   */
   moreOptions: (label) => `More ${label}`,
   productType: "Product type",
   productTypeAll: "All product types",
@@ -69,6 +277,9 @@ const copy = {
   selectProductType: "Select a product type",
 } satisfies CatalogFilterCopy;
 
+/**
+ * Empty facet set used to isolate panel behavior.
+ */
 const facets = {
   colors: [],
   fades: [],
@@ -78,6 +289,9 @@ const facets = {
   productTypes: [],
 };
 
+/**
+ * Empty controlled filter state used by panel tests.
+ */
 const filters = {
   colorIds: [],
   fadeColorSets: [],

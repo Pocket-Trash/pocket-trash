@@ -2,10 +2,17 @@ import type { CatalogProduct } from "@package/services";
 import { Badge } from "@/components/ui/badge";
 
 /**
- * Renders one catalog product summary card.
+ * Renders a catalog product summary with its first active image and counts.
  *
- * @param props - Product data and localized labels.
- * @returns The catalog card UI.
+ * @param props - Product card properties.
+ * @param props.approvalLabel - Localized review state shown to authorized viewers.
+ * @param props.finishOptionCountLabel - Preformatted finish-option count.
+ * @param props.imageAlt - Alternative text for the first active image.
+ * @param props.imageCountLabel - Preformatted image count.
+ * @param props.materialCountLabel - Preformatted material count.
+ * @param props.privateLabel - Label shown for a private product.
+ * @param props.product - Catalog product to summarize.
+ * @returns The product summary card.
  */
 export function ProductCard({
   approvalLabel,
@@ -18,11 +25,29 @@ export function ProductCard({
 }: {
   /** Localized review state shown to authorized viewers. */
   approvalLabel?: string;
+  /**
+   * Preformatted finish-option count.
+   */
   finishOptionCountLabel: string;
+  /**
+   * Alternative text for the first active image.
+   */
   imageAlt: string;
+  /**
+   * Preformatted image count.
+   */
   imageCountLabel: string;
+  /**
+   * Preformatted material count.
+   */
   materialCountLabel: string;
+  /**
+   * Label shown when the product is private.
+   */
   privateLabel: string;
+  /**
+   * Catalog product displayed by the card.
+   */
   product: CatalogProduct;
 }) {
   const image = product.images.find(({ deletedAt }) => !deletedAt);

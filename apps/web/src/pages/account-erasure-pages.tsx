@@ -14,9 +14,16 @@ import {
 } from "@/lib/account-erasure";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Polls and renders the current self-erasure request status.
+ *
+ * @param root0 - Initial erasure status.
+ * @returns The live account-erasure status page.
+ */
 export function AccountErasureStatusPage({
   initialStatus,
 }: {
+  /** Status loaded for the active erasure request. */
   initialStatus: ErasureStatusView;
 }) {
   const [status, setStatus] = useState(initialStatus);
@@ -41,8 +48,26 @@ export function AccountErasureStatusPage({
   return <AccountErasureState status={status} />;
 }
 
-export function AccountErasureState({ status }: { status: ErasureStatusView }) {
+/**
+ * Renders one account-erasure status and its available next action.
+ *
+ * @param root0 - Erasure status properties.
+ * @returns The account-erasure status UI.
+ */
+export function AccountErasureState({
+  status,
+}: {
+  /** Current erasure request status. */
+  status: ErasureStatusView;
+}) {
   const { locale } = useLocale();
+  /**
+   * Formats localized account-erasure copy.
+   *
+   * @param key - Translation key.
+   * @param params - Translation interpolation values.
+   * @returns The localized message.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -101,8 +126,19 @@ export function AccountErasureState({ status }: { status: ErasureStatusView }) {
   );
 }
 
+/**
+ * Renders the confirmation shown after account erasure completes.
+ *
+ * @returns The completed account-erasure page.
+ */
 export function AccountErasedPage() {
   const { locale } = useLocale();
+  /**
+   * Formats localized completion copy.
+   *
+   * @param key - Translation key.
+   * @returns The localized message.
+   */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   return (
     <AppShell title={t("web.erasure.status.title")}>

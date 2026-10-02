@@ -38,17 +38,34 @@ import {
 } from "@/lib/upload-sessions";
 import { useLocale } from "@/providers/locale-provider";
 
+/** A resource owned by the signed-in user. */
 type OwnedResource = Awaited<ReturnType<typeof listOwnedResources>>[number];
+/** Resource detail returned by the resource service. */
 type ResourceDetail = NonNullable<
   Awaited<ReturnType<typeof getResourceDetail>>
 >;
 
+/**
+ * Renders the signed-in user's resource management index.
+ *
+ * @param props - Resource management properties.
+ * @param props.resources - Owned resources to display.
+ * @returns The resource management page.
+ */
 export function ResourceManagementPage({
   resources,
 }: {
+  /** Owned resources to display. */
   resources: OwnedResource[];
 }) {
   const { locale } = useLocale();
+  /**
+   * Formats localized resource management copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -97,8 +114,27 @@ export function ResourceManagementPage({
   );
 }
 
-export function ResourceEditPage({ detail }: { detail: ResourceDetail }) {
+/**
+ * Renders resource editing and version upload tabs.
+ *
+ * @param props - Resource edit page properties.
+ * @param props.detail - Resource detail being edited.
+ * @returns The resource edit page.
+ */
+export function ResourceEditPage({
+  detail,
+}: {
+  /** Resource detail being edited. */
+  detail: ResourceDetail;
+}) {
   const { locale } = useLocale();
+  /**
+   * Formats localized resource edit copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -126,9 +162,28 @@ export function ResourceEditPage({ detail }: { detail: ResourceDetail }) {
   );
 }
 
-function ResourceEditForm({ detail }: { detail: ResourceDetail }) {
+/**
+ * Renders editable resource metadata, visibility, and images.
+ *
+ * @param props - Resource edit form properties.
+ * @param props.detail - Resource detail being edited.
+ * @returns The resource edit form.
+ */
+function ResourceEditForm({
+  detail,
+}: {
+  /** Resource detail being edited. */
+  detail: ResourceDetail;
+}) {
   const { locale } = useLocale();
   const navigate = useNavigate();
+  /**
+   * Formats localized resource edit copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -309,12 +364,27 @@ function ResourceEditForm({ detail }: { detail: ResourceDetail }) {
   );
 }
 
+/**
+ * Renders the standalone resource version upload page.
+ *
+ * @param props - Version upload page properties.
+ * @param props.detail - Resource receiving the new version.
+ * @returns The resource version upload page.
+ */
 export function ResourceVersionUploadPage({
   detail,
 }: {
+  /** Resource receiving the new version. */
   detail: ResourceDetail;
 }) {
   const { locale } = useLocale();
+  /**
+   * Formats localized version upload copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -329,7 +399,19 @@ export function ResourceVersionUploadPage({
   );
 }
 
-function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
+/**
+ * Renders the resource version upload form.
+ *
+ * @param props - Version upload form properties.
+ * @param props.detail - Resource receiving the new version.
+ * @returns The resource version upload form.
+ */
+function ResourceVersionUploadForm({
+  detail,
+}: {
+  /** Resource receiving the new version. */
+  detail: ResourceDetail;
+}) {
   const { getToken } = useAuth();
   const { locale } = useLocale();
   const navigate = useNavigate();
@@ -337,6 +419,13 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
+  /**
+   * Formats localized version upload copy.
+   *
+   * @param key - Localization key.
+   * @param params - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   const t = (
     key: TranslationKey,
     params: Record<string, number | string> = {},
@@ -360,10 +449,22 @@ function ResourceVersionUploadForm({ detail }: { detail: ResourceDetail }) {
           const result = await uploadResourceSession({
             files,
             getToken,
+            /**
+             * Reports file upload progress.
+             *
+             * @param filename - File currently uploading.
+             * @param percent - Completed percentage.
+             * @returns Nothing.
+             */
             onProgress: (filename, percent) =>
               setUploadStatus(
                 t("web.resources.upload.progress", { filename, percent }),
               ),
+            /**
+             * Reports upload workflow stage changes.
+             *
+             * @param stage - Current upload stage.
+             */
             onStage: (stage) => {
               if (stage === "complete") {
                 setUploadStatus(t("web.resources.upload.finalizing"));

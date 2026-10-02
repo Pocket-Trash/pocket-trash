@@ -17,9 +17,51 @@ const mocks = vi.hoisted(() => ({
   rootLocale: null as "en-US" | "es-MX" | null,
 }));
 
+vi.mock("@clerk/tanstack-react-start", () => ({
+  /**
+   * Rejects authentication access from error recovery UI.
+   *
+   * @throws When the recovery page attempts to read authentication.
+   */
+  useAuth: () => {
+    throw new Error("Authentication provider unavailable");
+  },
+}));
+
 vi.mock("@tanstack/react-router", () => ({
+  /**
+   * Renders navigation without requiring router context.
+   *
+   * @param props - Navigation link properties.
+   * @returns The navigation anchor.
+   */
+  Link: ({ children }: { /** Link contents. */ children: React.ReactNode }) => (
+    <a href="/">{children}</a>
+  ),
+
+  /**
+   * Returns the router invalidation fixture.
+   *
+   * @returns The router invalidation fixture.
+   */
   useRouter: () => ({ invalidate: mocks.invalidate }),
-  useRouterState: ({ select }: { select: (state: unknown) => unknown }) =>
+  /**
+   * Applies a route-state selector to the fixture state.
+   *
+   * @param root0 - Router-state hook options.
+   * @returns The selected fixture value.
+   */
+  useRouterState: ({
+    select,
+  }: {
+    /**
+     * Selects a value from the route-state fixture.
+     *
+     * @param state - Route state supplied by the hook.
+     * @returns The selected fixture value.
+     */
+    select: (state: unknown) => unknown;
+  }) =>
     select({
       location: { pathname: mocks.pathname },
       matches: [
@@ -38,11 +80,19 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns the configured active locale fixture.
+   *
+   * @returns The active locale, or `null` when unconfigured.
+   */
   useOptionalLocale: () => mocks.activeLocale,
 }));
 
 (
-  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+  globalThis as {
+    /** Enables React act-environment checks for this suite. */
+    IS_REACT_ACT_ENVIRONMENT?: boolean;
+  }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe("RouteErrorPage", () => {
@@ -101,7 +151,14 @@ describe("RouteErrorPage", () => {
   });
 
   it("disables Retry while invalidating and restores it on failure", async () => {
-    let rejectRetry: (error: Error) => void = () => {};
+    /**
+     * Rejects the pending router invalidation fixture.
+     *
+     * @param error - Rejection reason.
+     */
+    let rejectRetry: (error: Error) => void = (error) => {
+      void error;
+    };
     const onRetry = vi.fn(
       () =>
         new Promise<void>((_resolve, reject) => {
@@ -176,6 +233,30 @@ describe("RouteErrorPage", () => {
     );
   });
 
+  it("keeps the shared header visible without authentication or settings providers", () => {
+    act(() =>
+      root.render(
+        <RouteErrorView
+          development={false}
+          error={new Error("loader failed")}
+          locale="en-US"
+          onRetry={vi.fn()}
+          pathname="/feedback"
+        />,
+      ),
+    );
+    expect(container.querySelector("header")?.textContent).toContain(
+      "Pocket Trash",
+    );
+    expect(container.querySelector('header a[href="/"]')).not.toBeNull();
+    expect(container.querySelector("header")?.textContent).not.toContain(
+      "Sign in",
+    );
+    expect(container.querySelector("main")?.textContent).toContain(
+      "Something went wrong",
+    );
+  });
+
   it("uses a native Return home link", () => {
     act(() =>
       root.render(
@@ -189,7 +270,7 @@ describe("RouteErrorPage", () => {
       ),
     );
 
-    expect(container.querySelector('a[href="/"]')?.textContent).toBe(
+    expect(container.querySelector('main a[href="/"]')?.textContent).toBe(
       "Return home",
     );
   });

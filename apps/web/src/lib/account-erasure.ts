@@ -5,23 +5,37 @@ import { createServerFn } from "@tanstack/react-start";
 import { getActor, requireActor, requirePermission } from "@/lib/authorization";
 import { localizedServerError } from "@/lib/server-errors";
 
+/** Public progress state for an account-erasure request. */
 export type ErasureStatusView = {
+  /** Stable erasure request identifier. */
   requestId: string;
+  /** Client-facing progress state. */
   status: "processing" | "completed" | "needs_support";
 };
 
+/** Administrator view of an account-erasure request. */
 export type AdminErasureStatusView = ErasureStatusView & {
+  /** Failure code for a request needing support, or `null`. */
   errorCode: string | null;
+  /** Clerk user ID being erased, or `null` when unavailable. */
   targetClerkId: string | null;
 };
 
+/** Clerk account matched for an administrator erasure request. */
 export type ErasureTarget = {
+  /** Matched Clerk user ID. */
   clerkId: string;
+  /** Normalized target email address. */
   email: string;
+  /** Display name, falling back to the email address. */
   name: string;
 };
 
-/** Creates a strictly reverified self-service erasure request. */
+/** Creates a strictly reverified self-service erasure request.
+ *
+ * @returns A public request status or Clerk's strict-reverification response.
+ * @rejects When authentication, hashing, actor resolution, or persistence fails.
+ */
 export const requestSelfErasure = createServerFn({ method: "POST" })
   .validator(parseSelfErasureInput)
   .handler(async () => {
@@ -44,6 +58,11 @@ export const requestSelfErasure = createServerFn({ method: "POST" })
     );
   });
 
+/** Returns the current user's erasure receipt, `null`, or `signed_out`.
+ *
+ * @returns The public request status, `null` when none exists, or `signed_out`.
+ * @rejects When authentication, hashing, or receipt lookup fails.
+ */
 export const getSelfErasureStatus = createServerFn().handler(async () => {
   const clerkId = selfErasureClerkId(await clerkAuth());
   if (!clerkId) return "signed_out" as const;
@@ -54,17 +73,34 @@ export const getSelfErasureStatus = createServerFn().handler(async () => {
   return request ? statusView(request) : null;
 });
 
+/** Selects the Clerk ID only from an authenticated auth state.
+ *
+ * @param state - Authentication state from Clerk.
+ * @returns The Clerk user ID, or `null` when signed out or missing an ID.
+ */
 export function selfErasureClerkId(state: {
+  /** Whether Clerk authenticated the request. */
   isAuthenticated: boolean;
+  /** Clerk user ID supplied by the auth state. */
   userId: string | null;
 }): string | null {
   return state.isAuthenticated ? state.userId : null;
 }
 
+/** Reports whether the current actor may administer account erasure.
+ *
+ * @returns Whether the actor has account-erasure permission.
+ * @rejects When authentication or actor resolution fails.
+ */
 export const canEraseAccounts = createServerFn().handler(async () => {
   return hasPermission(await getActor(), "accounts.erase");
 });
 
+/** Finds the Clerk account matching a normalized email for an administrator.
+ *
+ * @returns The matching Clerk account, or `null` when none matches.
+ * @rejects When validation, authorization, configuration, or Clerk lookup fails.
+ */
 export const findErasureTarget = createServerFn({ method: "GET" })
   .validator(parseEmailInput)
   .handler(async ({ data }) => {
@@ -72,7 +108,11 @@ export const findErasureTarget = createServerFn({ method: "GET" })
     return await findClerkUserByEmail(data.email);
   });
 
-/** Creates an administrator-verified account-erasure request. */
+/** Creates an administrator-verified account-erasure request.
+ *
+ * @returns The administrator-visible request status.
+ * @rejects When validation, authorization, target verification, or persistence fails.
+ */
 export const requestAdminErasure = createServerFn({ method: "POST" })
   .validator(parseAdminErasureInput)
   .handler(async ({ data }): Promise<AdminErasureStatusView> => {
@@ -99,6 +139,11 @@ export const requestAdminErasure = createServerFn({ method: "POST" })
     };
   });
 
+/** Returns an administrator-visible erasure request, or `null` when absent.
+ *
+ * @returns The administrator-visible request status, or `null` when absent.
+ * @rejects When validation, authorization, or persistence fails.
+ */
 export const getAdminErasureStatus = createServerFn({ method: "GET" })
   .validator(parseRequestInput)
   .handler(async ({ data }): Promise<AdminErasureStatusView | null> => {
@@ -114,7 +159,11 @@ export const getAdminErasureStatus = createServerFn({ method: "GET" })
       : null;
   });
 
-/** Retries an erasure request that needs administrator attention. */
+/** Retries an erasure request that needs administrator attention.
+ *
+ * @returns The updated administrator-visible request status.
+ * @rejects When validation, authorization, retry, or status lookup fails.
+ */
 export const retryAdminErasure = createServerFn({ method: "POST" })
   .validator(parseRequestInput)
   .handler(async ({ data }): Promise<AdminErasureStatusView> => {
@@ -132,6 +181,12 @@ export const retryAdminErasure = createServerFn({ method: "POST" })
     };
   });
 
+/** Validates explicit confirmation for a self-service erasure request.
+ *
+ * @param input - Untrusted request payload.
+ * @returns The confirmed erasure input.
+ * @throws When confirmation is not exactly `true`.
+ */
 export function parseSelfErasureInput(input: unknown) {
   if (
     typeof input !== "object" ||
@@ -144,6 +199,12 @@ export function parseSelfErasureInput(input: unknown) {
   return { confirmed: true as const };
 }
 
+/** Normalizes and validates administrator erasure evidence.
+ *
+ * @param input - Untrusted request payload.
+ * @returns Bounded target and verification fields.
+ * @throws When any required field or verification method is invalid.
+ */
 export function parseAdminErasureInput(input: unknown) {
   const value = record(input);
   const verificationMethod = value.verificationMethod;
@@ -163,14 +224,32 @@ export function parseAdminErasureInput(input: unknown) {
   };
 }
 
+/** Parses a target-email request payload.
+ *
+ * @param input - Untrusted request payload.
+ * @returns The normalized target email.
+ * @throws When the payload or email is invalid.
+ */
 function parseEmailInput(input: unknown) {
   return { email: email(record(input).email) };
 }
 
+/** Parses a bounded erasure-request identifier.
+ *
+ * @param input - Untrusted request payload.
+ * @returns The normalized request identifier.
+ * @throws When the payload or identifier is invalid.
+ */
 function parseRequestInput(input: unknown) {
   return { requestId: requiredString(record(input).requestId, 120) };
 }
 
+/** Requires a non-null object request payload.
+ *
+ * @param input - Untrusted request payload.
+ * @returns The payload as a string-keyed record.
+ * @throws When the payload is not an object.
+ */
 function record(input: unknown): Record<string, unknown> {
   if (typeof input !== "object" || input === null) {
     throw localizedServerError("error.generic");
@@ -178,6 +257,13 @@ function record(input: unknown): Record<string, unknown> {
   return input as Record<string, unknown>;
 }
 
+/** Normalizes a required string within a maximum length.
+ *
+ * @param input - Untrusted field value.
+ * @param maximum - Maximum accepted character count.
+ * @returns The trimmed non-empty value.
+ * @throws When the value is missing, non-string, empty, or too long.
+ */
 function requiredString(input: unknown, maximum: number): string {
   if (typeof input !== "string") throw localizedServerError("error.generic");
   const value = input.trim();
@@ -187,6 +273,12 @@ function requiredString(input: unknown, maximum: number): string {
   return value;
 }
 
+/** Normalizes a bounded email address to lowercase.
+ *
+ * @param input - Untrusted email value.
+ * @returns The normalized email address.
+ * @throws When the value is not a valid bounded email address.
+ */
 function email(input: unknown): string {
   const value = requiredString(input, 254).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(value)) {
@@ -195,6 +287,12 @@ function email(input: unknown): string {
   return value;
 }
 
+/** Validates an opaque administrator verification reference.
+ *
+ * @param input - Untrusted reference value.
+ * @returns The bounded reference.
+ * @throws When the reference is missing, not a string, too long, or contains unsupported characters.
+ */
 function reference(input: unknown): string {
   const value = requiredString(input, 120);
   if (!/^[A-Za-z0-9:_-]+$/u.test(value)) {
@@ -203,8 +301,16 @@ function reference(input: unknown): string {
   return value;
 }
 
+/** Requires an authenticated Clerk user ID.
+ *
+ * @param state - Authentication state from Clerk.
+ * @returns The authenticated Clerk user ID.
+ * @throws When the request is signed out or lacks a user ID.
+ */
 function requireSignedInUser(state: {
+  /** Whether Clerk authenticated the request. */
   isAuthenticated: boolean;
+  /** Clerk user ID supplied by the auth state. */
   userId: string | null;
 }): string {
   if (!state.isAuthenticated || !state.userId) {
@@ -217,12 +323,18 @@ function requireSignedInUser(state: {
  * Requires an actor authorized to erase accounts.
  *
  * @returns The normalized administrator actor.
- * @rejects When the current actor lacks account-erasure permission.
+ * @rejects When authentication fails or the current actor lacks account-erasure permission.
  */
 async function requireAdmin(): Promise<Actor> {
   return await requirePermission("accounts.erase");
 }
 
+/** Finds the first Clerk user whose address matches an email case-insensitively.
+ *
+ * @param targetEmail - Normalized email address to search for.
+ * @returns The matched target, or `null` when no valid user matches.
+ * @rejects When configuration loading, the Clerk request, or response decoding fails.
+ */
 async function findClerkUserByEmail(
   targetEmail: string,
 ): Promise<ErasureTarget | null> {
@@ -251,6 +363,12 @@ async function findClerkUserByEmail(
   );
 }
 
+/** Derives the privacy-preserving subject hash for a Clerk user.
+ *
+ * @param clerkId - Clerk user ID to hash.
+ * @returns The keyed subject digest.
+ * @rejects When configuration, secret validation, or digest generation fails.
+ */
 async function subjectHmac(clerkId: string): Promise<string> {
   const [{ serverEnv }, { createErasureSubjectHmac }] = await Promise.all([
     import("@/env/server"),
@@ -259,6 +377,12 @@ async function subjectHmac(clerkId: string): Promise<string> {
   return await createErasureSubjectHmac(clerkId, serverEnv.ERASURE_HMAC_SECRET);
 }
 
+/** Converts an untrusted Clerk user response into an erasure target.
+ *
+ * @param input - Untrusted Clerk user payload.
+ * @param targetEmail - Normalized email that must be present on the user.
+ * @returns The target account, or `null` when identity data is invalid or no address matches case-insensitively.
+ */
 function parseClerkTarget(
   input: unknown,
   targetEmail: string,
@@ -284,8 +408,15 @@ function parseClerkTarget(
   return { clerkId, email: targetEmail, name: name || targetEmail };
 }
 
+/** Maps an internal erasure state to its client-facing status.
+ *
+ * @param request - Persisted erasure request state.
+ * @returns The stable request identifier and public progress state.
+ */
 function statusView(request: {
+  /** Persisted erasure request identifier. */
   id: string;
+  /** Internal processing status. */
   status: "pending" | "running" | "completed" | "needs_attention";
 }): ErasureStatusView {
   return {

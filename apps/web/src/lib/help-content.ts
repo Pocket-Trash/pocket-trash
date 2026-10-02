@@ -6,13 +6,19 @@ import englishMarkdownGuide from "@pocket-trash/localizations/help/en-US/how-to-
 import englishGuide from "@pocket-trash/localizations/help/en-US/image-size-and-resolution-guide.mdx?raw";
 import spanishGuide from "@pocket-trash/localizations/help/es-MX/image-size-and-resolution-guide.mdx?raw";
 
+/** Frontmatter fields attached to a help document. */
 type HelpMetadata = Record<string, string> & {
+  /** Localized document title. */
   title: string;
 };
 
+/** Parsed localized help content and its route slug. */
 export type HelpDocument = {
+  /** Markdown body without frontmatter. */
   body: string;
+  /** Parsed frontmatter fields. */
   metadata: HelpMetadata;
+  /** Route-safe document identifier. */
   slug: string;
 };
 
@@ -23,6 +29,7 @@ const rawDocuments = {
   "/help/es-MX/image-size-and-resolution-guide.mdx": spanishGuide,
 };
 
+/** Parsed help documents keyed by locale and slug. */
 const documents = new Map<string, HelpDocument>();
 
 for (const [path, source] of Object.entries(rawDocuments)) {
@@ -38,6 +45,12 @@ for (const [path, source] of Object.entries(rawDocuments)) {
   documents.set(`${locale}/${slug}`, document);
 }
 
+/** Returns a localized help document with an English fallback.
+ *
+ * @param locale - Preferred document locale.
+ * @param slug - Help topic identifier.
+ * @returns The localized or English document, or `undefined` when absent.
+ */
 export function getHelpDocument(
   locale: SupportedLocale,
   slug: string,
@@ -57,6 +70,11 @@ export function getHelpDocuments(locale: SupportedLocale): HelpDocument[] {
     .map(([, document]) => getHelpDocument(locale, document.slug) ?? document);
 }
 
+/** Formats the image-upload guide link and aspect-ratio warning.
+ *
+ * @param locale - Locale used for both messages.
+ * @returns Localized image-upload guidance.
+ */
 export function getImageUploadGuidance(locale: SupportedLocale) {
   return {
     helpLabel: formatTranslation(
@@ -72,6 +90,13 @@ export function getImageUploadGuidance(locale: SupportedLocale) {
   };
 }
 
+/** Parses help Markdown frontmatter and body content.
+ *
+ * @param source - Raw Markdown document including frontmatter.
+ * @param slug - Route identifier assigned to the document.
+ * @returns The parsed help document.
+ * @throws When frontmatter is absent, malformed, or lacks a title.
+ */
 export function parseHelpDocument(source: string, slug: string): HelpDocument {
   const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) throw new Error(`Help document ${slug} has no frontmatter.`);
@@ -96,6 +121,13 @@ export function parseHelpDocument(source: string, slug: string): HelpDocument {
   return { body: (match[2] ?? "").trim(), metadata, slug };
 }
 
+/** Reads a required help frontmatter field.
+ *
+ * @param metadata - Parsed document frontmatter.
+ * @param key - Required field name.
+ * @returns The non-empty field value.
+ * @throws When the field is missing or empty.
+ */
 function requiredMetadata(metadata: HelpMetadata, key: string): string {
   const value = metadata[key];
   if (!value) throw new Error(`Help document metadata is missing ${key}.`);

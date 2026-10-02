@@ -24,14 +24,16 @@ import {
 import { HelpIndexPage, HelpTopicPage } from "./help-pages";
 import { UserIndexPage } from "./user-index-page";
 
+/** Product image used by catalog page stories. */
 const productImage = image(1000, "one.webp", "product-images/one.webp");
+/** Collection image used by catalog page stories. */
 const collectionImage = image(
   1001,
   "thirteen.webp",
   "collection-images/thirteen.webp",
 );
 
-/** Approved catalog product fixture for page stories. */
+/** Catalog product shared by the stories. */
 const product: CatalogProduct = {
   approvalStatus: "approved",
   bearing: "R188 hybrid ceramic",
@@ -77,6 +79,7 @@ const product: CatalogProduct = {
   widthMm: null,
 };
 
+/** User collection shared by the stories. */
 const collection: UserCollectionSummary = {
   coverImage: collectionImage,
   coverImages: [collectionImage],
@@ -91,6 +94,7 @@ const collection: UserCollectionSummary = {
   updatedAt: new Date("2026-01-02"),
 };
 
+/** Collection item shared by the stories. */
 const item: UserCollectionItem = {
   bearing: "R188 full ceramic",
   bearingOverride: "R188 full ceramic",
@@ -125,6 +129,7 @@ const item: UserCollectionItem = {
   sourceProductFinishOptionId: product.finishOptions[0]?.id ?? null,
 };
 
+/** Installed spinner button used by the detail story. */
 const installedButton: UserCollectionItem = {
   ...item,
   collectionItemId: 1001,
@@ -137,6 +142,7 @@ const installedButton: UserCollectionItem = {
   productTypeSlug: "spinner-button",
 };
 
+/** Public collection owner shared by the stories. */
 const owner: PublicCollectionOwner = {
   collections: [collection],
   itemCount: 1,
@@ -145,9 +151,11 @@ const owner: PublicCollectionOwner = {
   username: "royanger",
 };
 
+/** Image guide document rendered by the help topic story. */
 const imageGuide = getHelpDocument("en-US", "image-size-and-resolution-guide");
 if (!imageGuide) throw new Error("The image guide story fixture is missing.");
 
+/** Catalog page Storybook configuration. */
 const meta = {
   beforeEach: mockStoryAuth,
   decorators: [
@@ -162,6 +170,7 @@ const meta = {
 } satisfies Meta;
 
 export default meta;
+/** A catalog page story. */
 type Story = StoryObj<typeof meta>;
 
 /** Collection page story. */
@@ -345,6 +354,14 @@ export const User: Story = {
   render: () => <UserIndexPage hasFeedback />,
 };
 
+/**
+ * Creates a catalog image story fixture.
+ *
+ * @param id - Image identifier.
+ * @param fileName - Image file name.
+ * @param path - CDN path below the storybook asset prefix.
+ * @returns The catalog image fixture.
+ */
 function image(id: number, fileName: string, path: string): CatalogImage {
   return {
     contentType: "image/webp",

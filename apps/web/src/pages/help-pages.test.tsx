@@ -5,10 +5,26 @@ import { parseHelpDocument } from "@/lib/help-content";
 import { HelpIndexPage, HelpTopicPage } from "./help-pages";
 
 vi.mock("@/components/app-shell", () => ({
-  AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  /**
+   * Renders only the shell content under test.
+   *
+   * @param root0 - Shell properties.
+   * @returns The nested page content.
+   */
+  AppShell: ({
+    children,
+  }: {
+    /** Nested page content. */
+    children: React.ReactNode;
+  }) => <>{children}</>,
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns the Spanish locale fixture.
+   *
+   * @returns The Spanish locale fixture.
+   */
   useLocale: () => ({ locale: "es-MX" }),
 }));
 

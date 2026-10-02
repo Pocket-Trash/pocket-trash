@@ -43,6 +43,12 @@ import {
 } from "@/lib/catalog-filters";
 import { cn } from "@/lib/utils";
 
+/**
+ * Builds localized copy for catalog filters.
+ *
+ * @param t - Catalog translation formatter.
+ * @returns Localized catalog filter copy.
+ */
 function catalogFilterCopy(
   t: ReturnType<typeof useCatalogCopy>,
 ): CatalogFilterCopy {
@@ -54,6 +60,12 @@ function catalogFilterCopy(
     close: t("web.action.close"),
     colors: t("web.catalog.field.colors"),
     description: t("web.catalog.filter.description"),
+    /**
+     * Formats a fade option name.
+     *
+     * @param colors - Colors included in the fade.
+     * @returns The localized fade name.
+     */
     fadeName: (colors) => t("web.catalog.filter.fadeName", { colors }),
     filters: t("web.archive.filters"),
     finishes: t("web.catalog.field.finishes"),
@@ -62,6 +74,12 @@ function catalogFilterCopy(
     materials: t("web.catalog.field.materials"),
     more: t("web.action.more"),
     moreFilters: t("web.action.moreFilters"),
+    /**
+     * Formats the label for additional filter options.
+     *
+     * @param label - Filter label receiving additional options.
+     * @returns The localized additional-options label.
+     */
     moreOptions: (label) => t("web.catalog.filter.moreOptions", { label }),
     productType: t("web.catalog.field.productType"),
     productTypeAll: t("web.catalog.filter.productTypeAll"),
@@ -70,6 +88,11 @@ function catalogFilterCopy(
   };
 }
 
+/**
+ * Renders the primary catalog navigation cards.
+ *
+ * @returns The home page.
+ */
 export function HomePage() {
   const t = useCatalogCopy();
   const cards = [
@@ -117,6 +140,11 @@ export function HomePage() {
   );
 }
 
+/**
+ * Renders the resources placeholder page.
+ *
+ * @returns The resources page.
+ */
 export function ResourcesPage() {
   const t = useCatalogCopy();
   return (
@@ -128,13 +156,25 @@ export function ResourcesPage() {
   );
 }
 
+/**
+ * Renders the filterable catalog product index.
+ *
+ * @param props - Product index properties.
+ * @param props.filters - Active catalog filters.
+ * @param props.onFiltersChange - Optional filter state updater.
+ * @param props.products - Catalog products to display.
+ * @returns The product index page.
+ */
 export function ProductsPage({
   filters = emptyCatalogFilters(),
   onFiltersChange,
   products,
 }: {
+  /** Active catalog filters. */
   filters?: CatalogFilters;
+  /** Optional filter state updater. */
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
+  /** Catalog products to display. */
   products: CatalogProduct[];
 }) {
   const t = useCatalogCopy();
@@ -176,13 +216,17 @@ export function ProductsPage({
  * Renders a catalog product and its matching collection items.
  *
  * @param props - Product detail data and related collection items.
+ * @param props.collectionItems - Collection items matching the product.
+ * @param props.product - Catalog product to display.
  * @returns The catalog product detail page.
  */
 export function ProductDetailPage({
   collectionItems = [],
   product,
 }: {
+  /** Collection items matching the product. */
   collectionItems?: UserCollectionItem[];
+  /** Catalog product to display. */
   product: CatalogProduct;
 }) {
   const t = useCatalogCopy();
@@ -423,13 +467,25 @@ export function ProductDetailPage({
   );
 }
 
+/**
+ * Renders public collections with optional catalog filtering.
+ *
+ * @param props - Public collection directory properties.
+ * @param props.filters - Active catalog filters.
+ * @param props.onFiltersChange - Optional filter state updater.
+ * @param props.owners - Owners and public collections to display.
+ * @returns The public collection directory.
+ */
 export function PublicCollectionsPage({
   filters = emptyCatalogFilters(),
   onFiltersChange,
   owners,
 }: {
+  /** Active catalog filters. */
   filters?: CatalogFilters;
+  /** Optional filter state updater. */
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
+  /** Owners and public collections to display. */
   owners: PublicCollectionOwner[];
 }) {
   const t = useCatalogCopy();
@@ -509,9 +565,17 @@ export function PublicCollectionsPage({
   );
 }
 
+/**
+ * Renders one owner's public collection cards.
+ *
+ * @param props - Public collection owner properties.
+ * @param props.owner - Owner and collections to display.
+ * @returns The public collection owner page.
+ */
 export function PublicCollectionPage({
   owner,
 }: {
+  /** Owner and collections to display. */
   owner: PublicCollectionOwner;
 }) {
   const t = useCatalogCopy();
@@ -550,15 +614,29 @@ export function PublicCollectionPage({
   );
 }
 
+/**
+ * Renders the signed-in user's collection directory.
+ *
+ * @param props - User collection directory properties.
+ * @param props.collections - User collections to display.
+ * @param props.filters - Active catalog filters.
+ * @param props.items - Collection items used for filtering.
+ * @param props.onFiltersChange - Optional filter state updater.
+ * @returns The user collection directory.
+ */
 export function UserCollectionsPage({
   collections,
   filters = emptyCatalogFilters(),
   items,
   onFiltersChange,
 }: {
+  /** User collections to display. */
   collections: UserCollectionSummary[];
+  /** Active catalog filters. */
   filters?: CatalogFilters;
+  /** Collection items used for filtering. */
   items: UserCollectionItem[];
+  /** Optional filter state updater. */
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
 }) {
   const t = useCatalogCopy();
@@ -628,6 +706,17 @@ export function UserCollectionsPage({
   );
 }
 
+/**
+ * Renders a collection summary, gallery, and filtered items.
+ *
+ * @param props - Collection page properties.
+ * @param props.collection - Collection to display.
+ * @param props.filters - Active catalog filters.
+ * @param props.items - Collection items to display.
+ * @param props.onFiltersChange - Optional filter state updater.
+ * @param props.ownerUsername - Public owner username shown in navigation.
+ * @returns The collection page.
+ */
 export function CollectionPage({
   collection,
   filters = emptyCatalogFilters(),
@@ -635,10 +724,15 @@ export function CollectionPage({
   onFiltersChange,
   ownerUsername,
 }: {
+  /** Collection to display. */
   collection: UserCollectionSummary;
+  /** Active catalog filters. */
   filters?: CatalogFilters;
+  /** Collection items to display. */
   items: UserCollectionItem[];
+  /** Optional filter state updater. */
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
+  /** Public owner username shown in navigation. */
   ownerUsername?: string;
 }) {
   const t = useCatalogCopy();
@@ -726,6 +820,13 @@ export function CollectionPage({
             owner: ownerUsername
               ? t("web.collections.gallery.owner", { owner: ownerUsername })
               : undefined,
+            /**
+             * Formats collection gallery pagination status.
+             *
+             * @param page - Current page number.
+             * @param pageCount - Total page count.
+             * @returns The localized pagination status.
+             */
             pageStatus: (page, pageCount) =>
               t("web.collections.gallery.pageStatus", { page, pageCount }),
             previousImage: t("web.resources.action.previousImage"),
@@ -797,7 +898,19 @@ export function CollectionPage({
   );
 }
 
-export function ProductGrid({ products }: { products: CatalogProduct[] }) {
+/**
+ * Renders catalog products as a responsive card grid.
+ *
+ * @param props - Product grid properties.
+ * @param props.products - Catalog products to display.
+ * @returns The product grid or its empty state.
+ */
+export function ProductGrid({
+  products,
+}: {
+  /** Catalog products to display. */
+  products: CatalogProduct[];
+}) {
   const t = useCatalogCopy();
   if (!products.length) {
     return <EmptyState>{t("web.catalog.noProducts")}</EmptyState>;
@@ -978,13 +1091,17 @@ function approvalStatusLabel(
  * Renders one collection item with its effective product details.
  *
  * @param props - Collection item data and its installed button, when present.
+ * @param props.installedButton - Installed spinner button, when present.
+ * @param props.item - Collection item to display.
  * @returns The collection item detail page.
  */
 export function CollectionItemDetailPage({
   installedButton = null,
   item,
 }: {
+  /** Installed spinner button, when present. */
   installedButton?: UserCollectionItem | null;
+  /** Collection item to display. */
   item: UserCollectionItem;
 }) {
   const t = useCatalogCopy();
@@ -1133,6 +1250,19 @@ export function CollectionItemDetailPage({
   );
 }
 
+/**
+ * Renders owner or administrator visibility controls.
+ *
+ * @param props - Visibility control properties.
+ * @param props.canAdminister - Whether the viewer can moderate visibility.
+ * @param props.disabled - Whether visibility changes are disabled.
+ * @param props.initialPrivate - Initial private state.
+ * @param props.isAdminPrivate - Whether moderation forced privacy.
+ * @param props.isOwner - Whether the viewer owns the resource.
+ * @param props.onChange - Persists a visibility change.
+ * @param props.t - Catalog translation formatter.
+ * @returns The visibility control.
+ */
 function VisibilityButton({
   canAdminister,
   disabled = false,
@@ -1142,12 +1272,25 @@ function VisibilityButton({
   onChange,
   t,
 }: {
+  /** Whether the viewer can moderate visibility. */
   canAdminister: boolean;
+  /** Whether visibility changes are disabled. */
   disabled?: boolean;
+  /** Initial private state. */
   initialPrivate: boolean;
+  /** Whether moderation forced privacy. */
   isAdminPrivate: boolean;
+  /** Whether the viewer owns the resource. */
   isOwner: boolean;
+  /**
+   * Persists a visibility change.
+   *
+   * @param isPrivate - Next private state.
+   * @param reason - Optional moderation reason.
+   * @returns A promise that resolves after persistence.
+   */
   onChange(isPrivate: boolean, reason?: string): Promise<unknown>;
+  /** Catalog translation formatter. */
   t: ReturnType<typeof useCatalogCopy>;
 }) {
   const [isPrivate, setIsPrivate] = useState(initialPrivate);
@@ -1198,11 +1341,21 @@ function VisibilityButton({
   );
 }
 
+/**
+ * Renders one labeled detail-list value.
+ *
+ * @param props - Detail properties.
+ * @param props.children - Detail value.
+ * @param props.label - Detail label.
+ * @returns The detail-list entry.
+ */
 function Detail({
   children,
   label,
 }: {
+  /** Detail value. */
   children: React.ReactNode;
+  /** Detail label. */
   label: string;
 }) {
   return (
@@ -1215,7 +1368,19 @@ function Detail({
   );
 }
 
-function EmptyState({ children }: { children: React.ReactNode }) {
+/**
+ * Renders an empty catalog result state.
+ *
+ * @param props - Empty-state properties.
+ * @param props.children - Empty-state copy.
+ * @returns The empty-state panel.
+ */
+function EmptyState({
+  children,
+}: {
+  /** Empty-state copy. */
+  children: React.ReactNode;
+}) {
   return (
     <div
       className={cn(
@@ -1227,6 +1392,13 @@ function EmptyState({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Formats a finish option with localized built-in color effects.
+ *
+ * @param option - Finish option to format.
+ * @param t - Catalog translation formatter.
+ * @returns The localized finish label.
+ */
 function localizedFinishLabel(
   option: CatalogFinishOption,
   t: ReturnType<typeof useCatalogCopy>,

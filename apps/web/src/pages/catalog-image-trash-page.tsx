@@ -7,13 +7,28 @@ import { Button } from "@/components/ui/button";
 import { restoreCatalogImage } from "@/lib/catalog-api";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Renders deleted catalog images and restore controls.
+ *
+ * @param props - Catalog image trash properties.
+ * @param props.initialImages - Deleted images shown initially.
+ * @returns The catalog image trash page.
+ */
 export function CatalogImageTrashPage({
   initialImages,
 }: {
+  /** Deleted images shown initially. */
   initialImages: CatalogImageTrashItem[];
 }) {
   const { locale } = useLocale();
   const [images, setImages] = useState(initialImages);
+  /**
+   * Formats localized catalog image trash copy.
+   *
+   * @param key - Localization key.
+   * @param values - Values interpolated into the translation.
+   * @returns The formatted translation.
+   */
   const t = (
     key: Parameters<typeof formatTranslation>[0],
     values: Record<string, unknown> = {},

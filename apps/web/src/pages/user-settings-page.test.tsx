@@ -3,18 +3,44 @@ import { describe, expect, it, vi } from "vitest";
 import { UserSettingsPage } from "./user-settings-page";
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
-    <a href={to}>{children}</a>
-  ),
+  /**
+   * Renders router links as native anchors.
+   *
+   * @param root0 - Link properties.
+   * @returns The anchor fixture.
+   */
+  Link: ({
+    children,
+    to,
+  }: {
+    /** Link content. */
+    children: React.ReactNode;
+    /** Link destination. */
+    to: string;
+  }) => <a href={to}>{children}</a>,
 }));
 
 vi.mock("@/components/user-page-shell", () => ({
-  UserPageShell: ({ children }: { children: React.ReactNode }) => (
-    <main>{children}</main>
-  ),
+  /**
+   * Renders a minimal user-page shell.
+   *
+   * @param root0 - Shell properties.
+   * @returns The shell fixture.
+   */
+  UserPageShell: ({
+    children,
+  }: {
+    /** Nested settings content. */
+    children: React.ReactNode;
+  }) => <main>{children}</main>,
 }));
 
 vi.mock("@/hooks/use-pen-settings", () => ({
+  /**
+   * Returns stable display-preference fixtures.
+   *
+   * @returns The display-preference fixtures.
+   */
   usePenSettings: () => ({
     currency: "USD",
     saving: false,
@@ -27,6 +53,11 @@ vi.mock("@/hooks/use-pen-settings", () => ({
 }));
 
 vi.mock("@/providers/locale-provider", () => ({
+  /**
+   * Returns the English locale fixture.
+   *
+   * @returns The English locale fixture.
+   */
   useLocale: () => ({ locale: "en-US" }),
 }));
 

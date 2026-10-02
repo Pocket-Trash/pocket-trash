@@ -3,7 +3,13 @@ import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect, within } from "storybook/test";
 import { CollectionGallery } from "./collection-gallery";
 
+/**
+ * Cover image shared by the gallery stories.
+ */
 const cover = image(1000, "thirteen.webp", 0, "collection-images");
+/**
+ * Ordered non-cover images shared by the gallery stories.
+ */
 const gallery = [
   "one",
   "eleven",
@@ -18,6 +24,9 @@ const gallery = [
 ].map((name, index) =>
   image(1001 + index, `${name}.webp`, index + 1, "product-images"),
 );
+/**
+ * Collection summary shared by the gallery stories.
+ */
 const collection: UserCollectionSummary = {
   coverImage: cover,
   coverImages: [cover, ...gallery],
@@ -32,6 +41,9 @@ const collection: UserCollectionSummary = {
   updatedAt: new Date("2026-01-02"),
 };
 
+/**
+ * Configures Storybook coverage for the collection gallery examples.
+ */
 const meta = {
   args: {
     collection,
@@ -43,6 +55,13 @@ const meta = {
       nextImage: "Next image",
       nextPage: "Next page",
       owner: "Owner: royanger",
+      /**
+       * Formats the current gallery page.
+       *
+       * @param page - Current one-based page number.
+       * @param pageCount - Total number of pages.
+       * @returns Human-readable pagination status.
+       */
       pageStatus: (page, pageCount) => `Page ${page} of ${pageCount}`,
       previousImage: "Previous image",
       previousPage: "Previous page",
@@ -55,9 +74,23 @@ const meta = {
 } satisfies Meta<typeof CollectionGallery>;
 
 export default meta;
+/**
+ * Storybook story contract for the collection gallery examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Defines the multi page collection gallery story.
+ */
 export const MultiPage: Story = {
+  /**
+   * Exercises the collection gallery story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.canvasElement - Rendered Storybook canvas element.
+   * @param context.userEvent - Storybook interaction driver.
+   */
   play: async ({ canvas, canvasElement, userEvent }) => {
     await expect(canvas.getByText("Page 1 of 2")).toBeVisible();
     await expect(
@@ -95,6 +128,9 @@ export const MultiPage: Story = {
   },
 };
 
+/**
+ * Defines the single page collection gallery story.
+ */
 export const SinglePage: Story = {
   args: {
     collection: {
@@ -102,6 +138,12 @@ export const SinglePage: Story = {
       coverImages: [cover, ...gallery.slice(0, 2)],
     },
   },
+  /**
+   * Exercises the collection gallery story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   */
   play: async ({ canvas }) => {
     await expect(
       canvas.queryByRole("button", { name: "Next page" }),
@@ -109,20 +151,41 @@ export const SinglePage: Story = {
   },
 };
 
+/**
+ * Defines the empty gallery collection gallery story.
+ */
 export const EmptyGallery: Story = {
   args: {
     collection: { ...collection, coverImage: null, coverImages: [] },
   },
+  /**
+   * Exercises the collection gallery story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   */
   play: async ({ canvas }) => {
     await expect(canvas.getByText("Daily Carry")).toBeVisible();
     await expect(canvas.queryByText("Gallery")).not.toBeInTheDocument();
   },
 };
 
+/**
+ * Defines the mobile collection gallery story.
+ */
 export const Mobile: Story = {
   globals: { viewport: "mobile1" },
 };
 
+/**
+ * Creates a collection image fixture.
+ *
+ * @param id - Stable image identifier.
+ * @param fileName - Stored file name.
+ * @param position - Image order within the collection.
+ * @param folder - Storybook asset folder.
+ * @returns A collection image fixture.
+ */
 function image(
   id: number,
   fileName: string,

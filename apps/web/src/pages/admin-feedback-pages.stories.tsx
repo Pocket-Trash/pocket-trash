@@ -20,6 +20,7 @@ import {
   AdminFeedbackRequestsPage,
 } from "./admin-feedback-pages";
 
+/** Feedback request shared by the admin feedback stories. */
 const request = {
   category: "feature" as const,
   createdAt: new Date("2026-09-28T12:00:00Z"),
@@ -91,9 +92,17 @@ const meta = {
 } satisfies Meta<typeof AdminFeedbackRequestsPage>;
 
 export default meta;
+/** A story for an admin feedback page. */
 type Story = StoryObj<typeof meta>;
 
+/** Pending feedback management story. */
 export const Requests: Story = {
+  /**
+   * Exercises pending feedback management and sorting.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas, canvasElement, userEvent }) => {
     const breadcrumbs = within(
       within(canvas.getByRole("banner")).getByRole("navigation"),
@@ -150,7 +159,13 @@ export const Requests: Story = {
   },
 };
 
+/** Planned feedback browsing story. */
 export const Active: Story = {
+  /**
+   * Renders planned feedback.
+   *
+   * @returns The planned feedback page.
+   */
   render: () => (
     <AdminActiveFeedbackPage
       initialPage={{
@@ -159,6 +174,12 @@ export const Active: Story = {
       }}
     />
   ),
+  /**
+   * Exercises planned feedback navigation and filtering.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas, canvasElement, userEvent }) => {
     const breadcrumbs = within(
       within(canvas.getByRole("banner")).getByRole("navigation"),
@@ -341,12 +362,24 @@ export const Synchronization: Story = {
   },
 };
 
+/** All-active feedback browsing story. */
 export const AllActive: Story = {
+  /**
+   * Renders all active feedback.
+   *
+   * @returns The all-active feedback page.
+   */
   render: () => (
     <AdminAllActiveFeedbackPage
       initialPage={{ hasNext: true, items: [request] }}
     />
   ),
+  /**
+   * Exercises active feedback search.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas, userEvent }) => {
     const breadcrumbs = within(
       within(canvas.getByRole("banner")).getByRole("navigation"),
@@ -366,7 +399,13 @@ export const AllActive: Story = {
   },
 };
 
+/** Archived feedback management story. */
 export const Archive: Story = {
+  /**
+   * Renders archived feedback.
+   *
+   * @returns The feedback archive page.
+   */
   render: () => (
     <AdminFeedbackArchivePage
       archiveStatuses={["completed", "merged", "denied", "canceled"]}
@@ -376,6 +415,12 @@ export const Archive: Story = {
       }}
     />
   ),
+  /**
+   * Exercises archived feedback filtering and editing.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas, canvasElement, userEvent }) => {
     const breadcrumbs = within(
       within(canvas.getByRole("banner")).getByRole("navigation"),
@@ -418,14 +463,27 @@ export const Archive: Story = {
   },
 };
 
+/** Empty planned feedback story. */
 export const Empty: Story = {
+  /**
+   * Renders an empty planned feedback page.
+   *
+   * @returns The empty feedback page.
+   */
   render: () => (
     <AdminActiveFeedbackPage initialPage={{ hasNext: false, items: [] }} />
   ),
 };
 
+/** Pending feedback story without available merge targets. */
 export const RequestsWithoutMergeTarget: Story = {
   args: { mergeTargets: [] },
+  /**
+   * Verifies that merge controls are omitted without targets.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the interaction completes.
+   */
   play: async ({ canvas, canvasElement, userEvent }) => {
     await userEvent.click(
       canvas.getByRole("button", { name: "Manage Saved searches" }),

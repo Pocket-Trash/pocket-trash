@@ -7,6 +7,9 @@ import {
   ResourceVisibilityToggle,
 } from "./resource-visibility-toggle";
 
+/**
+ * Configures Storybook coverage for the resource visibility toggle examples.
+ */
 const meta = {
   args: {
     canAdminister: false,
@@ -16,6 +19,9 @@ const meta = {
     name: "Pocket clip",
     resourceId: 1000,
   },
+  /**
+   * Resets successful visibility mutations before each story.
+   */
   beforeEach: () => {
     mocked(markResourcePrivate).mockResolvedValue(undefined);
     mocked(setResourceVisibility).mockResolvedValue(undefined);
@@ -34,9 +40,24 @@ const meta = {
 } satisfies Meta<typeof ResourceVisibilityToggle>;
 
 export default meta;
+/**
+ * Storybook story contract for the resource visibility toggle examples.
+ */
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Defines the owner public resource visibility toggle story.
+ */
 export const OwnerPublic: Story = {
+  /**
+   * Exercises the resource visibility toggle story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.userEvent - Storybook interaction driver.
+   * @returns A promise that resolves after the story assertions complete.
+   * @rejects When a Storybook interaction or assertion fails.
+   */
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("switch", { name: "Public" }));
     await expect(setResourceVisibility).toHaveBeenCalledWith({
@@ -45,10 +66,24 @@ export const OwnerPublic: Story = {
   },
 };
 
+/**
+ * Defines the owner private resource visibility toggle story.
+ */
 export const OwnerPrivate: Story = { args: { isPrivate: true } };
 
+/**
+ * Defines the admin locked resource visibility toggle story.
+ */
 export const AdminLocked: Story = {
   args: { isAdminPrivate: true, isPrivate: true },
+  /**
+   * Exercises the resource visibility toggle story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @returns A promise that resolves after the story assertions complete.
+   * @rejects When a Storybook interaction or assertion fails.
+   */
   play: async ({ canvas }) => {
     await expect(
       canvas.getByRole("switch", { name: "Public" }),
@@ -56,8 +91,21 @@ export const AdminLocked: Story = {
   },
 };
 
+/**
+ * Defines the admin moderation resource visibility toggle story.
+ */
 export const AdminModeration: Story = {
   args: { canAdminister: true, isOwner: false },
+  /**
+   * Exercises the resource visibility toggle story interaction and assertions.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.canvasElement - Rendered Storybook canvas element.
+   * @param context.userEvent - Storybook interaction driver.
+   * @returns A promise that resolves after the story assertions complete.
+   * @rejects When a Storybook interaction or assertion fails.
+   */
   play: async ({ canvas, canvasElement, userEvent }) => {
     await userEvent.click(canvas.getByRole("switch", { name: "Public" }));
     const dialog = within(canvasElement.ownerDocument.body).getByRole("dialog");
@@ -82,6 +130,7 @@ export const AdminRestore: Story = {
    *
    * @param context - Story interaction context.
    * @returns A promise that resolves after the interaction completes.
+   * @rejects When a Storybook interaction or assertion fails.
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
     const originalPrompt = canvasElement.ownerDocument.defaultView?.prompt;
@@ -102,7 +151,15 @@ export const AdminRestore: Story = {
   },
 };
 
+/**
+ * Defines the bare switch resource visibility toggle story.
+ */
 export const BareSwitch: Story = {
+  /**
+   * Renders the resource visibility toggle story example.
+   *
+   * @returns The rendered story example.
+   */
   render: () => (
     <PublicResourceSwitch checked onCheckedChange={() => undefined} />
   ),
