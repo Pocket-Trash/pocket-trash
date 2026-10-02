@@ -15,6 +15,9 @@ Shared catalog product identity for supported product types.
 | `name` | `text` | yes |  |  |  | Human-readable product name. | `Standard Katla` |
 | `slug` | `text` | yes |  |  |  | Stable product slug within its type. | `standard-katla` |
 | `description` | `text` | no |  |  |  | Optional product description stored as Markdown. | `A compact tri spinner.` |
+| `approval_status` | `text` | yes |  | `'pending'` |  | Current product review state. | `approved` |
+| `approval_decision_reason` | `text` | no |  |  |  | Reason supplied for the latest review transition. | `Product details verified.` |
+| `approval_decided_at` | `timestamp with time zone` | no |  |  |  | Timestamp of the latest review transition. |  |
 | `maker_product_url` | `text` | no |  |  |  | Direct URL to the maker's product page. | `https://example.com/products/standard-katla` |
 | `maker_product_url_valid` | `boolean` | yes |  | `true` |  | Whether the maker product URL may be shown publicly. | `true` |
 | `is_private` | `boolean` | yes |  |  |  |  |  |
@@ -30,4 +33,4 @@ Shared catalog product identity for supported product types.
 | --- | --- | --- | --- |
 | `product_owner_clerk_id_idx` | no | `btree` | `owner_clerk_id` |
 | `product_type_slug_unique` | yes | `btree` | `product_type_id`, `slug` |
-| `product_visibility_idx` | no | `btree` | `is_private` |
+| `product_visibility_idx` | no | `btree` | `approval_status`, `is_private` |

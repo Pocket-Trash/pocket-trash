@@ -6,6 +6,7 @@ import { ProductCard } from "./product-card";
  * Catalog product fixture without images.
  */
 const product: CatalogProduct = {
+  approvalStatus: "approved",
   bearing: null,
   buttonDiameterMm: null,
   canAdminister: false,

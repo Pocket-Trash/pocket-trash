@@ -7,13 +7,14 @@ import type {
 } from "@package/services";
 import { formatTranslation } from "@pocket-trash/localizations";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { fn } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 import { getHelpDocument } from "@/lib/help-content";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import {
   CollectionItemDetailPage,
   CollectionPage,
   HomePage,
+  ProductApprovalControls,
   ProductDetailPage,
   ProductsPage,
   PublicCollectionPage,
@@ -34,6 +35,7 @@ const collectionImage = image(
 
 /** Catalog product shared by the stories. */
 const product: CatalogProduct = {
+  approvalStatus: "approved",
   bearing: "R188 hybrid ceramic",
   buttonDiameterMm: null,
   canAdminister: false,
@@ -250,6 +252,52 @@ export const ProductDetail: Story = {
    */
   render: () => (
     <ProductDetailPage collectionItems={[item]} product={product} />
+  ),
+};
+
+const decideApproval = fn(async () => "approved" as const);
+
+/** Product approval state and interaction story. */
+export const ProductApproval: Story = {
+  /**
+   * Exercises each approval state and one successful decision.
+   *
+   * @param root0 - Storybook play context.
+   * @param root0.canvasElement - Rendered story root element.
+   */
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(
+      canvas.getAllByLabelText("Decision reason")[0] as HTMLTextAreaElement,
+      "Ready for the catalog",
+    );
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Approve product" }),
+    );
+    await expect(decideApproval).toHaveBeenCalledWith({
+      action: "approve",
+      reason: "Ready for the catalog",
+    });
+  },
+  /**
+   * Renders every approval state.
+   * @returns Product approval controls for visual review.
+   */
+  render: () => (
+    <main className="grid max-w-3xl gap-6 p-6">
+      <ProductApprovalControls
+        initialStatus="pending"
+        onDecide={decideApproval}
+      />
+      <ProductApprovalControls
+        initialStatus="approved"
+        onDecide={async () => "pending"}
+      />
+      <ProductApprovalControls
+        initialStatus="rejected"
+        onDecide={async () => "pending"}
+      />
+    </main>
   ),
 };
 

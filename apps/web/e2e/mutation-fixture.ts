@@ -134,12 +134,14 @@ export async function createMutationFixture({
       .insert(schema.product)
       .values([
         {
+          approvalStatus: "approved",
           makerId: maker.id,
           name: spinnerProductName,
           productTypeId: spinnerType.id,
           slug: spinnerProductSlug,
         },
         {
+          approvalStatus: "approved",
           makerId: maker.id,
           name: buttonProductName,
           productTypeId: buttonType.id,

@@ -170,6 +170,7 @@ describe("finish option editor", () => {
 
   it("renders the owned material and product finish choices", () => {
     const product: CatalogProduct = {
+      approvalStatus: "approved",
       bearing: null,
       buttonDiameterMm: null,
       canAdminister: false,
@@ -467,6 +468,7 @@ function productFixture(
   productTypeSlug: "spinner" | "spinner-button",
 ): CatalogProduct {
   return {
+    approvalStatus: "approved",
     bearing: null,
     buttonDiameterMm: null,
     canAdminister: false,

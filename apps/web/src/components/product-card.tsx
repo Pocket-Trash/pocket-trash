@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
  * Renders a catalog product summary with its first active image and counts.
  *
  * @param props - Product card properties.
+ * @param props.approvalLabel - Localized review state shown to authorized viewers.
  * @param props.finishOptionCountLabel - Preformatted finish-option count.
  * @param props.imageAlt - Alternative text for the first active image.
  * @param props.imageCountLabel - Preformatted image count.
@@ -14,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
  * @returns The product summary card.
  */
 export function ProductCard({
+  approvalLabel,
   finishOptionCountLabel,
   imageAlt,
   imageCountLabel,
@@ -21,6 +23,8 @@ export function ProductCard({
   privateLabel,
   product,
 }: {
+  /** Localized review state shown to authorized viewers. */
+  approvalLabel?: string;
   /**
    * Preformatted finish-option count.
    */
@@ -60,6 +64,11 @@ export function ProductCard({
         </div>
       ) : null}
       <div className="flex-1 p-5">
+        {approvalLabel ? (
+          <Badge className="mb-2" variant="secondary">
+            {approvalLabel}
+          </Badge>
+        ) : null}
         {product.isPrivate ? (
           <Badge className="mb-2" variant="secondary">
             {privateLabel}

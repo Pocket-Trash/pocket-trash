@@ -65,6 +65,8 @@ export type {
   ListAuditEventsInput,
   ListMyFeedbackOptions,
   MergePendingFeedbackInput,
+  ProductApprovalAction,
+  ProductApprovalStatus,
   ProductWriteInput,
   PublicCollectionOwner,
   SubmitFeedbackInput,

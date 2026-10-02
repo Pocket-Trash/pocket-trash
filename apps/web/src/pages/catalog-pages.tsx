@@ -1,13 +1,15 @@
 import type {
   CatalogFinishOption,
   CatalogProduct,
+  ProductApprovalAction,
+  ProductApprovalStatus,
   PublicCollectionOwner,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
   CatalogFilterBar,
@@ -21,9 +23,10 @@ import { MarkdownContent } from "@/components/markdown-content";
 import { ProductCard } from "@/components/product-card";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { finishOptionLabel } from "@/lib/catalog";
 import {
+  decideCatalogProductApproval,
   setCollectionItemVisibility,
   setCollectionVisibility,
   setProductVisibility,
@@ -310,6 +313,22 @@ export function ProductDetailPage({
       title={product.name}
     >
       <main className="mx-auto grid max-w-5xl gap-6 p-6">
+        {product.canAdminister ? (
+          <ProductApprovalControls
+            initialStatus={product.approvalStatus}
+            onDecide={async ({ action, reason }) => {
+              const result = await decideCatalogProductApproval({
+                data: { action, productId: product.id, reason },
+              });
+              if (!result.ok) throw new Error(result.formError);
+              return result.approvalStatus;
+            }}
+          />
+        ) : product.approvalStatus !== "approved" ? (
+          <Badge className="w-fit" variant="secondary">
+            {approvalStatusLabel(t, product.approvalStatus)}
+          </Badge>
+        ) : null}
         {product.isPrivate ? (
           <Badge className="w-fit" variant="secondary">
             {t("web.resources.moderation.privateBadge")}
@@ -914,6 +933,11 @@ export function ProductGrid({
             <span className="sr-only">{product.name}</span>
           </Link>
           <ProductCard
+            approvalLabel={
+              product.approvalStatus === "approved"
+                ? undefined
+                : approvalStatusLabel(t, product.approvalStatus)
+            }
             finishOptionCountLabel={t("web.catalog.finishOptionCount", {
               count: product.finishOptions.length,
             })}
@@ -931,6 +955,136 @@ export function ProductGrid({
       ))}
     </section>
   );
+}
+
+/**
+ * Renders the administrative product approval controls.
+ *
+ * @param props - Current approval state and persistence callback.
+ * @returns An accessible approval decision fieldset.
+ */
+export function ProductApprovalControls({
+  initialStatus,
+  onDecide,
+}: {
+  /** Initial durable approval state. */
+  initialStatus: ProductApprovalStatus;
+  /**
+   * Persists one approval decision.
+   *
+   * @param input - Administrative action and its nonblank reason.
+   * @returns The resulting durable approval state.
+   * @rejects When the decision cannot be persisted.
+   */
+  onDecide(input: {
+    /** Requested approval transition. */
+    action: ProductApprovalAction;
+    /** Nonblank reason supplied by the administrator. */
+    reason: string;
+  }): Promise<ProductApprovalStatus>;
+}) {
+  const t = useCatalogCopy();
+  const reasonId = useId();
+  const [error, setError] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [reason, setReason] = useState("");
+  const [status, setStatus] = useState(initialStatus);
+
+  /**
+   * Submits one approval action using the current reason.
+   *
+   * @param action - Requested approval transition.
+   * @returns Completion after the UI state settles.
+   */
+  const decide = async (action: ProductApprovalAction) => {
+    const normalizedReason = reason.trim();
+    if (!normalizedReason || pending) return;
+    setError(false);
+    setPending(true);
+    try {
+      setStatus(await onDecide({ action, reason: normalizedReason }));
+      setReason("");
+    } catch {
+      setError(true);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <fieldset className="grid gap-3 rounded-xl border border-border bg-card p-4">
+      <legend className="px-1 font-semibold">
+        {t("web.catalog.approval.title")}
+      </legend>
+      <Badge className="w-fit" variant="secondary">
+        {approvalStatusLabel(t, status)}
+      </Badge>
+      <label className="text-sm font-medium" htmlFor={reasonId}>
+        {t("web.catalog.approval.reasonLabel")}
+      </label>
+      <textarea
+        className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        disabled={pending}
+        id={reasonId}
+        maxLength={1000}
+        onChange={(event) => setReason(event.target.value)}
+        placeholder={t("web.catalog.approval.reasonPlaceholder")}
+        required
+        value={reason}
+      />
+      <div className="flex flex-wrap gap-2">
+        {status === "pending" ? (
+          <>
+            <Button
+              disabled={!reason.trim() || pending}
+              onClick={() => void decide("approve")}
+              type="button"
+            >
+              {t("web.catalog.approval.approve")}
+            </Button>
+            <Button
+              disabled={!reason.trim() || pending}
+              onClick={() => void decide("reject")}
+              type="button"
+              variant="destructive"
+            >
+              {t("web.catalog.approval.reject")}
+            </Button>
+          </>
+        ) : (
+          <Button
+            disabled={!reason.trim() || pending}
+            onClick={() => void decide("reverse")}
+            type="button"
+            variant="outline"
+          >
+            {t("web.catalog.approval.reverse")}
+          </Button>
+        )}
+      </div>
+      {error ? (
+        <p className="text-sm text-destructive" role="alert">
+          {t("web.catalog.error.form")}
+        </p>
+      ) : null}
+    </fieldset>
+  );
+}
+
+/**
+ * Localizes a product approval state.
+ *
+ * @param t - Catalog translation function.
+ * @param status - Approval state to label.
+ * @returns The localized state label.
+ */
+function approvalStatusLabel(
+  t: ReturnType<typeof useCatalogCopy>,
+  status: ProductApprovalStatus,
+) {
+  if (status === "approved") return t("web.catalog.approval.status.approved");
+  if (status === "rejected") return t("web.catalog.approval.status.rejected");
+  return t("web.catalog.approval.status.pending");
 }
 
 /**

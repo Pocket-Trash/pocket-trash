@@ -285,6 +285,13 @@ export const collectionWriteSchema = z.object({
   reason: z.string().trim().max(1000).optional(),
 });
 
+/** Validates one administrative product approval decision. */
+export const productApprovalSchema = z.object({
+  action: z.enum(["approve", "reject", "reverse"]),
+  productId: idSchema,
+  reason: z.string().trim().min(1, requiredMessage).max(1000),
+});
+
 /**
  * Success or validation-aware failure returned by catalog lookup mutations.
  *
@@ -1372,6 +1379,26 @@ export const setProductVisibility = createServerFn({ method: "POST" })
       actor,
       ...data,
     });
+  });
+
+/** Applies an authorized product approval transition. */
+export const decideCatalogProductApproval = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("products.manage");
+    const parsed = productApprovalSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+
+    const { s } = await import("@/lib/services");
+    try {
+      const approvalStatus = await s.db.catalog.decideProductApproval({
+        ...parsed.data,
+        actor,
+      });
+      return { approvalStatus, ok: true as const };
+    } catch (error) {
+      return mutationFailure(error);
+    }
   });
 
 /**
