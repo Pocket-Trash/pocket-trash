@@ -6,11 +6,36 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, edited]
+  schedule:
+    - cron: "17 13 * * *"
 
 permissions:
   contents: read
 
 jobs:
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm security:audit
+
   changeset:
     name: Changeset
     if: github.event_name == 'pull_request'
@@ -36,6 +61,8 @@ jobs:
 
   scraper-artifact:
     name: Scraper Artifact
+    if: github.event_name == 'pull_request'
+    needs: security
     runs-on: ubuntu-latest
 
     steps:
@@ -48,7 +75,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
@@ -62,6 +89,8 @@ jobs:
 
   api-artifact:
     name: API Artifact
+    if: github.event_name == 'pull_request'
+    needs: security
     runs-on: ubuntu-latest
 
     steps:
@@ -74,7 +103,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
@@ -88,6 +117,8 @@ jobs:
 
   web-artifact:
     name: Web Artifact
+    if: github.event_name == 'pull_request'
+    needs: security
     runs-on: ubuntu-latest
 
     steps:
@@ -100,7 +131,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
@@ -123,6 +154,8 @@ jobs:
 
   lint:
     name: Lint and Typecheck
+    if: github.event_name == 'pull_request'
+    needs: security
     runs-on: ubuntu-latest
 
     steps:
@@ -135,7 +168,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
@@ -155,6 +188,8 @@ jobs:
 
   test:
     name: Test
+    if: github.event_name == 'pull_request'
+    needs: security
     runs-on: ubuntu-latest
 
     steps:
@@ -167,7 +202,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
@@ -178,6 +213,8 @@ jobs:
 
   storybook-test:
     name: Storybook Tests
+    if: github.event_name == 'pull_request'
+    needs: security
     runs-on: ubuntu-latest
 
     steps:
@@ -190,7 +227,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
@@ -204,6 +241,8 @@ jobs:
 
   drizzle-check:
     name: Drizzle Migration Check
+    if: github.event_name == 'pull_request'
+    needs: security
     runs-on: ubuntu-latest
 
     steps:
@@ -216,7 +255,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
