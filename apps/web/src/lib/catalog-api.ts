@@ -297,6 +297,19 @@ export const collectionItemApprovalSchema = productApprovalSchema
   .omit({ productId: true })
   .extend({ collectionItemId: idSchema });
 
+/** Validates an explicit collection-item deletion acknowledgement. */
+export const collectionItemDeletionSchema = z.object({
+  collectionItemId: idSchema,
+  confirmed: z.literal(true),
+});
+
+/** Validates an explicit whole-product deletion acknowledgement and optional staff reason. */
+export const productDeletionSchema = z.object({
+  confirmed: z.literal(true),
+  productId: idSchema,
+  reason: z.string().trim().max(1000, requiredMessage).optional(),
+});
+
 /**
  * Success or validation-aware failure returned by catalog lookup mutations.
  *
@@ -1300,6 +1313,35 @@ export const updateCollectionItem = createServerFn({ method: "POST" })
   });
 
 /**
+ * Permanently deletes one collection item owned by the authenticated actor.
+ *
+ * @returns A success marker or a validation-aware mutation failure.
+ * @rejects If authentication or service loading fails.
+ */
+export const deleteCollectionItem = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const parsed = collectionItemDeletionSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+    const { s } = await import("@/lib/services");
+    try {
+      await s.db.collections.deleteItem({
+        actor,
+        collectionItemId: parsed.data.collectionItemId,
+      });
+      return { ok: true as const };
+    } catch {
+      return {
+        fieldErrors: {},
+        formError: "error.generic",
+        ok: false as const,
+        requiresConfirmation: false as const,
+      };
+    }
+  });
+
+/**
  * Moves a product or collection-item image to trash.
  *
  * @rejects If input validation, authentication, service loading, service authorization, auditing, operation logging, or persistence fails.
@@ -1404,6 +1446,27 @@ export const decideCatalogProductApproval = createServerFn({ method: "POST" })
       return { approvalStatus, ok: true as const };
     } catch (error) {
       return mutationFailure(error);
+    }
+  });
+
+/** Deletes an eligible product through the owner or staff authorization path. */
+export const deleteCatalogProduct = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const parsed = productDeletionSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+    const { s } = await import("@/lib/services");
+    try {
+      const deleted = await s.db.catalog.deleteProduct({
+        actor,
+        ...parsed.data,
+      });
+      return deleted
+        ? { ok: true as const }
+        : { ok: false as const, formError: "web.catalog.deletion.blocked" };
+    } catch {
+      return { ok: false as const, formError: "web.catalog.deletion.failed" };
     }
   });
 

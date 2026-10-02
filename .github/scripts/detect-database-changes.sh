@@ -5,7 +5,7 @@ set -euo pipefail
 changed_files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
 database=false
 
-if grep -Eq '^(packages/database/src/schema/|packages/database/drizzle/|packages/database/drizzle\.config\.ts$)' <<< "$changed_files"; then
+if grep -Eq '^(packages/database/src/schema/|packages/database/drizzle/|packages/database/seed-data/|packages/database/drizzle\.config\.ts$|packages/database/scripts/seed\.ts$)' <<< "$changed_files"; then
   database=true
 fi
 

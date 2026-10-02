@@ -8,12 +8,6 @@
       "passThroughEnv": ["INFISICAL_RUNNER_VERBOSE"],
       "persistent": true
     },
-    "dev:web": {
-      "dependsOn": ["^build"],
-      "cache": false,
-      "passThroughEnv": ["INFISICAL_RUNNER_VERBOSE"],
-      "persistent": true
-    },
     "build": {
       "dependsOn": ["^build"],
       "env": [

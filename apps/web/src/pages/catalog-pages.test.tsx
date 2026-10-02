@@ -16,6 +16,12 @@ import {
 
 vi.mock("@tanstack/react-router", () => ({
   /**
+   * Returns the navigation spy used by static page tests.
+   *
+   * @returns Mock navigation callback.
+   */
+  useNavigate: () => vi.fn(),
+  /**
    * Renders router links as anchors for static markup tests.
    *
    * @param props - Link properties.
@@ -344,6 +350,23 @@ describe("ProductCard", () => {
 });
 
 describe("ProductDetailPage", () => {
+  it("limits deletion controls to owners and authorized staff", () => {
+    const publicHtml = renderToStaticMarkup(
+      <ProductDetailPage collectionItems={[]} product={product} />,
+    );
+    expect(publicHtml).not.toContain("Permanently delete product");
+    for (const isOwner of [true, false]) {
+      const html = renderToStaticMarkup(
+        <ProductDetailPage
+          collectionItems={[]}
+          product={{ ...product, canEdit: true, isOwner }}
+        />,
+      );
+      expect(html).toContain("Permanently delete product");
+      expect(html.includes("<textarea")).toBe(!isOwner);
+    }
+  });
+
   it("links each matching collection and collection item", () => {
     const item = owners[0]?.items[0];
     if (!item) throw new Error("Collection item fixture is required.");

@@ -119,7 +119,10 @@ export type ArchiveTarget = {
   url: string;
 };
 
-/** Resource and image upload operations backed by Bunny Storage. */
+/**
+ * Validated object-key, byte-transfer, and Bunny I/O operations. Callers own
+ * authorization, upload-session state, and attachment records.
+ */
 export type UploadStorage = {
   /**
    * Creates a candidate-scoped archive destination.

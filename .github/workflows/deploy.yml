@@ -176,11 +176,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm security:audit
 
       - name: Build API workspace dependencies
         run: pnpm turbo run build --filter=@app/api
@@ -419,6 +422,8 @@ jobs:
         if: steps.db.outputs.can_deploy == 'true' && steps.db.outputs.isolated == 'true'
         working-directory: packages/database
         env:
+          BUNNY_IMAGE_FOLDER_PREFIX: images/preview/pr-${{ github.event.pull_request.number }}
+          BUNNY_RESOURCE_FOLDER_PREFIX: resources/preview/pr-${{ github.event.pull_request.number }}
           DATABASE_URL: ${{ steps.db.outputs.migration_database_url }}
         run: |
           set -euo pipefail
@@ -634,42 +639,42 @@ jobs:
               }
             }'
 
-          printf '%s' "$DATABASE_URL" | pnpm dlx @railway/cli variable set DATABASE_URL \
+          printf '%s' "$DATABASE_URL" | pnpm exec railway variable set DATABASE_URL \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          printf '%s' "$image_folder_prefix" | pnpm dlx @railway/cli variable set BUNNY_IMAGE_FOLDER_PREFIX \
+          printf '%s' "$image_folder_prefix" | pnpm exec railway variable set BUNNY_IMAGE_FOLDER_PREFIX \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          printf '%s' "$redis_url_reference" | pnpm dlx @railway/cli variable set REDIS_URL \
+          printf '%s' "$redis_url_reference" | pnpm exec railway variable set REDIS_URL \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          printf '%s' "$scraper_cron_enabled" | pnpm dlx @railway/cli variable set SCRAPER_CRON_ENABLED \
+          printf '%s' "$scraper_cron_enabled" | pnpm exec railway variable set SCRAPER_CRON_ENABLED \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          printf '%s' "$railway_environment" | pnpm dlx @railway/cli variable set LOG_DEPLOYMENT_ID \
+          printf '%s' "$railway_environment" | pnpm exec railway variable set LOG_DEPLOYMENT_ID \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          printf '%s' "railway" | pnpm dlx @railway/cli variable set LOG_DEPLOYMENT_TARGET \
+          printf '%s' "railway" | pnpm exec railway variable set LOG_DEPLOYMENT_TARGET \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
@@ -677,7 +682,7 @@ jobs:
             --environment "$railway_environment"
 
           railway_image_folder_prefix="$(
-            pnpm dlx @railway/cli variable list \
+            pnpm exec railway variable list \
               --kv \
               --project "$RAILWAY_PROJECT_ID" \
               --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
@@ -693,7 +698,7 @@ jobs:
           fi
 
           railway_scraper_cron_enabled="$(
-            pnpm dlx @railway/cli variable list \
+            pnpm exec railway variable list \
               --kv \
               --project "$RAILWAY_PROJECT_ID" \
               --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
@@ -738,21 +743,21 @@ jobs:
               }
             }'
 
-          printf '%s' "$railway_environment" | pnpm dlx @railway/cli variable set LOG_DEPLOYMENT_ID \
+          printf '%s' "$railway_environment" | pnpm exec railway variable set LOG_DEPLOYMENT_ID \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          printf '%s' "railway" | pnpm dlx @railway/cli variable set LOG_DEPLOYMENT_TARGET \
+          printf '%s' "railway" | pnpm exec railway variable set LOG_DEPLOYMENT_TARGET \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          pnpm dlx @railway/cli service redeploy \
+          pnpm exec railway service redeploy \
             --from-source \
             --yes \
             --project "$RAILWAY_PROJECT_ID" \
@@ -972,11 +977,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm security:audit
 
       - name: Build API workspace dependencies
         run: pnpm turbo run build --filter=@app/api
@@ -1001,6 +1009,8 @@ jobs:
 
       - name: Migrate, seed, and reconcile development users
         env:
+          BUNNY_IMAGE_FOLDER_PREFIX: images/dev
+          BUNNY_RESOURCE_FOLDER_PREFIX: resources/dev
           DATABASE_URL: ${{ steps.development_db.outputs.database_url }}
           MIGRATION_DATABASE_URL: ${{ steps.development_db.outputs.migration_database_url }}
         run: |
@@ -1086,11 +1096,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm security:audit
 
       - name: Remove preview webhook target
         working-directory: apps/api
@@ -1147,11 +1160,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm security:audit
 
       - name: Build API workspace dependencies
         run: pnpm turbo run build --filter=@app/api
@@ -1287,11 +1303,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm security:audit
 
       - name: Resolve release tag
         id: release
@@ -1330,7 +1349,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          pnpm dlx @railway/cli variable set \
+          pnpm exec railway variable set \
             APP_ENV=production \
             LOG_DEPLOYMENT_ID=production \
             LOG_DEPLOYMENT_TARGET=railway \
@@ -1346,7 +1365,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          pnpm dlx @railway/cli up \
+          pnpm exec railway up \
             --ci \
             --yes \
             --project "$RAILWAY_PROJECT_ID" \
@@ -1384,11 +1403,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm security:audit
 
       - name: Validate Vercel configuration
         shell: bash
@@ -1412,7 +1434,7 @@ jobs:
         env:
           NO_COLOR: "1"
         run: |
-          pnpm dlx vercel project update "$VERCEL_PROJECT_ID" \
+          pnpm exec vercel project update "$VERCEL_PROJECT_ID" \
             --framework tanstack-start \
             --scope "$VERCEL_ORG_ID" \
             --token "$VERCEL_TOKEN" \
@@ -1421,7 +1443,7 @@ jobs:
       - name: Pull Vercel production environment
         env:
           NO_COLOR: "1"
-        run: pnpm dlx vercel pull --yes --environment=production --scope "$VERCEL_ORG_ID"
+        run: pnpm exec vercel pull --yes --environment=production --scope "$VERCEL_ORG_ID"
 
       - name: Build Vercel production output
         shell: bash
@@ -1457,7 +1479,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          deployment_url="$(pnpm dlx vercel deploy --prebuilt --archive=tgz --prod --scope "$VERCEL_ORG_ID")"
+          deployment_url="$(pnpm exec vercel deploy --prebuilt --archive=tgz --prod --scope "$VERCEL_ORG_ID")"
           echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
           printf 'Vercel production deployment: %s\n' "$deployment_url"
 

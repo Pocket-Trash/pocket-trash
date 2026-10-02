@@ -178,8 +178,11 @@ test("CI keeps required names and gates jobs with one classifier", () => {
     ["drizzle-check", "Drizzle Migration Check", "database"],
   ]) {
     assert.equal(jobs[job].name, name);
-    assert.equal(jobs[job].needs, "classify-changes");
+    assert.deepEqual(jobs[job].needs, ["security", "classify-changes"]);
+    assert.match(jobs[job].if, /needs\.security\.result == 'skipped'/);
     assert.match(jobs[job].if, new RegExp(`outputs\\.${output} == 'true'`));
   }
+  assert.equal(jobs["classify-changes"].if, "github.event_name != 'schedule'");
+  assert.match(jobs.security.if, /github\.event\.action != 'labeled'/);
   assert.equal(jobs.changeset.name, "Changeset");
 });

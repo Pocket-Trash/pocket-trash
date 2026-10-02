@@ -83,6 +83,8 @@ describe("logger", () => {
         },
       },
       database: {
+        catalog: { deleteProduct: "database.catalog.deleteProduct" },
+        collections: { deleteItem: "database.collections.deleteItem" },
         audit: {
           redactAccount: "database.audit.redactAccount",
           write: "database.audit.write",

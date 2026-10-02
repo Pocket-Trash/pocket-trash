@@ -22,6 +22,28 @@ Use the Storage Zone password from Bunny Storage Zone -> Access -> API/HTTP as
 `BUNNY_STORAGE_ACCESS_KEY`. Do not use the global Bunny API key for runtime image
 uploads.
 
+## Resource Storage Operations
+
+Resource uploads share the same Storage Zone, Pull Zone, and CDN hostname.
+Assign each deployment its own `BUNNY_RESOURCE_FOLDER_PREFIX`:
+
+| Environment | Prefix |
+| --- | --- |
+| Production | `resources/files` |
+| Local development | `resources/dev` |
+| Shared preview | `resources/preview` |
+| Isolated PR preview | `resources/preview/pr-<number>` |
+
+Previews with an isolated PR database use the matching isolated prefix, which
+the close workflow deletes. Other PR previews use the shared preview prefix.
+
+Run `pnpm resources:reconcile-storage` to preview moves and orphan deletions
+across non-production Neon branches. Review the output, then rerun with
+`pnpm resources:reconcile-storage -- --apply`. Production is always skipped.
+The command maps local, shared-preview, and PR-preview branches to the prefixes
+above and protects database references, active upload reservations, and queued
+deletions.
+
 ## Runtime Env Vars
 
 | Variable | Suggested value | Notes |

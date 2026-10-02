@@ -3,6 +3,7 @@ import {
   collectionItemApprovalSchema,
   collectionWriteSchema,
   productApprovalSchema,
+  productDeletionSchema,
   productFormSchema,
 } from "./catalog-api";
 
@@ -71,6 +72,28 @@ describe("collection-item approval decisions", () => {
       collectionItemApprovalSchema.parse({ ...decision, action: "reverse" })
         .action,
     ).toBe("reverse");
+  });
+});
+
+describe("product deletion", () => {
+  it("requires explicit confirmation and validates identifiers and bounded reasons", () => {
+    const deletion = {
+      confirmed: true,
+      productId: 1000,
+      reason: " Owner requested help ",
+    };
+    expect(productDeletionSchema.parse(deletion)).toEqual({
+      ...deletion,
+      reason: "Owner requested help",
+    });
+    for (const invalid of [
+      { ...deletion, confirmed: false },
+      { ...deletion, confirmed: undefined },
+      { ...deletion, productId: 0 },
+      { ...deletion, productId: "1000" },
+      { ...deletion, reason: "x".repeat(1001) },
+    ])
+      expect(productDeletionSchema.safeParse(invalid).success).toBe(false);
   });
 });
 

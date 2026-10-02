@@ -1,285 +1,120 @@
 # Railway
 
-`apps/scraper` runs as one TypeScript cron service on Railway. Railway starts the
-service on a cron schedule, the scraper runs every source producer and the queue
-processor, then the process exits. The scraper is separate from the web app
-because scraper runs may exceed web request time limits.
+Railway hosts the scheduled scraper service and its Redis queue. Postgres remains
+the durable source of truth.
 
-Railway hosts the scheduled scraper service and Redis. Postgres remains the
-durable source of truth for scraped rows, image state, run records, and version
-history. Redis is the BullMQ work queue.
+The deployment contract lives in [`railway.json`](../railway.json), and the
+preview and production handoff lives in the
+[`Deploy` workflow](../.github/workflows/deploy.yml). Scraper commands,
+configuration defaults, sources, queues, and job identifiers belong in
+[`apps/scraper/src`](../apps/scraper/src).
 
-## Services
+## Provisioning
 
-Create only the `apps/scraper` service from this repository. Railway may
-detect other deployable workspace apps during import, but they should be ignored
-or skipped for this Railway project.
+Create these resources in the Pocket Trash Railway project:
 
-Use the root Railway config:
-
-| Service | Config file path |
-| --- | --- |
-| `pocket-trash` / `apps-scraper` | `/railway.json` |
-
-The config pins the build and start commands to `@app/scraper`, configures the
-Railway cron schedule, and limits automatic deploy triggers to `apps/scraper`,
-shared packages, and root workspace config files.
-
-Create these Railway services/resources:
-
-| Service | Type | Command | Schedule |
-| --- | --- | --- | --- |
-| `pocket-trash` / `apps-scraper` | Cron service | `pnpm --filter @app/scraper run cron:run` | Railway cron `0 * * * *`; runs every source producer and the queue processor, then exits. |
-| `redis` | Redis database | Railway Redis template | Always available to the scraper service. |
-
-Do not create one Railway service per scraped site. Adding Autmog, Grimsmo, FH,
-NTI, or future sources should add source definitions and handlers in
-`apps/scraper`, not new Railway services.
-
-## Health Check
-
-The scraper still exposes this endpoint when started as a long-running server:
-
-```txt
-GET /health
-```
-
-The response body is:
-
-```json
-{
-  "app": "scraper",
-  "ok": true
-}
-```
-
-Do not configure a Railway healthcheck for the cron service. Railway cron
-deployments should run their start command to completion and exit. `/health` is
-only for the non-cron server command.
-
-## Schedule Behavior
-
-The scraper service uses Railway cron instead of in-process schedules. Railway
-runs the service once per hour with:
-
-```cron
-0 * * * *
-```
-
-Each cron execution runs every source sequentially, then runs the queue
-processor. Railway owns the hourly cadence, so launch jitter cannot defer a
-source until the following hour.
-
-`railway.json` sets `deploy.cronSchedule`, so the value applies through
-Railway's config-as-code path. Railway's docs note that config-as-code values do
-not backfill the Settings form; verify the cron value in the deployment details,
-or set the same `0 * * * *` value manually in the Railway Settings page if you
-want the form itself populated.
-
-Railway cron services must exit after the job finishes. If a previous cron
-execution is still active when the next schedule is due, Railway skips the new
-execution.
-
-Keep handlers idempotent; BullMQ delivery is at-least-once.
-
-Do not add one Railway service per scraped site.
-
-Preview cron runs are gated by `SCRAPER_CRON_ENABLED`. When `APP_ENV=preview`,
-`cron:run` exits before opening DB or Redis connections unless
-`SCRAPER_CRON_ENABLED=true`. The API deploy workflow sets this to `true` only
-for DB-changing PRs with an isolated Neon `preview-pr-*` branch, and to `false`
-for non-DB PRs that share the preview database.
-
-Manual source runs use source keys. For local development, use the root command
-so local Docker/OrbStack Redis is started and `/apps/scraper` secrets are
-injected from Infisical:
-
-```sh
-pnpm scraper:scrape -- autmog
-```
-
-To simulate one Railway cron execution locally, run:
-
-```sh
-pnpm scraper:cron
-```
-
-This starts or reuses local Docker/OrbStack Redis, injects `/apps/scraper`
-secrets, runs every source producer and the queue processor once, then exits. It
-does not start a local timer.
-
-Inside a Railway shell, the service already has its environment variables, so
-the package command can be used directly:
-
-```sh
-pnpm --filter @app/scraper run scrape -- autmog
-```
-
-Implemented source keys are `autmog`, `grimsmo-saga`, `grimsmo-rask`,
-`grimsmo-fjell`, and `grimsmo-norseman`. The Grimsmo sources fetch unprefixed
-`https://grimsmoknives.com` Shopify collection URLs so prices normalize as USD.
-The older `pnpm scraper:scrape:autmog` and
-`pnpm --filter @app/scraper run scrape:autmog` aliases remain available.
-
-## Queue Design
-
-Use BullMQ with Railway Redis.
-
-Queues:
-
-- `scraper-items`: normalized item work for pens, knives, or future product
-  types.
-- `scraper-images`: image upload/delete work.
-
-Producer jobs fetch upstream data, normalize enough to identify each item, and
-enqueue item jobs. They do not upload images directly.
-
-The processor job drains queued work, upserts Postgres tables, writes version
-snapshots, enqueues or processes image jobs, uploads images, and handles pending
-deletes.
-
-Use deterministic job IDs so retries and duplicate scrape runs are idempotent:
-
-```txt
-autmog--pen--<sourceProductId>--<detailsHash>
-autmog--image--upload--<imageId>--<sourceHash>
-grimsmo-saga--pen-variation--<sourceHandle>--<detailsHash>
-grimsmo-rask--knife-variation--<sourceHandle>--<detailsHash>
-grimsmo-fjell--knife-variation--<sourceHandle>--<detailsHash>
-grimsmo-norseman--knife-variation--<sourceHandle>--<detailsHash>
-```
-
-Configure retries with exponential backoff and conservative concurrency. Treat
-BullMQ delivery as at-least-once; every handler must be safe to process more
-than once.
-
-Recommended initial processor tuning:
-
-| Variable | Initial value | Notes |
+| Resource | Railway name | Configuration |
 | --- | --- | --- |
-| `SCRAPER_ITEM_BATCH_SIZE` | `100` | Enough to drain current Autmog in a small number of processor runs without making each run too large. |
-| `SCRAPER_IMAGE_BATCH_SIZE` | `25` | Keeps image/network work bounded; increase after observing runtime and failure rate. |
-| `SCRAPER_QUEUE_CONCURRENCY` | `3` | Conservative starting point for DB, Redis, image storage, and upstream friendliness. |
+| Scraper cron service | `pocket-trash` in production; `pocket-trash (preview)` in previews | Repository root with `/railway.json` as the config path |
+| Redis | `scraper-queue` | Railway Redis template |
 
-Tune these from production logs after the first successful runs. Prefer raising
-batch sizes before raising concurrency.
+Railway may detect other deployable workspace apps during repository import.
+Skip them: this project deploys only `apps/scraper`.
+
+For the production scraper service:
+
+- Disable Railway's native GitHub auto-deploy. The tag-triggered `Deploy`
+  workflow owns production releases.
+- Do not configure a healthcheck. A cron deployment must run its command to
+  completion and exit.
+
+For the preview scraper service:
+
+- Keep native GitHub auto-deploy enabled.
+- Enable **Wait for CI** so the workflow can prepare its database and Redis
+  variables before Railway builds the commit.
+- Do not add a scraper `railway service redeploy --from-source` workflow step
+  while native auto-deploy is enabled; that would create two builds per push.
+
+The root [`.railwayignore`](../.railwayignore) keeps CLI uploads below Railway's
+source-upload limit. Update it when the scraper gains a workspace dependency.
+
+## Cron operation
+
+[`railway.json`](../railway.json) owns the build command, start command, hourly
+schedule, and no-restart policy. Railway cron services must exit after each
+run. If a run is still active when the next schedule is due, Railway skips the
+new run.
+
+Railway config-as-code values do not populate every Settings form. Verify the
+effective cron schedule in the deployment details; if operators also want the
+form populated, set it to the same value as `deploy.cronSchedule`.
+
+Preview runs are gated by `SCRAPER_CRON_ENABLED`. The deploy workflow enables
+them only for database-changing PRs with an isolated Neon branch; other previews
+share the preview database and keep cron disabled.
+
+The cron task ordering and failure behavior are documented beside
+[`runRailwayCronJob`](../apps/scraper/src/cron.ts). Runtime inputs and their
+validated defaults are documented beside
+[`createScraperJobEnv`](../apps/scraper/src/env.schema.ts).
 
 ## Redis
 
-Create Redis directly in Railway using the Railway Redis database/template.
-`apps/scraper` should not provision Redis at runtime. Reference Redis from the
-scraper service through `REDIS_URL`.
-
-Prefer Railway private networking/service variables for preview and production
-service-to-service access. If the Redis service is named `scraper-queue`, set
-this variable on the scraper service:
+Provision Redis in Railway; the scraper must not provision it at runtime. Set
+`REDIS_URL` on the scraper as a Railway service reference:
 
 ```dotenv
 REDIS_URL=${{scraper-queue.REDIS_PUBLIC_URL}}
 ```
 
-Use the actual Railway Redis service name. Avoid copying Railway Redis URLs into
-Infisical unless the scraper is connecting to a non-Railway Redis provider.
-Local development uses Docker/OrbStack through `pnpm dev:scraper`; see
-[docker.md](./docker.md).
+Use the actual Redis service name if it differs. Keep this reference in Railway
+rather than copying a Railway URL into Infisical. Redis is a queue, not durable
+history; losing it must not delete the persisted scraper state in Postgres.
 
-## Environment Variables
+Secret ownership and non-Railway environment placement are documented in
+[environment-variables.md](./environment-variables.md). Bunny provisioning and
+preview namespaces are documented in [image-cdn.md](./image-cdn.md).
 
-Runtime variables for `apps/scraper` are documented in
-[environment-variables.md](./environment-variables.md).
+## Production deploys
 
-Required groups:
+Production scraper deploys are downstream of the release workflow's database
+migrations. The workflow:
 
-- Database: `DATABASE_URL`
-- Queue: `REDIS_URL`
-- Image CDN: see [Image CDN](./image-cdn.md) for Bunny setup, upload path,
-  and preview namespace rules
-- Logger: `AXIOM_TOKEN`, `AXIOM_DATASET`, optional `AXIOM_EDGE_DOMAIN`,
-  `LOG_LEVEL`, `LOGGER`, `LOG_DEPLOYMENT_ID`, and `LOG_DEPLOYMENT_TARGET`
-- Grimsmo proxying: try direct fetches without `GRIMSMO_PROXY_URL` first; add
-  `GRIMSMO_PROXY_URL` only if Railway/direct IP fetches are blocked
-
-Railway runs all producers sequentially at the top of each hour. The
-configurable Grimsmo start delays apply only to the in-process scheduler, which
-staggers Saga, Rask, Fjell, and Norseman at `:00`, `:15`, `:30`, and `:45` by
-default.
-
-## Production Deploys
-
-Disable Railway's native GitHub auto-deploy for the production `pocket-trash`
-service. Production scraper deploys are owned by the tag-triggered `Deploy`
-workflow so the scraper cannot run newer code before committed production
-database migrations have been applied.
-
-The production workflow:
-
-1. Runs production Neon migrations.
-2. Smoke-tests the production web server.
-3. Sets Railway production metadata with `--skip-deploys`:
-   `APP_ENV=production`, `LOG_DEPLOYMENT_ID=production`, and
-   `LOG_DEPLOYMENT_TARGET=railway`.
-4. Uploads the checked-out release source to Railway with
-   `railway up --ci --message "Production release for vX.Y.Z"`.
-5. Waits for that Railway production deployment to finish with `SUCCESS`.
+1. Applies committed migrations to the production Neon branch.
+2. Deploys and smoke-tests the production API.
+3. Stages Railway production metadata with `--skip-deploys`.
+4. Uploads the checked-out release source to Railway.
+5. Waits for the Railway CLI deployment command to succeed.
 
 Do not move Drizzle migrations into the Railway build, pre-deploy, start, or
-cron command. Railway production deploys must remain downstream of the release
-workflow migration step.
+cron command. That could run scraper code before the production schema is ready.
 
-## Preview Database Sync
+## Preview database and Redis handoff
 
-The Railway scraper preview service must use the same Neon branch selected for
-web previews. Branch code running against the shared preview database can fail
-with misleading type errors when the PR contains database schema changes.
+Each preview uses the Railway environment
+`pocket-trash-pr-<pull-request-number>`. Before Railway's native scraper deploy,
+the workflow:
 
-The Deploy workflow configures this handoff after it prepares the Neon preview
-database:
+1. Selects the isolated `preview-pr-<number>` Neon branch for database-changing
+   PRs, or the shared `preview` branch otherwise.
+2. Stages the selected `DATABASE_URL`, Bunny image prefix, cron flag, deployment
+   metadata, and the Redis service reference on `pocket-trash (preview)` with
+   `--skip-deploys`.
+3. Redeploys `scraper-queue` from its configured image source so Redis is online.
 
-- DB-changing PRs use the isolated `preview-pr-<number>` branch and apply
-  committed migrations before deployment.
-- Other PRs use the shared `preview` branch.
-- The selected `DATABASE_URL` is upserted into the Railway scraper preview
-  service through the Railway CLI.
+Only the external Neon URL is copied into Railway. Keep `REDIS_URL` as the
+Railway service reference so it resolves inside the preview environment.
 
-GitHub Actions reads `RAILWAY_API_TOKEN` and `RAILWAY_PROJECT_ID` from
-Infisical `tools/github/secrets`.
+## Failure and rollback
 
-The workflow upserts `DATABASE_URL` into the scraper service variables in the
-Railway preview service named `pocket-trash (preview)` in the Railway environment
-named `pocket-trash-pr-<pull-request-number>`. For example, PR 53 uses
-`pocket-trash-pr-53`. The workflow also upserts `REDIS_URL` as a Railway reference
-to the `scraper-queue` service. It does not call `railway run` or assert
-resolved Redis reference values before deployment because variables set with
-`--skip-deploys` are staged until the next deployment. After the variables are
-set, the workflow deploys the `scraper-queue` Redis service from its configured
-image source so the Redis database is online for the scraper.
-
-Keep Railway's native GitHub auto-deploy enabled for the `pocket-trash (preview)`
-service and enable Railway's **Wait for CI** setting for that service. The
-native GitHub deploy is the only scraper code deploy path; the Deploy
-workflow prepares variables and Redis first. Do not add an explicit scraper
-`railway service redeploy --from-source` step to the workflow while native
-auto-deploy is enabled, or each push will produce two builds for the same
-commit.
-
-The root `.railwayignore` intentionally excludes unrelated apps and generated
-folders from any manual CLI uploads. Keep it aligned with the scraper's
-workspace dependency closure when adding scraper dependencies.
-
-Keep `REDIS_URL` as a Railway service reference such as
-`${{scraper-queue.REDIS_PUBLIC_URL}}`; only the external Neon `DATABASE_URL` is synced
-from the preview database workflow.
-
-## Deployment Notes
-
-- Keep one Railway service for `apps/scraper`.
-- Run the scheduled service with `pnpm --filter @app/scraper run cron:run`.
-- Set the Railway cron schedule to `0 * * * *`.
-- Do not configure a Railway healthcheck for the cron service.
-- Set `DATABASE_URL` and `REDIS_URL` before enabling the cron service; cron
-  executions validate job dependencies before running.
-- Do not rely on Redis for historical state. Persist current state and
-  idempotency markers in Postgres.
-- Make the processor safe to stop mid-run. Pending queue jobs and Postgres image
-  statuses should let the next run resume.
-- Keep concurrency low by default, then tune from logs after production runs.
+- If a preview deploy fails, fix the workflow or configuration and rerun it;
+  do not bypass the variable handoff with a manual scraper deployment.
+- If a production scraper deploy fails after migrations, leave the failed
+  deployment stopped and ship a forward fix. Do not roll back production
+  migrations.
+- Redeploy a prior scraper release only when its code is compatible with the
+  current production schema. Otherwise disable the cron service until the
+  forward fix is deployed.
+- Before re-enabling cron, confirm `DATABASE_URL` and `REDIS_URL` resolve in the
+  target Railway environment and inspect the failed deployment logs.

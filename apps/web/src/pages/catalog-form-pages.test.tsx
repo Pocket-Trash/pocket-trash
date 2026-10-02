@@ -322,6 +322,39 @@ describe("collection edit submission", () => {
   });
 });
 
+describe("collection item deletion", () => {
+  it("shows permanent deletion only to the item owner", () => {
+    const product = productFixture(1008, "Delete me", "spinner");
+    const item = collectionFixture(40, product, 1009);
+    const props = {
+      buttonProducts: [],
+      collections: [],
+      options: emptyCatalogOptions,
+      ownedButtons: [],
+      product,
+    };
+    const ownerHtml = renderToStaticMarkup(
+      createElement(CollectionEditPage, {
+        ...props,
+        item: { ...item, isOwner: true },
+      }),
+    );
+    const adminHtml = renderToStaticMarkup(
+      createElement(CollectionEditPage, {
+        ...props,
+        item: {
+          ...item,
+          canAdminister: true,
+          isOwner: false,
+        },
+      }),
+    );
+
+    expect(ownerHtml).toContain("Delete permanently");
+    expect(adminHtml).not.toContain("Delete permanently");
+  });
+});
+
 describe("product form conditional fields", () => {
   it.each([
     "spinner",
