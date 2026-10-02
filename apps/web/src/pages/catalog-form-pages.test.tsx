@@ -386,6 +386,23 @@ describe("collection edit conditional fields", () => {
 });
 
 describe("collection add form", () => {
+  it.each([
+    undefined,
+    9999,
+  ])("retains product selection without a valid preselected product (%s)", (initialProductId) => {
+    const html = renderToStaticMarkup(
+      createElement(CollectionAddPage, {
+        collections: [],
+        defaultCollectionName: null,
+        initialProductId,
+        options: emptyCatalogOptions,
+        products: [],
+      }),
+    );
+    expect(html).toContain('aria-label="Product type"');
+    expect(html).toMatch(/<details[^>]* open=""/u);
+  });
+
   it("renders localized collection copy and a disabled primary action", () => {
     const product = productFixture(1003, "Zoom Zoom", "spinner");
     const html = renderToStaticMarkup(
@@ -416,6 +433,11 @@ describe("collection add form", () => {
     );
 
     expect(html).not.toContain("Something went wrong");
+    expect(html).toContain('aria-label="Product type"');
+    expect(html).toContain(">Zoom Zoom</span>");
+    expect(html).toMatch(/<details[^>]*>/u);
+    expect(html).not.toMatch(/<details[^>]* open=/u);
+    expect(html).toMatch(/<summary[^>]*>Products<\/summary>/u);
     expect(html).toContain(">Collection<");
     expect(html).toContain(">Add new collection<");
     expect(html).toContain(">Add to collection<");
