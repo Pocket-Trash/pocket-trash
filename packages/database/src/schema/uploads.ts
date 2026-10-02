@@ -21,7 +21,7 @@ export const uploadTargetTypes = [
 ] as const;
 /** Supported file roles within an upload session. */
 export const uploadFileKinds = ["image", "file"] as const;
-/** Authenticated upload reservations with expiry and completion state. */
+/** Authenticated upload reservations with opaque resource metadata, reserved versions, expiry, and completion state. */
 export const uploadSession = pgTable(
   "upload_session",
   {
@@ -61,7 +61,7 @@ export const uploadSession = pgTable(
       .where(sql`${t.targetType} = 'resource' and ${t.completedAt} is null`),
   ],
 );
-/** Declared files and reserved object paths within upload sessions. */
+/** Declared files, reserved object paths, and verified upload state within upload sessions. */
 export const uploadFile = pgTable(
   "upload_file",
   {
@@ -95,7 +95,7 @@ export const uploadFile = pgTable(
   ],
 );
 
-/** Durable post-commit queue of storage objects awaiting deletion. */
+/** Durable post-commit queue of storage objects awaiting deletion. Paths remain reserved until cleanup succeeds. */
 export const storageObjectDeletion = pgTable(
   "storage_object_deletion",
   {
