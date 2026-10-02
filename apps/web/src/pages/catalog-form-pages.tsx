@@ -47,6 +47,7 @@ import {
   createCatalogFinish,
   createCatalogMaker,
   createCatalogMaterial,
+  deleteCollectionItem,
   deleteUserCollection,
   finishOptionSchema,
   type ProductFormInput,
@@ -2849,9 +2850,138 @@ export function CollectionEditPage({
         >
           {t("action.save")}
         </Button>
+        {item.isOwner ? (
+          <CollectionItemDeletionSection
+            itemName={item.displayName}
+            onDelete={async () => {
+              const result = await deleteCollectionItem({
+                data: {
+                  collectionItemId: item.collectionItemId,
+                  confirmed: true,
+                },
+              });
+              if (!result.ok) throw new Error(result.formError);
+              await navigate({
+                params: { collectionId: item.collectionId },
+                to: "/user/collections/$collectionId",
+              });
+            }}
+          />
+        ) : null}
         {formError ? <Notice>{t(formError)}</Notice> : null}
       </main>
     </AppShell>
+  );
+}
+
+/**
+ * Renders permanent deletion confirmation for one owned collection item.
+ *
+ * @param props - Item label and confirmed deletion callback.
+ * @returns Accessible owner-only deletion controls.
+ */
+function CollectionItemDeletionSection({
+  itemName,
+  onDelete,
+}: {
+  /** Collection item named in the dialog. */
+  itemName: string;
+  /**
+   * Permanently deletes the collection item.
+   *
+   * @returns Completion after deletion and navigation.
+   * @rejects When deletion or navigation fails.
+   */
+  onDelete(): Promise<void>;
+}) {
+  const t = useCatalogCopy();
+  const dialog = React.useRef<HTMLDialogElement>(null);
+  const titleId = React.useId();
+  const descriptionId = React.useId();
+  const [confirmed, setConfirmed] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [failed, setFailed] = React.useState(false);
+  return (
+    <section className="border-t border-border pt-5">
+      <Button
+        onClick={() => dialog.current?.showModal()}
+        type="button"
+        variant="destructive"
+      >
+        <Trash2 />
+        {t("web.resources.action.permanentlyDelete")}
+      </Button>
+      <dialog
+        aria-describedby={descriptionId}
+        aria-labelledby={titleId}
+        className="m-auto w-[min(36rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
+        onCancel={(event) => {
+          if (submitting) event.preventDefault();
+        }}
+        onClose={() => {
+          setConfirmed(false);
+          setFailed(false);
+        }}
+        ref={dialog}
+      >
+        <form
+          className="grid gap-5 p-6"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (submitting || !confirmed) return;
+            setSubmitting(true);
+            setFailed(false);
+            try {
+              await onDelete();
+              dialog.current?.close();
+            } catch {
+              setFailed(true);
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+        >
+          <h2 className="text-xl font-semibold" id={titleId}>
+            {t("web.resources.action.permanentlyDelete")}
+          </h2>
+          <p className="text-sm text-muted-foreground" id={descriptionId}>
+            {itemName}
+          </p>
+          <label className="flex items-start gap-3 text-sm">
+            <input
+              checked={confirmed}
+              className="mt-0.5 size-4"
+              disabled={submitting}
+              onChange={(event) => setConfirmed(event.target.checked)}
+              type="checkbox"
+            />
+            <span>{t("web.erasure.self.confirm")}</span>
+          </label>
+          {failed ? (
+            <p className="text-sm text-destructive" role="alert">
+              {t("error.generic")}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button
+              disabled={submitting}
+              onClick={() => dialog.current?.close()}
+              type="button"
+              variant="outline"
+            >
+              {t("action.cancel")}
+            </Button>
+            <Button
+              disabled={submitting || !confirmed}
+              type="submit"
+              variant="destructive"
+            >
+              {t("web.resources.action.permanentlyDelete")}
+            </Button>
+          </div>
+        </form>
+      </dialog>
+    </section>
   );
 }
 
