@@ -226,10 +226,22 @@ test("Deploy gates preview work and runs Playwright in a separate job", () => {
   );
 
   const e2eSteps = jobs.e2e.steps;
+  const githubSecrets = e2eSteps.find(
+    (step) => step.name === "Fetch GitHub secrets from Infisical",
+  );
+  assert.equal(githubSecrets.if, undefined);
   const checkout = e2eSteps.find(
     (step) => step.name === "Check out pull request head",
   );
   assert.equal(checkout.with.ref, "${{ github.event.pull_request.head.sha }}");
+  const resolveVercel = e2eSteps.find(
+    (step) => step.name === "Resolve Vercel deployment URL",
+  );
+  assert.equal(
+    resolveVercel.env.DEPLOYMENT_ID,
+    "${{ needs.preview.outputs.deployment_id }}",
+  );
+  assert.match(resolveVercel.run, /deployment-url/u);
   assert.ok(e2eSteps.some((step) => step.name === "Run safe E2E smoke tests"));
   assert.ok(
     e2eSteps.some((step) => step.name === "Run isolated E2E mutation fixtures"),

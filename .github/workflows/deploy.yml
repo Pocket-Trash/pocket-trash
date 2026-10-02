@@ -78,10 +78,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       can_deploy: ${{ steps.db.outputs.can_deploy }}
-      database_branch: ${{ steps.db.outputs.branch_name }}
       deployment_id: ${{ steps.vercel_preview.outputs.deployment_id }}
       isolated: ${{ steps.db.outputs.isolated }}
-      web_preview_url: ${{ steps.vercel_preview.outputs.web_preview_url }}
     permissions:
       contents: read
       id-token: write
@@ -935,7 +933,6 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Fetch GitHub secrets from Infisical
-        if: needs.classify-changes.outputs.mutation_e2e == 'true'
         uses: Infisical/secrets-action@v1.0.16
         with:
           method: oidc
@@ -978,12 +975,20 @@ jobs:
           ISOLATED: ${{ needs.preview.outputs.isolated }}
         run: test "$ISOLATED" = "true"
 
+      - name: Resolve Vercel deployment URL
+        id: vercel
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+          DEPLOYMENT_ID: ${{ needs.preview.outputs.deployment_id }}
+        run: bash .github/scripts/vercel-branch-database-url.sh deployment-url
+
       - name: Resolve Neon PR database
         if: needs.classify-changes.outputs.mutation_e2e == 'true'
         id: db
         shell: bash
         env:
-          BRANCH_NAME: ${{ needs.preview.outputs.database_branch }}
+          BRANCH_NAME: preview-pr-${{ github.event.pull_request.number }}
         run: bash .github/scripts/neon-database-branch.sh branch-url
 
       - name: Install Playwright Chromium
@@ -992,7 +997,7 @@ jobs:
       - name: Run safe E2E smoke tests
         if: needs.classify-changes.outputs.safe_e2e == 'true'
         env:
-          E2E_BASE_URL: ${{ needs.preview.outputs.web_preview_url }}
+          E2E_BASE_URL: ${{ steps.vercel.outputs.web_preview_url }}
         run: pnpm --filter @app/web test:e2e:ci
 
       - name: Run isolated E2E mutation fixtures
@@ -1001,8 +1006,8 @@ jobs:
           BUNNY_IMAGE_FOLDER_PREFIX: images/preview/pr-${{ github.event.pull_request.number }}
           BUNNY_RESOURCE_FOLDER_PREFIX: resources/preview/pr-${{ github.event.pull_request.number }}
           DATABASE_URL: ${{ steps.db.outputs.database_url }}
-          E2E_BASE_URL: ${{ needs.preview.outputs.web_preview_url }}
-          E2E_DATABASE_BRANCH: ${{ needs.preview.outputs.database_branch }}
+          E2E_BASE_URL: ${{ steps.vercel.outputs.web_preview_url }}
+          E2E_DATABASE_BRANCH: preview-pr-${{ github.event.pull_request.number }}
           E2E_PR_NUMBER: ${{ github.event.pull_request.number }}
           E2E_RUN_MUTATIONS: "true"
           E2E_VERCEL_DEPLOYMENT_ID: ${{ needs.preview.outputs.deployment_id }}
