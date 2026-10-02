@@ -109,7 +109,7 @@ export function ProductFormPage({
       ]}
       title={initialProduct ? initialProduct.name : t("web.action.addProduct")}
     >
-      <main className="grid max-w-3xl gap-6 p-6">
+      <main className="grid w-full max-w-6xl gap-6 p-6">
         {!initialProduct ? (
           <Field label={t("web.catalog.field.productType")}>
             <CatalogCombobox
@@ -312,337 +312,366 @@ export function ProductEditor({
 
   return (
     <form
-      className="grid gap-5 rounded-xl border border-border bg-card p-6"
+      className="grid gap-5 rounded-xl border border-border bg-card p-6 lg:grid-cols-2"
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
         void form.handleSubmit();
       }}
     >
-      <form.Field name="name">
-        {(field) => (
-          <Field label={t("web.catalog.field.name")}>
-            <Input
-              aria-label={t("web.catalog.field.name")}
-              name={field.name}
-              onBlur={field.handleBlur}
-              onChange={(event) => field.handleChange(event.target.value)}
-              required
-              value={field.state.value}
-            />
-            <FieldError error={serverErrors.name?.[0]} t={t} />
-          </Field>
-        )}
-      </form.Field>
-      <form.Subscribe selector={(state) => state.values.name}>
-        {(name) => (
-          <Field label={t("web.catalog.field.slug")}>
-            <Input
-              aria-label={t("web.catalog.field.slug")}
-              readOnly
-              value={productSlugPreview(name)}
-            />
-          </Field>
-        )}
-      </form.Subscribe>
-      <form.Field name="description">
-        {(field) => (
-          <CatalogMarkdownEditor
-            defaultValue={field.state.value}
-            error={
-              serverErrors.description?.[0]
-                ? t(serverErrors.description[0])
-                : undefined
-            }
-            help={t("web.catalog.help.markdownDescription")}
-            id="product-description"
-            label={t("web.catalog.field.description")}
-            onChange={field.handleChange}
-            onLoadingChange={setDescriptionLoading}
-            ref={descriptionRef}
-          />
-        )}
-      </form.Field>
-      <form.Field name="makerId">
-        {(field) => {
-          const selected =
-            options.makers.find(({ id }) => id === field.state.value) ?? null;
-          return (
-            <Field label={t("web.catalog.field.maker")}>
-              <CatalogCombobox
-                ariaLabel={t("web.catalog.field.maker")}
-                items={options.makers}
-                onValueChange={(value) =>
-                  field.handleChange(Number(value?.id ?? 0))
-                }
-                placeholder={t("web.catalog.selectMaker")}
-                value={selected}
-              />
-              <LookupDialog
-                kind="maker"
-                onCreated={(maker) => {
-                  setOptions((current) => ({
-                    ...current,
-                    makers: [...current.makers, maker].sort((a, b) =>
-                      a.name.localeCompare(b.name),
-                    ),
-                  }));
-                  field.handleChange(maker.id);
-                }}
-                t={t}
-              />
-              <FieldError error={serverErrors.makerId?.[0]} t={t} />
-            </Field>
-          );
-        }}
-      </form.Field>
-      <form.Field name="makerProductUrl">
-        {(field) => (
-          <Field label={t("web.catalog.field.makerProductUrl")}>
-            <Input
-              aria-label={t("web.catalog.field.makerProductUrl")}
-              aria-describedby="maker-product-url-help"
-              name={field.name}
-              onBlur={field.handleBlur}
-              onChange={(event) => field.handleChange(event.target.value)}
-              type="url"
-              value={field.state.value}
-            />
-            <p
-              className="text-xs text-muted-foreground"
-              id="maker-product-url-help"
-            >
-              {t("web.catalog.help.makerProductUrl")}
-            </p>
-            <FieldError error={serverErrors.makerProductUrl?.[0]} t={t} />
-          </Field>
-        )}
-      </form.Field>
-      <form.Field name="materialIds">
-        {(field) => {
-          const selected = options.materials.filter(({ id }) =>
-            field.state.value.includes(id),
-          );
-          return (
-            <Field label={t("web.catalog.field.materials")}>
-              <CatalogMultiCombobox
-                ariaLabel={t("web.catalog.field.materials")}
-                items={options.materials}
-                onValueChange={(values) =>
-                  field.handleChange(values.map(({ id }) => Number(id)))
-                }
-                placeholder={t("web.catalog.selectMaterials")}
-                removeLabel={t("web.action.close")}
-                value={selected}
-              />
-              <LookupDialog
-                kind="material"
-                onCreated={(material) => {
-                  setOptions((current) => ({
-                    ...current,
-                    materials: [...current.materials, material].sort((a, b) =>
-                      a.name.localeCompare(b.name),
-                    ),
-                  }));
-                  field.handleChange([...field.state.value, material.id]);
-                }}
-                t={t}
-              />
-              <FieldError error={serverErrors.materialIds?.[0]} t={t} />
-            </Field>
-          );
-        }}
-      </form.Field>
-
-      <form.Field mode="array" name="finishOptions">
-        {(field) => (
-          <FinishOptionsEditor
-            onChange={field.handleChange}
-            onOptionsChange={setOptions}
-            options={options}
-            t={t}
-            value={field.state.value}
-          />
-        )}
-      </form.Field>
-      <FieldError error={serverErrors.finishOptions?.[0]} t={t} />
-
-      {(productTypeSlug === "spinner"
-        ? ([
-            "weightG",
-            "lengthMm",
-            "widthMm",
-            "thicknessMm",
-            "thicknessWithButtonMm",
-            "buttonDiameterMm",
-            "spinDiameterMm",
-          ] as const)
-        : (["weightG", "diameterMm", "thicknessMm"] as const)
-      ).map((name) => {
-        const labels = {
-          buttonDiameterMm: "web.catalog.field.buttonDiameter",
-          diameterMm: "web.archive.spec.diameter",
-          lengthMm: "web.archive.spec.length",
-          spinDiameterMm: "web.catalog.field.spinDiameter",
-          thicknessMm: "web.catalog.field.thickness",
-          thicknessWithButtonMm: "web.catalog.field.thicknessWithButton",
-          weightG: "web.archive.spec.weight",
-          widthMm: "web.catalog.field.width",
-        } as const;
-        return (
-          <form.Field key={name} name={name}>
-            {(field) => (
-              <Field label={t(labels[name])}>
-                <Input
-                  aria-label={t(labels[name])}
-                  min="0"
-                  onBlur={field.handleBlur}
-                  onChange={(event) => {
-                    field.handleChange(event.target.value || null);
-                    if (name === "buttonDiameterMm") {
-                      form.setFieldValue("compatibleButtonId", null);
-                    }
-                  }}
-                  step="any"
-                  type="number"
-                  value={field.state.value ?? ""}
-                />
-                <FieldError error={serverErrors[name]?.[0]} t={t} />
-              </Field>
-            )}
-          </form.Field>
-        );
-      })}
-      {productTypeSlug === "spinner" ? (
-        <form.Field name="bearing">
+      <div className="grid content-start gap-5">
+        <form.Field name="name">
           {(field) => (
-            <Field label={t("web.catalog.field.bearing")}>
+            <Field label={t("web.catalog.field.name")}>
               <Input
-                aria-label={t("web.catalog.field.bearing")}
-                maxLength={200}
+                aria-label={t("web.catalog.field.name")}
                 name={field.name}
                 onBlur={field.handleBlur}
                 onChange={(event) => field.handleChange(event.target.value)}
+                required
                 value={field.state.value}
               />
-              <FieldError error={serverErrors.bearing?.[0]} t={t} />
+              <FieldError error={serverErrors.name?.[0]} t={t} />
             </Field>
           )}
         </form.Field>
-      ) : null}
-      {productTypeSlug === "spinner" ? (
-        <form.Subscribe selector={(state) => state.values.buttonDiameterMm}>
-          {(diameter) => (
-            <form.Field name="compatibleButtonId">
-              {(field) => {
-                const selected = field.state.value
-                  ? (options.spinnerButtons.find(
-                      ({ id }) => id === field.state.value,
-                    ) ?? null)
-                  : { id: "default", name: t("web.catalog.defaultButton") };
-                return (
-                  <Field label={t("web.catalog.field.button")}>
-                    <CatalogCombobox
-                      ariaLabel={t("web.catalog.field.button")}
-                      items={[
-                        {
-                          id: "default",
-                          name: t("web.catalog.defaultButton"),
-                        },
-                        ...filterButtonsByDiameter(
-                          options.spinnerButtons,
-                          diameter,
-                        ),
-                      ]}
-                      onValueChange={(value) =>
-                        field.handleChange(
-                          value && value.id !== "default"
-                            ? Number(value.id)
-                            : null,
-                        )
-                      }
-                      placeholder={t("web.catalog.defaultButton")}
-                      removeLabel={t("web.action.close")}
-                      showSelectedPill
-                      value={selected}
-                    />
-                    <FieldError
-                      error={serverErrors.compatibleButtonId?.[0]}
-                      t={t}
-                    />
-                  </Field>
-                );
-              }}
-            </form.Field>
+        <form.Subscribe selector={(state) => state.values.name}>
+          {(name) => (
+            <Field label={t("web.catalog.field.slug")}>
+              <Input
+                aria-label={t("web.catalog.field.slug")}
+                readOnly
+                value={productSlugPreview(name)}
+              />
+            </Field>
           )}
         </form.Subscribe>
-      ) : null}
+        <form.Field name="makerId">
+          {(field) => {
+            const selected =
+              options.makers.find(({ id }) => id === field.state.value) ?? null;
+            return (
+              <Field label={t("web.catalog.field.maker")}>
+                <CatalogCombobox
+                  ariaLabel={t("web.catalog.field.maker")}
+                  items={options.makers}
+                  onValueChange={(value) =>
+                    field.handleChange(Number(value?.id ?? 0))
+                  }
+                  placeholder={t("web.catalog.selectMaker")}
+                  value={selected}
+                />
+                <LookupDialog
+                  kind="maker"
+                  onCreated={(maker) => {
+                    setOptions((current) => ({
+                      ...current,
+                      makers: [...current.makers, maker].sort((a, b) =>
+                        a.name.localeCompare(b.name),
+                      ),
+                    }));
+                    field.handleChange(maker.id);
+                  }}
+                  t={t}
+                />
+                <FieldError error={serverErrors.makerId?.[0]} t={t} />
+              </Field>
+            );
+          }}
+        </form.Field>
+        <form.Field name="makerProductUrl">
+          {(field) => (
+            <Field label={t("web.catalog.field.makerProductUrl")}>
+              <Input
+                aria-label={t("web.catalog.field.makerProductUrl")}
+                aria-describedby="maker-product-url-help"
+                name={field.name}
+                onBlur={field.handleBlur}
+                onChange={(event) => field.handleChange(event.target.value)}
+                type="url"
+                value={field.state.value}
+              />
+              <p
+                className="text-xs text-muted-foreground"
+                id="maker-product-url-help"
+              >
+                {t("web.catalog.help.makerProductUrl")}
+              </p>
+              <FieldError error={serverErrors.makerProductUrl?.[0]} t={t} />
+            </Field>
+          )}
+        </form.Field>
+        <form.Field name="materialIds">
+          {(field) => {
+            const selected = options.materials.filter(({ id }) =>
+              field.state.value.includes(id),
+            );
+            return (
+              <Field label={t("web.catalog.field.materials")}>
+                <CatalogMultiCombobox
+                  ariaLabel={t("web.catalog.field.materials")}
+                  items={options.materials}
+                  onValueChange={(values) =>
+                    field.handleChange(values.map(({ id }) => Number(id)))
+                  }
+                  placeholder={t("web.catalog.selectMaterials")}
+                  removeLabel={t("web.action.close")}
+                  value={selected}
+                />
+                <LookupDialog
+                  kind="material"
+                  onCreated={(material) => {
+                    setOptions((current) => ({
+                      ...current,
+                      materials: [...current.materials, material].sort((a, b) =>
+                        a.name.localeCompare(b.name),
+                      ),
+                    }));
+                    field.handleChange([...field.state.value, material.id]);
+                  }}
+                  t={t}
+                />
+                <FieldError error={serverErrors.materialIds?.[0]} t={t} />
+              </Field>
+            );
+          }}
+        </form.Field>
 
-      {formError ? <Notice>{t(formError)}</Notice> : null}
-      <FileDropInput
-        accept=".avif,.jpeg,.jpg,.png,.webp"
-        aspectRatio={4 / 3}
-        aspectRatioHelpHref="/help/image-size-and-resolution-guide"
-        aspectRatioHelpLabel={imageGuidance.helpLabel}
-        aspectRatioWarning={imageGuidance.warning}
-        browseLabel={t("web.resources.upload.browseFiles")}
-        description={t("web.resources.upload.imagesHelp", {
-          maxFileSize: formatMiB(maxImageBytes, locale),
-          maxImages: maxImageSessionFiles,
-          maxSessionSize: formatMiB(maxImageSessionBytes, locale),
+        <form.Field mode="array" name="finishOptions">
+          {(field) => (
+            <FinishOptionsEditor
+              onChange={field.handleChange}
+              onOptionsChange={setOptions}
+              options={options}
+              t={t}
+              value={field.state.value}
+            />
+          )}
+        </form.Field>
+        <FieldError error={serverErrors.finishOptions?.[0]} t={t} />
+
+        {(productTypeSlug === "spinner"
+          ? ([
+              "weightG",
+              "lengthMm",
+              "widthMm",
+              "thicknessMm",
+              "thicknessWithButtonMm",
+              "buttonDiameterMm",
+              "spinDiameterMm",
+            ] as const)
+          : (["weightG", "diameterMm", "thicknessMm"] as const)
+        ).map((name) => {
+          const labels = {
+            buttonDiameterMm: "web.catalog.field.buttonDiameter",
+            diameterMm: "web.archive.spec.diameter",
+            lengthMm: "web.archive.spec.length",
+            spinDiameterMm: "web.catalog.field.spinDiameter",
+            thicknessMm: "web.catalog.field.thickness",
+            thicknessWithButtonMm: "web.catalog.field.thicknessWithButton",
+            weightG: "web.archive.spec.weight",
+            widthMm: "web.catalog.field.width",
+          } as const;
+          return (
+            <form.Field key={name} name={name}>
+              {(field) => (
+                <Field label={t(labels[name])}>
+                  <Input
+                    aria-label={t(labels[name])}
+                    min="0"
+                    onBlur={field.handleBlur}
+                    onChange={(event) => {
+                      field.handleChange(event.target.value || null);
+                      if (name === "buttonDiameterMm") {
+                        form.setFieldValue("compatibleButtonId", null);
+                      }
+                    }}
+                    step="any"
+                    type="number"
+                    value={field.state.value ?? ""}
+                  />
+                  <FieldError error={serverErrors[name]?.[0]} t={t} />
+                </Field>
+              )}
+            </form.Field>
+          );
         })}
-        fileTypes={t("web.resources.upload.imageTypes")}
-        files={images}
-        id="product-images"
-        label={t("web.resources.upload.imagesLabel")}
-        multiple
-        onFilesChange={(additions) =>
-          setImages((current) => [...current, ...additions])
-        }
-        onRemove={(index) =>
-          setImages((current) =>
-            current.filter((_, candidate) => candidate !== index),
-          )
-        }
-        removeFileLabel={t("web.action.close")}
-      />
-      {initialProduct ? (
-        <CatalogImageEditor
-          getReason={
-            initialProduct.canAdminister && !initialProduct.isOwner
-              ? () =>
-                  window
-                    .prompt(t("web.resources.moderation.reasonLabel"))
-                    ?.trim()
-              : undefined
+        {productTypeSlug === "spinner" ? (
+          <form.Field name="bearing">
+            {(field) => (
+              <Field label={t("web.catalog.field.bearing")}>
+                <Input
+                  aria-label={t("web.catalog.field.bearing")}
+                  maxLength={200}
+                  name={field.name}
+                  onBlur={field.handleBlur}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  value={field.state.value}
+                />
+                <FieldError error={serverErrors.bearing?.[0]} t={t} />
+              </Field>
+            )}
+          </form.Field>
+        ) : null}
+        {productTypeSlug === "spinner" ? (
+          <form.Subscribe selector={(state) => state.values.buttonDiameterMm}>
+            {(diameter) => (
+              <form.Field name="compatibleButtonId">
+                {(field) => {
+                  const selected = field.state.value
+                    ? (options.spinnerButtons.find(
+                        ({ id }) => id === field.state.value,
+                      ) ?? null)
+                    : { id: "default", name: t("web.catalog.defaultButton") };
+                  return (
+                    <Field label={t("web.catalog.field.button")}>
+                      <CatalogCombobox
+                        ariaLabel={t("web.catalog.field.button")}
+                        items={[
+                          {
+                            id: "default",
+                            name: t("web.catalog.defaultButton"),
+                          },
+                          ...filterButtonsByDiameter(
+                            options.spinnerButtons,
+                            diameter,
+                          ),
+                        ]}
+                        onValueChange={(value) =>
+                          field.handleChange(
+                            value && value.id !== "default"
+                              ? Number(value.id)
+                              : null,
+                          )
+                        }
+                        placeholder={t("web.catalog.defaultButton")}
+                        removeLabel={t("web.action.close")}
+                        showSelectedPill
+                        value={selected}
+                      />
+                      <FieldError
+                        error={serverErrors.compatibleButtonId?.[0]}
+                        t={t}
+                      />
+                    </Field>
+                  );
+                }}
+              </form.Field>
+            )}
+          </form.Subscribe>
+        ) : null}
+      </div>
+
+      <div className="grid content-start gap-5">
+        <form.Field name="description">
+          {(field) => (
+            <CatalogMarkdownEditor
+              defaultValue={field.state.value}
+              error={
+                serverErrors.description?.[0]
+                  ? t(serverErrors.description[0])
+                  : undefined
+              }
+              help={t("web.catalog.help.markdownDescription")}
+              id="product-description"
+              label={t("web.catalog.field.description")}
+              onChange={field.handleChange}
+              onLoadingChange={setDescriptionLoading}
+              ref={descriptionRef}
+            />
+          )}
+        </form.Field>
+        <FileDropInput
+          accept=".avif,.jpeg,.jpg,.png,.webp"
+          aspectRatio={4 / 3}
+          aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+          aspectRatioHelpLabel={imageGuidance.helpLabel}
+          aspectRatioWarning={imageGuidance.warning}
+          browseLabel={t("web.resources.upload.browseFiles")}
+          description={t("web.resources.upload.imagesHelp", {
+            maxFileSize: formatMiB(maxImageBytes, locale),
+            maxImages: maxImageSessionFiles,
+            maxSessionSize: formatMiB(maxImageSessionBytes, locale),
+          })}
+          fileTypes={t("web.resources.upload.imageTypes")}
+          files={images}
+          id="product-images"
+          label={t("web.resources.upload.imagesLabel")}
+          multiple
+          onFilesChange={(additions) =>
+            setImages((current) => [...current, ...additions])
           }
-          images={existingImages}
-          onChange={setExistingImages}
-          t={t}
-          targetType="product"
+          onRemove={(index) =>
+            setImages((current) =>
+              current.filter((_, candidate) => candidate !== index),
+            )
+          }
+          removeFileLabel={t("web.action.close")}
         />
-      ) : null}
-      {!initialProduct ? (
-        <p className="m-0 text-sm text-muted-foreground">
-          {t("web.erasure.productNotice")}
-        </p>
-      ) : null}
-      <form.Subscribe
-        selector={(state) => [state.isSubmitting, state.values.description]}
-      >
-        {([isSubmitting, description]) => (
-          <Button
-            disabled={
-              Boolean(isSubmitting) ||
-              descriptionLoading ||
-              String(description).length > 5000
+        {initialProduct ? (
+          <CatalogImageEditor
+            getReason={
+              initialProduct.canAdminister && !initialProduct.isOwner
+                ? () =>
+                    window
+                      .prompt(t("web.resources.moderation.reasonLabel"))
+                      ?.trim()
+                : undefined
             }
-            type="submit"
-          >
-            {initialProduct ? t("action.save") : t("web.action.addProduct")}
-          </Button>
-        )}
-      </form.Subscribe>
+            images={existingImages}
+            onChange={setExistingImages}
+            t={t}
+            targetType="product"
+          />
+        ) : null}
+        {!initialProduct ? (
+          <p className="m-0 text-sm text-muted-foreground">
+            {t("web.erasure.productNotice")}
+          </p>
+        ) : null}
+      </div>
+      {formError ? (
+        <div className="lg:col-span-2">
+          <Notice>{t(formError)}</Notice>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap justify-end gap-2 lg:col-span-2">
+        <Button
+          onClick={() => {
+            if (initialProduct) {
+              void navigate({
+                params: {
+                  productSlug: initialProduct.slug,
+                  productTypeSlug: initialProduct.productTypeSlug,
+                },
+                to: "/products/$productTypeSlug/$productSlug",
+              });
+              return;
+            }
+            void navigate({ to: "/products" });
+          }}
+          type="button"
+          variant="outline"
+        >
+          {t("action.cancel")}
+        </Button>
+        <form.Subscribe
+          selector={(state) => [state.isSubmitting, state.values.description]}
+        >
+          {([isSubmitting, description]) => (
+            <Button
+              disabled={
+                Boolean(isSubmitting) ||
+                descriptionLoading ||
+                String(description).length > 5000
+              }
+              type="submit"
+            >
+              {initialProduct ? t("action.save") : t("web.action.addProduct")}
+            </Button>
+          )}
+        </form.Subscribe>
+      </div>
     </form>
   );
 }
@@ -1138,6 +1167,7 @@ export function CollectionFormPage({
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const copy = {
     browse: t("web.resources.upload.browseFiles"),
+    cancel: t("action.cancel"),
     cover: t("web.resources.upload.imagesLabel"),
     description: t("web.collections.field.description"),
     descriptionPlaceholder: t("web.collections.placeholder.description"),
@@ -1249,7 +1279,7 @@ export function CollectionFormPage({
           : t("web.collections.add.title")
       }
     >
-      <main className="grid gap-6 p-6">
+      <main className="grid w-full max-w-6xl gap-6 p-6 lg:grid-cols-2">
         <CollectionForm
           copy={copy}
           disabled={saving}
@@ -1264,110 +1294,133 @@ export function CollectionFormPage({
                 }
               : undefined
           }
+          onCancel={
+            collection && current
+              ? () =>
+                  void navigate({
+                    params: { collectionId: current.id },
+                    to: "/user/collections/$collectionId",
+                  })
+              : undefined
+          }
           onSubmit={submit}
+          splitOnLargeScreens={Boolean(collection)}
         />
         {collection && current ? (
-          <CollectionImageUploader
-            copy={{
-              browse: t("web.resources.upload.browseFiles"),
-              imageHelp: t("web.collections.gallery.imagesHelp", {
-                maxFileSize: formatMiB(maxImageBytes, locale),
-                maxImages: maxImageSessionFiles,
-                maxSessionSize: formatMiB(maxImageSessionBytes, locale),
-              }),
-              imageTypes: t("web.resources.upload.imageTypes"),
-              label: t("web.collections.gallery.title"),
-              removeFile: t("web.resources.action.removeFile"),
-              submit: t("web.action.uploadImages"),
-            }}
-            disabled={saving}
-            error={uploadError}
-            onUpload={async (files) => {
-              setSaving(true);
-              setUploadError(null);
-              try {
-                const upload = await uploadImages({
-                  locale,
-                  files,
-                  getToken,
-                  targetId: current.id,
-                  targetType: "collection",
-                });
-                if (upload.failed.length) {
-                  setUploadError(t("web.collections.error.upload"));
+          <div className="grid content-start gap-6 lg:col-start-2">
+            <CollectionImageUploader
+              copy={{
+                browse: t("web.resources.upload.browseFiles"),
+                imageHelp: t("web.collections.gallery.imagesHelp", {
+                  maxFileSize: formatMiB(maxImageBytes, locale),
+                  maxImages: maxImageSessionFiles,
+                  maxSessionSize: formatMiB(maxImageSessionBytes, locale),
+                }),
+                imageTypes: t("web.resources.upload.imageTypes"),
+                label: t("web.collections.gallery.title"),
+                removeFile: t("web.resources.action.removeFile"),
+                submit: t("web.action.uploadImages"),
+              }}
+              disabled={saving}
+              error={uploadError}
+              onUpload={async (files) => {
+                setSaving(true);
+                setUploadError(null);
+                try {
+                  const upload = await uploadImages({
+                    locale,
+                    files,
+                    getToken,
+                    targetId: current.id,
+                    targetType: "collection",
+                  });
+                  if (upload.failed.length) {
+                    setUploadError(t("web.collections.error.upload"));
+                    setSaving(false);
+                    return false;
+                  }
+                  window.location.reload();
+                  return true;
+                } catch (uploadFailure) {
+                  const failure = uploadFailure as ImageUploadError;
+                  setUploadError(
+                    t(failure.key ?? "error.generic", failure.params),
+                  );
                   setSaving(false);
                   return false;
                 }
-                window.location.reload();
-                return true;
-              } catch (uploadFailure) {
-                const failure = uploadFailure as ImageUploadError;
-                setUploadError(
-                  t(failure.key ?? "error.generic", failure.params),
-                );
-                setSaving(false);
-                return false;
-              }
-            }}
-          />
-        ) : null}
-        {current?.coverImages.length ? (
-          <CollectionCoverManager
-            collection={current}
-            copy={{
-              clear: t("web.action.clearCover"),
-              clearConfirmation: t("web.collections.cover.clearConfirmation"),
-              current: t("web.collections.cover.current"),
-              delete: t("web.action.deleteImage"),
-              deleteConfirmation: t(
-                "web.collections.gallery.deleteConfirmation",
-              ),
-              history: t("web.collections.gallery.title"),
-              nextPage: t("web.collections.gallery.nextPage"),
-              /**
-               * Formats collection cover pagination status.
-               *
-               * @param page - Current page number.
-               * @param pageCount - Total page count.
-               * @returns The localized pagination status.
-               */
-              pageStatus: (page, pageCount) =>
-                t("web.collections.gallery.pageStatus", { page, pageCount }),
-              previousPage: t("web.collections.gallery.previousPage"),
-              select: t("web.action.selectCover"),
-            }}
-            disabled={saving}
-            onClear={() =>
-              updateCover((reason) =>
-                selectCollectionCover({
-                  data: { collectionId: current.id, imageId: null, reason },
-                }),
-              )
-            }
-            onDelete={(image) =>
-              updateCover((reason) =>
-                deleteCollectionCover({
-                  getToken,
-                  imageId: image.id,
-                  reason,
-                }),
-              )
-            }
-            onSelect={(image) =>
-              updateCover((reason) =>
-                selectCollectionCover({
-                  data: { collectionId: current.id, imageId: image.id, reason },
-                }),
-              )
-            }
-          />
+              }}
+            />
+            {current.coverImages.length ? (
+              <CollectionCoverManager
+                collection={current}
+                copy={{
+                  clear: t("web.action.clearCover"),
+                  clearConfirmation: t(
+                    "web.collections.cover.clearConfirmation",
+                  ),
+                  current: t("web.collections.cover.current"),
+                  delete: t("web.action.deleteImage"),
+                  deleteConfirmation: t(
+                    "web.collections.gallery.deleteConfirmation",
+                  ),
+                  history: t("web.collections.gallery.title"),
+                  nextPage: t("web.collections.gallery.nextPage"),
+                  /**
+                   * Formats collection cover pagination status.
+                   *
+                   * @param page - Current page number.
+                   * @param pageCount - Total page count.
+                   * @returns The localized pagination status.
+                   */
+                  pageStatus: (page, pageCount) =>
+                    t("web.collections.gallery.pageStatus", {
+                      page,
+                      pageCount,
+                    }),
+                  previousPage: t("web.collections.gallery.previousPage"),
+                  select: t("web.action.selectCover"),
+                }}
+                disabled={saving}
+                onClear={() =>
+                  updateCover((reason) =>
+                    selectCollectionCover({
+                      data: { collectionId: current.id, imageId: null, reason },
+                    }),
+                  )
+                }
+                onDelete={(image) =>
+                  updateCover((reason) =>
+                    deleteCollectionCover({
+                      getToken,
+                      imageId: image.id,
+                      reason,
+                    }),
+                  )
+                }
+                onSelect={(image) =>
+                  updateCover((reason) =>
+                    selectCollectionCover({
+                      data: {
+                        collectionId: current.id,
+                        imageId: image.id,
+                        reason,
+                      },
+                    }),
+                  )
+                }
+              />
+            ) : null}
+          </div>
         ) : null}
         {current && deletion ? (
-          <CollectionDeletionSection
-            collection={current}
-            destinations={deletion.destinations}
-            itemCount={deletion.itemCount}
-          />
+          <div className="lg:col-span-2">
+            <CollectionDeletionSection
+              collection={current}
+              destinations={deletion.destinations}
+              itemCount={deletion.itemCount}
+            />
+          </div>
         ) : null}
       </main>
     </AppShell>
@@ -1985,6 +2038,7 @@ export function CollectionAddPage({
             <CollectionForm
               copy={{
                 browse: t("web.resources.upload.browseFiles"),
+                cancel: t("action.cancel"),
                 cover: t("web.resources.upload.imagesLabel"),
                 description: t("web.collections.field.description"),
                 descriptionPlaceholder: t(

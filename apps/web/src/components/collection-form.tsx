@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getImageUploadGuidance } from "@/lib/help-content";
 import { countWords } from "@/lib/text";
+import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 /**
@@ -68,7 +69,9 @@ const managerColumns = managerColumnHelper.columns([
  * @param props.error - Optional submission error shown above the submit button.
  * @param props.includeImages - Whether to include the collection image picker.
  * @param props.initialValue - Initial metadata, defaulting to a blank private collection.
+ * @param props.onCancel - Optional cancellation callback.
  * @param props.onSubmit - Receives the current metadata and selected image files.
+ * @param props.splitOnLargeScreens - Whether large screens use two form columns.
  * @returns The collection form UI.
  * @throws {Error} When rendered outside `LocaleProvider`.
  */
@@ -78,7 +81,9 @@ export function CollectionForm({
   error,
   includeImages = true,
   initialValue,
+  onCancel,
   onSubmit,
+  splitOnLargeScreens = false,
 }: {
   /**
    * Localized form labels and guidance.
@@ -88,6 +93,10 @@ export function CollectionForm({
      * Label for browsing image files.
      */
     browse: string;
+    /**
+     * Label for cancelling the form.
+     */
+    cancel: string;
     /**
      * Label for the cover-image field.
      */
@@ -152,6 +161,10 @@ export function CollectionForm({
    */
   initialValue?: CollectionFormValue;
   /**
+   * Cancels editing and returns to the collection.
+   */
+  onCancel?: () => void;
+  /**
    * Submits the current metadata and selected image files.
    *
    * @param value - Current collection metadata.
@@ -159,6 +172,12 @@ export function CollectionForm({
    * @returns No value, or a promise the form starts without awaiting.
    */
   onSubmit(value: CollectionFormValue, images: File[]): void | Promise<void>;
+  /**
+   * Whether large screens use separate details and media columns.
+   *
+   * @default false
+   */
+  splitOnLargeScreens?: boolean;
 }) {
   const { locale } = useLocale();
   const imageGuidance = getImageUploadGuidance(locale);
@@ -171,7 +190,10 @@ export function CollectionForm({
   const [files, setFiles] = useState<File[]>([]);
   return (
     <form
-      className="grid max-w-3xl gap-5 rounded-xl border border-border bg-card p-6"
+      className={cn(
+        "grid max-w-3xl gap-5 rounded-xl border border-border bg-card p-6",
+        splitOnLargeScreens && "w-full max-w-6xl lg:col-span-2 lg:grid-cols-2",
+      )}
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
@@ -181,78 +203,102 @@ export function CollectionForm({
         void onSubmit({ ...value, description }, files);
       }}
     >
-      <label className="grid gap-2 text-sm font-medium" htmlFor={nameId}>
-        {copy.name}
-        <Input
-          disabled={disabled}
-          id={nameId}
-          maxLength={80}
-          minLength={2}
-          onChange={(event) => setValue({ ...value, name: event.target.value })}
-          placeholder={copy.namePlaceholder}
-          required
-          value={value.name}
-        />
-      </label>
-      <MarkdownEditor
-        counter={{ limit: 200, type: "words", warningAt: 180 }}
-        defaultValue={value.description}
-        disabled={disabled}
-        id={descriptionId}
-        label={copy.description}
-        onChange={(description) =>
-          setValue((current) => ({ ...current, description }))
-        }
-        placeholder={copy.descriptionPlaceholder}
-        ref={descriptionRef}
-      />
-      <div className="grid gap-2">
-        <span className="text-sm font-medium">{copy.public}</span>
-        <PublicResourceSwitch
-          checked={!value.isPrivate}
-          disabled={disabled}
-          onCheckedChange={(isPublic) =>
-            setValue({ ...value, isPrivate: !isPublic })
-          }
-        />
+      <div className="grid content-start gap-5">
+        <label className="grid gap-2 text-sm font-medium" htmlFor={nameId}>
+          {copy.name}
+          <Input
+            disabled={disabled}
+            id={nameId}
+            maxLength={80}
+            minLength={2}
+            onChange={(event) =>
+              setValue({ ...value, name: event.target.value })
+            }
+            placeholder={copy.namePlaceholder}
+            required
+            value={value.name}
+          />
+        </label>
+        <div className="grid gap-2">
+          <span className="text-sm font-medium">{copy.public}</span>
+          <PublicResourceSwitch
+            checked={!value.isPrivate}
+            disabled={disabled}
+            onCheckedChange={(isPublic) =>
+              setValue({ ...value, isPrivate: !isPublic })
+            }
+          />
+        </div>
       </div>
-      {includeImages ? (
-        <FileDropInput
-          accept=".avif,.jpeg,.jpg,.png,.webp"
-          aspectRatio={4 / 3}
-          aspectRatioHelpHref="/help/image-size-and-resolution-guide"
-          aspectRatioHelpLabel={imageGuidance.helpLabel}
-          aspectRatioWarning={imageGuidance.warning}
-          browseLabel={copy.browse}
-          description={copy.imageHelp}
+      <div className="grid content-start gap-5">
+        <MarkdownEditor
+          counter={{ limit: 200, type: "words", warningAt: 180 }}
+          defaultValue={value.description}
           disabled={disabled}
-          fileTypes={copy.imageTypes}
-          files={files}
-          id="collection-images"
-          label={copy.cover}
-          multiple
-          onFilesChange={(additions) =>
-            setFiles((current) => [...current, ...additions])
+          id={descriptionId}
+          label={copy.description}
+          onChange={(description) =>
+            setValue((current) => ({ ...current, description }))
           }
-          onRemove={(index) =>
-            setFiles((current) =>
-              current.filter((_, candidate) => candidate !== index),
-            )
-          }
-          removeFileLabel={copy.removeFile}
+          placeholder={copy.descriptionPlaceholder}
+          ref={descriptionRef}
         />
+        {includeImages ? (
+          <FileDropInput
+            accept=".avif,.jpeg,.jpg,.png,.webp"
+            aspectRatio={4 / 3}
+            aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+            aspectRatioHelpLabel={imageGuidance.helpLabel}
+            aspectRatioWarning={imageGuidance.warning}
+            browseLabel={copy.browse}
+            description={copy.imageHelp}
+            disabled={disabled}
+            fileTypes={copy.imageTypes}
+            files={files}
+            id="collection-images"
+            label={copy.cover}
+            multiple
+            onFilesChange={(additions) =>
+              setFiles((current) => [...current, ...additions])
+            }
+            onRemove={(index) =>
+              setFiles((current) =>
+                current.filter((_, candidate) => candidate !== index),
+              )
+            }
+            removeFileLabel={copy.removeFile}
+          />
+        ) : null}
+      </div>
+      {error ? (
+        <p className="text-sm text-destructive lg:col-span-2">{error}</p>
       ) : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button
-        disabled={
-          disabled ||
-          value.name.trim().length < 2 ||
-          countWords(value.description) > 200
-        }
-        type="submit"
+      <div
+        className={cn(
+          splitOnLargeScreens ? "flex justify-end gap-2 lg:col-span-2" : "grid",
+        )}
       >
-        {copy.submit}
-      </Button>
+        {onCancel ? (
+          <Button
+            disabled={disabled}
+            onClick={onCancel}
+            type="button"
+            variant="outline"
+          >
+            {copy.cancel}
+          </Button>
+        ) : null}
+        <Button
+          disabled={
+            disabled ||
+            value.name.trim().length < 2 ||
+            countWords(value.description) > 200
+          }
+          type="submit"
+        >
+          {copy.submit}
+        </Button>
+      </div>
     </form>
   );
 }

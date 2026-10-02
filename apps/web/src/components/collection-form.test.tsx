@@ -30,6 +30,7 @@ vi.mock("@/providers/locale-provider", () => ({
 /** Localized collection form copy used by the tests. */
 const copy = {
   browse: "Browse",
+  cancel: "Cancel",
   cover: "Images",
   description: "Description",
   descriptionPlaceholder: "Describe this collection",
@@ -95,6 +96,31 @@ describe("CollectionForm", () => {
       },
       [],
     );
+  });
+
+  it("splits large screens and keeps cancel and save in a full-width row", async () => {
+    const onCancel = vi.fn();
+    await act(() =>
+      root.render(
+        <CollectionForm
+          copy={copy}
+          includeImages={false}
+          onCancel={onCancel}
+          onSubmit={vi.fn()}
+          splitOnLargeScreens
+        />,
+      ),
+    );
+
+    const form = container.querySelector("form");
+    const save = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Save",
+    );
+    expect(form?.classList.contains("lg:grid-cols-2")).toBe(true);
+    expect(save?.parentElement?.classList.contains("lg:col-span-2")).toBe(true);
+
+    clickButton(container, "Cancel");
+    expect(onCancel).toHaveBeenCalledOnce();
   });
 
   it("allows 200 words and blocks 201 without truncating", async () => {

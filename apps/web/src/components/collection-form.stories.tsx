@@ -8,6 +8,7 @@ import { CollectionForm } from "./collection-form";
  */
 const copy = {
   browse: "Browse",
+  cancel: "Cancel",
   cover: "Images",
   description: "Description",
   descriptionPlaceholder: "Describe this collection",
@@ -70,6 +71,34 @@ export const EditPublic: Story = {
     ).toHaveTextContent("Everyday carry spinners.");
     await expect(canvas.getAllByText("3 / 200 words")[0]).toBeVisible();
     await expect(canvas.getByRole("switch", { name: "Public" })).toBeChecked();
+  },
+};
+
+/** Defines the responsive two-column edit form. */
+export const SplitLargeScreen: Story = {
+  args: {
+    initialValue: {
+      description: "Everyday carry spinners.",
+      isPrivate: false,
+      name: "Daily Carry",
+    },
+    onCancel: fn(),
+    splitOnLargeScreens: true,
+  },
+  parameters: { layout: "fullscreen" },
+  /**
+   * Verifies the edit form exposes both bottom-row actions.
+   *
+   * @param context - Story interaction context.
+   * @param context.args - Current story arguments.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.userEvent - Storybook interaction driver.
+   * @returns A promise that resolves after assertions complete.
+   */
+  play: async ({ args, canvas, userEvent }) => {
+    await expect(canvas.getByRole("button", { name: "Save" })).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Cancel" }));
+    await expect(args.onCancel).toHaveBeenCalledOnce();
   },
 };
 

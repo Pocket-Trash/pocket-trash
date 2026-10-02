@@ -121,6 +121,9 @@ describe("collection deletion choices", () => {
     expect(html).toContain('value="delete"');
     expect(html).toContain('value="move"');
     expect(html).toContain("Collection items: 2");
+    expect(html).toContain("lg:grid-cols-2");
+    expect(html).toContain("lg:col-start-2");
+    expect(html).toContain(">Cancel</button>");
   });
 });
 
@@ -347,6 +350,9 @@ describe("product form conditional fields", () => {
     );
 
     for (const html of [addHtml, editHtml]) {
+      expect(html).toContain("lg:grid-cols-2");
+      expect(html).toContain("lg:col-span-2");
+      expect(html).toContain(">Cancel</button>");
       expect(html).toContain("0 / 5,000 characters");
       if (productTypeSlug === "spinner") {
         expect(html).toContain('aria-label="Bearing"');
