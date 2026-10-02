@@ -67,7 +67,7 @@ export const Hub: Story = {
    * @param context - Story interaction context.
    * @returns A promise that resolves after the interaction completes.
    */
-  play: async ({ canvas }) => {
+  play: async ({ canvas, userEvent }) => {
     const main = within(
       canvas.getByRole("main", {
         name: "Manage Pocket Trash administration.",
@@ -104,6 +104,16 @@ export const Hub: Story = {
         sidebar.queryByRole("link", { name }),
       ).not.toBeInTheDocument();
     }
+
+    const toggle = canvas.getByRole("button", { name: "Toggle sidebar" });
+    const trashLink = sidebar.getByRole("link", { name: "Trash" });
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(toggle);
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(trashLink).not.toBeVisible();
+    await userEvent.click(toggle);
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(trashLink).toBeVisible();
   },
 };
 

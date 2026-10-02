@@ -105,6 +105,7 @@ function useSidebar() {
  *
  * @param props - Sidebar provider properties.
  * @param props.defaultOpen - Initial uncontrolled sidebar visibility.
+ * @param props.defaultOpenMobile - Initial mobile sidebar visibility.
  * @param props.open - Controlled desktop sidebar visibility.
  * @param props.onOpenChange - Callback invoked when desktop visibility changes.
  * @param props.className - Additional CSS classes.
@@ -114,6 +115,7 @@ function useSidebar() {
  */
 function SidebarProvider({
   defaultOpen = true,
+  defaultOpenMobile = false,
   open: openProp,
   onOpenChange: setOpenProp,
   className,
@@ -126,6 +128,10 @@ function SidebarProvider({
    */
   defaultOpen?: boolean;
   /**
+   * Initial mobile sidebar visibility.
+   */
+  defaultOpenMobile?: boolean;
+  /**
    * Whether the desktop sidebar is expanded.
    */
   open?: boolean;
@@ -137,7 +143,7 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void;
 }) {
   const isMobile = useIsMobile();
-  const [openMobile, setOpenMobile] = React.useState(false);
+  const [openMobile, setOpenMobile] = React.useState(defaultOpenMobile);
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -168,6 +174,15 @@ function SidebarProvider({
      * @param event - Keyboard event received by the sidebar listener.
      */
     const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.closest("input, textarea, select, [contenteditable='true']"))
+      ) {
+        return;
+      }
+
       if (
         event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
         (event.metaKey || event.ctrlKey)

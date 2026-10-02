@@ -2,6 +2,12 @@ import { Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { AppShell, type AppShellProps } from "@/components/app-shell";
+import {
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 
 /** Routes supported by the shared admin and user sidebars. */
 type SidebarPath =
@@ -52,11 +58,13 @@ export type SidebarLink = {
  *
  * @param props - Sidebar page shell properties.
  * @param props.children - Page content rendered beside the sidebar.
+ * @param props.headerActions - Optional controls rendered beside the sidebar toggle.
  * @param props.sidebar - Sidebar navigation rendered before the page content.
  * @returns The shared sidebar page layout.
  */
 export function SidebarPageShell({
   children,
+  headerActions,
   sidebar,
   ...shellProps
 }: AppShellProps & {
@@ -64,14 +72,74 @@ export function SidebarPageShell({
   sidebar: ReactNode;
 }) {
   return (
-    <AppShell {...shellProps}>
-      <div className="grid w-full flex-1 md:grid-cols-[12rem_minmax(0,1fr)]">
-        <aside className="border-b border-border p-3 md:border-r md:border-b-0">
-          {sidebar}
-        </aside>
-        <div className="min-w-0">{children}</div>
-      </div>
-    </AppShell>
+    <SidebarProvider defaultOpenMobile>
+      <AppShell
+        {...shellProps}
+        headerActions={
+          <>
+            <SidebarPageTrigger />
+            {headerActions}
+          </>
+        }
+      >
+        <SidebarPageLayout sidebar={sidebar}>{children}</SidebarPageLayout>
+      </AppShell>
+    </SidebarProvider>
+  );
+}
+
+/**
+ * Renders the sidebar toggle with its current expanded state.
+ *
+ * @returns The accessible sidebar toggle.
+ */
+function SidebarPageTrigger() {
+  const { isMobile, open, openMobile } = useSidebar();
+
+  return (
+    <SidebarTrigger
+      aria-controls="page-sidebar"
+      aria-expanded={isMobile ? openMobile : open}
+    />
+  );
+}
+
+/**
+ * Renders page content beside the currently visible sidebar.
+ *
+ * @param props - Sidebar layout properties.
+ * @param props.children - Page content rendered beside the sidebar.
+ * @param props.sidebar - Navigation shown while the sidebar is expanded.
+ * @returns The collapsible sidebar layout.
+ */
+function SidebarPageLayout({
+  children,
+  sidebar,
+}: {
+  /** Page content rendered beside the sidebar. */
+  children: ReactNode;
+  /** Navigation shown while the sidebar is expanded. */
+  sidebar: ReactNode;
+}) {
+  const { isMobile, open, openMobile } = useSidebar();
+  const expanded = isMobile ? openMobile : open;
+
+  return (
+    <div
+      className={cn(
+        "grid w-full flex-1",
+        expanded && "md:grid-cols-[12rem_minmax(0,1fr)]",
+      )}
+    >
+      <aside
+        className="border-b border-border p-3 md:border-r md:border-b-0"
+        hidden={!expanded}
+        id="page-sidebar"
+      >
+        {sidebar}
+      </aside>
+      <div className="min-w-0">{children}</div>
+    </div>
   );
 }
 

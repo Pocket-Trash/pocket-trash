@@ -47,7 +47,7 @@ export const Default: Story = {
    * @returns A promise that resolves after the interaction assertions pass.
    * @rejects {Error} If a user interaction or assertion fails.
    */
-  play: async ({ canvas }) => {
+  play: async ({ canvas, userEvent }) => {
     await expect(
       canvas.getByText("Account", { selector: "[aria-current='page']" }),
     ).toBeVisible();
@@ -70,5 +70,62 @@ export const Default: Story = {
     await expect(
       links.getByRole("link", { name: "Beta features" }),
     ).toHaveAttribute("href", "/user/settings/beta-features");
+
+    const toggle = canvas.getByRole("button", { name: "Toggle sidebar" });
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(toggle);
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(navigation).not.toBeVisible();
+    await userEvent.click(toggle);
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(navigation).toBeVisible();
+  },
+};
+
+/** User page shell containing an editable surface. */
+export const EditableContent: Story = {
+  args: {
+    children: (
+      <div
+        aria-label="Editor"
+        className="rounded-lg border border-border bg-card p-6"
+        contentEditable
+        role="textbox"
+        suppressContentEditableWarning
+      >
+        Editable content
+      </div>
+    ),
+  },
+  /**
+   * Verifies editor shortcuts do not also toggle the sidebar.
+   *
+   * @param context - Storybook play context.
+   * @returns A promise that resolves after the interaction assertions pass.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const toggle = canvas.getByRole("button", { name: "Toggle sidebar" });
+    await userEvent.click(canvas.getByRole("textbox", { name: "Editor" }));
+    await userEvent.keyboard("{Control>}b{/Control}");
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  },
+};
+
+/** User page shell at the mobile viewport. */
+export const Mobile: Story = {
+  globals: { viewport: "mobile1" },
+  /**
+   * Verifies the mobile sidebar starts expanded and remains collapsible.
+   *
+   * @param context - Storybook play context.
+   * @returns A promise that resolves after the interaction assertions pass.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const navigation = canvas.getByRole("navigation", { name: "User" });
+    const toggle = canvas.getByRole("button", { name: "Toggle sidebar" });
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(toggle);
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(navigation).not.toBeVisible();
   },
 };
