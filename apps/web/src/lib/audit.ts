@@ -33,6 +33,7 @@ export type AuditExportState = {
   canExport: boolean;
 };
 
+/** Reports whether the current actor may read audit events. */
 export const canReadAudit = createServerFn().handler(async () => {
   return hasPermission(await getActor(), "audit.read");
 });

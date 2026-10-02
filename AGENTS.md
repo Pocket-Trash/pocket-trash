@@ -5,7 +5,9 @@
 - Before modifying or creating any frontend layout or UI code, you MUST inject the design guidelines explicitly detailed inside `/docs/design-system.md`.
 - Translate all requested specs using these components directly.
 - Add complete JSDoc to stable named JavaScript and TypeScript declarations you
-  add or modify. Follow `/docs/jsdoc.md`.
+  add or modify. Follow `/docs/jsdoc.md`. `pnpm lint:jsdoc` checks every eligible
+  declaration in tracked, hand-authored source, including untouched declarations;
+  staging and Git base refs do not restrict coverage.
 - After implementing features or code changes, always run:
   - Use `$pocket-trash logger` to audit logger usage, centralized logger messages/values,
     and forbidden `console.*` calls before validation.

@@ -20,12 +20,20 @@ export type AuditJson =
   | string
   | AuditJson[]
   | {
-      /** JSON values keyed by audit field name. */
+      /**
+       * JSON values keyed by audit field name.
+       *
+       * @returns The JSON value associated with the audit field.
+       */
       [key: string]: AuditJson;
     };
 /** String-keyed JSON object accepted in an audit payload. */
 export type AuditJsonObject = {
-  /** JSON values keyed by audit field name. */
+  /**
+   * JSON values keyed by audit field name.
+   *
+   * @returns The JSON value associated with the audit field.
+   */
   [key: string]: AuditJson;
 };
 
