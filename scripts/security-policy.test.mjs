@@ -31,6 +31,7 @@ test("gates artifacts, releases, and deployments on the audit", () => {
     (deployWorkflow.match(/- name: Audit dependencies/g)?.length ?? 0) >= 5,
   );
   assert.doesNotMatch(deployWorkflow, /\bpnpm dlx\b/);
+  assert.doesNotMatch(deployWorkflow, /pnpm exec @railway\/cli/);
   assert.match(rootPackage.scripts.build, /^pnpm security:audit/);
   assert.match(rootPackage.scripts["build:ci"], /^pnpm security:audit/);
   assert.match(rootPackage.scripts.release, /^pnpm security:audit/);

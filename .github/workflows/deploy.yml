@@ -639,42 +639,42 @@ jobs:
               }
             }'
 
-          printf '%s' "$DATABASE_URL" | pnpm exec @railway/cli variable set DATABASE_URL \
+          printf '%s' "$DATABASE_URL" | pnpm exec railway variable set DATABASE_URL \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          printf '%s' "$image_folder_prefix" | pnpm exec @railway/cli variable set BUNNY_IMAGE_FOLDER_PREFIX \
+          printf '%s' "$image_folder_prefix" | pnpm exec railway variable set BUNNY_IMAGE_FOLDER_PREFIX \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          printf '%s' "$redis_url_reference" | pnpm exec @railway/cli variable set REDIS_URL \
+          printf '%s' "$redis_url_reference" | pnpm exec railway variable set REDIS_URL \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          printf '%s' "$scraper_cron_enabled" | pnpm exec @railway/cli variable set SCRAPER_CRON_ENABLED \
+          printf '%s' "$scraper_cron_enabled" | pnpm exec railway variable set SCRAPER_CRON_ENABLED \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          printf '%s' "$railway_environment" | pnpm exec @railway/cli variable set LOG_DEPLOYMENT_ID \
+          printf '%s' "$railway_environment" | pnpm exec railway variable set LOG_DEPLOYMENT_ID \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          printf '%s' "railway" | pnpm exec @railway/cli variable set LOG_DEPLOYMENT_TARGET \
+          printf '%s' "railway" | pnpm exec railway variable set LOG_DEPLOYMENT_TARGET \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
@@ -682,7 +682,7 @@ jobs:
             --environment "$railway_environment"
 
           railway_image_folder_prefix="$(
-            pnpm exec @railway/cli variable list \
+            pnpm exec railway variable list \
               --kv \
               --project "$RAILWAY_PROJECT_ID" \
               --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
@@ -698,7 +698,7 @@ jobs:
           fi
 
           railway_scraper_cron_enabled="$(
-            pnpm exec @railway/cli variable list \
+            pnpm exec railway variable list \
               --kv \
               --project "$RAILWAY_PROJECT_ID" \
               --service "$RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME" \
@@ -743,21 +743,21 @@ jobs:
               }
             }'
 
-          printf '%s' "$railway_environment" | pnpm exec @railway/cli variable set LOG_DEPLOYMENT_ID \
+          printf '%s' "$railway_environment" | pnpm exec railway variable set LOG_DEPLOYMENT_ID \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          printf '%s' "railway" | pnpm exec @railway/cli variable set LOG_DEPLOYMENT_TARGET \
+          printf '%s' "railway" | pnpm exec railway variable set LOG_DEPLOYMENT_TARGET \
             --stdin \
             --skip-deploys \
             --project "$RAILWAY_PROJECT_ID" \
             --service "$RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME" \
             --environment "$railway_environment"
 
-          pnpm exec @railway/cli service redeploy \
+          pnpm exec railway service redeploy \
             --from-source \
             --yes \
             --project "$RAILWAY_PROJECT_ID" \
@@ -1349,7 +1349,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          pnpm exec @railway/cli variable set \
+          pnpm exec railway variable set \
             APP_ENV=production \
             LOG_DEPLOYMENT_ID=production \
             LOG_DEPLOYMENT_TARGET=railway \
@@ -1365,7 +1365,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          pnpm exec @railway/cli up \
+          pnpm exec railway up \
             --ci \
             --yes \
             --project "$RAILWAY_PROJECT_ID" \

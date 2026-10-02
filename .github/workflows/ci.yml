@@ -61,6 +61,7 @@ jobs:
 
   scraper-artifact:
     name: Scraper Artifact
+    if: github.event_name == 'pull_request'
     needs: security
     runs-on: ubuntu-latest
 
@@ -88,6 +89,7 @@ jobs:
 
   api-artifact:
     name: API Artifact
+    if: github.event_name == 'pull_request'
     needs: security
     runs-on: ubuntu-latest
 
@@ -115,6 +117,7 @@ jobs:
 
   web-artifact:
     name: Web Artifact
+    if: github.event_name == 'pull_request'
     needs: security
     runs-on: ubuntu-latest
 
@@ -151,6 +154,7 @@ jobs:
 
   lint:
     name: Lint and Typecheck
+    if: github.event_name == 'pull_request'
     needs: security
     runs-on: ubuntu-latest
 
@@ -184,6 +188,7 @@ jobs:
 
   test:
     name: Test
+    if: github.event_name == 'pull_request'
     needs: security
     runs-on: ubuntu-latest
 
@@ -208,6 +213,7 @@ jobs:
 
   storybook-test:
     name: Storybook Tests
+    if: github.event_name == 'pull_request'
     needs: security
     runs-on: ubuntu-latest
 
@@ -235,6 +241,7 @@ jobs:
 
   drizzle-check:
     name: Drizzle Migration Check
+    if: github.event_name == 'pull_request'
     needs: security
     runs-on: ubuntu-latest
 
