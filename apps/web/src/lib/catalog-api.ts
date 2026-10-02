@@ -292,6 +292,11 @@ export const productApprovalSchema = z.object({
   reason: z.string().trim().min(1, requiredMessage).max(1000),
 });
 
+/** Validates one administrative collection-item approval decision. */
+export const collectionItemApprovalSchema = productApprovalSchema
+  .omit({ productId: true })
+  .extend({ collectionItemId: idSchema });
+
 /**
  * Success or validation-aware failure returned by catalog lookup mutations.
  *
@@ -1117,10 +1122,11 @@ export const getPublicCollection = createServerFn({ method: "GET" })
     ]);
     if (!collection) return null;
     const matchingOwner = owner.find(({ userId }) => userId === data.userId);
-    const items =
-      matchingOwner?.items.filter(
-        ({ collectionId }) => collectionId === data.collectionId,
-      ) ?? [];
+    const items = await s.db.collections.listCollectionItems({
+      collectionId: data.collectionId,
+      ownerUserId: data.userId,
+      viewer,
+    });
     const [signedCollection] = await signCollectionSummaries([collection]);
     if (!signedCollection) return null;
     return {
@@ -1392,6 +1398,26 @@ export const decideCatalogProductApproval = createServerFn({ method: "POST" })
     const { s } = await import("@/lib/services");
     try {
       const approvalStatus = await s.db.catalog.decideProductApproval({
+        ...parsed.data,
+        actor,
+      });
+      return { approvalStatus, ok: true as const };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
+
+/** Applies an authorized collection-item approval transition. */
+export const decideCollectionItemApproval = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("collections.manage");
+    const parsed = collectionItemApprovalSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+
+    const { s } = await import("@/lib/services");
+    try {
+      const approvalStatus = await s.db.collections.decideItemApproval({
         ...parsed.data,
         actor,
       });

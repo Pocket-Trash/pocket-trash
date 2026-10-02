@@ -527,6 +527,7 @@ function collectionFixture(
   sourceProductFinishOptionId: number,
 ): UserCollectionItem {
   return {
+    approvalStatus: "approved",
     bearing: null,
     bearingOverride: null,
     canAdminister: false,

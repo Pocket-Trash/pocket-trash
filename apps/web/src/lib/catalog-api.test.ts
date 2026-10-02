@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  collectionItemApprovalSchema,
   collectionWriteSchema,
   productApprovalSchema,
   productFormSchema,
@@ -39,6 +40,39 @@ const validFinishOptions = [
     finishIds: [1000],
   },
 ];
+
+describe("collection-item approval decisions", () => {
+  it("requires an item, a supported action, and a bounded nonblank reason", () => {
+    const decision = {
+      action: "approve",
+      collectionItemId: 1000,
+      reason: " Ready ",
+    };
+    expect(collectionItemApprovalSchema.parse(decision)).toEqual({
+      ...decision,
+      reason: "Ready",
+    });
+    for (const invalid of [
+      { ...decision, reason: " " },
+      { ...decision, reason: "x".repeat(1001) },
+      { ...decision, action: "delete" },
+      { ...decision, collectionItemId: 0 },
+      { ...decision, collectionItemId: undefined, productId: 1000 },
+    ]) {
+      expect(collectionItemApprovalSchema.safeParse(invalid).success).toBe(
+        false,
+      );
+    }
+    expect(
+      collectionItemApprovalSchema.parse({ ...decision, action: "reject" })
+        .action,
+    ).toBe("reject");
+    expect(
+      collectionItemApprovalSchema.parse({ ...decision, action: "reverse" })
+        .action,
+    ).toBe("reverse");
+  });
+});
 
 describe("product finish options", () => {
   it("requires one option with at least one finish", () => {
