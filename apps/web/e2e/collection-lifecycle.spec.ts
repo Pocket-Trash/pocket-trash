@@ -272,6 +272,7 @@ async function createCollectionLifecycleFixture(
       .insert(schema.collectionItem)
       .values(
         collectionScenarios.map(({ id, itemName }) => ({
+          approvalStatus: "approved" as const,
           collectionId: id,
           displayName: itemName,
           ownerId: owner.id,

@@ -6,6 +6,7 @@ import { CollectionAddPage } from "./catalog-form-pages";
 
 /** Catalog product used by the chooser interaction stories. */
 const product: CatalogProduct = {
+  approvalStatus: "approved",
   bearing: null,
   buttonDiameterMm: null,
   canAdminister: false,

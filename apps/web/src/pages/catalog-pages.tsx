@@ -1,8 +1,8 @@
 import type {
+  CatalogApprovalAction,
+  CatalogApprovalStatus,
   CatalogFinishOption,
   CatalogProduct,
-  ProductApprovalAction,
-  ProductApprovalStatus,
   PublicCollectionOwner,
   UserCollectionItem,
   UserCollectionSummary,
@@ -27,6 +27,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { finishOptionLabel } from "@/lib/catalog";
 import {
   decideCatalogProductApproval,
+  decideCollectionItemApproval,
   setCollectionItemVisibility,
   setCollectionVisibility,
   setProductVisibility,
@@ -314,7 +315,7 @@ export function ProductDetailPage({
     >
       <main className="mx-auto grid max-w-5xl gap-6 p-6">
         {product.canAdminister ? (
-          <ProductApprovalControls
+          <CatalogApprovalControls
             initialStatus={product.approvalStatus}
             onDecide={async ({ action, reason }) => {
               const result = await decideCatalogProductApproval({
@@ -491,8 +492,8 @@ export function PublicCollectionsPage({
   const t = useCatalogCopy();
   const publicItems = owners.flatMap(({ items }) =>
     items.filter(
-      ({ collectionIsPrivate, isPrivate }) =>
-        !(collectionIsPrivate || isPrivate),
+      ({ approvalStatus, collectionIsPrivate, isPrivate }) =>
+        approvalStatus === "approved" && !(collectionIsPrivate || isPrivate),
     ),
   );
   const matchingCollectionIds = new Set(
@@ -873,6 +874,11 @@ export function CollectionPage({
                 ) : null}
                 <div className="p-5">
                   <h2 className="font-semibold">{item.displayName}</h2>
+                  {item.approvalStatus !== "approved" ? (
+                    <Badge className="mt-2" variant="secondary">
+                      {approvalStatusLabel(t, item.approvalStatus)}
+                    </Badge>
+                  ) : null}
                   <p className="mt-1 text-xs text-muted-foreground">
                     {item.productTypeName} · {item.makerName}
                   </p>
@@ -958,17 +964,20 @@ export function ProductGrid({
 }
 
 /**
- * Renders the administrative product approval controls.
+ * Renders shared administrative product and collection-item approval controls.
  *
  * @param props - Current approval state and persistence callback.
  * @returns An accessible approval decision fieldset.
  */
-export function ProductApprovalControls({
+export function CatalogApprovalControls({
   initialStatus,
   onDecide,
+  target = "product",
 }: {
+  /** Entity type used for localized action labels and the legend. */
+  target?: "product" | "collectionItem";
   /** Initial durable approval state. */
-  initialStatus: ProductApprovalStatus;
+  initialStatus: CatalogApprovalStatus;
   /**
    * Persists one approval decision.
    *
@@ -978,10 +987,10 @@ export function ProductApprovalControls({
    */
   onDecide(input: {
     /** Requested approval transition. */
-    action: ProductApprovalAction;
+    action: CatalogApprovalAction;
     /** Nonblank reason supplied by the administrator. */
     reason: string;
-  }): Promise<ProductApprovalStatus>;
+  }): Promise<CatalogApprovalStatus>;
 }) {
   const t = useCatalogCopy();
   const reasonId = useId();
@@ -996,7 +1005,7 @@ export function ProductApprovalControls({
    * @param action - Requested approval transition.
    * @returns Completion after the UI state settles.
    */
-  const decide = async (action: ProductApprovalAction) => {
+  const decide = async (action: CatalogApprovalAction) => {
     const normalizedReason = reason.trim();
     if (!normalizedReason || pending) return;
     setError(false);
@@ -1014,9 +1023,11 @@ export function ProductApprovalControls({
   return (
     <fieldset className="grid gap-3 rounded-xl border border-border bg-card p-4">
       <legend className="px-1 font-semibold">
-        {t("web.catalog.approval.title")}
+        {target === "collectionItem"
+          ? t("web.catalog.approval.collectionItem.title")
+          : t("web.catalog.approval.title")}
       </legend>
-      <Badge className="w-fit" variant="secondary">
+      <Badge aria-live="polite" className="w-fit" variant="secondary">
         {approvalStatusLabel(t, status)}
       </Badge>
       <label className="text-sm font-medium" htmlFor={reasonId}>
@@ -1040,7 +1051,9 @@ export function ProductApprovalControls({
               onClick={() => void decide("approve")}
               type="button"
             >
-              {t("web.catalog.approval.approve")}
+              {target === "collectionItem"
+                ? t("web.catalog.approval.collectionItem.approve")
+                : t("web.catalog.approval.approve")}
             </Button>
             <Button
               disabled={!reason.trim() || pending}
@@ -1048,7 +1061,9 @@ export function ProductApprovalControls({
               type="button"
               variant="destructive"
             >
-              {t("web.catalog.approval.reject")}
+              {target === "collectionItem"
+                ? t("web.catalog.approval.collectionItem.reject")
+                : t("web.catalog.approval.reject")}
             </Button>
           </>
         ) : (
@@ -1072,7 +1087,7 @@ export function ProductApprovalControls({
 }
 
 /**
- * Localizes a product approval state.
+ * Localizes a product or collection-item approval state.
  *
  * @param t - Catalog translation function.
  * @param status - Approval state to label.
@@ -1080,7 +1095,7 @@ export function ProductApprovalControls({
  */
 function approvalStatusLabel(
   t: ReturnType<typeof useCatalogCopy>,
-  status: ProductApprovalStatus,
+  status: CatalogApprovalStatus,
 ) {
   if (status === "approved") return t("web.catalog.approval.status.approved");
   if (status === "rejected") return t("web.catalog.approval.status.rejected");
@@ -1157,6 +1172,27 @@ export function CollectionItemDetailPage({
       title={item.displayName}
     >
       <main className="mx-auto grid w-full max-w-5xl gap-6 p-6">
+        {item.canAdminister ? (
+          <CatalogApprovalControls
+            initialStatus={item.approvalStatus}
+            target="collectionItem"
+            onDecide={async ({ action, reason }) => {
+              const result = await decideCollectionItemApproval({
+                data: {
+                  action,
+                  collectionItemId: item.collectionItemId,
+                  reason,
+                },
+              });
+              if (!result.ok) throw new Error(result.formError);
+              return result.approvalStatus;
+            }}
+          />
+        ) : item.approvalStatus !== "approved" ? (
+          <Badge className="w-fit" variant="secondary">
+            {approvalStatusLabel(t, item.approvalStatus)}
+          </Badge>
+        ) : null}
         {item.isPrivate || item.collectionIsPrivate ? (
           <Badge className="w-fit" variant="secondary">
             {t("web.resources.moderation.privateBadge")}

@@ -34,6 +34,8 @@ export type {
   AuditRedactionContext,
   AuditService,
   AuditWriteInput,
+  CatalogApprovalAction,
+  CatalogApprovalStatus,
   CatalogColor,
   CatalogFinishOption,
   CatalogImage,

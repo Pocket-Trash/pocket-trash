@@ -359,7 +359,12 @@ async function createPublicPrivacyFixture(
     ];
     const items = await transaction
       .insert(schema.collectionItem)
-      .values(itemValues)
+      .values(
+        itemValues.map((value) => ({
+          ...value,
+          approvalStatus: "approved" as const,
+        })),
+      )
       .returning({
         id: schema.collectionItem.id,
         name: schema.collectionItem.displayName,

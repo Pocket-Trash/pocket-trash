@@ -131,6 +131,7 @@ const owners = [
     itemCount: 1,
     items: [
       {
+        approvalStatus: "approved",
         bearing: null,
         bearingOverride: null,
         canAdminister: false,
@@ -392,6 +393,28 @@ describe("ProductDetailPage", () => {
 });
 
 describe("CollectionItemDetailPage", () => {
+  it("shows approval actions only to administrators while owners retain review status and editing", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const pending = {
+      ...item,
+      approvalStatus: "pending" as const,
+      canEdit: true,
+      isOwner: true,
+    };
+    const ownerHtml = renderToStaticMarkup(
+      <CollectionItemDetailPage item={pending} />,
+    );
+    expect(ownerHtml).toContain("Pending review");
+    expect(ownerHtml).toContain(`/collections/edit/${item.collectionItemId}`);
+    expect(ownerHtml).not.toContain("Approve collection item");
+    const adminHtml = renderToStaticMarkup(
+      <CollectionItemDetailPage item={{ ...pending, canAdminister: true }} />,
+    );
+    expect(adminHtml).toContain("Collection item approval");
+    expect(adminHtml).toContain("Approve collection item");
+    expect(adminHtml).toContain("Reject collection item");
+  });
   it("uses the display name while retaining product details", () => {
     const item = owners[0]?.items[0];
     if (!item) throw new Error("Collection item fixture is required.");

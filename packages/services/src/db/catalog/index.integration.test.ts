@@ -130,7 +130,7 @@ describe("catalog product persistence", () => {
           productId: created.id,
           reason: "Invalid direct transition",
         }),
-      ).rejects.toThrow("Product approval transition is invalid.");
+      ).rejects.toThrow("Approval transition is invalid.");
       await expect(
         service.decideProductApproval({
           action: "reverse",

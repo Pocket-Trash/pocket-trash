@@ -11,10 +11,10 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import { getHelpDocument } from "@/lib/help-content";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import {
+  CatalogApprovalControls,
   CollectionItemDetailPage,
   CollectionPage,
   HomePage,
-  ProductApprovalControls,
   ProductDetailPage,
   ProductsPage,
   PublicCollectionPage,
@@ -96,6 +96,7 @@ const collection: UserCollectionSummary = {
 
 /** Collection item shared by the stories. */
 const item: UserCollectionItem = {
+  approvalStatus: "approved",
   bearing: "R188 full ceramic",
   bearingOverride: "R188 full ceramic",
   canAdminister: false,
@@ -286,19 +287,127 @@ export const ProductApproval: Story = {
    */
   render: () => (
     <main className="grid max-w-3xl gap-6 p-6">
-      <ProductApprovalControls
+      <CatalogApprovalControls
         initialStatus="pending"
         onDecide={decideApproval}
       />
-      <ProductApprovalControls
+      <CatalogApprovalControls
         initialStatus="approved"
         onDecide={async () => "pending"}
       />
-      <ProductApprovalControls
+      <CatalogApprovalControls
         initialStatus="rejected"
         onDecide={async () => "pending"}
       />
     </main>
+  ),
+};
+
+/** Collection-item approval states, validation, reversal, and failure recovery. */
+export const CollectionItemApproval: Story = {
+  /**
+   * Exercises required reasons, rejection, reversal, and a failed decision.
+   *
+   * @param root0 - Storybook play context.
+   * @param root0.canvasElement - Rendered story root element.
+   */
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const groups = canvas.getAllByRole("group", {
+      name: "Collection item approval",
+    });
+    const pending = within(groups[0] as HTMLElement);
+    await expect(
+      pending.getByRole("button", { name: "Approve collection item" }),
+    ).toBeDisabled();
+    await userEvent.type(pending.getByLabelText("Decision reason"), "   ");
+    await expect(
+      pending.getByRole("button", { name: "Reject collection item" }),
+    ).toBeDisabled();
+    await userEvent.type(
+      pending.getByLabelText("Decision reason"),
+      "Needs changes",
+    );
+    await userEvent.click(
+      pending.getByRole("button", { name: "Reject collection item" }),
+    );
+    await expect(pending.getByText("Rejected")).toBeVisible();
+    await expect(pending.getByLabelText("Decision reason")).toHaveValue("");
+
+    for (const group of groups.slice(1, 3)) {
+      const decided = within(group);
+      await userEvent.type(
+        decided.getByLabelText("Decision reason"),
+        "Review again",
+      );
+      await userEvent.click(
+        decided.getByRole("button", { name: "Return to pending" }),
+      );
+      await expect(decided.getByText("Pending review")).toBeVisible();
+    }
+    const failure = within(groups[3] as HTMLElement);
+    await userEvent.type(failure.getByLabelText("Decision reason"), "Ready");
+    await userEvent.click(
+      failure.getByRole("button", { name: "Approve collection item" }),
+    );
+    await expect(failure.getByRole("alert")).toBeVisible();
+    await expect(failure.getByText("Pending review")).toBeVisible();
+    await expect(failure.getByLabelText("Decision reason")).toHaveValue(
+      "Ready",
+    );
+    await expect(
+      failure.getByRole("button", { name: "Approve collection item" }),
+    ).toBeEnabled();
+  },
+  /**
+   * Renders collection-item approval states and a persistence failure.
+   *
+   * @returns Collection-item review controls for visual and accessibility checks.
+   */
+  render: () => (
+    <main className="grid max-w-3xl gap-6 p-6">
+      <CatalogApprovalControls
+        target="collectionItem"
+        initialStatus="pending"
+        onDecide={async () => "rejected"}
+      />
+      <CatalogApprovalControls
+        target="collectionItem"
+        initialStatus="approved"
+        onDecide={async () => "pending"}
+      />
+      <CatalogApprovalControls
+        target="collectionItem"
+        initialStatus="rejected"
+        onDecide={async () => "pending"}
+      />
+      <CatalogApprovalControls
+        target="collectionItem"
+        initialStatus="pending"
+        onDecide={async () => {
+          throw new Error("Persistence failed");
+        }}
+      />
+    </main>
+  ),
+};
+
+/** Pending collection item retained in its owner's collection. */
+export const PendingCollectionItem: Story = {
+  /**
+   * Renders the owner-facing review state without administrative controls.
+   *
+   * @returns A pending collection item detail page.
+   */
+  render: () => (
+    <CollectionItemDetailPage
+      item={{
+        ...item,
+        approvalStatus: "pending",
+        canEdit: true,
+        isOwner: true,
+      }}
+    />
   ),
 };
 
