@@ -62,6 +62,7 @@ export const ActiveBoard: Story = {
    * @param root0 - Story interaction context.
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
+    await expect(canvasElement.querySelector("main")).toHaveClass("lg:w-3/4");
     const opener = canvas.getByRole("button", {
       name: "View details for Saved searches",
     });

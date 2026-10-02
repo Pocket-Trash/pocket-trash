@@ -50,6 +50,26 @@ vi.mock("@/components/app-shell", () => ({
   }) => <div>{children}</div>,
 }));
 
+/**
+ * Renders a minimal user shell for tests.
+ *
+ * @param props - User shell properties.
+ * @param props.children - Nested page content.
+ * @returns The test user shell.
+ */
+function MockUserPageShell({
+  children,
+}: {
+  /** Nested page content. */
+  children: React.ReactNode;
+}) {
+  return <div>{children}</div>;
+}
+
+vi.mock("@/components/user-page-shell", () => ({
+  UserPageShell: MockUserPageShell,
+}));
+
 vi.mock("@/providers/locale-provider", () => ({
   /**
    * Provides locale data for page tests.

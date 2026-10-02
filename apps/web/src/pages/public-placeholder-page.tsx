@@ -34,7 +34,7 @@ export function PublicPlaceholderPage({
 
   return (
     <AppShell title={t(titleKey)}>
-      <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
+      <main className="mx-auto w-full p-3 md:p-[18px_22px_22px] lg:w-3/4">
         <p className="text-sm text-muted-foreground">
           {t("web.help.comingSoon")}
         </p>

@@ -101,6 +101,7 @@ describe("changelog pages", () => {
       "You can now follow customer-facing Pocket Trash updates",
     );
     expect(container.textContent).toContain("Date: 2027-10-02");
+    expect(container.querySelector("main")?.className).toContain("lg:w-3/4");
   });
 
   it("copies the absolute permanent URL and reports success or failure", async () => {

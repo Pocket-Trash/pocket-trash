@@ -91,6 +91,48 @@ vi.mock("@/components/app-shell", () => ({
   ),
 }));
 
+vi.mock("@/components/user-page-shell", () => ({
+  /**
+   * Renders a minimal user shell for catalog page tests.
+   *
+   * @param root0 - User shell properties.
+   * @param root0.breadcrumbItems - Additional breadcrumb labels.
+   * @param root0.children - Nested page content.
+   * @param root0.headerActions - Header controls.
+   * @param root0.title - Page title.
+   * @returns The test user shell.
+   */
+  UserPageShell: ({
+    breadcrumbItems = [],
+    children,
+    headerActions,
+    title,
+  }: {
+    /** Additional breadcrumb labels. */
+    breadcrumbItems?: Array<{
+      /** Visible breadcrumb label. */
+      label: string;
+    }>;
+    /** Nested page content. */
+    children: React.ReactNode;
+    /** Header controls. */
+    headerActions?: React.ReactNode;
+    /** Page title. */
+    title: string;
+  }) => (
+    <div
+      data-breadcrumbs={[
+        "User",
+        ...breadcrumbItems.map(({ label }) => label),
+        title,
+      ].join(" > ")}
+    >
+      {headerActions}
+      {children}
+    </div>
+  ),
+}));
+
 vi.mock("@/providers/locale-provider", () => ({
   /**
    * Returns the fixed test locale.

@@ -4,7 +4,6 @@ import {
   formatTranslation,
   type TranslationKey,
 } from "@pocket-trash/localizations";
-import { Link } from "@tanstack/react-router";
 import {
   Bell,
   Flag,
@@ -14,27 +13,16 @@ import {
   UsersRound,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { AppShell, type AppShellProps } from "@/components/app-shell";
+import type { AppShellProps } from "@/components/app-shell";
+import {
+  type SidebarLink,
+  SidebarNavigation,
+  SidebarPageShell,
+} from "@/components/sidebar-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
 /** Administrator navigation section identifiers. */
 type AdminSection = "audit" | "feedback" | "notifications" | "trash" | "users";
-/** Routes available from the administrator shell. */
-type AdminPath =
-  | "/admin/audit"
-  | "/admin/feedback"
-  | "/admin/feedback/archive"
-  | "/admin/feedback/planned"
-  | "/admin/feedback/requests"
-  | "/admin/notifications/feedback"
-  | "/admin/notifications/resources"
-  | "/admin/settings/feature-flags"
-  | "/admin/trash"
-  | "/admin/trash/catalog-images"
-  | "/admin/trash/resources"
-  | "/admin/users"
-  | "/notifications";
-
 /** Content and active navigation state for an administrator page. */
 type AdminPageShellProps = Pick<AppShellProps, "breadcrumbItems" | "title"> & {
   /** Page content rendered beside the administrator navigation. */
@@ -61,12 +49,13 @@ export function AdminPageShell({
   title,
 }: AdminPageShellProps) {
   return (
-    <AppShell breadcrumbItems={breadcrumbItems} title={title}>
-      <div className="grid w-full flex-1 md:grid-cols-[12rem_minmax(0,1fr)]">
-        <AdminSidebar section={section} />
-        <div className="min-w-0">{children}</div>
-      </div>
-    </AppShell>
+    <SidebarPageShell
+      breadcrumbItems={breadcrumbItems}
+      sidebar={<AdminSidebar section={section} />}
+      title={title}
+    >
+      {children}
+    </SidebarPageShell>
   );
 }
 
@@ -102,13 +91,13 @@ function AdminSidebar({
    * @returns The localized sidebar text.
    */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
-  const primaryLinks = [
+  const primaryLinks: SidebarLink[] = [
     ...(canManageUsers
       ? [
           {
             icon: UsersRound,
+            active: section === "users",
             label: t("web.admin.users.title"),
-            section: "users" as const,
             to: "/admin/users" as const,
           },
         ]
@@ -117,8 +106,8 @@ function AdminSidebar({
       ? [
           {
             icon: ScrollText,
+            active: section === "audit",
             label: t("web.admin.audit.title"),
-            section: "audit" as const,
             to: "/admin/audit" as const,
           },
         ]
@@ -127,6 +116,7 @@ function AdminSidebar({
       ? [
           {
             icon: Bell,
+            active: section === "notifications",
             label: t("web.admin.notifications.title"),
             links: [
               ...(canManageFeedback
@@ -146,7 +136,6 @@ function AdminSidebar({
                   ]
                 : []),
             ],
-            section: "notifications" as const,
             to: "/notifications" as const,
           },
         ]
@@ -155,6 +144,7 @@ function AdminSidebar({
       ? [
           {
             icon: MessageSquare,
+            active: section === "feedback",
             label: t("web.feedback.title"),
             links: [
               {
@@ -174,13 +164,12 @@ function AdminSidebar({
                 to: "/admin/feedback/archive" as const,
               },
             ],
-            section: "feedback" as const,
             to: "/admin/feedback" as const,
           },
         ]
       : []),
   ];
-  const utilityLinks = [
+  const utilityLinks: SidebarLink[] = [
     ...(canManageFlags
       ? [
           {
@@ -194,6 +183,7 @@ function AdminSidebar({
       ? [
           {
             icon: Trash2,
+            active: section === "trash",
             label: t("web.admin.trash.title"),
             links: [
               ...(canManageResources
@@ -213,7 +203,6 @@ function AdminSidebar({
                   ]
                 : []),
             ],
-            section: "trash" as const,
             to: "/admin/trash" as const,
           },
         ]
@@ -221,90 +210,10 @@ function AdminSidebar({
   ];
 
   return (
-    <aside className="border-b border-border p-3 md:border-r md:border-b-0">
-      <nav
-        aria-label={t("web.admin.hub.title")}
-        className="flex h-full flex-col gap-6"
-      >
-        <div className="grid gap-1">
-          {primaryLinks.map((link) => (
-            <AdminSidebarGroup
-              active={section === link.section}
-              key={link.to}
-              {...link}
-            />
-          ))}
-        </div>
-        <div className="grid gap-1 md:mt-auto">
-          {utilityLinks.map((link) => (
-            <AdminSidebarGroup
-              active={"section" in link && section === link.section}
-              key={link.to}
-              {...link}
-            />
-          ))}
-        </div>
-      </nav>
-    </aside>
-  );
-}
-
-/**
- * Renders a top-level administrator link and its active child links.
- *
- * @param props - Admin sidebar group properties.
- * @param props.active - Whether this navigation group is active.
- * @param props.icon - Icon rendered with the top-level link.
- * @param props.label - Localized top-level link label.
- * @param props.links - Child links shown only while the group is active.
- * @param props.to - Top-level destination.
- * @returns The administrator navigation group.
- */
-function AdminSidebarGroup({
-  active,
-  icon: Icon,
-  label,
-  links,
-  to,
-}: {
-  /** Whether this navigation group is active. */
-  active: boolean;
-  /** Icon rendered with the top-level link. */
-  icon: typeof Bell;
-  /** Localized top-level link label. */
-  label: string;
-  /** Child links shown only while this group is active. */
-  links?: Array<{
-    /** Localized child link label. */
-    label: string;
-    /** Child destination. */
-    to: AdminPath;
-  }>;
-  /** Top-level destination. */
-  to: AdminPath;
-}) {
-  return (
-    <div className="grid gap-1">
-      <Link
-        className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "text-foreground" : "text-muted-foreground"}`}
-        to={to}
-      >
-        <Icon aria-hidden="true" className="size-4" />
-        {label}
-      </Link>
-      {active && links ? (
-        <div className="grid gap-1 pl-6">
-          {links.map((link) => (
-            <Link
-              className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              key={link.to}
-              to={link.to}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
-      ) : null}
-    </div>
+    <SidebarNavigation
+      ariaLabel={t("web.admin.hub.title")}
+      primaryLinks={primaryLinks}
+      utilityLinks={utilityLinks}
+    />
   );
 }
