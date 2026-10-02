@@ -4,4 +4,4 @@
 "@package/logger": patch
 ---
 
-Add confirmed product deletion with transactional audit and image cleanup.
+Add confirmed product deletion with transactional audit and image cleanup, and preserve destructive button hover contrast.
