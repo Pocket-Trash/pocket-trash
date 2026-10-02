@@ -26,7 +26,10 @@ const railwayConfig = JSON.parse(await readFile("railway.json", "utf8"));
 
 test("gates artifacts, releases, and deployments on the audit", () => {
   assert.match(ciWorkflow, /name: Security/);
-  assert.equal(ciWorkflow.match(/needs: security/g)?.length, 7);
+  assert.equal(
+    ciWorkflow.match(/needs: \[security, classify-changes\]/g)?.length,
+    7,
+  );
   assert.ok(
     (deployWorkflow.match(/- name: Audit dependencies/g)?.length ?? 0) >= 5,
   );
