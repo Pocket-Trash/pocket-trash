@@ -47,7 +47,9 @@ export function createApiLogger(env: ApiBindings) {
 }
 
 /**
- * Configures API services from Cloudflare database and storage bindings.
+ * Creates a request-local API service registry from Cloudflare bindings.
+ * Database and logging are always configured; Bunny-backed storage is opt-in
+ * for handlers that use it.
  *
  * @param bindings - Cloudflare environment bindings.
  * @param options - Optional service capabilities to configure.

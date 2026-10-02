@@ -91,7 +91,9 @@ export class ScraperCommandInterruptedError extends Error {
 }
 
 /**
- * Creates and verifies shared resources for scraper job commands.
+ * Creates and verifies shared resources for scraper job commands. Shared
+ * services own image storage only; scraper database and queue access remain
+ * scraper-specific.
  *
  * @param env - Validated scraper job configuration.
  * @param logger - Logger supplied to shared services.
