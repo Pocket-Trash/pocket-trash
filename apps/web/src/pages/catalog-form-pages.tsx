@@ -38,6 +38,7 @@ import {
   type ComboboxOption,
 } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import { UserPageShell } from "@/components/user-page-shell";
 import { filterButtonsByDiameter, finishOptionLabel } from "@/lib/catalog";
 import {
   addCollectionProduct,
@@ -1240,10 +1241,12 @@ export function CollectionFormPage({
   }
 
   return (
-    <AppShell
+    <UserPageShell
       breadcrumbItems={[
         { label: t("web.navigation.collections"), to: "/user/collections" },
       ]}
+      contentClassName="p-0"
+      section="collections"
       title={
         current
           ? t("web.collections.edit.title")
@@ -1371,7 +1374,7 @@ export function CollectionFormPage({
           />
         ) : null}
       </main>
-    </AppShell>
+    </UserPageShell>
   );
 }
 

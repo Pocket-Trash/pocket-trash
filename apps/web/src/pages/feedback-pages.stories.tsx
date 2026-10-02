@@ -62,6 +62,14 @@ export const ActiveBoard: Story = {
    * @param root0 - Story interaction context.
    */
   play: async ({ canvas, canvasElement, userEvent }) => {
+    const main = canvas.getByRole("main");
+    const parentWidth = main.parentElement?.getBoundingClientRect().width ?? 0;
+    await expect(parentWidth).toBeGreaterThan(0);
+    await expect(main).toHaveClass("lg:max-w-[75%]");
+    await expect(main.getBoundingClientRect().width).toBeCloseTo(
+      parentWidth * 0.75,
+      0,
+    );
     const opener = canvas.getByRole("button", {
       name: "View details for Saved searches",
     });

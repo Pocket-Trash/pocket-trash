@@ -73,6 +73,7 @@ function UserCollectionRoute() {
       filters={filters}
       items={data.items}
       onFiltersChange={setFilters}
+      userArea
     />
   );
 }

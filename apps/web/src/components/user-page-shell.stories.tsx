@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect } from "storybook/test";
+import { expect, within } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { UserPageShell } from "./user-page-shell";
 
@@ -13,6 +13,7 @@ const meta = {
         Account content
       </div>
     ),
+    section: "account",
     title: "Account",
   },
   beforeEach: mockStoryAuth,
@@ -50,5 +51,24 @@ export const Default: Story = {
     await expect(
       canvas.getByText("Account", { selector: "[aria-current='page']" }),
     ).toBeVisible();
+    const navigation = canvas.getByRole("navigation", { name: "User" });
+    const links = within(navigation);
+    await expect(
+      links.getByRole("link", { name: "Collections" }),
+    ).toHaveAttribute("href", "/user/collections");
+    await expect(
+      links.getByRole("link", { name: "Resources" }),
+    ).toHaveAttribute("href", "/user/resources");
+    await expect(links.getByRole("link", { name: "Account" })).toHaveAttribute(
+      "href",
+      "/user/account",
+    );
+    await expect(links.getByRole("link", { name: "Settings" })).toHaveAttribute(
+      "href",
+      "/user/settings",
+    );
+    await expect(
+      links.getByRole("link", { name: "Beta features" }),
+    ).toHaveAttribute("href", "/user/settings/beta-features");
   },
 };
