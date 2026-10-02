@@ -2,4 +2,4 @@
 "@app/web": minor
 ---
 
-Paginate product and collection cards and optimize their images.
+Paginate product and collection cards responsively and optimize their images.

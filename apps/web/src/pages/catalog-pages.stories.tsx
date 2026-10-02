@@ -414,20 +414,20 @@ export const PendingCollectionItem: Story = {
 /** Product index page story. */
 export const Products: Story = {
   /**
-   * Verifies that only the current twenty-card page is rendered.
+   * Verifies that only the current responsive product page is rendered.
    *
    * @param root0 - Story interaction context.
    */
   play: async ({ canvas }) => {
     await expect(
-      canvas.getByRole("heading", { name: "Product 20" }),
+      canvas.getByRole("heading", { name: "Product 12" }),
     ).toBeVisible();
     await expect(
-      canvas.queryByRole("heading", { name: "Product 21" }),
+      canvas.queryByRole("heading", { name: "Product 13" }),
     ).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "Next page" }));
     await expect(
-      canvas.getByRole("heading", { name: "Product 21" }),
+      canvas.getByRole("heading", { name: "Product 13" }),
     ).toBeVisible();
     await expect(canvas.getByText("Page 2 of 2")).toBeVisible();
   },
@@ -460,20 +460,20 @@ export const PublicCollection: Story = {
 /** Public collections page story. */
 export const PublicCollections: Story = {
   /**
-   * Verifies that public collection cards paginate in groups of sixteen.
+   * Verifies that public collection cards use responsive pagination.
    *
    * @param root0 - Story interaction context.
    */
   play: async ({ canvas }) => {
     await expect(
-      canvas.getByRole("heading", { name: "Collection 16" }),
+      canvas.getByRole("heading", { name: "Collection 12" }),
     ).toBeVisible();
     await expect(
-      canvas.queryByRole("heading", { name: "Collection 17" }),
+      canvas.queryByRole("heading", { name: "Collection 13" }),
     ).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "Next page" }));
     await expect(
-      canvas.getByRole("heading", { name: "Collection 17" }),
+      canvas.getByRole("heading", { name: "Collection 13" }),
     ).toBeVisible();
   },
   /**

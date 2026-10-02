@@ -10,7 +10,7 @@ import type {
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
   CatalogFilterBar,
@@ -110,9 +110,26 @@ type PaginatedCardsProps<T> = {
   children(items: T[]): ReactNode;
   /** Ordered card data to paginate. */
   items: T[];
-  /** Maximum cards rendered per page. */
-  pageSize: number;
+  /** Maximum cards rendered above 1280 CSS pixels. */
+  widePageSize: number;
 };
+
+/**
+ * Resolves catalog page size from the browser viewport width.
+ *
+ * @param viewportWidth - Browser viewport width in CSS pixels.
+ * @param widePageSize - Page size used above 1280 CSS pixels.
+ * @returns The responsive catalog page size.
+ * @internal
+ */
+export function getCatalogPageSize(
+  viewportWidth: number,
+  widePageSize: number,
+) {
+  if (viewportWidth <= 480) return 8;
+  if (viewportWidth <= 1280) return 12;
+  return widePageSize;
+}
 
 /**
  * Renders one page of catalog cards and shared navigation controls.
@@ -125,11 +142,21 @@ function PaginatedCards<T>({
   ariaLabel,
   children,
   items,
-  pageSize,
+  widePageSize,
 }: PaginatedCardsProps<T>) {
   const t = useCatalogCopy();
+  const [pageSize, setPageSize] = useState(12);
   const [renderedItems, setRenderedItems] = useState(items);
   const [requestedPage, setRequestedPage] = useState(0);
+  useEffect(() => {
+    /** Synchronizes the page size with the current catalog grid width. */
+    const updatePageSize = () => {
+      setPageSize(getCatalogPageSize(window.innerWidth, widePageSize));
+    };
+    updatePageSize();
+    window.addEventListener("resize", updatePageSize);
+    return () => window.removeEventListener("resize", updatePageSize);
+  }, [widePageSize]);
   if (renderedItems !== items) {
     setRenderedItems(items);
     setRequestedPage(0);
@@ -640,7 +667,7 @@ export function PublicCollectionsPage({
         <PaginatedCards
           ariaLabel={t("web.navigation.collections")}
           items={collections}
-          pageSize={16}
+          widePageSize={15}
         >
           {(page) => (
             <main className="grid gap-[18px] p-4 sm:grid-cols-2 lg:grid-cols-3 md:p-[18px_22px_22px]">
@@ -706,7 +733,7 @@ export function PublicCollectionPage({
       <PaginatedCards
         ariaLabel={t("web.navigation.collections")}
         items={owner.collections}
-        pageSize={16}
+        widePageSize={15}
       >
         {(page) => (
           <main className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
@@ -806,7 +833,7 @@ export function UserCollectionsPage({
           <PaginatedCards
             ariaLabel={t("web.navigation.collections")}
             items={filtered}
-            pageSize={16}
+            widePageSize={15}
           >
             {(page) => (
               <section className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
@@ -822,10 +849,9 @@ export function UserCollectionsPage({
                       coverAlt={t("web.resources.detail.imageAlt", {
                         name: collection.name,
                       })}
-                      itemCountLabel={t(
-                        "web.collections.directory.itemCount",
-                        { count: collection.itemCount },
-                      )}
+                      itemCountLabel={t("web.collections.directory.itemCount", {
+                        count: collection.itemCount,
+                      })}
                       privateLabel={t("web.resources.visibility.private")}
                     />
                   </Link>
@@ -1093,7 +1119,7 @@ export function ProductGrid({
     <PaginatedCards
       ariaLabel={t("web.navigation.products")}
       items={products}
-      pageSize={20}
+      widePageSize={20}
     >
       {(page) => (
         <section className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">

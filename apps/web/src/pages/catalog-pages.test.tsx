@@ -9,6 +9,7 @@ import { ProductCard } from "@/components/product-card";
 import {
   CollectionItemDetailPage,
   CollectionPage,
+  getCatalogPageSize,
   ProductDetailPage,
   ProductGrid,
   PublicCollectionsPage,
@@ -258,6 +259,18 @@ const product: CatalogProduct = {
   widthMm: null,
 };
 
+describe("getCatalogPageSize", () => {
+  it("matches the requested compact, regular, and wide card counts", () => {
+    expect(getCatalogPageSize(402, 15)).toBe(8);
+    expect(getCatalogPageSize(480, 20)).toBe(8);
+    expect(getCatalogPageSize(744, 20)).toBe(12);
+    expect(getCatalogPageSize(820, 15)).toBe(12);
+    expect(getCatalogPageSize(1280, 15)).toBe(12);
+    expect(getCatalogPageSize(1281, 15)).toBe(15);
+    expect(getCatalogPageSize(1281, 20)).toBe(20);
+  });
+});
+
 describe("PublicCollectionsPage", () => {
   it("links public collection cards directly to their collection", () => {
     const html = renderToStaticMarkup(
@@ -269,7 +282,7 @@ describe("PublicCollectionsPage", () => {
     expect(html).not.toContain("Private collection");
   });
 
-  it("renders sixteen collection cards per page", () => {
+  it("renders twelve collection cards before viewport sizing initializes", () => {
     const collection = owners[0]?.collections[0];
     const owner = owners[0];
     if (!collection || !owner) throw new Error("Owner fixtures are required.");
@@ -290,9 +303,9 @@ describe("PublicCollectionsPage", () => {
     );
 
     expect(html).toContain("Collection 17");
-    expect(html).toContain("Collection 2");
-    expect(html).not.toContain("Collection 1</h2>");
-    expect(html).not.toContain("collection-1.webp");
+    expect(html).toContain("Collection 6");
+    expect(html).not.toContain("Collection 5</h2>");
+    expect(html).not.toContain("collection-5.webp");
     expect(html).toContain("width=640");
     expect(html).toContain("Page 1 of 2");
   });
@@ -472,7 +485,7 @@ describe("ProductCard", () => {
 });
 
 describe("ProductGrid", () => {
-  it("renders twenty product cards per page", () => {
+  it("renders twelve product cards before viewport sizing initializes", () => {
     const products = Array.from({ length: 21 }, (_, index) => ({
       ...product,
       id: index + 1,
@@ -483,8 +496,8 @@ describe("ProductGrid", () => {
     const html = renderToStaticMarkup(<ProductGrid products={products} />);
 
     expect(html).toContain("Product 1");
-    expect(html).toContain("Product 20");
-    expect(html).not.toContain("Product 21");
+    expect(html).toContain("Product 12");
+    expect(html).not.toContain("Product 13");
     expect(html).toContain("Page 1 of 2");
   });
 });
