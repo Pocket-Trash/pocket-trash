@@ -255,6 +255,7 @@ export const ProductDetail: Story = {
   ),
 };
 
+/** Approval-decision spy returning the approved state for story interactions. */
 const decideApproval = fn(async () => "approved" as const);
 
 /** Product approval state and interaction story. */
