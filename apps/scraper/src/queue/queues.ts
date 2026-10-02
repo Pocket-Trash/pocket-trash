@@ -66,6 +66,8 @@ export type ScraperQueueJobCounts = {
 
 /**
  * Creates the item and image BullMQ queues over one Redis connection.
+ * Jobs may be delivered more than once because failed jobs are retried; every
+ * consumer must be safe to process the same payload repeatedly.
  *
  * @param connection - Redis connection shared by both queues.
  *
