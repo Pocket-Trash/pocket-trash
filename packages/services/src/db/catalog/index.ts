@@ -693,7 +693,7 @@ export type CatalogService = {
    *
    * @param input - Product decision, actor, and nonblank reason.
    * @returns The resulting durable approval state.
-   * @rejects When authorization, input, product lookup, or transition validation fails.
+   * @rejects When authorization, validation, lookup, persistence, or auditing fails.
    */
   decideProductApproval(input: {
     /** Requested approval transition. */
@@ -1209,11 +1209,11 @@ export type CollectionWriteInput = {
 /** Database operations for user collections and their catalog items. */
 export type CollectionsService = {
   /**
-   * Applies a serialized collection-item approval decision.
+   * Applies a serialized collection-item approval decision with transactional auditing.
    *
    * @param input - Authenticated staff action, target, and nonblank reason.
    * @returns The resulting durable approval state.
-   * @rejects When authorization, validation, lookup, or persistence fails.
+   * @rejects When authorization, validation, lookup, persistence, or auditing fails.
    */
   decideItemApproval(input: {
     /** Requested approval transition. */
@@ -2160,7 +2160,7 @@ export function createCatalogService(
      *
      * @param input - Authorized approval decision.
      * @returns The resulting durable approval state.
-     * @rejects When authorization, validation, lookup, or persistence fails.
+     * @rejects When authorization, validation, lookup, persistence, or auditing fails.
      */
     async decideProductApproval(input) {
       if (!hasPermission(input.actor, "products.manage")) {
@@ -2170,12 +2170,18 @@ export function createCatalogService(
       if (!reason || reason.length > 1000) {
         throw new Error("A decision reason is required.");
       }
-      return await logger.operation(
+      if (!users || !audit) throw new Error("Product audit is not configured.");
+      return await loggedMutation(
+        logger,
         loggerMessages.database.catalog.updateProduct,
         async () =>
           await db.transaction(async (tx) => {
             const [product] = await tx
-              .select({ approvalStatus: schema.product.approvalStatus })
+              .select({
+                approvalStatus: schema.product.approvalStatus,
+                approvalDecidedAt: schema.product.approvalDecidedAt,
+                ownerClerkId: schema.product.ownerClerkId,
+              })
               .from(schema.product)
               .where(eq(schema.product.id, input.productId))
               .limit(1)
@@ -2185,15 +2191,52 @@ export function createCatalogService(
               product.approvalStatus,
               input.action,
             );
+            const [actorUser] = await tx
+              .select({ id: schema.user.id, username: schema.user.username })
+              .from(schema.user)
+              .where(eq(schema.user.clerkId, input.actor.clerkId))
+              .limit(1);
+            if (!actorUser) throw new Error("Product does not exist.");
+            const [ownerUser] = product.ownerClerkId
+              ? await tx
+                  .select({ id: schema.user.id })
+                  .from(schema.user)
+                  .where(eq(schema.user.clerkId, product.ownerClerkId))
+                  .limit(1)
+              : [];
+            const occurredAt = new Date();
             await tx
               .update(schema.product)
               .set({
-                approvalDecidedAt: new Date(),
+                approvalDecidedAt: occurredAt,
                 approvalDecisionReason: reason,
                 approvalStatus,
-                updatedAt: new Date(),
+                updatedAt: occurredAt,
               })
               .where(eq(schema.product.id, input.productId));
+            await writeProductAdminAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: {
+                approvalStatus,
+                approvalDecidedAt: occurredAt.toISOString(),
+              },
+              before: {
+                approvalStatus: product.approvalStatus,
+                approvalDecidedAt:
+                  product.approvalDecidedAt?.toISOString() ?? null,
+              },
+              definition:
+                input.action === "approve"
+                  ? productAudit.productApproved
+                  : input.action === "reject"
+                    ? productAudit.productRejected
+                    : productAudit.productApprovalReversed,
+              occurredAt,
+              ownerUserId: ownerUser?.id ?? null,
+              reason,
+              targetId: input.productId,
+            });
             return approvalStatus;
           }),
         actorAttributes(input.actor.clerkId, { productId: input.productId }),
@@ -2780,11 +2823,11 @@ export function createCollectionsService(
 ): CollectionsService {
   return {
     /**
-     * Applies one serialized collection-item approval transition.
+     * Applies one serialized collection-item approval transition with transactional auditing.
      *
      * @param input - Authorized approval decision.
      * @returns The resulting durable approval state.
-     * @rejects When authorization, validation, lookup, or persistence fails.
+     * @rejects When authorization, validation, lookup, persistence, or auditing fails.
      */
     async decideItemApproval(input) {
       if (!hasPermission(input.actor, "collections.manage")) {
@@ -2794,12 +2837,17 @@ export function createCollectionsService(
       if (!reason || reason.length > 1000) {
         throw new Error("A decision reason is required.");
       }
-      return await logger.operation(
+      return await loggedMutation(
+        logger,
         loggerMessages.database.collections.updateItem,
         async () =>
           await db.transaction(async (tx) => {
             const [item] = await tx
-              .select({ approvalStatus: schema.collectionItem.approvalStatus })
+              .select({
+                approvalStatus: schema.collectionItem.approvalStatus,
+                approvalDecidedAt: schema.collectionItem.approvalDecidedAt,
+                ownerId: schema.collectionItem.ownerId,
+              })
               .from(schema.collectionItem)
               .where(eq(schema.collectionItem.id, input.collectionItemId))
               .limit(1)
@@ -2809,15 +2857,46 @@ export function createCollectionsService(
               item.approvalStatus,
               input.action,
             );
+            const [actorUser] = await tx
+              .select({ id: schema.user.id, username: schema.user.username })
+              .from(schema.user)
+              .where(eq(schema.user.clerkId, input.actor.clerkId))
+              .limit(1);
+            if (!actorUser) throw new Error("Collection item does not exist.");
+            const occurredAt = new Date();
             await tx
               .update(schema.collectionItem)
               .set({
-                approvalDecidedAt: new Date(),
+                approvalDecidedAt: occurredAt,
                 approvalDecisionReason: reason,
                 approvalStatus,
-                updatedAt: new Date(),
+                updatedAt: occurredAt,
               })
               .where(eq(schema.collectionItem.id, input.collectionItemId));
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: {
+                approvalStatus,
+                approvalDecidedAt: occurredAt.toISOString(),
+              },
+              before: {
+                approvalStatus: item.approvalStatus,
+                approvalDecidedAt:
+                  item.approvalDecidedAt?.toISOString() ?? null,
+              },
+              definition:
+                input.action === "approve"
+                  ? collectionAudit.itemApproved
+                  : input.action === "reject"
+                    ? collectionAudit.itemRejected
+                    : collectionAudit.itemApprovalReversed,
+              occurredAt,
+              ownerUserId: item.ownerId,
+              permissionRequired: true,
+              reason,
+              targetId: input.collectionItemId,
+            });
             return approvalStatus;
           }),
         actorAttributes(input.actor.clerkId, {

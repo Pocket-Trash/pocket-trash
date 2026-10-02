@@ -7,7 +7,7 @@ import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
 import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
-import { createCatalogService } from "./index.js";
+import { createDbServices } from "../index.js";
 
 describe("catalog product persistence", () => {
   it("round-trips source details and enforces approval transitions", async () => {
@@ -48,10 +48,13 @@ describe("catalog product persistence", () => {
         throw new Error("Catalog fixtures were not created.");
       }
 
-      const service = createCatalogService(
+      await db
+        .insert(schema.user)
+        .values([{ clerkId: "user-test" }, { clerkId: "admin-test" }]);
+      const service = createDbServices(
         db as unknown as Database,
         createLogger({ app: "api", environment: "test" }),
-      );
+      ).catalog;
       const created = await service.createProduct({
         actor: { clerkId: "user-test", role: "user" },
         description: "Created description",

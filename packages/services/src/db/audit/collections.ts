@@ -66,6 +66,12 @@ function definition(
 
 /** Audit event definitions for collection mutations. */
 export const collectionAudit = {
+  itemApproved: definition("collections.item.approved", "collections.item"),
+  itemRejected: definition("collections.item.rejected", "collections.item"),
+  itemApprovalReversed: definition(
+    "collections.item.approval_reversed",
+    "collections.item",
+  ),
   collectionCreated: definition(
     "collections.collection.created",
     "collections.collection",
@@ -145,13 +151,18 @@ export async function writeCollectionAudit(
     definition: AuditEventDefinition<CollectionAuditData>;
     /** Database user ID that owns the collection. */
     ownerUserId: number;
+    /** Source mutation time, defaulting to the time of the audit write. */
+    occurredAt?: Date;
+    /** Require staff permission even when the actor owns the item. */
+    permissionRequired?: boolean;
     /** Required explanation for staff moderation. */
     reason?: string;
     /** Collection or collection-item database ID. */
     targetId: number;
   },
 ) {
-  const moderating = input.actorUser.id !== input.ownerUserId;
+  const moderating =
+    input.permissionRequired || input.actorUser.id !== input.ownerUserId;
   const reason = input.reason?.trim();
   if (moderating && !hasPermission(input.actor, "collections.manage")) {
     throw new Error("Collection does not exist.");
@@ -169,7 +180,7 @@ export async function writeCollectionAudit(
       : { type: "owner" },
     data: { after: input.after, before: input.before },
     definition: input.definition,
-    occurredAt: new Date(),
+    occurredAt: input.occurredAt ?? new Date(),
     ownerUserId: input.ownerUserId,
     reason,
     targetId: String(input.targetId),
