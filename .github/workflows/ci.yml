@@ -5,15 +5,77 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+  schedule:
+    - cron: "17 13 * * *"
 
 permissions:
   contents: read
 
 jobs:
+  classify-changes:
+    name: Classify Changes
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.classify.outputs.api }}
+      scraper: ${{ steps.classify.outputs.scraper }}
+      web: ${{ steps.classify.outputs.web }}
+      database: ${{ steps.classify.outputs.database }}
+      storybook: ${{ steps.classify.outputs.storybook }}
+      safe_e2e: ${{ steps.classify.outputs.safe_e2e }}
+      mutation_e2e: ${{ steps.classify.outputs.mutation_e2e }}
+      validation: ${{ steps.classify.outputs.validation }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify changes
+        id: classify
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          EVENT_ACTION: ${{ github.event.action }}
+          EVENT_LABEL: ${{ github.event.label.name }}
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          if ! node scripts/classify-changes.mjs; then
+            for domain in api scraper web database storybook safe_e2e mutation_e2e validation; do
+              echo "$domain=true" >> "$GITHUB_OUTPUT"
+            done
+          fi
+
+  security:
+    name: Security
+    if: github.event_name != 'pull_request' || (github.event.action != 'labeled' && github.event.action != 'unlabeled')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm security:audit
+
   changeset:
     name: Changeset
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.action != 'labeled' && github.event.action != 'unlabeled'
     runs-on: ubuntu-latest
 
     steps:
@@ -36,6 +98,12 @@ jobs:
 
   scraper-artifact:
     name: Scraper Artifact
+    needs: [security, classify-changes]
+    if: >-
+      always() &&
+      needs.classify-changes.result == 'success' &&
+      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
+      needs.classify-changes.outputs.scraper == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -48,7 +116,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
@@ -62,6 +130,12 @@ jobs:
 
   api-artifact:
     name: API Artifact
+    needs: [security, classify-changes]
+    if: >-
+      always() &&
+      needs.classify-changes.result == 'success' &&
+      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
+      needs.classify-changes.outputs.api == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -74,7 +148,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
@@ -88,6 +162,12 @@ jobs:
 
   web-artifact:
     name: Web Artifact
+    needs: [security, classify-changes]
+    if: >-
+      always() &&
+      needs.classify-changes.result == 'success' &&
+      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
+      needs.classify-changes.outputs.web == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -100,7 +180,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
@@ -123,6 +203,12 @@ jobs:
 
   lint:
     name: Lint and Typecheck
+    needs: [security, classify-changes]
+    if: >-
+      always() &&
+      needs.classify-changes.result == 'success' &&
+      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
+      needs.classify-changes.outputs.validation == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -135,7 +221,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
@@ -155,6 +241,12 @@ jobs:
 
   test:
     name: Test
+    needs: [security, classify-changes]
+    if: >-
+      always() &&
+      needs.classify-changes.result == 'success' &&
+      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
+      needs.classify-changes.outputs.validation == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -167,7 +259,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
@@ -178,6 +270,12 @@ jobs:
 
   storybook-test:
     name: Storybook Tests
+    needs: [security, classify-changes]
+    if: >-
+      always() &&
+      needs.classify-changes.result == 'success' &&
+      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
+      needs.classify-changes.outputs.storybook == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -190,7 +288,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies
@@ -204,6 +302,12 @@ jobs:
 
   drizzle-check:
     name: Drizzle Migration Check
+    needs: [security, classify-changes]
+    if: >-
+      always() &&
+      needs.classify-changes.result == 'success' &&
+      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
+      needs.classify-changes.outputs.database == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -216,7 +320,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.20.0
           cache: pnpm
 
       - name: Install dependencies

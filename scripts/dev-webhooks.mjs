@@ -61,7 +61,7 @@ delete webEnv.CLOUDFLARE_ACCOUNT_ID;
 delete webEnv.CLOUDFLARE_API_TOKEN;
 delete webEnv.INS_ID;
 /** Local web development server child process. */
-const web = spawn("pnpm", ["dev:web"], {
+const web = spawn("pnpm", ["dev"], {
   cwd: repoRoot,
   env: webEnv,
   stdio: "inherit",
@@ -306,7 +306,7 @@ async function assertClerkLink() {
     diagnostics = JSON.parse(await run("clerk", ["doctor", "--json"]));
   } catch {
     throw new Error(
-      "Clerk CLI health check failed; dev:web:webhooks requires an authenticated, linked Clerk CLI.",
+      "Clerk CLI health check failed; dev:webhooks requires an authenticated, linked Clerk CLI.",
     );
   }
   if (!Array.isArray(diagnostics)) {
@@ -328,7 +328,7 @@ async function assertClerkLink() {
     !project.detail.includes(`Dev instance: ${clerkInstanceId}`)
   ) {
     throw new Error(
-      `dev:web:webhooks is not linked to the Clerk app and development instance configured in Infisical /local/clerk.`,
+      `dev:webhooks is not linked to the Clerk app and development instance configured in Infisical /local/clerk.`,
     );
   }
 }

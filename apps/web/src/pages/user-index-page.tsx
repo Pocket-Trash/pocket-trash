@@ -13,7 +13,7 @@ import {
   Settings,
   User,
 } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
+import { UserPageShell } from "@/components/user-page-shell";
 import { useLocale } from "@/providers/locale-provider";
 
 /**
@@ -84,7 +84,7 @@ export function UserIndexPage({
   ];
 
   return (
-    <AppShell title={t("web.navigation.user")}>
+    <UserPageShell contentClassName="p-0" title={t("web.navigation.user")}>
       <main className="grid w-full max-w-3xl gap-3 p-4 md:grid-cols-2 md:p-6">
         {links.map(({ icon: Icon, label, to }) => (
           <Link
@@ -97,6 +97,6 @@ export function UserIndexPage({
           </Link>
         ))}
       </main>
-    </AppShell>
+    </UserPageShell>
   );
 }

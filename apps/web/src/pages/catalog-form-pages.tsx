@@ -30,6 +30,7 @@ import {
 } from "@/components/collection-form";
 import { CollectionSelector } from "@/components/collection-selector";
 import type { MarkdownEditorHandle } from "@/components/markdown-editor";
+import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
 import { FileDropInput } from "@/components/resource-file-input";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +39,7 @@ import {
   type ComboboxOption,
 } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import { UserPageShell } from "@/components/user-page-shell";
 import { filterButtonsByDiameter, finishOptionLabel } from "@/lib/catalog";
 import {
   addCollectionProduct,
@@ -46,6 +48,7 @@ import {
   createCatalogFinish,
   createCatalogMaker,
   createCatalogMaterial,
+  deleteCollectionItem,
   deleteUserCollection,
   finishOptionSchema,
   type ProductFormInput,
@@ -1269,10 +1272,12 @@ export function CollectionFormPage({
   }
 
   return (
-    <AppShell
+    <UserPageShell
       breadcrumbItems={[
         { label: t("web.navigation.collections"), to: "/user/collections" },
       ]}
+      contentClassName="p-0"
+      section="collections"
       title={
         current
           ? t("web.collections.edit.title")
@@ -1419,17 +1424,46 @@ export function CollectionFormPage({
             ) : null}
           </div>
         ) : null}
-        {current && deletion ? (
+        {current?.canEdit && deletion ? (
           <div className="lg:col-span-2">
             <CollectionDeletionSection
               collection={current}
               destinations={deletion.destinations}
               itemCount={deletion.itemCount}
+              onSubmit={async (choice, destinationId, reason) => {
+                if (choice === "archive") {
+                  await setCollectionVisibility({
+                    data: { collectionId: current.id, isPrivate: true, reason },
+                  });
+                  await navigate({
+                    params: { collectionId: current.id },
+                    to: "/user/collections/$collectionId",
+                  });
+                } else {
+                  await deleteUserCollection({
+                    data: {
+                      collectionId: current.id,
+                      confirmed: true,
+                      destinationCollectionId:
+                        choice === "move" ? destinationId : null,
+                      reason,
+                    },
+                  });
+                  await navigate(
+                    choice === "move" && destinationId !== null
+                      ? {
+                          params: { collectionId: destinationId },
+                          to: "/user/collections/$collectionId",
+                        }
+                      : { to: "/user/collections" },
+                  );
+                }
+              }}
             />
           </div>
         ) : null}
       </main>
-    </AppShell>
+    </UserPageShell>
   );
 }
 
@@ -1440,12 +1474,14 @@ export function CollectionFormPage({
  * @param props.collection - Collection being changed.
  * @param props.destinations - Collections eligible to receive moved items.
  * @param props.itemCount - Number of affected items.
+ * @param props.onSubmit - Authorized archive, delete, or move operation and navigation.
  * @returns The collection deletion controls.
  */
-function CollectionDeletionSection({
+export function CollectionDeletionSection({
   collection,
   destinations,
   itemCount,
+  onSubmit,
 }: {
   /** Collection being changed. */
   collection: UserCollectionSummary;
@@ -1453,9 +1489,22 @@ function CollectionDeletionSection({
   destinations: UserCollectionSummary[];
   /** Number of affected items. */
   itemCount: number;
+  /**
+   * Commits the selected action and navigates away on success.
+   *
+   * @param choice - Archive, delete all contents, or move items before deleting.
+   * @param destinationId - Required same-owner destination when moving items.
+   * @param reason - Required nonblank staff reason for cross-owner intervention.
+   * @returns Completion after the operation commits.
+   * @rejects When the action fails.
+   */
+  onSubmit(
+    choice: "archive" | "delete" | "move",
+    destinationId: number | null,
+    reason?: string,
+  ): Promise<void>;
 }) {
   const t = useCatalogCopy();
-  const navigate = useNavigate();
   const dialog = React.useRef<HTMLDialogElement>(null);
   const [choice, setChoice] = React.useState<"archive" | "delete" | "move">(
     "archive",
@@ -1464,6 +1513,10 @@ function CollectionDeletionSection({
   const [destinationId, setDestinationId] = React.useState<number | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
+  const [reason, setReason] = React.useState("");
+  const reasonId = React.useId();
+  const titleId = React.useId();
+  const moderating = Boolean(collection.canAdminister && !collection.isOwner);
   const destination = destinations.find(({ id }) => id === destinationId);
   const destructive = choice !== "archive";
 
@@ -1478,13 +1531,17 @@ function CollectionDeletionSection({
         {t("web.collections.deletion.open")}
       </Button>
       <dialog
-        aria-labelledby="collection-deletion-title"
+        aria-labelledby={titleId}
         className="m-auto w-[min(36rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
         onClose={() => {
           setChoice("archive");
           setConfirmed(false);
           setDestinationId(null);
           setFailed(false);
+          setReason("");
+        }}
+        onCancel={(event) => {
+          if (submitting) event.preventDefault();
         }}
         ref={dialog}
       >
@@ -1495,61 +1552,29 @@ function CollectionDeletionSection({
             if (
               submitting ||
               (destructive && !confirmed) ||
-              (choice === "move" && destinationId === null)
+              (choice === "move" && destinationId === null) ||
+              (moderating && !reason.trim())
             ) {
               return;
             }
-            const moderating = Boolean(
-              collection.canAdminister && !collection.isOwner,
-            );
-            const reason = moderating
-              ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
-              : undefined;
-            if (moderating && !reason) return;
             setFailed(false);
             setSubmitting(true);
             try {
-              if (choice === "archive") {
-                await setCollectionVisibility({
-                  data: {
-                    collectionId: collection.id,
-                    isPrivate: true,
-                    reason,
-                  },
-                });
-                await navigate({
-                  params: { collectionId: collection.id },
-                  to: "/user/collections/$collectionId",
-                });
-              } else {
-                await deleteUserCollection({
-                  data: {
-                    collectionId: collection.id,
-                    destinationCollectionId:
-                      choice === "move" ? destinationId : null,
-                    reason,
-                  },
-                });
-                await navigate(
-                  choice === "move" && destinationId !== null
-                    ? {
-                        params: { collectionId: destinationId },
-                        to: "/user/collections/$collectionId",
-                      }
-                    : { to: "/user/collections" },
-                );
-              }
+              await onSubmit(
+                choice,
+                destinationId,
+                moderating ? reason.trim() : undefined,
+              );
+              dialog.current?.close();
             } catch {
               setFailed(true);
+            } finally {
               setSubmitting(false);
             }
           }}
         >
           <fieldset className="grid gap-3">
-            <legend
-              className="mb-2 text-xl font-semibold"
-              id="collection-deletion-title"
-            >
+            <legend className="mb-2 text-xl font-semibold" id={titleId}>
               {t("web.collections.deletion.open")}
             </legend>
             {(
@@ -1617,8 +1642,30 @@ function CollectionDeletionSection({
                 onChange={(event) => setConfirmed(event.target.checked)}
                 type="checkbox"
               />
-              <span>{t("web.erasure.self.confirm")}</span>
+              <span>
+                {t(
+                  choice === "move"
+                    ? "web.collections.deletion.moveConfirmation"
+                    : "web.collections.deletion.deleteConfirmation",
+                )}
+              </span>
             </label>
+          ) : null}
+          {moderating ? (
+            <div className="grid gap-2">
+              <label htmlFor={reasonId}>
+                {t("web.resources.moderation.reasonLabel")}
+              </label>
+              <textarea
+                id={reasonId}
+                className="min-h-20 rounded-md border border-input bg-background p-3 text-foreground"
+                required
+                maxLength={1000}
+                disabled={submitting}
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+              />
+            </div>
           ) : null}
           {failed ? (
             <p aria-live="polite" className="m-0 text-sm text-destructive">
@@ -1638,7 +1685,8 @@ function CollectionDeletionSection({
               disabled={
                 submitting ||
                 (destructive && !confirmed) ||
-                (choice === "move" && destinationId === null)
+                (choice === "move" && destinationId === null) ||
+                (moderating && !reason.trim())
               }
               type="submit"
               variant={destructive ? "destructive" : "default"}
@@ -2907,6 +2955,27 @@ export function CollectionEditPage({
           {t("action.save")}
         </Button>
         {formError ? <Notice>{t(formError)}</Notice> : null}
+        {item.canEdit ? (
+          <PermanentDeletionControls
+            name={item.displayName}
+            targetType="collection_item"
+            reasonRequired={Boolean(item.canAdminister && !item.isOwner)}
+            onDelete={async (reason) => {
+              const result = await deleteCollectionItem({
+                data: {
+                  collectionItemId: item.collectionItemId,
+                  confirmed: true,
+                  reason,
+                },
+              });
+              if (!result.ok) throw new Error(result.formError);
+              await navigate({
+                params: { collectionId: item.collectionId },
+                to: "/user/collections/$collectionId",
+              });
+            }}
+          />
+        ) : null}
       </main>
     </AppShell>
   );

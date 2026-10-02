@@ -91,6 +91,48 @@ vi.mock("@/components/app-shell", () => ({
   ),
 }));
 
+vi.mock("@/components/user-page-shell", () => ({
+  /**
+   * Renders a minimal user shell for catalog page tests.
+   *
+   * @param root0 - User shell properties.
+   * @param root0.breadcrumbItems - Additional breadcrumb labels.
+   * @param root0.children - Nested page content.
+   * @param root0.headerActions - Header controls.
+   * @param root0.title - Page title.
+   * @returns The test user shell.
+   */
+  UserPageShell: ({
+    breadcrumbItems = [],
+    children,
+    headerActions,
+    title,
+  }: {
+    /** Additional breadcrumb labels. */
+    breadcrumbItems?: Array<{
+      /** Visible breadcrumb label. */
+      label: string;
+    }>;
+    /** Nested page content. */
+    children: React.ReactNode;
+    /** Header controls. */
+    headerActions?: React.ReactNode;
+    /** Page title. */
+    title: string;
+  }) => (
+    <div
+      data-breadcrumbs={[
+        "User",
+        ...breadcrumbItems.map(({ label }) => label),
+        title,
+      ].join(" > ")}
+    >
+      {headerActions}
+      {children}
+    </div>
+  ),
+}));
+
 vi.mock("@/providers/locale-provider", () => ({
   /**
    * Returns the fixed test locale.
@@ -228,14 +270,22 @@ describe("PublicCollectionsPage", () => {
 });
 
 describe("UserCollectionsPage", () => {
-  it("nests collections under the user breadcrumb", () => {
+  it("places filters and actions above the collection cards", () => {
     const html = renderToStaticMarkup(
-      <UserCollectionsPage collections={[]} items={[]} />,
+      <UserCollectionsPage
+        collections={owners[0]?.collections ?? []}
+        items={owners[0]?.items ?? []}
+        onFiltersChange={vi.fn()}
+      />,
     );
 
     expect(html).toContain('data-breadcrumbs="User &gt; Collections"');
     expect(html).not.toContain("Add to collection");
     expect(html).toContain("Add collection");
+    expect(html.indexOf("<main")).toBeLessThan(html.indexOf("More filters"));
+    expect(html.indexOf("More filters")).toBeLessThan(
+      html.indexOf("Daily Carry"),
+    );
   });
 });
 
@@ -258,6 +308,25 @@ describe("CollectionPage", () => {
     expect(html).toContain("Add to collection");
     expect(html.indexOf("Edit")).toBeLessThan(html.indexOf("Public"));
     expect(html).toContain("lg:grid-cols-2");
+  });
+
+  it("places user-area filters above the collection summary", () => {
+    const collection = owners[0]?.collections[0];
+    if (!collection) throw new Error("Collection fixture is required.");
+
+    const html = renderToStaticMarkup(
+      <CollectionPage
+        collection={collection}
+        items={owners[0]?.items ?? []}
+        onFiltersChange={vi.fn()}
+        userArea
+      />,
+    );
+
+    const content = html.slice(html.indexOf("<main"));
+    expect(content.indexOf("More filters")).toBeLessThan(
+      content.indexOf(collection.name),
+    );
   });
 
   it("keeps descriptions and bearings off collection lists", () => {

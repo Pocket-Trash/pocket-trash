@@ -41,10 +41,10 @@ test("@mutation collection covers survive failures and retain reusable history",
   const fixture = await createMutationFixture();
   const database = createDb({ databaseUrl });
   const firstImage = fileURLToPath(
-    new URL("../public/images/tmp/7866240630971-2.jpg", import.meta.url),
+    new URL("./fixtures/collection-covers/red.png", import.meta.url),
   );
   const secondImage = fileURLToPath(
-    new URL("../public/images/tmp/8104228421819-2.jpg", import.meta.url),
+    new URL("./fixtures/collection-covers/blue.png", import.meta.url),
   );
   const collectionName = `Cover lifecycle ${crypto.randomUUID()}`;
   const objectPaths = new Set<string>();

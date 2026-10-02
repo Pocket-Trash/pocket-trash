@@ -44,8 +44,10 @@ export const userCollection = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    /** Canonical per-owner key used to prevent duplicate collection names. */
     normalizedName: text("normalized_name").notNull(),
     description: text("description"),
+    /** Whether public routes hide the collection and its items. */
     isPrivate: boolean("is_private").default(true).notNull(),
     privateReason: text("private_reason"),
     privatedAt: timestamp("privated_at", { mode: "date", withTimezone: true }),
@@ -89,7 +91,9 @@ export const collectionItem = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     collectionId: bigint("collection_id", { mode: "number" }).notNull(),
+    /** Optional owner-defined name shown instead of the product name. */
     displayName: text("display_name"),
+    /** Optional Markdown description shown instead of the product description. */
     description: text("description"),
     materialId: bigint("material_id", { mode: "number" }).references(
       () => material.id,
@@ -100,16 +104,21 @@ export const collectionItem = pgTable(
     purchasedFromUserId: bigint("purchased_from_user_id", {
       mode: "number",
     }).references(() => user.id, { onDelete: "set null" }),
+    /** Free-text seller name used when no application user row exists. */
     purchasedFromUser: text("purchased_from_user"),
     soldToUserId: bigint("sold_to_user_id", { mode: "number" }).references(
       () => user.id,
       { onDelete: "set null" },
     ),
+    /** Free-text buyer name used when no application user row exists. */
     soldToUser: text("sold_to_user"),
+    /** Whether the item is currently owned by its owner. */
     owned: boolean("owned").notNull().default(true),
+    /** Administrative review state for public catalog visibility. */
     approvalStatus: text("approval_status", { enum: productApprovalStatuses })
       .default("pending")
       .notNull(),
+    /** Nonblank reason for the latest administrative decision. */
     approvalDecisionReason: text("approval_decision_reason"),
     approvalDecidedAt: timestamp("approval_decided_at", {
       mode: "date",
@@ -171,14 +180,18 @@ export const collectionImage = pgTable(
     collectionId: bigint("collection_id", { mode: "number" })
       .notNull()
       .references(() => userCollection.id, { onDelete: "cascade" }),
+    /** Whether this image is the collection's selected cover. */
     isCurrent: boolean("is_current").default(false).notNull(),
+    /** Stable zero-based display order within the collection. */
     position: integer("position").notNull(),
     fileName: text("file_name").notNull(),
     contentType: text("content_type").notNull(),
     size: integer("size").notNull(),
+    /** Exact-byte duplicate-detection hash. */
     sha256: text("sha256").notNull(),
     storageProvider: text("storage_provider").default("bunny").notNull(),
     objectPath: text("object_path").notNull(),
+    /** Unsigned CDN URL stored for the image. */
     url: text("url").notNull(),
     uploadedByClerkId: text("uploaded_by_clerk_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
@@ -220,18 +233,22 @@ export const product = pgTable(
     ownerClerkId: text("owner_clerk_id"),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    /** Optional product description stored as Markdown. */
     description: text("description"),
+    /** Current administrative review state. */
     approvalStatus: text("approval_status", {
       enum: productApprovalStatuses,
     })
       .default("pending")
       .notNull(),
+    /** Reason supplied for the latest administrative review transition. */
     approvalDecisionReason: text("approval_decision_reason"),
     approvalDecidedAt: timestamp("approval_decided_at", {
       mode: "date",
       withTimezone: true,
     }),
     makerProductUrl: text("maker_product_url"),
+    /** Whether the maker product URL may be shown publicly. */
     makerProductUrlValid: boolean("maker_product_url_valid")
       .default(true)
       .notNull(),
@@ -449,13 +466,16 @@ export const finishOption = pgTable(
     collectionItemId: bigint("collection_item_id", {
       mode: "number",
     }).references(() => collectionItem.id, { onDelete: "cascade" }),
+    /** Catalog option copied into this collection-item snapshot. */
     sourceProductFinishOptionId: bigint("source_product_finish_option_id", {
       mode: "number",
     }).references((): AnyPgColumn => finishOption.id, { onDelete: "set null" }),
+    /** Optional relationship between the selected colors. */
     colorEffectId: bigint("color_effect_id", { mode: "number" }).references(
       () => colorEffect.id,
       { onDelete: "restrict" },
     ),
+    /** Zero-based option display order. */
     position: integer("position").notNull(),
   },
   (table) => [
@@ -484,6 +504,7 @@ export const finishOptionFinish = pgTable(
     finishId: bigint("finish_id", { mode: "number" })
       .notNull()
       .references(() => finish.id, { onDelete: "restrict" }),
+    /** Zero-based finish display order. */
     position: integer("position").notNull(),
   },
   (table) => [
@@ -506,6 +527,7 @@ export const finishOptionColor = pgTable(
     colorId: bigint("color_id", { mode: "number" })
       .notNull()
       .references(() => color.id, { onDelete: "restrict" }),
+    /** Zero-based color display order. */
     position: integer("position").notNull(),
   },
   (table) => [
@@ -604,9 +626,11 @@ export const collectionSpinner = pgTable(
     productSpinnerId: bigint("product_spinner_id", { mode: "number" })
       .notNull()
       .references(() => productSpinner.id, { onDelete: "restrict" }),
+    /** Owned spinner button currently installed on this spinner. */
     installedButtonId: bigint("installed_button_id", {
       mode: "number",
     }).references(() => collectionSpinnerButton.id, { onDelete: "set null" }),
+    /** Optional bearing override for this owned spinner. */
     bearing: text("bearing"),
   },
   (table) => [

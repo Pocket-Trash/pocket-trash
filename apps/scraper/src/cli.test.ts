@@ -34,11 +34,10 @@ describe("scraper CLI", () => {
     });
   });
 
-  it("parses compact source scrape commands", () => {
-    expect(parseCommand(["scrape:autmog"])).toEqual({
-      source: "autmog",
-      type: "scrape",
-    });
+  it("rejects removed compact source scrape commands", () => {
+    expect(() => parseCommand(["scrape:autmog"])).toThrow(
+      "Expected cron:run, scrape, scrape <source>, process:queue, or process:dead-letter.",
+    );
   });
 
   it("parses queue processor commands", () => {

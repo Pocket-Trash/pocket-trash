@@ -66,7 +66,7 @@ export const resources = pgTable(
   ],
 );
 
-/** Ordered images attached to resources. */
+/** Ordered images attached to resources; position zero is the cover image. */
 export const resourceImages = pgTable(
   "resource_images",
   {
@@ -99,7 +99,7 @@ export const resourceImages = pgTable(
   ],
 );
 
-/** Immutable uploaded versions of resources. */
+/** Immutable uploaded file versions of resources. */
 export const resourceVersions = pgTable(
   "resource_versions",
   {

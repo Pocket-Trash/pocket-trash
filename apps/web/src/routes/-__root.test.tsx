@@ -6,8 +6,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * Controls settings responses and warning logs for root-route tests.
  */
 const mocks = vi.hoisted(() => ({
+  getCookie: vi.fn(),
   getSettings: vi.fn(),
   warn: vi.fn(),
+}));
+
+vi.mock("@tanstack/react-start/server", () => ({
+  getCookie: mocks.getCookie,
 }));
 
 vi.mock("@/lib/user-settings", () => ({
@@ -82,6 +87,7 @@ import { Route } from "./__root";
 describe("root route loader", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getCookie.mockReturnValue(undefined);
   });
 
   it("fails open when optional user settings cannot load", async () => {
@@ -138,6 +144,21 @@ describe("root route loader", () => {
     vi.useRealTimers();
   });
 
+  it("loads validated interface preferences from the request cookie", async () => {
+    mocks.getSettings.mockResolvedValue(null);
+    mocks.getCookie.mockReturnValue(JSON.stringify({ sidebarCollapsed: true }));
+    const loader = Route.options.loader;
+
+    expect(typeof loader).toBe("function");
+    if (typeof loader !== "function")
+      throw new Error("Root loader is missing.");
+
+    await expect(loader({} as never)).resolves.toMatchObject({
+      uiPreferences: { sidebarCollapsed: true },
+    });
+    expect(mocks.getCookie).toHaveBeenCalledWith("pocket-trash.ui-preferences");
+  });
+
   it("owns exactly one footer around routed content", () => {
     vi.spyOn(Route, "useLoaderData").mockReturnValue({
       copyrightYear: 2031,
@@ -146,6 +167,7 @@ describe("root route loader", () => {
         serverTheme: null,
         shouldUseServerTheme: false,
       },
+      uiPreferences: { sidebarCollapsed: false },
     });
     const RootComponent = Route.options.component;
 

@@ -106,6 +106,7 @@ export const collectionAudit = {
     "collections.collection",
   ),
   itemCreated: definition("collections.item.created", "collections.item"),
+  itemDeleted: definition("collections.item.deleted", "collections.item"),
   itemUpdated: definition("collections.item.updated", "collections.item"),
   itemMoved: definition("collections.item.moved", "collections.item"),
   itemVisibilityChanged: definition(

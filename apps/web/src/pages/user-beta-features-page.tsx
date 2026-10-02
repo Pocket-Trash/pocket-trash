@@ -45,7 +45,10 @@ export function UserBetaFeaturesPage() {
   }, [failedToLoadText]);
 
   return (
-    <UserPageShell title={t("web.navigation.betaFeatures")}>
+    <UserPageShell
+      section="beta-features"
+      title={t("web.navigation.betaFeatures")}
+    >
       <div className="mx-auto grid max-w-3xl gap-3">
         {status ? (
           <Badge className="bg-destructive text-destructive-foreground">

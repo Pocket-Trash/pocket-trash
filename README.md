@@ -2,7 +2,7 @@
 
 Monorepo for the pocket-trash.app apps and shared packages.
 
-## Getting started
+## Setup
 
 ### Prerequisites
 
@@ -11,92 +11,51 @@ Monorepo for the pocket-trash.app apps and shared packages.
 - pnpm 10.33.2, provided by the repo `packageManager` setting
 - Infisical CLI access to the `Pocket Trash` project (`pocket-trash` slug)
 
-### Installing and configuring Infisical
+### Install and configure Infisical
 
-This repo uses the Infisical project `Pocket Trash` (`pocket-trash` slug) for local Development secrets.
-Production and preview host secrets are synced from Infisical into the hosting
-platform where possible.
-
-See [Environment Variables](docs/environment-variables.md) for app-specific
-runtime variables.
+This repo uses the Infisical project `Pocket Trash` (`pocket-trash` slug) for
+local development secrets. Production and preview host secrets are synced from
+Infisical into the hosting platform where possible.
 
 1. Install the official Infisical CLI for your OS:
    <https://infisical.com/docs/cli/overview>
-
-2. Confirm the CLI is available:
-
-   ```sh
-   infisical --version
-   ```
-
-3. Authenticate with Infisical:
-
-   ```sh
-   infisical login
-   ```
-
-4. Test local Infisical access:
+2. Authenticate with `infisical login`.
+3. Verify local access:
 
    ```sh
    infisical run --env=dev --path=/local/smoke -- node -e "console.log(process.env.TEST)"
    ```
 
-   You should see:
-
-   ```txt
-   Infisical working
-   ```
-
-5. For app-specific environment variables and secret paths, see
-   [Environment Variables](docs/environment-variables.md).
-
-6. Confirm the app secret folders you need exist in Infisical:
-
+   The command should print `Infisical working`.
+4. Confirm the app secret folders you need exist:
    - `/apps/web` in `dev`, `preview`, and `prod`
    - `/apps/scraper` in `dev`
-   - `/tools/logger-axiom-test` in `dev`, if running the live Axiom logger test
+   - `/tools/logger-axiom-test` in `dev`, when running the live Axiom logger test
 
-### Install deps and set up the repo after Infisical
+See [Environment Variables](docs/environment-variables.md) for secret paths,
+runtime ownership, and links to the authoritative source schemas.
 
-After cloning the repo and confirming Infisical access, install dependencies from
-the repo root:
+### Install the repository
 
 ```sh
 corepack enable
 pnpm install
-```
-
-Install the shared Pocket Trash agent skills from GitHub:
-
-```sh
 pnpm agent-skills:update
+pnpm infisical:check
 ```
 
-Run the baseline checks before starting app work:
+`pnpm agent-skills:update` installs the shared Pocket Trash agent skills in a
+Git clone. Worktrees created by the Pocket Trash CLI install them automatically.
 
-```sh
-pnpm format
-pnpm lint
-pnpm typecheck
-```
+| Command | What it does |
+| --- | --- |
+| `pnpm agent-skills:update` | Installs or updates the shared Pocket Trash agent skills. |
+| `pnpm infisical:check` | Verifies local Infisical CLI authentication. |
 
-### Developing the web app and API
+### Test localizations with yalc
 
-Run the TanStack Start web app and Cloudflare API Worker from the repo root:
-
-```sh
-pnpm dev:web
-```
-
-### Testing localizations locally with yalc
-
-Install yalc once:
-
-```sh
-pnpm add -g yalc
-```
-
-Build and publish the sibling `localizations` repo:
+Install yalc once with `pnpm add -g yalc`, then build and publish the sibling
+`localizations` repo:
 
 ```sh
 cd ../localizations
@@ -105,7 +64,7 @@ pnpm build
 yalc publish
 ```
 
-Add it in Pocket Trash:
+Link it into Pocket Trash:
 
 ```sh
 cd ../pocket-trash
@@ -113,60 +72,106 @@ yalc add @pocket-trash/localizations --link
 pnpm install
 ```
 
-After localization changes:
+After localization changes, run `pnpm build && yalc push` from the
+`localizations` repo. See
+[Localizations Local Dev With yalc](docs/localizations-yalc-local-dev.md) for
+details.
 
-```sh
-cd ../localizations
-pnpm build
-yalc push
-```
+## Development
 
-For further information, see
-[Localizations Local Dev With yalc](docs/localizations-yalc-local-dev.md).
+Local development commands load development secrets from Infisical.
+
+| Command | What it does |
+| --- | --- |
+| `pnpm dev` | Starts the web app, API, and logger watcher. |
+| `pnpm dev:all` | Starts every app, including the scraper, plus the logger watcher. |
+| `pnpm dev:verbose` | Starts the web app, API, and logger watcher with Infisical provider information. |
+| `pnpm dev:webhooks` | Reconciles Clerk users, starts `pnpm dev`, opens Clerk and Cloudflare relays, and registers the temporary webhook targets. |
+| `pnpm storybook` | Starts the web Storybook server without opening a browser. |
+
+Set `INFISICAL_RUNNER_VERBOSE=1` when running `pnpm dev:all` if provider details
+are needed. Webhook setup and relay requirements are documented in
+[Development Webhook Forwarding](docs/clerk-webhooks.md).
+
+## Build and validation
+
+| Command | What it does |
+| --- | --- |
+| `pnpm build` | Builds all apps and packages through Turborepo. |
+| `pnpm build:ci` | Builds all apps and packages with CI-provided environment variables. |
+| `pnpm format` | Formats files and organizes imports with Biome. |
+| `pnpm lint` | Runs repository ESLint and the complete JSDoc check. |
+| `pnpm lint:jsdoc` | Checks JSDoc on eligible tracked JavaScript and TypeScript declarations. |
+| `pnpm typecheck` | Typechecks all apps and packages through Turborepo. |
+
+## Tests
+
+Local `pnpm test` requires `infisical login`. Use `pnpm test:ci` for the CI-style
+suite without the Infisical authentication check.
+
+| Command | What it does |
+| --- | --- |
+| `pnpm test` | Runs repository checks and all app and package tests with local secrets where required. |
+| `pnpm test:ci` | Runs repository checks and CI test tasks without local Infisical authentication. |
+| `pnpm test:jsdoc` | Tests the repository JSDoc checker. |
+| `pnpm test:logger:axiom` | Runs the live Axiom logger integration test. |
+| `pnpm test:watch` | Starts supported tests in watch mode with development secrets. |
+| `pnpm test:watch:no-infisical` | Starts supported tests in watch mode without Infisical. |
+| `pnpm test:workflows` | Tests repository workflow and command contracts. |
+
+## Deployment and database
+
+| Command | What it does |
+| --- | --- |
+| `pnpm changeset` | Creates release metadata for a change. |
+| `pnpm db:generate` | Generates a database migration from schema changes. |
+| `pnpm db:migrate` | Applies database migrations. |
+| `pnpm db:resolve-conflicts` | Resolves Drizzle migration history conflicts. |
+| `pnpm db:seed` | Seeds the selected database. |
+| `pnpm db:view` | Opens the local database viewer. |
+| `pnpm deploy` | Deploys the production API Worker. |
+| `pnpm deploy:development` | Deploys the development API Worker. |
+| `pnpm deploy:preview` | Deploys the preview API Worker. |
+| `pnpm release` | Applies pending Changesets and runs the repository release workflow. |
+
+## Scraper
+
+Root scraper commands start or reuse local Docker/OrbStack Redis and inject the
+scraper secrets from Infisical.
+
+| Command | What it does |
+| --- | --- |
+| `pnpm dev:scraper` | Starts the scraper in watch mode. |
+| `pnpm scraper:cron` | Runs one local scraper cron cycle and exits. |
+| `pnpm scraper:process:dead-letter` | Processes the scraper dead-letter queue. |
+| `pnpm scraper:process:queue` | Processes the scraper work queue. |
+| `pnpm scraper:scrape -- <source>` | Scrapes one source, such as `autmog` or `grimsmo-saga`. |
+| `pnpm start` | Starts the built scraper cron service. |
+
+See [Railway](docs/railway.md) for deployment behavior and all supported source
+keys.
+
+## Operations
+
+| Command | What it does |
+| --- | --- |
+| `pnpm bunny:audit` | Audits configured Bunny services, billing, and usage. |
+| `pnpm diagram:infra` | Regenerates the infrastructure diagram and metadata. |
+| `pnpm figjam` | Runs the FigJam CLI with supplied arguments. |
+| `pnpm figjam:read` | Reads the configured FigJam/Figma file into `.figjam/cache`. |
+| `pnpm figjam:serve` | Serves validated `.figjam/outbox` payloads to the local plugin bridge. |
+| `pnpm logger:axiom:map-fields` | Configures the Axiom field mapping used by the logger. |
+| `pnpm resources:reconcile-storage` | Reconciles database resource records with object storage. |
+| `pnpm users:reconcile` | Reconciles Clerk users into the application database. |
 
 ## AI commands
 
 | Task | Claude | Codex | What it does |
 | --- | --- | --- | --- |
 | List workflows | `/pocket-trash` | `$pocket-trash` | Lists Pocket Trash workflow subcommands. |
-| Commit | `/pocket-trash commit` | `$pocket-trash commit` | Uses the shared `pocket-trash` router to write conventional commits for this monorepo. |
-| Create PR | `/pocket-trash pr-create` | `$pocket-trash pr-create` | Uses the shared `pocket-trash` router to create a GitHub PR from the current branch and commits. |
-| FigJam | `/pocket-trash figjam` | `$pocket-trash figjam` | Uses shared FigJam tooling to read allowed FigJam/Figma files, generate plugin payloads, and update planning/design boards through the private plugin bridge. |
-| Grill me | `/pocket-trash grill-me` | `$pocket-trash grill-me` | Uses the shared `pocket-trash` router to stress-test a plan or design by walking through decision-tree questions one at a time. |
-| Update PR | `/pocket-trash pr-update` | `$pocket-trash pr-update` | Uses the shared `pocket-trash` router to refresh an existing PR title and description from branch commits and changes. |
-| Review PR | `/pocket-trash pr-review` | `$pocket-trash pr-review` | Uses the shared `pocket-trash` router to review a PR: run the repo checks, review the diff for real defects, and report findings scoped to that PR. |
-
-## Running apps
-
-Local app dev commands use Infisical to load Development secrets. Configure the repo first before running them.
-
-| Command | What it does |
-| --- | --- |
-| `pnpm dev` | Starts app dev servers through Turborepo. |
-| `pnpm dev:verbose` | Starts app dev servers and shows Infisical provider information. |
-| `pnpm dev:web` | Starts the TanStack Start web app and Cloudflare API Worker. |
-| `pnpm dev:web:verbose` | Starts the web app and API with Infisical provider information. |
-| `pnpm dev:scraper` | Runs scraper development commands. |
-
-
-## Running tools
-
-Local `pnpm test` requires `infisical login` because it checks Infisical CLI auth
-before running app tests. Use `pnpm test:ci` for the CI-style test run without
-Infisical.
-
-| Command | What it does |
-| --- | --- |
-| `pnpm build` | Builds all apps and packages through Turborepo. |
-| `pnpm build:ci` | Builds all apps and packages through Turborepo with environment variables already provided. |
-| `pnpm figjam read` | Reads the configured FigJam/Figma file into `.figjam/cache`; run through `infisical run --env=dev --path=/local/figma -- pnpm figjam read`. |
-| `pnpm figjam serve-outbox` | Serves validated `.figjam/outbox` payloads to the private local FigJam plugin bridge. |
-| `pnpm lint` | Runs centralized ESLint across the repository, then checks complete JSDoc on all tracked source declarations. |
-| `pnpm lint:jsdoc` | Checks complete JSDoc on every eligible declaration in tracked, hand-authored JS/TS source, regardless of edits or staging. |
-| `pnpm format` | Runs Biome formatting and import organization with Biome linting disabled. |
-| `pnpm check` | Runs the same Biome formatting and import-organization pass as `pnpm format`. |
-| `pnpm typecheck` | Runs TypeScript typechecking across packages and apps. |
-| `pnpm test` | Checks local Infisical CLI auth, then runs app tests with Infisical Development secrets and package tests without secrets. |
-| `pnpm test:ci` | Runs local/unit tests without Infisical for CI. |
-| `pnpm test:watch` | Runs watch-mode app tests with Infisical Development secrets and package tests without secrets. |
-| `pnpm test:watch:no-infisical` | Runs watch-mode tests without Infisical where supported. |
+| Commit | `/pocket-trash commit` | `$pocket-trash commit` | Writes conventional commits for this monorepo. |
+| Create PR | `/pocket-trash pr-create` | `$pocket-trash pr-create` | Creates a GitHub PR from the current branch and commits. |
+| FigJam | `/pocket-trash figjam` | `$pocket-trash figjam` | Reads allowed FigJam/Figma files and updates boards through the plugin bridge. |
+| Grill me | `/pocket-trash grill-me` | `$pocket-trash grill-me` | Stress-tests a plan or design with focused questions. |
+| Update PR | `/pocket-trash pr-update` | `$pocket-trash pr-update` | Refreshes an existing PR title and description. |
+| Review PR | `/pocket-trash pr-review` | `$pocket-trash pr-review` | Runs repository checks and reviews a PR diff for defects. |

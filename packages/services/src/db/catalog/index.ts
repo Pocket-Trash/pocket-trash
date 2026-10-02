@@ -9,6 +9,7 @@ import {
   eq,
   inArray,
   isNotNull,
+  notInArray,
   or,
   sql,
 } from "drizzle-orm";
@@ -34,6 +35,10 @@ import {
   writeProductAudit,
 } from "../audit/products.js";
 import type { UsersService } from "../users/index.js";
+import {
+  collectionDeletionState,
+  collectionItemDeletionState,
+} from "./deletion-state.js";
 
 /**
  * Error raised for collection button already installed.
@@ -1403,11 +1408,31 @@ export type CollectionsService = {
   deleteCollection(input: {
     /** Actor requesting deletion. */
     actor: Actor;
+    /** Explicit acknowledgement of collection deletion. */
+    confirmed: boolean;
     /** Collection to delete. */
     collectionId: number;
     /** Collection receiving moved items, or null for permanent deletion. */
     destinationCollectionId: number | null;
     /** Required moderation reason when acting for another user. */
+    reason?: string;
+  }): Promise<void>;
+
+  /**
+   * Deletes only a currently owned selected item and its images, retaining linked items and catalog products.
+   *
+   * @param input - Confirmed owner or staff request with a reason for cross-owner intervention.
+   * @returns Completion after the deletion and audit event commit.
+   * @rejects When confirmation, authorization, auditing, persistence, or logging fails.
+   */
+  deleteItem(input: {
+    /** Authenticated actor. */
+    actor: Actor;
+    /** Item to permanently delete. */
+    collectionItemId: number;
+    /** Explicit acknowledgement of irreversible deletion. */
+    confirmed: boolean;
+    /** Required nonblank reason for cross-owner deletion. */
     reason?: string;
   }): Promise<void>;
 
@@ -3382,18 +3407,32 @@ export function createCollectionsService(
      * @rejects When a collection is inaccessible or persistence, audit writing, or operation logging fails.
      */
     async deleteCollection(input) {
+      if (input.confirmed !== true)
+        throw new Error("Collection deletion confirmation is required.");
       await logger.operation(
         loggerMessages.database.collections.delete,
         async () => {
-          const actorUser = await users.getByClerkId(input.actor.clerkId);
-          if (!actorUser) throw new Error("Collection does not exist.");
           await db.transaction(async (tx) => {
+            // Resolve identity under the same lock used by account erasure and audit triggers.
+            await tx.execute(
+              sql`select pg_advisory_xact_lock(hashtextextended(${`account-erasure:${input.actor.clerkId}`}, 0))`,
+            );
+            const [actorUser] = await tx
+              .select({ id: schema.user.id, username: schema.user.username })
+              .from(schema.user)
+              .where(eq(schema.user.clerkId, input.actor.clerkId));
+            if (!actorUser) throw new Error("Collection does not exist.");
             const collectionIds = [
               input.collectionId,
               ...(input.destinationCollectionId === null
                 ? []
                 : [input.destinationCollectionId]),
             ];
+            for (const id of [...new Set(collectionIds)].sort(
+              (a, b) => a - b,
+            )) {
+              await lockTarget(tx, { type: "collection", id });
+            }
             const collections = await tx
               .select({
                 id: schema.userCollection.id,
@@ -3427,6 +3466,60 @@ export function createCollectionsService(
             ) {
               throw new Error("Destination collection does not exist.");
             }
+
+            const reason = input.reason?.trim();
+            if (reason && reason.length > 1000)
+              throw new Error("Moderation reason is too long.");
+            if (source.ownerId !== actorUser.id && !reason)
+              throw new Error("A moderation reason is required.");
+            const candidateIds = (
+              await tx
+                .select({ id: schema.collectionItem.id })
+                .from(schema.collectionItem)
+                .where(eq(schema.collectionItem.collectionId, source.id))
+                .orderBy(asc(schema.collectionItem.id))
+            ).map(({ id }) => id);
+            for (const id of candidateIds)
+              await lockTarget(tx, { type: "collection_item", id });
+            // Recheck membership after locking: a concurrent move may have committed.
+            const itemIds = candidateIds.length
+              ? (
+                  await tx
+                    .select({ id: schema.collectionItem.id })
+                    .from(schema.collectionItem)
+                    .where(
+                      and(
+                        inArray(schema.collectionItem.id, candidateIds),
+                        eq(schema.collectionItem.collectionId, source.id),
+                      ),
+                    )
+                    .orderBy(asc(schema.collectionItem.id))
+                    .for("update")
+                ).map(({ id }) => id)
+              : [];
+            const before = await collectionDeletionState(tx, source.id);
+            const items = await collectionItemDeletionState(tx, itemIds);
+            const detachedSpinners =
+              !destination && itemIds.length
+                ? await tx
+                    .select({
+                      id: schema.collectionSpinner.id,
+                      installedButtonId:
+                        schema.collectionSpinner.installedButtonId,
+                    })
+                    .from(schema.collectionSpinner)
+                    .where(
+                      and(
+                        inArray(
+                          schema.collectionSpinner.installedButtonId,
+                          itemIds,
+                        ),
+                        notInArray(schema.collectionSpinner.id, itemIds),
+                      ),
+                    )
+                    .orderBy(asc(schema.collectionSpinner.id))
+                    .for("update")
+                : [];
 
             const collectionImages = await tx
               .select({ objectPath: schema.collectionImage.objectPath })
@@ -3480,11 +3573,19 @@ export function createCollectionsService(
               after: {
                 deleted: true,
                 destinationCollectionId: destination?.id ?? null,
+                deletedItemIds: destination ? [] : itemIds,
+                movedItemIds: destination ? itemIds : [],
+                detachedSpinnerIds: detachedSpinners.map(({ id }) => id),
+                queuedImageCount: new Set(
+                  [...collectionImages, ...itemImages].map(
+                    ({ objectPath }) => objectPath,
+                  ),
+                ).size,
               },
-              before: { deleted: false, name: source.name },
+              before: { ...before, items, detachedSpinners },
               definition: collectionAudit.collectionDeleted,
               ownerUserId: source.ownerId,
-              reason: input.reason,
+              reason,
               targetId: input.collectionId,
             });
           });
@@ -3492,6 +3593,123 @@ export function createCollectionsService(
         actorAttributes(input.actor.clerkId, {
           collectionId: input.collectionId,
           destinationCollectionId: input.destinationCollectionId ?? undefined,
+        }),
+      );
+    },
+    /**
+     * Deletes one item atomically with its audit event and deferred image cleanup.
+     *
+     * @param input - Confirmed owner or authorized staff deletion request.
+     * @rejects When confirmation, authorization, auditing, persistence, or logging fails.
+     */
+    async deleteItem(input) {
+      if (input.confirmed !== true)
+        throw new Error("Collection item deletion confirmation is required.");
+      await logger.operation(
+        loggerMessages.database.collections.deleteItem,
+        async () => {
+          await db.transaction(async (tx) => {
+            await tx.execute(
+              sql`select pg_advisory_xact_lock(hashtextextended(${`account-erasure:${input.actor.clerkId}`}, 0))`,
+            );
+            const [actorUser] = await tx
+              .select({ id: schema.user.id, username: schema.user.username })
+              .from(schema.user)
+              .where(eq(schema.user.clerkId, input.actor.clerkId));
+            if (!actorUser) throw new Error("Collection item does not exist.");
+            const [current] = await tx
+              .select({ collectionId: schema.collectionItem.collectionId })
+              .from(schema.collectionItem)
+              .where(eq(schema.collectionItem.id, input.collectionItemId));
+            if (!current) throw new Error("Collection item does not exist.");
+            // Match whole-collection deletion's parent-before-item lock order.
+            await lockTarget(tx, {
+              type: "collection",
+              id: current.collectionId,
+            });
+            await tx
+              .select({ id: schema.userCollection.id })
+              .from(schema.userCollection)
+              .where(eq(schema.userCollection.id, current.collectionId))
+              .for("update");
+            await lockTarget(tx, {
+              type: "collection_item",
+              id: input.collectionItemId,
+            });
+            const [item] = await tx
+              .select({
+                id: schema.collectionItem.id,
+                collectionId: schema.collectionItem.collectionId,
+                ownerId: schema.collectionItem.ownerId,
+                owned: schema.collectionItem.owned,
+              })
+              .from(schema.collectionItem)
+              .where(eq(schema.collectionItem.id, input.collectionItemId))
+              .for("update");
+            if (
+              item?.owned !== true ||
+              item?.collectionId !== current.collectionId ||
+              (item.ownerId !== actorUser.id &&
+                !hasPermission(input.actor, "collections.manage"))
+            ) {
+              throw new Error("Collection item does not exist.");
+            }
+            const reason = input.reason?.trim();
+            if (reason && reason.length > 1000)
+              throw new Error("Moderation reason is too long.");
+            if (item.ownerId !== actorUser.id && !reason)
+              throw new Error("A moderation reason is required.");
+            // FK link writers lock the button key, not the parent item.
+            await tx
+              .select({ id: schema.collectionSpinnerButton.id })
+              .from(schema.collectionSpinnerButton)
+              .where(eq(schema.collectionSpinnerButton.id, item.id))
+              .for("update");
+            const detachedSpinners = await tx
+              .select({
+                id: schema.collectionSpinner.id,
+                installedButtonId: schema.collectionSpinner.installedButtonId,
+              })
+              .from(schema.collectionSpinner)
+              .where(eq(schema.collectionSpinner.installedButtonId, item.id))
+              .orderBy(asc(schema.collectionSpinner.id))
+              .for("update");
+            const [before] = await collectionItemDeletionState(tx, [item.id]);
+            if (!before) throw new Error("Collection item does not exist.");
+            const images = await tx
+              .select({ objectPath: schema.collectionItemImage.objectPath })
+              .from(schema.collectionItemImage)
+              .where(eq(schema.collectionItemImage.collectionItemId, item.id));
+            await queueObjectDeletions(
+              tx,
+              images.map(({ objectPath }) => objectPath),
+            );
+            await tx
+              .delete(schema.collectionItem)
+              .where(eq(schema.collectionItem.id, item.id));
+            await touchCollection(tx, item.collectionId);
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              ownerUserId: item.ownerId,
+              reason,
+              targetId: item.id,
+              definition: collectionAudit.itemDeleted,
+              before: { ...before, detachedSpinners },
+              after: {
+                deleted: true,
+                collectionId: item.collectionId,
+                detachedSpinnerIds: detachedSpinners.map(({ id }) => id),
+                retainedButtonId: before.installedButtonId ?? null,
+                queuedImageCount: new Set(
+                  images.map(({ objectPath }) => objectPath),
+                ).size,
+              },
+            });
+          });
+        },
+        actorAttributes(input.actor.clerkId, {
+          collectionItemId: input.collectionItemId,
         }),
       );
     },
