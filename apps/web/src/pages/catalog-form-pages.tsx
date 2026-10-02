@@ -315,14 +315,14 @@ export function ProductEditor({
 
   return (
     <form
-      className="grid gap-5 rounded-xl border border-border bg-card p-6 lg:grid-cols-2"
+      className="grid min-w-0 gap-5 rounded-xl border border-border bg-card p-6 lg:grid-cols-2"
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
         void form.handleSubmit();
       }}
     >
-      <div className="grid content-start gap-5">
+      <div className="grid min-w-0 content-start gap-5">
         <form.Field name="name">
           {(field) => (
             <Field label={t("web.catalog.field.name")}>
@@ -565,7 +565,7 @@ export function ProductEditor({
         ) : null}
       </div>
 
-      <div className="grid content-start gap-5">
+      <div className="grid min-w-0 content-start gap-5">
         <form.Field name="description">
           {(field) => (
             <CatalogMarkdownEditor
@@ -1284,13 +1284,7 @@ export function CollectionFormPage({
           : t("web.collections.add.title")
       }
     >
-      <main
-        className={
-          collection
-            ? "grid w-full max-w-6xl gap-6 p-6 lg:grid-cols-2"
-            : "grid w-full max-w-6xl gap-6 p-6"
-        }
-      >
+      <main className="grid w-full max-w-6xl gap-6 p-6">
         <CollectionForm
           copy={copy}
           disabled={saving}
@@ -1305,6 +1299,121 @@ export function CollectionFormPage({
                 }
               : undefined
           }
+          media={
+            collection && current ? (
+              <div className="grid min-w-0 content-start gap-6">
+                <CollectionImageUploader
+                  copy={{
+                    browse: t("web.resources.upload.browseFiles"),
+                    imageHelp: t("web.collections.gallery.imagesHelp", {
+                      maxFileSize: formatMiB(maxImageBytes, locale),
+                      maxImages: maxImageSessionFiles,
+                      maxSessionSize: formatMiB(maxImageSessionBytes, locale),
+                    }),
+                    imageTypes: t("web.resources.upload.imageTypes"),
+                    label: t("web.collections.gallery.title"),
+                    removeFile: t("web.resources.action.removeFile"),
+                    submit: t("web.action.uploadImages"),
+                  }}
+                  disabled={saving}
+                  embedded
+                  error={uploadError}
+                  onUpload={async (files) => {
+                    setSaving(true);
+                    setUploadError(null);
+                    try {
+                      const upload = await uploadImages({
+                        locale,
+                        files,
+                        getToken,
+                        targetId: current.id,
+                        targetType: "collection",
+                      });
+                      if (upload.failed.length) {
+                        setUploadError(t("web.collections.error.upload"));
+                        setSaving(false);
+                        return false;
+                      }
+                      window.location.reload();
+                      return true;
+                    } catch (uploadFailure) {
+                      const failure = uploadFailure as ImageUploadError;
+                      setUploadError(
+                        t(failure.key ?? "error.generic", failure.params),
+                      );
+                      setSaving(false);
+                      return false;
+                    }
+                  }}
+                />
+                {current.coverImages.length ? (
+                  <CollectionCoverManager
+                    collection={current}
+                    copy={{
+                      clear: t("web.action.clearCover"),
+                      clearConfirmation: t(
+                        "web.collections.cover.clearConfirmation",
+                      ),
+                      current: t("web.collections.cover.current"),
+                      delete: t("web.action.deleteImage"),
+                      deleteConfirmation: t(
+                        "web.collections.gallery.deleteConfirmation",
+                      ),
+                      history: t("web.collections.gallery.title"),
+                      nextPage: t("web.collections.gallery.nextPage"),
+                      /**
+                       * Formats collection cover pagination status.
+                       *
+                       * @param page - Current page number.
+                       * @param pageCount - Total page count.
+                       * @returns The localized pagination status.
+                       */
+                      pageStatus: (page, pageCount) =>
+                        t("web.collections.gallery.pageStatus", {
+                          page,
+                          pageCount,
+                        }),
+                      previousPage: t("web.collections.gallery.previousPage"),
+                      select: t("web.action.selectCover"),
+                    }}
+                    disabled={saving}
+                    embedded
+                    onClear={() =>
+                      updateCover((reason) =>
+                        selectCollectionCover({
+                          data: {
+                            collectionId: current.id,
+                            imageId: null,
+                            reason,
+                          },
+                        }),
+                      )
+                    }
+                    onDelete={(image) =>
+                      updateCover((reason) =>
+                        deleteCollectionCover({
+                          getToken,
+                          imageId: image.id,
+                          reason,
+                        }),
+                      )
+                    }
+                    onSelect={(image) =>
+                      updateCover((reason) =>
+                        selectCollectionCover({
+                          data: {
+                            collectionId: current.id,
+                            imageId: image.id,
+                            reason,
+                          },
+                        }),
+                      )
+                    }
+                  />
+                ) : null}
+              </div>
+            ) : undefined
+          }
           onCancel={
             collection && current
               ? () =>
@@ -1317,113 +1426,6 @@ export function CollectionFormPage({
           onSubmit={submit}
           splitOnLargeScreens={Boolean(collection)}
         />
-        {collection && current ? (
-          <div className="grid content-start gap-6 lg:col-start-2">
-            <CollectionImageUploader
-              copy={{
-                browse: t("web.resources.upload.browseFiles"),
-                imageHelp: t("web.collections.gallery.imagesHelp", {
-                  maxFileSize: formatMiB(maxImageBytes, locale),
-                  maxImages: maxImageSessionFiles,
-                  maxSessionSize: formatMiB(maxImageSessionBytes, locale),
-                }),
-                imageTypes: t("web.resources.upload.imageTypes"),
-                label: t("web.collections.gallery.title"),
-                removeFile: t("web.resources.action.removeFile"),
-                submit: t("web.action.uploadImages"),
-              }}
-              disabled={saving}
-              error={uploadError}
-              onUpload={async (files) => {
-                setSaving(true);
-                setUploadError(null);
-                try {
-                  const upload = await uploadImages({
-                    locale,
-                    files,
-                    getToken,
-                    targetId: current.id,
-                    targetType: "collection",
-                  });
-                  if (upload.failed.length) {
-                    setUploadError(t("web.collections.error.upload"));
-                    setSaving(false);
-                    return false;
-                  }
-                  window.location.reload();
-                  return true;
-                } catch (uploadFailure) {
-                  const failure = uploadFailure as ImageUploadError;
-                  setUploadError(
-                    t(failure.key ?? "error.generic", failure.params),
-                  );
-                  setSaving(false);
-                  return false;
-                }
-              }}
-            />
-            {current.coverImages.length ? (
-              <CollectionCoverManager
-                collection={current}
-                copy={{
-                  clear: t("web.action.clearCover"),
-                  clearConfirmation: t(
-                    "web.collections.cover.clearConfirmation",
-                  ),
-                  current: t("web.collections.cover.current"),
-                  delete: t("web.action.deleteImage"),
-                  deleteConfirmation: t(
-                    "web.collections.gallery.deleteConfirmation",
-                  ),
-                  history: t("web.collections.gallery.title"),
-                  nextPage: t("web.collections.gallery.nextPage"),
-                  /**
-                   * Formats collection cover pagination status.
-                   *
-                   * @param page - Current page number.
-                   * @param pageCount - Total page count.
-                   * @returns The localized pagination status.
-                   */
-                  pageStatus: (page, pageCount) =>
-                    t("web.collections.gallery.pageStatus", {
-                      page,
-                      pageCount,
-                    }),
-                  previousPage: t("web.collections.gallery.previousPage"),
-                  select: t("web.action.selectCover"),
-                }}
-                disabled={saving}
-                onClear={() =>
-                  updateCover((reason) =>
-                    selectCollectionCover({
-                      data: { collectionId: current.id, imageId: null, reason },
-                    }),
-                  )
-                }
-                onDelete={(image) =>
-                  updateCover((reason) =>
-                    deleteCollectionCover({
-                      getToken,
-                      imageId: image.id,
-                      reason,
-                    }),
-                  )
-                }
-                onSelect={(image) =>
-                  updateCover((reason) =>
-                    selectCollectionCover({
-                      data: {
-                        collectionId: current.id,
-                        imageId: image.id,
-                        reason,
-                      },
-                    }),
-                  )
-                }
-              />
-            ) : null}
-          </div>
-        ) : null}
         {current?.canEdit && deletion ? (
           <div className="lg:col-span-2">
             <CollectionDeletionSection
@@ -2466,8 +2468,10 @@ export function CollectionProductFields({
   ];
 
   return (
-    <fieldset className="grid gap-5 rounded-lg border border-border p-4">
-      <legend className="px-1 text-sm font-semibold">{product.name}</legend>
+    <fieldset className="grid min-w-0 gap-5 rounded-lg border border-border p-4">
+      <legend className="max-w-full wrap-anywhere px-1 text-sm font-semibold">
+        {product.name}
+      </legend>
       <Field label={t("web.catalog.field.materials")}>
         <CatalogCombobox
           ariaLabel={t("web.catalog.field.materials")}
@@ -2660,322 +2664,342 @@ export function CollectionEditPage({
       ]}
       title={item.displayName}
     >
-      <main className="grid max-w-xl gap-5 p-6">
-        <Field label={displayNameLabel}>
-          <Input
-            onChange={(event) => setDisplayName(event.target.value)}
-            required
-            value={displayName}
-          />
-        </Field>
-        <CatalogMarkdownEditor
-          defaultValue={description}
-          help={t("web.catalog.help.collectionDescriptionOverride")}
-          id="collection-item-override"
-          label={t("web.catalog.field.description")}
-          onChange={setDescription}
-          onLoadingChange={setDescriptionLoading}
-          ref={descriptionRef}
-        />
-        {item.productTypeSlug === "spinner" ? (
-          <Field label={t("web.catalog.field.bearing")}>
+      <main className="grid w-full max-w-6xl min-w-0 gap-5 rounded-xl border border-border bg-card p-6 lg:grid-cols-2">
+        <div className="grid min-w-0 content-start gap-5">
+          <Field label={displayNameLabel}>
             <Input
-              aria-label={t("web.catalog.field.bearing")}
-              maxLength={200}
-              onChange={(event) => setBearing(event.target.value)}
-              value={bearing}
+              onChange={(event) => setDisplayName(event.target.value)}
+              required
+              value={displayName}
             />
           </Field>
-        ) : null}
-        <CollectionSelector
-          addLabel={t("web.collections.select.addNew")}
-          collections={collections}
-          label={t("web.collections.field.collection")}
-          onChange={(nextCollectionId) => {
-            if (nextCollectionId) setCollectionId(nextCollectionId);
-          }}
-          placeholder={t("web.collections.select.placeholder")}
-          selectedId={collectionId}
-        />
-        <CollectionProductFields
-          currentFinish={item.finishOption}
-          customFinish={customFinish}
-          finish={finish}
-          material={material}
-          onCustomFinishChange={setCustomFinish}
-          onFinishChange={setFinish}
-          onMaterialChange={setMaterial}
-          onOptionsChange={setOptions}
-          options={options}
-          product={product}
-          t={t}
-        />
-        {item.productTypeSlug === "spinner" ? (
-          <Field label={t("web.catalog.field.button")}>
-            <CatalogCombobox
-              ariaLabel={t("web.catalog.field.button")}
-              items={[
-                { id: "default", name: t("web.catalog.defaultButton") },
-                ...ownedButtons
-                  .filter(
-                    (candidate) =>
-                      candidate.collectionId === collectionId ||
-                      candidate.collectionItemId === item.installedButtonId,
-                  )
-                  .map(({ collectionItemId, displayName }) => ({
-                    id: collectionItemId,
-                    name: displayName,
-                  })),
-              ]}
-              onValueChange={(value) => {
-                setButton(value);
-                const selected = ownedButtons.find(
-                  ({ collectionItemId }) => collectionItemId === value?.id,
-                );
-                setButtonMaterial(selected?.material ?? null);
-                setButtonFinish(
-                  selected?.finishOption
-                    ? {
-                        id: "current",
-                        name: localizedFinishLabel(selected.finishOption, t),
-                      }
-                    : null,
-                );
-                setButtonCustomFinish(emptyFinishOption());
-              }}
-              placeholder={t("web.catalog.defaultButton")}
-              removeLabel={t("web.action.close")}
-              showSelectedPill
-              value={button}
-            />
-          </Field>
-        ) : null}
-        {selectedButton && selectedButtonProduct ? (
+          <CatalogMarkdownEditor
+            defaultValue={description}
+            help={t("web.catalog.help.collectionDescriptionOverride")}
+            id="collection-item-override"
+            label={t("web.catalog.field.description")}
+            onChange={setDescription}
+            onLoadingChange={setDescriptionLoading}
+            ref={descriptionRef}
+          />
+          {item.productTypeSlug === "spinner" ? (
+            <Field label={t("web.catalog.field.bearing")}>
+              <Input
+                aria-label={t("web.catalog.field.bearing")}
+                maxLength={200}
+                onChange={(event) => setBearing(event.target.value)}
+                value={bearing}
+              />
+            </Field>
+          ) : null}
+          <CollectionSelector
+            addLabel={t("web.collections.select.addNew")}
+            collections={collections}
+            label={t("web.collections.field.collection")}
+            onChange={(nextCollectionId) => {
+              if (nextCollectionId) setCollectionId(nextCollectionId);
+            }}
+            placeholder={t("web.collections.select.placeholder")}
+            selectedId={collectionId}
+          />
           <CollectionProductFields
-            currentFinish={selectedButton.finishOption}
-            customFinish={buttonCustomFinish}
-            finish={buttonFinish}
-            material={buttonMaterial}
-            onCustomFinishChange={setButtonCustomFinish}
-            onFinishChange={setButtonFinish}
-            onMaterialChange={setButtonMaterial}
+            currentFinish={item.finishOption}
+            customFinish={customFinish}
+            finish={finish}
+            material={material}
+            onCustomFinishChange={setCustomFinish}
+            onFinishChange={setFinish}
+            onMaterialChange={setMaterial}
             onOptionsChange={setOptions}
             options={options}
-            product={selectedButtonProduct}
+            product={product}
             t={t}
           />
-        ) : null}
-        <FileDropInput
-          accept=".avif,.jpeg,.jpg,.png,.webp"
-          aspectRatio={4 / 3}
-          aspectRatioHelpHref="/help/image-size-and-resolution-guide"
-          aspectRatioHelpLabel={imageGuidance.helpLabel}
-          aspectRatioWarning={imageGuidance.warning}
-          browseLabel={t("web.resources.upload.browseFiles")}
-          description={t("web.resources.upload.imagesHelp", {
-            maxFileSize: formatMiB(maxImageBytes, locale),
-            maxImages: maxImageSessionFiles,
-            maxSessionSize: formatMiB(maxImageSessionBytes, locale),
-          })}
-          fileTypes={t("web.resources.upload.imageTypes")}
-          files={images}
-          id="collection-edit-images"
-          label={t("web.resources.upload.imagesLabel")}
-          multiple
-          onFilesChange={(additions) =>
-            setImages((current) => [...current, ...additions])
-          }
-          onRemove={(index) =>
-            setImages((current) =>
-              current.filter((_, candidate) => candidate !== index),
-            )
-          }
-          removeFileLabel={t("web.action.close")}
-        />
-        <CatalogImageEditor
-          getReason={
-            item.canAdminister && !item.isOwner
-              ? () =>
-                  window
-                    .prompt(t("web.resources.moderation.reasonLabel"))
-                    ?.trim()
-              : undefined
-          }
-          images={existingImages}
-          onChange={setExistingImages}
-          t={t}
-          targetType="collection_item"
-        />
-        <Button
-          disabled={descriptionLoading || submissionMode === "disabled"}
-          onClick={async () => {
-            const currentDescription =
-              descriptionRef.current?.getValue() ?? description;
-            if (
-              descriptionRef.current?.isLoading() ||
-              currentDescription.length > 5000 ||
-              submissionMode === "disabled"
-            ) {
-              return;
-            }
-            const moderating = item.canAdminister && !item.isOwner;
-            const reason = moderating
-              ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
-              : undefined;
-            if (moderating && !reason) return;
-            setFormError(null);
-            const imageError = validateImages(images, locale);
-            if (imageError) {
-              setFormError(imageError.key);
-              return;
-            }
-            if (images.length) {
-              try {
-                const uploads = await uploadImages({
-                  locale,
-                  files: images,
-                  getToken,
-                  reason,
-                  /**
-                   * Offers to restore an owner-deleted duplicate image.
-                   *
-                   * @param imageId - Duplicate image identifier.
-                   * @returns Whether the duplicate was restored.
-                   */
-                  onOwnerDeletedDuplicate: async (imageId) => {
-                    if (
-                      !window.confirm(
-                        t(
-                          "web.resources.trash.restoreConfirmationDescription",
-                          { name: item.displayName },
-                        ),
-                      )
+          {item.productTypeSlug === "spinner" ? (
+            <Field label={t("web.catalog.field.button")}>
+              <CatalogCombobox
+                ariaLabel={t("web.catalog.field.button")}
+                items={[
+                  { id: "default", name: t("web.catalog.defaultButton") },
+                  ...ownedButtons
+                    .filter(
+                      (candidate) =>
+                        candidate.collectionId === collectionId ||
+                        candidate.collectionItemId === item.installedButtonId,
                     )
-                      return false;
-                    await restoreCatalogImage({
-                      data: {
-                        imageId,
-                        reason,
-                        targetType: "collection_item",
-                      },
-                    });
-                    return true;
+                    .map(({ collectionItemId, displayName }) => ({
+                      id: collectionItemId,
+                      name: displayName,
+                    })),
+                ]}
+                onValueChange={(value) => {
+                  setButton(value);
+                  const selected = ownedButtons.find(
+                    ({ collectionItemId }) => collectionItemId === value?.id,
+                  );
+                  setButtonMaterial(selected?.material ?? null);
+                  setButtonFinish(
+                    selected?.finishOption
+                      ? {
+                          id: "current",
+                          name: localizedFinishLabel(selected.finishOption, t),
+                        }
+                      : null,
+                  );
+                  setButtonCustomFinish(emptyFinishOption());
+                }}
+                placeholder={t("web.catalog.defaultButton")}
+                removeLabel={t("web.action.close")}
+                showSelectedPill
+                value={button}
+              />
+            </Field>
+          ) : null}
+          {selectedButton && selectedButtonProduct ? (
+            <CollectionProductFields
+              currentFinish={selectedButton.finishOption}
+              customFinish={buttonCustomFinish}
+              finish={buttonFinish}
+              material={buttonMaterial}
+              onCustomFinishChange={setButtonCustomFinish}
+              onFinishChange={setButtonFinish}
+              onMaterialChange={setButtonMaterial}
+              onOptionsChange={setOptions}
+              options={options}
+              product={selectedButtonProduct}
+              t={t}
+            />
+          ) : null}
+          {formError ? <Notice>{t(formError)}</Notice> : null}
+          {item.canEdit ? (
+            <PermanentDeletionControls
+              name={item.displayName}
+              targetType="collection_item"
+              reasonRequired={Boolean(item.canAdminister && !item.isOwner)}
+              onDelete={async (reason) => {
+                const result = await deleteCollectionItem({
+                  data: {
+                    collectionItemId: item.collectionItemId,
+                    confirmed: true,
+                    reason,
                   },
-                  targetId: item.collectionItemId,
-                  targetType: "collection_item",
                 });
-                setImages(uploads.failed);
-                if (uploads.failed.length) {
-                  setFormError("web.resources.upload.sessionFailure");
-                  return;
-                }
-              } catch (error) {
-                setFormError(
-                  (error as ImageUploadError).key ?? "error.generic",
-                );
+                if (!result.ok) throw new Error(result.formError);
+                await navigate({
+                  params: { collectionId: item.collectionId },
+                  to: "/user/collections/$collectionId",
+                });
+              }}
+            />
+          ) : null}
+        </div>
+        <div className="grid min-w-0 content-start gap-5">
+          <FileDropInput
+            accept=".avif,.jpeg,.jpg,.png,.webp"
+            aspectRatio={4 / 3}
+            aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+            aspectRatioHelpLabel={imageGuidance.helpLabel}
+            aspectRatioWarning={imageGuidance.warning}
+            browseLabel={t("web.resources.upload.browseFiles")}
+            description={t("web.resources.upload.imagesHelp", {
+              maxFileSize: formatMiB(maxImageBytes, locale),
+              maxImages: maxImageSessionFiles,
+              maxSessionSize: formatMiB(maxImageSessionBytes, locale),
+            })}
+            fileTypes={t("web.resources.upload.imageTypes")}
+            files={images}
+            id="collection-edit-images"
+            label={t("web.resources.upload.imagesLabel")}
+            multiple
+            onFilesChange={(additions) =>
+              setImages((current) => [...current, ...additions])
+            }
+            onRemove={(index) =>
+              setImages((current) =>
+                current.filter((_, candidate) => candidate !== index),
+              )
+            }
+            removeFileLabel={t("web.action.close")}
+          />
+          <CatalogImageEditor
+            getReason={
+              item.canAdminister && !item.isOwner
+                ? () =>
+                    window
+                      .prompt(t("web.resources.moderation.reasonLabel"))
+                      ?.trim()
+                : undefined
+            }
+            images={existingImages}
+            onChange={setExistingImages}
+            t={t}
+            targetType="collection_item"
+          />
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 lg:col-span-2">
+          <Button
+            onClick={() =>
+              void navigate({
+                params: { collectionId },
+                to: "/user/collections/$collectionId",
+              })
+            }
+            type="button"
+            variant="outline"
+          >
+            {t("action.cancel")}
+          </Button>
+          <Button
+            disabled={descriptionLoading || submissionMode === "disabled"}
+            onClick={async () => {
+              const currentDescription =
+                descriptionRef.current?.getValue() ?? description;
+              if (
+                descriptionRef.current?.isLoading() ||
+                currentDescription.length > 5000 ||
+                submissionMode === "disabled"
+              ) {
                 return;
               }
-            }
-            if (submissionMode === "upload") {
-              await navigate({
-                params: { collectionId },
-                to: "/user/collections/$collectionId",
-              });
-              return;
-            }
-            if (!material || !finish) return;
-            let installedButton:
-              | {
-                  /** Installed collection item identifier. */
-                  collectionItemId: number;
-                  /** Custom finish applied to the installed button. */
-                  customFinish: FinishOptionFormValue | null;
-                  /** Catalog finish option applied to the installed button. */
-                  finishOptionId: number | null;
-                  /** Material applied to the installed button. */
-                  materialId: number;
-                }
-              | null
-              | undefined;
-            if (item.productTypeSlug === "spinner") {
-              if (button?.id === "default") {
-                installedButton = null;
-              } else {
-                if (
-                  !selectedButton ||
-                  !buttonMaterial ||
-                  !buttonFinish ||
-                  !buttonFinishSelectionIsValid
-                ) {
+              const moderating = item.canAdminister && !item.isOwner;
+              const reason = moderating
+                ? window
+                    .prompt(t("web.resources.moderation.reasonLabel"))
+                    ?.trim()
+                : undefined;
+              if (moderating && !reason) return;
+              setFormError(null);
+              const imageError = validateImages(images, locale);
+              if (imageError) {
+                setFormError(imageError.key);
+                return;
+              }
+              if (images.length) {
+                try {
+                  const uploads = await uploadImages({
+                    locale,
+                    files: images,
+                    getToken,
+                    reason,
+                    /**
+                     * Offers to restore an owner-deleted duplicate image.
+                     *
+                     * @param imageId - Duplicate image identifier.
+                     * @returns Whether the duplicate was restored.
+                     */
+                    onOwnerDeletedDuplicate: async (imageId) => {
+                      if (
+                        !window.confirm(
+                          t(
+                            "web.resources.trash.restoreConfirmationDescription",
+                            { name: item.displayName },
+                          ),
+                        )
+                      )
+                        return false;
+                      await restoreCatalogImage({
+                        data: {
+                          imageId,
+                          reason,
+                          targetType: "collection_item",
+                        },
+                      });
+                      return true;
+                    },
+                    targetId: item.collectionItemId,
+                    targetType: "collection_item",
+                  });
+                  setImages(uploads.failed);
+                  if (uploads.failed.length) {
+                    setFormError("web.resources.upload.sessionFailure");
+                    return;
+                  }
+                } catch (error) {
+                  setFormError(
+                    (error as ImageUploadError).key ?? "error.generic",
+                  );
                   return;
                 }
-                installedButton = {
-                  collectionItemId: selectedButton.collectionItemId,
-                  customFinish:
-                    buttonFinish.id === "custom" ? buttonCustomFinish : null,
-                  finishOptionId:
-                    buttonFinish.id === "current" ||
-                    buttonFinish.id === "custom"
-                      ? null
-                      : Number(buttonFinish.id),
-                  materialId: buttonMaterial.id,
-                };
               }
-            }
-            const result = await updateCollectionItem({
-              data: {
-                bearing,
-                collectionId,
-                collectionItemId: item.collectionItemId,
-                customFinish: finish.id === "custom" ? customFinish : null,
-                displayName,
-                description: currentDescription,
-                finishOptionId:
-                  finish.id === "current" || finish.id === "custom"
-                    ? null
-                    : Number(finish.id),
-                ...(item.productTypeSlug === "spinner"
-                  ? { installedButton }
-                  : {}),
-                materialId: material.id,
-                reason,
-              },
-            });
-            if (result.ok) {
-              await navigate({
-                params: { collectionId },
-                to: "/user/collections/$collectionId",
-              });
-            } else {
-              setFormError(result.formError);
-            }
-          }}
-          type="button"
-        >
-          {t("action.save")}
-        </Button>
-        {formError ? <Notice>{t(formError)}</Notice> : null}
-        {item.canEdit ? (
-          <PermanentDeletionControls
-            name={item.displayName}
-            targetType="collection_item"
-            reasonRequired={Boolean(item.canAdminister && !item.isOwner)}
-            onDelete={async (reason) => {
-              const result = await deleteCollectionItem({
+              if (submissionMode === "upload") {
+                await navigate({
+                  params: { collectionId },
+                  to: "/user/collections/$collectionId",
+                });
+                return;
+              }
+              if (!material || !finish) return;
+              let installedButton:
+                | {
+                    /** Installed collection item identifier. */
+                    collectionItemId: number;
+                    /** Custom finish applied to the installed button. */
+                    customFinish: FinishOptionFormValue | null;
+                    /** Catalog finish option applied to the installed button. */
+                    finishOptionId: number | null;
+                    /** Material applied to the installed button. */
+                    materialId: number;
+                  }
+                | null
+                | undefined;
+              if (item.productTypeSlug === "spinner") {
+                if (button?.id === "default") {
+                  installedButton = null;
+                } else {
+                  if (
+                    !selectedButton ||
+                    !buttonMaterial ||
+                    !buttonFinish ||
+                    !buttonFinishSelectionIsValid
+                  ) {
+                    return;
+                  }
+                  installedButton = {
+                    collectionItemId: selectedButton.collectionItemId,
+                    customFinish:
+                      buttonFinish.id === "custom" ? buttonCustomFinish : null,
+                    finishOptionId:
+                      buttonFinish.id === "current" ||
+                      buttonFinish.id === "custom"
+                        ? null
+                        : Number(buttonFinish.id),
+                    materialId: buttonMaterial.id,
+                  };
+                }
+              }
+              const result = await updateCollectionItem({
                 data: {
+                  bearing,
+                  collectionId,
                   collectionItemId: item.collectionItemId,
-                  confirmed: true,
+                  customFinish: finish.id === "custom" ? customFinish : null,
+                  displayName,
+                  description: currentDescription,
+                  finishOptionId:
+                    finish.id === "current" || finish.id === "custom"
+                      ? null
+                      : Number(finish.id),
+                  ...(item.productTypeSlug === "spinner"
+                    ? { installedButton }
+                    : {}),
+                  materialId: material.id,
                   reason,
                 },
               });
-              if (!result.ok) throw new Error(result.formError);
-              await navigate({
-                params: { collectionId: item.collectionId },
-                to: "/user/collections/$collectionId",
-              });
+              if (result.ok) {
+                await navigate({
+                  params: { collectionId },
+                  to: "/user/collections/$collectionId",
+                });
+              } else {
+                setFormError(result.formError);
+              }
             }}
-          />
-        ) : null}
+            type="button"
+          >
+            {t("action.save")}
+          </Button>
+        </div>
       </main>
     </AppShell>
   );
@@ -3055,16 +3079,16 @@ function CatalogImageEditor({
   return (
     <section
       aria-label={t("web.resources.upload.imagesLabel")}
-      className="grid gap-3"
+      className="grid min-w-0 gap-3"
     >
       {images.map((image) => (
         <div
-          className="flex items-center gap-3 rounded-lg border border-border p-3"
+          className="flex min-w-0 items-center gap-3 rounded-lg border border-border p-3"
           key={image.id}
         >
           <img
             alt={t("web.resources.detail.imageAlt", { name: image.fileName })}
-            className="size-16 rounded-md object-cover"
+            className="size-16 shrink-0 rounded-md object-cover"
             src={image.url}
           />
           <span className="min-w-0 flex-1 truncate text-sm">
@@ -3072,6 +3096,7 @@ function CatalogImageEditor({
           </span>
           <Button
             aria-label={`${t(image.deletedAt ? "web.resources.action.restore" : "web.resources.action.delete")} ${image.fileName}`}
+            className="shrink-0"
             onClick={async () => {
               const reason = getReason?.();
               if (getReason && !reason) return;

@@ -105,6 +105,7 @@ describe("CollectionForm", () => {
         <CollectionForm
           copy={copy}
           includeImages={false}
+          media={<div data-testid="media">Media</div>}
           onCancel={onCancel}
           onSubmit={vi.fn()}
           splitOnLargeScreens
@@ -113,10 +114,20 @@ describe("CollectionForm", () => {
     );
 
     const form = container.querySelector("form");
+    const columns = form?.querySelectorAll(":scope > div.grid.min-w-0");
     const save = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Save",
     );
+    const details = columns?.[0]?.textContent ?? "";
     expect(form?.classList.contains("lg:grid-cols-2")).toBe(true);
+    expect(details.indexOf("Name")).toBeLessThan(
+      details.indexOf("Description"),
+    );
+    expect(details.indexOf("Description")).toBeLessThan(
+      details.indexOf("Public"),
+    );
+    expect(columns?.[1]?.textContent).toBe("Media");
+    expect(container.querySelectorAll("form")).toHaveLength(1);
     expect(save?.parentElement?.classList.contains("lg:col-span-2")).toBe(true);
 
     clickButton(container, "Cancel");

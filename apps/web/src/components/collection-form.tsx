@@ -69,6 +69,7 @@ const managerColumns = managerColumnHelper.columns([
  * @param props.error - Optional submission error shown above the submit button.
  * @param props.includeImages - Whether to include the collection image picker.
  * @param props.initialValue - Initial metadata, defaulting to a blank private collection.
+ * @param props.media - Optional media controls rendered in the second column.
  * @param props.onCancel - Optional cancellation callback.
  * @param props.onSubmit - Receives the current metadata and selected image files.
  * @param props.splitOnLargeScreens - Whether large screens use two form columns.
@@ -81,6 +82,7 @@ export function CollectionForm({
   error,
   includeImages = true,
   initialValue,
+  media,
   onCancel,
   onSubmit,
   splitOnLargeScreens = false,
@@ -161,6 +163,10 @@ export function CollectionForm({
    */
   initialValue?: CollectionFormValue;
   /**
+   * Optional media controls rendered in the second column.
+   */
+  media?: React.ReactNode;
+  /**
    * Cancels editing and returns to the collection.
    */
   onCancel?: () => void;
@@ -191,7 +197,7 @@ export function CollectionForm({
   return (
     <form
       className={cn(
-        "grid max-w-3xl gap-5 rounded-xl border border-border bg-card p-6",
+        "grid min-w-0 max-w-3xl gap-5 rounded-xl border border-border bg-card p-6",
         splitOnLargeScreens && "w-full max-w-6xl lg:col-span-2 lg:grid-cols-2",
       )}
       noValidate
@@ -203,7 +209,7 @@ export function CollectionForm({
         void onSubmit({ ...value, description }, files);
       }}
     >
-      <div className="grid content-start gap-5">
+      <div className="grid min-w-0 content-start gap-5">
         <label className="grid gap-2 text-sm font-medium" htmlFor={nameId}>
           {copy.name}
           <Input
@@ -219,18 +225,6 @@ export function CollectionForm({
             value={value.name}
           />
         </label>
-        <div className="grid gap-2">
-          <span className="text-sm font-medium">{copy.public}</span>
-          <PublicResourceSwitch
-            checked={!value.isPrivate}
-            disabled={disabled}
-            onCheckedChange={(isPublic) =>
-              setValue({ ...value, isPrivate: !isPublic })
-            }
-          />
-        </div>
-      </div>
-      <div className="grid content-start gap-5">
         <MarkdownEditor
           counter={{ limit: 200, type: "words", warningAt: 180 }}
           defaultValue={value.description}
@@ -243,33 +237,48 @@ export function CollectionForm({
           placeholder={copy.descriptionPlaceholder}
           ref={descriptionRef}
         />
-        {includeImages ? (
-          <FileDropInput
-            accept=".avif,.jpeg,.jpg,.png,.webp"
-            aspectRatio={4 / 3}
-            aspectRatioHelpHref="/help/image-size-and-resolution-guide"
-            aspectRatioHelpLabel={imageGuidance.helpLabel}
-            aspectRatioWarning={imageGuidance.warning}
-            browseLabel={copy.browse}
-            description={copy.imageHelp}
+        <div className="grid gap-2">
+          <span className="text-sm font-medium">{copy.public}</span>
+          <PublicResourceSwitch
+            checked={!value.isPrivate}
             disabled={disabled}
-            fileTypes={copy.imageTypes}
-            files={files}
-            id="collection-images"
-            label={copy.cover}
-            multiple
-            onFilesChange={(additions) =>
-              setFiles((current) => [...current, ...additions])
+            onCheckedChange={(isPublic) =>
+              setValue({ ...value, isPrivate: !isPublic })
             }
-            onRemove={(index) =>
-              setFiles((current) =>
-                current.filter((_, candidate) => candidate !== index),
-              )
-            }
-            removeFileLabel={copy.removeFile}
           />
-        ) : null}
+        </div>
       </div>
+      {media || includeImages ? (
+        <div className="grid min-w-0 content-start gap-5">
+          {media}
+          {includeImages ? (
+            <FileDropInput
+              accept=".avif,.jpeg,.jpg,.png,.webp"
+              aspectRatio={4 / 3}
+              aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+              aspectRatioHelpLabel={imageGuidance.helpLabel}
+              aspectRatioWarning={imageGuidance.warning}
+              browseLabel={copy.browse}
+              description={copy.imageHelp}
+              disabled={disabled}
+              fileTypes={copy.imageTypes}
+              files={files}
+              id="collection-images"
+              label={copy.cover}
+              multiple
+              onFilesChange={(additions) =>
+                setFiles((current) => [...current, ...additions])
+              }
+              onRemove={(index) =>
+                setFiles((current) =>
+                  current.filter((_, candidate) => candidate !== index),
+                )
+              }
+              removeFileLabel={copy.removeFile}
+            />
+          ) : null}
+        </div>
+      ) : null}
       {error ? (
         <p
           className={cn(
@@ -318,6 +327,7 @@ export function CollectionForm({
  * @param props.collection - Collection whose cover images can be managed.
  * @param props.copy - Localized labels, confirmations, and pagination text.
  * @param props.disabled - Whether interaction is disabled.
+ * @param props.embedded - Whether the manager is inside another card.
  * @param props.onClear - Clears the current cover after confirmation.
  * @param props.onDelete - Deletes a cover image after confirmation.
  * @param props.onSelect - Selects a historical image as the current cover.
@@ -327,6 +337,7 @@ export function CollectionCoverManager({
   collection,
   copy,
   disabled = false,
+  embedded = false,
   onClear,
   onDelete,
   onSelect,
@@ -391,6 +402,12 @@ export function CollectionCoverManager({
    */
   disabled?: boolean;
   /**
+   * Whether the manager is inside another card.
+   *
+   * @default false
+   */
+  embedded?: boolean;
+  /**
    * Clears the current collection cover.
    *
    * @returns No value, or a promise the manager starts without awaiting.
@@ -438,13 +455,18 @@ export function CollectionCoverManager({
   );
   const pageCount = table.getPageCount();
   return (
-    <section className="grid max-w-3xl gap-4 rounded-xl border border-border bg-card p-6">
+    <section
+      className={cn(
+        "grid min-w-0 gap-4",
+        !embedded && "max-w-3xl rounded-xl border border-border bg-card p-6",
+      )}
+    >
       <h2 className="font-semibold">{copy.current}</h2>
       {current ? (
         <>
           <img
             alt=""
-            className="aspect-4/3 max-w-sm rounded-lg object-cover"
+            className="aspect-4/3 w-full max-w-sm rounded-lg object-cover"
             src={current.url}
           />
           <div className="flex flex-wrap gap-2">
@@ -556,6 +578,7 @@ export function CollectionCoverManager({
  * @param props - Collection image uploader properties.
  * @param props.copy - Localized uploader labels and guidance.
  * @param props.disabled - Whether interaction is disabled.
+ * @param props.embedded - Whether the uploader is inside another form card.
  * @param props.error - Optional upload error shown above the submit button.
  * @param props.onUpload - Uploads the selected files and reports whether to clear them.
  * @returns The collection image uploader UI.
@@ -564,6 +587,7 @@ export function CollectionCoverManager({
 export function CollectionImageUploader({
   copy,
   disabled = false,
+  embedded = false,
   error,
   onUpload,
 }: {
@@ -603,6 +627,12 @@ export function CollectionImageUploader({
    */
   disabled?: boolean;
   /**
+   * Whether the uploader is inside another form card.
+   *
+   * @default false
+   */
+  embedded?: boolean;
+  /**
    * Optional upload error shown above the submit button.
    */
   error?: string | null;
@@ -617,14 +647,16 @@ export function CollectionImageUploader({
   const { locale } = useLocale();
   const imageGuidance = getImageUploadGuidance(locale);
   const [files, setFiles] = useState<File[]>([]);
-  return (
-    <form
-      className="grid max-w-3xl gap-4 rounded-xl border border-border bg-card p-6"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        if (files.length && (await onUpload(files))) setFiles([]);
-      }}
-    >
+  /**
+   * Uploads the selected files and clears successful submissions.
+   *
+   * @returns A promise that resolves after the upload attempt.
+   */
+  const upload = async () => {
+    if (files.length && (await onUpload(files))) setFiles([]);
+  };
+  const content = (
+    <>
       <FileDropInput
         accept=".avif,.jpeg,.jpg,.png,.webp"
         aspectRatio={4 / 3}
@@ -650,9 +682,26 @@ export function CollectionImageUploader({
         removeFileLabel={copy.removeFile}
       />
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button disabled={disabled || !files.length} type="submit">
+      <Button
+        disabled={disabled || !files.length}
+        onClick={embedded ? () => void upload() : undefined}
+        type={embedded ? "button" : "submit"}
+      >
         {copy.submit}
       </Button>
+    </>
+  );
+  if (embedded)
+    return <section className="grid min-w-0 gap-4">{content}</section>;
+  return (
+    <form
+      className="grid max-w-3xl gap-4 rounded-xl border border-border bg-card p-6"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void upload();
+      }}
+    >
+      {content}
     </form>
   );
 }
