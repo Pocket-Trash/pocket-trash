@@ -11,6 +11,7 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import * as React from "react";
+import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { logger } from "@/lib/logger";
 import type { UserSettingsState } from "@/lib/user-settings";
@@ -151,65 +152,67 @@ export function RouteErrorView({
   };
 
   return (
-    <main className="flex flex-1 items-center justify-center bg-background px-4 py-10 text-foreground">
-      <section
-        aria-labelledby="route-error-title"
-        className="w-full max-w-xl rounded-lg border border-border bg-card px-6 py-8 text-card-foreground shadow-sm"
-      >
-        <h1
-          className="text-2xl font-bold tracking-[0.5px]"
-          id="route-error-title"
+    <AppShell showControls={false} title={t("web.page.error.title")}>
+      <main className="flex flex-1 items-center justify-center bg-background px-4 py-10 text-foreground">
+        <section
+          aria-labelledby="route-error-title"
+          className="w-full max-w-xl rounded-lg border border-border bg-card px-6 py-8 text-card-foreground shadow-sm"
         >
-          {t("web.page.error.title")}
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          {t("web.page.error.description")}
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Button
-            aria-busy={retrying}
-            disabled={retrying}
-            onClick={() => void retry()}
-            type="button"
+          <h1
+            className="text-2xl font-bold tracking-[0.5px]"
+            id="route-error-title"
           >
-            {t(retrying ? "web.page.error.retrying" : "web.page.error.retry")}
-          </Button>
-          <Button
-            nativeButton={false}
-            render={<a href="/" />}
-            variant="outline"
-          >
-            {t("web.page.error.returnHome")}
-          </Button>
-        </div>
-        {development ? (
-          <details className="mt-6 border-t border-border pt-4">
-            <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-              {t("web.page.error.technicalDetails")}
-            </summary>
-            <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap text-xs leading-5 text-muted-foreground">
-              {details}
-            </pre>
-            <div className="mt-3 flex items-center gap-3">
-              <Button
-                onClick={() => void copyDetails()}
-                size="sm"
-                type="button"
-              >
-                {t("web.page.error.copyDetails")}
-              </Button>
-              <span aria-live="polite" role="status">
-                {copyStatus === "copied"
-                  ? t("web.page.error.copied")
-                  : copyStatus === "failed"
-                    ? t("web.page.error.copyFailed")
-                    : null}
-              </span>
-            </div>
-          </details>
-        ) : null}
-      </section>
-    </main>
+            {t("web.page.error.title")}
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            {t("web.page.error.description")}
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Button
+              aria-busy={retrying}
+              disabled={retrying}
+              onClick={() => void retry()}
+              type="button"
+            >
+              {t(retrying ? "web.page.error.retrying" : "web.page.error.retry")}
+            </Button>
+            <Button
+              nativeButton={false}
+              render={<a href="/" />}
+              variant="outline"
+            >
+              {t("web.page.error.returnHome")}
+            </Button>
+          </div>
+          {development ? (
+            <details className="mt-6 border-t border-border pt-4">
+              <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+                {t("web.page.error.technicalDetails")}
+              </summary>
+              <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap text-xs leading-5 text-muted-foreground">
+                {details}
+              </pre>
+              <div className="mt-3 flex items-center gap-3">
+                <Button
+                  onClick={() => void copyDetails()}
+                  size="sm"
+                  type="button"
+                >
+                  {t("web.page.error.copyDetails")}
+                </Button>
+                <span aria-live="polite" role="status">
+                  {copyStatus === "copied"
+                    ? t("web.page.error.copied")
+                    : copyStatus === "failed"
+                      ? t("web.page.error.copyFailed")
+                      : null}
+                </span>
+              </div>
+            </details>
+          ) : null}
+        </section>
+      </main>
+    </AppShell>
   );
 }
 
