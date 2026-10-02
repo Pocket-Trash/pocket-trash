@@ -1,7 +1,9 @@
+import { useStore } from "@nanostores/react";
 import { Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useContext } from "react";
 import { AppShell, type AppShellProps } from "@/components/app-shell";
+import { Button } from "@/components/ui/button";
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -12,6 +14,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  $uiPreferences,
+  InitialUiPreferencesContext,
+  setSidebarOpen,
+} from "@/lib/ui-preferences";
 import { cn } from "@/lib/utils";
 
 /** Routes supported by the shared admin and user sidebars. */
@@ -90,8 +97,22 @@ export function SidebarPageShell({
   /** Localized sidebar heading. */
   sidebarTitle: string;
 }) {
+  const initialPreferences = useContext(InitialUiPreferencesContext);
+  const preferences = useStore($uiPreferences, {
+    /**
+     * Returns the request-scoped preferences used to hydrate the shell.
+     *
+     * @returns Initial interface preferences.
+     */
+    ssr: () => initialPreferences,
+  });
+
   return (
-    <SidebarProvider defaultOpenMobile>
+    <SidebarProvider
+      defaultOpenMobile
+      onOpenChange={setSidebarOpen}
+      open={!preferences.sidebarCollapsed}
+    >
       <AppShell
         {...shellProps}
         headerActions={
@@ -333,9 +354,9 @@ function SidebarNavigationAction({
     <Tooltip>
       <TooltipTrigger
         render={
-          <button
+          <Button
             className={cn(
-              "flex min-h-10 w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "min-h-10 w-full justify-start px-3 py-2",
               !expanded && "md:justify-center md:px-2",
             )}
             onClick={onSelect}

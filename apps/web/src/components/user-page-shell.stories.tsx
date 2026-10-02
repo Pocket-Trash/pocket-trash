@@ -1,6 +1,7 @@
 import { useClerk } from "@clerk/tanstack-react-start";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { expect, fn, mocked, within } from "storybook/test";
+import { setSidebarOpen, uiPreferencesStorageKey } from "@/lib/ui-preferences";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { UserPageShell } from "./user-page-shell";
 
@@ -22,6 +23,7 @@ const meta = {
   },
   /** Configures authenticated-client mocks before each story. */
   beforeEach: () => {
+    setSidebarOpen(true);
     mockStoryAuth();
     mocked(useClerk).mockReturnValue({ signOut } as unknown as ReturnType<
       typeof useClerk
@@ -85,14 +87,28 @@ export const Default: Story = {
     ).toHaveAttribute("href", "/user/settings/beta-features");
     const signOutButton = links.getByRole("button", { name: "Sign out" });
     await expect(signOutButton).toBeVisible();
+    await expect(signOutButton).toHaveClass("bg-primary");
     await userEvent.click(signOutButton);
     await expect(signOut).toHaveBeenCalledWith({ redirectUrl: "/" });
 
     const toggle = canvas.getByRole("button", { name: "Toggle sidebar" });
     const sidebar = canvas.getByRole("complementary");
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await userEvent.hover(toggle);
+    await expect(
+      await within(canvasElement.ownerDocument.body).findByText(
+        "Toggle sidebar",
+        { selector: "[data-slot='tooltip-content']" },
+      ),
+    ).toBeVisible();
+    await userEvent.unhover(toggle);
     await userEvent.click(toggle);
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      JSON.parse(
+        window.localStorage.getItem(uiPreferencesStorageKey) ?? "null",
+      ),
+    ).toEqual({ sidebarCollapsed: true });
     await expect(sidebar).toHaveAttribute("data-state", "collapsed");
     await expect(navigation).toBeVisible();
     const collectionsLink = links.getByRole("link", { name: "Collections" });
@@ -101,9 +117,46 @@ export const Default: Story = {
     await expect(
       await within(canvasElement.ownerDocument.body).findByText("Collections"),
     ).toBeVisible();
+    await userEvent.unhover(collectionsLink);
+    await userEvent.hover(toggle);
+    await expect(
+      await within(canvasElement.ownerDocument.body).findByText(
+        "Toggle sidebar",
+        { selector: "[data-slot='tooltip-content']" },
+      ),
+    ).toBeVisible();
+    await userEvent.unhover(toggle);
     await userEvent.click(toggle);
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      JSON.parse(
+        window.localStorage.getItem(uiPreferencesStorageKey) ?? "null",
+      ),
+    ).toEqual({ sidebarCollapsed: false });
     await expect(navigation).toBeVisible();
+  },
+};
+
+/** User page shell restored from a collapsed desktop preference. */
+export const PersistedCollapsed: Story = {
+  /** Stores the collapsed preference before the story renders. */
+  beforeEach: () => {
+    setSidebarOpen(false);
+  },
+  /**
+   * Verifies a newly mounted shell retains application-wide sidebar state.
+   *
+   * @param context - Storybook play context.
+   * @returns A promise that resolves after the state assertions pass.
+   */
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("button", { name: "Toggle sidebar" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    await expect(canvas.getByRole("complementary")).toHaveAttribute(
+      "data-state",
+      "collapsed",
+    );
   },
 };
 

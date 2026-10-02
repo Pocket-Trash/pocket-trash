@@ -13,6 +13,13 @@ import { themeStorageKey } from "@/lib/theme";
 import type { ThemeBootstrapState } from "@/lib/theme-bootstrap";
 import { resolveServerThemeBootstrap } from "@/lib/theme-bootstrap";
 import {
+  $uiPreferences,
+  parseUiPreferences,
+  type UiPreferences,
+  uiPreferencesCookieName,
+  uiPreferencesStorageKey,
+} from "@/lib/ui-preferences";
+import {
   getCurrentUserSettingsState,
   type UserSettingsState,
 } from "@/lib/user-settings";
@@ -53,6 +60,7 @@ export const Route = createRootRoute({
       copyrightYear: new Date().getFullYear(),
       settingsState,
       themeBootstrap: resolveServerThemeBootstrap(settingsState),
+      uiPreferences: await readInitialUiPreferences(),
     };
   },
   /**
@@ -136,6 +144,7 @@ function RootDocument({
             __html: bootstrapScript(
               { serverTheme: null, shouldUseServerTheme: false },
               null,
+              null,
             ),
           }}
         />
@@ -161,10 +170,17 @@ function RootContent() {
     <>
       <script
         dangerouslySetInnerHTML={{
-          __html: bootstrapScript(themeBootstrap, loaderData.settingsState),
+          __html: bootstrapScript(
+            themeBootstrap,
+            loaderData.settingsState,
+            loaderData.uiPreferences,
+          ),
         }}
       />
-      <AppProviders initialSettingsState={loaderData.settingsState}>
+      <AppProviders
+        initialSettingsState={loaderData.settingsState}
+        initialUiPreferences={loaderData.uiPreferences}
+      >
         <div className="flex min-h-svh flex-col bg-background text-foreground">
           <div className="flex flex-1 flex-col">
             <Outlet />
@@ -177,15 +193,29 @@ function RootContent() {
 }
 
 /**
+ * Reads validated browser interface preferences for the current environment.
+ *
+ * @returns Cookie-backed preferences on the server and local preferences in the browser.
+ */
+async function readInitialUiPreferences() {
+  if (!import.meta.env.SSR) return $uiPreferences.get();
+
+  const { getCookie } = await import("@tanstack/react-start/server");
+  return parseUiPreferences(getCookie(uiPreferencesCookieName));
+}
+
+/**
  * Builds the inline script that applies locale and theme state before hydration.
  *
  * @param themeBootstrap - Server-resolved theme bootstrap state.
  * @param settingsState - Resolved user settings, or `null` when unavailable.
+ * @param uiPreferences - Cookie-backed interface preferences, or `null` before route data is available.
  * @returns Executable bootstrap source.
  */
 function bootstrapScript(
   themeBootstrap: ThemeBootstrapState,
   settingsState: UserSettingsState | null,
+  uiPreferences: UiPreferences | null,
 ) {
   return `
 (() => {
@@ -201,6 +231,8 @@ function bootstrapScript(
     const storedLocale = localStorage.getItem("field-log.locale");
     const locale = serverLocale || (storedLocale === "en" || storedLocale === "en-US" ? "en-US" : storedLocale === "es-MX" ? "es-MX" : "en-US");
     document.documentElement.lang = locale;
+    const uiPreferences = ${JSON.stringify(uiPreferences)};
+    if (uiPreferences) localStorage.setItem(${JSON.stringify(uiPreferencesStorageKey)}, JSON.stringify(uiPreferences));
   } catch {}
 })();
 `;

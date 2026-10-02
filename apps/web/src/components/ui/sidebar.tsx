@@ -389,26 +389,40 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar();
+  const { isMobile, toggleSidebar } = useSidebar();
   const { locale } = useLocale();
   const label = formatTranslation("web.sidebar.toggle", {}, locale);
 
   return (
-    <Button
-      data-sidebar="trigger"
-      data-slot="sidebar-trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("size-7", className)}
-      onClick={(event) => {
-        onClick?.(event);
-        toggleSidebar();
-      }}
-      {...props}
-    >
-      <PanelLeftIcon />
-      <span className="sr-only">{label}</span>
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            data-sidebar="trigger"
+            data-slot="sidebar-trigger"
+            variant="ghost"
+            size="icon"
+            className={cn("size-7", className)}
+            onClick={(event) => {
+              onClick?.(event);
+              toggleSidebar();
+            }}
+            {...props}
+          />
+        }
+      >
+        <PanelLeftIcon />
+        <span className="sr-only">{label}</span>
+      </TooltipTrigger>
+      <TooltipContent
+        align="center"
+        hidden={isMobile}
+        side="right"
+        sideOffset={6}
+      >
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
