@@ -1185,6 +1185,8 @@ export function CollectionFormPage({
     public: t("web.resources.visibility.public"),
     removeFile: t("web.resources.action.removeFile"),
     submit: t("action.save"),
+    summary: t("web.collections.field.summary"),
+    summaryPlaceholder: t("web.collections.placeholder.summary"),
   };
 
   /**
@@ -1212,6 +1214,7 @@ export function CollectionFormPage({
         isPrivate: value.isPrivate,
         name: value.name,
         reason,
+        summary: value.summary,
       },
     });
     if (!result.ok) {
@@ -1296,6 +1299,7 @@ export function CollectionFormPage({
                   description: current.description ?? "",
                   isPrivate: current.isPrivate,
                   name: current.name,
+                  summary: current.summary ?? "",
                 }
               : undefined
           }
@@ -1754,6 +1758,7 @@ export function CollectionAddPage({
             description: "",
             isPrivate: true,
             name: defaultCollectionName,
+            summary: "",
           }
         : null,
     );
@@ -1850,6 +1855,7 @@ export function CollectionAddPage({
           itemCount: 0,
           name: newCollection.name,
           ownerUserId: 0,
+          summary: newCollection.summary || null,
           updatedAt: new Date(0),
         },
       ]
@@ -1952,6 +1958,7 @@ export function CollectionAddPage({
                 description: newCollection.description || null,
                 isPrivate: newCollection.isPrivate,
                 name: newCollection.name,
+                summary: newCollection.summary || null,
               }
             : null,
         productId: product.id,
@@ -2111,6 +2118,8 @@ export function CollectionAddPage({
                 public: t("web.resources.visibility.public"),
                 removeFile: t("web.resources.action.removeFile"),
                 submit: t("action.save"),
+                summary: t("web.collections.field.summary"),
+                summaryPlaceholder: t("web.collections.placeholder.summary"),
               }}
               onSubmit={(value, collectionImages) => {
                 setNewCollection(value);
