@@ -34,6 +34,15 @@ minimumReleaseAgeExclude:
   - "@tanstack/start-plugin-core@1.171.49"
   - "@tanstack/start-storage-context@1.167.36"
   - "@tanstack/store@0.11.2"
+  # ENG-318: retain the tested Storybook graph; remove after 2026-10-06T17:20:05.303Z.
+  - "@storybook/addon-a11y@10.6.1"
+  - "@storybook/addon-vitest@10.6.1"
+  - "@storybook/builder-vite@10.6.1"
+  - "@storybook/react-dom-shim@10.6.1"
+  - "@storybook/react-vite@10.6.1"
+  - "@storybook/react@10.6.1"
+  - "@storybook/tanstack-react@10.6.1"
+  - "storybook@10.6.1"
 minimumReleaseAgeIgnoreMissingTime: false
 minimumReleaseAgeStrict: true
 overrides:
