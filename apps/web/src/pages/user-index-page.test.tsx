@@ -20,14 +20,14 @@ vi.mock("@tanstack/react-router", () => ({
   }) => <a href={to}>{children}</a>,
 }));
 
-vi.mock("@/components/app-shell", () => ({
+vi.mock("@/components/user-page-shell", () => ({
   /**
    * Renders only the shell content under test.
    *
    * @param root0 - Shell properties.
    * @returns The nested page content.
    */
-  AppShell: ({
+  UserPageShell: ({
     children,
   }: {
     /** Nested page content. */

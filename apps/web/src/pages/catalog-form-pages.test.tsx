@@ -50,6 +50,26 @@ vi.mock("@/components/app-shell", () => ({
   }) => <div>{children}</div>,
 }));
 
+/**
+ * Renders a minimal user shell for tests.
+ *
+ * @param props - User shell properties.
+ * @param props.children - Nested page content.
+ * @returns The test user shell.
+ */
+function MockUserPageShell({
+  children,
+}: {
+  /** Nested page content. */
+  children: React.ReactNode;
+}) {
+  return <div>{children}</div>;
+}
+
+vi.mock("@/components/user-page-shell", () => ({
+  UserPageShell: MockUserPageShell,
+}));
+
 vi.mock("@/providers/locale-provider", () => ({
   /**
    * Provides locale data for page tests.
@@ -319,6 +339,50 @@ describe("collection edit submission", () => {
     expect(collectionEditSubmissionMode(false, 0)).toBe("disabled");
     expect(collectionEditSubmissionMode(false, 3)).toBe("upload");
     expect(collectionEditSubmissionMode(true, 0)).toBe("save");
+  });
+});
+
+describe("collection item deletion", () => {
+  it("shows one confirmed deletion control to owners and authorized staff", () => {
+    const product = productFixture(1008, "Delete me", "spinner");
+    const item = collectionFixture(40, product, 1009);
+    const props = {
+      buttonProducts: [],
+      collections: [],
+      options: emptyCatalogOptions,
+      ownedButtons: [],
+      product,
+    };
+    const ownerHtml = renderToStaticMarkup(
+      createElement(CollectionEditPage, {
+        ...props,
+        item: { ...item, isOwner: true },
+      }),
+    );
+    const adminHtml = renderToStaticMarkup(
+      createElement(CollectionEditPage, {
+        ...props,
+        item: {
+          ...item,
+          canAdminister: true,
+          isOwner: false,
+        },
+      }),
+    );
+    const strangerHtml = renderToStaticMarkup(
+      createElement(CollectionEditPage, {
+        ...props,
+        item: { ...item, canEdit: false, isOwner: false },
+      }),
+    );
+
+    expect(ownerHtml.match(/>Permanently delete item<\/button>/g)).toHaveLength(
+      2,
+    );
+    expect(ownerHtml).not.toContain("Reason");
+    expect(adminHtml).toContain("Permanently delete item");
+    expect(adminHtml).toContain('maxLength="1000"');
+    expect(strangerHtml).not.toContain("Permanently delete item");
   });
 });
 

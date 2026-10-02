@@ -20,11 +20,12 @@ import { CollectionGallery } from "@/components/collection-gallery";
 import { ImageGallery } from "@/components/image-gallery";
 import { MakerLink } from "@/components/maker-link";
 import { MarkdownContent } from "@/components/markdown-content";
+import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
 import { ProductCard } from "@/components/product-card";
-import { ProductDeletionControls } from "@/components/product-deletion-controls";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { UserPageShell } from "@/components/user-page-shell";
 import { finishOptionLabel } from "@/lib/catalog";
 import {
   decideCatalogProductApproval,
@@ -310,7 +311,7 @@ export function ProductDetailPage({
                 }
                 t={t}
               />
-              <ProductDeletionControls
+              <PermanentDeletionControls
                 name={product.name}
                 reasonRequired={!product.isOwner}
                 onDelete={async (reason) => {
@@ -670,8 +671,8 @@ export function UserCollectionsPage({
     filters.productType,
   );
   return (
-    <AppShell
-      breadcrumbItems={[{ label: t("web.navigation.user"), to: "/user" }]}
+    <UserPageShell
+      contentClassName="p-0"
       headerActions={
         <>
           {onFiltersChange ? (
@@ -690,6 +691,7 @@ export function UserCollectionsPage({
           </Link>
         </>
       }
+      section="collections"
       title={t("web.navigation.collections")}
     >
       <main className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
@@ -717,7 +719,7 @@ export function UserCollectionsPage({
           <EmptyState>{t("web.collections.emptyCollections")}</EmptyState>
         )}
       </main>
-    </AppShell>
+    </UserPageShell>
   );
 }
 
@@ -730,6 +732,7 @@ export function UserCollectionsPage({
  * @param props.items - Collection items to display.
  * @param props.onFiltersChange - Optional filter state updater.
  * @param props.ownerUsername - Public owner username shown in navigation.
+ * @param props.userArea - Whether the page is rendered in the signed-in user area.
  * @returns The collection page.
  */
 export function CollectionPage({
@@ -738,6 +741,7 @@ export function CollectionPage({
   items,
   onFiltersChange,
   ownerUsername,
+  userArea = false,
 }: {
   /** Collection to display. */
   collection: UserCollectionSummary;
@@ -749,6 +753,8 @@ export function CollectionPage({
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
   /** Public owner username shown in navigation. */
   ownerUsername?: string;
+  /** Whether the page is rendered in the signed-in user area. */
+  userArea?: boolean;
 }) {
   const t = useCatalogCopy();
   const filtered = items.filter((item) =>
@@ -758,12 +764,172 @@ export function CollectionPage({
     items.map(collectionFilterItem),
     filters.productType,
   );
+  const headerActions = (
+    <>
+      {onFiltersChange ? (
+        <CatalogFilterBar
+          copy={catalogFilterCopy(t)}
+          facets={facets}
+          filters={filters}
+          onChange={onFiltersChange}
+        />
+      ) : null}
+      {collection.canEdit ? (
+        <>
+          <Link className={buttonVariants()} to="/collections/add">
+            {t("web.action.addToCollection")}
+          </Link>
+          <Link
+            className={buttonVariants({ variant: "outline" })}
+            params={{ collectionId: collection.id }}
+            to="/user/collections/$collectionId/edit"
+          >
+            {t("web.action.edit")}
+          </Link>
+          <VisibilityButton
+            canAdminister={Boolean(collection.canAdminister)}
+            initialPrivate={collection.isPrivate}
+            isAdminPrivate={collection.isAdminPrivate}
+            isOwner={Boolean(collection.isOwner)}
+            onChange={(isPrivate, reason) =>
+              setCollectionVisibility({
+                data: { collectionId: collection.id, isPrivate, reason },
+              })
+            }
+            t={t}
+          />
+        </>
+      ) : null}
+    </>
+  );
+  const content = (
+    <main className="grid gap-6 p-3 md:p-[18px_22px_22px]">
+      <CollectionGallery
+        collection={collection}
+        copy={{
+          closeImage: t("web.resources.action.closeImage"),
+          gallery: t("web.collections.gallery.title"),
+          imageAlt: t("web.resources.detail.imageAlt", {
+            name: collection.name,
+          }),
+          itemCount: t("web.collections.directory.itemCount", {
+            count: collection.itemCount,
+          }),
+          nextImage: t("web.resources.action.nextImage"),
+          nextPage: t("web.collections.gallery.nextPage"),
+          owner: ownerUsername
+            ? t("web.collections.gallery.owner", { owner: ownerUsername })
+            : undefined,
+          /**
+           * Formats collection gallery pagination status.
+           *
+           * @param page - Current page number.
+           * @param pageCount - Total page count.
+           * @returns The localized pagination status.
+           */
+          pageStatus: (page, pageCount) =>
+            t("web.collections.gallery.pageStatus", { page, pageCount }),
+          previousImage: t("web.resources.action.previousImage"),
+          previousPage: t("web.collections.gallery.previousPage"),
+          visibility: t(
+            collection.isPrivate
+              ? "web.resources.visibility.private"
+              : "web.resources.visibility.public",
+          ),
+        }}
+      />
+      <section className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
+        {filtered.length ? (
+          filtered.map((item) => (
+            <article
+              className="group relative flex h-[28rem] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground hover:border-primary focus-within:ring-2 focus-within:ring-ring"
+              key={item.collectionItemId}
+            >
+              <Link
+                className="absolute inset-0 z-10 outline-none"
+                params={{
+                  collectionId: collection.id,
+                  collectionItemId: item.collectionItemId,
+                  userId: item.ownerUserId,
+                }}
+                to="/collections/$userId/$collectionId/$collectionItemId"
+              >
+                <span className="sr-only">{item.displayName}</span>
+              </Link>
+              {[...item.images, ...item.productImages].find(
+                ({ deletedAt }) => !deletedAt,
+              ) ? (
+                <img
+                  alt={t("web.resources.detail.imageAlt", {
+                    name: item.displayName,
+                  })}
+                  className="aspect-4/3 w-full shrink-0 border-b border-border object-cover"
+                  src={
+                    [...item.images, ...item.productImages].find(
+                      ({ deletedAt }) => !deletedAt,
+                    )?.url
+                  }
+                />
+              ) : null}
+              <div className="p-5">
+                <h2 className="font-semibold">{item.displayName}</h2>
+                {item.approvalStatus !== "approved" ? (
+                  <Badge className="mt-2" variant="secondary">
+                    {approvalStatusLabel(t, item.approvalStatus)}
+                  </Badge>
+                ) : null}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {item.productTypeName} · {item.makerName}
+                </p>
+                {item.material ? (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {item.material.name}
+                  </p>
+                ) : null}
+                {item.finishOption ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {localizedFinishLabel(item.finishOption, t)}
+                  </p>
+                ) : null}
+              </div>
+            </article>
+          ))
+        ) : (
+          <EmptyState>{t("web.collections.empty")}</EmptyState>
+        )}
+      </section>
+    </main>
+  );
+  const meta = t("web.collections.directory.itemCount", {
+    count: collection.itemCount,
+  });
+
+  if (userArea) {
+    return (
+      <UserPageShell
+        breadcrumbItems={[
+          {
+            label: t("web.navigation.collections"),
+            to: "/user/collections",
+          },
+        ]}
+        contentClassName="p-0"
+        headerActions={headerActions}
+        meta={meta}
+        section="collections"
+        title={collection.name}
+      >
+        {content}
+      </UserPageShell>
+    );
+  }
+
   return (
     <AppShell
       breadcrumbItems={[
         {
           label: t("web.navigation.collections"),
-          to: collection.isOwner ? "/user/collections" : "/collections",
+          to: "/collections",
         },
         ...(ownerUsername
           ? [
@@ -775,145 +941,11 @@ export function CollectionPage({
             ]
           : []),
       ]}
-      headerActions={
-        <>
-          {onFiltersChange ? (
-            <CatalogFilterBar
-              copy={catalogFilterCopy(t)}
-              facets={facets}
-              filters={filters}
-              onChange={onFiltersChange}
-            />
-          ) : null}
-          {collection.canEdit ? (
-            <>
-              <Link className={buttonVariants()} to="/collections/add">
-                {t("web.action.addToCollection")}
-              </Link>
-              <Link
-                className={buttonVariants({ variant: "outline" })}
-                params={{ collectionId: collection.id }}
-                to="/user/collections/$collectionId/edit"
-              >
-                {t("web.action.edit")}
-              </Link>
-              <VisibilityButton
-                canAdminister={Boolean(collection.canAdminister)}
-                initialPrivate={collection.isPrivate}
-                isAdminPrivate={collection.isAdminPrivate}
-                isOwner={Boolean(collection.isOwner)}
-                onChange={(isPrivate, reason) =>
-                  setCollectionVisibility({
-                    data: { collectionId: collection.id, isPrivate, reason },
-                  })
-                }
-                t={t}
-              />
-            </>
-          ) : null}
-        </>
-      }
-      meta={t("web.collections.directory.itemCount", {
-        count: collection.itemCount,
-      })}
+      headerActions={headerActions}
+      meta={meta}
       title={collection.name}
     >
-      <main className="grid gap-6 p-3 md:p-[18px_22px_22px]">
-        <CollectionGallery
-          collection={collection}
-          copy={{
-            closeImage: t("web.resources.action.closeImage"),
-            gallery: t("web.collections.gallery.title"),
-            imageAlt: t("web.resources.detail.imageAlt", {
-              name: collection.name,
-            }),
-            itemCount: t("web.collections.directory.itemCount", {
-              count: collection.itemCount,
-            }),
-            nextImage: t("web.resources.action.nextImage"),
-            nextPage: t("web.collections.gallery.nextPage"),
-            owner: ownerUsername
-              ? t("web.collections.gallery.owner", { owner: ownerUsername })
-              : undefined,
-            /**
-             * Formats collection gallery pagination status.
-             *
-             * @param page - Current page number.
-             * @param pageCount - Total page count.
-             * @returns The localized pagination status.
-             */
-            pageStatus: (page, pageCount) =>
-              t("web.collections.gallery.pageStatus", { page, pageCount }),
-            previousImage: t("web.resources.action.previousImage"),
-            previousPage: t("web.collections.gallery.previousPage"),
-            visibility: t(
-              collection.isPrivate
-                ? "web.resources.visibility.private"
-                : "web.resources.visibility.public",
-            ),
-          }}
-        />
-        <section className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
-          {filtered.length ? (
-            filtered.map((item) => (
-              <article
-                className="group relative flex h-[28rem] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground hover:border-primary focus-within:ring-2 focus-within:ring-ring"
-                key={item.collectionItemId}
-              >
-                <Link
-                  className="absolute inset-0 z-10 outline-none"
-                  params={{
-                    collectionId: collection.id,
-                    collectionItemId: item.collectionItemId,
-                    userId: item.ownerUserId,
-                  }}
-                  to="/collections/$userId/$collectionId/$collectionItemId"
-                >
-                  <span className="sr-only">{item.displayName}</span>
-                </Link>
-                {[...item.images, ...item.productImages].find(
-                  ({ deletedAt }) => !deletedAt,
-                ) ? (
-                  <img
-                    alt={t("web.resources.detail.imageAlt", {
-                      name: item.displayName,
-                    })}
-                    className="aspect-4/3 w-full shrink-0 border-b border-border object-cover"
-                    src={
-                      [...item.images, ...item.productImages].find(
-                        ({ deletedAt }) => !deletedAt,
-                      )?.url
-                    }
-                  />
-                ) : null}
-                <div className="p-5">
-                  <h2 className="font-semibold">{item.displayName}</h2>
-                  {item.approvalStatus !== "approved" ? (
-                    <Badge className="mt-2" variant="secondary">
-                      {approvalStatusLabel(t, item.approvalStatus)}
-                    </Badge>
-                  ) : null}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {item.productTypeName} · {item.makerName}
-                  </p>
-                  {item.material ? (
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      {item.material.name}
-                    </p>
-                  ) : null}
-                  {item.finishOption ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {localizedFinishLabel(item.finishOption, t)}
-                    </p>
-                  ) : null}
-                </div>
-              </article>
-            ))
-          ) : (
-            <EmptyState>{t("web.collections.empty")}</EmptyState>
-          )}
-        </section>
-      </main>
+      {content}
     </AppShell>
   );
 }

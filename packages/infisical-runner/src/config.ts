@@ -123,11 +123,6 @@ export const commandSecrets = {
     "process:dead-letter": scraperCommandSecretConfig,
     "process:queue": scraperCommandSecretConfig,
     scrape: scraperCommandSecretConfig,
-    "scrape:autmog": scraperCommandSecretConfig,
-    "scrape:grimsmo-fjell": scraperCommandSecretConfig,
-    "scrape:grimsmo-norseman": scraperCommandSecretConfig,
-    "scrape:grimsmo-rask": scraperCommandSecretConfig,
-    "scrape:grimsmo-saga": scraperCommandSecretConfig,
   },
   web: {
     build: {

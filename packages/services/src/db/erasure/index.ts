@@ -409,7 +409,9 @@ export function createErasureService(
     },
 
     /**
-     * Erases account data and maps verification failures to operation errors.
+     * Erases owned rows and redacts retained references in one transaction.
+     * Before commit, captured target, raw identifier, and orphan checks must all
+     * return zero; any deletion or verification failure rolls back the erasure.
      *
      * @param targetClerkId - Clerk user identifier whose data is erased.
      * @rejects When validation or database erasure fails.

@@ -1,27 +1,44 @@
-# Environment Variables
+# Environment Variable Placement
 
-Pocket Trash runs `apps/web` on Vercel, `apps/api` on Cloudflare Workers, and
-the scraper on Railway. Browser logs are forwarded to Axiom through the API.
+Variable names, meanings, validation, and defaults are defined beside the code
+that consumes them:
 
-## Local Secret Paths
+- [Web server environment](../apps/web/src/env/server.schema.ts)
+- [Web browser environment](../apps/web/src/env/client.schema.ts)
+- [API Worker bindings](../apps/api/src/app.ts)
+- [Scraper environment](../apps/scraper/src/env.schema.ts)
+- [Database package environment](../packages/database/src/env.schema.ts)
+- [Web build-time aliases](../apps/web/vite.config.ts)
 
-| Path | Used by |
+This document covers only where values live and constraints that cross runtime
+boundaries.
+
+## Runtime Ownership
+
+Pocket Trash runs the web application on Vercel, the API on Cloudflare Workers,
+and the scraper on Railway.
+
+| Infisical path | Owner and destination |
 | --- | --- |
-| `/apps/api` | Local API Worker development. |
-| `/apps/web` | Web dev/build/test and database migration commands. |
-| `/apps/scraper` | Scraper cron and queue commands. |
-| `/local/database` | Optional developer-specific `DATABASE_URL_<INITIALS>` values. |
-| `/local/bunny` | Bunny account audits. |
-| `/tools/logger-axiom-test` | Live logger integration test. |
-| `tools/github/secrets` | GitHub Actions runtime values fetched with OIDC. |
-| `tools/github/infisical-connection` | GitHub repository bootstrap secrets synced from Infisical. |
+| `/apps/web` | Web development, builds, tests, and database commands; deploy workflows copy required values to Vercel |
+| `/apps/api` | Local API development and Cloudflare Worker deployment |
+| `/apps/scraper` | Local scraper commands and Railway services |
+| `/local/database` | Optional developer-specific database URLs |
+| `/local/bunny` | Bunny account audits |
+| `/tools/logger-axiom-test` | Local live Axiom integration test |
+| `tools/github/secrets` | GitHub Actions values fetched at runtime through OIDC |
+| `tools/github/infisical-connection` | Bootstrap values synchronized into GitHub repository secrets |
 
-### Erasure HMAC Secret
+Use the same path names in every Infisical environment that needs them. Values
+remain environment-specific.
 
-Store `ERASURE_HMAC_SECRET` in both `/apps/api` and `/apps/web` for every
-Infisical environment. The two paths must use the same value within an
-environment because both applications create erasure-subject identifiers. Use a
-different value for each environment.
+## Cross-Runtime Constraints
+
+### Erasure subject secret
+
+`ERASURE_HMAC_SECRET` must have the same value in `/apps/api` and
+`/apps/web` within one environment because both applications create
+erasure-subject identifiers. Use a different value in each environment.
 
 Generate a 256-bit value with:
 
@@ -29,115 +46,38 @@ Generate a 256-bit value with:
 openssl rand -hex 32
 ```
 
-Keep the value stable until every erasure receipt created with it has expired.
-Deployed web environments must receive the matching value through Vercel because
-Vercel builds do not read `/apps/web` from Infisical.
+Keep it stable until every receipt created with it has expired. Vercel must
+receive the matching web value during deployment because a deployed build does
+not read `/apps/web` directly.
 
-## Web
+### Local database override
 
-| Variable | Scope | Notes |
-| --- | --- | --- |
-| `DATABASE_URL` | Server | Postgres connection string. |
-| `CLERK_SECRET_KEY` | Server | Clerk server API key. |
-| `ERASURE_HMAC_SECRET` | Secret | HMAC key for opaque erasure-subject identifiers. Must match the API value for the environment. |
-| `CLERK_PUBLISHABLE_KEY` | Build/client | Aliased to `VITE_CLERK_PUBLISHABLE_KEY` for Vite. |
-| `VITE_CLERK_PUBLISHABLE_KEY` | Client | Clerk browser key. |
-| `VITE_CLERK_SIGN_IN_URL` | Client | Sign-in route. |
-| `VITE_CLERK_SIGN_UP_URL` | Client | Sign-up route. |
-| `AXIOM_TOKEN` | Server | Enables Axiom transport when paired with `AXIOM_DATASET`. |
-| `AXIOM_DATASET` | Server | Axiom dataset name. |
-| `AXIOM_EDGE_DOMAIN` | Server | Optional Axiom ingest domain. |
-| `LOGGER` | Server | `compact` or `verbose` console mode. |
-| `LOG_LEVEL` | Server | `trace`, `debug`, `verbose`, `info`, `warn`, `error`, or `fatal`. |
-| `LOG_PROXY_CLIENT_KEY` | Server/build | Optional browser log ingestion key. Aliased to `VITE_LOG_PROXY_CLIENT_KEY`. |
-| `VITE_LOG_PROXY_CLIENT_KEY` | Client | Optional key sent as `x-log-client-key`. |
-| `LOG_DEPLOYMENT_ID` | Server/build | Optional deployment id. Aliased to `VITE_LOG_DEPLOYMENT_ID`. |
-| `LOG_DEPLOYMENT_TARGET` | Server/build | Optional deployment target. Aliased to `VITE_LOG_DEPLOYMENT_TARGET`. |
-| `BUNNY_IMAGE_FOLDER_PREFIX` | Server | Image folder prefix for preview isolation. |
-| `BUNNY_API_KEY` | Secret | Bunny account API key used only for exact CDN purges and Pull Zone checks during account erasure. |
-| `ASSET_FOLDER_PREFIX` | Server/build | Static asset namespace; always `assets`. |
-| `BUNNY_CDN_BASE_URL` | Server | Public Bunny resource delivery origin. |
-| `BUNNY_CDN_TOKEN_KEY` | Secret | Signs short-lived Bunny resource URLs. |
-| `BUNNY_RESOURCE_FOLDER_PREFIX` | Server | Resource namespace: `resources/files`, `resources/dev`, `resources/preview`, or `resources/preview/pr-<number>`. |
-| `BUNNY_PULL_ZONE_ID` | Server | Pull Zone ID checked for disabled Perma-Cache during account erasure. |
-| `BUNNY_STORAGE_ACCESS_KEY` | Server | Resource Storage Zone password. |
-| `BUNNY_STORAGE_ENDPOINT` | Server | Regional Bunny Storage API origin. |
-| `BUNNY_STORAGE_ZONE_NAME` | Server | Shared `pocket-trash-storage` Storage Zone name. |
-| `API_URL` | Build/client | Aliased to `VITE_API_URL` for Vite. |
-| `VITE_API_URL` | Client | API origin used for resource upload sessions. |
-| `SITE_URL` | Server | Public site origin when needed. |
-
-### End-to-end tests
-
-The Playwright suite reads `E2E_BASE_URL`, `E2E_CLERK_REGULAR_USER_EMAIL`,
-`E2E_CLERK_REGULAR_USER_ID`, `E2E_CLERK_EDITOR_USER_EMAIL`, and
-`E2E_CLERK_ADMIN_USER_EMAIL`. `E2E_CLERK_DISPOSABLE_USER_EMAIL` reserves an
-account for erasure coverage. CI also supplies `E2E_PR_NUMBER`,
-`E2E_DATABASE_BRANCH`, and `E2E_RUN_MUTATIONS` for the isolated mutation
-fixture. See [End-to-End Testing](./e2e-testing.md) for commands and safety
-checks.
-
-### Local Database Override
-
-The Infisical `dev` value for `DATABASE_URL` is the shared default and points to
-the `development` Neon branch. To opt into a personal branch, store its URL in
-Infisical `/local/database` as `DATABASE_URL_<INITIALS>`, then add its initials
-to `.env.local` or `.env` at the repository root (`.env.local` takes
-precedence):
+The `dev` application paths provide the shared development database. To select
+a personal Neon branch for local web, API, scraper, and database commands, store
+its URL in `/local/database` as `DATABASE_URL_<INITIALS>` and set the
+repository-root selector:
 
 ```dotenv
 URL_INITIALS=RA
 ```
 
-The runner promotes the matching injected value (`DATABASE_URL_RA` in this
-example) to `DATABASE_URL` for local web, API, scraper, and database commands.
-If neither root file contains a selector, the shared Infisical value remains
-active. A configured selector with no matching secret fails explicitly. The
-runner exposes the normalized `URL_INITIALS` to child processes.
+`.env.local` takes precedence over `.env`. A selector without a matching
+Infisical secret fails before a database connection is attempted. See
+[Database Operations](./database.md) for the workflow.
 
-## API
+### Web build values
 
-| Variable | Scope | Notes |
-| --- | --- | --- |
-| `DATABASE_URL` | Secret | Neon Postgres connection string. GitHub Actions resolves the deployment-specific branch URL. |
-| `CLERK_SECRET_KEY` | Secret | Verifies Clerk bearer tokens. |
-| `CLERK_WEBHOOK_SIGNING_SECRET` | Secret | Verifies Clerk user webhooks. |
-| `LINEAR_WEBHOOK_SIGNING_SECRET` | Secret | Verifies Linear lifecycle webhooks. The `prod` value matches the production Linear endpoint; `dev` and `preview` share the development endpoint value. |
-| `ERASURE_HMAC_SECRET` | Secret | HMAC key for opaque erasure-subject identifiers. Must match the web value for the environment. |
-| `URL_INITIALS` | Local server | Normalized developer selector exposed by the Infisical runner. |
-| `BUNNY_API_KEY` | Secret | Bunny account API key for erasure-time Pull Zone checks and exact CDN purges. |
-| `BUNNY_CDN_BASE_URL` | Worker | Public Bunny delivery origin. |
-| `BUNNY_IMAGE_FOLDER_PREFIX` | Worker | Required for upload storage. Complete image namespace: `images`, `images/dev`, `images/preview`, or `images/preview/pr-<number>`. |
-| `BUNNY_CDN_TOKEN_KEY` | Secret | Signs delivery verification URLs during account erasure. |
-| `BUNNY_PULL_ZONE_ID` | Worker | Pull Zone checked for disabled Perma-Cache before account erasure. |
-| `BUNNY_RESOURCE_FOLDER_PREFIX` | Worker | Resource namespace selected for the deployment. |
-| `BUNNY_STORAGE_ACCESS_KEY` | Secret | Bunny Storage Zone password. |
-| `BUNNY_STORAGE_ENDPOINT` | Worker | Regional Bunny Storage API origin. |
-| `BUNNY_STORAGE_ZONE_NAME` | Worker | Shared `pocket-trash-storage` Storage Zone name. |
-| `AXIOM_TOKEN`, `AXIOM_DATASET`, `AXIOM_EDGE_DOMAIN`, `LOG_LEVEL`, `LOGGER` | Worker | Shared logger configuration. |
+Browser-visible values must reach Vercel at build time. Shared server values
+are copied to their `VITE_` aliases only by
+[`applyWebClientEnvAliases`](../apps/web/vite.config.ts); do not expose other
+server secrets to the browser bundle.
 
-Production Clerk sends webhooks to
-`https://api.pocket-trash.app/api/v0/webhooks/clerk`; development Clerk sends
-them to `https://dev-api.pocket-trash.app/api/v0/webhooks/clerk`. Run
-`pnpm dev:web:webhooks` to register a 24-hour local relay target. PR previews
-receive development events only while labeled `preview:webhooks`.
-Linear sends Issue and Project lifecycle webhooks to the production and stable
-development API endpoints. Stable development forwards exact signed requests to
-registered previews and local tunnels. The `preview:webhooks` label controls
-preview registration; `pnpm dev:web:webhooks` controls a 24-hour local target.
+## Operational Runbooks
 
-## Scraper
-
-| Variable | Notes |
-| --- | --- |
-| `DATABASE_URL` | Postgres connection string. |
-| `REDIS_URL` | Queue backend. |
-| `SCRAPER_CRON_ENABLED` | Enables scheduled scraping on Railway. |
-| `BUNNY_IMAGE_FOLDER_PREFIX` | Required at scraper startup, including dry runs. Complete image namespace: `images`, `images/dev`, `images/preview`, or `images/preview/pr-<number>`. Missing or invalid values fail startup; there is no default. |
-| `AXIOM_TOKEN`, `AXIOM_DATASET`, `AXIOM_EDGE_DOMAIN`, `LOG_LEVEL`, `LOGGER` | Shared logger configuration. |
-
-## Hosting
-
-GitHub Actions hosting credentials are stored in Infisical. See
-[GitHub Infisical OIDC](./github-infisical.md) for the exact paths and
-inventory.
+- [Complete Erasure](./complete-erasure.md)
+- [Database Operations](./database.md)
+- [End-to-End Testing](./e2e-testing.md)
+- [Development Webhook Forwarding](./clerk-webhooks.md)
+- [GitHub Infisical OIDC](./github-infisical.md)
+- [Logger Operations](./logger.md)
+- [Railway](./railway.md)

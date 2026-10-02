@@ -5,13 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "tsx ../../packages/infisical-runner/src/cli.ts api dev -- env CLOUDFLARE_INCLUDE_PROCESS_ENV=true wrangler dev --port 4006 --var APP_ENV:development",
-    "dev:web": "pnpm run dev",
     "build": "tsc -p tsconfig.json",
     "build:ci": "tsc -p tsconfig.json",
     "cf-typegen": "wrangler types src/worker-configuration.d.ts --include-runtime false",
-    "deploy": "pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy -- pnpm exec wrangler deploy --config wrangler.jsonc --env=\"\" --keep-vars",
-    "deploy:development": "pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy:development -- pnpm exec wrangler deploy --config wrangler.jsonc --env=development --keep-vars",
-    "deploy:preview": "pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy:preview -- pnpm exec wrangler deploy --config wrangler.jsonc --env=preview --keep-vars",
+    "deploy": "pnpm --dir ../.. security:audit && pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy -- pnpm exec wrangler deploy --config wrangler.jsonc --env=\"\" --keep-vars",
+    "deploy:development": "pnpm --dir ../.. security:audit && pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy:development -- pnpm exec wrangler deploy --config wrangler.jsonc --env=development --keep-vars",
+    "deploy:preview": "pnpm --dir ../.. security:audit && pnpm exec turbo run build --filter=@app/api && tsx ../../packages/infisical-runner/src/cli.ts api deploy:preview -- pnpm exec wrangler deploy --config wrangler.jsonc --env=preview --keep-vars",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:ci": "vitest run",
@@ -32,6 +31,6 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260916.1",
     "@package/tsconfig": "workspace:*",
-    "wrangler": "4.133.0"
+    "wrangler": "4.139.0"
   }
 }

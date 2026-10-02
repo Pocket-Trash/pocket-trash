@@ -13,7 +13,6 @@
     "start": "node dist/index.js",
     "start:scheduled": "SCRAPER_SCHEDULER_ENABLED=true node dist/index.js",
     "scrape": "node dist/cli.js scrape",
-    "scrape:autmog": "node dist/cli.js scrape:autmog",
     "process:queue": "node dist/cli.js process:queue",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
@@ -21,7 +20,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@hono/node-server": "latest",
+    "@hono/node-server": "^2.1.1",
     "@package/database": "workspace:*",
     "@package/logger": "workspace:*",
     "@package/markdown": "workspace:*",
@@ -29,9 +28,9 @@
     "@t3-oss/env-core": "^0.13.11",
     "bullmq": "^5.80.4",
     "drizzle-orm": "^0.45.2",
-    "hono": "latest",
+    "hono": "^4.13.9",
     "ioredis": "^5.11.1",
-    "undici": "^8.8.0",
+    "undici": "^8.11.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {
