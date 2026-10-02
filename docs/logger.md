@@ -129,7 +129,7 @@ running.
 Use normal dev commands:
 
 ```sh
-pnpm dev:web
+pnpm dev
 ```
 
 ## Development Terminal Logs

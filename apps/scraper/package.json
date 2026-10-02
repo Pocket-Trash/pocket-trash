@@ -13,7 +13,6 @@
     "start": "node dist/index.js",
     "start:scheduled": "SCRAPER_SCHEDULER_ENABLED=true node dist/index.js",
     "scrape": "node dist/cli.js scrape",
-    "scrape:autmog": "node dist/cli.js scrape:autmog",
     "process:queue": "node dist/cli.js process:queue",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",

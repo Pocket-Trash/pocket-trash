@@ -119,12 +119,12 @@ runner exposes the normalized `URL_INITIALS` to child processes.
 Production Clerk sends webhooks to
 `https://api.pocket-trash.app/api/v0/webhooks/clerk`; development Clerk sends
 them to `https://dev-api.pocket-trash.app/api/v0/webhooks/clerk`. Run
-`pnpm dev:web:webhooks` to register a 24-hour local relay target. PR previews
+`pnpm dev:webhooks` to register a 24-hour local relay target. PR previews
 receive development events only while labeled `preview:webhooks`.
 Linear sends Issue and Project lifecycle webhooks to the production and stable
 development API endpoints. Stable development forwards exact signed requests to
 registered previews and local tunnels. The `preview:webhooks` label controls
-preview registration; `pnpm dev:web:webhooks` controls a 24-hour local target.
+preview registration; `pnpm dev:webhooks` controls a 24-hour local target.
 
 ## Scraper
 
