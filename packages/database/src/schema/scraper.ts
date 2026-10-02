@@ -397,7 +397,6 @@ export const tmpProductVariations = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    /** Aggregate row and product-level image-folder key. */
     productId: bigint("product_id", { mode: "number" })
       .notNull()
       .references(() => tmpProducts.id, { onDelete: "cascade" }),
@@ -434,6 +433,7 @@ export const tmpImages = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    /** Aggregate row and product-level image-folder key. */
     productId: bigint("product_id", { mode: "number" })
       .notNull()
       .references(() => tmpProducts.id, { onDelete: "cascade" }),
