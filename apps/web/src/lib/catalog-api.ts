@@ -297,6 +297,13 @@ export const collectionItemApprovalSchema = productApprovalSchema
   .omit({ productId: true })
   .extend({ collectionItemId: idSchema });
 
+/** Validates an explicit whole-product deletion acknowledgement and optional staff reason. */
+export const productDeletionSchema = z.object({
+  confirmed: z.literal(true),
+  productId: idSchema,
+  reason: z.string().trim().max(1000, requiredMessage).optional(),
+});
+
 /**
  * Success or validation-aware failure returned by catalog lookup mutations.
  *
@@ -1404,6 +1411,27 @@ export const decideCatalogProductApproval = createServerFn({ method: "POST" })
       return { approvalStatus, ok: true as const };
     } catch (error) {
       return mutationFailure(error);
+    }
+  });
+
+/** Deletes an eligible product through the owner or staff authorization path. */
+export const deleteCatalogProduct = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    const parsed = productDeletionSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+    const { s } = await import("@/lib/services");
+    try {
+      const deleted = await s.db.catalog.deleteProduct({
+        actor,
+        ...parsed.data,
+      });
+      return deleted
+        ? { ok: true as const }
+        : { ok: false as const, formError: "web.catalog.deletion.blocked" };
+    } catch {
+      return { ok: false as const, formError: "web.catalog.deletion.failed" };
     }
   });
 
