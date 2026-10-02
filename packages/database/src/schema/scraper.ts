@@ -251,6 +251,7 @@ export const maker = pgTable(
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
     name: text("name").notNull(),
+    /** Canonical root URL for this scraper source. */
     rootUrl: text("root_url"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
@@ -274,6 +275,7 @@ export const scraperRuns = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    /** Scraper source key that created this aggregate row. */
     source: text("source").notNull(),
     jobType: text("job_type").notNull(),
     status: text("status").notNull(),
@@ -397,6 +399,11 @@ export const tmpProductVariations = pgTable(
     productId: bigint("product_id", { mode: "number" })
       .notNull()
       .references(() => tmpProducts.id, { onDelete: "cascade" }),
+    /**
+     * Stable variation key supplied by the scraper source.
+     *
+     * @example "saga-1234-5678"
+     */
     sourceKey: text("source_key").notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
@@ -437,8 +444,14 @@ export const tmpImages = pgTable(
     altText: text("alt_text"),
     width: integer("width"),
     height: integer("height"),
+    /**
+     * Stable source-identity hash used to deduplicate image rows.
+     *
+     * @example "sha256:db2ef0e97513c1dc9d75f55ee8c014c06fc31a459c1c25b12904696bf2ab1c55"
+     */
     sourceHash: text("source_hash").notNull(),
     imageProvider: text("image_provider"),
+    /** Provider identifier used to update or delete the uploaded image. */
     imageFileId: text("image_file_id"),
     imagePath: text("image_path"),
     imageUrl: text("image_url"),
@@ -449,6 +462,7 @@ export const tmpImages = pgTable(
       withTimezone: true,
     }),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
+    /** Last time this image appeared in the upstream source. */
     lastSeenAt: timestamp("last_seen_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -504,6 +518,7 @@ export const tmpAutmogPens = pgTable(
     sourceHandle: text("source_handle").notNull(),
     title: text("title").notNull(),
     productUrl: text("product_url").notNull(),
+    /** Editable Markdown initially converted from the source HTML. */
     description: text("description"),
     size: text("size"),
     refill: text("refill"),
@@ -520,12 +535,17 @@ export const tmpAutmogPens = pgTable(
       .$type<unknown[]>()
       .default(sql`'[]'::jsonb`)
       .notNull(),
+    /** Full normalized payload consumed by application features. */
     normalizedData: jsonb("normalized_data")
       .$type<AutmogPenNormalizedData>()
       .notNull(),
+    /** Hash of normalized non-image product details. */
     detailsHash: text("details_hash").notNull(),
+    /** Hash of normalized source-image identities. */
     imageSetHash: text("image_set_hash").notNull(),
+    /** Minimum source variant price in cents. */
     priceMinCents: integer("price_min_cents"),
+    /** Maximum source variant price in cents. */
     priceMaxCents: integer("price_max_cents"),
     currencyCode: text("currency_code").notNull().default("USD"),
     availableForSale: boolean("available_for_sale").notNull().default(false),

@@ -25,6 +25,7 @@ export const user = pgTable("users", {
     .primaryKey()
     .generatedAlwaysAsIdentity({ startWith: 1000 }),
   clerkId: text("clerk_id").notNull().unique(),
+  /** Provider timestamp used to ignore stale Clerk profile updates. */
   clerkUpdatedAt: timestamp("clerk_updated_at", {
     mode: "date",
     withTimezone: true,
