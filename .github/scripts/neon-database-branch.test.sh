@@ -74,7 +74,7 @@ PATH="$test_dir:$PATH" \
   NEON_PROJECT_ID="test-project" \
   NEON_DATABASE_NAME="test-database" \
   NEON_DATABASE_USER="test-user" \
-  DB_CHANGING=true \
+  ISOLATION_REQUIRED=true \
   PR_NUMBER=42 \
   GITHUB_OUTPUT="$database_change_output_file" \
   bash "$script_dir/neon-database-branch.sh" prepare-preview > /dev/null

@@ -10,6 +10,7 @@ const domains = [
   "web",
   "database",
   "storybook",
+  "preview",
   "safe_e2e",
   "mutation_e2e",
   "validation",
@@ -102,17 +103,24 @@ export function classifyChanges(
       }
 
       if (file.startsWith("apps/api/")) {
-        enable(result, "api", "safe_e2e", "mutation_e2e", "validation");
+        enable(
+          result,
+          "api",
+          "preview",
+          "safe_e2e",
+          "mutation_e2e",
+          "validation",
+        );
         continue;
       }
 
       if (file.startsWith("apps/scraper/")) {
-        enable(result, "scraper", "validation");
+        enable(result, "scraper", "preview", "validation");
         continue;
       }
 
       if (file.startsWith("apps/web/")) {
-        enable(result, "web", "safe_e2e", "validation");
+        enable(result, "web", "preview", "safe_e2e", "validation");
         if (!file.startsWith("apps/web/e2e/")) enable(result, "storybook");
         if (
           file.startsWith("apps/web/src/") ||
@@ -136,6 +144,7 @@ export function classifyChanges(
           "scraper",
           "web",
           "storybook",
+          "preview",
           "safe_e2e",
           "mutation_e2e",
           "validation",
@@ -144,7 +153,15 @@ export function classifyChanges(
       }
 
       if (file.startsWith("packages/markdown/")) {
-        enable(result, "scraper", "web", "storybook", "safe_e2e", "validation");
+        enable(
+          result,
+          "scraper",
+          "web",
+          "storybook",
+          "preview",
+          "safe_e2e",
+          "validation",
+        );
         continue;
       }
 
@@ -169,6 +186,14 @@ export function classifyChanges(
       (action === "labeled" && (eventLabel ?? labels[0]) === "test:storybook"))
   ) {
     enable(result, "storybook");
+  }
+
+  if (
+    labels.includes("test:e2e") &&
+    (!labelEvent ||
+      (action === "labeled" && (eventLabel ?? labels[0]) === "test:e2e"))
+  ) {
+    enable(result, "preview", "safe_e2e", "mutation_e2e");
   }
 
   return result;

@@ -104,10 +104,11 @@ Bunny CDN caches served files and Optimizer transformations.
 
 ## CI Behavior
 
-The API deploy workflow assigns an isolated preview image prefix before it runs
-Playwright:
+The API deploy workflow assigns the preview image prefix before Playwright:
 
-- PR previews get `BUNNY_IMAGE_FOLDER_PREFIX=images/preview/pr-<number>`.
+- Mutation-relevant PR previews get
+  `BUNNY_IMAGE_FOLDER_PREFIX=images/preview/pr-<number>`; other previews use
+  `images/preview`.
 - DB-changing PR scraper previews set `SCRAPER_CRON_ENABLED=true` because they
   need schema-aware scraping. PRs without DB changes set
   `SCRAPER_CRON_ENABLED=false`.

@@ -263,10 +263,10 @@ write_branch_metadata() {
 prepare_preview() {
   require_neon_env
   require_env PR_NUMBER
-  require_env DB_CHANGING
+  require_env ISOLATION_REQUIRED
 
-  if [[ "$DB_CHANGING" != "true" && "$DB_CHANGING" != "false" ]]; then
-    echo "DB_CHANGING must be true or false." >&2
+  if [[ "$ISOLATION_REQUIRED" != "true" && "$ISOLATION_REQUIRED" != "false" ]]; then
+    echo "ISOLATION_REQUIRED must be true or false." >&2
     exit 1
   fi
 
@@ -311,7 +311,7 @@ prepare_preview() {
   write_output preview_branch_id "$preview_branch_id"
   write_output branch_created false
 
-  if [[ "$DB_CHANGING" != "true" ]]; then
+  if [[ "$ISOLATION_REQUIRED" != "true" ]]; then
     emit_ci_log info "ci.database.preview.noPrBranch.needed" "$(jq -n \
       --arg pr_number "$PR_NUMBER" \
       --arg target_branch "$target_branch" \
