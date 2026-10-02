@@ -1377,6 +1377,19 @@ export type CollectionsService = {
     },
   ): Promise<UserCollectionSummary>;
   /**
+   * Permanently deletes one collection item owned by the actor.
+   *
+   * @param input - Authorized collection-item deletion request.
+   * @returns Completion after dependent rows, image cleanup, and auditing commit.
+   * @rejects When the item is inaccessible or persistence, auditing, or operation logging fails.
+   */
+  deleteItem(input: {
+    /** Authenticated owner requesting deletion. */
+    actor: Actor;
+    /** Collection item to delete. */
+    collectionItemId: number;
+  }): Promise<void>;
+  /**
    * Counts owned products.
    *
    * @param input - Actor and candidate product identifiers.
@@ -3373,6 +3386,80 @@ export function createCollectionsService(
         }
       }
       return result;
+    },
+    /**
+     * Permanently deletes one owned collection item.
+     *
+     * @param input - Authenticated owner and collection-item identifier.
+     * @returns Completion after dependent rows, image cleanup, and auditing commit.
+     * @rejects When the item is inaccessible or persistence, auditing, or operation logging fails.
+     */
+    async deleteItem(input) {
+      await logger.operation(
+        loggerMessages.database.collections.deleteItem,
+        async () => {
+          const actorUser = await users.getByClerkId(input.actor.clerkId);
+          if (!actorUser) throw new Error("Collection item does not exist.");
+          await db.transaction(async (tx) => {
+            const [item] = await tx
+              .select({
+                collectionId: schema.collectionItem.collectionId,
+                displayName: schema.collectionItem.displayName,
+                id: schema.collectionItem.id,
+                ownerId: schema.collectionItem.ownerId,
+              })
+              .from(schema.collectionItem)
+              .where(
+                and(
+                  eq(schema.collectionItem.id, input.collectionItemId),
+                  eq(schema.collectionItem.ownerId, actorUser.id),
+                  eq(schema.collectionItem.owned, true),
+                ),
+              )
+              .limit(1)
+              .for("update");
+            if (!item) throw new Error("Collection item does not exist.");
+            const images = await tx
+              .select({ objectPath: schema.collectionItemImage.objectPath })
+              .from(schema.collectionItemImage)
+              .where(
+                eq(
+                  schema.collectionItemImage.collectionItemId,
+                  input.collectionItemId,
+                ),
+              );
+            await queueObjectDeletions(
+              tx,
+              images.map(({ objectPath }) => objectPath),
+            );
+            await tx
+              .delete(schema.collectionItem)
+              .where(eq(schema.collectionItem.id, input.collectionItemId));
+            await touchCollection(tx, item.collectionId);
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: {
+                deleted: true,
+                queuedImageCount: new Set(
+                  images.map(({ objectPath }) => objectPath),
+                ).size,
+              },
+              before: {
+                collectionId: item.collectionId,
+                displayName: item.displayName,
+                id: item.id,
+              },
+              definition: collectionAudit.itemDeleted,
+              ownerUserId: item.ownerId,
+              targetId: item.id,
+            });
+          });
+        },
+        actorAttributes(input.actor.clerkId, {
+          collectionItemId: input.collectionItemId,
+        }),
+      );
     },
     /**
      * Moves or permanently deletes a collection and its contents.
