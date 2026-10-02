@@ -5,20 +5,23 @@ import { useCatalogCopy } from "@/lib/catalog-copy";
 /**
  * Renders explicit permanent-deletion confirmation without changing ownership rules.
  *
- * @param props - Product label, staff reason requirement, and deletion callback.
- * @returns Accessible product deletion controls.
+ * @param props - Target label, target type, staff reason requirement, and deletion callback.
+ * @returns Accessible permanent deletion controls shared by products and collection items.
  */
-export function ProductDeletionControls({
+export function PermanentDeletionControls({
   name,
   onDelete,
   reasonRequired,
+  targetType = "product",
 }: {
-  /** Product name shown in the warning. */
+  /** Entity name shown in the warning. */
   name: string;
   /** Whether cross-owner staff intervention needs a reason. */
   reasonRequired: boolean;
+  /** Entity whose deletion consequences are shown; defaults to a catalog product. */
+  targetType?: "product" | "collection_item";
   /**
-   * Deletes the confirmed product.
+   * Deletes the confirmed entity.
    *
    * @param reason - Required staff reason, absent for an owner deletion.
    * @returns Completion after deletion commits.
@@ -27,6 +30,12 @@ export function ProductDeletionControls({
   onDelete(reason?: string): Promise<void>;
 }) {
   const t = useCatalogCopy();
+  const item = targetType === "collection_item";
+  const action = t(
+    item
+      ? "web.collections.deletion.itemAction"
+      : "web.catalog.deletion.action",
+  );
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -42,7 +51,7 @@ export function ProductDeletionControls({
         variant="destructive"
         onClick={() => dialog.current?.showModal()}
       >
-        {t("web.catalog.deletion.action")}
+        {action}
       </Button>
       <dialog
         ref={dialog}
@@ -72,9 +81,12 @@ export function ProductDeletionControls({
             } catch (error) {
               setFailure(
                 error instanceof Error &&
+                  !item &&
                   error.message === "web.catalog.deletion.blocked"
                   ? error.message
-                  : "web.catalog.deletion.failed",
+                  : item
+                    ? "error.generic"
+                    : "web.catalog.deletion.failed",
               );
             } finally {
               setSubmitting(false);
@@ -82,10 +94,15 @@ export function ProductDeletionControls({
           }}
         >
           <h2 className="text-xl font-semibold" id={titleId}>
-            {t("web.catalog.deletion.title")}
+            {item ? action : t("web.catalog.deletion.title")}
           </h2>
           <p className="text-sm text-muted-foreground" id={descriptionId}>
-            {t("web.catalog.deletion.description", { name })}
+            {t(
+              item
+                ? "web.collections.deletion.itemDescription"
+                : "web.catalog.deletion.description",
+              { name },
+            )}
           </p>
           {reasonRequired ? (
             <div className="grid gap-2">
@@ -111,7 +128,13 @@ export function ProductDeletionControls({
               disabled={submitting}
               onChange={(event) => setConfirmed(event.target.checked)}
             />
-            <span>{t("web.catalog.deletion.confirmation")}</span>
+            <span>
+              {t(
+                item
+                  ? "web.collections.deletion.itemConfirmation"
+                  : "web.catalog.deletion.confirmation",
+              )}
+            </span>
           </label>
           {failure ? (
             <p className="text-sm text-destructive" role="alert">
@@ -134,7 +157,7 @@ export function ProductDeletionControls({
                 submitting || !confirmed || (reasonRequired && !reason.trim())
               }
             >
-              {t("web.catalog.deletion.action")}
+              {action}
             </Button>
           </div>
         </form>

@@ -215,8 +215,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/services
       '@pocket-trash/localizations':
-        specifier: ^0.26.0
-        version: 0.26.0
+        specifier: ^0.28.0
+        version: 0.28.0
       '@t3-oss/env-core':
         specifier: ^0.13.11
         version: 0.13.11(typescript@6.0.3)(zod@4.4.3)
@@ -2445,9 +2445,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@pocket-trash/localizations@0.26.0':
-    resolution: {integrity: sha512-e8u6hZJiDBZM2CkvTtjlMdHJeKId1Q7dm6pgKw52ml7VI24B2Lv6dQ/bX0dVStV4/LNvhTfJGpM25WHNZo1yMg==}
-    engines: {node: '>=20'}
+  '@pocket-trash/localizations@0.28.0':
+    resolution: {integrity: sha512-IsQoMTigrGIKI4VjIApaVgsWSSr+MLx1AVF0Q4D7sA4V558rXWr5rtsZoRtfPoRIUPj/42rSHIpp4lNn0s7n3Q==}
+    engines: {node: '>=22.20.0 <23'}
 
   '@pocket-trash/localizations@0.9.2':
     resolution: {integrity: sha512-mpQtymbGO2i2xjFJFbO/seOeYPkkzFZ7ylZ59LkftGS8UcAWmRsTxEa7D/t9BO1S1d8GC1AiX8QrQPWHZ7KHZA==}
@@ -10539,11 +10539,7 @@ snapshots:
   '@oxc-resolver/binding-win32-x64-msvc@11.21.2':
     optional: true
 
-  '@pocket-trash/localizations@0.26.0':
-    dependencies:
-      lts: 2.0.0
-    transitivePeerDependencies:
-      - supports-color
+  '@pocket-trash/localizations@0.28.0': {}
 
   '@pocket-trash/localizations@0.9.2':
     dependencies:

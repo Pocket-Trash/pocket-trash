@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  collectionDeletionSchema,
   collectionItemApprovalSchema,
+  collectionItemDeletionSchema,
   collectionWriteSchema,
   productApprovalSchema,
   productDeletionSchema,
@@ -300,6 +302,28 @@ describe("product approval", () => {
 });
 
 describe("collection writes", () => {
+  it("requires explicit deletion acknowledgement and bounds staff reasons", () => {
+    for (const [schema, ids] of [
+      [
+        collectionDeletionSchema,
+        { collectionId: 1000, destinationCollectionId: null },
+      ],
+      [collectionItemDeletionSchema, { collectionItemId: 1000 }],
+    ] as const) {
+      expect(schema.safeParse(ids).success).toBe(false);
+      expect(schema.safeParse({ ...ids, confirmed: false }).success).toBe(
+        false,
+      );
+      expect(
+        schema.safeParse({ ...ids, confirmed: true, reason: "x".repeat(1001) })
+          .success,
+      ).toBe(false);
+      expect(
+        schema.parse({ ...ids, confirmed: true, reason: "  Owner request  " })
+          .reason,
+      ).toBe("Owner request");
+    }
+  });
   it("accepts the null description sent by the combined collection flow", () => {
     const result = collectionWriteSchema.safeParse({
       description: null,

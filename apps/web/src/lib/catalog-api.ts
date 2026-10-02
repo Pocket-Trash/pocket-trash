@@ -304,6 +304,21 @@ export const productDeletionSchema = z.object({
   reason: z.string().trim().max(1000, requiredMessage).optional(),
 });
 
+/** Validates confirmed collection deletion with an optional same-owner move destination. */
+export const collectionDeletionSchema = productDeletionSchema
+  .omit({ productId: true })
+  .extend({
+    collectionId: idSchema,
+    destinationCollectionId: idSchema.nullable(),
+  });
+
+/** Validates explicit acknowledgement of permanent collection-item deletion. */
+export const collectionItemDeletionSchema = productDeletionSchema
+  .omit({ productId: true })
+  .extend({
+    collectionItemId: idSchema,
+  });
+
 /**
  * Success or validation-aware failure returned by catalog lookup mutations.
  *
@@ -1091,19 +1106,30 @@ export const getCollectionDeletionContext = createServerFn({ method: "GET" })
  * @rejects If input validation, authentication, service loading, service authorization, auditing, operation logging, or persistence fails.
  */
 export const deleteUserCollection = createServerFn({ method: "POST" })
-  .validator((input: unknown) =>
-    z
-      .object({
-        collectionId: idSchema,
-        destinationCollectionId: idSchema.nullable(),
-        reason: z.string().trim().max(1000).optional(),
-      })
-      .parse(input),
-  )
+  .validator((input: unknown) => collectionDeletionSchema.parse(input))
   .handler(async ({ data }) => {
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
     await s.db.collections.deleteCollection({ actor, ...data });
+  });
+
+/**
+ * Permanently deletes one authorized collection item and sanitizes service failures.
+ *
+ * @returns Whether deletion committed, or a localized generic failure key.
+ * @rejects When input validation or authentication fails.
+ */
+export const deleteCollectionItem = createServerFn({ method: "POST" })
+  .validator((input: unknown) => collectionItemDeletionSchema.parse(input))
+  .handler(async ({ data }) => {
+    const actor = await requireActor();
+    try {
+      const { s } = await import("@/lib/services");
+      await s.db.collections.deleteItem({ actor, ...data });
+      return { ok: true as const };
+    } catch {
+      return { ok: false as const, formError: "error.generic" };
+    }
   });
 
 /**
