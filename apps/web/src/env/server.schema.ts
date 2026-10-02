@@ -15,7 +15,10 @@ export type WebServerRuntimeEnv = {
   CLERK_SECRET_KEY?: string;
   /** PostgreSQL connection URL. */
   DATABASE_URL?: string;
-  /** HMAC secret used to pseudonymize erasure subjects. */
+  /**
+   * HMAC secret used to pseudonymize erasure subjects.
+   * Must match the API value in the same environment and remain stable until all receipts expire.
+   */
   ERASURE_HMAC_SECRET?: string;
   /** Deployment-scoped Bunny image object prefix. */
   BUNNY_IMAGE_FOLDER_PREFIX?: string;
