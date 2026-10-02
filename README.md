@@ -32,8 +32,8 @@ Infisical into the hosting platform where possible.
    - `/apps/scraper` in `dev`
    - `/tools/logger-axiom-test` in `dev`, when running the live Axiom logger test
 
-See [Environment Variables](docs/environment-variables.md) for app-specific
-runtime variables and secret paths.
+See [Environment Variables](docs/environment-variables.md) for secret paths,
+runtime ownership, and links to the authoritative source schemas.
 
 ### Install the repository
 

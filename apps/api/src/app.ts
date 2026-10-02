@@ -52,7 +52,10 @@ export type ApiBindings = Omit<Env, "APP_ENV" | "BUNNY_IMAGE_FOLDER_PREFIX"> & {
   CLERK_WEBHOOK_TARGETS?: KVNamespace;
   /** PostgreSQL connection string. */
   DATABASE_URL?: string;
-  /** Secret used to pseudonymize erasure subjects. */
+  /**
+   * Secret used to pseudonymize erasure subjects.
+   * Must match the web value in the same environment and remain stable until all receipts expire.
+   */
   ERASURE_HMAC_SECRET?: string;
   /** Console transport output mode. */
   LOGGER?: string;
@@ -64,7 +67,10 @@ export type ApiBindings = Omit<Env, "APP_ENV" | "BUNNY_IMAGE_FOLDER_PREFIX"> & {
   LOG_LEVEL?: string;
   /** Shared key accepted by the client log proxy. */
   LOG_PROXY_CLIENT_KEY?: string;
-  /** Secret used to verify Linear webhook signatures. */
+  /**
+   * Secret used to verify Linear webhook signatures.
+   * Production uses the production endpoint value; development and preview share the development endpoint value.
+   */
   LINEAR_WEBHOOK_SIGNING_SECRET?: string;
   /** Initials required for local webhook forwarding targets. */
   URL_INITIALS?: string;
