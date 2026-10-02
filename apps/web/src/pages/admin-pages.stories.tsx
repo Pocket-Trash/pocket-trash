@@ -68,6 +68,9 @@ export const Hub: Story = {
    * @returns A promise that resolves after the interaction completes.
    */
   play: async ({ canvas, userEvent }) => {
+    await expect(
+      canvas.getByRole("heading", { name: "Admin Menu" }),
+    ).toBeVisible();
     const main = within(
       canvas.getByRole("main", {
         name: "Manage Pocket Trash administration.",
@@ -110,7 +113,11 @@ export const Hub: Story = {
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await userEvent.click(toggle);
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(trashLink).not.toBeVisible();
+    await expect(canvas.getByRole("complementary")).toHaveAttribute(
+      "data-state",
+      "collapsed",
+    );
+    await expect(trashLink).toBeVisible();
     await userEvent.click(toggle);
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(trashLink).toBeVisible();

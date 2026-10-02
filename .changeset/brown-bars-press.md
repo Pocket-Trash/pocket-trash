@@ -2,4 +2,4 @@
 "@app/web": minor
 ---
 
-Make admin and user sidebars collapsible.
+Add collapsible admin and user sidebars with compact navigation controls.

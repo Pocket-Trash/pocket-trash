@@ -7,6 +7,11 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 /** Routes supported by the shared admin and user sidebars. */
@@ -53,6 +58,16 @@ export type SidebarLink = {
   to: SidebarPath;
 };
 
+/** One button rendered after the sidebar utility destinations. */
+type SidebarAction = {
+  /** Icon rendered with the action. */
+  icon: LucideIcon;
+  /** Localized action label. */
+  label: string;
+  /** Callback invoked when the action is selected. */
+  onSelect: () => void;
+};
+
 /**
  * Renders shared application chrome with a responsive sidebar and content area.
  *
@@ -60,16 +75,20 @@ export type SidebarLink = {
  * @param props.children - Page content rendered beside the sidebar.
  * @param props.headerActions - Optional controls rendered beside the sidebar toggle.
  * @param props.sidebar - Sidebar navigation rendered before the page content.
+ * @param props.sidebarTitle - Localized sidebar heading.
  * @returns The shared sidebar page layout.
  */
 export function SidebarPageShell({
   children,
   headerActions,
   sidebar,
+  sidebarTitle,
   ...shellProps
 }: AppShellProps & {
   /** Sidebar navigation rendered before the page content. */
   sidebar: ReactNode;
+  /** Localized sidebar heading. */
+  sidebarTitle: string;
 }) {
   return (
     <SidebarProvider defaultOpenMobile>
@@ -77,12 +96,14 @@ export function SidebarPageShell({
         {...shellProps}
         headerActions={
           <>
-            <SidebarPageTrigger />
+            <MobileSidebarTrigger />
             {headerActions}
           </>
         }
       >
-        <SidebarPageLayout sidebar={sidebar}>{children}</SidebarPageLayout>
+        <SidebarPageLayout sidebar={sidebar} title={sidebarTitle}>
+          {children}
+        </SidebarPageLayout>
       </AppShell>
     </SidebarProvider>
   );
@@ -91,17 +112,36 @@ export function SidebarPageShell({
 /**
  * Renders the sidebar toggle with its current expanded state.
  *
+ * @param props - Sidebar toggle properties.
+ * @param props.className - Optional trigger classes.
  * @returns The accessible sidebar toggle.
  */
-function SidebarPageTrigger() {
+function SidebarPageTrigger({
+  className,
+}: {
+  /** Optional trigger classes. */
+  className?: string;
+}) {
   const { isMobile, open, openMobile } = useSidebar();
 
   return (
     <SidebarTrigger
       aria-controls="page-sidebar"
       aria-expanded={isMobile ? openMobile : open}
+      className={className}
     />
   );
+}
+
+/**
+ * Restores the sidebar from the page header after it is closed on mobile.
+ *
+ * @returns The mobile restore control while the sidebar is closed.
+ */
+function MobileSidebarTrigger() {
+  const { isMobile, openMobile } = useSidebar();
+
+  return isMobile && !openMobile ? <SidebarPageTrigger /> : null;
 }
 
 /**
@@ -110,16 +150,20 @@ function SidebarPageTrigger() {
  * @param props - Sidebar layout properties.
  * @param props.children - Page content rendered beside the sidebar.
  * @param props.sidebar - Navigation shown while the sidebar is expanded.
+ * @param props.title - Localized sidebar heading.
  * @returns The collapsible sidebar layout.
  */
 function SidebarPageLayout({
   children,
   sidebar,
+  title,
 }: {
   /** Page content rendered beside the sidebar. */
   children: ReactNode;
   /** Navigation shown while the sidebar is expanded. */
   sidebar: ReactNode;
+  /** Localized sidebar heading. */
+  title: string;
 }) {
   const { isMobile, open, openMobile } = useSidebar();
   const expanded = isMobile ? openMobile : open;
@@ -128,15 +172,36 @@ function SidebarPageLayout({
     <div
       className={cn(
         "grid w-full flex-1",
-        expanded && "md:grid-cols-[12rem_minmax(0,1fr)]",
+        expanded
+          ? "md:grid-cols-[12rem_minmax(0,1fr)]"
+          : "md:grid-cols-[3rem_minmax(0,1fr)]",
       )}
     >
       <aside
-        className="border-b border-border p-3 md:border-r md:border-b-0"
-        hidden={!expanded}
+        aria-labelledby="page-sidebar-title"
+        className={cn(
+          "flex min-h-0 flex-col border-b border-border p-3 md:border-r md:border-b-0",
+          !expanded && "md:px-2",
+        )}
+        data-state={expanded ? "expanded" : "collapsed"}
+        hidden={!expanded && isMobile}
         id="page-sidebar"
       >
-        {sidebar}
+        <div className="mb-3 flex min-h-7 items-center gap-2">
+          <h2
+            className={cn(
+              "truncate text-sm font-semibold",
+              !expanded && "md:sr-only",
+            )}
+            id="page-sidebar-title"
+          >
+            {title}
+          </h2>
+          <SidebarPageTrigger
+            className={cn("ml-auto shrink-0", !expanded && "md:mx-auto")}
+          />
+        </div>
+        <div className="min-h-0 flex-1">{sidebar}</div>
       </aside>
       <div className="min-w-0">{children}</div>
     </div>
@@ -148,15 +213,19 @@ function SidebarPageLayout({
  *
  * @param props - Sidebar navigation properties.
  * @param props.ariaLabel - Accessible navigation label.
+ * @param props.action - Optional action rendered after the utility links.
  * @param props.primaryLinks - Main destinations shown at the top.
  * @param props.utilityLinks - Secondary destinations shown at the bottom.
  * @returns The shared sidebar navigation.
  */
 export function SidebarNavigation({
+  action,
   ariaLabel,
   primaryLinks,
   utilityLinks = [],
 }: {
+  /** Optional action rendered after the utility links. */
+  action?: SidebarAction;
   /** Accessible navigation label. */
   ariaLabel: string;
   /** Main destinations shown at the top. */
@@ -171,10 +240,11 @@ export function SidebarNavigation({
           <SidebarNavigationGroup key={link.to} {...link} />
         ))}
       </div>
-      <div className="grid gap-1 md:mt-auto">
+      <div className="mt-auto grid gap-1">
         {utilityLinks.map((link) => (
           <SidebarNavigationGroup key={link.to} {...link} />
         ))}
+        {action ? <SidebarNavigationAction {...action} /> : null}
       </div>
     </nav>
   );
@@ -198,16 +268,37 @@ function SidebarNavigationGroup({
   links,
   to,
 }: SidebarLink) {
+  const { isMobile, open, openMobile } = useSidebar();
+  const expanded = isMobile ? openMobile : open;
+
   return (
     <div className="grid gap-1">
-      <Link
-        className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "text-foreground" : "text-muted-foreground"}`}
-        to={to}
-      >
-        <Icon aria-hidden="true" className="size-4" />
-        {label}
-      </Link>
-      {active && links ? (
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Link
+              className={cn(
+                "flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                active ? "text-foreground" : "text-muted-foreground",
+                !expanded && "md:justify-center md:px-2",
+              )}
+              to={to}
+            />
+          }
+        >
+          <Icon aria-hidden="true" className="size-4 shrink-0" />
+          <span className={cn(!expanded && "md:sr-only")}>{label}</span>
+        </TooltipTrigger>
+        <TooltipContent
+          align="center"
+          hidden={expanded || isMobile}
+          side="right"
+          sideOffset={6}
+        >
+          {label}
+        </TooltipContent>
+      </Tooltip>
+      {expanded && active && links ? (
         <div className="grid gap-1 pl-6">
           {links.map((link) => (
             <Link
@@ -221,5 +312,48 @@ function SidebarNavigationGroup({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Renders a sidebar action with the same collapsed tooltip as navigation links.
+ *
+ * @param props - Sidebar action properties.
+ * @returns One sidebar action.
+ */
+function SidebarNavigationAction({
+  icon: Icon,
+  label,
+  onSelect,
+}: SidebarAction) {
+  const { isMobile, open, openMobile } = useSidebar();
+  const expanded = isMobile ? openMobile : open;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            className={cn(
+              "flex min-h-10 w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              !expanded && "md:justify-center md:px-2",
+            )}
+            onClick={onSelect}
+            type="button"
+          />
+        }
+      >
+        <Icon aria-hidden="true" className="size-4 shrink-0" />
+        <span className={cn(!expanded && "md:sr-only")}>{label}</span>
+      </TooltipTrigger>
+      <TooltipContent
+        align="center"
+        hidden={expanded || isMobile}
+        side="right"
+        sideOffset={6}
+      >
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }

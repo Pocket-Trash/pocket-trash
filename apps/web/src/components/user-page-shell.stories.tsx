@@ -1,7 +1,11 @@
+import { useClerk } from "@clerk/tanstack-react-start";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect, within } from "storybook/test";
+import { expect, fn, mocked, within } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { UserPageShell } from "./user-page-shell";
+
+/** Sign-out request spy shared by the user shell stories. */
+const signOut = fn(async () => undefined).mockName("signOut");
 
 /**
  * Configures Storybook coverage for the user page shell examples.
@@ -16,7 +20,13 @@ const meta = {
     section: "account",
     title: "Account",
   },
-  beforeEach: mockStoryAuth,
+  /** Configures authenticated-client mocks before each story. */
+  beforeEach: () => {
+    mockStoryAuth();
+    mocked(useClerk).mockReturnValue({ signOut } as unknown as ReturnType<
+      typeof useClerk
+    >);
+  },
   component: UserPageShell,
   decorators: [
     (Story) => (
@@ -47,7 +57,10 @@ export const Default: Story = {
    * @returns A promise that resolves after the interaction assertions pass.
    * @rejects {Error} If a user interaction or assertion fails.
    */
-  play: async ({ canvas, userEvent }) => {
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await expect(
+      canvas.getByRole("heading", { name: "Profile" }),
+    ).toBeVisible();
     await expect(
       canvas.getByText("Account", { selector: "[aria-current='page']" }),
     ).toBeVisible();
@@ -70,12 +83,24 @@ export const Default: Story = {
     await expect(
       links.getByRole("link", { name: "Beta features" }),
     ).toHaveAttribute("href", "/user/settings/beta-features");
+    const signOutButton = links.getByRole("button", { name: "Sign out" });
+    await expect(signOutButton).toBeVisible();
+    await userEvent.click(signOutButton);
+    await expect(signOut).toHaveBeenCalledWith({ redirectUrl: "/" });
 
     const toggle = canvas.getByRole("button", { name: "Toggle sidebar" });
+    const sidebar = canvas.getByRole("complementary");
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await userEvent.click(toggle);
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(navigation).not.toBeVisible();
+    await expect(sidebar).toHaveAttribute("data-state", "collapsed");
+    await expect(navigation).toBeVisible();
+    const collectionsLink = links.getByRole("link", { name: "Collections" });
+    await expect(collectionsLink).toBeVisible();
+    await userEvent.hover(collectionsLink);
+    await expect(
+      await within(canvasElement.ownerDocument.body).findByText("Collections"),
+    ).toBeVisible();
     await userEvent.click(toggle);
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(navigation).toBeVisible();
@@ -113,7 +138,7 @@ export const EditableContent: Story = {
 
 /** User page shell at the mobile viewport. */
 export const Mobile: Story = {
-  globals: { viewport: "mobile1" },
+  parameters: { viewport: { defaultViewport: "mobile1" } },
   /**
    * Verifies the mobile sidebar starts expanded and remains collapsible.
    *
@@ -125,7 +150,9 @@ export const Mobile: Story = {
     const toggle = canvas.getByRole("button", { name: "Toggle sidebar" });
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await userEvent.click(toggle);
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      canvas.getByRole("button", { name: "Toggle sidebar" }),
+    ).toHaveAttribute("aria-expanded", "false");
     await expect(navigation).not.toBeVisible();
   },
 };
