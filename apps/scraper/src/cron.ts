@@ -22,10 +22,12 @@ type CronTaskFailure = {
 };
 
 /**
- * Runs every source producer followed by queue processing for Railway cron.
- * Task failures are logged and accumulated so later tasks still run.
+ * Runs every configured source producer sequentially, then processes the queue.
+ * Individual task failures are logged and accumulated so later tasks still run;
+ * they do not reject the cron command after its dependencies are initialized.
  *
  * @param options - Job dependencies and optional schedule time.
+ * @returns A promise that settles after every source and queue task is attempted.
  */
 export async function runRailwayCronJob({
   context,
