@@ -15,6 +15,8 @@ jobs:
     name: Refresh Preview
     runs-on: ubuntu-latest
     env:
+      BUNNY_IMAGE_FOLDER_PREFIX: images/preview
+      BUNNY_RESOURCE_FOLDER_PREFIX: resources/preview
       CI_JOB_NAME: Refresh Preview
 
     steps:
@@ -31,6 +33,17 @@ jobs:
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           env-slug: preview
           secret-path: tools/github/secrets
+
+      - name: Fetch API secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: dev
+          secret-path: /apps/api
 
       - name: Enable Corepack
         run: corepack enable

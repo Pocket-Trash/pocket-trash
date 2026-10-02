@@ -27,7 +27,7 @@ const refreshWorkflow = parse(
   ),
 );
 
-test("database detection ignores base-only and package changes", (context) => {
+test("database detection includes schema and seed changes", (context) => {
   const script = readFileSync(
     new URL("../.github/scripts/detect-database-changes.sh", import.meta.url),
     "utf8",
@@ -72,6 +72,8 @@ test("database detection ignores base-only and package changes", (context) => {
     ["apps/web/content/help/en-US/guide.mdx", false],
     ["packages/database/package.json", false],
     ["pnpm-lock.yaml", false],
+    ["packages/database/scripts/seed.ts", true],
+    ["packages/database/seed-data/catalog.json", true],
     ["packages/database/src/schema/topic.ts", true],
     ["packages/database/drizzle/0001_topic.sql", true],
     ["packages/database/drizzle.config.ts", true],

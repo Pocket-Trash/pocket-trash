@@ -76,6 +76,7 @@ export const loggerMessages = {
       createMaker: "database.catalog.createMaker",
       createMaterial: "database.catalog.createMaterial",
       createProduct: "database.catalog.createProduct",
+      deleteProduct: "database.catalog.deleteProduct",
       listColorEffects: "database.catalog.listColorEffects",
       listColors: "database.catalog.listColors",
       listFinishes: "database.catalog.listFinishes",

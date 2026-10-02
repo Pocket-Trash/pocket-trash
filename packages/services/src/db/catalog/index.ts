@@ -689,6 +689,23 @@ export type CatalogService = {
    */
   createProduct(input: ProductWriteInput): Promise<CatalogProduct>;
   /**
+   * Permanently deletes an unreferenced product with transactional audit and storage cleanup.
+   *
+   * @param input - Confirmed owner or staff deletion with a reason for staff intervention.
+   * @returns Whether deletion committed; `false` means the product is still referenced.
+   * @rejects When confirmation, authorization, validation, persistence, or auditing fails.
+   */
+  deleteProduct(input: {
+    /** Authenticated actor requesting deletion. */
+    actor: Actor;
+    /** Explicit acknowledgement of permanent deletion. */
+    confirmed: boolean;
+    /** Catalog product being deleted. */
+    productId: number;
+    /** Required nonblank reason for cross-owner deletion. */
+    reason?: string;
+  }): Promise<boolean>;
+  /**
    * Applies one authorized product approval transition.
    *
    * @param input - Product decision, actor, and nonblank reason.
@@ -2238,6 +2255,138 @@ export function createCatalogService(
               targetId: input.productId,
             });
             return approvalStatus;
+          }),
+        actorAttributes(input.actor.clerkId, { productId: input.productId }),
+      );
+    },
+    /**
+     * Deletes one unreferenced product, queues all its images, and audits atomically.
+     *
+     * @param input - Confirmed owner or authorized staff deletion.
+     * @returns Whether deletion committed; referenced products remain unchanged.
+     * @rejects When confirmation, authorization, validation, persistence, or auditing fails.
+     */
+    async deleteProduct(input) {
+      if (input.confirmed !== true)
+        throw new Error("Product deletion confirmation is required.");
+      if (!users || !audit) throw new Error("Product audit is not configured.");
+      return await loggedMutation(
+        logger,
+        loggerMessages.database.catalog.deleteProduct,
+        async () =>
+          await db.transaction(async (tx) => {
+            await lockTarget(tx, { type: "product", id: input.productId });
+            const [row] = await tx
+              .select()
+              .from(schema.product)
+              .where(eq(schema.product.id, input.productId))
+              .limit(1)
+              .for("update");
+            if (
+              !row ||
+              (row.ownerClerkId !== input.actor.clerkId &&
+                !hasPermission(input.actor, "products.manage"))
+            ) {
+              throw new Error("Product does not exist.");
+            }
+            const reason = input.reason?.trim();
+            if (
+              (row.ownerClerkId !== input.actor.clerkId && !reason) ||
+              (reason && reason.length > 1000)
+            ) {
+              throw new Error("A moderation reason is required.");
+            }
+            const [actorUser] = await tx
+              .select({ id: schema.user.id, username: schema.user.username })
+              .from(schema.user)
+              .where(eq(schema.user.clerkId, input.actor.clerkId))
+              .limit(1);
+            if (!actorUser) throw new Error("Product does not exist.");
+            const [ownerUser] = row.ownerClerkId
+              ? await tx
+                  .select({ id: schema.user.id })
+                  .from(schema.user)
+                  .where(eq(schema.user.clerkId, row.ownerClerkId))
+                  .limit(1)
+              : [];
+            // FK writers lock these child keys, not necessarily the parent product.
+            await tx
+              .select({ id: schema.productSpinner.id })
+              .from(schema.productSpinner)
+              .where(eq(schema.productSpinner.id, row.id))
+              .for("update");
+            await tx
+              .select({ id: schema.productSpinnerButton.id })
+              .from(schema.productSpinnerButton)
+              .where(eq(schema.productSpinnerButton.id, row.id))
+              .for("update");
+            const finishes = await tx
+              .select({ id: schema.finishOption.id })
+              .from(schema.finishOption)
+              .where(eq(schema.finishOption.productId, row.id))
+              .orderBy(asc(schema.finishOption.id))
+              .for("update");
+            const references = await tx.execute(sql`
+            select 1 from collection_spinner where product_spinner_id = ${row.id}
+            union all select 1 from collection_spinner_button where product_spinner_button_id = ${row.id}
+            union all select 1 from product_spinner where compatible_button_id = ${row.id}
+            union all select 1 from finish_option selected join finish_option source on source.id = selected.source_product_finish_option_id where source.product_id = ${row.id}
+            limit 1`);
+            if (references.rows.length) return false;
+            const product = (
+              await queryProducts(tx, undefined, row.slug, input.actor)
+            ).find(({ id }) => id === row.id);
+            if (!product) failProductLoad();
+            const images = await tx
+              .select({
+                id: schema.productImage.id,
+                position: schema.productImage.position,
+                fileName: schema.productImage.fileName,
+                contentType: schema.productImage.contentType,
+                size: schema.productImage.size,
+                sha256: schema.productImage.sha256,
+                storageProvider: schema.productImage.storageProvider,
+                objectPath: schema.productImage.objectPath,
+                deletedAt: schema.productImage.deletedAt,
+              })
+              .from(schema.productImage)
+              .where(eq(schema.productImage.productId, row.id))
+              .orderBy(asc(schema.productImage.id));
+            await queueObjectDeletions(
+              tx,
+              images.map(({ objectPath }) => objectPath),
+            );
+            await tx
+              .delete(schema.product)
+              .where(eq(schema.product.id, row.id));
+            await writeProductAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              before: {
+                ...productAuditState(product),
+                approvalStatus: row.approvalStatus,
+                approvalDecidedAt: row.approvalDecidedAt?.toISOString() ?? null,
+                createdAt: row.createdAt.toISOString(),
+                updatedAt: row.updatedAt.toISOString(),
+                images: images.map((image) => ({
+                  ...image,
+                  deletedAt: image.deletedAt?.toISOString() ?? null,
+                })),
+              },
+              after: {
+                deleted: true,
+                queuedImageCount: new Set(
+                  images.map(({ objectPath }) => objectPath),
+                ).size,
+                deletedFinishOptionCount: finishes.length,
+              },
+              definition: productAudit.productDeleted,
+              ownerClerkId: row.ownerClerkId,
+              ownerUserId: ownerUser?.id ?? null,
+              reason,
+              targetId: row.id,
+            });
+            return true;
           }),
         actorAttributes(input.actor.clerkId, { productId: input.productId }),
       );
@@ -4738,7 +4887,7 @@ async function updateCollectionItemSnapshot(
  * @rejects When the database query fails.
  */
 async function queryProducts(
-  db: Database,
+  db: Pick<Database, "select">,
   productTypeSlug?: string,
   productSlug?: string,
   viewer?: CatalogViewer,
@@ -4915,7 +5064,7 @@ async function queryProducts(
  * @rejects When the required catalog data cannot be queried.
  */
 async function loadProductImages(
-  db: Database,
+  db: Pick<Database, "select">,
   products: CatalogProduct[],
   viewer?: CatalogViewer,
 ) {
@@ -4971,7 +5120,10 @@ async function loadProductImages(
  * @param products - Products.
  * @rejects When the required catalog data cannot be queried.
  */
-async function loadFinishOptions(db: Database, products: CatalogProduct[]) {
+async function loadFinishOptions(
+  db: Pick<Database, "select">,
+  products: CatalogProduct[],
+) {
   if (!products.length) return;
 
   const options = await db
@@ -5019,7 +5171,7 @@ async function loadFinishOptions(db: Database, products: CatalogProduct[]) {
  * @rejects When the required catalog data cannot be queried.
  */
 async function loadFinishOptionComponents(
-  db: Database,
+  db: Pick<Database, "select">,
   options: Array<{
     /**
      * Color effect identifier.

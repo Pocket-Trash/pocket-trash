@@ -8,7 +8,7 @@ import type {
   UserCollectionSummary,
 } from "@package/services";
 import type { TranslationKey } from "@pocket-trash/localizations";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useId, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
@@ -21,6 +21,7 @@ import { ImageGallery } from "@/components/image-gallery";
 import { MakerLink } from "@/components/maker-link";
 import { MarkdownContent } from "@/components/markdown-content";
 import { ProductCard } from "@/components/product-card";
+import { ProductDeletionControls } from "@/components/product-deletion-controls";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import { finishOptionLabel } from "@/lib/catalog";
 import {
   decideCatalogProductApproval,
   decideCollectionItemApproval,
+  deleteCatalogProduct,
   setCollectionItemVisibility,
   setCollectionVisibility,
   setProductVisibility,
@@ -231,6 +233,7 @@ export function ProductDetailPage({
   product: CatalogProduct;
 }) {
   const t = useCatalogCopy();
+  const navigate = useNavigate();
   if (
     product.productTypeSlug !== "spinner" &&
     product.productTypeSlug !== "spinner-button"
@@ -306,6 +309,17 @@ export function ProductDetailPage({
                   })
                 }
                 t={t}
+              />
+              <ProductDeletionControls
+                name={product.name}
+                reasonRequired={!product.isOwner}
+                onDelete={async (reason) => {
+                  const result = await deleteCatalogProduct({
+                    data: { confirmed: true, productId: product.id, reason },
+                  });
+                  if (!result.ok) throw new Error(result.formError);
+                  await navigate({ to: "/products" });
+                }}
               />
             </>
           ) : null}
