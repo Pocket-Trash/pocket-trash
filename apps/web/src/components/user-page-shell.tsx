@@ -77,15 +77,6 @@ export function UserPageShell({
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const userTitle = t("web.navigation.user");
   const primaryLinks: SidebarLink[] = [
-    ...(hasStaffPermission(actor)
-      ? [
-          {
-            icon: Shield,
-            label: t("web.navigation.admin"),
-            to: "/admin" as const,
-          },
-        ]
-      : []),
     {
       active: section === "collections",
       icon: Folder,
@@ -119,6 +110,15 @@ export function UserPageShell({
     },
   ];
   const utilityLinks: SidebarLink[] = [
+    ...(hasStaffPermission(actor)
+      ? [
+          {
+            icon: Shield,
+            label: t("web.navigation.admin"),
+            to: "/admin" as const,
+          },
+        ]
+      : []),
     {
       active: section === "settings",
       icon: Settings,

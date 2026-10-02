@@ -97,5 +97,11 @@ describe("UserPageShell", () => {
     );
 
     expect(html).toContain('href="/admin"');
+    expect(html.indexOf('href="/user/account"')).toBeLessThan(
+      html.indexOf('href="/admin"'),
+    );
+    expect(html.indexOf('href="/admin"')).toBeLessThan(
+      html.indexOf('href="/user/settings"'),
+    );
   });
 });

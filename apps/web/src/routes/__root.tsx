@@ -6,6 +6,7 @@ import {
   Outlet,
   Scripts,
 } from "@tanstack/react-router";
+import { createIsomorphicFn } from "@tanstack/react-start";
 import type * as React from "react";
 import { PageFooter } from "@/components/page-footer";
 import { logger } from "@/lib/logger";
@@ -197,12 +198,12 @@ function RootContent() {
  *
  * @returns Cookie-backed preferences on the server and local preferences in the browser.
  */
-async function readInitialUiPreferences() {
-  if (!import.meta.env.SSR) return $uiPreferences.get();
-
-  const { getCookie } = await import("@tanstack/react-start/server");
-  return parseUiPreferences(getCookie(uiPreferencesCookieName));
-}
+const readInitialUiPreferences = createIsomorphicFn()
+  .client(() => $uiPreferences.get())
+  .server(async () => {
+    const { getCookie } = await import("@tanstack/react-start/server");
+    return parseUiPreferences(getCookie(uiPreferencesCookieName));
+  });
 
 /**
  * Builds the inline script that applies locale and theme state before hydration.
