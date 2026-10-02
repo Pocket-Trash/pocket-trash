@@ -1,3 +1,65 @@
 packages:
   - "apps/*"
   - "packages/*"
+patchedDependencies:
+  "@railway/cli@5.62.1": patches/@railway__cli@5.62.1.patch
+allowBuilds:
+  "@railway/cli": true
+  bufferutil: false
+  core-js: false
+  esbuild: false
+  msgpackr-extract: false
+  utf-8-validate: false
+  workerd: false
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - "@pocket-trash/cli"
+  - "@pocket-trash/localizations"
+  - "@pocket-trash/skills"
+  # ENG-299: retain the patched TanStack release; remove after 2026-10-07T17:48:34.385Z.
+  - "@tanstack/react-start@1.168.60"
+  # ENG-299: retain the patched TanStack release; remove after 2026-10-07T17:48:11.683Z.
+  - "@tanstack/start-server-core@1.169.39"
+  # ENG-299: preserve the patched TanStack graph; remove after each version matures by 2026-10-07T22:49:52.170Z.
+  - "@tanstack/highlight@1.0.0"
+  - "@tanstack/react-router@1.170.41"
+  - "@tanstack/react-start-client@1.168.39"
+  - "@tanstack/react-start-rsc@0.1.59"
+  - "@tanstack/react-start-server@1.167.46"
+  - "@tanstack/react-store@0.11.2"
+  - "@tanstack/router-core@1.171.34"
+  - "@tanstack/router-generator@1.167.40"
+  - "@tanstack/router-plugin@1.168.42"
+  - "@tanstack/start-client-core@1.170.34"
+  - "@tanstack/start-plugin-core@1.171.49"
+  - "@tanstack/start-storage-context@1.167.36"
+  - "@tanstack/store@0.11.2"
+minimumReleaseAgeIgnoreMissingTime: false
+minimumReleaseAgeStrict: true
+overrides:
+  "@tootallnate/once@2": "2.0.1"
+  "ajv@8": "8.18.0"
+  "axios@1": "1.20.0"
+  "baseline-browser-mapping@2": "2.11.26"
+  "brace-expansion@1": "1.1.21"
+  "brace-expansion@5": "5.0.12"
+  "browserslist@4": "4.29.1"
+  "drizzle-orm": "0.45.3"
+  "drizzle-orm@0.45.3>expo-sqlite": "-"
+  "fast-uri@3": "3.1.8"
+  "image-size": "2.0.4"
+  "joi@18": "18.2.9"
+  "js-yaml@3": "3.15.2"
+  "js-yaml@4": "4.3.2"
+  "lightningcss": "1.30.1"
+  "minimatch@10": "10.2.6"
+  "miniflare>undici": "7.29.1"
+  "nanoid@3": "3.3.19"
+  "path-to-regexp@6": "6.3.0"
+  "path-to-regexp@8": "8.4.0"
+  "postcss@8": "8.5.28"
+  "smol-toml@1": "1.7.1"
+  "tailwind-csstree": "0.4.0"
+  "tar": "7.5.22"
+  "undici@5": "6.29.0"
+  "utf-8-validate": "5.0.10"
