@@ -808,6 +808,7 @@ export function CollectionPage({
   );
   const content = (
     <main className="grid gap-6 p-3 md:p-[18px_22px_22px]">
+      {userArea ? filterBar : null}
       <CollectionGallery
         collection={collection}
         copy={{
@@ -842,7 +843,6 @@ export function CollectionPage({
           ),
         }}
       />
-      {userArea ? filterBar : null}
       <section className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
         {filtered.length ? (
           filtered.map((item) => (

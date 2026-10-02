@@ -310,7 +310,7 @@ describe("CollectionPage", () => {
     expect(html).toContain("lg:grid-cols-2");
   });
 
-  it("places user-area filters above the collection item cards", () => {
+  it("places user-area filters above the collection summary", () => {
     const collection = owners[0]?.collections[0];
     if (!collection) throw new Error("Collection fixture is required.");
 
@@ -323,8 +323,10 @@ describe("CollectionPage", () => {
       />,
     );
 
-    expect(html.indexOf("<main")).toBeLessThan(html.indexOf("More filters"));
-    expect(html.indexOf("More filters")).toBeLessThan(html.indexOf("My Catla"));
+    const content = html.slice(html.indexOf("<main"));
+    expect(content.indexOf("More filters")).toBeLessThan(
+      content.indexOf(collection.name),
+    );
   });
 
   it("keeps descriptions and bearings off collection lists", () => {
