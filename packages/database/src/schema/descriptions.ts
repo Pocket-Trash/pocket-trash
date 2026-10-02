@@ -317,6 +317,17 @@ const schemaDescriptions = {
         description: "Optional product description stored as Markdown.",
         example: "A compact tri spinner.",
       },
+      approval_status: {
+        description: "Current product review state.",
+        example: "approved",
+      },
+      approval_decision_reason: {
+        description: "Reason supplied for the latest review transition.",
+        example: "Product details verified.",
+      },
+      approval_decided_at: {
+        description: "Timestamp of the latest review transition.",
+      },
       maker_product_url: {
         description: "Direct URL to the maker's product page.",
         example: "https://example.com/products/standard-katla",

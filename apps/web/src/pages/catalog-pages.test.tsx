@@ -171,6 +171,7 @@ const owners = [
 
 /** Catalog product fixture used by page tests. */
 const product: CatalogProduct = {
+  approvalStatus: "approved",
   bearing: null,
   buttonDiameterMm: null,
   canAdminister: false,

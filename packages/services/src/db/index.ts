@@ -115,6 +115,8 @@ export type {
   CatalogService,
   CatalogViewer,
   CollectionsService,
+  ProductApprovalAction,
+  ProductApprovalStatus,
   ProductWriteInput,
   PublicCollectionOwner,
   UserCollectionItem,

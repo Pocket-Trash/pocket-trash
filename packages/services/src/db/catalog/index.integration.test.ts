@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { createCatalogService } from "./index.js";
 
 describe("catalog product persistence", () => {
-  it("round-trips source details through create and edit", async () => {
+  it("round-trips source details and enforces approval transitions", async () => {
     const client = new PGlite();
     const db = drizzle(client, { schema });
 
@@ -73,6 +73,7 @@ describe("catalog product persistence", () => {
 
       expect(created).toEqual(
         expect.objectContaining({
+          approvalStatus: "pending",
           bearing: "R188",
           description: "Created description",
           makerProductUrl: "https://maker.example/spinner",
@@ -80,6 +81,72 @@ describe("catalog product persistence", () => {
           spinDiameterMm: "52",
         }),
       );
+      await expect(
+        service.getProduct("spinner", "spinner"),
+      ).resolves.toBeNull();
+      await expect(
+        service.getProduct("spinner", "spinner", {
+          clerkId: "other-user",
+          role: "user",
+        }),
+      ).resolves.toBeNull();
+      await expect(
+        service.getProduct("spinner", "spinner", {
+          clerkId: "admin-test",
+          role: "admin",
+        }),
+      ).resolves.toEqual(expect.objectContaining({ id: created.id }));
+      await expect(
+        service.decideProductApproval({
+          action: "approve",
+          actor: { clerkId: "user-test", role: "user" },
+          productId: created.id,
+          reason: "Ready",
+        }),
+      ).rejects.toThrow("Product does not exist.");
+      await expect(
+        service.decideProductApproval({
+          action: "approve",
+          actor: { clerkId: "admin-test", role: "admin" },
+          productId: created.id,
+          reason: " ",
+        }),
+      ).rejects.toThrow("A decision reason is required.");
+      await expect(
+        service.decideProductApproval({
+          action: "approve",
+          actor: { clerkId: "admin-test", role: "admin" },
+          productId: created.id,
+          reason: "Ready for the catalog",
+        }),
+      ).resolves.toBe("approved");
+      await expect(service.getProduct("spinner", "spinner")).resolves.toEqual(
+        expect.objectContaining({ approvalStatus: "approved", id: created.id }),
+      );
+      await expect(
+        service.decideProductApproval({
+          action: "reject",
+          actor: { clerkId: "admin-test", role: "admin" },
+          productId: created.id,
+          reason: "Invalid direct transition",
+        }),
+      ).rejects.toThrow("Product approval transition is invalid.");
+      await expect(
+        service.decideProductApproval({
+          action: "reverse",
+          actor: { clerkId: "admin-test", role: "admin" },
+          productId: created.id,
+          reason: "Needs another review",
+        }),
+      ).resolves.toBe("pending");
+      await expect(
+        service.decideProductApproval({
+          action: "reject",
+          actor: { clerkId: "admin-test", role: "admin" },
+          productId: created.id,
+          reason: "Not suitable",
+        }),
+      ).resolves.toBe("rejected");
 
       await service.setMakerProductUrlValidity({
         actor: { clerkId: "admin-test", role: "admin" },
