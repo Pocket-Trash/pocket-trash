@@ -10,7 +10,7 @@ import type {
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { type ReactNode, useEffect, useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
   CatalogFilterBar,
@@ -128,10 +128,14 @@ function PaginatedCards<T>({
   pageSize,
 }: PaginatedCardsProps<T>) {
   const t = useCatalogCopy();
+  const [renderedItems, setRenderedItems] = useState(items);
   const [requestedPage, setRequestedPage] = useState(0);
+  if (renderedItems !== items) {
+    setRenderedItems(items);
+    setRequestedPage(0);
+  }
   const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
   const page = Math.min(requestedPage, pageCount - 1);
-  useEffect(() => setRequestedPage(0), [items]);
 
   return (
     <>
