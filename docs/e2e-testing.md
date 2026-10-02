@@ -41,11 +41,16 @@ Mutation fixtures stay disabled unless `E2E_RUN_MUTATIONS=true`.
 
 ## CI
 
-For database-changing PRs, the Deploy workflow creates or reuses
-`preview-pr-<number>`, configures the matching Vercel database override, and
-assigns both Bunny prefixes before it runs Playwright. Other PRs use the shared
-preview database and run only the read-only smoke suite. The mutation fixture
-runs only after Neon reports an isolated branch.
+The Deploy workflow runs only for preview-relevant changes. Safe E2E runs for
+web, API, and shared-service changes. Mutation-relevant changes create or reuse
+`preview-pr-<number>`, configure the matching Vercel database override, and
+assign both Bunny prefixes before Playwright starts. Database migrations are
+one reason for mutation isolation, not a requirement for it.
+
+The persistent `test:e2e` pull-request label forces both suites and isolated
+resources for the current head and later commits until the label is removed.
+Playwright runs in a separate E2E job after preview deployment, so rerunning a
+failed E2E job reuses the successful preview deployment.
 
 Before any mutation, the guard verifies these exact boundaries:
 

@@ -20,6 +20,7 @@ jobs:
       web: ${{ steps.classify.outputs.web }}
       database: ${{ steps.classify.outputs.database }}
       storybook: ${{ steps.classify.outputs.storybook }}
+      preview: ${{ steps.classify.outputs.preview }}
       safe_e2e: ${{ steps.classify.outputs.safe_e2e }}
       mutation_e2e: ${{ steps.classify.outputs.mutation_e2e }}
       validation: ${{ steps.classify.outputs.validation }}
@@ -41,7 +42,7 @@ jobs:
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           if ! node scripts/classify-changes.mjs; then
-            for domain in api scraper web database storybook safe_e2e mutation_e2e validation; do
+            for domain in api scraper web database storybook preview safe_e2e mutation_e2e validation; do
               echo "$domain=true" >> "$GITHUB_OUTPUT"
             done
           fi

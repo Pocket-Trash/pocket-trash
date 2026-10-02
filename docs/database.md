@@ -205,7 +205,7 @@ for production:
 | `preview` | permanent | `development` | Shared non-production baseline for preview refreshes. |
 | `development` | permanent | root | Shared non-production database for local development. |
 | Developer-specific | permanent | `development` | Optional personal local work branch selected through `.env.local`. |
-| `preview-pr-<number>` | ephemeral | `development` | Isolated non-production database for database-changing PR previews. |
+| `preview-pr-<number>` | ephemeral | `development` | Isolated non-production database for mutation-relevant PR previews. |
 
 Local development uses `development` unless repository-root `.env.local` or
 `.env` selects a personal Infisical secret with `URL_INITIALS`. Before opening
@@ -218,17 +218,16 @@ the branch from non-production `development` when missing, so production user da
 never enters preview databases. Isolated PR branches get a
 Neon expiration timestamp, defaulting to 14 days and configurable with
 `NEON_PREVIEW_BRANCH_EXPIRES_DAYS`. Reused PR branches have that expiration
-refreshed on each deploy. The workflow runs committed migrations when the PR
-changes the schema and sets a branch-specific Vercel Preview `DATABASE_URL` for
-the web preview branch. The same selected `DATABASE_URL` is also pushed into the Railway
-scraper preview environment so scraper cron executions use the same database
-branch as the web preview. See [Image CDN](./image-cdn.md) for the matching
-preview image folder namespace.
+refreshed on each deploy. The workflow isolates any PR whose changes can affect
+mutation E2E, runs committed migrations when the PR changes the schema, and
+sets a branch-specific Vercel Preview `DATABASE_URL`. The same selected
+`DATABASE_URL` is also pushed into the Railway scraper preview environment so
+scraper cron executions use the same database branch as the web preview. See
+[Image CDN](./image-cdn.md) for the matching preview image folder namespace.
 
-PRs without schema changes use the shared `preview` branch and skip Playwright
-mutation fixtures. The close workflow is the primary cleanup path for isolated
-branches; Neon branch expiration is the backup when a close event or cleanup
-run is missed.
+PRs without mutation-relevant changes use the shared `preview` branch. The
+close workflow is the primary cleanup path for isolated branches; Neon branch
+expiration is the backup when a close event or cleanup run is missed.
 
 ENG-69 operational status: this repo change adds the backup expiration path, but
 `preview-pr-63` was not deleted from this worktree. The blocker is that Neon

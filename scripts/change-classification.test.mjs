@@ -14,6 +14,7 @@ const domains = [
   "web",
   "database",
   "storybook",
+  "preview",
   "safe_e2e",
   "mutation_e2e",
   "validation",
@@ -22,6 +23,14 @@ const domains = [
 /** Parsed CI workflow under test. */
 const ciWorkflow = parse(
   readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"),
+);
+
+/** Parsed Deploy workflow under test. */
+const deployWorkflow = parse(
+  readFileSync(
+    new URL("../.github/workflows/deploy.yml", import.meta.url),
+    "utf8",
+  ),
 );
 
 /**
@@ -40,16 +49,16 @@ test("classifies application and package changes by affected domain", () => {
   for (const [path, enabled] of [
     [
       "apps/api/src/index.ts",
-      ["api", "safe_e2e", "mutation_e2e", "validation"],
+      ["api", "preview", "safe_e2e", "mutation_e2e", "validation"],
     ],
-    ["apps/scraper/src/index.ts", ["scraper", "validation"]],
+    ["apps/scraper/src/index.ts", ["scraper", "preview", "validation"]],
     [
       "apps/web/src/components/product-card.tsx",
-      ["web", "storybook", "safe_e2e", "mutation_e2e", "validation"],
+      ["web", "storybook", "preview", "safe_e2e", "mutation_e2e", "validation"],
     ],
     [
       "apps/web/e2e/collection-covers.spec.ts",
-      ["web", "safe_e2e", "mutation_e2e", "validation"],
+      ["web", "preview", "safe_e2e", "mutation_e2e", "validation"],
     ],
     ["packages/database/src/schema/product.ts", domains],
     ["packages/figjam/src/cli.ts", ["validation"]],
@@ -141,12 +150,27 @@ test("applies persistent label overrides without rerunning unrelated jobs", () =
     }),
     expected(),
   );
+  assert.deepEqual(
+    classifyChanges(["docs/e2e-testing.md"], {
+      action: "labeled",
+      eventLabel: "test:e2e",
+      labels: ["test:e2e"],
+    }),
+    expected("preview", "safe_e2e", "mutation_e2e"),
+  );
+  assert.deepEqual(
+    classifyChanges(["docs/e2e-testing.md"], {
+      action: "synchronize",
+      labels: ["test:e2e"],
+    }),
+    expected("preview", "safe_e2e", "mutation_e2e"),
+  );
 });
 
 test("uses the same conservative rules for pushes to main", () => {
   assert.deepEqual(
     classifyChanges(["apps/scraper/src/index.ts"], { eventName: "push" }),
-    expected("scraper", "validation"),
+    expected("scraper", "preview", "validation"),
   );
   assert.deepEqual(
     classifyChanges(["unknown.config.js"], { eventName: "push" }),
@@ -181,4 +205,44 @@ test("CI keeps required names and gates jobs with one classifier", () => {
     assert.match(jobs[job].if, new RegExp(`outputs\\.${output} == 'true'`));
   }
   assert.equal(jobs.changeset.name, "Changeset");
+});
+
+test("Deploy gates preview work and runs Playwright in a separate job", () => {
+  assert.equal(deployWorkflow.on.pull_request.paths, undefined);
+
+  const jobs = deployWorkflow.jobs;
+  assert.ok(jobs["classify-changes"]);
+  assert.equal(jobs.preview.needs, "classify-changes");
+  assert.match(jobs.preview.if, /outputs\.preview == 'true'/u);
+
+  assert.deepEqual(jobs.e2e.needs, ["classify-changes", "preview"]);
+  assert.match(jobs.e2e.if, /outputs\.safe_e2e == 'true'/u);
+  assert.match(jobs.e2e.if, /outputs\.mutation_e2e == 'true'/u);
+
+  const previewSteps = jobs.preview.steps;
+  assert.equal(
+    previewSteps.some((step) => /Playwright|E2E/u.test(step.name ?? "")),
+    false,
+  );
+
+  const e2eSteps = jobs.e2e.steps;
+  const checkout = e2eSteps.find(
+    (step) => step.name === "Check out pull request head",
+  );
+  assert.equal(checkout.with.ref, "${{ github.event.pull_request.head.sha }}");
+  assert.ok(e2eSteps.some((step) => step.name === "Run safe E2E smoke tests"));
+  assert.ok(
+    e2eSteps.some((step) => step.name === "Run isolated E2E mutation fixtures"),
+  );
+  assert.ok(
+    e2eSteps.some((step) => step.name === "Upload failed Playwright report"),
+  );
+
+  const prepareDatabase = previewSteps.find(
+    (step) => step.name === "Prepare Neon preview database",
+  );
+  assert.match(
+    prepareDatabase.env.ISOLATION_REQUIRED,
+    /outputs\.mutation_e2e/u,
+  );
 });
