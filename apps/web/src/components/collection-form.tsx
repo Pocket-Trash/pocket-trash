@@ -271,7 +271,14 @@ export function CollectionForm({
         ) : null}
       </div>
       {error ? (
-        <p className="text-sm text-destructive lg:col-span-2">{error}</p>
+        <p
+          className={cn(
+            "text-sm text-destructive",
+            splitOnLargeScreens && "lg:col-span-2",
+          )}
+        >
+          {error}
+        </p>
       ) : null}
       <div
         className={cn(

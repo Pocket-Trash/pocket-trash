@@ -93,6 +93,12 @@ const emptyCatalogOptions = {
 };
 
 describe("collection deletion choices", () => {
+  it("keeps collection creation in a single column", () => {
+    const html = renderToStaticMarkup(createElement(CollectionFormPage));
+
+    expect(html).not.toContain("lg:grid-cols-2");
+  });
+
   it("renders all outcomes with the affected item count", () => {
     const collection: UserCollectionSummary = {
       canAdminister: false,

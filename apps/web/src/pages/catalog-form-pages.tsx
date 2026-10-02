@@ -1279,7 +1279,13 @@ export function CollectionFormPage({
           : t("web.collections.add.title")
       }
     >
-      <main className="grid w-full max-w-6xl gap-6 p-6 lg:grid-cols-2">
+      <main
+        className={
+          collection
+            ? "grid w-full max-w-6xl gap-6 p-6 lg:grid-cols-2"
+            : "grid w-full max-w-6xl gap-6 p-6"
+        }
+      >
         <CollectionForm
           copy={copy}
           disabled={saving}

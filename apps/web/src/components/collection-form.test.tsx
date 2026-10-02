@@ -123,6 +123,19 @@ describe("CollectionForm", () => {
     expect(onCancel).toHaveBeenCalledOnce();
   });
 
+  it("keeps unsplit errors in a single grid column", async () => {
+    await act(() =>
+      root.render(
+        <CollectionForm copy={copy} error="Try again" onSubmit={vi.fn()} />,
+      ),
+    );
+
+    const error = Array.from(container.querySelectorAll("p")).find(
+      (element) => element.textContent === "Try again",
+    );
+    expect(error?.classList.contains("lg:col-span-2")).toBe(false);
+  });
+
   it("allows 200 words and blocks 201 without truncating", async () => {
     const onSubmit = vi.fn<(value: CollectionFormValue) => void>();
     await act(() =>
