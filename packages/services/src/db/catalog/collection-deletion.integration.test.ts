@@ -8,6 +8,8 @@ import { createNoopLogger } from "@package/logger";
 import { eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
+import { objectIsAttached } from "../../storage/object-lifecycle.js";
+import { AuditPayloadTooLargeError } from "../audit/index.js";
 import { createDbServices } from "../index.js";
 
 describe("collection deletion", () => {
@@ -103,6 +105,20 @@ describe("collection deletion", () => {
         installedButtonId: buttonItem.id,
         productSpinnerId: spinnerProduct.id,
       });
+      const [finish] = await db
+        .insert(schema.finish)
+        .values({ name: "Polished", slug: "polished" })
+        .returning();
+      const [option] = await db
+        .insert(schema.finishOption)
+        .values({ collectionItemId: buttonItem.id, position: 0 })
+        .returning();
+      if (!finish || !option) throw new Error("Finish fixtures missing.");
+      await db.insert(schema.finishOptionFinish).values({
+        finishOptionId: option.id,
+        finishId: finish.id,
+        position: 0,
+      });
 
       await db
         .insert(schema.collectionImage)
@@ -110,15 +126,64 @@ describe("collection deletion", () => {
           image(source.id, "source-cover"),
           image(doomed.id, "doomed-cover"),
         ]);
-      await db
-        .insert(schema.collectionItemImage)
-        .values([
-          itemImage(buttonItem.id, "button-image"),
-          itemImage(doomedItem.id, "doomed-item-image"),
-        ]);
+      await db.insert(schema.collectionItemImage).values([
+        itemImage(buttonItem.id, "button-image"),
+        {
+          ...itemImage(buttonItem.id, "trashed-button-image"),
+          sha256: "b".repeat(64),
+          deletedAt: new Date(),
+          deletedByRole: "owner",
+          deletedByClerkId: owner.clerkId,
+        },
+        itemImage(doomedItem.id, "doomed-item-image"),
+      ]);
+
+      const deletion = {
+        actor: { clerkId: owner.clerkId, role: "user" as const },
+        confirmed: true,
+        collectionId: source.id,
+        destinationCollectionId: destination.id,
+      };
+      await expect(
+        services.collections.deleteCollection({
+          ...deletion,
+          confirmed: false,
+        }),
+      ).rejects.toThrow(/confirmation/);
+      await expect(
+        services.collections.deleteCollection({
+          ...deletion,
+          destinationCollectionId: source.id,
+        }),
+      ).rejects.toThrow(/Destination/);
+      const [foreign] = await db
+        .insert(schema.userCollection)
+        .values({
+          ownerId: stranger.id,
+          name: "Foreign",
+          normalizedName: "foreign",
+        })
+        .returning();
+      if (!foreign) throw new Error("Foreign collection missing.");
+      await expect(
+        services.collections.deleteCollection({
+          ...deletion,
+          destinationCollectionId: foreign.id,
+        }),
+      ).rejects.toThrow(/Destination/);
+      await client.exec(`create function reject_collection_audit() returns trigger language plpgsql as $$
+        begin raise exception 'forced audit failure'; end $$;
+        create trigger reject_collection_audit before insert on audit_event for each row execute function reject_collection_audit();`);
+      await expect(
+        services.collections.deleteCollection(deletion),
+      ).rejects.toThrow();
+      await client.exec("drop trigger reject_collection_audit on audit_event;");
+      expect(await db.select().from(schema.auditEvent)).toHaveLength(0);
+      expect(await db.select().from(schema.collectionImage)).toHaveLength(2);
 
       await expect(
         services.collections.deleteCollection({
+          confirmed: true,
           actor: { clerkId: stranger.clerkId, role: "user" },
           collectionId: source.id,
           destinationCollectionId: destination.id,
@@ -126,6 +191,7 @@ describe("collection deletion", () => {
       ).rejects.toThrow("Collection does not exist.");
       await expect(
         services.collections.deleteCollection({
+          confirmed: true,
           actor: { clerkId: admin.clerkId, role: "admin" },
           collectionId: source.id,
           destinationCollectionId: destination.id,
@@ -143,6 +209,7 @@ describe("collection deletion", () => {
       expect(await db.select().from(schema.storageObjectDeletion)).toEqual([]);
 
       await services.collections.deleteCollection({
+        confirmed: true,
         actor: { clerkId: admin.clerkId, role: "admin" },
         collectionId: source.id,
         destinationCollectionId: destination.id,
@@ -171,9 +238,211 @@ describe("collection deletion", () => {
           .where(
             eq(schema.collectionItemImage.collectionItemId, buttonItem.id),
           ),
+      ).toHaveLength(2);
+      const [moveEvent] = await db.select().from(schema.auditEvent);
+      expect(moveEvent).toMatchObject({
+        actorUserId: admin.id,
+        ownerUserId: owner.id,
+        authorizationType: "permission",
+        permission: "collections.manage",
+        reason: "Owner requested help",
+        beforeState: {
+          id: source.id,
+          name: "Source",
+          images: [{ objectPath: "source-cover" }],
+          items: [
+            { id: spinnerItem.id, installedButtonId: buttonItem.id },
+            {
+              id: buttonItem.id,
+              images: expect.any(Array),
+              finishOptions: [
+                { id: option.id, finishes: [{ id: finish.id, position: 0 }] },
+              ],
+            },
+          ],
+        },
+        afterState: {
+          deleted: true,
+          deletedItemIds: [],
+          movedItemIds: [spinnerItem.id, buttonItem.id],
+          queuedImageCount: 1,
+        },
+      });
+      const itemDeletion = {
+        actor: { clerkId: admin.clerkId, role: "editor" as const },
+        confirmed: true,
+        collectionItemId: buttonItem.id,
+        reason: " Owner requested deletion ",
+      };
+      await expect(
+        services.collections.deleteItem({ ...itemDeletion, confirmed: false }),
+      ).rejects.toThrow(/confirmation/);
+      await expect(
+        services.collections.deleteItem({
+          ...itemDeletion,
+          actor: { clerkId: stranger.clerkId, role: "user" },
+        }),
+      ).rejects.toThrow(/does not exist/);
+      await expect(
+        services.collections.deleteItem({
+          ...itemDeletion,
+          actor: { clerkId: "missing", role: "admin" },
+        }),
+      ).rejects.toThrow(/does not exist/);
+      await expect(
+        services.collections.deleteItem({ ...itemDeletion, reason: " " }),
+      ).rejects.toThrow(/reason/i);
+      await expect(
+        services.collections.deleteItem({
+          ...itemDeletion,
+          reason: "x".repeat(1001),
+        }),
+      ).rejects.toThrow(/reason/i);
+      await client.exec(
+        "create trigger reject_collection_audit before insert on audit_event for each row execute function reject_collection_audit();",
+      );
+      await expect(
+        services.collections.deleteItem(itemDeletion),
+      ).rejects.toThrow();
+      await client.exec("drop trigger reject_collection_audit on audit_event;");
+      expect(
+        (await db.select().from(schema.collectionSpinner))[0]
+          ?.installedButtonId,
+      ).toBe(buttonItem.id);
+      expect(await db.select().from(schema.finishOption)).toHaveLength(1);
+      expect(await db.select().from(schema.storageObjectDeletion)).toHaveLength(
+        1,
+      );
+      await services.collections.deleteItem(itemDeletion);
+      expect(
+        (await db.select().from(schema.collectionSpinner))[0]
+          ?.installedButtonId,
+      ).toBeNull();
+      expect(await db.select().from(schema.finishOption)).toHaveLength(0);
+      expect(await db.select().from(schema.finishOptionFinish)).toHaveLength(0);
+      expect(await db.select().from(schema.finish)).toHaveLength(1);
+      expect(await db.select().from(schema.product)).toHaveLength(2);
+      const itemEvent = (
+        await db.select().from(schema.auditEvent).orderBy(schema.auditEvent.id)
+      ).at(-1);
+      expect(itemEvent).toMatchObject({
+        action: "collections.item.deleted",
+        actorRole: "editor",
+        targetId: String(buttonItem.id),
+        reason: "Owner requested deletion",
+        authorizationType: "permission",
+        permission: "collections.manage",
+        beforeState: {
+          id: buttonItem.id,
+          collectionId: destination.id,
+          productSpinnerButtonId: buttonProduct.id,
+          finishOptions: [{ id: option.id }],
+          images: expect.any(Array),
+        },
+        afterState: {
+          deleted: true,
+          detachedSpinnerIds: [spinnerItem.id],
+          queuedImageCount: 2,
+        },
+      });
+      expect(itemEvent?.beforeState?.images).toHaveLength(2);
+      expect(JSON.stringify(itemEvent?.beforeState)).not.toContain(
+        owner.clerkId,
+      );
+      expect(JSON.stringify(itemEvent?.beforeState)).not.toContain("https://");
+      await expect(
+        services.collections.deleteItem(itemDeletion),
+      ).rejects.toThrow(/does not exist/);
+      const [retainedButton] = await db
+        .insert(schema.collectionItem)
+        .values({ collectionId: destination.id, ownerId: owner.id })
+        .returning();
+      if (!retainedButton) throw new Error("Retained button missing.");
+      await db.insert(schema.collectionSpinnerButton).values({
+        id: retainedButton.id,
+        productSpinnerButtonId: buttonProduct.id,
+      });
+      await db
+        .update(schema.collectionSpinner)
+        .set({ installedButtonId: retainedButton.id })
+        .where(eq(schema.collectionSpinner.id, spinnerItem.id));
+      await services.collections.deleteItem({
+        actor: { clerkId: owner.clerkId, role: "editor" },
+        confirmed: true,
+        collectionItemId: spinnerItem.id,
+      });
+      expect(
+        await db
+          .select()
+          .from(schema.collectionItem)
+          .where(eq(schema.collectionItem.id, retainedButton.id)),
       ).toHaveLength(1);
+      expect(
+        (
+          await db
+            .select()
+            .from(schema.auditEvent)
+            .orderBy(schema.auditEvent.id)
+        ).at(-1),
+      ).toMatchObject({
+        authorizationType: "owner",
+        permission: null,
+        reason: null,
+        afterState: { retainedButtonId: retainedButton.id },
+      });
+      await db
+        .update(schema.collectionItem)
+        .set({ displayName: "x".repeat(256 * 1024) })
+        .where(eq(schema.collectionItem.id, doomedItem.id));
+      await expect(
+        services.collections.deleteItem({
+          actor: deletion.actor,
+          confirmed: true,
+          collectionItemId: doomedItem.id,
+        }),
+      ).rejects.toThrow(AuditPayloadTooLargeError);
+      await expect(
+        services.collections.deleteCollection({
+          ...deletion,
+          collectionId: doomed.id,
+          destinationCollectionId: null,
+        }),
+      ).rejects.toThrow(AuditPayloadTooLargeError);
+      expect(
+        await db
+          .select()
+          .from(schema.userCollection)
+          .where(eq(schema.userCollection.id, doomed.id)),
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(schema.collectionItem)
+          .where(eq(schema.collectionItem.id, doomedItem.id)),
+      ).toHaveLength(1);
+      expect(await objectIsAttached(db, "doomed-item-image")).toBe(true);
+      await db
+        .update(schema.collectionItem)
+        .set({ displayName: null })
+        .where(eq(schema.collectionItem.id, doomedItem.id));
+      // Legacy cross-collection links must be cleared without deleting their spinner.
+      await db.insert(schema.collectionSpinnerButton).values({
+        id: doomedItem.id,
+        productSpinnerButtonId: buttonProduct.id,
+      });
+      const [externalSpinner] = await db
+        .insert(schema.collectionItem)
+        .values({ collectionId: destination.id, ownerId: owner.id })
+        .returning();
+      if (!externalSpinner) throw new Error("External spinner missing.");
+      await db.insert(schema.collectionSpinner).values({
+        id: externalSpinner.id,
+        installedButtonId: doomedItem.id,
+        productSpinnerId: spinnerProduct.id,
+      });
 
       await services.collections.deleteCollection({
+        confirmed: true,
         actor: { clerkId: owner.clerkId, role: "user" },
         collectionId: doomed.id,
         destinationCollectionId: null,
@@ -192,11 +461,93 @@ describe("collection deletion", () => {
         )
           .map(({ objectPath }) => objectPath)
           .sort(),
-      ).toEqual(["doomed-cover", "doomed-item-image", "source-cover"]);
+      ).toEqual([
+        "button-image",
+        "doomed-cover",
+        "doomed-item-image",
+        "source-cover",
+        "trashed-button-image",
+      ]);
+      expect(await objectIsAttached(db, "doomed-item-image")).toBe(false);
+      const events = await db
+        .select()
+        .from(schema.auditEvent)
+        .orderBy(schema.auditEvent.id);
+      expect(events).toHaveLength(4);
+      expect(events.at(-1)).toMatchObject({
+        beforeState: {
+          id: doomed.id,
+          images: [{ objectPath: "doomed-cover" }],
+          items: [
+            {
+              id: doomedItem.id,
+              images: [{ objectPath: "doomed-item-image" }],
+            },
+          ],
+        },
+        afterState: {
+          deletedItemIds: [doomedItem.id],
+          movedItemIds: [],
+          queuedImageCount: 2,
+          detachedSpinnerIds: [externalSpinner.id],
+        },
+      });
+      expect(
+        (
+          await db
+            .select()
+            .from(schema.collectionSpinner)
+            .where(eq(schema.collectionSpinner.id, externalSpinner.id))
+        )[0]?.installedButtonId,
+      ).toBeNull();
+      expect(
+        await db
+          .select()
+          .from(schema.collectionItem)
+          .where(eq(schema.collectionItem.id, externalSpinner.id)),
+      ).toHaveLength(1);
+      await db.transaction((tx) => services.audit.redactAccount(tx, admin.id));
+      expect(
+        (
+          await db
+            .select()
+            .from(schema.auditEvent)
+            .orderBy(schema.auditEvent.id)
+        )[1],
+      ).toMatchObject({
+        actorUserId: null,
+        reason: "[erased]",
+        beforeState: itemEvent?.beforeState,
+      });
+      await db.transaction((tx) => services.audit.redactAccount(tx, owner.id));
+      for (const event of await db.select().from(schema.auditEvent)) {
+        expect(event).toMatchObject({
+          ownerUserId: null,
+          beforeState: null,
+          afterState: null,
+          metadata: { redacted: true },
+        });
+      }
+      const concurrent = await Promise.allSettled(
+        [0, 1].map(() =>
+          services.collections.deleteCollection({
+            ...deletion,
+            collectionId: destination.id,
+            destinationCollectionId: null,
+          }),
+        ),
+      );
+      expect(
+        concurrent.filter(({ status }) => status === "fulfilled"),
+      ).toHaveLength(1);
+      expect(
+        concurrent.filter(({ status }) => status === "rejected"),
+      ).toHaveLength(1);
+      expect(await db.select().from(schema.auditEvent)).toHaveLength(5);
     } finally {
       await client.close();
     }
-  }, 30_000);
+  }, 60_000);
 });
 
 /**
