@@ -103,18 +103,18 @@ test("@mutation collection lifecycle and deletion choices persist through the pu
     await page.goto(`/collections/edit/${fixture.archive.itemId}`);
     await waitForHydration(page);
     await page
-      .getByRole("button", { exact: true, name: "Delete permanently" })
+      .getByRole("button", { exact: true, name: "Permanently delete item" })
       .click();
     const itemDeletionDialog = page.getByRole("dialog", {
-      name: "Delete permanently",
+      name: "Permanently delete item",
     });
     await itemDeletionDialog
       .getByRole("checkbox", {
-        name: "I understand that this is permanent and cannot be canceled.",
+        name: "I understand that deleting this item and its images cannot be undone.",
       })
       .check();
     await itemDeletionDialog
-      .getByRole("button", { exact: true, name: "Delete permanently" })
+      .getByRole("button", { exact: true, name: "Permanently delete item" })
       .click();
     await expect(page).toHaveURL(
       new RegExp(`/user/collections/${fixture.archive.id}$`, "u"),
@@ -139,7 +139,7 @@ test("@mutation collection lifecycle and deletion choices persist through the pu
     await expect(deleteButton).toBeDisabled();
     await page
       .getByRole("checkbox", {
-        name: "I understand that this is permanent and cannot be canceled.",
+        name: "I understand that deleting this collection, its items, and their images cannot be undone.",
       })
       .check();
     await expect(deleteButton).toBeEnabled();
@@ -164,7 +164,7 @@ test("@mutation collection lifecycle and deletion choices persist through the pu
     await selectCollection(page, fixture.destinationName);
     await page
       .getByRole("checkbox", {
-        name: "I understand that this is permanent and cannot be canceled.",
+        name: "I understand that this collection and its cover images will be permanently deleted. Moved items and their images will be kept.",
       })
       .check();
     await expect(moveButton).toBeEnabled();
