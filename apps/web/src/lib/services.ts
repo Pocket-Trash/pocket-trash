@@ -67,4 +67,5 @@ services.configure({
       : undefined,
 });
 
+/** Server-only, app-configured service registry. Browser modules must not import it. */
 export { services as s };

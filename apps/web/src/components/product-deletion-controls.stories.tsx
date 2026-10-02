@@ -68,6 +68,7 @@ export const Owner: Story = {
         name: formatTranslation("action.cancel", {}, "en-US"),
       }),
     );
+    await waitFor(() => expect(checkbox).not.toBeChecked());
     await userEvent.click(page.getByRole("button", { name: action }));
     await expect(dialog.getByRole("checkbox")).not.toBeChecked();
     await userEvent.click(dialog.getByRole("checkbox"));

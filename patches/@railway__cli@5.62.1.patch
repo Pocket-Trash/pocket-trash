@@ -1,0 +1,7 @@
+diff --git a/npm-install/postinstall.js b/npm-install/postinstall.js
+index 348af93..c769956 100644
+--- a/npm-install/postinstall.js
++++ b/npm-install/postinstall.js
+@@ -7 +7 @@ import { fileURLToPath } from "url";
+-import tar from "tar";
++import * as tar from "tar";

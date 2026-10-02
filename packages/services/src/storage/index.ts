@@ -76,6 +76,8 @@ export const uploadManifestSchema = z.object({
 });
 /** Parsed manifest used to reserve and upload session files. */
 export type UploadManifest = z.infer<typeof uploadManifestSchema>;
+/** One-hour lifetime for an incomplete upload session and its path reservations. */
+export const uploadSessionLifetimeMs = 60 * 60 * 1000;
 /** Persisted attachment kinds accepted by file deletion. */
 export const fileTypes = [
   "product_image",
@@ -90,7 +92,9 @@ export type FileType = (typeof fileTypes)[number];
 type Session = typeof schema.uploadSession.$inferSelect;
 
 /**
- * Creates resumable upload-session operations.
+ * Creates resumable upload-session operations. Services own authorization,
+ * database records, path reservations, completion, and deferred deletion;
+ * `UploadStorage` owns validated object keys and Bunny I/O.
  *
  * @param input - Storage service dependencies.
  * @returns Configured storage service.
@@ -122,7 +126,8 @@ export function createStorageService(input: {
   const uuid = input.randomUUID ?? (() => crypto.randomUUID());
   const service = {
     /**
-     * Creates an upload session.
+     * Creates a one-hour upload session. Reserved object paths remain
+     * unavailable until completion or successful expiry cleanup.
      *
      * @param value - Untrusted upload manifest.
      * @param actor - Uploading actor.
@@ -198,7 +203,7 @@ export function createStorageService(input: {
           version = versions.rows[0]?.version ?? 1;
         }
         const id = uuid(),
-          expiresAt = new Date(now().getTime() + 60 * 60 * 1000);
+          expiresAt = new Date(now().getTime() + uploadSessionLifetimeMs);
         attributes.sessionIdHash = hashLogIdentifier(id);
         const positions = { image: 0, file: 0 };
         const files = manifest.files.map((file) => {
@@ -357,7 +362,8 @@ export function createStorageService(input: {
       });
     },
     /**
-     * Completes an uploaded session atomically.
+     * Completes an uploaded session atomically. Retrying a completed session
+     * returns its recorded identity without writing another object or record.
      *
      * @param sessionId - Upload session identifier.
      * @param actor - Uploading actor.
@@ -495,7 +501,8 @@ export function createStorageService(input: {
       });
     },
     /**
-     * Removes expired sessions and any unattached uploaded objects.
+     * Removes expired sessions and any unattached uploaded objects, releasing
+     * their path reservations only after successful cleanup.
      *
      * Individual session failures are logged and left for a later retry.
      *
@@ -709,7 +716,9 @@ export function createStorageService(input: {
     /**
      * Removes an authorized attachment and queues its object for deletion.
      *
-     * The final resource file or image cannot be removed.
+     * The final resource file or image cannot be removed. Deleting a current
+     * collection cover promotes the latest remaining image, or leaves the
+     * collection without a cover when none remains.
      *
      * @param input - Attachment identity, requesting actor, and optional audit reason.
      * @param attributes - Mutable log attributes populated by the operation.

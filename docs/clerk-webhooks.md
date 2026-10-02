@@ -35,7 +35,7 @@ local API runs.
 Set `URL_INITIALS` in repository-root `.env.local` or `.env`, then run:
 
 ```sh
-pnpm dev:web:webhooks
+pnpm dev:webhooks
 ```
 
 The stable development API must already be deployed so its
@@ -45,7 +45,7 @@ Before the feature reaches `main`, run the `Deploy` GitHub Actions workflow
 from the feature branch with the `development` target.
 
 The command requires both the Clerk CLI and `cloudflared`. It first reconciles
-existing Clerk users, then starts `dev:web`, creates temporary Clerk and
+existing Clerk users, then starts `dev`, creates temporary Clerk and
 Cloudflare relays, and registers `target:local:<INITIALS>` and
 `linear-target:local:<INITIALS>` for 24 hours. Both targets are removed on
 normal termination. The local destinations include the initials so only the

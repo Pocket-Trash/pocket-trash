@@ -114,11 +114,6 @@ describe("buildInfisicalRunArgs", () => {
     ["process:dead-letter"],
     ["process:queue"],
     ["scrape"],
-    ["scrape:autmog"],
-    ["scrape:grimsmo-fjell"],
-    ["scrape:grimsmo-norseman"],
-    ["scrape:grimsmo-rask"],
-    ["scrape:grimsmo-saga"],
   ])("maps the scraper %s command to scraper app secrets", (command) => {
     expect(commandSecrets.scraper).toHaveProperty(command);
 
@@ -134,6 +129,16 @@ describe("buildInfisicalRunArgs", () => {
       databaseUrlUserOverride: true,
       databaseUrlUserOverrideFilePaths: ["/repo/.env.local", "/repo/.env"],
     });
+  });
+
+  it.each([
+    "scrape:autmog",
+    "scrape:grimsmo-fjell",
+    "scrape:grimsmo-norseman",
+    "scrape:grimsmo-rask",
+    "scrape:grimsmo-saga",
+  ])("does not configure the removed scraper %s alias", (command) => {
+    expect(commandSecrets.scraper).not.toHaveProperty(command);
   });
 
   it("rejects unknown app commands", () => {

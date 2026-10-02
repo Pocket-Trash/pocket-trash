@@ -182,17 +182,8 @@ export function parseCommand(args: string[]): ScraperCommand {
     };
   }
 
-  const [prefix, sourceKey] = command?.split(":") ?? [];
-
-  if (prefix === "scrape" && isScraperSourceKey(sourceKey)) {
-    return {
-      source: sourceKey,
-      type: "scrape",
-    };
-  }
-
   throw new Error(
-    `Unknown scraper command "${args.join(" ")}". Expected cron:run, scrape, scrape <source>, scrape:<source>, process:queue, or process:dead-letter. Supported sources: ${scraperSourceKeys.join(", ")}.`,
+    `Unknown scraper command "${args.join(" ")}". Expected cron:run, scrape, scrape <source>, process:queue, or process:dead-letter. Supported sources: ${scraperSourceKeys.join(", ")}.`,
   );
 }
 

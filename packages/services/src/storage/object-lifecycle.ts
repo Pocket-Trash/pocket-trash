@@ -68,10 +68,10 @@ export async function assertNotPendingDeletion(db: StorageDb, path: string) {
     throw new UploadSessionError("upload_in_progress", 409);
 }
 
-// Call inside the same transaction that removes the attachment. Writers use the
-// same path lock and refuse queued paths until cleanup has finished.
 /**
  * Queues unique object paths for deferred deletion under per-path locks.
+ * Call this in the transaction that removes the attachment. Writers use the
+ * same lock and reject queued paths until cleanup finishes.
  *
  * @param db - Application database.
  * @param paths - Object-storage paths removed from their attachments.
@@ -137,7 +137,9 @@ async function erasableObjectOwner(db: StorageDb, path: string) {
 }
 
 /**
- * Drains queued object deletions without failing the batch on individual errors.
+ * Drains queued object deletions without failing the batch on individual
+ * errors. Failed or upload-reserved paths remain queued; paths attached again
+ * have their stale queue entry removed without deleting the object.
  *
  * @param db - Application database.
  * @param storage - Object storage from which unreferenced paths are deleted.

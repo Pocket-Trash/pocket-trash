@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "tsx ../../packages/infisical-runner/src/cli.ts web dev -- vite dev",
-    "dev:web": "pnpm run dev",
     "build": "tsx ../../packages/infisical-runner/src/cli.ts web build -- vite build",
     "build:ci": "vite build",
     "start": "vite preview",
@@ -39,7 +38,7 @@
     "@package/logger": "workspace:*",
     "@package/markdown": "workspace:*",
     "@package/services": "workspace:*",
-    "@pocket-trash/localizations": "^0.26.0",
+    "@pocket-trash/localizations": "^0.27.0",
     "@t3-oss/env-core": "^0.13.11",
     "@tailwindcss/vite": "^4.3.2",
     "@tanstack/react-form": "^1.33.5",
@@ -60,7 +59,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@clerk/testing": "2.2.41",
+    "@clerk/testing": "2.2.39",
     "@package/database": "workspace:*",
     "@package/tsconfig": "workspace:*",
     "@storybook/addon-a11y": "10.6.1",
@@ -70,12 +69,13 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "^6.0.3",
-    "@vitest/browser-playwright": "4.1.10",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/browser-playwright": "4.1.11",
+    "@vitest/coverage-v8": "4.1.11",
     "drizzle-orm": "latest",
+    "jsdom": "30.1.1",
     "playwright": "1.63.0",
     "storybook": "10.6.1",
     "vite": "latest",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   }
 }
