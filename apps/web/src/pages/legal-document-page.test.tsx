@@ -44,6 +44,6 @@ describe("LegalDocumentPage", () => {
     expect(html).toContain("v1.0");
     expect(html).toContain("Privacy rights");
     expect(html).toContain("Policy body.");
-    expect(html).toContain("lg:w-3/4");
+    expect(html).toContain("lg:max-w-[75%]");
   });
 });

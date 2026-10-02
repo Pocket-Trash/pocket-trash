@@ -77,7 +77,7 @@ export function SubmitFeedbackPage() {
 
   return (
     <AppShell title={t("web.feedback.new.title")}>
-      <main className="mx-auto w-full p-3 md:p-[18px_22px_22px] lg:w-3/4">
+      <main className="mx-auto w-full p-3 md:p-[18px_22px_22px] lg:max-w-[75%]">
         <form
           aria-busy={submitting}
           className="grid gap-6 rounded-xl border border-border bg-card p-5 text-card-foreground shadow-sm md:p-7"
@@ -255,7 +255,7 @@ export function FeedbackBoardPage({
     >
       <main
         aria-busy={loading}
-        className="mx-auto grid w-full gap-6 p-3 md:p-[18px_22px_22px] lg:w-3/4"
+        className="mx-auto grid w-full gap-6 p-3 md:p-[18px_22px_22px] lg:max-w-[75%]"
       >
         <search>
           <form
@@ -380,7 +380,7 @@ export function CompletedFeedbackPage({
     >
       <main
         aria-busy={loading}
-        className="mx-auto grid w-full gap-4 p-3 md:p-[18px_22px_22px] lg:w-3/4"
+        className="mx-auto grid w-full gap-4 p-3 md:p-[18px_22px_22px] lg:max-w-[75%]"
       >
         <search>
           <form
@@ -481,7 +481,7 @@ export function MyFeedbackPage({
     >
       <main
         aria-busy={loading}
-        className="mx-auto grid w-full gap-4 p-3 md:p-[18px_22px_22px] lg:w-3/4"
+        className="mx-auto grid w-full gap-4 p-3 md:p-[18px_22px_22px] lg:max-w-[75%]"
       >
         <search>
           <form

@@ -30,7 +30,7 @@ export function HelpIndexPage({
 
   return (
     <AppShell title={t("web.navigation.help")}>
-      <main className="mx-auto grid w-full gap-6 p-3 md:p-[18px_22px_22px] lg:w-3/4">
+      <main className="mx-auto grid w-full gap-6 p-3 md:p-[18px_22px_22px] lg:max-w-[75%]">
         <blockquote className="border-l-4 border-primary bg-accent/30 p-4">
           {t("web.help.developmentCallout")}
         </blockquote>
@@ -89,7 +89,7 @@ export function HelpTopicPage({
       breadcrumbItems={[{ label: helpTitle, to: "/help" }]}
       title={document.metadata.title}
     >
-      <main className="mx-auto grid w-full gap-6 p-3 md:p-[18px_22px_22px] lg:w-3/4">
+      <main className="mx-auto grid w-full gap-6 p-3 md:p-[18px_22px_22px] lg:max-w-[75%]">
         <p className="text-sm text-muted-foreground">
           {modified ? dateModifiedLabel : dateLabel}:{" "}
           <time dateTime={date}>{date}</time>
@@ -120,7 +120,7 @@ function HelpArticle({
   );
 
   return includeMain ? (
-    <main className="mx-auto w-full p-3 md:p-[18px_22px_22px] lg:w-3/4">
+    <main className="mx-auto w-full p-3 md:p-[18px_22px_22px] lg:max-w-[75%]">
       {content}
     </main>
   ) : (

@@ -23,7 +23,7 @@ export function LegalDocumentPage({ document }: LegalDocumentPageProps) {
 
   return (
     <AppShell title={document.metadata.title}>
-      <main className="mx-auto grid w-full gap-6 p-3 md:p-[18px_22px_22px] lg:w-3/4">
+      <main className="mx-auto grid w-full gap-6 p-3 md:p-[18px_22px_22px] lg:max-w-[75%]">
         <p className="text-sm text-muted-foreground">
           {formatTranslation(
             modified ? "web.help.dateModified" : "web.help.datePublished",

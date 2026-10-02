@@ -110,6 +110,6 @@ describe("HelpIndexPage", () => {
     expect(html).toContain('href="/help/image-size-and-resolution-guide"');
     expect(html).toContain("Contacto");
     expect(html).toContain("Próximamente.");
-    expect(html).toContain("lg:w-3/4");
+    expect(html).toContain("lg:max-w-[75%]");
   });
 });
