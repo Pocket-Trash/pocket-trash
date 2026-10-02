@@ -97,15 +97,18 @@ preview storage namespace.
 
 ## Neon Compute Caps
 
-Compute sizing is managed through Neon, not repository configuration. Resizing
-an endpoint restarts it, so schedule production changes for a low-risk window.
+Compute sizing is managed through Neon, not repository configuration. Verify
+the current values in Neon before changing them. Resizing an endpoint restarts
+it, so schedule production changes for a low-risk window.
 
-| Branch class | Minimum CU | Maximum CU | Scale to zero |
+Recommended targets, subject to current Neon metrics:
+
+| Branch class | Target minimum CU | Target maximum CU | Scale to zero |
 | --- | ---: | ---: | --- |
 | `preview-pr-*` | 0.25 | 0.5 | Enabled |
 | `preview` | 0.25 | 0.5 | Enabled |
 | Developer branches | 0.25 | 0.5 | Enabled |
-| `production` | 0.25 | 2 | Preserve unless deliberately changed |
+| `production` | 0.25 | 2 | Preserve the current setting unless deliberately changed |
 
 For a production resize, retain the prior maximum as the rollback value. Roll
 back when API p95 latency or error rate regresses for two consecutive 15-minute
@@ -124,6 +127,7 @@ Print the repository-specific recovery instructions with:
 pnpm db:resolve-conflicts
 ```
 
-The command invokes the shared `$pocket-trash db-migration-conflicts` workflow.
-It preserves schema intent and hand-written SQL, regenerates migration
-artifacts, and runs the Drizzle consistency check.
+The command prints instructions for Codex to use the shared
+`$pocket-trash db-migration-conflicts` workflow. That workflow preserves
+schema intent and hand-written SQL, regenerates migration artifacts, and runs
+the Drizzle consistency check.
