@@ -1,5 +1,6 @@
 import type { CatalogProduct } from "@package/services";
 import { Badge } from "@/components/ui/badge";
+import { cardImageUrl } from "@/lib/card-image";
 
 /**
  * Renders a catalog product summary with its first active image and counts.
@@ -59,7 +60,8 @@ export function ProductCard({
           <img
             alt={imageAlt}
             className="h-full w-full object-cover"
-            src={image.url}
+            loading="lazy"
+            src={cardImageUrl(image.url)}
           />
         </div>
       ) : null}

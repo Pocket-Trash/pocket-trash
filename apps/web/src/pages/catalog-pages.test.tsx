@@ -10,6 +10,7 @@ import {
   CollectionItemDetailPage,
   CollectionPage,
   ProductDetailPage,
+  ProductGrid,
   PublicCollectionsPage,
   UserCollectionsPage,
 } from "./catalog-pages";
@@ -267,6 +268,34 @@ describe("PublicCollectionsPage", () => {
     expect(html).not.toContain('href="/collections/1002"');
     expect(html).not.toContain("Private collection");
   });
+
+  it("renders sixteen collection cards per page", () => {
+    const collection = owners[0]?.collections[0];
+    const owner = owners[0];
+    if (!collection || !owner) throw new Error("Owner fixtures are required.");
+    const collections = Array.from({ length: 17 }, (_, index) => {
+      const coverImage = collectionImage(index + 1);
+      return {
+        ...collection,
+        coverImage,
+        coverImages: [coverImage],
+        id: index + 1,
+        name: `Collection ${index + 1}`,
+        updatedAt: new Date(2026, 0, index + 1),
+      };
+    });
+
+    const html = renderToStaticMarkup(
+      <PublicCollectionsPage owners={[{ ...owner, collections }]} />,
+    );
+
+    expect(html).toContain("Collection 17");
+    expect(html).toContain("Collection 2");
+    expect(html).not.toContain("Collection 1</h2>");
+    expect(html).not.toContain("collection-1.webp");
+    expect(html).toContain("width=640");
+    expect(html).toContain("Page 1 of 2");
+  });
 });
 
 describe("UserCollectionsPage", () => {
@@ -415,6 +444,48 @@ describe("ProductCard", () => {
     );
 
     expect(html).not.toContain("CARD_ONLY_DESCRIPTION");
+  });
+
+  it("requests a lazy card-sized image", () => {
+    const html = renderToStaticMarkup(
+      <ProductCard
+        finishOptionCountLabel="No finishes"
+        imageAlt="Catla"
+        imageCountLabel="One image"
+        materialCountLabel="No materials"
+        privateLabel="Private"
+        product={{
+          ...product,
+          images: [
+            {
+              ...collectionImage(1),
+              url: "https://cdn.test/product.webp?token=signed&format=webp&quality=85",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(html).toContain("width=640");
+    expect(html).toContain('loading="lazy"');
+  });
+});
+
+describe("ProductGrid", () => {
+  it("renders twenty product cards per page", () => {
+    const products = Array.from({ length: 21 }, (_, index) => ({
+      ...product,
+      id: index + 1,
+      name: `Product ${index + 1}`,
+      slug: `product-${index + 1}`,
+    }));
+
+    const html = renderToStaticMarkup(<ProductGrid products={products} />);
+
+    expect(html).toContain("Product 1");
+    expect(html).toContain("Product 20");
+    expect(html).not.toContain("Product 21");
+    expect(html).toContain("Page 1 of 2");
   });
 });
 

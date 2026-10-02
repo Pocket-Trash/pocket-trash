@@ -1,5 +1,6 @@
 import type { UserCollectionSummary } from "@package/services";
 import { Badge } from "@/components/ui/badge";
+import { cardImageUrl } from "@/lib/card-image";
 
 /**
  * Renders a collection summary with its optional cover, owner, item count, and privacy badge.
@@ -47,7 +48,8 @@ export function CollectionCard({
           <img
             alt={coverAlt}
             className="h-full w-full object-cover"
-            src={collection.coverImage.url}
+            loading="lazy"
+            src={cardImageUrl(collection.coverImage.url)}
           />
         </div>
       ) : null}

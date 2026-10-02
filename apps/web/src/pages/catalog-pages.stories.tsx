@@ -414,10 +414,38 @@ export const PendingCollectionItem: Story = {
 /** Product index page story. */
 export const Products: Story = {
   /**
+   * Verifies that only the current twenty-card page is rendered.
+   *
+   * @param root0 - Story interaction context.
+   */
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("heading", { name: "Product 20" }),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole("heading", { name: "Product 21" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Next page" }));
+    await expect(
+      canvas.getByRole("heading", { name: "Product 21" }),
+    ).toBeVisible();
+    await expect(canvas.getByText("Page 2 of 2")).toBeVisible();
+  },
+  /**
    * Renders the product index story.
    * @returns The product index fixture.
    */
-  render: () => <ProductsPage onFiltersChange={fn()} products={[product]} />,
+  render: () => (
+    <ProductsPage
+      onFiltersChange={fn()}
+      products={Array.from({ length: 21 }, (_, index) => ({
+        ...product,
+        id: index + 1,
+        name: `Product ${index + 1}`,
+        slug: `product-${index + 1}`,
+      }))}
+    />
+  ),
 };
 
 /** Public collection page story. */
@@ -432,11 +460,41 @@ export const PublicCollection: Story = {
 /** Public collections page story. */
 export const PublicCollections: Story = {
   /**
+   * Verifies that public collection cards paginate in groups of sixteen.
+   *
+   * @param root0 - Story interaction context.
+   */
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("heading", { name: "Collection 16" }),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole("heading", { name: "Collection 17" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Next page" }));
+    await expect(
+      canvas.getByRole("heading", { name: "Collection 17" }),
+    ).toBeVisible();
+  },
+  /**
    * Renders the public collections story.
    * @returns Public collection fixtures.
    */
   render: () => (
-    <PublicCollectionsPage onFiltersChange={fn()} owners={[owner]} />
+    <PublicCollectionsPage
+      onFiltersChange={fn()}
+      owners={[
+        {
+          ...owner,
+          collections: Array.from({ length: 17 }, (_, index) => ({
+            ...collection,
+            id: index + 1,
+            name: `Collection ${index + 1}`,
+            updatedAt: new Date(2026, 0, 17 - index),
+          })),
+        },
+      ]}
+    />
   ),
 };
 
