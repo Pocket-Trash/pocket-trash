@@ -275,7 +275,7 @@ export const scraperRuns = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    /** Scraper source key that created this aggregate row. */
+    /** Scraper source or subsystem that ran. */
     source: text("source").notNull(),
     jobType: text("job_type").notNull(),
     status: text("status").notNull(),
@@ -376,6 +376,7 @@ export const tmpProducts = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    /** Scraper source key that created this aggregate row. */
     source: text("source").notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
@@ -396,6 +397,7 @@ export const tmpProductVariations = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    /** Aggregate row and product-level image-folder key. */
     productId: bigint("product_id", { mode: "number" })
       .notNull()
       .references(() => tmpProducts.id, { onDelete: "cascade" }),
@@ -548,6 +550,7 @@ export const tmpAutmogPens = pgTable(
     /** Maximum source variant price in cents. */
     priceMaxCents: integer("price_max_cents"),
     currencyCode: text("currency_code").notNull().default("USD"),
+    /** Whether any source variant is currently available. */
     availableForSale: boolean("available_for_sale").notNull().default(false),
     archivedAt: timestamp("archived_at", { mode: "date", withTimezone: true }),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })

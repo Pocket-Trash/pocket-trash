@@ -630,6 +630,7 @@ export const collectionSpinner = pgTable(
     installedButtonId: bigint("installed_button_id", {
       mode: "number",
     }).references(() => collectionSpinnerButton.id, { onDelete: "set null" }),
+    /** Optional bearing override for this owned spinner. */
     bearing: text("bearing"),
   },
   (table) => [
