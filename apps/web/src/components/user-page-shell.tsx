@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/tanstack-react-start";
+import { useAuth, useClerk } from "@clerk/tanstack-react-start";
 import {
   hasStaffPermission,
   normalizeActor,
@@ -11,6 +11,7 @@ import {
   Files,
   FlaskConical,
   Folder,
+  LogOut,
   Settings,
   Shield,
   User,
@@ -64,6 +65,7 @@ export function UserPageShell({
   section?: UserSection;
 }) {
   const { sessionClaims, userId } = useAuth();
+  const clerk = useClerk();
   const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
   const { locale } = useLocale();
   /**
@@ -75,15 +77,6 @@ export function UserPageShell({
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const userTitle = t("web.navigation.user");
   const primaryLinks: SidebarLink[] = [
-    ...(hasStaffPermission(actor)
-      ? [
-          {
-            icon: Shield,
-            label: t("web.navigation.admin"),
-            to: "/admin" as const,
-          },
-        ]
-      : []),
     {
       active: section === "collections",
       icon: Folder,
@@ -117,6 +110,15 @@ export function UserPageShell({
     },
   ];
   const utilityLinks: SidebarLink[] = [
+    ...(hasStaffPermission(actor)
+      ? [
+          {
+            icon: Shield,
+            label: t("web.navigation.admin"),
+            to: "/admin" as const,
+          },
+        ]
+      : []),
     {
       active: section === "settings",
       icon: Settings,
@@ -143,11 +145,20 @@ export function UserPageShell({
       meta={meta}
       sidebar={
         <SidebarNavigation
+          action={{
+            icon: LogOut,
+            label: t("web.action.signOut"),
+            /** Signs out the current user and returns to the home page. */
+            onSelect: () => {
+              void clerk.signOut({ redirectUrl: "/" });
+            },
+          }}
           ariaLabel={userTitle}
           primaryLinks={primaryLinks}
           utilityLinks={utilityLinks}
         />
       }
+      sidebarTitle={t("web.sidebar.profile")}
       title={title}
     >
       <div className={cn("w-full px-4 py-6 md:px-6", contentClassName)}>

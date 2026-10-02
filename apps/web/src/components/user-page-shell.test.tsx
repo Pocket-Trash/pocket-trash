@@ -12,6 +12,12 @@ vi.mock("@clerk/tanstack-react-start", () => ({
    * @returns Authentication state for the test actor.
    */
   useAuth: () => ({ sessionClaims: {}, userId: "user_1" }),
+  /**
+   * Returns the minimal Clerk client consumed by the sign-out action.
+   *
+   * @returns A Clerk client with a sign-out spy.
+   */
+  useClerk: () => ({ signOut: vi.fn() }),
 }));
 
 vi.mock("@package/services/authorization", () => ({
@@ -78,6 +84,8 @@ describe("UserPageShell", () => {
     expect(html).toContain('href="/user/account"');
     expect(html).toContain('href="/user/settings"');
     expect(html).toContain('href="/user/settings/beta-features"');
+    expect(html).toContain(">Profile</h2>");
+    expect(html).toContain(">Sign out</span>");
     expect(html).not.toContain('href="/admin"');
   });
 
@@ -89,5 +97,11 @@ describe("UserPageShell", () => {
     );
 
     expect(html).toContain('href="/admin"');
+    expect(html.indexOf('href="/user/account"')).toBeLessThan(
+      html.indexOf('href="/admin"'),
+    );
+    expect(html.indexOf('href="/admin"')).toBeLessThan(
+      html.indexOf('href="/user/settings"'),
+    );
   });
 });
