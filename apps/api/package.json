@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "tsx ../../packages/infisical-runner/src/cli.ts api dev -- env CLOUDFLARE_INCLUDE_PROCESS_ENV=true wrangler dev --port 4006 --var APP_ENV:development",
-    "dev:web": "pnpm run dev",
     "build": "tsc -p tsconfig.json",
     "build:ci": "tsc -p tsconfig.json",
     "cf-typegen": "wrangler types src/worker-configuration.d.ts --include-runtime false",

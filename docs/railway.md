@@ -118,8 +118,6 @@ pnpm --filter @app/scraper run scrape -- autmog
 Implemented source keys are `autmog`, `grimsmo-saga`, `grimsmo-rask`,
 `grimsmo-fjell`, and `grimsmo-norseman`. The Grimsmo sources fetch unprefixed
 `https://grimsmoknives.com` Shopify collection URLs so prices normalize as USD.
-The older `pnpm scraper:scrape:autmog` and
-`pnpm --filter @app/scraper run scrape:autmog` aliases remain available.
 
 ## Queue Design
 
