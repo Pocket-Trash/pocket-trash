@@ -60,7 +60,7 @@ export function ChangelogListPage({
 
   return (
     <AppShell title={changelogTitle}>
-      <main className="mx-auto grid w-full max-w-3xl gap-8 p-6">
+      <main className="mx-auto grid w-full gap-8 p-3 md:p-[18px_22px_22px] lg:max-w-[75%]">
         <nav
           aria-label={t("web.changelog.allCategories")}
           className="flex flex-wrap gap-2"
@@ -203,7 +203,7 @@ export function ChangelogEntryPage({ entry }: ChangelogEntryPageProps) {
       breadcrumbItems={[{ label: changelogTitle, to: "/changelog" }]}
       title={entry.title}
     >
-      <main className="mx-auto grid w-full max-w-3xl gap-6 p-6">
+      <main className="mx-auto grid w-full gap-6 p-3 md:p-[18px_22px_22px] lg:max-w-[75%]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <EntryHeading entry={entry} />
           <div className="flex items-center gap-3">

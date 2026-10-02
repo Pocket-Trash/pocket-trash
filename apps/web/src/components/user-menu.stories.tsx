@@ -179,6 +179,12 @@ export const BasicSignedInUser: Story = {
       await page.findByRole("menuitem", { name: "Log out" }),
     ).toBeVisible();
     await expect(
+      page.getByRole("menuitem", { name: "Resources" }),
+    ).toHaveAttribute("href", "/user/resources");
+    await expect(
+      page.queryByRole("menuitem", { name: "Your resources" }),
+    ).not.toBeInTheDocument();
+    await expect(
       page.queryByRole("menuitem", { name: "Admin Panel" }),
     ).not.toBeInTheDocument();
   },

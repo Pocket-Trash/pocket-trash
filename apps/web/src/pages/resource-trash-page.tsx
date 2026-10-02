@@ -33,6 +33,7 @@ export function OwnerResourceTrashPage({
   const { locale } = useLocale();
   return (
     <UserPageShell
+      section="resources"
       title={formatTranslation("web.resources.trash.ownerTitle", {}, locale)}
     >
       <ResourceTrashList

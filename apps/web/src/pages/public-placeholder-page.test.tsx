@@ -41,4 +41,5 @@ it("renders a localized public placeholder", () => {
 
   expect(html).toContain("Privacidad");
   expect(html).toContain("Próximamente.");
+  expect(html).toContain("lg:max-w-[75%]");
 });

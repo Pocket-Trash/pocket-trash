@@ -29,7 +29,7 @@ export function UserAccountPage() {
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
 
   return (
-    <UserPageShell title={t("web.navigation.account")}>
+    <UserPageShell section="account" title={t("web.navigation.account")}>
       <ClerkLoading>
         <UserProfileSkeleton />
       </ClerkLoading>

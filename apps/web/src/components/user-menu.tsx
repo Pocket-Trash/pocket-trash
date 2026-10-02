@@ -122,7 +122,7 @@ export function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/resources" />}>
           <Files />
-          {t("web.resources.management.title")}
+          {t("web.navigation.resources")}
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/user/settings" />}>
           <Settings />
