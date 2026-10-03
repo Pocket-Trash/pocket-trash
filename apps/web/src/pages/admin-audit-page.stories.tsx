@@ -126,12 +126,13 @@ const Populated: Story = {
       eventCells[2]?.clientWidth ?? 0,
     );
 
-    const details = within(canvas.getByRole("group", { name: "Details" }));
+    const detailsElement = canvas.getByRole("group", { name: "Details" });
+    const details = within(detailsElement);
     await userEvent.click(details.getByText("Details"));
     await expect(details.getByText(/Old name/)).toBeVisible();
     await expect(details.getByText(/New name/)).toBeVisible();
-    await expect(details.getByRole("table").scrollWidth).toBeLessThanOrEqual(
-      details.getByRole("table").clientWidth,
+    await expect(detailsElement.scrollWidth).toBeLessThanOrEqual(
+      detailsElement.clientWidth,
     );
   },
 };
