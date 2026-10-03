@@ -10,7 +10,7 @@ const page = {
   coveredDomains: ["collection", "product"],
   items: [
     {
-      action: "product.updated",
+      action: "feature_flags.user_override.set",
       actorRole: "admin",
       actorUserId: 42,
       actorUsername: "ada",
@@ -27,7 +27,7 @@ const page = {
       recordedAt: new Date("2026-09-29T12:00:01Z"),
       requestId: "request-123",
       targetId: "product-123",
-      targetType: "product.catalog",
+      targetType: "feature_flags.user_override",
     },
   ],
   nextCursor: {
@@ -87,16 +87,53 @@ const Populated: Story = {
     const { canvas, userEvent } = context;
     await expect(canvas.getByRole("link", { name: "Audit log" })).toBeVisible();
     await expect(canvas.getByLabelText("Actor ID")).toBeVisible();
-    await expect(canvas.getByText("product.updated")).toBeVisible();
+    await expect(
+      canvas.getByText("feature_flags.user_override.set"),
+    ).toBeVisible();
     await expect(canvas.getByText("user.banned")).toBeVisible();
     await expect(
       canvas.getByRole("link", { name: "Older events" }),
     ).toBeVisible();
 
-    const details = within(canvas.getByRole("group", { name: "Details" }));
+    const eventTable = canvas
+      .getAllByRole("table")
+      .find((table) =>
+        within(table).queryByRole("columnheader", { name: "Action" }),
+      );
+    const columns = eventTable?.querySelectorAll("col") ?? [];
+    await expect(columns).toHaveLength(7);
+    await expect(columns[1]?.getBoundingClientRect().width).toBe(
+      columns[2]?.getBoundingClientRect().width,
+    );
+    await expect(columns[1]?.getBoundingClientRect().width).toBeGreaterThan(
+      columns[3]?.getBoundingClientRect().width ?? 0,
+    );
+    await expect(
+      eventTable?.getBoundingClientRect().width ?? 0,
+    ).toBeGreaterThanOrEqual(
+      eventTable?.parentElement?.getBoundingClientRect().width ?? 0,
+    );
+    const eventRow = canvas
+      .getByText("feature_flags.user_override.set")
+      .closest("tr");
+    await expect(eventRow).not.toBeNull();
+    if (!eventRow) return;
+    const eventCells = within(eventRow).getAllByRole("cell");
+    await expect(eventCells[1]?.scrollWidth).toBeLessThanOrEqual(
+      eventCells[1]?.clientWidth ?? 0,
+    );
+    await expect(eventCells[2]?.scrollWidth).toBeLessThanOrEqual(
+      eventCells[2]?.clientWidth ?? 0,
+    );
+
+    const detailsElement = canvas.getByRole("group", { name: "Details" });
+    const details = within(detailsElement);
     await userEvent.click(details.getByText("Details"));
     await expect(details.getByText(/Old name/)).toBeVisible();
     await expect(details.getByText(/New name/)).toBeVisible();
+    await expect(detailsElement.scrollWidth).toBeLessThanOrEqual(
+      detailsElement.clientWidth,
+    );
   },
 };
 
