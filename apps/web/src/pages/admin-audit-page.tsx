@@ -480,7 +480,7 @@ function AuditEventDetails({
         {t("web.resources.action.details")}
       </summary>
       {keys.length ? (
-        <table className="mt-2 w-full table-fixed text-xs">
+        <table className="mt-2 w-full table-fixed border-collapse text-xs">
           <thead>
             <tr>
               <td aria-hidden="true" className="w-1/4 p-1" />
