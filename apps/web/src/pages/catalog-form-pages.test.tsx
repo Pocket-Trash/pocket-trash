@@ -113,6 +113,12 @@ const emptyCatalogOptions = {
 };
 
 describe("collection deletion choices", () => {
+  it("keeps collection creation in a single column", () => {
+    const html = renderToStaticMarkup(createElement(CollectionFormPage));
+
+    expect(html).not.toContain("lg:grid-cols-2");
+  });
+
   it("renders all outcomes with the affected item count", () => {
     const collection: UserCollectionSummary = {
       canAdminister: false,
@@ -141,6 +147,10 @@ describe("collection deletion choices", () => {
     expect(html).toContain('value="delete"');
     expect(html).toContain('value="move"');
     expect(html).toContain("Collection items: 2");
+    expect(html).toContain("lg:grid-cols-2");
+    expect(html).not.toContain("lg:col-start-2");
+    expect(html.match(/<form/g)).toHaveLength(2);
+    expect(html).toContain(">Cancel</button>");
   });
 });
 
@@ -411,6 +421,9 @@ describe("product form conditional fields", () => {
     );
 
     for (const html of [addHtml, editHtml]) {
+      expect(html).toContain("lg:grid-cols-2");
+      expect(html).toContain("lg:col-span-2");
+      expect(html).toContain(">Cancel</button>");
       expect(html).toContain("0 / 5,000 characters");
       if (productTypeSlug === "spinner") {
         expect(html).toContain('aria-label="Bearing"');
@@ -429,11 +442,27 @@ describe("collection edit conditional fields", () => {
     "spinner-button",
   ] as const)("renders the bearing override correctly for %s items", (productTypeSlug) => {
     const product = productFixture(1006, "Test product", productTypeSlug);
+    const item = collectionFixture(30, product, 1007);
+    item.images = [
+      {
+        contentType: "image/webp",
+        createdAt: new Date(0),
+        deletedAt: null,
+        deletedByClerkId: null,
+        deletedByRole: null,
+        fileName: `${"long-name-".repeat(20)}.webp`,
+        id: 1008,
+        objectPath: "collections/1000/long-name.webp",
+        position: 0,
+        size: 1024,
+        url: "https://cdn.test/long-name.webp",
+      },
+    ];
     const html = renderToStaticMarkup(
       createElement(CollectionEditPage, {
         buttonProducts: [],
         collections: [],
-        item: collectionFixture(30, product, 1007),
+        item,
         options: emptyCatalogOptions,
         ownedButtons: [],
         product,
@@ -445,6 +474,12 @@ describe("collection edit conditional fields", () => {
     } else {
       expect(html).not.toContain('aria-label="Bearing"');
     }
+    expect(html).toContain("max-w-6xl");
+    expect(html).toContain("lg:grid-cols-2");
+    expect(html).toContain("lg:col-span-2");
+    expect(html).toContain(">Cancel</button>");
+    expect(html).toContain("flex min-w-0 items-center");
+    expect(html).toContain("min-w-0 flex-1 truncate");
     expect(html).toContain("0 / 5,000 characters");
   });
 });

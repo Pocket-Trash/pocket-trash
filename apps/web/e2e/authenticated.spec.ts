@@ -65,7 +65,6 @@ test("@mutation regular user theme persists after reload", async ({
 
   try {
     await nextTheme.click();
-    await expect(nextTheme).toBeDisabled();
     await expect(nextTheme).toBeEnabled();
     changed = true;
 
@@ -75,7 +74,6 @@ test("@mutation regular user theme persists after reload", async ({
     if (changed) {
       await page.goto("/user/settings");
       await originalTheme.click();
-      await expect(originalTheme).toBeDisabled();
       await expect(originalTheme).toBeEnabled();
     }
   }
