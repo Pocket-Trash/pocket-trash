@@ -9,7 +9,9 @@ import { ProductCard } from "@/components/product-card";
 import {
   CollectionItemDetailPage,
   CollectionPage,
+  getCatalogPageSize,
   ProductDetailPage,
+  ProductGrid,
   PublicCollectionsPage,
   UserCollectionsPage,
 } from "./catalog-pages";
@@ -257,6 +259,18 @@ const product: CatalogProduct = {
   widthMm: null,
 };
 
+describe("getCatalogPageSize", () => {
+  it("matches the requested compact, regular, and wide card counts", () => {
+    expect(getCatalogPageSize(402, 15)).toBe(8);
+    expect(getCatalogPageSize(480, 20)).toBe(8);
+    expect(getCatalogPageSize(744, 20)).toBe(12);
+    expect(getCatalogPageSize(820, 15)).toBe(12);
+    expect(getCatalogPageSize(1280, 15)).toBe(12);
+    expect(getCatalogPageSize(1281, 15)).toBe(15);
+    expect(getCatalogPageSize(1281, 20)).toBe(20);
+  });
+});
+
 describe("PublicCollectionsPage", () => {
   it("links public collection cards directly to their collection", () => {
     const html = renderToStaticMarkup(
@@ -266,6 +280,34 @@ describe("PublicCollectionsPage", () => {
     expect(html).toContain('href="/collections/1002/1000"');
     expect(html).not.toContain('href="/collections/1002"');
     expect(html).not.toContain("Private collection");
+  });
+
+  it("renders twelve collection cards before viewport sizing initializes", () => {
+    const collection = owners[0]?.collections[0];
+    const owner = owners[0];
+    if (!collection || !owner) throw new Error("Owner fixtures are required.");
+    const collections = Array.from({ length: 17 }, (_, index) => {
+      const coverImage = collectionImage(index + 1);
+      return {
+        ...collection,
+        coverImage,
+        coverImages: [coverImage],
+        id: index + 1,
+        name: `Collection ${index + 1}`,
+        updatedAt: new Date(2026, 0, index + 1),
+      };
+    });
+
+    const html = renderToStaticMarkup(
+      <PublicCollectionsPage owners={[{ ...owner, collections }]} />,
+    );
+
+    expect(html).toContain("Collection 17");
+    expect(html).toContain("Collection 6");
+    expect(html).not.toContain("Collection 5</h2>");
+    expect(html).not.toContain("collection-5.webp");
+    expect(html).toContain("width=640");
+    expect(html).toContain("Page 1 of 2");
   });
 });
 
@@ -415,6 +457,48 @@ describe("ProductCard", () => {
     );
 
     expect(html).not.toContain("CARD_ONLY_DESCRIPTION");
+  });
+
+  it("requests a lazy card-sized image", () => {
+    const html = renderToStaticMarkup(
+      <ProductCard
+        finishOptionCountLabel="No finishes"
+        imageAlt="Catla"
+        imageCountLabel="One image"
+        materialCountLabel="No materials"
+        privateLabel="Private"
+        product={{
+          ...product,
+          images: [
+            {
+              ...collectionImage(1),
+              url: "https://cdn.test/product.webp?token=signed&format=webp&quality=85",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(html).toContain("width=640");
+    expect(html).toContain('loading="lazy"');
+  });
+});
+
+describe("ProductGrid", () => {
+  it("renders twelve product cards before viewport sizing initializes", () => {
+    const products = Array.from({ length: 21 }, (_, index) => ({
+      ...product,
+      id: index + 1,
+      name: `Product ${index + 1}`,
+      slug: `product-${index + 1}`,
+    }));
+
+    const html = renderToStaticMarkup(<ProductGrid products={products} />);
+
+    expect(html).toContain("Product 1");
+    expect(html).toContain("Product 12");
+    expect(html).not.toContain("Product 13");
+    expect(html).toContain("Page 1 of 2");
   });
 });
 

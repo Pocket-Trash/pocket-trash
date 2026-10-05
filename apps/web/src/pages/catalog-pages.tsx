@@ -9,7 +9,8 @@ import type {
 } from "@package/services";
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useId, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
   CatalogFilterBar,
@@ -90,6 +91,117 @@ function catalogFilterCopy(
     selectMaker: t("web.catalog.selectMaker"),
     selectProductType: t("web.catalog.selectProductType"),
   };
+}
+
+/**
+ * Properties shared by paginated catalog card lists.
+ *
+ * @template T - Card data preserved while slicing pages.
+ */
+type PaginatedCardsProps<T> = {
+  /** Accessible name for the pagination controls. */
+  ariaLabel: string;
+  /**
+   * Renders the cards for the current page.
+   *
+   * @param items - Card data on the current page.
+   * @returns The current page's card grid.
+   */
+  children(items: T[]): ReactNode;
+  /** Ordered card data to paginate. */
+  items: T[];
+  /** Maximum cards rendered above 1280 CSS pixels. */
+  widePageSize: number;
+};
+
+/**
+ * Resolves catalog page size from the browser viewport width.
+ *
+ * @param viewportWidth - Browser viewport width in CSS pixels.
+ * @param widePageSize - Page size used above 1280 CSS pixels.
+ * @returns The responsive catalog page size.
+ * @internal
+ */
+export function getCatalogPageSize(
+  viewportWidth: number,
+  widePageSize: number,
+) {
+  if (viewportWidth <= 480) return 8;
+  if (viewportWidth <= 1280) return 12;
+  return widePageSize;
+}
+
+/**
+ * Renders one page of catalog cards and shared navigation controls.
+ *
+ * @param props - Catalog pagination properties.
+ * @returns The current card page and controls when multiple pages exist.
+ * @template T - Card data preserved while slicing pages.
+ */
+function PaginatedCards<T>({
+  ariaLabel,
+  children,
+  items,
+  widePageSize,
+}: PaginatedCardsProps<T>) {
+  const t = useCatalogCopy();
+  const [pageSize, setPageSize] = useState(12);
+  const [renderedItems, setRenderedItems] = useState(items);
+  const [requestedPage, setRequestedPage] = useState(0);
+  useEffect(() => {
+    /** Synchronizes the page size with the current catalog grid width. */
+    const updatePageSize = () => {
+      setPageSize(getCatalogPageSize(window.innerWidth, widePageSize));
+    };
+    updatePageSize();
+    window.addEventListener("resize", updatePageSize);
+    return () => window.removeEventListener("resize", updatePageSize);
+  }, [widePageSize]);
+  if (renderedItems !== items) {
+    setRenderedItems(items);
+    setRequestedPage(0);
+  }
+  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
+  const page = Math.min(requestedPage, pageCount - 1);
+
+  return (
+    <>
+      {children(items.slice(page * pageSize, (page + 1) * pageSize))}
+      {pageCount > 1 ? (
+        <nav
+          aria-label={ariaLabel}
+          className="flex items-center justify-center gap-3 px-3 pb-6"
+        >
+          <Button
+            aria-label={t("web.collections.gallery.previousPage")}
+            disabled={page === 0}
+            onClick={() => setRequestedPage(page - 1)}
+            size="icon"
+            type="button"
+            variant="outline"
+          >
+            <ChevronLeft />
+          </Button>
+          <output aria-live="polite" className="text-sm">
+            {t("web.collections.gallery.pageStatus", {
+              page: page + 1,
+              pageCount,
+            })}
+          </output>
+          <Button
+            aria-label={t("web.collections.gallery.nextPage")}
+            disabled={page === pageCount - 1}
+            onClick={() => setRequestedPage(page + 1)}
+            size="icon"
+            type="button"
+            variant="outline"
+          >
+            <ChevronRight />
+          </Button>
+        </nav>
+      ) : null}
+    </>
+  );
 }
 
 /**
@@ -551,32 +663,45 @@ export function PublicCollectionsPage({
       }
       title={t("web.navigation.collections")}
     >
-      <main className="grid gap-[18px] p-4 sm:grid-cols-2 lg:grid-cols-3 md:p-[18px_22px_22px]">
-        {collections.length ? (
-          collections.map(({ collection, owner }) => (
-            <Link
-              className="group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              key={collection.id}
-              params={{ collectionId: collection.id, userId: owner.userId }}
-              to="/collections/$userId/$collectionId"
-            >
-              <CollectionCard
-                collection={collection}
-                coverAlt={t("web.resources.detail.imageAlt", {
-                  name: collection.name,
-                })}
-                itemCountLabel={t("web.collections.directory.itemCount", {
-                  count: collection.itemCount,
-                })}
-                ownerName={owner.username}
-                privateLabel={t("web.resources.visibility.private")}
-              />
-            </Link>
-          ))
-        ) : (
+      {collections.length ? (
+        <PaginatedCards
+          ariaLabel={t("web.navigation.collections")}
+          items={collections}
+          widePageSize={15}
+        >
+          {(page) => (
+            <main className="grid gap-[18px] p-4 sm:grid-cols-2 lg:grid-cols-3 md:p-[18px_22px_22px]">
+              {page.map(({ collection, owner }) => (
+                <Link
+                  className="group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  key={collection.id}
+                  params={{
+                    collectionId: collection.id,
+                    userId: owner.userId,
+                  }}
+                  to="/collections/$userId/$collectionId"
+                >
+                  <CollectionCard
+                    collection={collection}
+                    coverAlt={t("web.resources.detail.imageAlt", {
+                      name: collection.name,
+                    })}
+                    itemCountLabel={t("web.collections.directory.itemCount", {
+                      count: collection.itemCount,
+                    })}
+                    ownerName={owner.username}
+                    privateLabel={t("web.resources.visibility.private")}
+                  />
+                </Link>
+              ))}
+            </main>
+          )}
+        </PaginatedCards>
+      ) : (
+        <main className="p-4 md:p-[18px_22px_22px]">
           <EmptyState>{t("web.collections.empty")}</EmptyState>
-        )}
-      </main>
+        </main>
+      )}
     </AppShell>
   );
 }
@@ -605,27 +730,35 @@ export function PublicCollectionPage({
       })}
       title={owner.username}
     >
-      <main className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
-        {owner.collections.map((collection) => (
-          <Link
-            className="group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            key={collection.id}
-            params={{ collectionId: collection.id, userId: owner.userId }}
-            to="/collections/$userId/$collectionId"
-          >
-            <CollectionCard
-              collection={collection}
-              coverAlt={t("web.resources.detail.imageAlt", {
-                name: collection.name,
-              })}
-              itemCountLabel={t("web.collections.directory.itemCount", {
-                count: collection.itemCount,
-              })}
-              privateLabel={t("web.resources.visibility.private")}
-            />
-          </Link>
-        ))}
-      </main>
+      <PaginatedCards
+        ariaLabel={t("web.navigation.collections")}
+        items={owner.collections}
+        widePageSize={15}
+      >
+        {(page) => (
+          <main className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
+            {page.map((collection) => (
+              <Link
+                className="group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                key={collection.id}
+                params={{ collectionId: collection.id, userId: owner.userId }}
+                to="/collections/$userId/$collectionId"
+              >
+                <CollectionCard
+                  collection={collection}
+                  coverAlt={t("web.resources.detail.imageAlt", {
+                    name: collection.name,
+                  })}
+                  itemCountLabel={t("web.collections.directory.itemCount", {
+                    count: collection.itemCount,
+                  })}
+                  privateLabel={t("web.resources.visibility.private")}
+                />
+              </Link>
+            ))}
+          </main>
+        )}
+      </PaginatedCards>
     </AppShell>
   );
 }
@@ -696,31 +829,41 @@ export function UserCollectionsPage({
         ) : (
           <div className="flex justify-end">{addCollection}</div>
         )}
-        <section className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
-          {filtered.length ? (
-            filtered.map((collection) => (
-              <Link
-                className="group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                key={collection.id}
-                params={{ collectionId: collection.id }}
-                to="/user/collections/$collectionId"
-              >
-                <CollectionCard
-                  collection={collection}
-                  coverAlt={t("web.resources.detail.imageAlt", {
-                    name: collection.name,
-                  })}
-                  itemCountLabel={t("web.collections.directory.itemCount", {
-                    count: collection.itemCount,
-                  })}
-                  privateLabel={t("web.resources.visibility.private")}
-                />
-              </Link>
-            ))
-          ) : (
+        {filtered.length ? (
+          <PaginatedCards
+            ariaLabel={t("web.navigation.collections")}
+            items={filtered}
+            widePageSize={15}
+          >
+            {(page) => (
+              <section className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))]">
+                {page.map((collection) => (
+                  <Link
+                    className="group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    key={collection.id}
+                    params={{ collectionId: collection.id }}
+                    to="/user/collections/$collectionId"
+                  >
+                    <CollectionCard
+                      collection={collection}
+                      coverAlt={t("web.resources.detail.imageAlt", {
+                        name: collection.name,
+                      })}
+                      itemCountLabel={t("web.collections.directory.itemCount", {
+                        count: collection.itemCount,
+                      })}
+                      privateLabel={t("web.resources.visibility.private")}
+                    />
+                  </Link>
+                ))}
+              </section>
+            )}
+          </PaginatedCards>
+        ) : (
+          <section>
             <EmptyState>{t("web.collections.emptyCollections")}</EmptyState>
-          )}
-        </section>
+          </section>
+        )}
       </main>
     </UserPageShell>
   );
@@ -973,44 +1116,52 @@ export function ProductGrid({
     return <EmptyState>{t("web.catalog.noProducts")}</EmptyState>;
   }
   return (
-    <section className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
-      {products.map((product) => (
-        <div
-          className="group relative h-full focus-within:ring-2 focus-within:ring-ring"
-          key={product.id}
-        >
-          <Link
-            className="absolute inset-0 z-10 outline-none"
-            params={{
-              productSlug: product.slug,
-              productTypeSlug: product.productTypeSlug,
-            }}
-            to="/products/$productTypeSlug/$productSlug"
-          >
-            <span className="sr-only">{product.name}</span>
-          </Link>
-          <ProductCard
-            approvalLabel={
-              product.approvalStatus === "approved"
-                ? undefined
-                : approvalStatusLabel(t, product.approvalStatus)
-            }
-            finishOptionCountLabel={t("web.catalog.finishOptionCount", {
-              count: product.finishOptions.length,
-            })}
-            imageAlt={t("web.resources.detail.imageAlt", {
-              name: product.name,
-            })}
-            imageCountLabel={`${t("web.resources.upload.imagesLabel")}: ${product.imageCount}`}
-            materialCountLabel={t("web.catalog.materialCount", {
-              count: product.materials.length,
-            })}
-            privateLabel={t("web.resources.moderation.privateBadge")}
-            product={product}
-          />
-        </div>
-      ))}
-    </section>
+    <PaginatedCards
+      ariaLabel={t("web.navigation.products")}
+      items={products}
+      widePageSize={20}
+    >
+      {(page) => (
+        <section className="grid grid-cols-1 gap-[18px] p-3 min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_4_*_18px)_/_5)),1fr))] md:p-[18px_22px_22px]">
+          {page.map((product) => (
+            <div
+              className="group relative h-full focus-within:ring-2 focus-within:ring-ring"
+              key={product.id}
+            >
+              <Link
+                className="absolute inset-0 z-10 outline-none"
+                params={{
+                  productSlug: product.slug,
+                  productTypeSlug: product.productTypeSlug,
+                }}
+                to="/products/$productTypeSlug/$productSlug"
+              >
+                <span className="sr-only">{product.name}</span>
+              </Link>
+              <ProductCard
+                approvalLabel={
+                  product.approvalStatus === "approved"
+                    ? undefined
+                    : approvalStatusLabel(t, product.approvalStatus)
+                }
+                finishOptionCountLabel={t("web.catalog.finishOptionCount", {
+                  count: product.finishOptions.length,
+                })}
+                imageAlt={t("web.resources.detail.imageAlt", {
+                  name: product.name,
+                })}
+                imageCountLabel={`${t("web.resources.upload.imagesLabel")}: ${product.imageCount}`}
+                materialCountLabel={t("web.catalog.materialCount", {
+                  count: product.materials.length,
+                })}
+                privateLabel={t("web.resources.moderation.privateBadge")}
+                product={product}
+              />
+            </div>
+          ))}
+        </section>
+      )}
+    </PaginatedCards>
   );
 }
 
