@@ -480,30 +480,35 @@ function AuditEventDetails({
         {t("web.resources.action.details")}
       </summary>
       {keys.length ? (
-        <table className="mt-2 w-full table-fixed border-collapse text-xs">
-          <thead>
-            <tr>
-              <td aria-hidden="true" className="w-1/4 p-1" />
-              <th className="p-1 text-left" scope="col">
-                {t("web.admin.audit.before")}
-              </th>
-              <th className="p-1 text-left" scope="col">
-                {t("web.admin.audit.after")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {keys.map((key) => (
-              <tr className="border-t border-border" key={key}>
-                <th className="p-1 align-top font-mono font-medium" scope="row">
-                  {key}
+        <div className="mt-2 max-w-full overflow-x-auto">
+          <table className="w-full table-fixed border-collapse text-xs">
+            <thead>
+              <tr>
+                <td aria-hidden="true" className="w-1/4 p-1" />
+                <th className="p-1 text-left" scope="col">
+                  {t("web.admin.audit.before")}
                 </th>
-                <AuditValue value={event.beforeState?.[key]} />
-                <AuditValue value={event.afterState?.[key]} />
+                <th className="p-1 text-left" scope="col">
+                  {t("web.admin.audit.after")}
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {keys.map((key) => (
+                <tr className="border-t border-border" key={key}>
+                  <th
+                    className="p-1 align-top font-mono font-medium"
+                    scope="row"
+                  >
+                    {key}
+                  </th>
+                  <AuditValue value={event.beforeState?.[key]} />
+                  <AuditValue value={event.afterState?.[key]} />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : null}
       {event.metadata ? (
         <div className="mt-2 border-t border-border pt-2">
