@@ -67,15 +67,6 @@ export default defineConfig([
     },
   },
   {
-    files: ["tools/figjam-plugin/code.js"],
-    languageOptions: {
-      globals: {
-        __html__: "readonly",
-        figma: "readonly",
-      },
-    },
-  },
-  {
     files: ["packages/infisical-runner/src/env-alias.mjs"],
     rules: {
       "no-redeclare": "off",

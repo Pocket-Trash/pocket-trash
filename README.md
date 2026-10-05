@@ -157,9 +157,6 @@ keys.
 | --- | --- |
 | `pnpm bunny:audit` | Audits configured Bunny services, billing, and usage. |
 | `pnpm diagram:infra` | Regenerates the infrastructure diagram and metadata. |
-| `pnpm figjam` | Runs the FigJam CLI with supplied arguments. |
-| `pnpm figjam:read` | Reads the configured FigJam/Figma file into `.figjam/cache`. |
-| `pnpm figjam:serve` | Serves validated `.figjam/outbox` payloads to the local plugin bridge. |
 | `pnpm logger:axiom:map-fields` | Configures the Axiom field mapping used by the logger. |
 | `pnpm resources:reconcile-storage` | Reconciles database resource records with object storage. |
 | `pnpm users:reconcile` | Reconciles Clerk users into the application database. |
@@ -171,7 +168,6 @@ keys.
 | List workflows | `/pocket-trash` | `$pocket-trash` | Lists Pocket Trash workflow subcommands. |
 | Commit | `/pocket-trash commit` | `$pocket-trash commit` | Writes conventional commits for this monorepo. |
 | Create PR | `/pocket-trash pr-create` | `$pocket-trash pr-create` | Creates a GitHub PR from the current branch and commits. |
-| FigJam | `/pocket-trash figjam` | `$pocket-trash figjam` | Reads allowed FigJam/Figma files and updates boards through the plugin bridge. |
 | Grill me | `/pocket-trash grill-me` | `$pocket-trash grill-me` | Stress-tests a plan or design with focused questions. |
 | Update PR | `/pocket-trash pr-update` | `$pocket-trash pr-update` | Refreshes an existing PR title and description. |
 | Review PR | `/pocket-trash pr-review` | `$pocket-trash pr-review` | Runs repository checks and reviews a PR diff for defects. |

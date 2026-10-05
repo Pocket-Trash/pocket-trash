@@ -4,22 +4,22 @@ source: "docs/infrastructure-diagram.yaml"
 generatedBy: "pnpm diagram:infra"
 scope:
   apps:
+    - "@app/api"
     - "@app/scraper"
     - "@app/web"
   packages:
     - "@package/database"
     - "@package/feature-flags"
-    - "@package/storage"
     - "@package/json-data"
     - "@package/logger"
     - "@package/markdown"
     - "@package/services"
+    - "@package/storage"
   excludedApps:
     - "@app/autmog"
   excludedPackages:
     - "@package/lint"
     - "@package/tsconfig"
-    - "@package/figjam"
     - "@package/github-discord-notifier"
     - "@package/infisical-runner"
 services:
@@ -55,10 +55,6 @@ services:
     label: "Discord"
     icon: "message-circle"
     color: "indigo"
-  - id: "figjam"
-    label: "Figma / FigJam"
-    icon: "figma"
-    color: "pink"
 environments:
   - id: "prod"
     label: "Production"
@@ -178,5 +174,31 @@ environments:
       - from: "dev_web"
         to: "dev_neon"
         label: "read/write"
-detections: []
+detections:
+  - id: webLogProxy
+    source: "@app/web"
+    target: axiom
+    label: "source scan: browser log proxy -> /api/v0/logs"
+    paths:
+      - apps/web/src/lib/logger.ts
+    patterns:
+      - /api/v0/logs
+      - createProxyTransport
+  - id: webClerk
+    source: "@app/web"
+    target: clerk
+    label: "source scan: Clerk web SDK"
+    paths:
+      - apps/web/src
+    patterns:
+      - "@clerk/tanstack-react-start"
+  - id: webAxiom
+    source: "@app/web"
+    target: axiom
+    label: "source scan: createAxiomTransport"
+    paths:
+      - apps/web
+    patterns:
+      - createAxiomTransport
+      - AXIOM_TOKEN
 relationships: []

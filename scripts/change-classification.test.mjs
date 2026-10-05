@@ -61,7 +61,6 @@ test("classifies application and package changes by affected domain", () => {
       ["web", "preview", "safe_e2e", "mutation_e2e", "validation"],
     ],
     ["packages/database/src/schema/product.ts", domains],
-    ["packages/figjam/src/cli.ts", ["validation"]],
   ]) {
     assert.deepEqual(classifyChanges([path]), expected(...enabled), path);
   }

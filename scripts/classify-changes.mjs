@@ -166,7 +166,6 @@ export function classifyChanges(
       }
 
       if (
-        file.startsWith("packages/figjam/") ||
         file.startsWith("packages/github-discord-notifier/") ||
         file.startsWith("packages/infisical-runner/") ||
         file.startsWith("packages/json-data/") ||

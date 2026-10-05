@@ -34,10 +34,6 @@ yarn-error.log*
 
 # Local scratch files
 .drizzle/
-.figjam/cache/
-.figjam/inbox/
-.figjam/outbox/
-.figjam/payload-input/
 .yalc/
 **/.yalc/
 yalc.lock

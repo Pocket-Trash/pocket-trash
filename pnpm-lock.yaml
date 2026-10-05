@@ -404,12 +404,6 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/figjam:
-    devDependencies:
-      '@package/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
   packages/github-discord-notifier:
     dependencies:
       '@t3-oss/env-core':
