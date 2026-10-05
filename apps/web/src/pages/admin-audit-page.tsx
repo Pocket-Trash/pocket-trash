@@ -66,7 +66,7 @@ export function AdminAuditPage({
       section="audit"
       title={t("web.admin.audit.title")}
     >
-      <main className="grid w-full max-w-7xl gap-5 px-4 py-6 md:px-6">
+      <main className="grid w-full gap-5 px-4 py-6 md:px-6">
         <p className="m-0 text-sm text-muted-foreground">
           {t("web.admin.audit.description")}
         </p>
@@ -317,7 +317,16 @@ export function AdminAuditPage({
         </div>
         {page.items.length ? (
           <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full min-w-5xl border-collapse text-left text-sm">
+            <table className="w-full min-w-5xl table-fixed border-collapse text-left text-sm">
+              <colgroup>
+                <col className="w-36" />
+                <col />
+                <col />
+                <col className="w-24" />
+                <col className="w-56" />
+                <col className="w-40" />
+                <col className="w-32" />
+              </colgroup>
               <thead className="bg-muted/60 text-xs text-muted-foreground">
                 <tr>
                   {[
@@ -356,10 +365,10 @@ export function AdminAuditPage({
                         : (event.actorUsername ?? event.actorRole)}
                       {event.actorUserId ? ` (#${event.actorUserId})` : null}
                     </td>
-                    <td className="px-3 py-3 font-mono text-xs">
+                    <td className="break-words px-3 py-3 font-mono text-xs">
                       {event.action}
                     </td>
-                    <td className="px-3 py-3 font-mono text-xs">
+                    <td className="break-words px-3 py-3 font-mono text-xs">
                       {event.targetType}
                       <br />
                       {event.targetId}
@@ -468,36 +477,41 @@ function AuditEventDetails({
   return (
     <details
       aria-label={t("web.resources.action.details")}
-      className="min-w-72"
+      className="min-w-0 max-w-full overflow-x-auto"
     >
-      <summary className="cursor-pointer underline-offset-4 hover:underline">
+      <summary className="cursor-pointer underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {t("web.resources.action.details")}
       </summary>
       {keys.length ? (
-        <table className="mt-2 w-full table-fixed text-xs">
-          <thead>
-            <tr>
-              <td aria-hidden="true" className="w-1/4 p-1" />
-              <th className="p-1 text-left" scope="col">
-                {t("web.admin.audit.before")}
-              </th>
-              <th className="p-1 text-left" scope="col">
-                {t("web.admin.audit.after")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {keys.map((key) => (
-              <tr className="border-t border-border" key={key}>
-                <th className="p-1 align-top font-mono font-medium" scope="row">
-                  {key}
+        <div className="mt-2 max-w-full">
+          <table className="w-full table-fixed border-collapse text-xs">
+            <thead>
+              <tr>
+                <td aria-hidden="true" className="w-1/4 p-1" />
+                <th className="p-1 text-left" scope="col">
+                  {t("web.admin.audit.before")}
                 </th>
-                <AuditValue value={event.beforeState?.[key]} />
-                <AuditValue value={event.afterState?.[key]} />
+                <th className="p-1 text-left" scope="col">
+                  {t("web.admin.audit.after")}
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {keys.map((key) => (
+                <tr className="border-t border-border" key={key}>
+                  <th
+                    className="p-1 align-top font-mono font-medium"
+                    scope="row"
+                  >
+                    {key}
+                  </th>
+                  <AuditValue value={event.beforeState?.[key]} />
+                  <AuditValue value={event.afterState?.[key]} />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : null}
       {event.metadata ? (
         <div className="mt-2 border-t border-border pt-2">
