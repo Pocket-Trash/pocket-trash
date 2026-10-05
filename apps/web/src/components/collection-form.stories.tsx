@@ -19,6 +19,8 @@ const copy = {
   public: "Public",
   removeFile: "Remove file",
   submit: "Save",
+  summary: "Summary",
+  summaryPlaceholder: "Summarize this collection",
 };
 
 /**
@@ -57,6 +59,7 @@ export const EditPublic: Story = {
       description: "Everyday carry spinners.",
       isPrivate: false,
       name: "Daily Carry",
+      summary: "Favourite everyday carry pieces.",
     },
   },
   /**
@@ -69,7 +72,7 @@ export const EditPublic: Story = {
     await expect(
       await canvas.findByRole("textbox", { name: "Description" }),
     ).toHaveTextContent("Everyday carry spinners.");
-    await expect(canvas.getAllByText("3 / 200 words")[0]).toBeVisible();
+    await expect(canvas.getAllByText("24 / 5,000 characters")[0]).toBeVisible();
     await expect(canvas.getByRole("switch", { name: "Public" })).toBeChecked();
   },
 };
@@ -81,6 +84,7 @@ export const SplitLargeScreen: Story = {
       description: "Everyday carry spinners.",
       isPrivate: false,
       name: "Daily Carry",
+      summary: "",
     },
     onCancel: fn(),
     splitOnLargeScreens: true,
@@ -119,6 +123,10 @@ export const Submit: Story = {
       canvas.getByRole("textbox", { name: "Name" }),
       "Daily Carry",
     );
+    await userEvent.type(
+      canvas.getByRole("textbox", { name: "Summary" }),
+      "Favourite pieces",
+    );
     await userEvent.click(canvas.getByRole("button", { name: "Source" }));
     await userEvent.type(
       canvas.getByRole("textbox", { name: "Description" }),
@@ -126,7 +134,10 @@ export const Submit: Story = {
     );
     await userEvent.click(canvas.getByRole("button", { name: "Save" }));
     await expect(args.onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ description: "Current **description**" }),
+      expect.objectContaining({
+        description: "Current **description**",
+        summary: "Favourite pieces",
+      }),
       [],
     );
   },
@@ -136,21 +147,22 @@ export const Submit: Story = {
 export const DescriptionWarning: Story = {
   args: {
     initialValue: {
-      description: Array.from({ length: 180 }, () => "word").join(" "),
+      description: "d".repeat(4800),
       isPrivate: true,
       name: "Warning",
+      summary: "",
     },
   },
   /**
-   * Verifies warning styling begins at 180 words.
+   * Verifies warning styling begins at 4,800 characters.
    *
    * @param context - Story interaction context.
    * @returns A promise that resolves after assertions complete.
    */
   play: async ({ canvas }) => {
-    await expect(canvas.getAllByText(/180 \/ 200 words/u)[0]).toHaveClass(
-      "text-primary",
-    );
+    await expect(
+      canvas.getAllByText(/4,800 \/ 5,000 characters/u)[0],
+    ).toHaveClass("text-primary");
     await expect(canvas.getByRole("button", { name: "Save" })).toBeEnabled();
   },
 };
@@ -159,21 +171,22 @@ export const DescriptionWarning: Story = {
 export const DescriptionLimitReached: Story = {
   args: {
     initialValue: {
-      description: Array.from({ length: 200 }, () => "word").join(" "),
+      description: "d".repeat(5000),
       isPrivate: true,
       name: "At Limit",
+      summary: "",
     },
   },
   /**
-   * Verifies exactly 200 words remain valid with limit styling.
+   * Verifies exactly 5,000 characters remain valid with limit styling.
    *
    * @param context - Story interaction context.
    * @returns A promise that resolves after assertions complete.
    */
   play: async ({ canvas }) => {
-    await expect(canvas.getAllByText(/200 \/ 200 words/u)[0]).toHaveClass(
-      "text-destructive",
-    );
+    await expect(
+      canvas.getAllByText(/5,000 \/ 5,000 characters/u)[0],
+    ).toHaveClass("text-destructive");
     await expect(canvas.getByRole("button", { name: "Save" })).toBeEnabled();
   },
 };
@@ -185,6 +198,7 @@ export const DescriptionOverLimit: Story = {
       description: "",
       isPrivate: true,
       name: "Over Limit",
+      summary: "",
     },
   },
   /**
@@ -194,14 +208,16 @@ export const DescriptionOverLimit: Story = {
    * @returns A promise that resolves after assertions complete.
    */
   play: async ({ canvas, userEvent }) => {
-    const overLimit = Array.from({ length: 201 }, () => "word").join(" ");
+    const overLimit = "d".repeat(5001);
     await userEvent.click(canvas.getByRole("button", { name: "Source" }));
     const description = canvas.getByRole("textbox", { name: "Description" });
     await userEvent.click(description);
     await userEvent.paste(overLimit);
     await expect(description).toHaveAttribute("aria-invalid", "true");
     await expect(description).toHaveValue(overLimit);
-    await expect(canvas.getAllByText(/201 \/ 200 words/u)[0]).toBeVisible();
+    await expect(
+      canvas.getAllByText(/5,001 \/ 5,000 characters/u)[0],
+    ).toBeVisible();
     await expect(canvas.getByRole("button", { name: "Save" })).toBeDisabled();
   },
 };
@@ -214,6 +230,7 @@ export const Disabled: Story = {
       description: "Saved description",
       isPrivate: true,
       name: "Saved collection",
+      summary: "Saved summary",
     },
   },
   /**

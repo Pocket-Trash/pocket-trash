@@ -329,12 +329,13 @@ describe("collection writes", () => {
       description: null,
       isPrivate: true,
       name: "New collection",
+      summary: null,
     });
 
     expect(result.success).toBe(true);
   });
 
-  it("accepts 200 description words and rejects 201", () => {
+  it("accepts bounded summaries and descriptions", () => {
     const input = {
       isPrivate: true,
       name: "New collection",
@@ -343,13 +344,22 @@ describe("collection writes", () => {
     expect(
       collectionWriteSchema.safeParse({
         ...input,
-        description: Array.from({ length: 200 }, () => "word").join(" \n"),
+        description: "d".repeat(5000),
+        summary: "s".repeat(200),
       }).success,
     ).toBe(true);
     expect(
       collectionWriteSchema.safeParse({
         ...input,
-        description: Array.from({ length: 201 }, () => "word").join("\t"),
+        description: "d".repeat(5001),
+        summary: "short",
+      }).success,
+    ).toBe(false);
+    expect(
+      collectionWriteSchema.safeParse({
+        ...input,
+        description: "short",
+        summary: "s".repeat(201),
       }).success,
     ).toBe(false);
   });

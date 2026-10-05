@@ -17,7 +17,6 @@ import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getImageUploadGuidance } from "@/lib/help-content";
-import { countWords } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -37,6 +36,10 @@ export type CollectionFormValue = {
    * Collection name.
    */
   name: string;
+  /**
+   * Optional plain-text summary shown on collection cards.
+   */
+  summary: string;
 };
 
 /**
@@ -139,6 +142,14 @@ export function CollectionForm({
      * Submit-button label.
      */
     submit: string;
+    /**
+     * Label for the collection summary.
+     */
+    summary: string;
+    /**
+     * Placeholder for the collection summary.
+     */
+    summaryPlaceholder: string;
   };
   /**
    * Whether interaction is disabled.
@@ -159,7 +170,7 @@ export function CollectionForm({
   /**
    * Initial metadata, defaulting to a blank private collection.
    *
-   * @default { description: "", isPrivate: true, name: "" }
+   * @default { description: "", isPrivate: true, name: "", summary: "" }
    */
   initialValue?: CollectionFormValue;
   /**
@@ -188,10 +199,16 @@ export function CollectionForm({
   const { locale } = useLocale();
   const imageGuidance = getImageUploadGuidance(locale);
   const nameId = useId();
+  const summaryId = useId();
   const descriptionId = useId();
   const descriptionRef = useRef<MarkdownEditorHandle>(null);
   const [value, setValue] = useState<CollectionFormValue>(
-    initialValue ?? { description: "", isPrivate: true, name: "" },
+    initialValue ?? {
+      description: "",
+      isPrivate: true,
+      name: "",
+      summary: "",
+    },
   );
   const [files, setFiles] = useState<File[]>([]);
   return (
@@ -205,7 +222,7 @@ export function CollectionForm({
         event.preventDefault();
         const description =
           descriptionRef.current?.getValue() ?? value.description;
-        if (countWords(description) > 200) return;
+        if (description.length > 5000 || value.summary.length > 200) return;
         void onSubmit({ ...value, description }, files);
       }}
     >
@@ -225,8 +242,23 @@ export function CollectionForm({
             value={value.name}
           />
         </label>
+        <label className="grid gap-2 text-sm font-medium" htmlFor={summaryId}>
+          {copy.summary}
+          <textarea
+            className="min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={disabled}
+            id={summaryId}
+            maxLength={200}
+            name="summary"
+            onChange={(event) =>
+              setValue({ ...value, summary: event.target.value })
+            }
+            placeholder={copy.summaryPlaceholder}
+            value={value.summary}
+          />
+        </label>
         <MarkdownEditor
-          counter={{ limit: 200, type: "words", warningAt: 180 }}
+          counter={{ limit: 5000, type: "characters", warningAt: 4800 }}
           defaultValue={value.description}
           disabled={disabled}
           id={descriptionId}
@@ -308,7 +340,8 @@ export function CollectionForm({
           disabled={
             disabled ||
             value.name.trim().length < 2 ||
-            countWords(value.description) > 200
+            value.description.length > 5000 ||
+            value.summary.length > 200
           }
           type="submit"
         >
