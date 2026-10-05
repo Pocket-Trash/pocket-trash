@@ -1,0 +1,10 @@
+[
+  {
+    "advisory": "GHSA-vfj7-8cjw-p6xm",
+    "owner": "Roy Anger",
+    "followUpIssue": "ENG-337",
+    "approvedAt": "2026-10-05T17:34:28Z",
+    "expiresAt": "2026-10-12T17:00:00Z",
+    "reason": "No patched braces release exists; affected paths are development tooling."
+  }
+]

@@ -42,7 +42,7 @@
     "scraper:process:dead-letter": "node scripts/scraper-command.mjs process:dead-letter",
     "scraper:process:queue": "node scripts/scraper-command.mjs process:queue",
     "scraper:scrape": "node scripts/scraper-command.mjs scrape",
-    "security:audit": "pnpm audit --audit-level high",
+    "security:audit": "node scripts/security-audit.mjs",
     "start": "pnpm --filter @app/scraper run cron:run",
     "storybook": "pnpm --filter @app/web storybook --no-open",
     "test": "pnpm test:jsdoc && pnpm test:workflows && pnpm test:security && pnpm infisical:check && turbo run test",

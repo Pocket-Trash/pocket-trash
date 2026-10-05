@@ -75,10 +75,17 @@ For an urgent security release, add only the reviewed exact package version to
 the Linear issue, reason, and UTC maturity/removal time, then remove the entry
 after it matures. Never lower `minimumReleaseAge` or add a scope wildcard.
 
-There are no vulnerability exceptions. Do not add one without Roy's explicit
-approval for the specific GHSA, an owner, a follow-up Linear issue, and a UTC
-expiry within seven days. The first such exception also requires an expiry
-validator so incomplete or expired entries fail every security gate.
+Roy must approve each vulnerability exception. Every exception requires a GHSA,
+an owner, a follow-up Linear issue, and a UTC expiry within seven days.
+Record the metadata in `security-audit-exceptions.json` and the matching GHSA in
+`auditConfig.ignoreGhsas` in `pnpm-workspace.yaml`. The
+`scripts/security-audit.mjs` validator rejects incomplete, mismatched, overlong,
+or expired exceptions before pnpm audits dependencies.
+
+`GHSA-vfj7-8cjw-p6xm` has a temporary exception. No patched `braces` release
+exists, and the affected paths are development tooling. Roy Anger owns the
+exception. [ENG-337](https://linear.app/pocket-trash/issue/ENG-337) tracks its
+removal. The exception expires at `2026-10-12T17:00:00Z`.
 
 Vercel production Git deployment gating is documented in
 [vercel.md](./vercel.md).

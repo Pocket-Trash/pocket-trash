@@ -164,6 +164,115 @@ test("blocks artifacts for a high-severity development advisory", async (t) => {
   );
 });
 
+test("allows the reviewed braces advisory", async (t) => {
+  const registry = await startAuditRegistry(t, bracesAudit);
+  const result = await run("pnpm", ["run", "security:audit"], process.cwd(), {
+    PNPM_CONFIG_FETCH_RETRIES: "0",
+    PNPM_CONFIG_REGISTRY: registry,
+  });
+
+  assert.equal(result.code, 0, result.output);
+});
+
+test("rejects an incomplete audit exception", async (t) => {
+  const directory = await mkdtemp(
+    path.join(tmpdir(), "pnpm-audit-exceptions-"),
+  );
+  const exceptionsFile = path.join(directory, "exceptions.json");
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(
+    exceptionsFile,
+    JSON.stringify([{ advisory: "GHSA-vfj7-8cjw-p6xm" }]),
+  );
+
+  const result = await run(
+    "node",
+    ["scripts/security-audit.mjs", "--exceptions-file", exceptionsFile],
+    process.cwd(),
+  );
+
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /owner/);
+});
+
+test("rejects an expired audit exception", async (t) => {
+  const directory = await mkdtemp(
+    path.join(tmpdir(), "pnpm-audit-exceptions-"),
+  );
+  const exceptionsFile = path.join(directory, "exceptions.json");
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(
+    exceptionsFile,
+    JSON.stringify([
+      {
+        advisory: "GHSA-vfj7-8cjw-p6xm",
+        owner: "Security Owner",
+        followUpIssue: "ENG-337",
+        approvedAt: "2026-09-01T00:00:00Z",
+        expiresAt: "2026-09-08T00:00:00Z",
+        reason: "No patched release exists.",
+      },
+    ]),
+  );
+
+  const result = await run(
+    "node",
+    ["scripts/security-audit.mjs", "--exceptions-file", exceptionsFile],
+    process.cwd(),
+  );
+
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /expired/);
+});
+
+test("rejects an audit exception lasting more than seven days", async (t) => {
+  const directory = await mkdtemp(
+    path.join(tmpdir(), "pnpm-audit-exceptions-"),
+  );
+  const exceptionsFile = path.join(directory, "exceptions.json");
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(
+    exceptionsFile,
+    JSON.stringify([
+      {
+        advisory: "GHSA-vfj7-8cjw-p6xm",
+        owner: "Security Owner",
+        followUpIssue: "ENG-337",
+        approvedAt: "2026-10-05T00:00:00Z",
+        expiresAt: "2026-10-13T00:00:00Z",
+        reason: "No patched release exists.",
+      },
+    ]),
+  );
+
+  const result = await run(
+    "node",
+    ["scripts/security-audit.mjs", "--exceptions-file", exceptionsFile],
+    process.cwd(),
+  );
+
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /seven days/);
+});
+
+test("rejects audit configuration without matching exception metadata", async (t) => {
+  const directory = await mkdtemp(
+    path.join(tmpdir(), "pnpm-audit-exceptions-"),
+  );
+  const exceptionsFile = path.join(directory, "exceptions.json");
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(exceptionsFile, "[]");
+
+  const result = await run(
+    "node",
+    ["scripts/security-audit.mjs", "--exceptions-file", exceptionsFile],
+    process.cwd(),
+  );
+
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /does not match/);
+});
+
 test("blocks artifacts when the advisory service is unavailable", async (t) => {
   await assertAuditBlocksArtifact(
     t,
@@ -375,45 +484,36 @@ function run(command, args, cwd, env = {}) {
 
 /** High-severity development advisory fixture. */
 const vulnerableAudit = {
-  auditReportVersion: 2,
-  vulnerabilities: {
-    typescript: {
-      name: "typescript",
+  braces: [
+    {
+      id: 999999,
+      url: "https://github.com/advisories/GHSA-grv7-fg5c-xmjg",
+      title: "Fixture development advisory",
       severity: "high",
-      isDirect: true,
-      via: [
-        {
-          source: 999999,
-          name: "typescript",
-          dependency: "typescript",
-          title: "Fixture development advisory",
-          url: "https://example.invalid/advisory",
-          severity: "high",
-          range: "*",
-        },
-      ],
-      effects: [],
-      range: "*",
-      nodes: ["node_modules/typescript"],
-      fixAvailable: false,
+      vulnerable_versions: "<=3.0.3",
+      cwe: ["CWE-400"],
+      cvss: {
+        score: 7.5,
+        vectorString: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      },
     },
-  },
-  metadata: {
-    vulnerabilities: {
-      info: 0,
-      low: 0,
-      moderate: 0,
-      high: 1,
-      critical: 0,
-      total: 1,
+  ],
+};
+
+/** Reviewed braces advisory fixture. */
+const bracesAudit = {
+  braces: [
+    {
+      id: 999998,
+      url: "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+      title: "Braces fixture advisory",
+      severity: "high",
+      vulnerable_versions: "<=3.0.3",
+      cwe: ["CWE-674"],
+      cvss: {
+        score: 7.5,
+        vectorString: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      },
     },
-    dependencies: {
-      prod: 0,
-      dev: 1,
-      optional: 0,
-      peer: 0,
-      peerOptional: 0,
-      total: 1,
-    },
-  },
+  ],
 };
