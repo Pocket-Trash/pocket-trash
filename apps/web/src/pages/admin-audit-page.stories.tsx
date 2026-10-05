@@ -131,9 +131,13 @@ const Populated: Story = {
     await userEvent.click(details.getByText("Details"));
     await expect(details.getByText(/Old name/)).toBeVisible();
     await expect(details.getByText(/New name/)).toBeVisible();
-    await expect(detailsElement.scrollWidth).toBeLessThanOrEqual(
-      detailsElement.clientWidth,
-    );
+    await expect(detailsElement).toHaveClass("overflow-x-auto");
+    await expect(
+      detailsElement.parentElement?.scrollWidth ?? 0,
+    ).toBeLessThanOrEqual(detailsElement.parentElement?.clientWidth ?? 0);
+    const detailsSummary = details.getByText("Details");
+    detailsSummary.focus();
+    await expect(detailsSummary).toHaveFocus();
   },
 };
 

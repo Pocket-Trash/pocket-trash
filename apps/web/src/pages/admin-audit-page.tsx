@@ -475,12 +475,15 @@ function AuditEventDetails({
   ].sort();
 
   return (
-    <details aria-label={t("web.resources.action.details")} className="min-w-0">
-      <summary className="cursor-pointer underline-offset-4 hover:underline">
+    <details
+      aria-label={t("web.resources.action.details")}
+      className="min-w-0 max-w-full overflow-x-auto"
+    >
+      <summary className="cursor-pointer underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {t("web.resources.action.details")}
       </summary>
       {keys.length ? (
-        <div className="mt-2 max-w-full overflow-x-auto">
+        <div className="mt-2 max-w-full">
           <table className="w-full table-fixed border-collapse text-xs">
             <thead>
               <tr>
