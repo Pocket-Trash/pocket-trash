@@ -30,6 +30,7 @@ vi.mock("@/providers/locale-provider", () => ({
 /** Localized collection form copy used by the tests. */
 const copy = {
   browse: "Browse",
+  cancel: "Cancel",
   cover: "Images",
   description: "Description",
   descriptionPlaceholder: "Describe this collection",
@@ -95,6 +96,55 @@ describe("CollectionForm", () => {
       },
       [],
     );
+  });
+
+  it("splits large screens and keeps cancel and save in a full-width row", async () => {
+    const onCancel = vi.fn();
+    await act(() =>
+      root.render(
+        <CollectionForm
+          copy={copy}
+          includeImages={false}
+          media={<div data-testid="media">Media</div>}
+          onCancel={onCancel}
+          onSubmit={vi.fn()}
+          splitOnLargeScreens
+        />,
+      ),
+    );
+
+    const form = container.querySelector("form");
+    const columns = form?.querySelectorAll(":scope > div.grid.min-w-0");
+    const save = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Save",
+    );
+    const details = columns?.[0]?.textContent ?? "";
+    expect(form?.classList.contains("lg:grid-cols-2")).toBe(true);
+    expect(details.indexOf("Name")).toBeLessThan(
+      details.indexOf("Description"),
+    );
+    expect(details.indexOf("Description")).toBeLessThan(
+      details.indexOf("Public"),
+    );
+    expect(columns?.[1]?.textContent).toBe("Media");
+    expect(container.querySelectorAll("form")).toHaveLength(1);
+    expect(save?.parentElement?.classList.contains("lg:col-span-2")).toBe(true);
+
+    clickButton(container, "Cancel");
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it("keeps unsplit errors in a single grid column", async () => {
+    await act(() =>
+      root.render(
+        <CollectionForm copy={copy} error="Try again" onSubmit={vi.fn()} />,
+      ),
+    );
+
+    const error = Array.from(container.querySelectorAll("p")).find(
+      (element) => element.textContent === "Try again",
+    );
+    expect(error?.classList.contains("lg:col-span-2")).toBe(false);
   });
 
   it("allows 200 words and blocks 201 without truncating", async () => {
