@@ -33,11 +33,13 @@ pnpm --filter @app/web exec playwright install chromium
 Run the smoke suite against a Vercel preview:
 
 ```sh
-E2E_BASE_URL=https://example.vercel.app pnpm --filter @app/web test:e2e
+E2E_BASE_URL=https://example.vercel.app pnpm e2e
 ```
 
-The local command reads Clerk and test-user values from the web Infisical path.
-Mutation fixtures stay disabled unless `E2E_RUN_MUTATIONS=true`.
+The root command delegates to the web package's safe E2E suite. It reads Clerk
+and test-user values from the web Infisical path and always excludes mutation
+fixtures. Run mutation tests only through CI against isolated `preview-pr-*`
+resources.
 
 ## CI
 
