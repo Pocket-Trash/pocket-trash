@@ -164,6 +164,101 @@ test("blocks artifacts for a high-severity development advisory", async (t) => {
   );
 });
 
+test("allows the reviewed braces advisory", async (t) => {
+  const registry = await startAuditRegistry(t, bracesAudit);
+  const result = await run("pnpm", ["run", "security:audit"], process.cwd(), {
+    PNPM_CONFIG_FETCH_RETRIES: "0",
+    PNPM_CONFIG_REGISTRY: registry,
+  });
+
+  assert.equal(result.code, 0, result.output);
+});
+
+test("rejects an incomplete audit exception", async (t) => {
+  const result = await runAuditWithExceptions(t, [
+    { advisory: "GHSA-vfj7-8cjw-p6xm" },
+  ]);
+
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /owner/);
+});
+
+test("rejects an expired audit exception", async (t) => {
+  const result = await runAuditWithExceptions(t, [
+    {
+      ...validAuditException,
+      approvedAt: "2026-09-01T00:00:00Z",
+      expiresAt: "2026-09-08T00:00:00Z",
+    },
+  ]);
+
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /expired/);
+});
+
+test("rejects an audit exception lasting more than seven days", async (t) => {
+  const result = await runAuditWithExceptions(t, [
+    {
+      ...validAuditException,
+      approvedAt: "2026-10-05T00:00:00Z",
+      expiresAt: "2026-10-13T00:00:00Z",
+    },
+  ]);
+
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /seven days/);
+});
+
+test("rejects audit configuration without matching exception metadata", async (t) => {
+  const result = await runAuditWithExceptions(t, []);
+
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /does not match/);
+});
+
+test("rejects an audit exception approved in the future", async (t) => {
+  const result = await runAuditWithExceptions(t, [
+    {
+      ...validAuditException,
+      approvedAt: "2099-01-01T00:00:00Z",
+      expiresAt: "2099-01-08T00:00:00Z",
+    },
+  ]);
+
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /future/);
+});
+
+test("requires UTC audit exception timestamps", async (t) => {
+  const result = await runAuditWithExceptions(t, [
+    {
+      ...validAuditException,
+      expiresAt: "2026-10-12T17:00:00+00:00",
+    },
+  ]);
+
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /UTC/);
+});
+
+test("requires a GHSA advisory identifier", async (t) => {
+  const result = await runAuditWithExceptions(t, [
+    { ...validAuditException, advisory: "CVE-2026-93687" },
+  ]);
+
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /GHSA/);
+});
+
+test("requires a Linear follow-up issue identifier", async (t) => {
+  const result = await runAuditWithExceptions(t, [
+    { ...validAuditException, followUpIssue: "remove-braces-exception" },
+  ]);
+
+  assert.notEqual(result.code, 0, result.output);
+  assert.match(result.output, /Linear/);
+});
+
 test("blocks artifacts when the advisory service is unavailable", async (t) => {
   await assertAuditBlocksArtifact(
     t,
@@ -206,6 +301,29 @@ async function assertAuditBlocksArtifact(t, audit, status, outputPattern) {
   assert.notEqual(result.code, 0, result.output);
   assert.match(result.output, outputPattern);
   await assert.rejects(stat(artifact), { code: "ENOENT" });
+}
+
+/**
+ * Runs the security audit with temporary exception metadata.
+ *
+ * @param t - Node test context.
+ * @param exceptions - Exception metadata to validate.
+ * @returns The audit command result.
+ * @rejects When the fixture cannot be created.
+ */
+async function runAuditWithExceptions(t, exceptions) {
+  const directory = await mkdtemp(
+    path.join(tmpdir(), "pnpm-audit-exceptions-"),
+  );
+  const exceptionsFile = path.join(directory, "exceptions.json");
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(exceptionsFile, JSON.stringify(exceptions));
+
+  return run(
+    "node",
+    ["scripts/security-audit.mjs", "--exceptions-file", exceptionsFile],
+    process.cwd(),
+  );
 }
 
 /**
@@ -373,47 +491,48 @@ function run(command, args, cwd, env = {}) {
   });
 }
 
+/** Valid temporary audit exception metadata. */
+const validAuditException = {
+  advisory: "GHSA-vfj7-8cjw-p6xm",
+  owner: "Security Owner",
+  followUpIssue: "ENG-337",
+  approvedAt: "2026-10-05T17:34:28Z",
+  expiresAt: "2026-10-12T17:00:00Z",
+  reason: "No patched release exists.",
+};
+
 /** High-severity development advisory fixture. */
 const vulnerableAudit = {
-  auditReportVersion: 2,
-  vulnerabilities: {
-    typescript: {
-      name: "typescript",
+  braces: [
+    {
+      id: 999999,
+      url: "https://github.com/advisories/GHSA-grv7-fg5c-xmjg",
+      title: "Fixture development advisory",
       severity: "high",
-      isDirect: true,
-      via: [
-        {
-          source: 999999,
-          name: "typescript",
-          dependency: "typescript",
-          title: "Fixture development advisory",
-          url: "https://example.invalid/advisory",
-          severity: "high",
-          range: "*",
-        },
-      ],
-      effects: [],
-      range: "*",
-      nodes: ["node_modules/typescript"],
-      fixAvailable: false,
+      vulnerable_versions: "<=3.0.3",
+      cwe: ["CWE-400"],
+      cvss: {
+        score: 7.5,
+        vectorString: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      },
     },
-  },
-  metadata: {
-    vulnerabilities: {
-      info: 0,
-      low: 0,
-      moderate: 0,
-      high: 1,
-      critical: 0,
-      total: 1,
+  ],
+};
+
+/** Reviewed braces advisory fixture. */
+const bracesAudit = {
+  braces: [
+    {
+      id: 999998,
+      url: "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+      title: "Braces fixture advisory",
+      severity: "high",
+      vulnerable_versions: "<=3.0.3",
+      cwe: ["CWE-674"],
+      cvss: {
+        score: 7.5,
+        vectorString: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      },
     },
-    dependencies: {
-      prod: 0,
-      dev: 1,
-      optional: 0,
-      peer: 0,
-      peerOptional: 0,
-      total: 1,
-    },
-  },
+  ],
 };
