@@ -1201,13 +1201,17 @@ export type UserCollectionSummary = {
    */
   ownerUserId: number;
   /**
+   * Optional plain-text summary shown on collection cards.
+   */
+  summary?: string | null;
+  /**
    * Updated timestamp.
    */
   updatedAt: Date;
 };
 
 /**
- * Editable collection name, description, and visibility.
+ * Editable collection name, summary, description, and visibility.
  */
 export type CollectionWriteInput = {
   /**
@@ -1226,6 +1230,10 @@ export type CollectionWriteInput = {
    * Administrative reason for the operation.
    */
   reason?: string;
+  /**
+   * Optional plain-text summary.
+   */
+  summary?: string | null;
 };
 
 /** Database operations for user collections and their catalog items. */
@@ -3991,6 +3999,7 @@ export function createCollectionsService(
             name: schema.userCollection.name,
             ownerId: schema.userCollection.ownerId,
             privatedByClerkId: schema.userCollection.privatedByClerkId,
+            summary: schema.userCollection.summary,
           })
           .from(schema.userCollection)
           .where(eq(schema.userCollection.id, input.collectionId))
@@ -4015,6 +4024,7 @@ export function createCollectionsService(
           id: input.collectionId,
           isPrivate: collection.isPrivate,
           name: collection.name,
+          summary: collection.summary,
         };
         await tx
           .update(schema.userCollection)
@@ -4061,6 +4071,7 @@ export function createCollectionsService(
                 name: schema.userCollection.name,
                 ownerId: schema.userCollection.ownerId,
                 privatedByClerkId: schema.userCollection.privatedByClerkId,
+                summary: schema.userCollection.summary,
               })
               .from(schema.userCollection)
               .where(eq(schema.userCollection.id, input.collectionId))
@@ -4083,6 +4094,7 @@ export function createCollectionsService(
               id: input.collectionId,
               isPrivate: row.isPrivate,
               name: row.name,
+              summary: row.summary,
             };
             await tx
               .update(schema.userCollection)
@@ -4103,6 +4115,7 @@ export function createCollectionsService(
               id: input.collectionId,
               isPrivate: input.isPrivate,
               name: values.name,
+              summary: values.summary,
             };
             await writeCollectionAudit(audit, tx, {
               actor: input.actor,
@@ -4718,9 +4731,9 @@ export function normalizeCollectionName(name: string) {
 /**
  * Validates and normalizes collection values.
  *
- * @param input - Raw collection name, description, and visibility.
+ * @param input - Raw collection name, summary, description, and visibility.
  * @returns Trimmed collection values and a normalized name.
- * @throws When the name or description violates collection constraints.
+ * @throws When the name, summary, or description violates collection constraints.
  */
 function validatedCollectionValues(input: CollectionWriteInput) {
   const name = input.name.trim();
@@ -4731,10 +4744,16 @@ function validatedCollectionValues(input: CollectionWriteInput) {
   const normalizedName = normalizeCollectionName(name);
   if (!normalizedName) throw new Error("Collection name is invalid.");
   const description = input.description?.trim() || null;
-  if (description && description.split(/\s+/u).length > 200) {
-    throw new Error("Collection description must be 200 words or fewer.");
+  if (description && [...description].length > 5000) {
+    throw new Error(
+      "Collection description must be 5,000 characters or fewer.",
+    );
   }
-  return { description, name, normalizedName };
+  const summary = input.summary?.trim() || null;
+  if (summary && [...summary].length > 200) {
+    throw new Error("Collection summary must be 200 characters or fewer.");
+  }
+  return { description, name, normalizedName, summary };
 }
 
 /**
@@ -4917,6 +4936,7 @@ async function queryCollections(
       ownerClerkId: schema.user.clerkId,
       ownerUserId: schema.userCollection.ownerId,
       privatedByClerkId: schema.userCollection.privatedByClerkId,
+      summary: schema.userCollection.summary,
       updatedAt: schema.userCollection.updatedAt,
     })
     .from(schema.userCollection)
@@ -5031,6 +5051,7 @@ async function queryCollections(
     itemCount: countByCollection.get(row.id) ?? 0,
     name: row.name,
     ownerUserId: row.ownerUserId,
+    summary: row.summary,
     updatedAt: row.updatedAt,
   }));
 }

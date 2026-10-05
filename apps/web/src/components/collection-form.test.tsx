@@ -41,6 +41,8 @@ const copy = {
   public: "Public",
   removeFile: "Remove file",
   submit: "Save",
+  summary: "Summary",
+  summaryPlaceholder: "Summarize this collection",
 };
 
 describe("CollectionForm", () => {
@@ -69,18 +71,26 @@ describe("CollectionForm", () => {
             description: "Old description",
             isPrivate: true,
             name: "Daily Carry",
+            summary: "Old summary",
           }}
           onSubmit={onSubmit}
         />,
       ),
     );
     clickButton(container, "Source");
-    const textarea = container.querySelector("textarea");
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Description"]',
+    );
+    const summary = container.querySelector<HTMLTextAreaElement>(
+      'textarea[name="summary"]',
+    );
 
     act(() => {
-      if (!textarea) return;
+      if (!textarea || !summary) return;
       setTextareaValue(textarea, "Current **description**");
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      setTextareaValue(summary, "Current summary");
+      summary.dispatchEvent(new Event("input", { bubbles: true }));
       container
         .querySelector("form")
         ?.dispatchEvent(
@@ -93,9 +103,11 @@ describe("CollectionForm", () => {
         description: "Current **description**",
         isPrivate: true,
         name: "Daily Carry",
+        summary: "Current summary",
       },
       [],
     );
+    expect(summary?.maxLength).toBe(200);
   });
 
   it("splits large screens and keeps cancel and save in a full-width row", async () => {
@@ -147,22 +159,29 @@ describe("CollectionForm", () => {
     expect(error?.classList.contains("lg:col-span-2")).toBe(false);
   });
 
-  it("allows 200 words and blocks 201 without truncating", async () => {
+  it("allows 5,000 description characters and blocks 5,001 without truncating", async () => {
     const onSubmit = vi.fn<(value: CollectionFormValue) => void>();
     await act(() =>
       root.render(
         <CollectionForm
           copy={copy}
           includeImages={false}
-          initialValue={{ description: "", isPrivate: true, name: "Words" }}
+          initialValue={{
+            description: "",
+            isPrivate: true,
+            name: "Words",
+            summary: "",
+          }}
           onSubmit={onSubmit}
         />,
       ),
     );
     clickButton(container, "Source");
-    const textarea = container.querySelector("textarea");
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Description"]',
+    );
     const form = container.querySelector("form");
-    const atLimit = Array.from({ length: 200 }, () => "word").join(" ");
+    const atLimit = "d".repeat(5000);
 
     act(() => {
       if (!textarea) return;
@@ -177,14 +196,14 @@ describe("CollectionForm", () => {
     onSubmit.mockClear();
     act(() => {
       if (!textarea) return;
-      setTextareaValue(textarea, `${atLimit} extra`);
+      setTextareaValue(textarea, `${atLimit}x`);
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
       form?.dispatchEvent(
         new Event("submit", { bubbles: true, cancelable: true }),
       );
     });
 
-    expect(textarea?.value).toBe(`${atLimit} extra`);
+    expect(textarea?.value).toBe(`${atLimit}x`);
     expect(textarea?.getAttribute("aria-invalid")).toBe("true");
     expect(onSubmit).not.toHaveBeenCalled();
   });
