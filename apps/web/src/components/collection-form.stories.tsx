@@ -84,6 +84,7 @@ export const SplitLargeScreen: Story = {
       description: "Everyday carry spinners.",
       isPrivate: false,
       name: "Daily Carry",
+      summary: "",
     },
     onCancel: fn(),
     splitOnLargeScreens: true,
