@@ -67,6 +67,10 @@ export const productAudit = {
     "products.compatibility_family.created",
     "products.compatibility_family",
   ),
+  magnetConfigurationTemplateCreated: definition(
+    "products.magnet_configuration_template.created",
+    "products.magnet_configuration_template",
+  ),
   terminologyAliasCreated: definition(
     "products.terminology_alias.created",
     "products.terminology_alias",

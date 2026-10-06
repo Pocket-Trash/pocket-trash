@@ -417,6 +417,58 @@ export type CatalogBodyHostedMagnetSetup = {
   sourceNote: string | null;
 };
 
+/** One positive insert click count in immutable insertion order. */
+export type CatalogInsertClickOption = {
+  /** Positive click count. */
+  clickCount: number;
+  /** Database identifier. */
+  id: number;
+  /** Immutable system-assigned insertion position. */
+  insertionPosition: number;
+};
+
+/** One complete, exact magnet configuration offered by an insert product. */
+export type CatalogInsertMagnetOffer = {
+  /** Referenced insert click-option identifier, when linked. */
+  clickOptionId: number | null;
+  /** Linked positive click count, when present. */
+  clickCount: number | null;
+  /** Complete exact offer snapshot. */
+  configuration: CatalogMagnetConfiguration;
+  /** Authoring template provenance, when copied from a template. */
+  copiedFromTemplateId: number | null;
+  /** Database identifier. */
+  id: number;
+  /** Exact host insert product identifier. */
+  insertProductId: number;
+  /** Whether this is the insert product's advertised default. */
+  isAdvertisedDefault: boolean;
+};
+
+/** An exact insert offer explicitly merchandised for an insert-driven slider. */
+export type CatalogSliderInsertOffer = CatalogInsertMagnetOffer & {
+  /** Exact host insert product name. */
+  insertProductName: string;
+  /** Whether this is the slider's advertised default association. */
+  isSliderAdvertisedDefault: boolean;
+};
+
+/** Catalog-manager-only reusable authoring source. */
+export type CatalogMagnetConfigurationTemplate = {
+  /** Family scope target, when family-scoped. */
+  compatibilityFamilyId: number | null;
+  /** Complete exact authoring configuration. */
+  configuration: CatalogMagnetConfiguration;
+  /** Database identifier. */
+  id: number;
+  /** Maker scope target, when maker-scoped. */
+  makerId: number | null;
+  /** Manager-facing template name. */
+  name: string;
+  /** Authoring visibility scope. */
+  scope: "global" | "maker" | "family";
+};
+
 /**
  * Fully hydrated catalog product returned to callers.
  */
@@ -435,6 +487,8 @@ export type CatalogProduct = {
   bearing: string | null;
   /** Live inherent setup for a body-hosted slider. */
   bodyHostedMagnetSetup: CatalogBodyHostedMagnetSetup | null;
+  /** Exact insert offers explicitly merchandised for this slider. */
+  advertisedInsertOffers: CatalogSliderInsertOffer[];
   /**
    * Button diameter in millimetres.
    */
@@ -481,6 +535,10 @@ export type CatalogProduct = {
   images: CatalogImage[];
   /** Exact products sold as components with this product. */
   includedComponents: CatalogIncludedComponent[];
+  /** Positive click counts owned by this exact insert product. */
+  insertClickOptions: CatalogInsertClickOption[];
+  /** Complete configuration offers owned by this exact insert product. */
+  insertMagnetOffers: CatalogInsertMagnetOffer[];
   /**
    * Database identifier.
    */
@@ -633,6 +691,31 @@ export type ProductWriteInput = {
   materialIds: number[];
   /** Exact component products sold with this product. */
   includedComponentIds?: number[];
+  /** Exact offers merchandised by an insert-driven slider. */
+  advertisedInsertOffers?: Array<{
+    /** Whether this association is the slider's Default setup. */
+    isAdvertisedDefault: boolean;
+    /** Exact host-bound insert offer identifier. */
+    offerId: number;
+  }>;
+  /** Insert-owned click counts and complete exact configuration offers. */
+  insertHostedMagnetOptions?: {
+    /** Positive click counts in system-managed insertion order. */
+    clickCounts: number[];
+    /** Complete exact offers hosted by this insert product. */
+    offers: Array<{
+      /** Linked click count belonging to the same insert. */
+      clickCount: number | null;
+      /** Complete exact configuration snapshot. */
+      configuration: CatalogMagnetConfiguration;
+      /** Optional manager template provenance. */
+      copiedFromTemplateId?: number | null;
+      /** Existing offer identifier retained across updates. */
+      id?: number;
+      /** Whether this is the insert product's advertised default. */
+      isAdvertisedDefault: boolean;
+    }>;
+  } | null;
   /**
    * Display name.
    */
@@ -741,6 +824,27 @@ export type CatalogService = {
     /** URL-safe identifier. */
     slug: string;
   }): Promise<CatalogCompatibilityFamily>;
+  /**
+   * Creates a catalog-manager-only exact configuration authoring template.
+   *
+   * @param input - Template scope, name, configuration, and authenticated actor.
+   * @returns Created reusable authoring template.
+   * @rejects When authorization, validation, persistence, auditing, or logging fails.
+   */
+  createMagnetConfigurationTemplate(input: {
+    /** Authenticated catalog manager. */
+    actor: Actor;
+    /** Family scope target, required only for family scope. */
+    compatibilityFamilyId: number | null;
+    /** Complete exact configuration copied by future offers. */
+    configuration: CatalogMagnetConfiguration;
+    /** Maker scope target, required only for maker scope. */
+    makerId: number | null;
+    /** Manager-facing template name. */
+    name: string;
+    /** Visibility scope used by catalog authoring. */
+    scope: "global" | "maker" | "family";
+  }): Promise<CatalogMagnetConfigurationTemplate>;
   /**
    * Attaches images.
    *
@@ -1055,6 +1159,16 @@ export type CatalogService = {
    * @rejects When the database query or operation logging fails.
    */
   listCompatibilityFamilies(): Promise<CatalogCompatibilityFamily[]>;
+  /**
+   * Lists authoring templates only for catalog managers.
+   *
+   * @param viewer - Viewer whose catalog permissions control access.
+   * @returns Reusable exact configuration templates or an empty list.
+   * @rejects When the database query or operation logging fails.
+   */
+  listMagnetConfigurationTemplates(
+    viewer?: CatalogViewer,
+  ): Promise<CatalogMagnetConfigurationTemplate[]>;
   /**
    * Lists maker-scoped terminology aliases ordered by label.
    *
@@ -2259,6 +2373,85 @@ export function createCatalogService(
       );
     },
     /**
+     * Creates an audited catalog-manager configuration template.
+     *
+     * @param input - Template scope, exact configuration, and actor.
+     * @returns Created reusable authoring template.
+     * @rejects When authorization, validation, persistence, auditing, or logging fails.
+     */
+    async createMagnetConfigurationTemplate(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const name = normalizeRequiredVocabulary(input.name);
+      const normalizedName = normalizeCatalogSearch(name);
+      const configuration = normalizeCatalogMagnetConfiguration(
+        input.configuration,
+      );
+      if (
+        (input.scope === "global" &&
+          (input.makerId !== null || input.compatibilityFamilyId !== null)) ||
+        (input.scope === "maker" &&
+          (input.makerId === null || input.compatibilityFamilyId !== null)) ||
+        (input.scope === "family" &&
+          (input.makerId !== null || input.compatibilityFamilyId === null))
+      ) {
+        throw new Error("Magnet configuration template scope is invalid.");
+      }
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await logger.operation(
+        loggerMessages.database.catalog.createMagnetConfigurationTemplate,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [row] = await tx
+              .insert(schema.magnetConfigurationTemplate)
+              .values({
+                compatibilityFamilyId: input.compatibilityFamilyId,
+                configuration,
+                makerId: input.makerId,
+                name,
+                normalizedName,
+                scope: input.scope,
+              })
+              .returning()
+              .catch(mapCatalogNameConflict);
+            if (!row)
+              throw new Error(
+                "Failed to create magnet configuration template.",
+              );
+            const result: CatalogMagnetConfigurationTemplate = {
+              compatibilityFamilyId: row.compatibilityFamilyId,
+              configuration: normalizeCatalogMagnetConfiguration(
+                row.configuration,
+              ),
+              id: row.id,
+              makerId: row.makerId,
+              name: row.name,
+              scope: row.scope,
+            };
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: {
+                  compatibilityFamilyId: result.compatibilityFamilyId,
+                  configuration: result.configuration,
+                  makerId: result.makerId,
+                  name: result.name,
+                  scope: result.scope,
+                },
+                definition: productAudit.magnetConfigurationTemplateCreated,
+                targetId: row.id,
+              });
+            }
+            return result;
+          }),
+        actorAttributes(input.actor.clerkId),
+      );
+    },
+    /**
      * Creates color.
      *
      * @param input - Color name, slug, hex value, and authenticated actor.
@@ -2591,6 +2784,8 @@ export function createCatalogService(
               input.specs,
             );
             await replaceBodyHostedMagnetSetup(tx, row.id, input, true);
+            await replaceInsertHostedMagnetOptions(tx, row.id, input, true);
+            await replaceSliderInsertOffers(tx, row.id, input, true);
             await replaceProductRelationships(tx, row.id, input);
             if (dependencies && actorUser) {
               const [created] = await queryProducts(
@@ -2938,6 +3133,36 @@ export function createCatalogService(
               asc(schema.maker.name),
               asc(schema.compatibilityFamily.name),
             ),
+      );
+    },
+    /**
+     * Lists exact configuration templates only to catalog managers.
+     *
+     * @param viewer - Viewer whose manager permission controls access.
+     * @returns Visible authoring templates.
+     */
+    async listMagnetConfigurationTemplates(viewer) {
+      if (!hasPermission(viewer, "products.manage")) return [];
+      return await logger.operation(
+        loggerMessages.database.catalog.listMagnetConfigurationTemplates,
+        async () => {
+          const rows = await db
+            .select()
+            .from(schema.magnetConfigurationTemplate)
+            .orderBy(asc(schema.magnetConfigurationTemplate.name));
+          return rows.map(
+            (row): CatalogMagnetConfigurationTemplate => ({
+              compatibilityFamilyId: row.compatibilityFamilyId,
+              configuration: normalizeCatalogMagnetConfiguration(
+                row.configuration,
+              ),
+              id: row.id,
+              makerId: row.makerId,
+              name: row.name,
+              scope: row.scope,
+            }),
+          );
+        },
       );
     },
     /**
@@ -3500,6 +3725,13 @@ export function createCatalogService(
               input,
               false,
             );
+            await replaceInsertHostedMagnetOptions(
+              tx,
+              input.productId,
+              input,
+              false,
+            );
+            await replaceSliderInsertOffers(tx, input.productId, input, false);
             await replaceProductRelationships(tx, input.productId, input);
             if (dependencies && actorUser) {
               const [updated] = await queryProducts(
@@ -5219,6 +5451,13 @@ function requireProductAudit(
  */
 function productAuditState(product: CatalogProduct): AuditJsonObject {
   return {
+    advertisedInsertOffers: product.advertisedInsertOffers.map(
+      ({ id, insertProductId, isSliderAdvertisedDefault }) => ({
+        id,
+        insertProductId,
+        isSliderAdvertisedDefault,
+      }),
+    ),
     bearing: product.bearing,
     bodyHostedMagnetSetup: product.bodyHostedMagnetSetup ?? null,
     buttonDiameterMm: product.buttonDiameterMm,
@@ -5239,6 +5478,8 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     id: product.id,
     imageIds: product.images.map(({ id }) => id),
     includedComponentIds: product.includedComponents.map(({ id }) => id),
+    insertClickOptions: product.insertClickOptions,
+    insertMagnetOffers: product.insertMagnetOffers,
     isPrivate: product.isPrivate,
     lengthMm: product.lengthMm,
     makerId: product.makerId,
@@ -5809,6 +6050,7 @@ async function queryProducts(
     }
     products.set(row.id, {
       approvalStatus: row.approvalStatus,
+      advertisedInsertOffers: [],
       bearing: row.bearing,
       bodyHostedMagnetSetup:
         row.magnetSystem === "body-hosted"
@@ -5835,6 +6077,8 @@ async function queryProducts(
       imageCount: 0,
       images: [],
       includedComponents: [],
+      insertClickOptions: [],
+      insertMagnetOffers: [],
       id: row.id,
       lengthMm: row.lengthMm,
       makerId: row.makerId,
@@ -5880,6 +6124,7 @@ async function queryProducts(
     loadProductImages(db, result, viewer),
     loadProductRelationships(db, result, viewer),
     loadProductMagnetConfigurations(db, result),
+    loadInsertHostedMagnetOptions(db, result, viewer),
   ]);
   return result;
 }
@@ -6008,6 +6253,231 @@ async function loadProductMagnetConfigurations(
       sourceLabel: configuration.sourceLabel,
       sourceNotes: configuration.sourceNotes,
     };
+  }
+}
+
+/**
+ * Hydrates insert-owned options and slider-specific advertised offers.
+ *
+ * @param db - Database used for option and offer reads.
+ * @param products - Products receiving hydrated insert-hosted data.
+ * @param viewer - Viewer controlling associated insert-product visibility.
+ * @rejects When insert option or offer data cannot be queried.
+ */
+async function loadInsertHostedMagnetOptions(
+  db: Pick<Database, "select">,
+  products: CatalogProduct[],
+  viewer?: CatalogViewer,
+) {
+  const inserts = products.filter(
+    ({ productTypeSlug }) => productTypeSlug === "slider-insert",
+  );
+  const sliders = products.filter(
+    ({ productTypeSlug }) => productTypeSlug === "slider",
+  );
+  const byProductId = new Map(products.map((product) => [product.id, product]));
+
+  if (inserts.length) {
+    const insertIds = inserts.map(({ id }) => id);
+    const clickOptions = await db
+      .select({
+        clickCount: schema.productInsertClickOption.clickCount,
+        id: schema.productInsertClickOption.id,
+        insertionPosition: schema.productInsertClickOption.insertionPosition,
+        insertProductId: schema.productInsertClickOption.insertProductId,
+      })
+      .from(schema.productInsertClickOption)
+      .where(
+        inArray(schema.productInsertClickOption.insertProductId, insertIds),
+      )
+      .orderBy(asc(schema.productInsertClickOption.insertionPosition));
+    for (const option of clickOptions) {
+      byProductId.get(option.insertProductId)?.insertClickOptions.push({
+        clickCount: option.clickCount,
+        id: option.id,
+        insertionPosition: option.insertionPosition,
+      });
+    }
+  }
+
+  const associationRows = sliders.length
+    ? await db
+        .select({
+          insertOfferId: schema.productSliderInsertOffer.insertOfferId,
+          isSliderAdvertisedDefault:
+            schema.productSliderInsertOffer.isAdvertisedDefault,
+          sliderProductId: schema.productSliderInsertOffer.sliderProductId,
+        })
+        .from(schema.productSliderInsertOffer)
+        .where(
+          inArray(
+            schema.productSliderInsertOffer.sliderProductId,
+            sliders.map(({ id }) => id),
+          ),
+        )
+    : [];
+  const insertIds = inserts.map(({ id }) => id);
+  const associatedOfferIds = associationRows.map(
+    ({ insertOfferId }) => insertOfferId,
+  );
+  if (!insertIds.length && !associatedOfferIds.length) return;
+  const offerCondition = and(
+    insertIds.length
+      ? inArray(schema.productInsertMagnetOffer.insertProductId, insertIds)
+      : undefined,
+  );
+  const offerVisibility = hasPermission(viewer, "products.manage")
+    ? undefined
+    : viewer?.clerkId
+      ? sql`((${schema.product.approvalStatus} = 'approved' and ${schema.product.isPrivate} = false) or ${schema.product.ownerClerkId} = ${viewer.clerkId})`
+      : and(
+          eq(schema.product.approvalStatus, "approved"),
+          eq(schema.product.isPrivate, false),
+        );
+  const offers = await db
+    .select({
+      clickCount: schema.productInsertClickOption.clickCount,
+      clickOptionId: schema.productInsertMagnetOffer.clickOptionId,
+      copiedFromTemplateId:
+        schema.productInsertMagnetOffer.copiedFromTemplateId,
+      id: schema.productInsertMagnetOffer.id,
+      insertProductId: schema.productInsertMagnetOffer.insertProductId,
+      insertProductName: schema.product.name,
+      isAdvertisedDefault: schema.productInsertMagnetOffer.isAdvertisedDefault,
+      label: schema.magnetConfigurationLabel.name,
+      sourceLabel: schema.productInsertMagnetOffer.sourceLabel,
+      sourceNotes: schema.productInsertMagnetOffer.sourceNotes,
+    })
+    .from(schema.productInsertMagnetOffer)
+    .innerJoin(
+      schema.product,
+      eq(schema.productInsertMagnetOffer.insertProductId, schema.product.id),
+    )
+    .innerJoin(
+      schema.magnetConfigurationLabel,
+      eq(
+        schema.productInsertMagnetOffer.configurationLabelId,
+        schema.magnetConfigurationLabel.id,
+      ),
+    )
+    .leftJoin(
+      schema.productInsertClickOption,
+      eq(
+        schema.productInsertMagnetOffer.clickOptionId,
+        schema.productInsertClickOption.id,
+      ),
+    )
+    .where(
+      and(
+        insertIds.length && associatedOfferIds.length
+          ? or(
+              offerCondition,
+              inArray(schema.productInsertMagnetOffer.id, associatedOfferIds),
+            )
+          : insertIds.length
+            ? offerCondition
+            : inArray(schema.productInsertMagnetOffer.id, associatedOfferIds),
+        offerVisibility,
+      ),
+    );
+  if (!offers.length) return;
+  const offerIds = offers.map(({ id }) => id);
+  const [groups, slots] = await Promise.all([
+    db
+      .select({
+        diameterMm: schema.productInsertMagnetGroup.diameterMm,
+        grade: schema.productInsertMagnetGroup.grade,
+        key: schema.productInsertMagnetGroup.groupKey,
+        label: schema.magnetGroupLabel.name,
+        offerId: schema.productInsertMagnetGroup.offerId,
+        thicknessMm: schema.productInsertMagnetGroup.thicknessMm,
+      })
+      .from(schema.productInsertMagnetGroup)
+      .innerJoin(
+        schema.magnetGroupLabel,
+        eq(
+          schema.productInsertMagnetGroup.groupLabelId,
+          schema.magnetGroupLabel.id,
+        ),
+      )
+      .where(inArray(schema.productInsertMagnetGroup.offerId, offerIds))
+      .orderBy(asc(schema.productInsertMagnetGroup.displayOrder)),
+    db
+      .select({
+        documentedColumn: schema.productInsertMagnetSlot.documentedColumn,
+        documentedRow: schema.productInsertMagnetSlot.documentedRow,
+        groupKey: schema.productInsertMagnetGroup.groupKey,
+        half: schema.productInsertMagnetSlot.half,
+        key: schema.productInsertMagnetSlot.slotKey,
+        offerId: schema.productInsertMagnetSlot.offerId,
+        state: schema.productInsertMagnetSlot.state,
+      })
+      .from(schema.productInsertMagnetSlot)
+      .leftJoin(
+        schema.productInsertMagnetGroup,
+        and(
+          eq(
+            schema.productInsertMagnetSlot.groupId,
+            schema.productInsertMagnetGroup.id,
+          ),
+          eq(
+            schema.productInsertMagnetSlot.offerId,
+            schema.productInsertMagnetGroup.offerId,
+          ),
+        ),
+      )
+      .where(inArray(schema.productInsertMagnetSlot.offerId, offerIds))
+      .orderBy(asc(schema.productInsertMagnetSlot.displayOrder)),
+  ]);
+  const hydrated = new Map<number, CatalogInsertMagnetOffer>();
+  for (const offer of offers) {
+    const value: CatalogInsertMagnetOffer = {
+      clickCount: offer.clickCount,
+      clickOptionId: offer.clickOptionId,
+      configuration: {
+        groups: groups
+          .filter(({ offerId }) => offerId === offer.id)
+          .map((group) => ({
+            diameterMm: group.diameterMm,
+            grade: group.grade,
+            key: group.key,
+            label: group.label,
+            thicknessMm: group.thicknessMm,
+          })),
+        label: offer.label,
+        slots: slots
+          .filter(({ offerId }) => offerId === offer.id)
+          .map((slot) => ({
+            documentedColumn: slot.documentedColumn,
+            documentedRow: slot.documentedRow,
+            groupKey: slot.groupKey,
+            half: slot.half,
+            key: slot.key,
+            state: slot.state,
+          })),
+        sourceLabel: offer.sourceLabel,
+        sourceNotes: offer.sourceNotes,
+      },
+      copiedFromTemplateId: offer.copiedFromTemplateId,
+      id: offer.id,
+      insertProductId: offer.insertProductId,
+      isAdvertisedDefault: offer.isAdvertisedDefault,
+    };
+    hydrated.set(offer.id, value);
+    byProductId.get(offer.insertProductId)?.insertMagnetOffers.push(value);
+  }
+  for (const association of associationRows) {
+    const offer = hydrated.get(association.insertOfferId);
+    const slider = byProductId.get(association.sliderProductId);
+    const insertName = offers.find(
+      ({ id }) => id === association.insertOfferId,
+    )?.insertProductName;
+    if (!offer || !slider || !insertName) continue;
+    slider.advertisedInsertOffers.push({
+      ...offer,
+      insertProductName: insertName,
+      isSliderAdvertisedDefault: association.isSliderAdvertisedDefault,
+    });
   }
 }
 
@@ -7225,6 +7695,315 @@ async function replaceBodyHostedMagnetSetup(
 }
 
 /**
+ * Replaces insert-owned click counts and exact offers while retaining stable IDs.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - Exact insert host product identifier.
+ * @param input - Product write containing insert-hosted options.
+ * @param creating - Whether this is the initial product write.
+ * @rejects When authorization, validation, or persistence fails.
+ */
+async function replaceInsertHostedMagnetOptions(
+  tx: CatalogTransaction,
+  productId: number,
+  input: ProductWriteInput,
+  creating: boolean,
+) {
+  if (input.insertHostedMagnetOptions === undefined && !creating) return;
+  const candidate = input.insertHostedMagnetOptions ?? {
+    clickCounts: [],
+    offers: [],
+  };
+  if (
+    input.productTypeSlug !== "slider-insert" &&
+    (candidate.clickCounts.length || candidate.offers.length)
+  ) {
+    throw new Error("Only slider inserts may define insert-hosted options.");
+  }
+  if (input.productTypeSlug !== "slider-insert") return;
+
+  const clickCounts = candidate.clickCounts.map((clickCount) => {
+    if (!Number.isSafeInteger(clickCount) || clickCount <= 0)
+      throw new Error("Click count must be a positive integer.");
+    return clickCount;
+  });
+  if (new Set(clickCounts).size !== clickCounts.length)
+    throw new Error("Insert click counts must be unique.");
+  if (
+    candidate.offers.filter(({ isAdvertisedDefault }) => isAdvertisedDefault)
+      .length > 1
+  )
+    throw new Error("An insert may have at most one advertised default.");
+
+  const currentOptions = await tx
+    .select({
+      clickCount: schema.productInsertClickOption.clickCount,
+      id: schema.productInsertClickOption.id,
+      insertionPosition: schema.productInsertClickOption.insertionPosition,
+    })
+    .from(schema.productInsertClickOption)
+    .where(eq(schema.productInsertClickOption.insertProductId, productId));
+  const optionByCount = new Map(
+    currentOptions.map((option) => [option.clickCount, option]),
+  );
+  let nextPosition =
+    Math.max(
+      -1,
+      ...currentOptions.map(({ insertionPosition }) => insertionPosition),
+    ) + 1;
+  for (const clickCount of clickCounts) {
+    if (optionByCount.has(clickCount)) continue;
+    const [created] = await tx
+      .insert(schema.productInsertClickOption)
+      .values({
+        clickCount,
+        insertionPosition: nextPosition,
+        insertProductId: productId,
+      })
+      .returning({
+        clickCount: schema.productInsertClickOption.clickCount,
+        id: schema.productInsertClickOption.id,
+        insertionPosition: schema.productInsertClickOption.insertionPosition,
+      });
+    if (!created) throw new Error("Failed to create insert click option.");
+    optionByCount.set(clickCount, created);
+    nextPosition += 1;
+  }
+
+  const currentOffers = await tx
+    .select({ id: schema.productInsertMagnetOffer.id })
+    .from(schema.productInsertMagnetOffer)
+    .where(eq(schema.productInsertMagnetOffer.insertProductId, productId));
+  const currentOfferIds = new Set(currentOffers.map(({ id }) => id));
+  const submittedIds = candidate.offers.flatMap(({ id }) =>
+    id === undefined ? [] : [id],
+  );
+  if (
+    new Set(submittedIds).size !== submittedIds.length ||
+    submittedIds.some((id) => !currentOfferIds.has(id))
+  ) {
+    throw new Error("Insert offer does not belong to this product.");
+  }
+  const removedOfferIds = [...currentOfferIds].filter(
+    (id) => !submittedIds.includes(id),
+  );
+  if (removedOfferIds.length) {
+    await tx
+      .delete(schema.productInsertMagnetOffer)
+      .where(inArray(schema.productInsertMagnetOffer.id, removedOfferIds));
+  }
+  if (currentOfferIds.size) {
+    await tx
+      .update(schema.productInsertMagnetOffer)
+      .set({ isAdvertisedDefault: false })
+      .where(eq(schema.productInsertMagnetOffer.insertProductId, productId));
+  }
+
+  for (const offer of candidate.offers) {
+    if (offer.clickCount !== null && !clickCounts.includes(offer.clickCount))
+      throw new Error("Offer click count must belong to the same insert.");
+    const configuration = normalizeCatalogMagnetConfiguration(
+      offer.configuration,
+    );
+    const copiedFromTemplateId = offer.copiedFromTemplateId ?? null;
+    if (copiedFromTemplateId !== null) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const [template] = await tx
+        .select({
+          compatibilityFamilyId:
+            schema.magnetConfigurationTemplate.compatibilityFamilyId,
+          id: schema.magnetConfigurationTemplate.id,
+          makerId: schema.magnetConfigurationTemplate.makerId,
+          scope: schema.magnetConfigurationTemplate.scope,
+        })
+        .from(schema.magnetConfigurationTemplate)
+        .where(eq(schema.magnetConfigurationTemplate.id, copiedFromTemplateId))
+        .limit(1);
+      if (!template)
+        throw new Error("Magnet configuration template does not exist.");
+      if (
+        (template.scope === "maker" && template.makerId !== input.makerId) ||
+        (template.scope === "family" &&
+          !input.compatibilityFamilyIds?.includes(
+            template.compatibilityFamilyId ?? 0,
+          ))
+      ) {
+        throw new Error(
+          "Magnet configuration template is outside this product scope.",
+        );
+      }
+    }
+    const configurationLabelId = await getOrCreateMagnetConfigurationLabel(
+      tx,
+      configuration.label,
+    );
+    const clickOptionId =
+      offer.clickCount === null
+        ? null
+        : (optionByCount.get(offer.clickCount)?.id ?? null);
+    let offerId = offer.id;
+    if (offerId === undefined) {
+      const [created] = await tx
+        .insert(schema.productInsertMagnetOffer)
+        .values({
+          clickOptionId,
+          configurationLabelId,
+          copiedFromTemplateId,
+          insertProductId: productId,
+          isAdvertisedDefault: offer.isAdvertisedDefault,
+          sourceLabel: configuration.sourceLabel,
+          sourceNotes: configuration.sourceNotes,
+        })
+        .returning({ id: schema.productInsertMagnetOffer.id });
+      if (!created) throw new Error("Failed to create insert offer.");
+      offerId = created.id;
+    } else {
+      await tx
+        .update(schema.productInsertMagnetOffer)
+        .set({
+          clickOptionId,
+          configurationLabelId,
+          copiedFromTemplateId,
+          isAdvertisedDefault: offer.isAdvertisedDefault,
+          sourceLabel: configuration.sourceLabel,
+          sourceNotes: configuration.sourceNotes,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.productInsertMagnetOffer.id, offerId));
+      await tx
+        .delete(schema.productInsertMagnetSlot)
+        .where(eq(schema.productInsertMagnetSlot.offerId, offerId));
+      await tx
+        .delete(schema.productInsertMagnetGroup)
+        .where(eq(schema.productInsertMagnetGroup.offerId, offerId));
+    }
+    const groupsByKey = new Map<string, number>();
+    for (const [displayOrder, group] of configuration.groups.entries()) {
+      const groupLabelId = await getOrCreateMagnetGroupLabel(tx, group.label);
+      const [created] = await tx
+        .insert(schema.productInsertMagnetGroup)
+        .values({
+          diameterMm: group.diameterMm,
+          displayOrder,
+          grade: group.grade,
+          groupKey: group.key,
+          groupLabelId,
+          offerId,
+          thicknessMm: group.thicknessMm,
+        })
+        .returning({ id: schema.productInsertMagnetGroup.id });
+      if (!created) throw new Error("Failed to create insert magnet group.");
+      groupsByKey.set(group.key, created.id);
+    }
+    await tx.insert(schema.productInsertMagnetSlot).values(
+      configuration.slots.map((slot, displayOrder) => ({
+        displayOrder,
+        documentedColumn: slot.documentedColumn,
+        documentedRow: slot.documentedRow,
+        groupId: slot.groupKey
+          ? (groupsByKey.get(slot.groupKey) ?? null)
+          : null,
+        half: slot.half,
+        offerId,
+        slotKey: slot.key,
+        state: slot.state,
+      })),
+    );
+  }
+  const removedOptionIds = currentOptions
+    .filter(({ clickCount }) => !clickCounts.includes(clickCount))
+    .map(({ id }) => id);
+  if (removedOptionIds.length) {
+    await tx
+      .delete(schema.productInsertClickOption)
+      .where(inArray(schema.productInsertClickOption.id, removedOptionIds));
+  }
+}
+
+/**
+ * Replaces exact insert-offer merchandising for one insert-driven slider.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - Insert-driven slider product identifier.
+ * @param input - Product write containing exact offer associations.
+ * @param creating - Whether this is the initial product write.
+ * @rejects When associations are invalid or cannot be persisted.
+ */
+async function replaceSliderInsertOffers(
+  tx: CatalogTransaction,
+  productId: number,
+  input: ProductWriteInput,
+  creating: boolean,
+) {
+  if (input.advertisedInsertOffers === undefined && !creating) {
+    if (
+      input.productTypeSlug !== "slider" ||
+      input.specs.magnetSystem === "insert-driven"
+    ) {
+      return;
+    }
+    await tx
+      .delete(schema.productSliderInsertOffer)
+      .where(eq(schema.productSliderInsertOffer.sliderProductId, productId));
+    return;
+  }
+  const associations = input.advertisedInsertOffers ?? [];
+  if (
+    associations.length &&
+    (input.productTypeSlug !== "slider" ||
+      input.specs.magnetSystem !== "insert-driven")
+  ) {
+    throw new Error("Only insert-driven sliders may advertise insert offers.");
+  }
+  if (input.productTypeSlug !== "slider") return;
+  if (
+    new Set(associations.map(({ offerId }) => offerId)).size !==
+    associations.length
+  )
+    throw new Error("Duplicate slider insert offers are not allowed.");
+  if (
+    associations.length &&
+    associations.filter(({ isAdvertisedDefault }) => isAdvertisedDefault)
+      .length !== 1
+  ) {
+    throw new Error(
+      "A slider with insert offers requires exactly one advertised default.",
+    );
+  }
+  const offers = associations.length
+    ? await tx
+        .select({
+          id: schema.productInsertMagnetOffer.id,
+          insertProductId: schema.productInsertMagnetOffer.insertProductId,
+        })
+        .from(schema.productInsertMagnetOffer)
+        .where(
+          inArray(
+            schema.productInsertMagnetOffer.id,
+            associations.map(({ offerId }) => offerId),
+          ),
+        )
+    : [];
+  if (offers.length !== associations.length)
+    throw new Error("Insert offer does not exist.");
+  await tx
+    .delete(schema.productSliderInsertOffer)
+    .where(eq(schema.productSliderInsertOffer.sliderProductId, productId));
+  if (associations.length) {
+    const byId = new Map(offers.map((offer) => [offer.id, offer]));
+    await tx.insert(schema.productSliderInsertOffer).values(
+      associations.map((association) => ({
+        insertOfferId: association.offerId,
+        insertProductId: byId.get(association.offerId)?.insertProductId ?? 0,
+        isAdvertisedDefault: association.isAdvertisedDefault,
+        sliderProductId: productId,
+      })),
+    );
+  }
+}
+
+/**
  * Validates and normalizes one body-hosted setup without inventing missing facts.
  *
  * @param setup - Candidate setup or undocumented state.
@@ -7246,7 +8025,23 @@ function normalizeBodyHostedMagnetSetup(
   if (!setup.configuration) {
     return { clickCount, configuration: null, sourceNote };
   }
-  const configuration = setup.configuration;
+  return {
+    clickCount,
+    configuration: normalizeCatalogMagnetConfiguration(setup.configuration),
+    sourceNote,
+  };
+}
+
+/**
+ * Validates one complete exact catalog magnet layout.
+ *
+ * @param configuration - Candidate exact configuration.
+ * @returns Normalized complete catalog configuration.
+ * @throws When the configuration is incomplete or internally inconsistent.
+ */
+function normalizeCatalogMagnetConfiguration(
+  configuration: CatalogMagnetConfiguration,
+): CatalogMagnetConfiguration {
   const label = normalizeRequiredVocabulary(configuration.label);
   const sourceLabel = normalizeBoundedText(configuration.sourceLabel, 200);
   const sourceNotes = normalizeBoundedText(configuration.sourceNotes, 5000);
@@ -7298,17 +8093,7 @@ function normalizeBodyHostedMagnetSetup(
   });
   if (groups.some(({ key }) => !referencedGroupKeys.has(key)))
     throw new Error("Every magnet group must contain an occupied slot.");
-  return {
-    clickCount,
-    configuration: {
-      groups,
-      label,
-      slots,
-      sourceLabel,
-      sourceNotes,
-    },
-    sourceNote,
-  };
+  return { groups, label, slots, sourceLabel, sourceNotes };
 }
 
 /**

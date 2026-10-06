@@ -572,6 +572,199 @@ describe("catalog product persistence", () => {
     }
   }, 30_000);
 
+  it("round-trips insert offers with stable click order and exact slider defaults", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      const migrationsFolder = fileURLToPath(
+        new URL("../../../../database/drizzle", import.meta.url),
+      );
+      for (const file of readdirSync(migrationsFolder)
+        .filter((name) => name.endsWith(".sql"))
+        .sort()) {
+        await client.exec(
+          readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
+            "--> statement-breakpoint",
+            "",
+          ),
+        );
+      }
+      const [maker] = await db
+        .insert(schema.maker)
+        .values({ name: "Insert Maker" })
+        .returning({ id: schema.maker.id });
+      await db.insert(schema.productType).values([
+        { name: "Slider", slug: "slider" },
+        { name: "Slider Insert", slug: "slider-insert" },
+      ]);
+      const [material] = await db
+        .insert(schema.material)
+        .values({ name: "Steel", slug: "steel" })
+        .returning({ id: schema.material.id });
+      await db.insert(schema.user).values({ clerkId: "admin-insert" });
+      if (!maker || !material) throw new Error("Insert fixtures failed.");
+      const service = createDbServices(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      ).catalog;
+      const actor = { clerkId: "admin-insert", role: "admin" as const };
+      const configuration = {
+        groups: [
+          {
+            diameterMm: "6.35",
+            grade: "n52",
+            key: "corners",
+            label: "Corners",
+            thicknessMm: "3.175",
+          },
+        ],
+        label: "Medium",
+        slots: [
+          {
+            documentedColumn: null,
+            documentedRow: null,
+            groupKey: "corners",
+            half: "half-a" as const,
+            key: "A1",
+            state: "occupied" as const,
+          },
+        ],
+        sourceLabel: "Maker medium",
+        sourceNotes: null,
+      };
+      const template = await service.createMagnetConfigurationTemplate({
+        actor,
+        compatibilityFamilyId: null,
+        configuration,
+        makerId: null,
+        name: "Standard medium",
+        scope: "global",
+      });
+      await expect(
+        service.listMagnetConfigurationTemplates({
+          clerkId: "collection-owner",
+          role: "user",
+        }),
+      ).resolves.toEqual([]);
+      await expect(
+        service.listMagnetConfigurationTemplates(actor),
+      ).resolves.toEqual([expect.objectContaining({ id: template.id })]);
+      const insert = await service.createProduct({
+        actor,
+        finishOptions: [],
+        insertHostedMagnetOptions: {
+          clickCounts: [3, 5],
+          offers: [
+            {
+              clickCount: 3,
+              configuration,
+              copiedFromTemplateId: template.id,
+              isAdvertisedDefault: true,
+            },
+            {
+              clickCount: 5,
+              configuration: { ...configuration, label: "Strong" },
+              isAdvertisedDefault: false,
+            },
+          ],
+        },
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: "Exact Insert",
+        productTypeSlug: "slider-insert",
+        slug: "exact-insert",
+        specs: {},
+      });
+      expect(
+        insert.insertClickOptions.map(({ clickCount }) => clickCount),
+      ).toEqual([3, 5]);
+      expect(insert.insertMagnetOffers).toEqual([
+        expect.objectContaining({
+          clickCount: 3,
+          copiedFromTemplateId: template.id,
+          isAdvertisedDefault: true,
+          configuration: expect.objectContaining({ label: "Medium" }),
+        }),
+        expect.objectContaining({
+          clickCount: 5,
+          isAdvertisedDefault: false,
+          configuration: expect.objectContaining({ label: "Strong" }),
+        }),
+      ]);
+      const advertisedOffer = insert.insertMagnetOffers[1];
+      if (!advertisedOffer) throw new Error("Offer fixture failed.");
+      const slider = await service.createProduct({
+        actor,
+        advertisedInsertOffers: [
+          { isAdvertisedDefault: true, offerId: advertisedOffer.id },
+        ],
+        finishOptions: [],
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: "Insert Slider",
+        productTypeSlug: "slider",
+        slug: "insert-slider",
+        specs: { magnetSystem: "insert-driven" },
+      });
+      expect(slider.advertisedInsertOffers).toEqual([
+        expect.objectContaining({
+          id: advertisedOffer.id,
+          insertProductId: insert.id,
+          insertProductName: "Exact Insert",
+          isSliderAdvertisedDefault: true,
+        }),
+      ]);
+      const updated = await service.updateProduct({
+        actor,
+        finishOptions: [],
+        insertHostedMagnetOptions: {
+          clickCounts: [5, 7, 3],
+          offers: insert.insertMagnetOffers.map((offer) => ({
+            clickCount: offer.clickCount,
+            configuration: offer.configuration,
+            id: offer.id,
+            isAdvertisedDefault: offer.isAdvertisedDefault,
+          })),
+        },
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: insert.name,
+        productId: insert.id,
+        productTypeSlug: "slider-insert",
+        slug: insert.slug,
+        specs: {},
+      });
+      expect(
+        updated.insertClickOptions.map(({ clickCount, insertionPosition }) => ({
+          clickCount,
+          insertionPosition,
+        })),
+      ).toEqual([
+        { clickCount: 3, insertionPosition: 0 },
+        { clickCount: 5, insertionPosition: 1 },
+        { clickCount: 7, insertionPosition: 2 },
+      ]);
+      await expect(
+        service.createProduct({
+          actor,
+          advertisedInsertOffers: [
+            { isAdvertisedDefault: false, offerId: advertisedOffer.id },
+          ],
+          finishOptions: [],
+          makerId: maker.id,
+          materialIds: [material.id],
+          name: "No default",
+          productTypeSlug: "slider",
+          slug: "no-default",
+          specs: { magnetSystem: "insert-driven" },
+        }),
+      ).rejects.toThrow("requires exactly one advertised default");
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("orders canonical meaningful updates without approval or privacy churn", async () => {
     const client = new PGlite();
     const db = drizzle(client, { schema });
