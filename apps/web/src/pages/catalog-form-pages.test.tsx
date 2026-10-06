@@ -455,10 +455,10 @@ describe("finish option editor", () => {
       }),
     );
 
-    expect(html).toContain("web.slider.setup.default");
-    expect(html).toContain("web.slider.setup.selectOffer");
-    expect(html).toContain("web.slider.setup.fromScratch");
-    expect(html).toContain("web.slider.setup.clickCount");
+    expect(html).toContain("Default setup");
+    expect(html).toContain("Select a setup offer");
+    expect(html).toContain("Build from scratch");
+    expect(html).toContain("Click count");
     expect(html.indexOf(">3<")).toBeLessThan(html.indexOf(">5<"));
   });
 
