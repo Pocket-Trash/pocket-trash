@@ -317,10 +317,11 @@ describe("catalog schema", () => {
       schema.collectionSliderInsert,
     ]) {
       const config = getTableConfig(table);
-      expect(config.columns.map(({ name }) => name)).toEqual([
-        "id",
-        expect.stringMatching(/^product_slider(?:_plate|_insert)?_id$/u),
-      ]);
+      expect(config.columns.map(({ name }) => name)).toEqual(
+        table === schema.collectionSliderInsert
+          ? ["id", "product_slider_insert_id", "setup"]
+          : ["id", "product_slider_plate_id"],
+      );
       expect(config.foreignKeys).toHaveLength(2);
     }
     const slider = getTableConfig(schema.collectionSlider);
