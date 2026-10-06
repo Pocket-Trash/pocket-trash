@@ -20,6 +20,8 @@ import { user } from "./users.js";
 
 /** Roles allowed to soft-delete catalog images. */
 export const catalogDeletionRoles = ["owner", "admin"] as const;
+/** Roles allowed to soft-delete maker images. */
+export const makerImageDeletionRoles = ["admin"] as const;
 /** Catalog entity types that can own an image. */
 export const catalogImageTargetTypes = [
   "maker",
@@ -381,7 +383,7 @@ export const makerImage = pgTable(
     uploadedByClerkId: text("uploaded_by_clerk_id"),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
     deletedByClerkId: text("deleted_by_clerk_id"),
-    deletedByRole: text("deleted_by_role", { enum: catalogDeletionRoles }),
+    deletedByRole: text("deleted_by_role", { enum: makerImageDeletionRoles }),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),

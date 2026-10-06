@@ -408,7 +408,14 @@ function MakerImageFields({
             {image.fileName}
           </span>
           <Button
-            aria-label={`${t(image.deletedAt ? "web.resources.action.restore" : "web.resources.action.delete")} ${image.fileName}`}
+            aria-label={t("web.admin.makers.imageAction", {
+              action: t(
+                image.deletedAt
+                  ? "web.resources.action.restore"
+                  : "web.resources.action.delete",
+              ),
+              fileName: image.fileName,
+            })}
             onClick={async () => {
               if (image.deletedAt) {
                 await restoreCatalogImage({
