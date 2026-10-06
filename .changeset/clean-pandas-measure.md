@@ -2,4 +2,4 @@
 "@app/web": patch
 ---
 
-Document the CI cost baseline and reduction target.
+Document and automate the CI cost baseline and reduction target.

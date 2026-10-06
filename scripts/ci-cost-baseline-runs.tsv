@@ -1,0 +1,19 @@
+# category	run_id	attempt
+code-push-ci	37496210839	1
+code-push-ci	37496209188	1
+code-push-ci	37496216789	1
+code-push-ci	37496220239	1
+metadata-edit-ci	37496418646	1
+metadata-edit-ci	37496422923	1
+metadata-edit-ci	37496427330	1
+metadata-edit-ci	37496433108	1
+failed-retried-deployment	37496211633	1
+failed-retried-deployment	37496209526	1
+failed-retried-deployment	37496209526	2
+failed-retried-deployment	37496209526	3
+failed-retried-deployment	37496217339	1
+failed-retried-deployment	37496220493	1
+successful-deployment	37496211633	2
+successful-deployment	37496209526	4
+successful-deployment	37496217339	2
+successful-deployment	37496220493	2

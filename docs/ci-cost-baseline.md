@@ -41,47 +41,21 @@ job to the category containing its first occurrence. Sum the de-duplicated job
 durations, then round category totals to one decimal place. Do not round
 individual jobs or runs.
 
-The following Bash script reproduces every category total from the GitHub API:
+The maintained calculator and baseline run manifest live in
+[`scripts/calculate-ci-job-minutes.sh`](../scripts/calculate-ci-job-minutes.sh)
+and
+[`scripts/ci-cost-baseline-runs.tsv`](../scripts/ci-cost-baseline-runs.tsv).
+From the repository root, reproduce the baseline with:
 
 ```bash
-runs=(
-  'code-push-ci:37496210839:1'
-  'code-push-ci:37496209188:1'
-  'code-push-ci:37496216789:1'
-  'code-push-ci:37496220239:1'
-  'metadata-edit-ci:37496418646:1'
-  'metadata-edit-ci:37496422923:1'
-  'metadata-edit-ci:37496427330:1'
-  'metadata-edit-ci:37496433108:1'
-  'failed-retried-deployment:37496211633:1'
-  'failed-retried-deployment:37496209526:1'
-  'failed-retried-deployment:37496209526:2'
-  'failed-retried-deployment:37496209526:3'
-  'failed-retried-deployment:37496217339:1'
-  'failed-retried-deployment:37496220493:1'
-  'successful-deployment:37496211633:2'
-  'successful-deployment:37496209526:4'
-  'successful-deployment:37496217339:2'
-  'successful-deployment:37496220493:2'
-)
+scripts/calculate-ci-job-minutes.sh
+```
 
-for specification in "${runs[@]}"; do
-  IFS=: read -r category run_id attempt <<<"$specification"
-  while IFS=$'\t' read -r job started completed seconds; do
-    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$category" "$run_id" "$job" "$started" "$completed" "$seconds"
-  done < <(gh api \
-    "repos/Pocket-Trash/pocket-trash/actions/runs/$run_id/attempts/$attempt/jobs?per_page=100" \
-    --jq '.jobs[] | select(.conclusion != "skipped") | [.name, .started_at, .completed_at, ((.completed_at | fromdateiso8601) - (.started_at | fromdateiso8601))] | @tsv')
-done | awk -F '\t' '
-  {
-    key = $2 FS $3 FS $4 FS $5
-    if (!seen[key]++) totals[$1] += $6
-  }
-  END {
-    for (category in totals) printf "%s\t%.1f\n", category, totals[category] / 60
-  }
-'
+ENG-380 can rerun the same calculation with a new manifest and the number of
+distinct code-changing pull requests. Both arguments are required together:
+
+```bash
+scripts/calculate-ci-job-minutes.sh path/to/post-rollout-runs.tsv <pull-request-count>
 ```
 
 ## Baseline
