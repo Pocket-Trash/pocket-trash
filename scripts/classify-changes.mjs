@@ -246,18 +246,16 @@ export function classifyChanges(
   const noCodePaths = [];
   const unknownPaths = [];
 
-  if (!labelEvent) {
-    for (const file of files) {
-      const rule = findRule(file);
+  for (const file of files) {
+    const rule = findRule(file);
 
-      if (!rule) {
-        unknownPaths.push(file);
-        continue;
-      }
-
-      if (rule.domains.length === 0) noCodePaths.push(file);
-      else enable(domains, ...rule.domains);
+    if (!rule) {
+      unknownPaths.push(file);
+      continue;
     }
+
+    if (rule.domains.length === 0) noCodePaths.push(file);
+    else if (!labelEvent) enable(domains, ...rule.domains);
   }
 
   if (unknownPaths.length > 0) enable(domains, ...validationDomains);

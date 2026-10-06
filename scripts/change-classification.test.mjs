@@ -206,7 +206,7 @@ test("applies persistent label overrides additively", () => {
       action: "labeled",
       labels: ["test:storybook"],
     }),
-    expected(["storybook"]),
+    expected(["storybook"], { noCodePaths: ["docs/storybook.md"] }),
   );
   assert.deepEqual(
     classifyChanges(["apps/api/src/index.ts"], {
@@ -236,7 +236,9 @@ test("applies persistent label overrides additively", () => {
       eventLabel: "test:e2e",
       labels: ["test:e2e"],
     }),
-    expected(["preview", "safe_e2e", "mutation_e2e"]),
+    expected(["preview", "safe_e2e", "mutation_e2e"], {
+      noCodePaths: ["docs/e2e-testing.md"],
+    }),
   );
   assert.deepEqual(
     classifyChanges(["apps/scraper/src/index.ts"], {
@@ -244,6 +246,14 @@ test("applies persistent label overrides additively", () => {
       labels: ["test:e2e"],
     }),
     expected(["scraper", "preview", "safe_e2e", "mutation_e2e", "validation"]),
+  );
+  assert.deepEqual(
+    classifyChanges(["future/new-path.ts"], {
+      action: "labeled",
+      eventLabel: "test:storybook",
+      labels: ["test:storybook"],
+    }),
+    expected(validationDomains, { unknownPaths: ["future/new-path.ts"] }),
   );
 });
 
@@ -270,6 +280,27 @@ test("CI keeps required names and gates jobs with one classifier", () => {
     "unlabeled",
   ]);
   assert.ok(jobs["classify-changes"]);
+  assert.match(jobs["classify-changes"].if, /action != 'edited'/u);
+  assert.match(jobs["classify-changes"].if, /changes\.base != null/u);
+  assert.equal(
+    jobs["classify-changes"].outputs.unknown_paths,
+    "${{ steps.classify.outputs.unknown_paths }}",
+  );
+
+  assert.equal(jobs.classification.name, "Classification");
+  assert.equal(jobs.classification.needs, "classify-changes");
+  assert.match(jobs.classification.if, /action != 'edited'/u);
+  assert.match(jobs.classification.if, /changes\.base != null/u);
+  const requireClassification = jobs.classification.steps.find(
+    (step) => step.name === "Require explicit path classification",
+  );
+  assert.match(requireClassification.run, /Unclassified repository paths:/u);
+  assert.match(requireClassification.run, /jq -r/u);
+
+  assert.equal(jobs.metadata.name, "Metadata");
+  assert.match(jobs.metadata.if, /github\.event\.action != 'labeled'/u);
+  assert.match(jobs.metadata.if, /github\.event\.action != 'unlabeled'/u);
+  assert.ok(jobs.metadata.steps.some((step) => step.name === "Lint PR title"));
 
   for (const [job, name, output] of [
     ["scraper-artifact", "Scraper Artifact", "scraper"],
@@ -285,9 +316,16 @@ test("CI keeps required names and gates jobs with one classifier", () => {
     assert.match(jobs[job].if, /needs\.security\.result == 'skipped'/);
     assert.match(jobs[job].if, new RegExp(`outputs\\.${output} == 'true'`));
   }
-  assert.equal(jobs["classify-changes"].if, "github.event_name != 'schedule'");
+  assert.match(jobs.security.if, /github\.event\.action != 'edited'/u);
+  assert.match(jobs.security.if, /github\.event\.changes\.base != null/u);
   assert.match(jobs.security.if, /github\.event\.action != 'labeled'/);
   assert.equal(jobs.changeset.name, "Changeset");
+  assert.match(jobs.changeset.if, /github\.event\.action != 'edited'/u);
+  assert.match(jobs.changeset.if, /github\.event\.changes\.base != null/u);
+  assert.equal(
+    jobs.lint.steps.some((step) => step.name === "Lint PR title"),
+    false,
+  );
 });
 
 test("Deploy gates preview work and runs Playwright in a separate job", () => {

@@ -15,7 +15,7 @@ permissions:
 jobs:
   classify-changes:
     name: Classify Changes
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'pull_request' || github.event.action != 'edited' || github.event.changes.base != null)
     runs-on: ubuntu-latest
     outputs:
       api: ${{ steps.classify.outputs.api }}
@@ -27,6 +27,8 @@ jobs:
       safe_e2e: ${{ steps.classify.outputs.safe_e2e }}
       mutation_e2e: ${{ steps.classify.outputs.mutation_e2e }}
       validation: ${{ steps.classify.outputs.validation }}
+      unknown_paths: ${{ steps.classify.outputs.unknown_paths }}
+      classification_error: ${{ steps.classify.outputs.classification_error }}
 
     steps:
       - name: Check out repository
@@ -48,11 +50,65 @@ jobs:
             for domain in api scraper web database storybook preview safe_e2e mutation_e2e validation; do
               echo "$domain=true" >> "$GITHUB_OUTPUT"
             done
+            echo 'unknown_paths=[]' >> "$GITHUB_OUTPUT"
+            echo 'classification_error=classifier-failed' >> "$GITHUB_OUTPUT"
           fi
+
+  classification:
+    name: Classification
+    needs: classify-changes
+    if: >-
+      always() &&
+      github.event_name != 'schedule' &&
+      (github.event_name != 'pull_request' || github.event.action != 'edited' || github.event.changes.base != null)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require explicit path classification
+        env:
+          CLASSIFICATION_ERROR: ${{ needs.classify-changes.outputs.classification_error }}
+          UNKNOWN_PATHS: ${{ needs.classify-changes.outputs.unknown_paths }}
+        run: |
+          if [[ -n "$CLASSIFICATION_ERROR" ]]; then
+            echo "Change classification failed: $CLASSIFICATION_ERROR" >&2
+            exit 1
+          fi
+
+          if [[ "$UNKNOWN_PATHS" != "[]" ]]; then
+            echo "Unclassified repository paths:" >&2
+            jq -r '.[] | "- \(.)"' <<< "$UNKNOWN_PATHS" >&2
+            exit 1
+          fi
+
+  metadata:
+    name: Metadata
+    if: github.event_name == 'pull_request' && github.event.action != 'labeled' && github.event.action != 'unlabeled'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint
 
   security:
     name: Security
-    if: github.event_name != 'pull_request' || (github.event.action != 'labeled' && github.event.action != 'unlabeled')
+    if: github.event_name != 'pull_request' || ((github.event.action != 'edited' || github.event.changes.base != null) && github.event.action != 'labeled' && github.event.action != 'unlabeled')
     runs-on: ubuntu-latest
 
     steps:
@@ -76,7 +132,7 @@ jobs:
 
   changeset:
     name: Changeset
-    if: github.event_name == 'pull_request' && github.event.action != 'labeled' && github.event.action != 'unlabeled'
+    if: github.event_name == 'pull_request' && (github.event.action != 'edited' || github.event.changes.base != null) && github.event.action != 'labeled' && github.event.action != 'unlabeled'
     runs-on: ubuntu-latest
 
     steps:
@@ -233,12 +289,6 @@ jobs:
 
       - name: Run typecheck
         run: pnpm typecheck
-
-      - name: Lint PR title
-        if: github.event_name == 'pull_request'
-        run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
 
   test:
     name: Test
