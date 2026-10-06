@@ -25,6 +25,10 @@
     "./catalog-terminology": {
       "types": "./dist/catalog-terminology.d.ts",
       "default": "./dist/catalog-terminology.js"
+    },
+    "./catalog-import": {
+      "types": "./dist/catalog-import/index.d.ts",
+      "default": "./dist/catalog-import/index.js"
     }
   },
   "scripts": {
