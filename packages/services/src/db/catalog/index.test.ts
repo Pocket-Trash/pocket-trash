@@ -8,6 +8,7 @@ import {
   createCatalogService,
   createCollectionsService,
   normalizeCollectionName,
+  resolveEffectiveSliderSetup,
 } from "./index.js";
 
 /**
@@ -77,6 +78,103 @@ describe("collection name normalization", () => {
       "roys",
     ]);
     expect(normalizeCollectionName(" --- ")).toBe("");
+  });
+});
+
+describe("effective owned slider setup", () => {
+  const configuration = {
+    groups: [],
+    label: "Catalog layout",
+    slots: [
+      {
+        documentedColumn: null,
+        documentedRow: null,
+        groupKey: null,
+        half: "half-a" as const,
+        key: "A1",
+        state: "empty" as const,
+      },
+    ],
+    sourceLabel: null,
+    sourceNotes: null,
+  };
+  const matchingDefault = {
+    clickCount: 5,
+    clickOptionId: 1000,
+    configuration,
+    copiedFromTemplateId: null,
+    id: 2000,
+    insertProductId: 3000,
+    insertProductName: "Matching insert",
+    isAdvertisedDefault: true,
+    isSliderAdvertisedDefault: true,
+  };
+  const otherInsertDefault = {
+    ...matchingDefault,
+    id: 2001,
+    insertProductId: 3001,
+    insertProductName: "Other insert",
+  };
+
+  it("uses only a matching installed insert for live catalog fallback", () => {
+    expect(
+      resolveEffectiveSliderSetup({
+        bodyHostedSetup: null,
+        installedInsertOffers: [],
+        installedInsertProductId: 3000,
+        ownedInsertSetup: null,
+        sliderAdvertisedOffers: [otherInsertDefault, matchingDefault],
+      }),
+    ).toMatchObject({
+      clickCount: 5,
+      source: "slider-default",
+    });
+    expect(
+      resolveEffectiveSliderSetup({
+        bodyHostedSetup: null,
+        installedInsertOffers: [],
+        installedInsertProductId: 3000,
+        ownedInsertSetup: null,
+        sliderAdvertisedOffers: [otherInsertDefault],
+      }),
+    ).toMatchObject({ clickCount: null, source: "not-recorded" });
+  });
+
+  it("lets a partial owned snapshot win without filling catalog gaps", () => {
+    expect(
+      resolveEffectiveSliderSetup({
+        bodyHostedSetup: null,
+        installedInsertOffers: [matchingDefault],
+        installedInsertProductId: 3000,
+        ownedInsertSetup: {
+          clickCount: null,
+          configuration: null,
+          sourceOfferId: null,
+        },
+        sliderAdvertisedOffers: [matchingDefault],
+      }),
+    ).toEqual({
+      clickCount: null,
+      configuration: null,
+      isLiveCatalog: false,
+      source: "owned-insert",
+    });
+  });
+
+  it("resolves an uninstalled slider default without creating an insert", () => {
+    expect(
+      resolveEffectiveSliderSetup({
+        bodyHostedSetup: null,
+        installedInsertOffers: [],
+        installedInsertProductId: null,
+        ownedInsertSetup: null,
+        sliderAdvertisedOffers: [matchingDefault],
+      }),
+    ).toMatchObject({
+      configuration,
+      isLiveCatalog: true,
+      source: "slider-default",
+    });
   });
 });
 
