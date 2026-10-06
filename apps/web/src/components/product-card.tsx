@@ -1,4 +1,5 @@
 import type { CatalogProduct } from "@package/services";
+import { MakerLink } from "@/components/maker-link";
 import { Badge } from "@/components/ui/badge";
 import { cardImageUrl } from "@/lib/card-image";
 
@@ -80,7 +81,12 @@ export function ProductCard({
           {product.name}
         </h2>
         <p className="mt-1 min-h-[2.9em] text-[12.5px] leading-[1.45] text-muted-foreground">
-          {product.productTypeName} · {product.makerName}
+          {product.productTypeName} ·{" "}
+          <MakerLink
+            className="relative z-20"
+            name={product.makerName}
+            slug={product.makerSlug}
+          />
         </p>
         <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
           <span>{materialCountLabel}</span>

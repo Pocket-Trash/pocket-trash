@@ -30,6 +30,7 @@ const product: CatalogProduct = {
   lengthMm: null,
   makerId: 1,
   makerName: "Maker",
+  makerSlug: "maker",
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: null,

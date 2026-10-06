@@ -34,6 +34,7 @@ const product: CatalogProduct = {
   lengthMm: null,
   makerId: 1000,
   makerName: "KAP EDC",
+  makerSlug: "kap-edc",
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",

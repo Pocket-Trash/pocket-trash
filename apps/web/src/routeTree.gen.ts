@@ -38,6 +38,7 @@ import { Route as FeedbackNewRouteImport } from './routes/feedback.new'
 import { Route as HelpIndexRouteImport } from './routes/help.index'
 import { Route as HelpSlugRouteImport } from './routes/help.$slug'
 import { Route as MakersIndexRouteImport } from './routes/makers.index'
+import { Route as MakersSlugRouteImport } from './routes/makers.$slug'
 import { Route as MaterialsIndexRouteImport } from './routes/materials.index'
 import { Route as MaterialsMaterialSlugRouteImport } from './routes/materials.$materialSlug'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
@@ -227,6 +228,11 @@ const HelpSlugRoute = HelpSlugRouteImport.update({
 const MakersIndexRoute = MakersIndexRouteImport.update({
   id: '/makers/',
   path: '/makers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MakersSlugRoute = MakersSlugRouteImport.update({
+  id: '/makers/$slug',
+  path: '/makers/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MaterialsIndexRoute = MaterialsIndexRouteImport.update({
@@ -492,6 +498,7 @@ export interface FileRoutesByFullPath {
   '/feedback/my-requests': typeof FeedbackMyRequestsRoute
   '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
+  '/makers/$slug': typeof MakersSlugRoute
   '/materials/$materialSlug': typeof MaterialsMaterialSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
@@ -564,6 +571,7 @@ export interface FileRoutesByTo {
   '/feedback/my-requests': typeof FeedbackMyRequestsRoute
   '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
+  '/makers/$slug': typeof MakersSlugRoute
   '/materials/$materialSlug': typeof MaterialsMaterialSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
@@ -641,6 +649,7 @@ export interface FileRoutesById {
   '/feedback/my-requests': typeof FeedbackMyRequestsRoute
   '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
+  '/makers/$slug': typeof MakersSlugRoute
   '/materials/$materialSlug': typeof MaterialsMaterialSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
@@ -719,6 +728,7 @@ export interface FileRouteTypes {
     | '/feedback/my-requests'
     | '/feedback/new'
     | '/help/$slug'
+    | '/makers/$slug'
     | '/materials/$materialSlug'
     | '/pens/$penId'
     | '/products/add'
@@ -791,6 +801,7 @@ export interface FileRouteTypes {
     | '/feedback/my-requests'
     | '/feedback/new'
     | '/help/$slug'
+    | '/makers/$slug'
     | '/materials/$materialSlug'
     | '/pens/$penId'
     | '/products/add'
@@ -867,6 +878,7 @@ export interface FileRouteTypes {
     | '/feedback/my-requests'
     | '/feedback/new'
     | '/help/$slug'
+    | '/makers/$slug'
     | '/materials/$materialSlug'
     | '/pens/$penId'
     | '/products/add'
@@ -937,6 +949,7 @@ export interface RootRouteChildren {
   CollectionsUserIdRoute: typeof CollectionsUserIdRoute
   CollectionsAddRoute: typeof CollectionsAddRoute
   HelpSlugRoute: typeof HelpSlugRoute
+  MakersSlugRoute: typeof MakersSlugRoute
   MaterialsMaterialSlugRoute: typeof MaterialsMaterialSlugRoute
   PensPenIdRoute: typeof PensPenIdRoute
   ProductsAddRoute: typeof ProductsAddRoute
@@ -1158,6 +1171,13 @@ declare module '@tanstack/react-router' {
       path: '/makers'
       fullPath: '/makers/'
       preLoaderRoute: typeof MakersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/makers/$slug': {
+      id: '/makers/$slug'
+      path: '/makers/$slug'
+      fullPath: '/makers/$slug'
+      preLoaderRoute: typeof MakersSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/materials/': {
@@ -1634,6 +1654,7 @@ const rootRouteChildren: RootRouteChildren = {
   CollectionsUserIdRoute: CollectionsUserIdRoute,
   CollectionsAddRoute: CollectionsAddRoute,
   HelpSlugRoute: HelpSlugRoute,
+  MakersSlugRoute: MakersSlugRoute,
   MaterialsMaterialSlugRoute: MaterialsMaterialSlugRoute,
   PensPenIdRoute: PensPenIdRoute,
   ProductsAddRoute: ProductsAddRoute,

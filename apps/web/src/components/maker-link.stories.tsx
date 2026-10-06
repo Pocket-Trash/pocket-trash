@@ -21,6 +21,9 @@ type Story = StoryObj<typeof meta>;
  */
 export const WithUrl: Story = {};
 
+/** Defines an internal maker profile link story. */
+export const WithSlug: Story = { args: { slug: "kap-edc" } };
+
 /**
  * Defines the without url maker link story.
  */
