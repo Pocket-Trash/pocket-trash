@@ -1493,6 +1493,36 @@ export const collectionSpinner = pgTable(
   ],
 );
 
+/** Catalog slider mapping selected for a standalone collection item. */
+export const collectionSlider = pgTable("collection_slider", {
+  id: bigint("id", { mode: "number" })
+    .primaryKey()
+    .references(() => collectionItem.id, { onDelete: "cascade" }),
+  productSliderId: bigint("product_slider_id", { mode: "number" })
+    .notNull()
+    .references(() => productSlider.id, { onDelete: "restrict" }),
+});
+
+/** Catalog slider plate-set mapping selected for a standalone collection item. */
+export const collectionSliderPlate = pgTable("collection_slider_plate", {
+  id: bigint("id", { mode: "number" })
+    .primaryKey()
+    .references(() => collectionItem.id, { onDelete: "cascade" }),
+  productSliderPlateId: bigint("product_slider_plate_id", { mode: "number" })
+    .notNull()
+    .references(() => productSliderPlate.id, { onDelete: "restrict" }),
+});
+
+/** Catalog slider insert-set mapping selected for a standalone collection item. */
+export const collectionSliderInsert = pgTable("collection_slider_insert", {
+  id: bigint("id", { mode: "number" })
+    .primaryKey()
+    .references(() => collectionItem.id, { onDelete: "cascade" }),
+  productSliderInsertId: bigint("product_slider_insert_id", { mode: "number" })
+    .notNull()
+    .references(() => productSliderInsert.id, { onDelete: "restrict" }),
+});
+
 /** Stored collection item row. */
 export type CollectionItem = typeof collectionItem.$inferSelect;
 /** Values accepted when creating a collection item row. */
@@ -1663,3 +1693,17 @@ export type CollectionSpinnerButton =
 /** Values accepted when creating a collection spinner button row. */
 export type NewCollectionSpinnerButton =
   typeof collectionSpinnerButton.$inferInsert;
+/** Stored collection slider row. */
+export type CollectionSlider = typeof collectionSlider.$inferSelect;
+/** Values accepted when creating a collection slider row. */
+export type NewCollectionSlider = typeof collectionSlider.$inferInsert;
+/** Stored collection slider plate-set row. */
+export type CollectionSliderPlate = typeof collectionSliderPlate.$inferSelect;
+/** Values accepted when creating a collection slider plate-set row. */
+export type NewCollectionSliderPlate =
+  typeof collectionSliderPlate.$inferInsert;
+/** Stored collection slider insert-set row. */
+export type CollectionSliderInsert = typeof collectionSliderInsert.$inferSelect;
+/** Values accepted when creating a collection slider insert-set row. */
+export type NewCollectionSliderInsert =
+  typeof collectionSliderInsert.$inferInsert;

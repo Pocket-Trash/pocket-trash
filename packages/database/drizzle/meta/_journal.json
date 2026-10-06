@@ -407,6 +407,13 @@
       "when": 1791276097381,
       "tag": "0057_demonic_miek",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1791277333852,
+      "tag": "0058_thin_white_tiger",
+      "breakpoints": true
     }
   ]
 }

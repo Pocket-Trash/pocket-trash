@@ -281,4 +281,19 @@ describe("catalog schema", () => {
       ),
     ).toEqual(["id", "id"]);
   });
+
+  it("models each owned slider product as a standalone collection item", () => {
+    for (const table of [
+      schema.collectionSlider,
+      schema.collectionSliderPlate,
+      schema.collectionSliderInsert,
+    ]) {
+      const config = getTableConfig(table);
+      expect(config.columns.map(({ name }) => name)).toEqual([
+        "id",
+        expect.stringMatching(/^product_slider(?:_plate|_insert)?_id$/u),
+      ]);
+      expect(config.foreignKeys).toHaveLength(2);
+    }
+  });
 });
