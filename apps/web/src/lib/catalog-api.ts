@@ -5,6 +5,7 @@ import type {
   CatalogLookup,
   CatalogProduct,
   CatalogProductType,
+  CatalogTerminologyAlias,
   ProductWriteInput,
   UserCollectionItem,
   UserCollectionSummary,
@@ -80,6 +81,14 @@ const slugNameSchema = z
  * Schema for a non-empty trimmed display name.
  */
 const displayNameSchema = z.string().trim().min(1, requiredMessage);
+/** Schema for a maker-scoped alias of a registered product type. */
+const terminologyAliasSchema = z.object({
+  canonicalKey: productTypeSchema,
+  canonicalNamespace: z.literal("product-type"),
+  isPreferred: z.boolean(),
+  label: z.string().trim().min(1, requiredMessage).max(80),
+  makerId: idSchema,
+});
 /**
  * Schema that preserves nonblank descriptions, limits them to 5,000 characters, and maps whitespace-only values to `null`.
  */
@@ -592,6 +601,8 @@ export type ProductFormInput = z.input<typeof productFormSchema>;
  * Lookup values and spinner buttons required by catalog forms.
  */
 export type CatalogOptions = {
+  /** Maker-scoped registered catalog terminology aliases. */
+  terminologyAliases?: CatalogTerminologyAlias[];
   /**
    * Available color effects.
    */
@@ -651,6 +662,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       productTypes,
       relationshipProducts,
       spinnerButtons,
+      terminologyAliases,
     ] = await Promise.all([
       listColorEffects(),
       listCompatibilityFamilies(),
@@ -662,6 +674,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       listProductTypes(),
       s.db.catalog.listProducts(undefined, viewer),
       s.db.catalog.listProducts("spinner-button", viewer),
+      s.db.catalog.listTerminologyAliases(),
     ]);
     return {
       colorEffects,
@@ -674,9 +687,18 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       productTypes,
       relationshipProducts,
       spinnerButtons,
+      terminologyAliases,
     };
   },
 );
+
+/** Lists registered catalog terminology aliases for shared client-side search. */
+export const listCatalogTerminologyAliases = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<CatalogTerminologyAlias[]> => {
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listTerminologyAliases();
+});
 
 /**
  * Lists visible products, optionally limited to one product type.
@@ -871,6 +893,25 @@ export const createCatalogCompatibilityFamily = createServerFn({
       }
     },
   );
+
+/** Validates and creates an audited maker-scoped catalog terminology alias. */
+export const createCatalogTerminologyAlias = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("products.manage");
+    const parsed = terminologyAliasSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+    const { s } = await import("@/lib/services");
+    try {
+      const terminologyAlias = await s.db.catalog.createTerminologyAlias({
+        actor,
+        ...parsed.data,
+      });
+      return { ok: true as const, terminologyAlias };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
 
 /**
  * Validates and creates a uniquely slugged finish for an authorized product manager.

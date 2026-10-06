@@ -1,5 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { getUserCollection, getUserCollections } from "@/lib/catalog-api";
+import {
+  getUserCollection,
+  getUserCollections,
+  listCatalogTerminologyAliases,
+} from "@/lib/catalog-api";
 import { parseCatalogFilterSearch } from "@/lib/catalog-filters";
 import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { UserCollectionsPage } from "@/pages/catalog-pages";
@@ -16,11 +20,12 @@ export const Route = createFileRoute("/user/collections")({
    * @rejects When the current user's collection data cannot be loaded.
    */
   loader: async () => {
-    const [items, collections] = await Promise.all([
+    const [items, collections, aliases] = await Promise.all([
       getUserCollection(),
       getUserCollections(),
+      listCatalogTerminologyAliases(),
     ]);
-    return { collections, items };
+    return { aliases, collections, items };
   },
   component: UserCollectionsRoute,
 });
@@ -39,6 +44,7 @@ function UserCollectionsRoute() {
   );
   return (
     <UserCollectionsPage
+      aliases={Route.useLoaderData().aliases}
       collections={Route.useLoaderData().collections}
       filters={filters}
       items={Route.useLoaderData().items}

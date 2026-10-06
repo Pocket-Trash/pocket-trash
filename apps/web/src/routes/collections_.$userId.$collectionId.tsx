@@ -1,5 +1,8 @@
 import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
-import { getPublicCollection } from "@/lib/catalog-api";
+import {
+  getPublicCollection,
+  listCatalogTerminologyAliases,
+} from "@/lib/catalog-api";
 import { parseCatalogFilterSearch } from "@/lib/catalog-filters";
 import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { CollectionPage } from "@/pages/catalog-pages";
@@ -52,9 +55,12 @@ export const Route = createFileRoute("/collections_/$userId/$collectionId")({
     ) {
       throw notFound();
     }
-    const result = await getPublicCollection({ data: params });
+    const [result, aliases] = await Promise.all([
+      getPublicCollection({ data: params }),
+      listCatalogTerminologyAliases(),
+    ]);
     if (!result) throw notFound();
-    return result;
+    return { ...result, aliases };
   },
   component: PublicCollectionRoute,
 });
@@ -82,6 +88,7 @@ function PublicCollectionRoute() {
   );
   return (
     <CollectionPage
+      aliases={data.aliases}
       collection={data.collection}
       filters={filters}
       items={data.items}

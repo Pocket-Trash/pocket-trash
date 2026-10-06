@@ -496,6 +496,8 @@ describe("product form conditional fields", () => {
 
     expect(html).toContain("Compatibility families");
     expect(html).toContain("Reviewed advisory");
+    expect(html).toContain("Maker terminology");
+    expect(html).toContain("Add terminology alias");
     expect(html).toContain('aria-label="Length"');
     expect(html).not.toContain('aria-label="Diameter"');
     if (productTypeSlug === "slider") {

@@ -7,6 +7,7 @@ import type {
   CatalogLookup,
   CatalogProduct,
   CatalogProductType,
+  CatalogTerminologyAlias,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
@@ -52,6 +53,7 @@ import {
   createCatalogMaker,
   createCatalogMaterial,
   createCatalogPattern,
+  createCatalogTerminologyAlias,
   deleteCollectionItem,
   deleteUserCollection,
   finishOptionSchema,
@@ -390,6 +392,43 @@ export function ProductEditor({
             );
           }}
         </form.Field>
+        <form.Subscribe selector={(state) => state.values.makerId}>
+          {(makerId) =>
+            makerId > 0 ? (
+              <Field label={t("web.slider.alias.managementLabel")}>
+                {(options.terminologyAliases ?? [])
+                  .filter(
+                    (alias) =>
+                      alias.makerId === makerId &&
+                      alias.canonicalKey === productTypeSlug,
+                  )
+                  .map((alias) => (
+                    <p className="text-sm" key={alias.id}>
+                      {alias.label}
+                      {alias.isPreferred
+                        ? ` · ${t("web.slider.alias.preferred")}`
+                        : ""}
+                    </p>
+                  ))}
+                <LookupDialog
+                  canonicalKey={productTypeSlug}
+                  kind="terminologyAlias"
+                  makerId={makerId}
+                  onCreated={(terminologyAlias) =>
+                    setOptions((current) => ({
+                      ...current,
+                      terminologyAliases: [
+                        ...(current.terminologyAliases ?? []),
+                        terminologyAlias,
+                      ],
+                    }))
+                  }
+                  t={t}
+                />
+              </Field>
+            ) : null
+          }
+        </form.Subscribe>
         <form.Field name="makerProductUrl">
           {(field) => (
             <Field label={t("web.catalog.field.makerProductUrl")}>
@@ -1294,6 +1333,20 @@ type LookupDialogProps = (
       onCreated: (value: CatalogCompatibilityFamily) => void;
     }
   | {
+      /** Product type named by the alias. */
+      canonicalKey: CatalogProductType;
+      /** Lookup kind created by this dialog. */
+      kind: "terminologyAlias";
+      /** Maker that owns the terminology alias. */
+      makerId: number;
+      /**
+       * Receives the created terminology alias.
+       *
+       * @param value - Created catalog terminology alias.
+       */
+      onCreated: (value: CatalogTerminologyAlias) => void;
+    }
+  | {
       /** Lookup kind created by this dialog. */
       kind: "finish" | "material" | "pattern";
       /**
@@ -1322,6 +1375,7 @@ function LookupDialog(props: LookupDialogProps) {
   const [name, setName] = React.useState("");
   const [hex, setHex] = React.useState("#808080");
   const [rootUrl, setRootUrl] = React.useState("");
+  const [isPreferred, setIsPreferred] = React.useState(false);
   const [fieldErrors, setFieldErrors] = React.useState<
     Record<string, string[] | undefined>
   >({});
@@ -1333,6 +1387,7 @@ function LookupDialog(props: LookupDialogProps) {
     maker: "web.action.addMaker",
     material: "web.action.addMaterial",
     pattern: "web.slider.appearance.pattern",
+    terminologyAlias: "web.slider.alias.add",
   }[kind] as TranslationKey;
 
   /**
@@ -1359,6 +1414,22 @@ function LookupDialog(props: LookupDialogProps) {
         return;
       }
       props.onCreated(result.compatibilityFamily);
+    } else if (props.kind === "terminologyAlias") {
+      const result = await createCatalogTerminologyAlias({
+        data: {
+          canonicalKey: props.canonicalKey,
+          canonicalNamespace: "product-type",
+          isPreferred,
+          label: name,
+          makerId: props.makerId,
+        },
+      });
+      if (!result.ok) {
+        setFieldErrors(result.fieldErrors);
+        setError(result.formError);
+        return;
+      }
+      props.onCreated(result.terminologyAlias);
     } else if (props.kind === "material") {
       const result = await createCatalogMaterial({ data: { name } });
       if (!result.ok) {
@@ -1395,6 +1466,7 @@ function LookupDialog(props: LookupDialogProps) {
     setName("");
     setHex("#808080");
     setRootUrl("");
+    setIsPreferred(false);
     setFieldErrors({});
     setError(null);
     ref.current?.close();
@@ -1444,7 +1516,7 @@ function LookupDialog(props: LookupDialogProps) {
               />
               <FieldError error={fieldErrors.rootUrl?.[0]} t={t} />
             </Field>
-          ) : (
+          ) : kind === "terminologyAlias" ? null : (
             <Field label={t("web.catalog.field.slug")}>
               <Input
                 aria-label={t("web.catalog.field.slug")}
@@ -1453,6 +1525,16 @@ function LookupDialog(props: LookupDialogProps) {
               />
             </Field>
           )}
+          {kind === "terminologyAlias" ? (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                checked={isPreferred}
+                onChange={(event) => setIsPreferred(event.target.checked)}
+                type="checkbox"
+              />
+              {t("web.slider.alias.preferred")}
+            </label>
+          ) : null}
           {kind === "color" ? (
             <Field label={t("web.catalog.field.colors")}>
               <Input
