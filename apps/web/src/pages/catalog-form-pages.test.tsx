@@ -396,8 +396,8 @@ describe("finish option editor", () => {
       }),
     );
 
-    expect(html).toContain("web.slider.component.installedPlate");
-    expect(html).toContain("web.slider.component.installedInsert");
+    expect(html).toContain("Installed plate");
+    expect(html).toContain("Installed insert");
     expect(html).toContain("Plate");
     expect(html).not.toContain("Busy plate");
   });
@@ -766,7 +766,9 @@ describe("collection add form", () => {
       }),
     );
 
-    expect(html).toContain("web.slider.relationship.inclusionHelp");
+    expect(html).toContain(
+      "Included components describe what is sold with this product. They do not create collection items.",
+    );
     expect(html).toContain("Suggested plate");
     expect(html).toContain("Suggested insert");
   });
