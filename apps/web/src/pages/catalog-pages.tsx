@@ -110,9 +110,24 @@ type PaginatedCardsProps<T> = {
   children(items: T[]): ReactNode;
   /** Ordered card data to paginate. */
   items: T[];
+  /** Zero-based externally controlled page. */
+  page?: number;
+  /**
+   * Handles controlled page changes and out-of-range replacement.
+   *
+   * @param page - Zero-based destination page.
+   * @param options - Navigation history behavior.
+   */
+  onPageChange?: (page: number, options: PageChangeOptions) => void;
   /** Maximum cards rendered above 1280 CSS pixels. */
   widePageSize: number;
 };
+
+/** Navigation options for a controlled catalog page change. */
+interface PageChangeOptions {
+  /** Replace the current history entry instead of pushing one. */
+  replace: boolean;
+}
 
 /**
  * Resolves catalog page size from the browser viewport width.
@@ -138,20 +153,24 @@ export function getCatalogPageSize(
  * @returns The current card page and controls when multiple pages exist.
  * @template T - Card data preserved while slicing pages.
  */
-function PaginatedCards<T>({
+export function PaginatedCards<T>({
   ariaLabel,
   children,
   items,
+  onPageChange,
+  page: controlledPage,
   widePageSize,
 }: PaginatedCardsProps<T>) {
   const t = useCatalogCopy();
   const [pageSize, setPageSize] = useState(12);
+  const [viewportMeasured, setViewportMeasured] = useState(false);
   const [renderedItems, setRenderedItems] = useState(items);
   const [requestedPage, setRequestedPage] = useState(0);
   useEffect(() => {
     /** Synchronizes the page size with the current catalog grid width. */
     const updatePageSize = () => {
       setPageSize(getCatalogPageSize(window.innerWidth, widePageSize));
+      setViewportMeasured(true);
     };
     updatePageSize();
     window.addEventListener("resize", updatePageSize);
@@ -159,10 +178,34 @@ function PaginatedCards<T>({
   }, [widePageSize]);
   if (renderedItems !== items) {
     setRenderedItems(items);
-    setRequestedPage(0);
+    if (controlledPage === undefined) setRequestedPage(0);
   }
   const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
-  const page = Math.min(requestedPage, pageCount - 1);
+  const page = Math.max(
+    0,
+    Math.min(controlledPage ?? requestedPage, pageCount - 1),
+  );
+  useEffect(() => {
+    if (
+      viewportMeasured &&
+      controlledPage !== undefined &&
+      controlledPage !== page
+    ) {
+      onPageChange?.(page, { replace: true });
+    }
+  }, [controlledPage, onPageChange, page, viewportMeasured]);
+  /**
+   * Applies a user-requested page to controlled or local state.
+   *
+   * @param nextPage - Zero-based destination page.
+   */
+  const changePage = (nextPage: number) => {
+    if (onPageChange) {
+      onPageChange(nextPage, { replace: false });
+    } else {
+      setRequestedPage(nextPage);
+    }
+  };
 
   return (
     <>
@@ -175,7 +218,7 @@ function PaginatedCards<T>({
           <Button
             aria-label={t("web.collections.gallery.previousPage")}
             disabled={page === 0}
-            onClick={() => setRequestedPage(page - 1)}
+            onClick={() => changePage(page - 1)}
             size="icon"
             type="button"
             variant="outline"
@@ -191,7 +234,7 @@ function PaginatedCards<T>({
           <Button
             aria-label={t("web.collections.gallery.nextPage")}
             disabled={page === pageCount - 1}
-            onClick={() => setRequestedPage(page + 1)}
+            onClick={() => changePage(page + 1)}
             size="icon"
             type="button"
             variant="outline"
@@ -502,7 +545,7 @@ export function ProductDetailPage({
             {product.productTypeName}
           </Detail>
           <Detail label={t("web.catalog.field.maker")}>
-            <MakerLink name={product.makerName} url={product.makerUrl} />
+            <MakerLink name={product.makerName} slug={product.makerSlug} />
           </Detail>
           {product.makerProductUrl && product.makerProductUrlValid ? (
             <Detail label={t("web.catalog.field.makerProductUrl")}>
@@ -1039,7 +1082,12 @@ export function CollectionPage({
                   </Badge>
                 ) : null}
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {item.productTypeName} · {item.makerName}
+                  {item.productTypeName} ·{" "}
+                  <MakerLink
+                    className="relative z-20"
+                    name={item.makerName}
+                    slug={item.makerSlug}
+                  />
                 </p>
                 {item.material ? (
                   <p className="mt-3 text-xs text-muted-foreground">
@@ -1427,7 +1475,7 @@ export function CollectionItemDetailPage({
             {item.productTypeName}
           </Detail>
           <Detail label={t("web.catalog.field.maker")}>
-            <MakerLink name={item.makerName} url={item.makerUrl} />
+            <MakerLink name={item.makerName} slug={item.makerSlug} />
           </Detail>
           {item.material ? (
             <Detail label={t("web.catalog.field.materials")}>

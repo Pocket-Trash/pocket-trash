@@ -8,6 +8,7 @@ import type {
   CatalogProduct,
   CatalogProductType,
   ProductWriteInput,
+  PublicMakerDetail,
   PublicMakerSummary,
   PublicMaterial,
   PublicMaterialSummary,
@@ -728,6 +729,28 @@ export const listPublicMakers = createServerFn({ method: "GET" }).handler(
     );
   },
 );
+
+/**
+ * Loads one public maker profile with signed related catalog images.
+ *
+ * @returns The matching maker detail, or `null` when absent.
+ * @rejects If validation, service loading, persistence, or image signing fails.
+ */
+export const getPublicMakerDetail = createServerFn({ method: "GET" })
+  .validator((input: unknown) =>
+    z.object({ slug: z.string().regex(slugPattern) }).parse(input),
+  )
+  .handler(async ({ data }): Promise<PublicMakerDetail | null> => {
+    const { s } = await import("@/lib/services");
+    const maker = await s.db.catalog.getPublicMakerDetail(data.slug);
+    if (!maker) return null;
+    const [images, products, collectionItems] = await Promise.all([
+      signCatalogImageUrls(maker.images),
+      signCatalogProducts(maker.products),
+      Promise.all(maker.collectionItems.map(signCollectionItem)),
+    ]);
+    return { ...maker, collectionItems, images, products };
+  });
 
 /**
  * Loads one maker profile for the current product administrator.

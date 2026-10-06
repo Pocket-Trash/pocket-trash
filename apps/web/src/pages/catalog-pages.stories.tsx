@@ -2,6 +2,7 @@ import type {
   CatalogImage,
   CatalogProduct,
   PublicCollectionOwner,
+  PublicMakerDetail,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
@@ -22,6 +23,7 @@ import {
   UserCollectionsPage,
 } from "./catalog-pages";
 import { HelpIndexPage, HelpTopicPage } from "./help-pages";
+import { MakerDetailPage } from "./maker-detail-page";
 import { UserIndexPage } from "./user-index-page";
 
 /** Product image used by catalog page stories. */
@@ -61,6 +63,7 @@ const product: CatalogProduct = {
   lengthMm: null,
   makerId: 1000,
   makerName: "KAP EDC",
+  makerSlug: "kap-edc",
   makerProductUrl: "https://www.kapedc.com/products/katla",
   makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
@@ -116,6 +119,7 @@ const item: UserCollectionItem = {
   isPrivate: false,
   makerId: product.makerId,
   makerName: product.makerName,
+  makerSlug: product.makerSlug,
   makerUrl: product.makerUrl,
   material: product.materials[0] ?? null,
   name: product.name,
@@ -152,6 +156,18 @@ const owner: PublicCollectionOwner = {
   username: "royanger",
 };
 
+/** Public maker detail shared by the story. */
+const maker: PublicMakerDetail = {
+  collectionItems: [item],
+  description: "KAP EDC makes **precision-machined** everyday carry products.",
+  id: product.makerId,
+  images: [productImage],
+  name: product.makerName,
+  products: [product],
+  rootUrl: product.makerUrl,
+  slug: product.makerSlug,
+};
+
 /** Image guide document rendered by the help topic story. */
 const imageGuide = getHelpDocument("en-US", "image-size-and-resolution-guide");
 if (!imageGuide) throw new Error("The image guide story fixture is missing.");
@@ -173,6 +189,24 @@ const meta = {
 export default meta;
 /** A catalog page story. */
 type Story = StoryObj<typeof meta>;
+
+/** Public maker detail page story. */
+export const MakerDetail: Story = {
+  /**
+   * Renders the public maker detail story.
+   *
+   * @returns A maker profile with related catalog content.
+   */
+  render: () => (
+    <MakerDetailPage
+      collectionItemsPage={0}
+      maker={maker}
+      onCollectionItemsPageChange={fn()}
+      onProductsPageChange={fn()}
+      productsPage={0}
+    />
+  ),
+};
 
 /** Collection page story. */
 export const Collection: Story = {

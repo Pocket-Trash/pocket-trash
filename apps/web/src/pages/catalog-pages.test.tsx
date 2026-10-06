@@ -11,6 +11,7 @@ import {
   CollectionPage,
   getCatalogPageSize,
   HomePage,
+  PaginatedCards,
   ProductDetailPage,
   ProductGrid,
   PublicCollectionsPage,
@@ -223,6 +224,7 @@ const owners = [
         isPrivate: false,
         makerId: 1,
         makerName: "KAP EDC",
+        makerSlug: "kap-edc",
         makerUrl: null,
         material: null,
         name: "Catla",
@@ -263,6 +265,7 @@ const product: CatalogProduct = {
   lengthMm: null,
   makerId: 1,
   makerName: "KAP EDC",
+  makerSlug: "kap-edc",
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
@@ -290,6 +293,24 @@ describe("getCatalogPageSize", () => {
     expect(getCatalogPageSize(1280, 15)).toBe(12);
     expect(getCatalogPageSize(1281, 15)).toBe(15);
     expect(getCatalogPageSize(1281, 20)).toBe(20);
+    expect(getCatalogPageSize(1281, 16)).toBe(16);
+  });
+
+  it("renders an externally controlled page without changing shared defaults", () => {
+    const html = renderToStaticMarkup(
+      <PaginatedCards
+        ariaLabel="Controlled cards"
+        items={Array.from({ length: 14 }, (_value, index) => index + 1)}
+        onPageChange={vi.fn()}
+        page={1}
+        widePageSize={16}
+      >
+        {(items) => <div>{items.join(",")}</div>}
+      </PaginatedCards>,
+    );
+
+    expect(html).toContain(">13,14<");
+    expect(html).not.toContain(">1,2,3,");
   });
 });
 
@@ -579,7 +600,7 @@ describe("ProductDetailPage", () => {
     expect(html).toContain('class="grid gap-3 lg:grid-cols-2"');
     expect(html).toContain('href="/collections/1002/1000"');
     expect(html).toContain('href="/collections/1002/1000/2000"');
-    expect(html).toContain('href="https://www.kapedc.com"');
+    expect(html).toContain('href="/makers/kap-edc"');
   });
 
   it("renders sanitized markdown and only valid maker product links", () => {

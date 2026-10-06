@@ -33,6 +33,7 @@ export type AppShellProps = {
           | "/changelog"
           | "/help"
           | "/materials"
+          | "/makers"
           | "/products"
           | "/notifications"
           | "/user"

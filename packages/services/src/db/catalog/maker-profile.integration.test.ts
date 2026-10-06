@@ -260,6 +260,29 @@ describe("maker profile persistence", () => {
           slug: "directory-maker",
         }),
       ]);
+      await expect(
+        service.getPublicMakerDetail("directory-maker"),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          collectionItems: [
+            expect.objectContaining({
+              displayName: "Visible",
+              makerSlug: "directory-maker",
+            }),
+          ],
+          images: [expect.objectContaining({ fileName: "lead.png" })],
+          products: [
+            expect.objectContaining({
+              makerSlug: "directory-maker",
+              name: "Public product",
+            }),
+          ],
+          slug: "directory-maker",
+        }),
+      );
+      await expect(
+        service.getPublicMakerDetail("missing-maker"),
+      ).resolves.toBeNull();
     } finally {
       await client.close();
     }

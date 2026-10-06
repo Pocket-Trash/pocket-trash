@@ -124,6 +124,7 @@ export type {
   ProductApprovalStatus,
   ProductWriteInput,
   PublicCollectionOwner,
+  PublicMakerDetail,
   PublicMakerSummary,
   PublicMaterial,
   PublicMaterialSummary,

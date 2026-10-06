@@ -157,6 +157,14 @@ export type PublicMakerSummary = CatalogMaker & {
   productCount: number;
 };
 
+/** Public maker profile with its visibility-filtered related catalog data. */
+export type PublicMakerDetail = CatalogMaker & {
+  /** Distinct owned and unsold public collection items associated with the maker. */
+  collectionItems: UserCollectionItem[];
+  /** Distinct approved public products associated with the maker. */
+  products: CatalogProduct[];
+};
+
 /**
  * Catalog color lookup with its hexadecimal display value.
  */
@@ -401,6 +409,8 @@ export type CatalogProduct = {
    * Maker name.
    */
   makerName: string;
+  /** Stable public maker slug. */
+  makerSlug: string;
   /**
    * Maker product URL.
    */
@@ -781,6 +791,14 @@ export type CatalogService = {
     productSlug: string,
     viewer?: CatalogViewer,
   ): Promise<CatalogProduct | null>;
+  /**
+   * Returns one public maker profile and its public catalog content.
+   *
+   * @param slug - Stable maker slug.
+   * @returns The matching public maker detail, or `null` when absent.
+   * @rejects When maker or catalog data cannot be queried.
+   */
+  getPublicMakerDetail(slug: string): Promise<PublicMakerDetail | null>;
   /**
    * Returns one maker profile to an authorized product manager.
    *
@@ -1192,6 +1210,8 @@ export type UserCollectionItem = {
    * Maker name.
    */
   makerName: string;
+  /** Stable public maker slug. */
+  makerSlug: string;
   /**
    * Maker URL.
    */
@@ -2592,6 +2612,35 @@ export function createCatalogService(
      */
     async listMakers() {
       return await queryMakerProfiles(db, false);
+    },
+    /**
+     * Returns one public maker profile with public products and collection items.
+     *
+     * @param slug - Stable maker slug.
+     * @returns Public detail for the matching maker, or `null` when absent.
+     * @rejects When maker or catalog data cannot be queried.
+     */
+    async getPublicMakerDetail(slug) {
+      const maker = (await queryMakerProfiles(db, false)).find(
+        (candidate) => candidate.slug === slug,
+      );
+      if (!maker) return null;
+      const [products, collectionItems] = await Promise.all([
+        queryProducts(db),
+        queryOwnedItems(db, undefined, undefined, {
+          makerId: maker.id,
+          publicOnly: true,
+        }),
+      ]);
+      return {
+        ...maker,
+        collectionItems: [
+          ...new Map(
+            collectionItems.map((item) => [item.collectionItemId, item]),
+          ).values(),
+        ],
+        products: products.filter((product) => product.makerId === maker.id),
+      };
     },
     /**
      * Lists public maker directory summaries.
@@ -5892,6 +5941,7 @@ async function queryProducts(
       lengthMm: schema.productSpinner.lengthMm,
       makerId: schema.maker.id,
       makerName: schema.maker.name,
+      makerSlug: schema.maker.slug,
       makerProductUrl: schema.product.makerProductUrl,
       makerProductUrlValid: schema.product.makerProductUrlValid,
       makerUrl: schema.maker.rootUrl,
@@ -5978,6 +6028,7 @@ async function queryProducts(
       lengthMm: row.lengthMm,
       makerId: row.makerId,
       makerName: row.makerName,
+      makerSlug: row.makerSlug,
       makerProductUrl: row.makerProductUrl,
       makerProductUrlValid: row.makerProductUrlValid,
       makerUrl: row.makerUrl,
@@ -6235,6 +6286,8 @@ async function queryOwnedItems(
      * Include private.
      */
     includePrivate?: boolean;
+    /** Maker identifier. */
+    makerId?: number;
     /**
      * Directly assigned material identifier.
      */
@@ -6279,13 +6332,16 @@ async function queryOwnedItems(
   if (options.materialId !== undefined) {
     conditions.push(eq(schema.collectionItem.materialId, options.materialId));
   }
+  if (options.makerId !== undefined) {
+    conditions.push(eq(schema.maker.id, options.makerId));
+  }
   if (options.ownerUserId !== undefined) {
     conditions.push(eq(schema.collectionItem.ownerId, options.ownerUserId));
   }
   if (options.productId !== undefined) {
     conditions.push(eq(schema.product.id, options.productId));
   }
-  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false and ${schema.collectionItem.approvalStatus} = 'approved' and ${schema.product.approvalStatus} = 'approved' and ${schema.product.isPrivate} = false)`;
+  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false and ${schema.collectionItem.soldAt} is null and ${schema.collectionItem.approvalStatus} = 'approved' and ${schema.product.approvalStatus} = 'approved' and ${schema.product.isPrivate} = false)`;
   if (options.publicOnly) {
     conditions.push(publicItem);
   } else if (!options.includePrivate) {
@@ -6316,6 +6372,7 @@ async function queryOwnedItems(
       privatedByClerkId: schema.collectionItem.privatedByClerkId,
       makerId: schema.maker.id,
       makerName: schema.maker.name,
+      makerSlug: schema.maker.slug,
       makerUrl: schema.maker.rootUrl,
       materialId: schema.material.id,
       materialName: schema.material.name,
@@ -6428,6 +6485,7 @@ async function queryOwnedItems(
     isOwner: options.viewerClerkId === row.ownerClerkId,
     makerId: row.makerId,
     makerName: row.makerName,
+    makerSlug: row.makerSlug,
     makerUrl: row.makerUrl,
     material:
       row.materialId && row.materialName && row.materialSlug
