@@ -95,7 +95,7 @@ describe("maker administration pages", () => {
     expect(html).toContain("Autmog");
     expect(html).toContain("autmog");
     expect(html).toContain("web.action.addMaker");
-    expect(html).toContain("web.action.edit: Autmog");
+    expect(html).toContain('aria-label="web.admin.makers.editMaker"');
   });
 
   it("keeps the persisted slug read-only while editing a renamed maker", () => {
