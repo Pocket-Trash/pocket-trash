@@ -1084,7 +1084,7 @@ describe("catalog lookup writes", () => {
     }
   });
 
-  it("updates maker product URL validity without rewriting the product", async () => {
+  it("marks maker product URL validity as a meaningful update", async () => {
     const { db, updates } = setup(
       [],
       [[{ makerProductUrlValid: true, ownerUserId: 1000 }]],
@@ -1103,7 +1103,10 @@ describe("catalog lookup writes", () => {
 
     expect(updates).toContainEqual({
       table: schema.product,
-      value: { makerProductUrlValid: false },
+      value: {
+        makerProductUrlValid: false,
+        updatedAt: expect.any(Date),
+      },
     });
   });
 

@@ -5,6 +5,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
@@ -441,6 +442,189 @@ describe("catalog product persistence", () => {
           reason: "Remove referenced component",
         }),
       ).resolves.toBe(false);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("orders canonical meaningful updates without approval or privacy churn", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      const migrationsFolder = fileURLToPath(
+        new URL("../../../../database/drizzle", import.meta.url),
+      );
+      for (const file of readdirSync(migrationsFolder)
+        .filter((name) => name.endsWith(".sql"))
+        .sort()) {
+        await client.exec(
+          readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
+            "--> statement-breakpoint",
+            "",
+          ),
+        );
+      }
+      const [maker] = await db
+        .insert(schema.maker)
+        .values({ name: "Recent Maker" })
+        .returning({ id: schema.maker.id });
+      await db
+        .insert(schema.productType)
+        .values({ name: "Spinner", slug: "spinner" });
+      const [material] = await db
+        .insert(schema.material)
+        .values({ name: "Titanium", slug: "titanium" })
+        .returning({ id: schema.material.id });
+      await db.insert(schema.user).values({ clerkId: "admin-recent" });
+      if (!maker || !material)
+        throw new Error("Recent-product fixtures were not created.");
+
+      const service = createDbServices(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      ).catalog;
+      const actor = { clerkId: "admin-recent", role: "admin" as const };
+      const created = [];
+      for (const [name, slug] of [
+        ["Beta", "beta"],
+        ["Alpha", "alpha-one"],
+        ["Alpha", "alpha-two"],
+      ] as const) {
+        created.push(
+          await service.createProduct({
+            actor,
+            finishOptions: [],
+            makerId: maker.id,
+            materialIds: [material.id],
+            name,
+            productTypeSlug: "spinner",
+            slug,
+            specs: { bearing: "R188" },
+          }),
+        );
+      }
+      const [beta, alphaOne, alphaTwo] = created;
+      if (!beta || !alphaOne || !alphaTwo)
+        throw new Error("Recent products were not created.");
+      const baseline = new Date("2026-01-01T00:00:00.000Z");
+      const misleadingSubtypeDate = new Date("2030-01-01T00:00:00.000Z");
+      await db.update(schema.product).set({ updatedAt: baseline });
+      await db
+        .update(schema.productSpinner)
+        .set({ updatedAt: misleadingSubtypeDate })
+        .where(eq(schema.productSpinner.id, beta.id));
+
+      await expect(service.listProducts(undefined, actor)).resolves.toEqual([
+        expect.objectContaining({ id: alphaOne.id, updatedAt: baseline }),
+        expect.objectContaining({ id: alphaTwo.id, updatedAt: baseline }),
+        expect.objectContaining({ id: beta.id, updatedAt: baseline }),
+      ]);
+
+      await service.decideProductApproval({
+        action: "approve",
+        actor,
+        productId: beta.id,
+        reason: "Ready",
+      });
+      await service.setVisibility({
+        actor,
+        isPrivate: true,
+        productId: beta.id,
+      });
+      await service.setVisibility({
+        actor,
+        isPrivate: false,
+        productId: beta.id,
+      });
+      const [moderated] = await db
+        .select({ updatedAt: schema.product.updatedAt })
+        .from(schema.product)
+        .where(eq(schema.product.id, beta.id));
+      expect(moderated?.updatedAt).toEqual(baseline);
+
+      const updated = await service.updateProduct({
+        actor,
+        finishOptions: [],
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: beta.name,
+        productId: beta.id,
+        productTypeSlug: "spinner",
+        slug: beta.slug,
+        specs: { bearing: "One Drop" },
+      });
+      expect(updated.updatedAt.getTime()).toBeGreaterThan(baseline.getTime());
+      expect((await service.listProducts(undefined, actor))[0]?.id).toBe(
+        beta.id,
+      );
+
+      await db
+        .update(schema.product)
+        .set({ updatedAt: baseline })
+        .where(eq(schema.product.id, beta.id));
+      await service.attachImages({
+        actor,
+        files: [
+          {
+            contentType: "image/jpeg",
+            fileName: "beta.jpg",
+            kind: "image",
+            objectPath: "images/test/products/beta.jpg",
+            position: 0,
+            sha256: "a".repeat(64),
+            size: 12,
+            url: "https://cdn.example/beta.jpg",
+          },
+        ],
+        target: { id: beta.id, type: "product" },
+      });
+      const [image] = await db
+        .select({ id: schema.productImage.id })
+        .from(schema.productImage)
+        .where(eq(schema.productImage.productId, beta.id));
+      const [afterImage] = await db
+        .select({ updatedAt: schema.product.updatedAt })
+        .from(schema.product)
+        .where(eq(schema.product.id, beta.id));
+      expect(afterImage?.updatedAt.getTime()).toBeGreaterThan(
+        baseline.getTime(),
+      );
+      if (!image) throw new Error("Product image was not created.");
+
+      await db
+        .update(schema.product)
+        .set({ updatedAt: baseline })
+        .where(eq(schema.product.id, beta.id));
+      await service.softDeleteImage({
+        actor,
+        imageId: image.id,
+        targetType: "product",
+      });
+      const [afterDeletion] = await db
+        .select({ updatedAt: schema.product.updatedAt })
+        .from(schema.product)
+        .where(eq(schema.product.id, beta.id));
+      expect(afterDeletion?.updatedAt.getTime()).toBeGreaterThan(
+        baseline.getTime(),
+      );
+
+      await db
+        .update(schema.product)
+        .set({ updatedAt: baseline })
+        .where(eq(schema.product.id, beta.id));
+      await service.restoreImage({
+        actor,
+        imageId: image.id,
+        targetType: "product",
+      });
+      const [afterRestore] = await db
+        .select({ updatedAt: schema.product.updatedAt })
+        .from(schema.product)
+        .where(eq(schema.product.id, beta.id));
+      expect(afterRestore?.updatedAt.getTime()).toBeGreaterThan(
+        baseline.getTime(),
+      );
     } finally {
       await client.close();
     }
