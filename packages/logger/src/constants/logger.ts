@@ -71,6 +71,7 @@ export const loggerMessages = {
     catalog: {
       attachImages: "database.catalog.attachImages",
       selectCollectionCover: "database.catalog.selectCollectionCover",
+      createCompatibilityFamily: "database.catalog.createCompatibilityFamily",
       createColor: "database.catalog.createColor",
       createFinish: "database.catalog.createFinish",
       createMaker: "database.catalog.createMaker",
@@ -81,6 +82,7 @@ export const loggerMessages = {
       createProduct: "database.catalog.createProduct",
       deleteProduct: "database.catalog.deleteProduct",
       listColorEffects: "database.catalog.listColorEffects",
+      listCompatibilityFamilies: "database.catalog.listCompatibilityFamilies",
       listColors: "database.catalog.listColors",
       listFinishes: "database.catalog.listFinishes",
       listPatterns: "database.catalog.listPatterns",
