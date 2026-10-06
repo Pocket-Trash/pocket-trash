@@ -99,6 +99,11 @@ export const commandSecrets = {
       databaseUrlUserOverride: true,
       paths: [webSecretPath, databaseLocalSecretPath],
     },
+    "db:validate:personal": {
+      allowServerSecrets: false,
+      databaseUrlUserOverride: true,
+      paths: [databaseLocalSecretPath],
+    },
     "resources:reconcile-storage": {
       allowServerSecrets: true,
       environmentSlug: "preview",

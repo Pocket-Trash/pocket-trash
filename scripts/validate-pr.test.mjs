@@ -53,6 +53,7 @@ test("reports classification failures and every unknown path", () => {
 test("selects validation, build, and Storybook checks by domain", () => {
   const plan = createValidationPlan({
     api: true,
+    database: true,
     scraper: false,
     storybook: true,
     validation: true,
@@ -71,12 +72,38 @@ test("selects validation, build, and Storybook checks by domain", () => {
     "lint",
     "typecheck",
     "test",
+    "database-chain",
     "api-build",
-    "web-build",
     "storybook-test",
     "storybook-build",
+    "infisical-auth",
+    "web-build",
+    "database-personal",
   ]);
   assert.deepEqual(skipped, ["scraper-build"]);
+});
+
+test("runs credential-free checks before credential-dependent checks", () => {
+  const selected = createValidationPlan({
+    database: true,
+    validation: true,
+    web: true,
+  }).filter((check) => check.selected);
+  const firstCredentialIndex = selected.findIndex(
+    (check) => check.requiresCredentials,
+  );
+
+  assert.ok(firstCredentialIndex > 0);
+  assert.ok(
+    selected
+      .slice(0, firstCredentialIndex)
+      .every((check) => !check.requiresCredentials),
+  );
+  assert.ok(
+    selected
+      .slice(firstCredentialIndex)
+      .every((check) => check.requiresCredentials),
+  );
 });
 
 test("documentation-only validation still verifies formatting and Changesets", () => {

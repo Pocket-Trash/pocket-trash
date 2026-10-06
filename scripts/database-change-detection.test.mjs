@@ -26,6 +26,17 @@ const refreshWorkflow = parse(
     "utf8",
   ),
 );
+/** Raw production and preview deployment workflow sources. */
+const deploymentSources = [
+  readFileSync(
+    new URL("../.github/workflows/deploy.yml", import.meta.url),
+    "utf8",
+  ),
+  readFileSync(
+    new URL("../.github/workflows/preview-refresh.yml", import.meta.url),
+    "utf8",
+  ),
+];
 
 test("database detection includes schema and seed changes", (context) => {
   const script = readFileSync(
@@ -133,4 +144,10 @@ test("PR mutation isolation is independent of migration detection", () => {
     readyComment.env.DB_CHANGING,
     "${{ steps.db_changes.outputs.database }}",
   );
+});
+
+test("real Neon deploy workflows retain the Drizzle migration fidelity check", () => {
+  for (const source of deploymentSources) {
+    assert.match(source, /drizzle-kit migrate --config=drizzle\.config\.ts/u);
+  }
 });

@@ -14,6 +14,17 @@ test("exposes the committed pull-request validation command", () => {
   assert.equal(scripts["validate:pr"], "node scripts/validate-pr.mjs");
 });
 
+test("exposes disposable and personal migration validation commands", () => {
+  assert.equal(
+    scripts["db:validate:chain"],
+    "pnpm --filter @package/database db:validate:chain",
+  );
+  assert.equal(
+    scripts["db:validate:personal"],
+    "pnpm --filter @package/database db:validate:personal",
+  );
+});
+
 test("exposes the documented root development commands", () => {
   assert.equal(
     scripts.dev,

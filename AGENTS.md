@@ -33,7 +33,9 @@
     credentials are unavailable, report the skipped local check and verify the
     E2E CI result. See [`docs/e2e-testing.md`](docs/e2e-testing.md).
   - For database schema or migration changes, run
-    `pnpm --filter @package/database db:check`.
+    `pnpm --filter @package/database db:check`. `validate:pr` also applies the
+    complete chain to disposable PGlite and compares the selected personal
+    Neon migration history without modifying it.
   - When adding, updating, or removing dependencies or changing the lockfile,
     run `pnpm security:audit`.
 - If code changes touch `packages/logger/**`, also run `pnpm test:logger:axiom`
