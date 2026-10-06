@@ -444,6 +444,59 @@ export const compatibilityFamily = pgTable(
   ],
 );
 
+/** Maker-scoped catalog terminology mapped to a registered canonical concept. */
+export const catalogTerminologyAlias = pgTable(
+  "catalog_terminology_alias",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    makerId: bigint("maker_id", { mode: "number" })
+      .notNull()
+      .references(() => maker.id, { onDelete: "restrict" }),
+    canonicalNamespace: text("canonical_namespace").notNull(),
+    canonicalKey: text("canonical_key")
+      .notNull()
+      .references(() => productType.slug, { onDelete: "restrict" }),
+    label: text("label").notNull(),
+    normalizedValue: text("normalized_value").notNull(),
+    isPreferred: boolean("is_preferred").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("catalog_terminology_alias_maker_concept_value_unique").on(
+      table.makerId,
+      table.canonicalNamespace,
+      table.canonicalKey,
+      table.normalizedValue,
+    ),
+    uniqueIndex("catalog_terminology_alias_preferred_unique")
+      .on(table.makerId, table.canonicalNamespace, table.canonicalKey)
+      .where(sql`${table.isPreferred}`),
+    index("catalog_terminology_alias_concept_idx").on(
+      table.canonicalNamespace,
+      table.canonicalKey,
+    ),
+    check(
+      "catalog_terminology_alias_namespace_valid",
+      sql`${table.canonicalNamespace} = 'product-type'`,
+    ),
+    check(
+      "catalog_terminology_alias_label_valid",
+      sql`char_length(trim(${table.label})) between 1 and 80`,
+    ),
+    check(
+      "catalog_terminology_alias_normalized_value_valid",
+      sql`char_length(${table.normalizedValue}) between 1 and 80 and ${table.normalizedValue} = lower(trim(${table.normalizedValue}))`,
+    ),
+  ],
+);
+
 /** Reviewed many-to-many membership between products and compatibility families. */
 export const productCompatibilityFamily = pgTable(
   "product_compatibility_family",
@@ -920,6 +973,12 @@ export type NewProductMaterial = typeof productMaterial.$inferInsert;
 export type CompatibilityFamily = typeof compatibilityFamily.$inferSelect;
 /** Values accepted when creating a compatibility family row. */
 export type NewCompatibilityFamily = typeof compatibilityFamily.$inferInsert;
+/** Stored maker-scoped catalog terminology alias. */
+export type CatalogTerminologyAlias =
+  typeof catalogTerminologyAlias.$inferSelect;
+/** Values accepted when creating a catalog terminology alias. */
+export type NewCatalogTerminologyAlias =
+  typeof catalogTerminologyAlias.$inferInsert;
 /** Stored product compatibility-family membership. */
 export type ProductCompatibilityFamily =
   typeof productCompatibilityFamily.$inferSelect;

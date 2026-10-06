@@ -386,6 +386,13 @@
       "when": 1791272035493,
       "tag": "0054_legal_black_crow",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1791273198103,
+      "tag": "0055_last_masque",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+  catalogTerminologyAlias,
   collectionImage,
   collectionItem,
   collectionItemImage,
@@ -212,11 +213,27 @@ export const featureFlagUserOverridesRelations = relations(
 /** Connects a maker to catalog products and staged Autmog, Grimsmo pen, and Grimsmo knife records. */
 export const makersRelations = relations(maker, ({ many }) => ({
   autmogPens: many(tmpAutmogPens),
+  catalogTerminologyAliases: many(catalogTerminologyAlias),
   compatibilityFamilies: many(compatibilityFamily),
   grimsmoKnives: many(tmpGrimsmoKnives),
   grimsmoPens: many(tmpGrimsmoPens),
   products: many(product),
 }));
+
+/** Connects a terminology alias to the maker and canonical product type it names. */
+export const catalogTerminologyAliasRelations = relations(
+  catalogTerminologyAlias,
+  ({ one }) => ({
+    maker: one(maker, {
+      fields: [catalogTerminologyAlias.makerId],
+      references: [maker.id],
+    }),
+    productType: one(productType, {
+      fields: [catalogTerminologyAlias.canonicalKey],
+      references: [productType.slug],
+    }),
+  }),
+);
 
 /** Connects a material to catalog products, collection items, and staged Autmog pens. */
 export const materialsRelations = relations(material, ({ many }) => ({
@@ -232,6 +249,7 @@ export const mechanismsRelations = relations(mechanism, ({ many }) => ({
 
 /** Connects a product type to catalog products and staged product assignments. */
 export const productTypesRelations = relations(productType, ({ many }) => ({
+  catalogTerminologyAliases: many(catalogTerminologyAlias),
   catalogProducts: many(product),
   products: many(tmpProductProductTypes),
 }));
