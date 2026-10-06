@@ -100,6 +100,7 @@ const emptyCustomFinish = {
   colorEffectSlug: null,
   colorIds: [],
   finishIds: [],
+  patternId: null,
 };
 /** Empty catalog option lists used by form tests. */
 const emptyCatalogOptions = {
@@ -108,6 +109,7 @@ const emptyCatalogOptions = {
   finishes: [],
   makers: [],
   materials: [],
+  patterns: [],
   productTypes: [],
   spinnerButtons: [],
 };
@@ -172,6 +174,7 @@ describe("finish option editor", () => {
           finishes: [{ id: 1000, name: "Anodized", slug: "anodized" }],
           makers: [],
           materials: [],
+          patterns: [{ id: 1002, name: "Honeycomb", slug: "honeycomb" }],
           productTypes: [],
           spinnerButtons: [],
         },
@@ -182,6 +185,7 @@ describe("finish option editor", () => {
             colorEffectSlug: "fade",
             colorIds: [1000, 1001],
             finishIds: [1000],
+            patternId: 1002,
           },
         ],
       }),
@@ -190,11 +194,13 @@ describe("finish option editor", () => {
     expect(html).toContain('aria-label="web.catalog.field.finishes"');
     expect(html).toContain('aria-label="web.action.close: Anodized"');
     expect(html).toContain('aria-label="web.action.close: Blue"');
+    expect(html).toContain('aria-label="web.slider.appearance.pattern"');
+    expect(html).toContain('value="Honeycomb"');
     expect(html).toContain("web.action.moveFinishOptionUp");
     expect(html).toContain("web.action.moveFinishOptionDown");
     expect(html).toContain("web.action.removeFinishOption");
     expect(html).toContain(
-      "Anodized · Blue → Purple web.catalog.colorEffect.fade",
+      "Anodized · Blue → Purple web.catalog.colorEffect.fade · Honeycomb",
     );
   });
 
@@ -216,6 +222,7 @@ describe("finish option editor", () => {
           colors: [],
           finishes: [{ id: 1001, name: "Polished", slug: "polished" }],
           id: 1002,
+          pattern: null,
         },
       ],
       imageCount: 0,
@@ -273,6 +280,7 @@ describe("finish option editor", () => {
           colorEffectSlug: "fade",
           colorIds: [22, 21],
           finishIds: [31],
+          patternId: null,
         },
         finish: {
           id: "custom",
@@ -606,6 +614,7 @@ function productFixture(
         colors: [],
         finishes: [{ id: id + 2, name: "Polished", slug: "polished" }],
         id: id + 3,
+        pattern: null,
       },
     ],
     imageCount: 0,

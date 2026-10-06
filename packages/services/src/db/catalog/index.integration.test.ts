@@ -44,7 +44,11 @@ describe("catalog product persistence", () => {
         .insert(schema.material)
         .values({ name: "Titanium", slug: "titanium" })
         .returning({ id: schema.material.id });
-      if (!maker || !productType || !finish || !material) {
+      const [pattern] = await db
+        .insert(schema.pattern)
+        .values({ name: "Honeycomb", slug: "honeycomb" })
+        .returning({ id: schema.pattern.id });
+      if (!maker || !productType || !finish || !material || !pattern) {
         throw new Error("Catalog fixtures were not created.");
       }
 
@@ -63,6 +67,7 @@ describe("catalog product persistence", () => {
             colorEffectId: null,
             colorIds: [],
             finishIds: [finish.id],
+            patternId: pattern.id,
           },
         ],
         makerId: maker.id,
@@ -84,6 +89,11 @@ describe("catalog product persistence", () => {
           spinDiameterMm: "52",
         }),
       );
+      expect(created.finishOptions[0]?.pattern).toEqual({
+        id: pattern.id,
+        name: "Honeycomb",
+        slug: "honeycomb",
+      });
       await expect(
         service.getProduct("spinner", "spinner"),
       ).resolves.toBeNull();
@@ -182,6 +192,7 @@ describe("catalog product persistence", () => {
             colorEffectId: null,
             colorIds: [],
             finishIds: [finish.id],
+            patternId: pattern.id,
           },
         ],
         makerId: maker.id,

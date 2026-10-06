@@ -53,6 +53,7 @@ const product: CatalogProduct = {
       colors: [{ hex: "#2563eb", id: 1000, name: "Blue", slug: "blue" }],
       finishes: [{ id: 1000, name: "Anodized", slug: "anodized" }],
       id: 1000,
+      pattern: null,
     },
   ],
   id: 1000,

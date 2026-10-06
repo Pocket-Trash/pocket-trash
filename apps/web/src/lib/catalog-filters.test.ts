@@ -74,6 +74,7 @@ function option(
     colors,
     finishes,
     id: Math.random(),
+    pattern: null,
   };
 }
 
