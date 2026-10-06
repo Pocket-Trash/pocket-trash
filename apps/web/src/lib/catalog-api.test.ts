@@ -420,6 +420,73 @@ describe("slider catalog product validation", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("validates insert-owned offers and exactly one slider advertised default", () => {
+    const configuration = {
+      groups: [
+        {
+          diameterMm: "6.35",
+          grade: "N52",
+          key: "corners",
+          label: "Corners",
+          thicknessMm: "3.175",
+        },
+      ],
+      label: "Medium",
+      slots: [
+        {
+          documentedColumn: null,
+          documentedRow: null,
+          groupKey: "corners",
+          half: "half-a" as const,
+          key: "A1",
+          state: "occupied" as const,
+        },
+      ],
+      sourceLabel: null,
+      sourceNotes: null,
+    };
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        insertHostedMagnetOptions: {
+          clickCounts: [3, 5],
+          offers: [
+            {
+              clickCount: 3,
+              configuration,
+              isAdvertisedDefault: true,
+            },
+          ],
+        },
+        productTypeSlug: "slider-insert",
+      }).success,
+    ).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        insertHostedMagnetOptions: {
+          clickCounts: [3],
+          offers: [
+            {
+              clickCount: 5,
+              configuration,
+              isAdvertisedDefault: false,
+            },
+          ],
+        },
+        productTypeSlug: "slider-insert",
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        advertisedInsertOffers: [{ isAdvertisedDefault: false, offerId: 4000 }],
+        magnetSystem: "insert-driven",
+        productTypeSlug: "slider",
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("product approval", () => {

@@ -225,8 +225,11 @@ const owners = [
 /** Catalog product fixture used by page tests. */
 const product: CatalogProduct = {
   approvalStatus: "approved",
+  advertisedInsertOffers: [],
   bearing: null,
   bodyHostedMagnetSetup: null,
+  insertClickOptions: [],
+  insertMagnetOffers: [],
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: false,
@@ -584,6 +587,53 @@ describe("ProductDetailPage", () => {
     expect(html).toContain("Half A A1");
     expect(html).not.toContain("Install");
     expect(html).not.toContain("Custom setup");
+  });
+
+  it("distinguishes insert offers and slider advertised defaults", () => {
+    const configuration = {
+      groups: [],
+      label: "Medium",
+      slots: [
+        {
+          documentedColumn: null,
+          documentedRow: null,
+          groupKey: null,
+          half: "half-a" as const,
+          key: "A1",
+          state: "empty" as const,
+        },
+      ],
+      sourceLabel: null,
+      sourceNotes: null,
+    };
+    const html = renderToStaticMarkup(
+      <ProductDetailPage
+        collectionItems={[]}
+        product={{
+          ...product,
+          advertisedInsertOffers: [
+            {
+              clickCount: 3,
+              clickOptionId: 3000,
+              configuration,
+              copiedFromTemplateId: null,
+              id: 4000,
+              insertProductId: 2000,
+              insertProductName: "Maker Insert",
+              isAdvertisedDefault: true,
+              isSliderAdvertisedDefault: true,
+            },
+          ],
+          magnetSystem: "insert-driven",
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+      />,
+    );
+
+    expect(html).toContain("Available insert setups");
+    expect(html).toContain("Maker Insert: Medium");
+    expect(html).toContain("Default setup");
   });
 
   it("limits deletion controls to owners and authorized staff", () => {

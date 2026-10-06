@@ -3,6 +3,7 @@ import type {
   CatalogCompatibilityFamily,
   CatalogImage,
   CatalogLookup,
+  CatalogMagnetConfigurationTemplate,
   CatalogProduct,
   CatalogProductType,
   CatalogTerminologyAlias,
@@ -147,25 +148,18 @@ const magnetSlotSchema = z.object({
   state: z.enum(["occupied", "empty"]),
 });
 
-/** Body-hosted setup form contract. */
-const bodyHostedMagnetSetupSchema = z
+/** Complete exact catalog magnet configuration form contract. */
+const magnetConfigurationSchema = z
   .object({
-    clickCount: z.number().int().positive().nullable(),
-    configuration: z
-      .object({
-        groups: z.array(magnetGroupSchema),
-        label: z.string().trim().min(1, requiredMessage).max(100),
-        slots: z
-          .array(magnetSlotSchema)
-          .min(1, "web.slider.validation.completeConfiguration"),
-        sourceLabel: optionalMagnetTextSchema(200),
-        sourceNotes: optionalMagnetTextSchema(5000),
-      })
-      .nullable(),
-    sourceNote: optionalMagnetTextSchema(5000),
+    groups: z.array(magnetGroupSchema),
+    label: z.string().trim().min(1, requiredMessage).max(100),
+    slots: z
+      .array(magnetSlotSchema)
+      .min(1, "web.slider.validation.completeConfiguration"),
+    sourceLabel: optionalMagnetTextSchema(200),
+    sourceNotes: optionalMagnetTextSchema(5000),
   })
-  .superRefine(({ configuration }, context) => {
-    if (!configuration) return;
+  .superRefine((configuration, context) => {
     const groupKeys = configuration.groups.map(({ key }) => key);
     if (new Set(groupKeys).size !== groupKeys.length) {
       context.addIssue({
@@ -215,6 +209,64 @@ const bodyHostedMagnetSetupSchema = z
       });
     }
   });
+
+/** Body-hosted setup form contract. */
+const bodyHostedMagnetSetupSchema = z.object({
+  clickCount: z.number().int().positive().nullable(),
+  configuration: magnetConfigurationSchema.nullable(),
+  sourceNote: optionalMagnetTextSchema(5000),
+});
+
+/** Insert-owned click counts and complete exact configuration offers. */
+const insertHostedMagnetOptionsSchema = z
+  .object({
+    clickCounts: z.array(z.number().int().positive()),
+    offers: z.array(
+      z.object({
+        clickCount: z.number().int().positive().nullable(),
+        configuration: magnetConfigurationSchema,
+        copiedFromTemplateId: idSchema.nullable().optional(),
+        id: idSchema.nullable().default(null),
+        isAdvertisedDefault: z.boolean(),
+      }),
+    ),
+  })
+  .superRefine(({ clickCounts, offers }, context) => {
+    if (new Set(clickCounts).size !== clickCounts.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["clickCounts"],
+      });
+    }
+    if (
+      offers.filter(({ isAdvertisedDefault }) => isAdvertisedDefault).length > 1
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["offers"],
+      });
+    }
+    for (const [index, offer] of offers.entries()) {
+      if (
+        offer.clickCount !== null &&
+        !clickCounts.includes(offer.clickCount)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["offers", index, "clickCount"],
+        });
+      }
+    }
+  });
+
+/** Exact insert offers merchandised by an insert-driven slider. */
+const advertisedInsertOfferSchema = z.object({
+  isAdvertisedDefault: z.boolean(),
+  offerId: idSchema,
+});
 
 /** Schema for one reviewed, non-blocking exact-product compatibility warning. */
 const compatibilityAdvisorySchema = z.object({
@@ -315,6 +367,7 @@ export const finishOptionSchema = z
  */
 export const productFormSchema = z
   .object({
+    advertisedInsertOffers: z.array(advertisedInsertOfferSchema).default([]),
     bearing: optionalBearingSchema,
     bodyHostedMagnetSetup: bodyHostedMagnetSetupSchema.nullable().default(null),
     buttonDiameterMm: numericSpecSchema,
@@ -325,6 +378,9 @@ export const productFormSchema = z
     diameterMm: numericSpecSchema,
     finishOptions: z.array(finishOptionSchema),
     includedComponentIds: z.array(idSchema),
+    insertHostedMagnetOptions: insertHostedMagnetOptionsSchema
+      .nullable()
+      .default(null),
     lengthMm: numericSpecSchema,
     makerId: idSchema,
     makerProductUrl: optionalUrlSchema,
@@ -346,10 +402,12 @@ export const productFormSchema = z
       {
         bearing,
         bodyHostedMagnetSetup,
+        advertisedInsertOffers,
         compatibilityAdvisories,
         compatibilityFamilyIds,
         finishOptions,
         includedComponentIds,
+        insertHostedMagnetOptions,
         magnetSystem,
         productId,
         productTypeSlug,
@@ -367,6 +425,38 @@ export const productFormSchema = z
           code: "custom",
           message: "web.catalog.error.form",
           path: [bearing !== null ? "bearing" : "spinDiameterMm"],
+        });
+      }
+      if (
+        insertHostedMagnetOptions !== null &&
+        productTypeSlug !== "slider-insert"
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.bodyHostedInsert",
+          path: ["insertHostedMagnetOptions"],
+        });
+      }
+      if (
+        advertisedInsertOffers.length &&
+        (productTypeSlug !== "slider" || magnetSystem !== "insert-driven")
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["advertisedInsertOffers"],
+        });
+      }
+      if (
+        advertisedInsertOffers.length &&
+        advertisedInsertOffers.filter(({ isAdvertisedDefault }) =>
+          Boolean(isAdvertisedDefault),
+        ).length !== 1
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["advertisedInsertOffers"],
         });
       }
       if (productTypeSlug === "slider" && magnetSystem === null) {
@@ -712,10 +802,15 @@ const collectionEditSchema = z
  */
 export type ProductFormInput = z.input<typeof productFormSchema>;
 
+/** Fully parsed product form value used by controlled editors. */
+export type ProductFormValue = z.output<typeof productFormSchema>;
+
 /**
  * Lookup values and spinner buttons required by catalog forms.
  */
 export type CatalogOptions = {
+  /** Catalog-manager-only exact configuration authoring templates. */
+  magnetConfigurationTemplates?: CatalogMagnetConfigurationTemplate[];
   /** Maker-scoped registered catalog terminology aliases. */
   terminologyAliases?: CatalogTerminologyAlias[];
   /**
@@ -772,6 +867,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       colors,
       finishes,
       makers,
+      magnetConfigurationTemplates,
       materials,
       patterns,
       productTypes,
@@ -784,6 +880,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       listColors(),
       listFinishes(),
       listMakers(),
+      s.db.catalog.listMagnetConfigurationTemplates(viewer),
       listMaterials(),
       listPatterns(),
       listProductTypes(),
@@ -797,6 +894,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       colors,
       finishes,
       makers,
+      magnetConfigurationTemplates,
       materials,
       patterns,
       productTypes,
@@ -1166,6 +1264,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     const slug = nextAvailableSlug(parsed.data.name, slugs);
     const input: ProductWriteInput = {
       actor,
+      advertisedInsertOffers: parsed.data.advertisedInsertOffers,
       bodyHostedMagnetSetup: parsed.data.bodyHostedMagnetSetup,
       compatibilityAdvisories: parsed.data.compatibilityAdvisories,
       compatibilityFamilyIds: parsed.data.compatibilityFamilyIds,
@@ -1182,6 +1281,17 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       makerProductUrl: parsed.data.makerProductUrl,
       materialIds: parsed.data.materialIds,
       includedComponentIds: parsed.data.includedComponentIds,
+      insertHostedMagnetOptions: parsed.data.insertHostedMagnetOptions
+        ? {
+            ...parsed.data.insertHostedMagnetOptions,
+            offers: parsed.data.insertHostedMagnetOptions.offers.map(
+              ({ id, ...offer }) => ({
+                ...offer,
+                ...(id === null ? {} : { id }),
+              }),
+            ),
+          }
+        : null,
       name: parsed.data.name,
       productTypeSlug: parsed.data.productTypeSlug,
       reason: parsed.data.reason,

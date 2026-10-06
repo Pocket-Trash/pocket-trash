@@ -59,6 +59,7 @@ import {
   deleteUserCollection,
   finishOptionSchema,
   type ProductFormInput,
+  type ProductFormValue,
   productFormSchema,
   productSlugPreview,
   productTypeIsSupported,
@@ -146,6 +147,19 @@ export function ProductFormPage({
   );
 }
 
+/** Controlled editor value keeps text inputs as strings before schema parsing. */
+type ProductEditorValue = Omit<
+  ProductFormValue,
+  "bearing" | "description" | "makerProductUrl"
+> & {
+  /** Bearing text before blank normalization. */
+  bearing: string;
+  /** Markdown description before blank normalization. */
+  description: string;
+  /** Maker URL before blank normalization. */
+  makerProductUrl: string;
+};
+
 /**
  * Renders the product fields shared by add and edit flows.
  *
@@ -186,55 +200,80 @@ export function ProductEditor({
   const [formError, setFormError] = React.useState<string | null>(null);
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
   const [descriptionLoading, setDescriptionLoading] = React.useState(true);
+  const defaultValues: ProductEditorValue = {
+    advertisedInsertOffers:
+      initialProduct?.advertisedInsertOffers.map(
+        ({ id, isSliderAdvertisedDefault }) => ({
+          isAdvertisedDefault: isSliderAdvertisedDefault,
+          offerId: id,
+        }),
+      ) ?? [],
+    bearing: initialProduct?.bearing ?? "",
+    bodyHostedMagnetSetup:
+      initialProduct?.bodyHostedMagnetSetup ??
+      (initialProduct?.magnetSystem === "body-hosted"
+        ? { clickCount: null, configuration: null, sourceNote: null }
+        : null),
+    buttonDiameterMm: initialProduct?.buttonDiameterMm ?? null,
+    compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
+    compatibilityAdvisories:
+      initialProduct?.compatibilityAdvisories.map(
+        ({ relatedProductId, text }) => ({ relatedProductId, text }),
+      ) ?? [],
+    compatibilityFamilyIds:
+      initialProduct?.compatibilityFamilies.map(({ id }) => id) ?? [],
+    description: initialProduct?.description ?? "",
+    diameterMm: initialProduct?.diameterMm ?? null,
+    finishOptions: initialProduct?.finishOptions.length
+      ? initialProduct.finishOptions.map((option) => ({
+          colorEffectId: option.colorEffect?.id ?? null,
+          colorEffectSlug:
+            option.colorEffect?.slug === "solid"
+              ? ("solid" as const)
+              : option.colorEffect?.slug === "fade"
+                ? ("fade" as const)
+                : null,
+          colorIds: option.colors.map(({ id }) => id),
+          finishIds: option.finishes.map(({ id }) => id),
+          patternId: option.pattern?.id ?? null,
+        }))
+      : [],
+    includedComponentIds:
+      initialProduct?.includedComponents.map(({ id }) => id) ?? [],
+    insertHostedMagnetOptions:
+      productTypeSlug === "slider-insert"
+        ? {
+            clickCounts:
+              initialProduct?.insertClickOptions.map(
+                ({ clickCount }) => clickCount,
+              ) ?? [],
+            offers:
+              initialProduct?.insertMagnetOffers.map((offer) => ({
+                clickCount: offer.clickCount,
+                configuration: offer.configuration,
+                copiedFromTemplateId: offer.copiedFromTemplateId,
+                id: offer.id,
+                isAdvertisedDefault: offer.isAdvertisedDefault,
+              })) ?? [],
+          }
+        : null,
+    lengthMm: initialProduct?.lengthMm ?? null,
+    makerId: initialProduct?.makerId ?? 0,
+    makerProductUrl: initialProduct?.makerProductUrl ?? "",
+    magnetSystem: initialProduct?.magnetSystem ?? null,
+    materialIds: initialProduct?.materials.map(({ id }) => id) ?? [],
+    name: initialProduct?.name ?? "",
+    productId: initialProduct?.id ?? null,
+    productTypeSlug,
+    spinDiameterMm: initialProduct?.spinDiameterMm ?? null,
+    thicknessMm: initialProduct?.thicknessMm ?? null,
+    thicknessWithButtonMm: initialProduct?.thicknessWithButtonMm ?? null,
+    weightG: initialProduct?.weightG ?? null,
+    weightBasis: initialProduct?.weightBasis ?? null,
+    widthMm: initialProduct?.widthMm ?? null,
+  };
   const form = useForm({
-    defaultValues: {
-      bearing: initialProduct?.bearing ?? "",
-      bodyHostedMagnetSetup:
-        initialProduct?.bodyHostedMagnetSetup ??
-        (initialProduct?.magnetSystem === "body-hosted"
-          ? { clickCount: null, configuration: null, sourceNote: null }
-          : null),
-      buttonDiameterMm: initialProduct?.buttonDiameterMm ?? null,
-      compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
-      compatibilityAdvisories:
-        initialProduct?.compatibilityAdvisories.map(
-          ({ relatedProductId, text }) => ({ relatedProductId, text }),
-        ) ?? [],
-      compatibilityFamilyIds:
-        initialProduct?.compatibilityFamilies.map(({ id }) => id) ?? [],
-      description: initialProduct?.description ?? "",
-      diameterMm: initialProduct?.diameterMm ?? null,
-      finishOptions: initialProduct?.finishOptions.length
-        ? initialProduct.finishOptions.map((option) => ({
-            colorEffectId: option.colorEffect?.id ?? null,
-            colorEffectSlug:
-              option.colorEffect?.slug === "solid"
-                ? ("solid" as const)
-                : option.colorEffect?.slug === "fade"
-                  ? ("fade" as const)
-                  : null,
-            colorIds: option.colors.map(({ id }) => id),
-            finishIds: option.finishes.map(({ id }) => id),
-            patternId: option.pattern?.id ?? null,
-          }))
-        : [],
-      includedComponentIds:
-        initialProduct?.includedComponents.map(({ id }) => id) ?? [],
-      lengthMm: initialProduct?.lengthMm ?? null,
-      makerId: initialProduct?.makerId ?? 0,
-      makerProductUrl: initialProduct?.makerProductUrl ?? "",
-      magnetSystem: initialProduct?.magnetSystem ?? null,
-      materialIds: initialProduct?.materials.map(({ id }) => id) ?? [],
-      name: initialProduct?.name ?? "",
-      productId: initialProduct?.id ?? null,
-      productTypeSlug,
-      spinDiameterMm: initialProduct?.spinDiameterMm ?? null,
-      thicknessMm: initialProduct?.thicknessMm ?? null,
-      thicknessWithButtonMm: initialProduct?.thicknessWithButtonMm ?? null,
-      weightG: initialProduct?.weightG ?? null,
-      weightBasis: initialProduct?.weightBasis ?? null,
-      widthMm: initialProduct?.widthMm ?? null,
-    },
+    defaultValues,
     /**
      * Saves the current product editor values.
      *
@@ -719,6 +758,45 @@ export function ProductEditor({
             }
           </form.Subscribe>
         ) : null}
+        {productTypeSlug === "slider-insert" ? (
+          <form.Field name="insertHostedMagnetOptions">
+            {(field) =>
+              field.state.value ? (
+                <InsertHostedMagnetOptionsEditor
+                  onChange={field.handleChange}
+                  t={t}
+                  templates={options.magnetConfigurationTemplates ?? []}
+                  value={field.state.value}
+                />
+              ) : null
+            }
+          </form.Field>
+        ) : null}
+        {productTypeSlug === "slider" ? (
+          <form.Subscribe selector={(state) => state.values.magnetSystem}>
+            {(magnetSystem) =>
+              magnetSystem === "insert-driven" ? (
+                <form.Field name="advertisedInsertOffers">
+                  {(field) => (
+                    <SliderInsertOfferEditor
+                      onChange={field.handleChange}
+                      offers={options.relationshipProducts.flatMap((product) =>
+                        product.productTypeSlug === "slider-insert"
+                          ? product.insertMagnetOffers.map((offer) => ({
+                              ...offer,
+                              insertProductName: product.name,
+                            }))
+                          : [],
+                      )}
+                      t={t}
+                      value={field.state.value}
+                    />
+                  )}
+                </form.Field>
+              ) : null
+            }
+          </form.Subscribe>
+        ) : null}
         {productTypeSlug === "slider-plate" ||
         productTypeSlug === "slider-insert" ? (
           <p className="text-xs text-muted-foreground">
@@ -1036,6 +1114,383 @@ export function ProductEditor({
   );
 }
 
+/** Insert-hosted authoring form value. */
+type InsertHostedMagnetOptionsValue = NonNullable<
+  ProductFormValue["insertHostedMagnetOptions"]
+>;
+
+/** Slider offer-association form value. */
+type SliderInsertOfferValue = ProductFormValue["advertisedInsertOffers"];
+
+/**
+ * Edits insertion-ordered click counts and exact offers for one insert product.
+ *
+ * @param props - Current options and replacement callback.
+ * @returns Insert option and offer authoring controls.
+ */
+function InsertHostedMagnetOptionsEditor({
+  onChange,
+  t,
+  templates,
+  value,
+}: {
+  /**
+   * Replaces all insert-hosted options.
+   *
+   * @param value - Next insert-hosted options.
+   */
+  onChange(value: InsertHostedMagnetOptionsValue): void;
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+  /** Catalog-manager-only reusable authoring templates. */
+  templates: Array<{
+    /** Complete configuration copied into an offer snapshot. */
+    configuration: InsertHostedMagnetOptionsValue["offers"][number]["configuration"];
+    /** Template identifier retained as authoring provenance. */
+    id: number;
+    /** Manager-facing template name. */
+    name: string;
+  }>;
+  /** Current insert-hosted options. */
+  value: InsertHostedMagnetOptionsValue;
+}) {
+  return (
+    <fieldset className="grid gap-4 rounded-lg border border-border p-4">
+      <legend className="px-1 text-sm font-medium">
+        {t("web.slider.setup.availableOffers")}
+      </legend>
+      <fieldset className="grid gap-3 rounded-md border border-border p-3">
+        <legend className="px-1 text-sm font-medium">
+          {t("web.slider.setup.clickCount")}
+        </legend>
+        {value.clickCounts.map((clickCount, index) => (
+          <div className="flex items-end gap-2" key={`${clickCount}-${index}`}>
+            <Field label={t("web.slider.setup.clickCount")}>
+              <Input
+                aria-label={t("web.slider.setup.clickCount")}
+                min="1"
+                onChange={(event) =>
+                  onChange({
+                    ...value,
+                    clickCounts: value.clickCounts.map((current, position) =>
+                      position === index ? Number(event.target.value) : current,
+                    ),
+                  })
+                }
+                step="1"
+                type="number"
+                value={clickCount || ""}
+              />
+            </Field>
+            <Button
+              onClick={() =>
+                onChange({
+                  clickCounts: value.clickCounts.filter(
+                    (_, position) => position !== index,
+                  ),
+                  offers: value.offers.map((offer) =>
+                    offer.clickCount === clickCount
+                      ? { ...offer, clickCount: null }
+                      : offer,
+                  ),
+                })
+              }
+              type="button"
+              variant="outline"
+            >
+              {t("web.action.removeSelection", { name: String(clickCount) })}
+            </Button>
+          </div>
+        ))}
+        <Button
+          className="w-fit"
+          onClick={() =>
+            onChange({ ...value, clickCounts: [...value.clickCounts, 0] })
+          }
+          type="button"
+          variant="outline"
+        >
+          {t("web.action.confirmAdd")} {t("web.slider.setup.clickCount")}
+        </Button>
+      </fieldset>
+      {value.offers.map((offer, index) => (
+        <section
+          className="grid gap-3 rounded-md border border-border p-3"
+          key={offer.id ?? `new-${index}`}
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label={t("web.slider.setup.clickCount")}>
+              <select
+                aria-label={t("web.slider.setup.clickCount")}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                onChange={(event) =>
+                  onChange({
+                    ...value,
+                    offers: value.offers.map((current, position) =>
+                      position === index
+                        ? {
+                            ...current,
+                            clickCount: event.target.value
+                              ? Number(event.target.value)
+                              : null,
+                          }
+                        : current,
+                    ),
+                  })
+                }
+                value={offer.clickCount ?? ""}
+              >
+                <option value="">{t("web.slider.setup.notRecorded")}</option>
+                {value.clickCounts
+                  .filter((count) => count > 0)
+                  .map((count) => (
+                    <option key={count} value={count}>
+                      {count}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                checked={offer.isAdvertisedDefault}
+                onChange={(event) =>
+                  onChange({
+                    ...value,
+                    offers: value.offers.map((current, position) => ({
+                      ...current,
+                      isAdvertisedDefault:
+                        position === index ? event.target.checked : false,
+                    })),
+                  })
+                }
+                type="checkbox"
+              />
+              {t("web.slider.setup.advertisedDefault")}
+            </label>
+          </div>
+          {templates.length ? (
+            <Field label={t("web.slider.setup.copyAndCustomize")}>
+              <select
+                aria-label={t("web.slider.setup.copyAndCustomize")}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                onChange={(event) => {
+                  const template = templates.find(
+                    ({ id }) => id === Number(event.target.value),
+                  );
+                  if (!template) return;
+                  onChange({
+                    ...value,
+                    offers: value.offers.map((current, position) =>
+                      position === index
+                        ? {
+                            ...current,
+                            configuration: template.configuration,
+                            copiedFromTemplateId: template.id,
+                          }
+                        : current,
+                    ),
+                  });
+                }}
+                value={offer.copiedFromTemplateId ?? ""}
+              >
+                <option value="">{t("web.slider.setup.selectOffer")}</option>
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+          <BodyHostedMagnetSetupEditor
+            legend={t("web.slider.setup.offer")}
+            onChange={(setup) => {
+              const configuration = setup.configuration;
+              if (!configuration) return;
+              onChange({
+                ...value,
+                offers: value.offers.map((current, position) =>
+                  position === index ? { ...current, configuration } : current,
+                ),
+              });
+            }}
+            showClickCount={false}
+            showSourceNote={false}
+            t={t}
+            value={{
+              clickCount: offer.clickCount,
+              configuration: offer.configuration,
+              sourceNote: null,
+            }}
+          />
+          <Button
+            className="w-fit"
+            onClick={() =>
+              onChange({
+                ...value,
+                offers: value.offers.filter(
+                  (_, position) => position !== index,
+                ),
+              })
+            }
+            type="button"
+            variant="outline"
+          >
+            {t("web.action.removeSelection", {
+              name: offer.configuration.label || t("web.slider.setup.offer"),
+            })}
+          </Button>
+        </section>
+      ))}
+      <Button
+        className="w-fit"
+        onClick={() =>
+          onChange({
+            ...value,
+            offers: [
+              ...value.offers,
+              {
+                clickCount: null,
+                configuration: {
+                  groups: [],
+                  label: "",
+                  slots: [
+                    {
+                      documentedColumn: null,
+                      documentedRow: null,
+                      groupKey: null,
+                      half: "half-a",
+                      key: "A1",
+                      state: "empty",
+                    },
+                  ],
+                  sourceLabel: null,
+                  sourceNotes: null,
+                },
+                copiedFromTemplateId: null,
+                id: null,
+                isAdvertisedDefault: false,
+              },
+            ],
+          })
+        }
+        type="button"
+        variant="outline"
+      >
+        {t("web.action.confirmAdd")} {t("web.slider.setup.offer")}
+      </Button>
+    </fieldset>
+  );
+}
+
+/**
+ * Selects exact insert offers merchandised for one insert-driven slider.
+ *
+ * @param props - Available offers, selected associations, and replacement callback.
+ * @returns Exact-offer selection with one required slider default.
+ */
+function SliderInsertOfferEditor({
+  offers,
+  onChange,
+  t,
+  value,
+}: {
+  /** Exact offers from visible insert products. */
+  offers: Array<{
+    /** Exact insert offer identifier. */
+    id: number;
+    /** Exact host insert product name. */
+    insertProductName: string;
+    /** Minimal configuration facts used by the selector label. */
+    configuration: {
+      /** Global configuration vocabulary label. */
+      label: string;
+    };
+  }>;
+  /**
+   * Replaces the exact associations.
+   *
+   * @param value - Next slider-to-offer associations.
+   */
+  onChange(value: SliderInsertOfferValue): void;
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+  /** Current slider associations. */
+  value: SliderInsertOfferValue;
+}) {
+  return (
+    <fieldset className="grid gap-3 rounded-lg border border-border p-4">
+      <legend className="px-1 text-sm font-medium">
+        {t("web.slider.setup.availableOffers")}
+      </legend>
+      {offers.length ? (
+        offers.map((offer) => {
+          const selected = value.find(({ offerId }) => offerId === offer.id);
+          return (
+            <div
+              className="flex flex-wrap items-center gap-4 rounded-md border border-border p-3"
+              key={offer.id}
+            >
+              <label className="flex flex-1 items-center gap-2 text-sm">
+                <input
+                  checked={Boolean(selected)}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      onChange([
+                        ...value,
+                        {
+                          isAdvertisedDefault: value.length === 0,
+                          offerId: offer.id,
+                        },
+                      ]);
+                      return;
+                    }
+                    const remaining = value.filter(
+                      ({ offerId }) => offerId !== offer.id,
+                    );
+                    onChange(
+                      selected?.isAdvertisedDefault && remaining.length
+                        ? remaining.map((current, index) => ({
+                            ...current,
+                            isAdvertisedDefault: index === 0,
+                          }))
+                        : remaining,
+                    );
+                  }}
+                  type="checkbox"
+                />
+                {offer.insertProductName} · {offer.configuration.label}
+              </label>
+              {selected ? (
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    checked={selected.isAdvertisedDefault}
+                    name="slider-advertised-default"
+                    onChange={() =>
+                      onChange(
+                        value.map((current) => ({
+                          ...current,
+                          isAdvertisedDefault: current.offerId === offer.id,
+                        })),
+                      )
+                    }
+                    type="radio"
+                  />
+                  {t("web.slider.setup.advertisedDefault")}
+                </label>
+              ) : null}
+            </div>
+          );
+        })
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {t("web.slider.empty.noOffers")}
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
 /**
  * Edits the single inherent setup of a body-hosted catalog slider.
  *
@@ -1043,16 +1498,25 @@ export function ProductEditor({
  * @returns Structured setup authoring fields.
  */
 function BodyHostedMagnetSetupEditor({
+  legend,
   onChange,
+  showClickCount = true,
+  showSourceNote = true,
   t,
   value,
 }: {
+  /** Optional fieldset legend override. */
+  legend?: string;
   /**
    * Replaces the complete form value.
    *
    * @param value - Next complete body-hosted setup.
    */
   onChange(value: CatalogBodyHostedMagnetSetup): void;
+  /** Whether to show the body-level click count field. */
+  showClickCount?: boolean;
+  /** Whether to show the incomplete-layout note field. */
+  showSourceNote?: boolean;
   /** Localized catalog message formatter. */
   t: ReturnType<typeof useCatalogCopy>;
   /** Current inherent setup. */
@@ -1071,37 +1535,41 @@ function BodyHostedMagnetSetupEditor({
   return (
     <fieldset className="grid gap-4 rounded-lg border border-border p-4">
       <legend className="px-1 text-sm font-medium">
-        {t("web.slider.setup.title")}
+        {legend ?? t("web.slider.setup.title")}
       </legend>
-      <Field label={t("web.slider.setup.clickCount")}>
-        <Input
-          aria-label={t("web.slider.setup.clickCount")}
-          min="1"
-          onChange={(event) =>
-            onChange({
-              ...value,
-              clickCount: event.target.value
-                ? Number(event.target.value)
-                : null,
-            })
-          }
-          step="1"
-          type="number"
-          value={value.clickCount ?? ""}
-        />
-      </Field>
-      <Field label={t("web.slider.setup.sourceNote")}>
-        <textarea
-          aria-label={t("web.slider.setup.sourceNote")}
-          className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          maxLength={5000}
-          onChange={(event) =>
-            onChange({ ...value, sourceNote: event.target.value })
-          }
-          placeholder={t("web.slider.setup.incompleteSourceNote")}
-          value={value.sourceNote ?? ""}
-        />
-      </Field>
+      {showClickCount ? (
+        <Field label={t("web.slider.setup.clickCount")}>
+          <Input
+            aria-label={t("web.slider.setup.clickCount")}
+            min="1"
+            onChange={(event) =>
+              onChange({
+                ...value,
+                clickCount: event.target.value
+                  ? Number(event.target.value)
+                  : null,
+              })
+            }
+            step="1"
+            type="number"
+            value={value.clickCount ?? ""}
+          />
+        </Field>
+      ) : null}
+      {showSourceNote ? (
+        <Field label={t("web.slider.setup.sourceNote")}>
+          <textarea
+            aria-label={t("web.slider.setup.sourceNote")}
+            className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            maxLength={5000}
+            onChange={(event) =>
+              onChange({ ...value, sourceNote: event.target.value })
+            }
+            placeholder={t("web.slider.setup.incompleteSourceNote")}
+            value={value.sourceNote ?? ""}
+          />
+        </Field>
+      ) : null}
       {configuration ? (
         <section className="grid gap-4 rounded-lg border border-border bg-muted/20 p-4">
           <div className="grid gap-3 md:grid-cols-2">
