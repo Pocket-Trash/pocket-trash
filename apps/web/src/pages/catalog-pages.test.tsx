@@ -10,6 +10,7 @@ import {
   CollectionItemDetailPage,
   CollectionPage,
   getCatalogPageSize,
+  HomePage,
   ProductDetailPage,
   ProductGrid,
   PublicCollectionsPage,
@@ -260,6 +261,27 @@ const product: CatalogProduct = {
   weightG: null,
   widthMm: null,
 };
+
+describe("HomePage", () => {
+  it("orders Products, Collections, Materials, and Resources and reuses the product hero", () => {
+    const html = renderToStaticMarkup(<HomePage />);
+    const products = html.indexOf('href="/products"');
+    const collections = html.indexOf('href="/collections"');
+    const materials = html.indexOf('href="/materials"');
+    const resources = html.indexOf('href="/resources"');
+
+    expect(products).toBeGreaterThan(-1);
+    expect(products).toBeLessThan(collections);
+    expect(collections).toBeLessThan(materials);
+    expect(materials).toBeLessThan(resources);
+    expect(html.slice(products, collections)).toContain(
+      "hero-cards/products.webp",
+    );
+    expect(html.slice(materials, resources)).toContain(
+      "hero-cards/products.webp",
+    );
+  });
+});
 
 describe("getCatalogPageSize", () => {
   it("matches the requested compact, regular, and wide card counts", () => {

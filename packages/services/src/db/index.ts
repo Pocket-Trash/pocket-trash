@@ -123,6 +123,8 @@ export type {
   ProductApprovalStatus,
   ProductWriteInput,
   PublicCollectionOwner,
+  PublicMaterial,
+  PublicMaterialSummary,
   UserCollectionItem,
   UserCollectionSummary,
 } from "./catalog/index.js";
