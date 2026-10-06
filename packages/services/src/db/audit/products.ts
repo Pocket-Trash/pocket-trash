@@ -75,6 +75,15 @@ export const productAudit = {
   imageDeleted: definition("products.image.deleted", "products.product"),
   imageRestored: definition("products.image.restored", "products.product"),
   makerCreated: definition("products.maker.created", "products.maker"),
+  makerImageAdded: definition("products.maker_image.added", "products.maker"),
+  makerImageDeleted: definition(
+    "products.maker_image.deleted",
+    "products.maker",
+  ),
+  makerImageRestored: definition(
+    "products.maker_image.restored",
+    "products.maker",
+  ),
   makerUpdated: definition("products.maker.updated", "products.maker"),
   makerProductUrlValidityChanged: definition(
     "products.product.maker_url_validity_changed",

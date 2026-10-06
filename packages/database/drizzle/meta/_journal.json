@@ -386,6 +386,13 @@
       "when": 1791302791007,
       "tag": "0054_whole_pet_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1791303075110,
+      "tag": "0055_violet_proudstar",
+      "breakpoints": true
     }
   ]
 }

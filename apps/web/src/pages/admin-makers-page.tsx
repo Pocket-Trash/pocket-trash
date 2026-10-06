@@ -1,20 +1,32 @@
-import type { CatalogMaker } from "@package/services";
+import { useAuth } from "@clerk/tanstack-react-start";
+import type { CatalogImage, CatalogMaker } from "@package/services";
+import {
+  maxImageBytes,
+  maxImageSessionBytes,
+  maxImageSessionFiles,
+} from "@package/services/constants";
 import {
   formatTranslation,
+  type SupportedLocale,
   type TranslationKey,
 } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Factory, Pencil } from "lucide-react";
+import { Factory, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { CatalogMarkdownEditor } from "@/components/catalog-markdown-editor";
+import { FileDropInput } from "@/components/resource-file-input";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   makerProfileSchema,
   productSlugPreview,
+  restoreCatalogImage,
   saveAdminMaker,
+  softDeleteCatalogImage,
 } from "@/lib/catalog-api";
+import { getImageUploadGuidance } from "@/lib/help-content";
+import { formatMiB, uploadImages } from "@/lib/upload-sessions";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -74,6 +86,20 @@ export function AdminMakersPage({ makers }: AdminMakersPageProperties) {
                 className="grid gap-3 rounded-lg border border-border bg-card p-4 text-card-foreground"
                 key={maker.id}
               >
+                {maker.images.find(({ deletedAt }) => !deletedAt) ? (
+                  <img
+                    alt={maker.name}
+                    className="aspect-[4/3] w-full rounded-md object-cover"
+                    src={maker.images.find(({ deletedAt }) => !deletedAt)?.url}
+                  />
+                ) : (
+                  <div className="grid aspect-[4/3] place-items-center rounded-md bg-muted text-muted-foreground">
+                    <Factory aria-hidden="true" className="size-8" />
+                    <span className="sr-only">
+                      {t("web.admin.makers.imagesEmpty")}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-start gap-3">
                   <Factory aria-hidden="true" className="mt-0.5 size-5" />
                   <div className="min-w-0 flex-1">
@@ -120,11 +146,16 @@ export function AdminMakersPage({ makers }: AdminMakersPageProperties) {
  * @returns The maker profile form page.
  */
 export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
+  const { getToken } = useAuth();
   const { locale } = useLocale();
   const navigate = useNavigate();
   const [name, setName] = useState(maker?.name ?? "");
   const [rootUrl, setRootUrl] = useState(maker?.rootUrl ?? "");
   const [description, setDescription] = useState(maker?.description ?? "");
+  const [images, setImages] = useState<File[]>([]);
+  const [existingImages, setExistingImages] = useState<CatalogImage[]>(
+    maker?.images ?? [],
+  );
   const [editorLoading, setEditorLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<
@@ -176,6 +207,21 @@ export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
       setFormError(result.formError);
       setBusy(false);
       return;
+    }
+    if (images.length) {
+      try {
+        await uploadImages({
+          files: images,
+          getToken,
+          locale,
+          targetId: result.maker.id,
+          targetType: "maker",
+        });
+      } catch {
+        setFormError("web.catalog.error.form");
+        setBusy(false);
+        return;
+      }
     }
     await navigate({ to: "/admin/makers" });
   }
@@ -240,6 +286,14 @@ export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
             onChange={setDescription}
             onLoadingChange={setEditorLoading}
           />
+          <MakerImageFields
+            existingImages={existingImages}
+            images={images}
+            locale={locale}
+            onExistingImagesChange={setExistingImages}
+            onImagesChange={setImages}
+            t={t}
+          />
           {formError ? (
             <p className="m-0 text-sm text-destructive" role="alert">
               {t(formError as TranslationKey)}
@@ -259,6 +313,151 @@ export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
         </form>
       </main>
     </AdminPageShell>
+  );
+}
+
+/**
+ * Renders maker image upload, placeholder, archive, and restore controls.
+ *
+ * @param props - Maker image field properties.
+ * @returns Maker image administration controls.
+ */
+function MakerImageFields({
+  existingImages,
+  images,
+  locale,
+  onExistingImagesChange,
+  onImagesChange,
+  t,
+}: {
+  /** Persisted active and archived maker images. */
+  existingImages: CatalogImage[];
+  /** Images waiting to upload after the maker is saved. */
+  images: File[];
+  /** Active interface locale. */
+  locale: SupportedLocale;
+  /**
+   * Receives persisted image state changes.
+   *
+   * @param images - Updated persisted images.
+   */
+  onExistingImagesChange(images: CatalogImage[]): void;
+  /**
+   * Receives pending upload changes.
+   *
+   * @param images - Updated pending images.
+   */
+  onImagesChange(images: File[]): void;
+  /**
+   * Formats localized maker image copy.
+   *
+   * @param key - Localization key.
+   * @param values - Translation interpolation values.
+   * @returns Localized copy.
+   */
+  t(key: TranslationKey, values?: Readonly<Record<string, unknown>>): string;
+}) {
+  const guidance = getImageUploadGuidance(locale);
+  const activeImages = existingImages.filter(({ deletedAt }) => !deletedAt);
+  return (
+    <section className="grid gap-3">
+      <FileDropInput
+        accept=".avif,.jpeg,.jpg,.png,.webp"
+        aspectRatio={4 / 3}
+        aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+        aspectRatioHelpLabel={guidance.helpLabel}
+        aspectRatioWarning={guidance.warning}
+        browseLabel={t("web.resources.upload.browseFiles")}
+        description={t("web.resources.upload.imagesHelp", {
+          maxFileSize: formatMiB(maxImageBytes, locale),
+          maxImages: maxImageSessionFiles,
+          maxSessionSize: formatMiB(maxImageSessionBytes, locale),
+        })}
+        fileTypes={t("web.resources.upload.imageTypes")}
+        files={images}
+        id="maker-images"
+        label={t("web.resources.upload.imagesLabel")}
+        multiple
+        onFilesChange={(additions) => onImagesChange([...images, ...additions])}
+        onRemove={(index) =>
+          onImagesChange(
+            images.filter((_image, candidate) => candidate !== index),
+          )
+        }
+        removeFileLabel={t("web.action.close")}
+      />
+      {!activeImages.length && !images.length ? (
+        <div className="grid aspect-[4/3] max-w-sm place-items-center rounded-lg border border-dashed border-border bg-muted text-muted-foreground">
+          <div className="grid justify-items-center gap-2 text-sm">
+            <Factory aria-hidden="true" className="size-8" />
+            <span>{t("web.admin.makers.imagesEmpty")}</span>
+          </div>
+        </div>
+      ) : null}
+      {existingImages.map((image) => (
+        <div
+          className="flex min-w-0 items-center gap-3 rounded-lg border border-border p-3"
+          key={image.id}
+        >
+          <img
+            alt={t("web.resources.detail.imageAlt", { name: image.fileName })}
+            className="size-16 shrink-0 rounded-md object-cover"
+            src={image.url}
+          />
+          <span className="min-w-0 flex-1 truncate text-sm">
+            {image.fileName}
+          </span>
+          <Button
+            aria-label={`${t(image.deletedAt ? "web.resources.action.restore" : "web.resources.action.delete")} ${image.fileName}`}
+            onClick={async () => {
+              if (image.deletedAt) {
+                await restoreCatalogImage({
+                  data: { imageId: image.id, targetType: "maker" },
+                });
+                onExistingImagesChange(
+                  existingImages.map((candidate) =>
+                    candidate.id === image.id
+                      ? {
+                          ...candidate,
+                          deletedAt: null,
+                          deletedByClerkId: null,
+                          deletedByRole: null,
+                        }
+                      : candidate,
+                  ),
+                );
+              } else {
+                await softDeleteCatalogImage({
+                  data: { imageId: image.id, targetType: "maker" },
+                });
+                onExistingImagesChange(
+                  existingImages.map((candidate) =>
+                    candidate.id === image.id
+                      ? {
+                          ...candidate,
+                          deletedAt: new Date(),
+                          deletedByClerkId: null,
+                          deletedByRole: "admin",
+                        }
+                      : candidate,
+                  ),
+                );
+              }
+            }}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {image.deletedAt ? <RotateCcw /> : <Trash2 />}
+            {t(
+              image.deletedAt
+                ? "web.resources.action.restore"
+                : "web.resources.action.delete",
+            )}
+          </Button>
+        </div>
+      ))}
+    </section>
   );
 }
 

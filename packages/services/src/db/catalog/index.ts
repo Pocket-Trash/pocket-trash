@@ -8,6 +8,7 @@ import {
   desc,
   eq,
   inArray,
+  isNull,
   isNotNull,
   isNull,
   notInArray,
@@ -139,6 +140,8 @@ export type CatalogMaker = {
   description: string | null;
   /** Database identifier. */
   id: number;
+  /** Ordered active images, plus archived images for authorized administration reads. */
+  images: CatalogImage[];
   /** Display name. */
   name: string;
   /** Optional external website root URL. */
@@ -277,6 +280,7 @@ export type CatalogImageTargetType =
   | "collection"
   | "collection_item"
   | "material"
+  | "maker"
   | "product";
 /**
  * Soft-deleted image with ownership and target context for restoration.
@@ -2160,7 +2164,7 @@ export function createCatalogService(
                 targetId: row.id,
               });
             }
-            return row;
+            return { ...row, images: [] };
           }),
         actorAttributes(input.actor.clerkId),
       );
@@ -2573,16 +2577,7 @@ export function createCatalogService(
      * @rejects When the database query fails.
      */
     async listMakers() {
-      return await db
-        .select({
-          description: schema.maker.description,
-          id: schema.maker.id,
-          name: schema.maker.name,
-          rootUrl: schema.maker.rootUrl,
-          slug: schema.maker.slug,
-        })
-        .from(schema.maker)
-        .orderBy(asc(schema.maker.name));
+      return await queryMakerProfiles(db, false);
     },
     /**
      * Lists maker profiles for an authorized product manager.
@@ -2594,16 +2589,7 @@ export function createCatalogService(
     async listMakersForAdmin(actor) {
       if (!hasPermission(actor, "products.manage"))
         throw new Error("Product does not exist.");
-      return await db
-        .select({
-          description: schema.maker.description,
-          id: schema.maker.id,
-          name: schema.maker.name,
-          rootUrl: schema.maker.rootUrl,
-          slug: schema.maker.slug,
-        })
-        .from(schema.maker)
-        .orderBy(asc(schema.maker.name));
+      return await queryMakerProfiles(db, true);
     },
     /**
      * Returns one maker profile to an authorized product manager.
@@ -2615,17 +2601,7 @@ export function createCatalogService(
     async getMakerForAdmin(input) {
       if (!hasPermission(input.actor, "products.manage"))
         throw new Error("Product does not exist.");
-      const [maker] = await db
-        .select({
-          description: schema.maker.description,
-          id: schema.maker.id,
-          name: schema.maker.name,
-          rootUrl: schema.maker.rootUrl,
-          slug: schema.maker.slug,
-        })
-        .from(schema.maker)
-        .where(eq(schema.maker.id, input.makerId))
-        .limit(1);
+      const [maker] = await queryMakerProfiles(db, true, input.makerId);
       return maker ?? null;
     },
     /**
@@ -2885,6 +2861,29 @@ export function createCatalogService(
         });
         return;
       }
+      if (input.targetType === "maker") {
+        const dependencies = requireProductAudit(users, audit);
+        const actorUser = dependencies
+          ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+          : null;
+        await db.transaction(async (tx) => {
+          const context = await makerImageContext(tx, input.imageId);
+          await restoreCatalogImage(tx, input);
+          if (dependencies && actorUser) {
+            if (!context) throw new Error("Image does not exist.");
+            await writeProductAdminAudit(dependencies.audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: { deleted: false, imageId: input.imageId },
+              before: { deleted: true, imageId: input.imageId },
+              definition: productAudit.makerImageRestored,
+              reason: input.reason,
+              targetId: context.makerId,
+            });
+          }
+        });
+        return;
+      }
       if (input.targetType === "product") {
         const dependencies = requireProductAudit(users, audit);
         const actorUser = dependencies
@@ -3070,7 +3069,8 @@ export function createCatalogService(
                 targetId: after.id,
               });
             }
-            return after;
+            const images = await queryMakerProfiles(tx, true, after.id);
+            return images[0] ?? { ...after, images: [] };
           }),
         actorAttributes(input.actor.clerkId, { makerId: input.makerId }),
       );
@@ -3165,6 +3165,29 @@ export function createCatalogService(
               before: { deleted: false, imageId: input.imageId },
               definition: productAudit.materialImageDeleted,
               targetId: context.materialId,
+            });
+          }
+        });
+        return;
+      }
+      if (input.targetType === "maker") {
+        const dependencies = requireProductAudit(users, audit);
+        const actorUser = dependencies
+          ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+          : null;
+        await db.transaction(async (tx) => {
+          const context = await makerImageContext(tx, input.imageId);
+          if (!(await softDeleteCatalogImage(tx, input))) return;
+          if (dependencies && actorUser) {
+            if (!context) throw new Error("Image does not exist.");
+            await writeProductAdminAudit(dependencies.audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: { deleted: true, imageId: input.imageId },
+              before: { deleted: false, imageId: input.imageId },
+              definition: productAudit.makerImageDeleted,
+              reason: input.reason,
+              targetId: context.makerId,
             });
           }
         });
@@ -5138,6 +5161,26 @@ async function productImageContext(
 }
 
 /**
+ * Loads the maker owning a shared maker image.
+ *
+ * @param db - Application database.
+ * @param imageId - Image identifier.
+ * @returns Maker image context, or `null` when unavailable.
+ * @rejects When the database query fails.
+ */
+async function makerImageContext(
+  db: Pick<Database, "select">,
+  imageId: number,
+) {
+  const [row] = await db
+    .select({ makerId: schema.makerImage.makerId })
+    .from(schema.makerImage)
+    .where(eq(schema.makerImage.id, imageId))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
  * Requires collection audit.
  *
  * @param users - User service.
@@ -6361,6 +6404,72 @@ async function loadCollectionImages(
  * @param row - Row.
  * @returns Catalog image representation.
  */
+/**
+ * Loads name-sorted maker profiles with ordered image metadata.
+ *
+ * @param db - Application database.
+ * @param includeDeleted - Whether archived images are included.
+ * @param makerId - Optional maker identifier filter.
+ * @returns Matching maker profiles.
+ * @rejects When maker or image queries fail.
+ */
+async function queryMakerProfiles(
+  db: Pick<Database, "select">,
+  includeDeleted: boolean,
+  makerId?: number,
+): Promise<CatalogMaker[]> {
+  const makers = await db
+    .select({
+      description: schema.maker.description,
+      id: schema.maker.id,
+      name: schema.maker.name,
+      rootUrl: schema.maker.rootUrl,
+      slug: schema.maker.slug,
+    })
+    .from(schema.maker)
+    .where(makerId === undefined ? undefined : eq(schema.maker.id, makerId))
+    .orderBy(asc(schema.maker.name));
+  if (!makers.length) return [];
+  const images = await db
+    .select({
+      contentType: schema.makerImage.contentType,
+      createdAt: schema.makerImage.createdAt,
+      deletedAt: schema.makerImage.deletedAt,
+      deletedByClerkId: schema.makerImage.deletedByClerkId,
+      deletedByRole: schema.makerImage.deletedByRole,
+      fileName: schema.makerImage.fileName,
+      id: schema.makerImage.id,
+      makerId: schema.makerImage.makerId,
+      objectPath: schema.makerImage.objectPath,
+      position: schema.makerImage.position,
+      size: schema.makerImage.size,
+      url: schema.makerImage.url,
+    })
+    .from(schema.makerImage)
+    .where(
+      and(
+        inArray(
+          schema.makerImage.makerId,
+          makers.map(({ id }) => id),
+        ),
+        includeDeleted ? undefined : isNull(schema.makerImage.deletedAt),
+      ),
+    )
+    .orderBy(asc(schema.makerImage.position), asc(schema.makerImage.id));
+  return makers.map((maker) => ({
+    ...maker,
+    images: images
+      .filter((image) => image.makerId === maker.id)
+      .map(toCatalogImage),
+  }));
+}
+
+/**
+ * Converts a selected image row into the shared catalog image shape.
+ *
+ * @param row - Selected image metadata.
+ * @returns Shared catalog image metadata.
+ */
 function toCatalogImage(row: {
   /**
    * Content type.
@@ -6750,6 +6859,26 @@ async function softDeleteCatalogImage(
       .where(eq(schema.materialImage.id, input.imageId));
     return true;
   }
+  if (input.targetType === "maker") {
+    if (!hasPermission(input.actor, "products.manage"))
+      throw new Error("Image does not exist.");
+    const [image] = await db
+      .select({ deletedAt: schema.makerImage.deletedAt })
+      .from(schema.makerImage)
+      .where(eq(schema.makerImage.id, input.imageId))
+      .limit(1);
+    if (!image) throw new Error("Image does not exist.");
+    if (image.deletedAt) return false;
+    await db
+      .update(schema.makerImage)
+      .set({
+        deletedAt,
+        deletedByClerkId: input.actor.clerkId,
+        deletedByRole: "admin",
+      })
+      .where(eq(schema.makerImage.id, input.imageId));
+    return true;
+  }
   if (input.targetType === "product") {
     const canManage = hasPermission(input.actor, "products.manage");
     const [image] = await db
@@ -6851,6 +6980,28 @@ async function restoreCatalogImage(
       .update(schema.materialImage)
       .set({ deletedAt: null, deletedByClerkId: null, deletedByRole: null })
       .where(eq(schema.materialImage.id, input.imageId));
+    return;
+  }
+  if (input.targetType === "maker") {
+    const [image] = await db
+      .select({
+        deletedByClerkId: schema.makerImage.deletedByClerkId,
+        deletedByRole: schema.makerImage.deletedByRole,
+        ownerClerkId: sql<string | null>`null`,
+      })
+      .from(schema.makerImage)
+      .where(
+        and(
+          eq(schema.makerImage.id, input.imageId),
+          isNotNull(schema.makerImage.deletedAt),
+        ),
+      )
+      .limit(1);
+    assertCanRestoreImage(image, input.actor, "products.manage");
+    await db
+      .update(schema.makerImage)
+      .set({ deletedAt: null, deletedByClerkId: null, deletedByRole: null })
+      .where(eq(schema.makerImage.id, input.imageId));
     return;
   }
   if (input.targetType === "product") {
@@ -6964,7 +7115,7 @@ async function listCatalogImageTrash(
   },
 ): Promise<CatalogImageTrashItem[]> {
   const { actor } = input;
-  const [materials, products, collectionItems] = await Promise.all([
+  const [materials, makers, products, collectionItems] = await Promise.all([
     db
       .select({
         contentType: schema.materialImage.contentType,
@@ -6993,6 +7144,31 @@ async function listCatalogImageTrash(
           hasPermission(actor, "products.manage") ? undefined : sql`false`,
         ),
       ),
+    hasPermission(actor, "products.manage")
+      ? db
+          .select({
+            contentType: schema.makerImage.contentType,
+            createdAt: schema.makerImage.createdAt,
+            deletedAt: schema.makerImage.deletedAt,
+            deletedByClerkId: schema.makerImage.deletedByClerkId,
+            deletedByRole: schema.makerImage.deletedByRole,
+            fileName: schema.makerImage.fileName,
+            id: schema.makerImage.id,
+            objectPath: schema.makerImage.objectPath,
+            ownerClerkId: sql<string | null>`null`,
+            position: schema.makerImage.position,
+            size: schema.makerImage.size,
+            targetId: schema.maker.id,
+            targetName: schema.maker.name,
+            url: schema.makerImage.url,
+          })
+          .from(schema.makerImage)
+          .innerJoin(
+            schema.maker,
+            eq(schema.makerImage.makerId, schema.maker.id),
+          )
+          .where(isNotNull(schema.makerImage.deletedAt))
+      : Promise.resolve([]),
     db
       .select({
         contentType: schema.productImage.contentType,
@@ -7086,6 +7262,7 @@ async function listCatalogImageTrash(
       ...image,
       targetType: "material" as const,
     })),
+    ...makers.map((image) => ({ ...image, targetType: "maker" as const })),
     ...products.map((image) => ({ ...image, targetType: "product" as const })),
     ...collectionItems.map((image) => ({
       ...image,

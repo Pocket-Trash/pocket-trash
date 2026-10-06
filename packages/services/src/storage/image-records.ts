@@ -17,6 +17,14 @@ export const imageTargets = {
     owner: sql`select null::text as owner from materials where id =`,
     parent: "materials",
   },
+  maker: {
+    table: "maker_image",
+    column: "maker_id",
+    entity: "makers",
+    softDelete: true,
+    owner: sql`select null::text as owner from makers where id =`,
+    parent: "makers",
+  },
   product: {
     table: "product_image",
     column: "product_id",
@@ -103,7 +111,8 @@ export async function assertCanEditTarget(
  */
 function permissionFor(target: UploadTarget["type"]): Permission {
   if (target === "resource") return "resources.manage";
-  if (target === "product" || target === "material") return "products.manage";
+  if (target === "maker" || target === "material" || target === "product")
+    return "products.manage";
   return "collections.manage";
 }
 /**

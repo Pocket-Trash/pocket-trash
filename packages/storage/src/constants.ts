@@ -53,6 +53,7 @@ export const maxResourceFiles = 10;
 export const maxResourceImages = 10;
 /** Domain targets that may own uploaded content. */
 export const uploadTargetTypes = [
+  "maker",
   "product",
   "material",
   "collection",
@@ -63,6 +64,7 @@ export const uploadTargetTypes = [
 export type UploadTargetType = (typeof uploadTargetTypes)[number];
 /** Storage namespaces that may own images. */
 export const imageEntities = [
+  "makers",
   "products",
   "materials",
   "collections",
