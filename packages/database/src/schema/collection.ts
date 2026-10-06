@@ -552,6 +552,14 @@ export const finish = pgTable("finish", lookupColumns(), (table) => [
   uniqueIndex("finish_slug_unique").on(table.slug),
 ]);
 
+/** Canonical catalog surface patterns. */
+export const pattern = pgTable("pattern", lookupColumns(), (table) => [
+  uniqueIndex("pattern_name_case_insensitive_unique").on(
+    sql`lower(${table.name})`,
+  ),
+  uniqueIndex("pattern_slug_unique").on(table.slug),
+]);
+
 /** Canonical catalog colors. */
 export const color = pgTable(
   "color",
@@ -594,6 +602,11 @@ export const finishOption = pgTable(
     /** Optional relationship between the selected colors. */
     colorEffectId: bigint("color_effect_id", { mode: "number" }).references(
       () => colorEffect.id,
+      { onDelete: "restrict" },
+    ),
+    /** Optional reusable surface pattern included in this appearance. */
+    patternId: bigint("pattern_id", { mode: "number" }).references(
+      () => pattern.id,
       { onDelete: "restrict" },
     ),
     /** Zero-based option display order. */

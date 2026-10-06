@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { schema } from "../src/index";
 
 describe("catalog schema", () => {
-  it("exports generic products, shared materials, and nullable lookup fields", () => {
+  it("exports generic products, shared materials, optional appearances, and reusable patterns", () => {
     const collectionItem = getTableConfig(schema.collectionItem);
     expect(schema.collectionItem.approvalStatus.default).toBe("pending");
     expect(collectionItem.checks.map(({ name }) => name)).toEqual(
@@ -21,6 +21,7 @@ describe("catalog schema", () => {
     const productType = getTableConfig(schema.productType);
     const finishOption = getTableConfig(schema.finishOption);
     const color = getTableConfig(schema.color);
+    const pattern = getTableConfig(schema.pattern);
 
     expect(product.columns.map(({ name }) => name)).toEqual([
       "id",
@@ -77,6 +78,21 @@ describe("catalog schema", () => {
         ),
       )?.onDelete,
     ).toBe("set null");
+    expect(
+      finishOption.columns.find(({ name }) => name === "pattern_id")?.notNull,
+    ).toBe(false);
+    expect(
+      finishOption.foreignKeys.find(({ reference }) =>
+        reference().columns.some(({ name }) => name === "pattern_id"),
+      )?.onDelete,
+    ).toBe("restrict");
+    expect(pattern.uniqueConstraints).toHaveLength(0);
+    expect(pattern.indexes.map(({ config }) => config.name)).toEqual(
+      expect.arrayContaining([
+        "pattern_name_case_insensitive_unique",
+        "pattern_slug_unique",
+      ]),
+    );
     expect(
       collectionItem.columns.find(({ name }) => name === "material_id")
         ?.notNull,
