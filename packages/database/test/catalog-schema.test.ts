@@ -311,9 +311,8 @@ describe("catalog schema", () => {
     ).toEqual(["id", "id"]);
   });
 
-  it("models each owned slider product as a standalone collection item", () => {
+  it("models standalone slider items and unique installed assemblies", () => {
     for (const table of [
-      schema.collectionSlider,
       schema.collectionSliderPlate,
       schema.collectionSliderInsert,
     ]) {
@@ -324,5 +323,17 @@ describe("catalog schema", () => {
       ]);
       expect(config.foreignKeys).toHaveLength(2);
     }
+    const slider = getTableConfig(schema.collectionSlider);
+    expect(slider.columns.map(({ name }) => name)).toEqual([
+      "id",
+      "product_slider_id",
+      "installed_plate_id",
+      "installed_insert_id",
+    ]);
+    expect(slider.foreignKeys).toHaveLength(4);
+    expect(slider.indexes.map(({ config }) => config.name)).toEqual([
+      "collection_slider_installed_plate_unique",
+      "collection_slider_installed_insert_unique",
+    ]);
   });
 });
