@@ -154,6 +154,12 @@ describe("catalog schema", () => {
     const configuration = getTableConfig(schema.productMagnetConfiguration);
     const magnetGroup = getTableConfig(schema.productMagnetGroup);
     const magnetSlot = getTableConfig(schema.productMagnetSlot);
+    const clickOption = getTableConfig(schema.productInsertClickOption);
+    const insertOffer = getTableConfig(schema.productInsertMagnetOffer);
+    const insertOfferGroup = getTableConfig(schema.productInsertMagnetGroup);
+    const insertOfferSlot = getTableConfig(schema.productInsertMagnetSlot);
+    const template = getTableConfig(schema.magnetConfigurationTemplate);
+    const sliderOffer = getTableConfig(schema.productSliderInsertOffer);
 
     expect(slider.columns.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
@@ -238,6 +244,65 @@ describe("catalog schema", () => {
     );
     expect(magnetSlot.columns.map(({ name }) => name)).not.toEqual(
       expect.arrayContaining(["polarity", "x", "y", "x_mm", "y_mm"]),
+    );
+    expect(clickOption.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "id",
+        "insert_product_id",
+        "click_count",
+        "insertion_position",
+      ]),
+    );
+    expect(clickOption.checks.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "product_insert_click_option_click_count_positive",
+        "product_insert_click_option_position_nonnegative",
+      ]),
+    );
+    expect(insertOffer.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "id",
+        "insert_product_id",
+        "configuration_label_id",
+        "click_option_id",
+        "is_advertised_default",
+        "copied_from_template_id",
+      ]),
+    );
+    expect(insertOffer.indexes.map(({ config }) => config.name)).toContain(
+      "product_insert_magnet_offer_advertised_default_unique",
+    );
+    expect(insertOfferGroup.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "offer_id",
+        "group_key",
+        "diameter_mm",
+        "thickness_mm",
+        "grade",
+      ]),
+    );
+    expect(insertOfferSlot.columns.map(({ name }) => name)).not.toEqual(
+      expect.arrayContaining(["polarity", "x", "y", "x_mm", "y_mm"]),
+    );
+    expect(template.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "name",
+        "scope",
+        "maker_id",
+        "compatibility_family_id",
+        "configuration",
+      ]),
+    );
+    expect(sliderOffer.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "slider_product_id",
+        "insert_offer_id",
+        "insert_product_id",
+        "is_advertised_default",
+      ]),
+    );
+    expect(sliderOffer.indexes.map(({ config }) => config.name)).toContain(
+      "product_slider_insert_offer_advertised_default_unique",
     );
     expect(
       inclusion.foreignKeys.map(
