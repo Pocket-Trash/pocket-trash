@@ -807,7 +807,9 @@ describe("CollectionItemDetailPage", () => {
 
     expect(html).toContain("Installed plate");
     expect(html).toContain("Installed insert");
-    expect(html).toContain("web.slider.component.grandfatheredWarning");
+    expect(html).toContain(
+      "This installation can remain connected, but reinstalling will use current compatibility.",
+    );
   });
 
   it("shows approval actions only to administrators while owners retain review status and editing", () => {
