@@ -345,6 +345,20 @@ export function seedImageFolderPrefix(imageFolderPrefix: string): string {
 }
 
 /**
+ * Converts a reviewed catalog snapshot timestamp into a stable seed timestamp.
+ *
+ * @param importedAt - ISO timestamp recorded with the reviewed source snapshot.
+ * @returns Deterministic timestamp reused whenever the snapshot is applied.
+ * @throws When the reviewed timestamp is invalid.
+ */
+export function catalogSeedTimestamp(importedAt: string): Date {
+  const timestamp = new Date(importedAt);
+  if (Number.isNaN(timestamp.getTime()))
+    throw new Error("Catalog seed timestamp is invalid.");
+  return timestamp;
+}
+
+/**
  * Loads the reviewed KAP product and primary-image snapshot.
  *
  * @returns The reviewed KAP seed snapshot.
@@ -500,6 +514,7 @@ export async function seedKapedcProducts(
     .from(material);
   const materialIds = new Map(materials.map(({ id, slug }) => [slug, id]));
   const seeded = [];
+  const updatedAt = catalogSeedTimestamp(snapshot.importedAt);
 
   for (const value of snapshot.products) {
     const productTypeId = typeIds.get(value.type);
@@ -515,7 +530,7 @@ export async function seedKapedcProducts(
       ownerClerkId: seedOwnerClerkId,
       productTypeId,
       slug: value.slug,
-      updatedAt: new Date(),
+      updatedAt,
     };
     const [seededProduct] = await db
       .insert(product)
@@ -534,7 +549,7 @@ export async function seedKapedcProducts(
       .insert(subtype)
       .values({ id: seededProduct.id })
       .onConflictDoUpdate({
-        set: { updatedAt: new Date() },
+        set: { updatedAt },
         target: subtype.id,
       });
 
