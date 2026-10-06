@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import type {
   CatalogColor,
+  CatalogCompatibilityFamily,
   CatalogFinishOption,
   CatalogImage,
   CatalogLookup,
@@ -45,7 +46,9 @@ import { filterButtonsByDiameter, finishOptionLabel } from "@/lib/catalog";
 import {
   addCollectionProduct,
   type CatalogOptions,
+  collectionProductTypeIsSupported,
   createCatalogColor,
+  createCatalogCompatibilityFamily,
   createCatalogFinish,
   createCatalogMaker,
   createCatalogMaterial,
@@ -186,6 +189,12 @@ export function ProductEditor({
       bearing: initialProduct?.bearing ?? "",
       buttonDiameterMm: initialProduct?.buttonDiameterMm ?? null,
       compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
+      compatibilityAdvisories:
+        initialProduct?.compatibilityAdvisories.map(
+          ({ relatedProductId, text }) => ({ relatedProductId, text }),
+        ) ?? [],
+      compatibilityFamilyIds:
+        initialProduct?.compatibilityFamilies.map(({ id }) => id) ?? [],
       description: initialProduct?.description ?? "",
       diameterMm: initialProduct?.diameterMm ?? null,
       finishOptions: initialProduct?.finishOptions.length
@@ -202,9 +211,12 @@ export function ProductEditor({
             patternId: option.pattern?.id ?? null,
           }))
         : [],
+      includedComponentIds:
+        initialProduct?.includedComponents.map(({ id }) => id) ?? [],
       lengthMm: initialProduct?.lengthMm ?? null,
       makerId: initialProduct?.makerId ?? 0,
       makerProductUrl: initialProduct?.makerProductUrl ?? "",
+      magnetSystem: initialProduct?.magnetSystem ?? null,
       materialIds: initialProduct?.materials.map(({ id }) => id) ?? [],
       name: initialProduct?.name ?? "",
       productId: initialProduct?.id ?? null,
@@ -213,6 +225,7 @@ export function ProductEditor({
       thicknessMm: initialProduct?.thicknessMm ?? null,
       thicknessWithButtonMm: initialProduct?.thicknessWithButtonMm ?? null,
       weightG: initialProduct?.weightG ?? null,
+      weightBasis: initialProduct?.weightBasis ?? null,
       widthMm: initialProduct?.widthMm ?? null,
     },
     /**
@@ -436,6 +449,65 @@ export function ProductEditor({
           }}
         </form.Field>
 
+        <form.Subscribe selector={(state) => state.values.makerId}>
+          {(makerId) => (
+            <form.Field name="compatibilityFamilyIds">
+              {(field) => {
+                const families = options.compatibilityFamilies.filter(
+                  (family) => family.makerId === makerId,
+                );
+                const selected = families.filter(({ id }) =>
+                  field.state.value.includes(id),
+                );
+                return (
+                  <Field
+                    label={t("web.slider.relationship.compatibilityFamilies")}
+                  >
+                    <CatalogMultiCombobox
+                      ariaLabel={t(
+                        "web.slider.relationship.compatibilityFamilies",
+                      )}
+                      items={families}
+                      onValueChange={(values) =>
+                        field.handleChange(values.map(({ id }) => Number(id)))
+                      }
+                      placeholder={t(
+                        "web.slider.relationship.compatibilityFamilies",
+                      )}
+                      removeLabel={t("web.action.close")}
+                      value={selected}
+                    />
+                    {makerId > 0 ? (
+                      <LookupDialog
+                        kind="compatibilityFamily"
+                        makerId={makerId}
+                        onCreated={(family) => {
+                          setOptions((current) => ({
+                            ...current,
+                            compatibilityFamilies: [
+                              ...current.compatibilityFamilies,
+                              family,
+                            ].sort((a, b) => a.name.localeCompare(b.name)),
+                          }));
+                          field.handleChange([...field.state.value, family.id]);
+                        }}
+                        t={t}
+                      />
+                    ) : null}
+                    <p className="text-xs text-muted-foreground">
+                      {t("web.slider.relationship.compatibilityHelp")}
+                    </p>
+                    <FieldError
+                      error={serverErrors.compatibilityFamilyIds?.[0]}
+                      t={t}
+                    />
+                  </Field>
+                );
+              }}
+            </form.Field>
+          )}
+        </form.Subscribe>
+
         <form.Field mode="array" name="finishOptions">
           {(field) => (
             <FinishOptionsEditor
@@ -459,7 +531,9 @@ export function ProductEditor({
               "buttonDiameterMm",
               "spinDiameterMm",
             ] as const)
-          : (["weightG", "diameterMm", "thicknessMm"] as const)
+          : productTypeSlug === "spinner-button"
+            ? (["weightG", "diameterMm", "thicknessMm"] as const)
+            : (["weightG", "lengthMm", "widthMm", "thicknessMm"] as const)
         ).map((name) => {
           const labels = {
             buttonDiameterMm: "web.catalog.field.buttonDiameter",
@@ -495,6 +569,218 @@ export function ProductEditor({
             </form.Field>
           );
         })}
+        {productTypeSlug === "slider" ? (
+          <form.Field name="magnetSystem">
+            {(field) => {
+              const items = [
+                {
+                  id: "body-hosted",
+                  name: t("web.slider.capability.bodyHosted"),
+                },
+                {
+                  id: "insert-driven",
+                  name: t("web.slider.capability.insertDriven"),
+                },
+              ];
+              return (
+                <Field label={t("web.slider.capability.label")}>
+                  <CatalogCombobox
+                    ariaLabel={t("web.slider.capability.label")}
+                    items={items}
+                    onValueChange={(value) =>
+                      field.handleChange(
+                        value?.id === "body-hosted" ||
+                          value?.id === "insert-driven"
+                          ? value.id
+                          : null,
+                      )
+                    }
+                    placeholder={t("web.slider.capability.label")}
+                    value={
+                      items.find(({ id }) => id === field.state.value) ?? null
+                    }
+                  />
+                  <FieldError error={serverErrors.magnetSystem?.[0]} t={t} />
+                </Field>
+              );
+            }}
+          </form.Field>
+        ) : null}
+        {productTypeSlug === "slider" ? (
+          <form.Field name="weightBasis">
+            {(field) => {
+              const items = [
+                {
+                  id: "body-only",
+                  name: t("web.slider.measurement.bodyOnly"),
+                },
+                {
+                  id: "complete-build",
+                  name: t("web.slider.measurement.completeBuild"),
+                },
+              ];
+              return (
+                <Field label={t("web.slider.measurement.weightBasis")}>
+                  <CatalogCombobox
+                    ariaLabel={t("web.slider.measurement.weightBasis")}
+                    items={items}
+                    onValueChange={(value) =>
+                      field.handleChange(
+                        value?.id === "body-only" ||
+                          value?.id === "complete-build"
+                          ? value.id
+                          : null,
+                      )
+                    }
+                    placeholder={t("web.slider.measurement.weightBasis")}
+                    removeLabel={t("web.action.close")}
+                    value={
+                      items.find(({ id }) => id === field.state.value) ?? null
+                    }
+                  />
+                  <FieldError error={serverErrors.weightBasis?.[0]} t={t} />
+                </Field>
+              );
+            }}
+          </form.Field>
+        ) : null}
+        {productTypeSlug === "slider-plate" ||
+        productTypeSlug === "slider-insert" ? (
+          <p className="text-xs text-muted-foreground">
+            {t("web.slider.measurement.setLevelHelp")}
+          </p>
+        ) : null}
+        {productTypeSlug === "slider" ? (
+          <form.Field name="includedComponentIds">
+            {(field) => {
+              const items = options.relationshipProducts.filter(
+                (candidate) =>
+                  candidate.id !== initialProduct?.id &&
+                  (candidate.productTypeSlug === "slider-plate" ||
+                    candidate.productTypeSlug === "slider-insert"),
+              );
+              const selected = items.filter(({ id }) =>
+                field.state.value.includes(id),
+              );
+              return (
+                <Field label={t("web.slider.relationship.includedComponents")}>
+                  <CatalogMultiCombobox
+                    ariaLabel={t("web.slider.relationship.includedComponents")}
+                    items={items}
+                    onValueChange={(values) =>
+                      field.handleChange(values.map(({ id }) => Number(id)))
+                    }
+                    placeholder={t(
+                      "web.slider.relationship.includedComponents",
+                    )}
+                    removeLabel={t("web.action.close")}
+                    value={selected}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t("web.slider.relationship.includedHelp")}
+                  </p>
+                  <FieldError
+                    error={serverErrors.includedComponentIds?.[0]}
+                    t={t}
+                  />
+                </Field>
+              );
+            }}
+          </form.Field>
+        ) : null}
+        <form.Field mode="array" name="compatibilityAdvisories">
+          {(field) => (
+            <fieldset className="grid gap-3 rounded-lg border border-border p-4">
+              <legend className="px-1 text-sm font-medium">
+                {t("web.slider.relationship.reviewedAdvisory")}
+              </legend>
+              {field.state.value.map((advisory, index) => {
+                const selected =
+                  options.relationshipProducts.find(
+                    ({ id }) => id === advisory.relatedProductId,
+                  ) ?? null;
+                return (
+                  <section
+                    className="grid gap-3 rounded-lg border border-border bg-background p-3"
+                    key={`${advisory.relatedProductId}-${index}`}
+                  >
+                    <CatalogCombobox
+                      ariaLabel={t("web.slider.relationship.reviewedAdvisory")}
+                      items={options.relationshipProducts.filter(
+                        ({ id }) => id !== initialProduct?.id,
+                      )}
+                      onValueChange={(value) =>
+                        field.handleChange(
+                          field.state.value.map((current, position) =>
+                            position === index
+                              ? {
+                                  ...current,
+                                  relatedProductId: Number(value?.id ?? 0),
+                                }
+                              : current,
+                          ),
+                        )
+                      }
+                      placeholder={t(
+                        "web.slider.relationship.reviewedAdvisory",
+                      )}
+                      value={selected}
+                    />
+                    <textarea
+                      aria-label={t("web.slider.relationship.reviewedAdvisory")}
+                      className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      maxLength={1000}
+                      onChange={(event) =>
+                        field.handleChange(
+                          field.state.value.map((current, position) =>
+                            position === index
+                              ? { ...current, text: event.target.value }
+                              : current,
+                          ),
+                        )
+                      }
+                      value={advisory.text}
+                    />
+                    <Button
+                      className="w-fit"
+                      onClick={() =>
+                        field.handleChange(
+                          field.state.value.filter(
+                            (_, position) => position !== index,
+                          ),
+                        )
+                      }
+                      type="button"
+                      variant="outline"
+                    >
+                      {t("web.action.removeCompatibilityAdvisory")}
+                    </Button>
+                  </section>
+                );
+              })}
+              <Button
+                className="w-fit"
+                onClick={() =>
+                  field.handleChange([
+                    ...field.state.value,
+                    { relatedProductId: 0, text: "" },
+                  ])
+                }
+                type="button"
+                variant="outline"
+              >
+                {t("web.action.addCompatibilityAdvisory")}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                {t("web.slider.relationship.advisoryHelp")}
+              </p>
+              <FieldError
+                error={serverErrors.compatibilityAdvisories?.[0]}
+                t={t}
+              />
+            </fieldset>
+          )}
+        </form.Field>
         {productTypeSlug === "spinner" ? (
           <form.Field name="bearing">
             {(field) => (
@@ -991,6 +1277,18 @@ type LookupDialogProps = (
     }
   | {
       /** Lookup kind created by this dialog. */
+      kind: "compatibilityFamily";
+      /** Maker that defines the compatibility family. */
+      makerId: number;
+      /**
+       * Receives a newly created compatibility family.
+       *
+       * @param value - Created compatibility-family value.
+       */
+      onCreated: (value: CatalogCompatibilityFamily) => void;
+    }
+  | {
+      /** Lookup kind created by this dialog. */
       kind: "finish" | "material" | "pattern";
       /**
        * Receives a newly created finish or material.
@@ -1024,6 +1322,7 @@ function LookupDialog(props: LookupDialogProps) {
   const [error, setError] = React.useState<string | null>(null);
   const action = {
     color: "web.action.addColor",
+    compatibilityFamily: "web.action.addCompatibilityFamily",
     finish: "web.action.addFinish",
     maker: "web.action.addMaker",
     material: "web.action.addMaterial",
@@ -1044,6 +1343,16 @@ function LookupDialog(props: LookupDialogProps) {
         return;
       }
       props.onCreated(result.maker);
+    } else if (props.kind === "compatibilityFamily") {
+      const result = await createCatalogCompatibilityFamily({
+        data: { makerId: props.makerId, name },
+      });
+      if (!result.ok) {
+        setFieldErrors(result.fieldErrors);
+        setError(result.formError);
+        return;
+      }
+      props.onCreated(result.compatibilityFamily);
     } else if (props.kind === "material") {
       const result = await createCatalogMaterial({ data: { name } });
       if (!result.ok) {
@@ -1909,7 +2218,7 @@ export function CollectionAddPage({
       selectedCollectionId === null ||
       !material ||
       (finish?.id === "custom" && !customFinishIsValid) ||
-      !productTypeIsSupported(product.productTypeSlug) ||
+      !collectionProductTypeIsSupported(product.productTypeSlug) ||
       (selectedButton &&
         (!buttonMaterial ||
           (buttonFinish?.id === "custom" && !buttonCustomFinishIsValid)))

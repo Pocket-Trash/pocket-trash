@@ -2,6 +2,7 @@ import type {
   AdminMaterial,
   AdminMaterialSummary,
   CatalogColor,
+  CatalogCompatibilityFamily,
   CatalogImage,
   CatalogLookup,
   CatalogMaker,
@@ -64,7 +65,15 @@ const urlMessage = "web.catalog.error.url";
 /**
  * Schema for supported catalog product-type slugs.
  */
-const productTypeSchema = z.enum(["spinner", "spinner-button"]);
+const productTypeSchema = z.enum([
+  "slider",
+  "slider-insert",
+  "slider-plate",
+  "spinner",
+  "spinner-button",
+]);
+/** Product types supported by the collection editor before slider ownership lands. */
+const collectionProductTypeSchema = z.enum(["spinner", "spinner-button"]);
 /**
  * Schema for positive integer identifiers.
  */
@@ -111,6 +120,12 @@ const optionalUrlSchema = z
   .trim()
   .refine((value) => isWebUrl(normalizeOptionalUrl(value)), urlMessage)
   .transform((value) => normalizeOptionalUrl(value) || null);
+
+/** Schema for one reviewed, non-blocking exact-product compatibility warning. */
+const compatibilityAdvisorySchema = z.object({
+  relatedProductId: idSchema,
+  text: z.string().trim().min(1, requiredMessage).max(1000),
+});
 
 /**
  * Checks whether an optional URL uses HTTP or HTTPS.
@@ -208,12 +223,16 @@ export const productFormSchema = z
     bearing: optionalBearingSchema,
     buttonDiameterMm: numericSpecSchema,
     compatibleButtonId: idSchema.nullable(),
+    compatibilityAdvisories: z.array(compatibilityAdvisorySchema),
+    compatibilityFamilyIds: z.array(idSchema),
     description: optionalDescriptionSchema,
     diameterMm: numericSpecSchema,
     finishOptions: z.array(finishOptionSchema),
+    includedComponentIds: z.array(idSchema),
     lengthMm: numericSpecSchema,
     makerId: idSchema,
     makerProductUrl: optionalUrlSchema,
+    magnetSystem: z.enum(["body-hosted", "insert-driven"]).nullable(),
     materialIds: z.array(idSchema).min(1, requiredMessage),
     name: slugNameSchema,
     productId: idSchema.nullable(),
@@ -223,10 +242,26 @@ export const productFormSchema = z
     thicknessMm: numericSpecSchema,
     thicknessWithButtonMm: numericSpecSchema,
     weightG: numericSpecSchema,
+    weightBasis: z.enum(["body-only", "complete-build"]).nullable(),
     widthMm: numericSpecSchema,
   })
   .superRefine(
-    ({ bearing, finishOptions, productTypeSlug, spinDiameterMm }, context) => {
+    (
+      {
+        bearing,
+        compatibilityAdvisories,
+        compatibilityFamilyIds,
+        finishOptions,
+        includedComponentIds,
+        magnetSystem,
+        productId,
+        productTypeSlug,
+        spinDiameterMm,
+        weightBasis,
+        weightG,
+      },
+      context,
+    ) => {
       if (
         productTypeSlug !== "spinner" &&
         (bearing !== null || spinDiameterMm !== null)
@@ -235,6 +270,79 @@ export const productFormSchema = z
           code: "custom",
           message: "web.catalog.error.form",
           path: [bearing !== null ? "bearing" : "spinDiameterMm"],
+        });
+      }
+      if (productTypeSlug === "slider" && magnetSystem === null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.capabilityRequired",
+          path: ["magnetSystem"],
+        });
+      }
+      if (productTypeSlug !== "slider" && magnetSystem !== null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["magnetSystem"],
+        });
+      }
+      if (
+        productTypeSlug === "slider" &&
+        (weightG === null) !== (weightBasis === null)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: [weightG === null ? "weightG" : "weightBasis"],
+        });
+      }
+      if (productTypeSlug !== "slider" && weightBasis !== null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["weightBasis"],
+        });
+      }
+      if (productTypeSlug !== "slider" && includedComponentIds.length) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["includedComponentIds"],
+        });
+      }
+      for (const [path, ids] of [
+        ["compatibilityFamilyIds", compatibilityFamilyIds],
+        ["includedComponentIds", includedComponentIds],
+      ] as const) {
+        if (new Set(ids).size !== ids.length) {
+          context.addIssue({
+            code: "custom",
+            message: "web.catalog.error.form",
+            path: [path],
+          });
+        }
+      }
+      const advisoryKeys = compatibilityAdvisories.map(
+        ({ relatedProductId, text }) =>
+          `${relatedProductId}:${text.toLocaleLowerCase()}`,
+      );
+      if (new Set(advisoryKeys).size !== advisoryKeys.length) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["compatibilityAdvisories"],
+        });
+      }
+      if (
+        productId !== null &&
+        compatibilityAdvisories.some(
+          ({ relatedProductId }) => relatedProductId === productId,
+        )
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["compatibilityAdvisories"],
         });
       }
       const signatures = finishOptions.map(
@@ -294,6 +402,11 @@ const materialWriteSchema = materialSchema.extend({
 const finishSchema = z.object({ name: slugNameSchema });
 /** Schema for pattern names. */
 const patternSchema = z.object({ name: slugNameSchema });
+/** Schema for maker-scoped compatibility-family names. */
+const compatibilityFamilySchema = z.object({
+  makerId: idSchema,
+  name: slugNameSchema,
+});
 /**
  * Schema for color names and six-digit uppercase hexadecimal values.
  */
@@ -407,7 +520,7 @@ const collectionAddSchema = z
     materialId: idSchema,
     newCollection: collectionWriteSchema.nullable().optional().default(null),
     productId: idSchema,
-    productTypeSlug: productTypeSchema,
+    productTypeSlug: collectionProductTypeSchema,
   })
   .superRefine((input, context) => {
     const finishCount = [input.finishOptionId, input.customFinish].filter(
@@ -507,6 +620,8 @@ export type CatalogOptions = {
    * Available color effects.
    */
   colorEffects: Awaited<ReturnType<typeof listColorEffects>>;
+  /** Reviewed maker-scoped compatibility families. */
+  compatibilityFamilies: Awaited<ReturnType<typeof listCompatibilityFamilies>>;
   /**
    * Available catalog colors.
    */
@@ -531,6 +646,8 @@ export type CatalogOptions = {
    * Available product types.
    */
   productTypes: Awaited<ReturnType<typeof listProductTypes>>;
+  /** Visible products available for exact relationship selection. */
+  relationshipProducts: CatalogProduct[];
   /**
    * Visible spinner-button products.
    */
@@ -549,31 +666,37 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
     const viewer = await getResourceViewer();
     const [
       colorEffects,
+      compatibilityFamilies,
       colors,
       finishes,
       makers,
       materials,
       patterns,
       productTypes,
+      relationshipProducts,
       spinnerButtons,
     ] = await Promise.all([
       listColorEffects(),
+      listCompatibilityFamilies(),
       listColors(),
       listFinishes(),
       listMakers(),
       listMaterials(),
       listPatterns(),
       listProductTypes(),
+      s.db.catalog.listProducts(undefined, viewer),
       s.db.catalog.listProducts("spinner-button", viewer),
     ]);
     return {
       colorEffects,
+      compatibilityFamilies,
       colors,
       finishes,
       makers,
       materials,
       patterns,
       productTypes,
+      relationshipProducts,
       spinnerButtons,
     };
   },
@@ -970,6 +1093,50 @@ export const saveAdminMaterial = createServerFn({ method: "POST" })
   });
 
 /**
+ * Validates and creates a maker-scoped reviewed compatibility family.
+ *
+ * @returns The created family or a validation-aware mutation failure.
+ * @rejects If permission checking, service loading, or family lookup fails.
+ */
+export const createCatalogCompatibilityFamily = createServerFn({
+  method: "POST",
+})
+  .validator((input: unknown) => input)
+  .handler(
+    async ({
+      data,
+    }): Promise<
+      CatalogLookupMutationResult<
+        "compatibilityFamily",
+        CatalogCompatibilityFamily
+      >
+    > => {
+      const actor = await requirePermission("products.manage");
+      const parsed = compatibilityFamilySchema.safeParse(data);
+      if (!parsed.success) return validationFailure(parsed.error);
+      const { s } = await import("@/lib/services");
+      const families = await s.db.catalog.listCompatibilityFamilies();
+      try {
+        const compatibilityFamily =
+          await s.db.catalog.createCompatibilityFamily({
+            actor,
+            makerId: parsed.data.makerId,
+            name: parsed.data.name,
+            slug: nextAvailableSlug(
+              parsed.data.name,
+              families
+                .filter(({ makerId }) => makerId === parsed.data.makerId)
+                .map(({ slug }) => slug),
+            ),
+          });
+        return { compatibilityFamily, ok: true as const };
+      } catch (error) {
+        return mutationFailure(error);
+      }
+   },
+ );
+
+/**
  * Validates and creates a uniquely slugged finish for an authorized product manager.
  *
  * @returns The created finish or a validation-aware mutation failure.
@@ -1107,6 +1274,8 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     const slug = nextAvailableSlug(parsed.data.name, slugs);
     const input: ProductWriteInput = {
       actor,
+      compatibilityAdvisories: parsed.data.compatibilityAdvisories,
+      compatibilityFamilyIds: parsed.data.compatibilityFamilyIds,
       description: parsed.data.description,
       finishOptions: parsed.data.finishOptions.map(
         ({ colorEffectId, colorIds, finishIds, patternId }) => ({
@@ -1119,6 +1288,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       makerId: parsed.data.makerId,
       makerProductUrl: parsed.data.makerProductUrl,
       materialIds: parsed.data.materialIds,
+      includedComponentIds: parsed.data.includedComponentIds,
       name: parsed.data.name,
       productTypeSlug: parsed.data.productTypeSlug,
       reason: parsed.data.reason,
@@ -1129,10 +1299,12 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
         compatibleButtonId: parsed.data.compatibleButtonId,
         diameterMm: parsed.data.diameterMm,
         lengthMm: parsed.data.lengthMm,
+        magnetSystem: parsed.data.magnetSystem,
         spinDiameterMm: parsed.data.spinDiameterMm,
         thicknessMm: parsed.data.thicknessMm,
         thicknessWithButtonMm: parsed.data.thicknessWithButtonMm,
         weightG: parsed.data.weightG,
+        weightBasis: parsed.data.weightBasis,
         widthMm: parsed.data.widthMm,
       },
     };
@@ -1886,6 +2058,17 @@ async function listColorEffects(): Promise<CatalogLookup[]> {
 }
 
 /**
+ * Loads reviewed compatibility families.
+ *
+ * @returns A promise resolving to maker-scoped compatibility families.
+ * @rejects If the service module or family query fails.
+ */
+async function listCompatibilityFamilies() {
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listCompatibilityFamilies();
+}
+
+/**
  * Loads catalog colors.
  *
  * @returns A promise resolving to catalog colors.
@@ -2110,6 +2293,21 @@ export function productTypeIsSupported(
   value: string,
 ): value is CatalogProductType {
   return productTypeSchema.safeParse(value).success;
+}
+
+/**
+ * Checks whether a product type is supported by the current collection editor.
+ *
+ * Slider catalog records deliberately fail closed here until the slider ownership
+ * model is implemented by ENG-356.
+ *
+ * @param value - Candidate product-type slug.
+ * @returns Whether the collection editor can safely create an owned item.
+ */
+export function collectionProductTypeIsSupported(
+  value: string,
+): value is "spinner" | "spinner-button" {
+  return collectionProductTypeSchema.safeParse(value).success;
 }
 
 /**

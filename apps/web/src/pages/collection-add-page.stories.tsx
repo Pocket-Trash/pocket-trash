@@ -13,6 +13,8 @@ const product: CatalogProduct = {
   canEdit: true,
   compatibleButtonId: null,
   compatibleButtonName: null,
+  compatibilityAdvisories: [],
+  compatibilityFamilies: [],
   createdAt: new Date(0),
   description: null,
   diameterMm: null,
@@ -27,6 +29,7 @@ const product: CatalogProduct = {
   ],
   imageCount: 0,
   images: [],
+  includedComponents: [],
   id: 1000,
   lengthMm: null,
   makerId: 1,
@@ -35,6 +38,7 @@ const product: CatalogProduct = {
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: null,
+  magnetSystem: null,
   materials: [{ id: 1001, name: "Bronze", slug: "bronze" }],
   name: "Product 1",
   ownerClerkId: "user_test",
@@ -49,6 +53,7 @@ const product: CatalogProduct = {
   thicknessWithButtonMm: null,
   updatedAt: new Date(0),
   weightG: null,
+  weightBasis: null,
   widthMm: null,
 };
 
@@ -95,11 +100,13 @@ const meta = {
     initialProductId: 1000,
     options: {
       colorEffects: [],
+      compatibilityFamilies: [],
       colors: [],
       finishes: [],
       makers: [],
       materials: [],
       patterns: [],
+      relationshipProducts: [],
       spinnerButtons: [],
       productTypes: [
         { id: 1, name: "Spinner", slug: "spinner" },

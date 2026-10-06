@@ -1,5 +1,6 @@
 import type {
   CatalogProduct,
+  CatalogProductType,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
@@ -105,12 +106,14 @@ const emptyCustomFinish = {
 /** Empty catalog option lists used by form tests. */
 const emptyCatalogOptions = {
   colorEffects: [],
+  compatibilityFamilies: [],
   colors: [],
   finishes: [],
   makers: [],
   materials: [],
   patterns: [],
   productTypes: [],
+  relationshipProducts: [],
   spinnerButtons: [],
 };
 
@@ -167,6 +170,7 @@ describe("finish option editor", () => {
             { id: 1000, name: "Solid", slug: "solid" },
             { id: 1001, name: "Fade", slug: "fade" },
           ],
+          compatibilityFamilies: [],
           colors: [
             { id: 1000, name: "Blue", slug: "blue" },
             { id: 1001, name: "Purple", slug: "purple" },
@@ -176,6 +180,7 @@ describe("finish option editor", () => {
           materials: [],
           patterns: [{ id: 1002, name: "Honeycomb", slug: "honeycomb" }],
           productTypes: [],
+          relationshipProducts: [],
           spinnerButtons: [],
         },
         t,
@@ -213,6 +218,8 @@ describe("finish option editor", () => {
       canEdit: true,
       compatibleButtonId: null,
       compatibleButtonName: null,
+      compatibilityAdvisories: [],
+      compatibilityFamilies: [],
       createdAt: new Date(0),
       description: null,
       diameterMm: null,
@@ -227,6 +234,7 @@ describe("finish option editor", () => {
       ],
       imageCount: 0,
       images: [],
+      includedComponents: [],
       id: 1000,
       lengthMm: null,
       makerId: 1000,
@@ -235,6 +243,7 @@ describe("finish option editor", () => {
       makerProductUrl: null,
       makerProductUrlValid: true,
       makerUrl: null,
+      magnetSystem: null,
       materials: [{ id: 1000, name: "Bronze", slug: "bronze" }],
       name: "Spinner",
       ownerClerkId: "user_test",
@@ -249,6 +258,7 @@ describe("finish option editor", () => {
       thicknessWithButtonMm: null,
       updatedAt: new Date(0),
       weightG: null,
+      weightBasis: null,
       widthMm: null,
     };
     const html = renderToStaticMarkup(
@@ -443,6 +453,62 @@ describe("product form conditional fields", () => {
       }
     }
   });
+
+  it.each([
+    "slider",
+    "slider-plate",
+    "slider-insert",
+  ] as const)("renders exhaustive slider catalog fields for %s", (productTypeSlug) => {
+    const product = productFixture(1010, "Slider product", productTypeSlug);
+    const relationshipProduct = productFixture(
+      1011,
+      "Matched plates",
+      "slider-plate",
+    );
+    const html = renderToStaticMarkup(
+      createElement(ProductEditor, {
+        initialProduct: product,
+        options: {
+          ...emptyCatalogOptions,
+          compatibilityFamilies: [
+            {
+              id: 3000,
+              makerId: product.makerId,
+              makerName: product.makerName,
+              name: "Rail 50",
+              slug: "rail-50",
+            },
+          ],
+          makers: [
+            { id: product.makerId, name: product.makerName, rootUrl: null },
+          ],
+          productTypes: [
+            {
+              id: product.productTypeId,
+              name: product.productTypeName,
+              slug: productTypeSlug,
+            },
+          ],
+          relationshipProducts: [relationshipProduct],
+        },
+        productTypeSlug,
+      }),
+    );
+
+    expect(html).toContain("web.slider.relationship.compatibilityFamilies");
+    expect(html).toContain("web.slider.relationship.reviewedAdvisory");
+    expect(html).toContain('aria-label="Length"');
+    expect(html).not.toContain('aria-label="Diameter"');
+    if (productTypeSlug === "slider") {
+      expect(html).toContain('aria-label="web.slider.capability.label"');
+      expect(html).toContain('aria-label="web.slider.measurement.weightBasis"');
+      expect(html).toContain("web.slider.relationship.includedComponents");
+    } else {
+      expect(html).toContain("web.slider.measurement.setLevelHelp");
+      expect(html).not.toContain('aria-label="web.slider.capability.label"');
+      expect(html).not.toContain("web.slider.relationship.includedComponents");
+    }
+  });
 });
 
 describe("collection edit conditional fields", () => {
@@ -595,7 +661,7 @@ describe("collection add form", () => {
 function productFixture(
   id: number,
   name: string,
-  productTypeSlug: "spinner" | "spinner-button",
+  productTypeSlug: CatalogProductType,
 ): CatalogProduct {
   return {
     approvalStatus: "approved",
@@ -605,6 +671,8 @@ function productFixture(
     canEdit: true,
     compatibleButtonId: null,
     compatibleButtonName: null,
+    compatibilityAdvisories: [],
+    compatibilityFamilies: [],
     createdAt: new Date(0),
     description: null,
     diameterMm: null,
@@ -619,6 +687,7 @@ function productFixture(
     ],
     imageCount: 0,
     images: [],
+    includedComponents: [],
     id,
     lengthMm: null,
     makerId: 1,
@@ -627,13 +696,20 @@ function productFixture(
     makerProductUrl: null,
     makerProductUrlValid: true,
     makerUrl: null,
+    magnetSystem: productTypeSlug === "slider" ? "body-hosted" : null,
     materials: [{ id: id + 1, name: "Bronze", slug: "bronze" }],
     name,
     ownerClerkId: "user_test",
     isAdminPrivate: false,
     isPrivate: false,
     productTypeId: 1,
-    productTypeName: productTypeSlug === "spinner" ? "Spinner" : "Button",
+    productTypeName: {
+      slider: "Slider",
+      "slider-insert": "Slider Insert",
+      "slider-plate": "Slider Plate",
+      spinner: "Spinner",
+      "spinner-button": "Button",
+    }[productTypeSlug],
     productTypeSlug,
     slug: name.toLowerCase(),
     spinDiameterMm: null,
@@ -641,6 +717,7 @@ function productFixture(
     thicknessWithButtonMm: null,
     updatedAt: new Date(0),
     weightG: null,
+    weightBasis: null,
     widthMm: null,
   };
 }

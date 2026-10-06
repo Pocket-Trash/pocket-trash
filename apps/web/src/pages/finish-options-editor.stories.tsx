@@ -10,12 +10,14 @@ const catalogOptions: CatalogOptions = {
     { id: 1000, name: "Solid", slug: "solid" },
     { id: 1001, name: "Fade", slug: "fade" },
   ],
+  compatibilityFamilies: [],
   colors: [{ id: 1000, name: "Black", slug: "black" }],
   finishes: [{ id: 1000, name: "Stonewashed", slug: "stonewashed" }],
   makers: [],
   materials: [],
   patterns: [{ id: 1000, name: "Honeycomb", slug: "honeycomb" }],
   productTypes: [],
+  relationshipProducts: [],
   spinnerButtons: [],
 };
 
