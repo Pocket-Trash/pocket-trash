@@ -72,6 +72,7 @@ export function MakerDetailPage({
       title={maker.name}
     >
       <main className="grid gap-8 p-4 md:p-[18px_22px_22px]">
+        <h1 className="m-0 text-2xl font-semibold">{maker.name}</h1>
         {maker.images.length ? (
           <ImageGallery
             alt={t("web.makers.imageAlt", { name: maker.name })}
