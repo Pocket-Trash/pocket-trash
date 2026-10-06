@@ -1566,12 +1566,7 @@ export const softDeleteCatalogImage = createServerFn({ method: "POST" })
       .object({
         imageId: idSchema,
         reason: z.string().trim().max(1000).optional(),
-        targetType: z.enum([
-          "maker",
-          "material",
-          "product",
-          "collection_item",
-        ]),
+        targetType: z.enum(["maker", "material", "product", "collection_item"]),
       })
       .parse(input),
   )
@@ -1595,12 +1590,7 @@ export const restoreCatalogImage = createServerFn({ method: "POST" })
       .object({
         imageId: idSchema,
         reason: z.string().trim().max(1000).optional(),
-        targetType: z.enum([
-          "maker",
-          "material",
-          "product",
-          "collection_item",
-        ]),
+        targetType: z.enum(["maker", "material", "product", "collection_item"]),
       })
       .parse(input),
   )
