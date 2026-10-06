@@ -16,6 +16,8 @@ minimumReleaseAgeExclude:
   - "@pocket-trash/cli"
   - "@pocket-trash/localizations"
   - "@pocket-trash/skills"
+  # Security: accept the source-map-js advisory fix; remove after 2026-10-07T14:08:09.382Z.
+  - "source-map-js@1.2.2"
   # ENG-332: accept the reviewed Clerk security fix; remove after all versions mature by 2026-10-08T20:48:58.312Z.
   - "@clerk/localizations@4.21.2"
   - "@clerk/shared@4.38.0"
@@ -72,6 +74,7 @@ overrides:
   "path-to-regexp@8": "8.4.0"
   "postcss@8": "8.5.28"
   "smol-toml@1": "1.7.1"
+  "source-map-js@1": "1.2.2"
   "tailwind-csstree": "0.4.0"
   "tar": "7.5.22"
   "undici@5": "6.29.0"
