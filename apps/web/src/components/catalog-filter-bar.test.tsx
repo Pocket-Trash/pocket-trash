@@ -275,6 +275,8 @@ const copy = {
   productTypeAll: "All product types",
   selectMaker: "Select a maker",
   selectProductType: "Select a product type",
+  searchLabel: "Search catalog and collections",
+  searchPlaceholder: "Search products, makers, types, aliases, or owners",
 } satisfies CatalogFilterCopy;
 
 /**
@@ -299,6 +301,7 @@ const filters = {
   makerIds: [],
   materialIds: [],
   productType: null,
+  query: "",
   strict: false,
 };
 
@@ -315,6 +318,35 @@ describe("CatalogFilterBar", () => {
   afterEach(() => {
     act(() => root.unmount());
     document.body.replaceChildren();
+  });
+
+  it("exposes a controlled accessible search field", () => {
+    const onChange = vi.fn();
+    act(() =>
+      root.render(
+        <CatalogFilterBar
+          copy={copy}
+          facets={facets}
+          filters={filters}
+          onChange={onChange}
+        />,
+      ),
+    );
+
+    const input = container.querySelector<HTMLInputElement>(
+      'input[type="search"]',
+    );
+    expect(input?.getAttribute("placeholder")).toBe(copy.searchPlaceholder);
+    act(() => {
+      if (!input) return;
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(input, "cassette");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(onChange).toHaveBeenCalledWith({ ...filters, query: "cassette" });
   });
 
   it("opens the anchored panel without opening the mobile sheet", () => {

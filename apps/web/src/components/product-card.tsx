@@ -14,6 +14,8 @@ import { cardImageUrl } from "@/lib/card-image";
  * @param props.materialCountLabel - Preformatted material count.
  * @param props.privateLabel - Label shown for a private product.
  * @param props.product - Catalog product to summarize.
+ * @param props.productTypeLabel - Localized canonical or maker-preferred type label.
+ * @param props.searchContext - Optional context explaining a non-name search match.
  * @returns The product summary card.
  */
 export function ProductCard({
@@ -24,6 +26,8 @@ export function ProductCard({
   materialCountLabel,
   privateLabel,
   product,
+  productTypeLabel = product.productTypeName,
+  searchContext,
 }: {
   /** Localized review state shown to authorized viewers. */
   approvalLabel?: string;
@@ -51,6 +55,10 @@ export function ProductCard({
    * Catalog product displayed by the card.
    */
   product: CatalogProduct;
+  /** Localized canonical or maker-preferred product-type label. */
+  productTypeLabel?: string;
+  /** Context explaining a type, alias, or owner search match. */
+  searchContext?: string;
 }) {
   const image = product.images.find(({ deletedAt }) => !deletedAt);
 
@@ -81,13 +89,16 @@ export function ProductCard({
           {product.name}
         </h2>
         <p className="mt-1 min-h-[2.9em] text-[12.5px] leading-[1.45] text-muted-foreground">
-          {product.productTypeName} ·{" "}
+          {productTypeLabel} ·{" "}
           <MakerLink
             className="relative z-20"
             name={product.makerName}
             slug={product.makerSlug}
           />
         </p>
+        {searchContext ? (
+          <p className="mt-1 text-xs text-primary">{searchContext}</p>
+        ) : null}
         <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
           <span>{materialCountLabel}</span>
           <span>{finishOptionCountLabel}</span>

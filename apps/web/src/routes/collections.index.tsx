@@ -1,5 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { getPublicCollectionOwners } from "@/lib/catalog-api";
+import {
+  getPublicCollectionOwners,
+  listCatalogTerminologyAliases,
+} from "@/lib/catalog-api";
 import { parseCatalogFilterSearch } from "@/lib/catalog-filters";
 import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { PublicCollectionsPage } from "@/pages/catalog-pages";
@@ -15,7 +18,13 @@ export const Route = createFileRoute("/collections/")({
    * @returns Users who expose public collections.
    * @rejects When public collection owners cannot be loaded.
    */
-  loader: () => getPublicCollectionOwners(),
+  loader: async () => {
+    const [owners, aliases] = await Promise.all([
+      getPublicCollectionOwners(),
+      listCatalogTerminologyAliases(),
+    ]);
+    return { aliases, owners };
+  },
   component: CollectionsRoute,
 });
 
@@ -34,7 +43,8 @@ function CollectionsRoute() {
     <PublicCollectionsPage
       filters={filters}
       onFiltersChange={setFilters}
-      owners={Route.useLoaderData()}
+      aliases={Route.useLoaderData().aliases}
+      owners={Route.useLoaderData().owners}
     />
   );
 }

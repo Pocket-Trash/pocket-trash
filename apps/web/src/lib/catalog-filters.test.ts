@@ -161,6 +161,7 @@ describe("catalog filters", () => {
     const search = parseCatalogFilterSearch({
       color: ["2", "1", "bad"],
       fade: ["2.1", "1.2"],
+      q: "  CASSÉTTE  ",
       strict: "true",
       type: "spinner",
     });
@@ -170,6 +171,7 @@ describe("catalog filters", () => {
       finish: undefined,
       maker: undefined,
       material: undefined,
+      q: "CASSÉTTE",
       strict: true,
       type: "spinner",
     });

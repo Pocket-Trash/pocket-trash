@@ -34,6 +34,8 @@ export type CatalogFilters = {
    * Selected product type, or `null` for all types.
    */
   productType: CatalogProductType | null;
+  /** Shared catalog and collection search query. */
+  query: string;
   /**
    * Whether each filter group must contain every selected value.
    */
@@ -44,6 +46,8 @@ export type CatalogFilters = {
  * Optional URL-search representation of catalog filter selections.
  */
 export type CatalogFilterSearch = {
+  /** Normalized free-text query encoded in URL search. */
+  q?: string;
   /**
    * Color identifiers encoded in URL search.
    */
@@ -194,6 +198,7 @@ export const emptyCatalogFilters = (): CatalogFilters => ({
   makerIds: [],
   materialIds: [],
   productType: null,
+  query: "",
   strict: false,
 });
 
@@ -206,10 +211,7 @@ export const emptyCatalogFilters = (): CatalogFilters => ({
 export function parseCatalogFilterSearch(
   search: Record<string, unknown>,
 ): CatalogFilterSearch {
-  const type =
-    search.type === "spinner" || search.type === "spinner-button"
-      ? search.type
-      : undefined;
+  const type = isCatalogProductType(search.type) ? search.type : undefined;
   const fade = values(search.fade)
     .map((value) =>
       fadeKey(
@@ -226,6 +228,10 @@ export function parseCatalogFilterSearch(
     finish: numbers(search.finish),
     maker: numbers(search.maker),
     material: numbers(search.material),
+    q:
+      typeof search.q === "string" && search.q.trim()
+        ? search.q.trim().slice(0, 120)
+        : undefined,
     strict:
       search.strict === true || search.strict === "true" ? true : undefined,
     type,
@@ -248,6 +254,7 @@ export function filtersFromSearch(search: CatalogFilterSearch): CatalogFilters {
     makerIds: search.maker ?? [],
     materialIds: search.material ?? [],
     productType: search.type ?? null,
+    query: search.q ?? "",
     strict: search.strict ?? false,
   };
 }
@@ -267,6 +274,7 @@ export function filtersToSearch(filters: CatalogFilters): CatalogFilterSearch {
     finish: filters.finishIds.length ? filters.finishIds : undefined,
     maker: filters.makerIds.length ? filters.makerIds : undefined,
     material: filters.materialIds.length ? filters.materialIds : undefined,
+    q: filters.query.trim() || undefined,
     strict: filters.strict ? true : undefined,
     type: filters.productType ?? undefined,
   };
@@ -281,12 +289,29 @@ export function filtersToSearch(filters: CatalogFilters): CatalogFilterSearch {
 export function hasCatalogFilters(filters: CatalogFilters): boolean {
   return (
     filters.productType !== null ||
+    filters.query.trim().length > 0 ||
     filters.materialIds.length > 0 ||
     filters.finishIds.length > 0 ||
     filters.colorIds.length > 0 ||
     filters.fadeColorSets.length > 0 ||
     filters.makerIds.length > 0 ||
     filters.strict
+  );
+}
+
+/**
+ * Narrows an unknown route value to a supported catalog product type.
+ *
+ * @param value - Untrusted route-search value.
+ * @returns Whether the value is a supported catalog product type.
+ */
+function isCatalogProductType(value: unknown): value is CatalogProductType {
+  return (
+    value === "slider" ||
+    value === "slider-insert" ||
+    value === "slider-plate" ||
+    value === "spinner" ||
+    value === "spinner-button"
   );
 }
 

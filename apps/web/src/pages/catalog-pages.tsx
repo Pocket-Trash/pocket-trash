@@ -3,6 +3,8 @@ import type {
   CatalogApprovalStatus,
   CatalogFinishOption,
   CatalogProduct,
+  CatalogProductType,
+  CatalogTerminologyAlias,
   PublicCollectionOwner,
   UserCollectionItem,
   UserCollectionSummary,
@@ -46,6 +48,11 @@ import {
   matchesCatalogFilters,
   productFilterItem,
 } from "@/lib/catalog-filters";
+import {
+  type CatalogSearchMatch,
+  catalogTypeDisplayLabel,
+  matchCatalogSearch,
+} from "@/lib/catalog-search";
 import { cn } from "@/lib/utils";
 
 export {
@@ -93,9 +100,70 @@ function catalogFilterCopy(
     moreOptions: (label) => t("web.catalog.filter.moreOptions", { label }),
     productType: t("web.catalog.field.productType"),
     productTypeAll: t("web.catalog.filter.productTypeAll"),
+    searchLabel: t("web.slider.search.label"),
+    searchPlaceholder: t("web.slider.search.placeholder"),
     selectMaker: t("web.catalog.selectMaker"),
     selectProductType: t("web.catalog.selectProductType"),
   };
+}
+
+/** English canonical product-type labels retained as locale fallback search terms. */
+const englishProductTypeLabels: Record<CatalogProductType, string> = {
+  slider: "Slider",
+  "slider-insert": "Slider insert",
+  "slider-plate": "Slider plate",
+  spinner: "Spinner",
+  "spinner-button": "Spinner button",
+};
+
+/**
+ * Returns the active-locale canonical product-type label.
+ *
+ * @param t - Active-locale catalog formatter.
+ * @param productType - Canonical product-type key.
+ * @param fallback - Persisted label used until a localization ships.
+ * @returns Active-locale label or the persisted fallback.
+ */
+function localizedProductTypeLabel(
+  t: ReturnType<typeof useCatalogCopy>,
+  productType: CatalogProductType,
+  fallback: string,
+) {
+  const key = {
+    slider: "web.slider.productType.slider",
+    "slider-insert": "web.slider.productType.insert",
+    "slider-plate": "web.slider.productType.plate",
+    spinner: "web.slider.productType.spinner",
+    "spinner-button": "web.slider.productType.spinnerButton",
+  }[productType];
+  const label = t(key);
+  return label === key ? fallback : label;
+}
+
+/**
+ * Formats a concise explanation for a non-name search match.
+ *
+ * @param t - Active-locale catalog formatter.
+ * @param match - Search context to explain.
+ * @returns Localized context, or `undefined` for direct name and maker matches.
+ */
+function searchMatchContext(
+  t: ReturnType<typeof useCatalogCopy>,
+  match: CatalogSearchMatch | undefined,
+) {
+  if (match?.matchedAlias)
+    return t("web.slider.search.matchedAliasContext", {
+      alias: match.matchedAlias,
+    });
+  if (match?.matchedType)
+    return t("web.slider.search.matchedTypeContext", {
+      type: match.matchedType,
+    });
+  if (match?.matchedOwner)
+    return t("web.slider.search.ownerMatchContext", {
+      owner: match.matchedOwner,
+    });
+  return undefined;
 }
 
 /**
@@ -188,10 +256,13 @@ export function ResourcesPage() {
  * @returns The product index page.
  */
 export function ProductsPage({
+  aliases = [],
   filters = emptyCatalogFilters(),
   onFiltersChange,
   products,
 }: {
+  /** Registered terminology aliases available to search and display. */
+  aliases?: CatalogTerminologyAlias[];
   /** Active catalog filters. */
   filters?: CatalogFilters;
   /** Optional filter state updater. */
@@ -200,9 +271,31 @@ export function ProductsPage({
   products: CatalogProduct[];
 }) {
   const t = useCatalogCopy();
-  const filtered = products.filter((product) =>
-    matchesCatalogFilters(productFilterItem(product), filters),
-  );
+  const searchMatches = new Map<number, CatalogSearchMatch>();
+  const filtered = products.filter((product) => {
+    if (!matchesCatalogFilters(productFilterItem(product), filters))
+      return false;
+    const activeTypeLabel = localizedProductTypeLabel(
+      t,
+      product.productTypeSlug,
+      product.productTypeName,
+    );
+    const match = matchCatalogSearch(
+      {
+        activeTypeLabel,
+        englishTypeLabel: englishProductTypeLabels[product.productTypeSlug],
+        makerId: product.makerId,
+        makerName: product.makerName,
+        name: product.name,
+        ownerDisplayName: null,
+        productTypeSlug: product.productTypeSlug,
+      },
+      filters.query,
+      aliases,
+    );
+    if (match) searchMatches.set(product.id, match);
+    return match !== null;
+  });
   const facets = buildCatalogFacets(
     products.map(productFilterItem),
     filters.productType,
@@ -229,7 +322,11 @@ export function ProductsPage({
       }
       title={t("web.navigation.products")}
     >
-      <ProductGrid products={filtered} />
+      <ProductGrid
+        aliases={aliases}
+        products={filtered}
+        searchMatches={searchMatches}
+      />
     </AppShell>
   );
 }
@@ -566,10 +663,13 @@ export function ProductDetailPage({
  * @returns The public collection directory.
  */
 export function PublicCollectionsPage({
+  aliases = [],
   filters = emptyCatalogFilters(),
   onFiltersChange,
   owners,
 }: {
+  /** Registered terminology aliases available to search. */
+  aliases?: CatalogTerminologyAlias[];
   /** Active catalog filters. */
   filters?: CatalogFilters;
   /** Optional filter state updater. */
@@ -584,11 +684,34 @@ export function PublicCollectionsPage({
         approvalStatus === "approved" && !(collectionIsPrivate || isPrivate),
     ),
   );
+  const ownerNames = new Map(
+    owners.map((owner) => [owner.userId, owner.username]),
+  );
   const matchingCollectionIds = new Set(
     publicItems
-      .filter((item) =>
-        matchesCatalogFilters(collectionFilterItem(item), filters),
-      )
+      .filter((item) => {
+        if (!matchesCatalogFilters(collectionFilterItem(item), filters))
+          return false;
+        return Boolean(
+          matchCatalogSearch(
+            {
+              activeTypeLabel: localizedProductTypeLabel(
+                t,
+                item.productTypeSlug,
+                item.productTypeName,
+              ),
+              englishTypeLabel: englishProductTypeLabels[item.productTypeSlug],
+              makerId: item.makerId,
+              makerName: item.makerName,
+              name: item.displayName,
+              ownerDisplayName: ownerNames.get(item.ownerUserId) ?? null,
+              productTypeSlug: item.productTypeSlug,
+            },
+            filters.query,
+            aliases,
+          ),
+        );
+      })
       .map(({ collectionId }) => collectionId),
   );
   const collections = owners
@@ -735,11 +858,14 @@ export function PublicCollectionPage({
  * @returns The user collection directory.
  */
 export function UserCollectionsPage({
+  aliases = [],
   collections,
   filters = emptyCatalogFilters(),
   items,
   onFiltersChange,
 }: {
+  /** Registered terminology aliases available to search. */
+  aliases?: CatalogTerminologyAlias[];
   /** User collections to display. */
   collections: UserCollectionSummary[];
   /** Active catalog filters. */
@@ -752,9 +878,29 @@ export function UserCollectionsPage({
   const t = useCatalogCopy();
   const matchingIds = new Set(
     items
-      .filter((item) =>
-        matchesCatalogFilters(collectionFilterItem(item), filters),
-      )
+      .filter((item) => {
+        if (!matchesCatalogFilters(collectionFilterItem(item), filters))
+          return false;
+        return Boolean(
+          matchCatalogSearch(
+            {
+              activeTypeLabel: localizedProductTypeLabel(
+                t,
+                item.productTypeSlug,
+                item.productTypeName,
+              ),
+              englishTypeLabel: englishProductTypeLabels[item.productTypeSlug],
+              makerId: item.makerId,
+              makerName: item.makerName,
+              name: item.displayName,
+              ownerDisplayName: item.ownerUsername,
+              productTypeSlug: item.productTypeSlug,
+            },
+            filters.query,
+            aliases,
+          ),
+        );
+      })
       .map(({ collectionId }) => collectionId),
   );
   const filtered = hasCatalogFilters(filters)
@@ -843,6 +989,7 @@ export function UserCollectionsPage({
  * @returns The collection page.
  */
 export function CollectionPage({
+  aliases = [],
   collection,
   filters = emptyCatalogFilters(),
   items,
@@ -850,6 +997,8 @@ export function CollectionPage({
   ownerUsername,
   userArea = false,
 }: {
+  /** Registered terminology aliases available to search and display. */
+  aliases?: CatalogTerminologyAlias[];
   /** Collection to display. */
   collection: UserCollectionSummary;
   /** Active catalog filters. */
@@ -864,9 +1013,30 @@ export function CollectionPage({
   userArea?: boolean;
 }) {
   const t = useCatalogCopy();
-  const filtered = items.filter((item) =>
-    matchesCatalogFilters(collectionFilterItem(item), filters),
-  );
+  const searchMatches = new Map<number, CatalogSearchMatch>();
+  const filtered = items.filter((item) => {
+    if (!matchesCatalogFilters(collectionFilterItem(item), filters))
+      return false;
+    const match = matchCatalogSearch(
+      {
+        activeTypeLabel: localizedProductTypeLabel(
+          t,
+          item.productTypeSlug,
+          item.productTypeName,
+        ),
+        englishTypeLabel: englishProductTypeLabels[item.productTypeSlug],
+        makerId: item.makerId,
+        makerName: item.makerName,
+        name: item.displayName,
+        ownerDisplayName: item.ownerUsername ?? ownerUsername ?? null,
+        productTypeSlug: item.productTypeSlug,
+      },
+      filters.query,
+      aliases,
+    );
+    if (match) searchMatches.set(item.collectionItemId, match);
+    return match !== null;
+  });
   const facets = buildCatalogFacets(
     items.map(collectionFilterItem),
     filters.productType,
@@ -988,13 +1158,36 @@ export function CollectionPage({
                   </Badge>
                 ) : null}
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {item.productTypeName} ·{" "}
+                  {catalogTypeDisplayLabel(
+                    {
+                      activeTypeLabel: localizedProductTypeLabel(
+                        t,
+                        item.productTypeSlug,
+                        item.productTypeName,
+                      ),
+                      makerId: item.makerId,
+                      productTypeSlug: item.productTypeSlug,
+                    },
+                    aliases,
+                  )}{" "}
+                  ·{" "}
                   <MakerLink
                     className="relative z-20"
                     name={item.makerName}
                     slug={item.makerSlug}
                   />
                 </p>
+                {searchMatchContext(
+                  t,
+                  searchMatches.get(item.collectionItemId),
+                ) ? (
+                  <p className="mt-1 text-xs text-primary">
+                    {searchMatchContext(
+                      t,
+                      searchMatches.get(item.collectionItemId),
+                    )}
+                  </p>
+                ) : null}
                 {item.material ? (
                   <p className="mt-3 text-xs text-muted-foreground">
                     {item.material.name}
@@ -1072,10 +1265,16 @@ export function CollectionPage({
  * @returns The product grid or its empty state.
  */
 export function ProductGrid({
+  aliases = [],
   products,
+  searchMatches = new Map(),
 }: {
+  /** Registered terminology aliases available for preferred display labels. */
+  aliases?: CatalogTerminologyAlias[];
   /** Catalog products to display. */
   products: CatalogProduct[];
+  /** Per-product context explaining a search match. */
+  searchMatches?: ReadonlyMap<number, CatalogSearchMatch>;
 }) {
   const t = useCatalogCopy();
   if (!products.length) {
@@ -1122,6 +1321,22 @@ export function ProductGrid({
                 })}
                 privateLabel={t("web.resources.moderation.privateBadge")}
                 product={product}
+                productTypeLabel={catalogTypeDisplayLabel(
+                  {
+                    activeTypeLabel: localizedProductTypeLabel(
+                      t,
+                      product.productTypeSlug,
+                      product.productTypeName,
+                    ),
+                    makerId: product.makerId,
+                    productTypeSlug: product.productTypeSlug,
+                  },
+                  aliases,
+                )}
+                searchContext={searchMatchContext(
+                  t,
+                  searchMatches.get(product.id),
+                )}
               />
             </div>
           ))}
