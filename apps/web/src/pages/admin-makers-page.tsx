@@ -56,6 +56,9 @@ export function AdminMakersPage({ makers }: AdminMakersPageProperties) {
       <main className="grid content-start gap-5 p-4 md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="grid gap-1">
+            <h1 className="m-0 text-2xl font-semibold">
+              {t("web.admin.makers.title")}
+            </h1>
             <p className="m-0 text-sm text-muted-foreground">
               {t("web.admin.makers.description")}
             </p>
@@ -197,6 +200,7 @@ export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
       title={title}
     >
       <main className="grid content-start gap-5 p-4 md:p-6">
+        <h1 className="m-0 text-2xl font-semibold">{title}</h1>
         <form className="grid max-w-2xl gap-5" onSubmit={submit}>
           <MakerField
             error={errorFor("name")}
