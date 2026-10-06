@@ -3,7 +3,7 @@
 Status: pending user approval
 
 Approval payload SHA-256:
-`0056d7bc81c70ab4f90debb4a4a10b73b05b1fec515f1f18289f32f1ab44247a`
+`b543130f1c35ccb33c338b64ec380ed6ad72970928ca4c8f9a6ee2be7543c494`
 
 This document is the human review for ENG-348. The exact product,
 relationship, development-fixture, and image inventory is stored in
@@ -61,10 +61,14 @@ The existing snapshot at
 - Products: 71
 - Images: 271 unique checksummed images, 53,303,520 bytes
 
-The file already records each product's exact name, type, source URL,
-materials, ordered gallery, content type, byte count, filename, cache path,
-and SHA-256 digest. Approval of this review includes every object in that
-content-addressed snapshot; no reviewed KAP product is excluded.
+The review JSON expands all 271 KAP images into a per-image inventory with the
+exact product name, product type, first-party source product URL, review import
+timestamp, expected rights controller, gallery position, content type, byte
+count, filename, cache path, and SHA-256 digest. The earlier snapshot did not
+retain the original image CDN URLs; the immutable cached bytes and their
+checksums remain available for later verification. Approval of this review
+includes every object in that content-addressed snapshot; no reviewed KAP
+product is excluded.
 
 ## Deterministic slider boundary
 
@@ -264,4 +268,4 @@ jq 'del(.approvalPayloadSha256)' docs/slider-catalog-manifest-review.json \
 ```
 
 The result must be
-`0056d7bc81c70ab4f90debb4a4a10b73b05b1fec515f1f18289f32f1ab44247a`.
+`b543130f1c35ccb33c338b64ec380ed6ad72970928ca4c8f9a6ee2be7543c494`.
