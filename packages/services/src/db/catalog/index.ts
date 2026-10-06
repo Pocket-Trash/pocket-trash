@@ -216,12 +216,27 @@ export type CatalogImage = {
   url: string;
 };
 
+/** Material content and image state exposed to product administrators. */
+export type AdminMaterial = CatalogLookup & {
+  /** Optional Markdown description. */
+  description: string | null;
+  /** Active and soft-deleted material images in display order. */
+  images: CatalogImage[];
+};
+
+/** Material content shown in the administrator directory. */
+export type AdminMaterialSummary = CatalogLookup & {
+  /** Optional Markdown description. */
+  description: string | null;
+};
+
 /**
  * Entity kinds that can own catalog images.
  */
 export type CatalogImageTargetType =
   | "collection"
   | "collection_item"
+  | "material"
   | "product";
 /**
  * Soft-deleted image with ownership and target context for restoration.
@@ -654,7 +669,7 @@ export type CatalogService = {
   /**
    * Creates material.
    *
-   * @param input - Material name, slug, and authenticated actor.
+   * @param input - Material name, optional description, and authenticated actor.
    * @returns Created material.
    * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
    */
@@ -663,28 +678,13 @@ export type CatalogService = {
      * Authenticated actor.
      */
     actor: Actor;
+    /** Optional Markdown description. */
+    description?: string | null;
     /**
      * Display name.
      */
     name: string;
-    /**
-     * URL-safe identifier.
-     */
-    slug: string;
-  }): Promise<{
-    /**
-     * Database identifier.
-     */
-    id: number;
-    /**
-     * Display name.
-     */
-    name: string;
-    /**
-     * URL-safe identifier.
-     */
-    slug: string;
-  }>;
+  }): Promise<AdminMaterial>;
   /**
    * Creates product.
    *
@@ -806,6 +806,43 @@ export type CatalogService = {
       slug: string;
     }>
   >;
+  /**
+   * Lists material content for product administrators.
+   *
+   * @param actor - Administrator requesting material content.
+   * @returns Materials without image payloads.
+   * @rejects When authorization or persistence fails.
+   */
+  listAdminMaterials(actor: Actor): Promise<AdminMaterialSummary[]>;
+  /**
+   * Loads one material for product administration.
+   *
+   * @param materialId - Material identifier.
+   * @param actor - Administrator requesting material content.
+   * @returns Matching material, or `null` when no row exists.
+   * @rejects When authorization or persistence fails.
+   */
+  getAdminMaterial(
+    materialId: number,
+    actor: Actor,
+  ): Promise<AdminMaterial | null>;
+  /**
+   * Updates editable material content while preserving its stable slug.
+   *
+   * @param input - Material identifier, replacement content, and administrator.
+   * @returns Updated material with images.
+   * @rejects When authorization, validation, persistence, auditing, or logging fails.
+   */
+  updateMaterial(input: {
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** Optional Markdown description. */
+    description: string | null;
+    /** Material identifier. */
+    materialId: number;
+    /** Replacement display name. */
+    name: string;
+  }): Promise<AdminMaterial>;
   /**
    * Lists products.
    *
@@ -1761,7 +1798,7 @@ export function createCatalogService(
         input.target.type,
       );
       const productDependencies =
-        input.target.type === "product"
+        input.target.type === "product" || input.target.type === "material"
           ? requireProductAudit(users, audit)
           : null;
       const dependencies = collectionDependencies ?? productDependencies;
@@ -1781,6 +1818,10 @@ export function createCatalogService(
               input.target,
             );
             const productContext = await productImageTargetContext(
+              tx,
+              input.target,
+            );
+            const materialContext = await materialImageTargetContext(
               tx,
               input.target,
             );
@@ -1818,6 +1859,17 @@ export function createCatalogService(
                 ownerUserId: productContext.ownerUserId,
                 reason: input.reason,
                 targetId: input.target.id,
+              });
+            } else if (materialContext) {
+              if (!productDependencies || !actorUser)
+                throw new Error("Product audit is not configured.");
+              await writeProductAdminAudit(productDependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: await collectionImageState(tx, input.target),
+                before,
+                definition: productAudit.materialImageAdded,
+                targetId: materialContext.materialId,
               });
             }
           }),
@@ -2029,13 +2081,14 @@ export function createCatalogService(
     /**
      * Creates material.
      *
-     * @param input - Material name, slug, and authenticated actor.
+     * @param input - Material name, optional description, and authenticated actor.
      * @returns Created material.
      * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
      */
     async createMaterial(input) {
       if (!hasPermission(input.actor, "products.manage"))
-        throw new Error("Product does not exist.");
+        throw new Error("Material does not exist.");
+      const values = normalizeMaterialWrite(input);
       const dependencies = requireProductAudit(users, audit);
       const actorUser = dependencies
         ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
@@ -2050,16 +2103,18 @@ export function createCatalogService(
               .where(
                 eq(
                   sql`lower(${schema.material.name})`,
-                  input.name.toLowerCase(),
+                  values.name.toLowerCase(),
                 ),
               )
               .limit(1);
             if (duplicate) throw new Error("Material name already exists.");
+            const slug = await nextMaterialSlug(tx, values.name);
 
             const [row] = await tx
               .insert(schema.material)
-              .values({ name: input.name, slug: input.slug })
+              .values({ ...values, slug })
               .returning({
+                description: schema.material.description,
                 id: schema.material.id,
                 name: schema.material.name,
                 slug: schema.material.slug,
@@ -2075,9 +2130,9 @@ export function createCatalogService(
                 targetId: row.id,
               });
             }
-            return row;
+            return { ...row, images: [] };
           }),
-        actorAttributes(input.actor.clerkId, { slug: input.slug }),
+        actorAttributes(input.actor.clerkId),
       );
     },
     /**
@@ -2518,6 +2573,47 @@ export function createCatalogService(
         .orderBy(asc(schema.material.name));
     },
     /**
+     * Lists material content for product administrators.
+     *
+     * @param actor - Administrator requesting material content.
+     * @returns Materials without image payloads.
+     * @rejects When authorization or persistence fails.
+     */
+    async listAdminMaterials(actor) {
+      if (!hasPermission(actor, "products.manage"))
+        throw new Error("Material does not exist.");
+      return await logger.operation(
+        loggerMessages.database.catalog.listAdminMaterials,
+        async () => await queryAdminMaterialRows(db),
+        actorAttributes(actor.clerkId),
+      );
+    },
+    /**
+     * Loads one material for product administration.
+     *
+     * @param materialId - Material identifier.
+     * @param actor - Administrator requesting material content.
+     * @returns Matching material, or `null` when no row exists.
+     * @rejects When authorization or persistence fails.
+     */
+    async getAdminMaterial(materialId, actor) {
+      if (!hasPermission(actor, "products.manage"))
+        throw new Error("Material does not exist.");
+      return await logger.operation(
+        loggerMessages.database.catalog.getAdminMaterial,
+        async () => {
+          const material = (await queryAdminMaterialRows(db, materialId))[0];
+          return material
+            ? {
+                ...material,
+                images: await queryMaterialImages(db, material.id),
+              }
+            : null;
+        },
+        actorAttributes(actor.clerkId, { materialId }),
+      );
+    },
+    /**
      * Lists products.
      *
      * @param productTypeSlug - Product type slug.
@@ -2584,6 +2680,30 @@ export function createCatalogService(
      * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
      */
     async restoreImage(input) {
+      if (input.targetType === "material") {
+        if (!hasPermission(input.actor, "products.manage"))
+          throw new Error("Image does not exist.");
+        const dependencies = requireProductAudit(users, audit);
+        const actorUser = dependencies
+          ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+          : null;
+        await db.transaction(async (tx) => {
+          const context = await materialImageContext(tx, input.imageId);
+          await restoreCatalogImage(tx, input);
+          if (dependencies && actorUser) {
+            if (!context) throw new Error("Image does not exist.");
+            await writeProductAdminAudit(dependencies.audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: { deleted: false, imageId: input.imageId },
+              before: { deleted: true, imageId: input.imageId },
+              definition: productAudit.materialImageRestored,
+              targetId: context.materialId,
+            });
+          }
+        });
+        return;
+      }
       if (input.targetType === "product") {
         const dependencies = requireProductAudit(users, audit);
         const actorUser = dependencies
@@ -2781,6 +2901,30 @@ export function createCatalogService(
      * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
      */
     async softDeleteImage(input) {
+      if (input.targetType === "material") {
+        if (!hasPermission(input.actor, "products.manage"))
+          throw new Error("Image does not exist.");
+        const dependencies = requireProductAudit(users, audit);
+        const actorUser = dependencies
+          ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+          : null;
+        await db.transaction(async (tx) => {
+          const context = await materialImageContext(tx, input.imageId);
+          if (!(await softDeleteCatalogImage(tx, input))) return;
+          if (dependencies && actorUser) {
+            if (!context) throw new Error("Image does not exist.");
+            await writeProductAdminAudit(dependencies.audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: { deleted: true, imageId: input.imageId },
+              before: { deleted: false, imageId: input.imageId },
+              definition: productAudit.materialImageDeleted,
+              targetId: context.materialId,
+            });
+          }
+        });
+        return;
+      }
       if (input.targetType === "product") {
         const dependencies = requireProductAudit(users, audit);
         const actorUser = dependencies
@@ -2833,6 +2977,80 @@ export function createCatalogService(
           targetId: context.collectionItemId,
         });
       });
+    },
+    /**
+     * Updates editable material content while preserving its stable slug.
+     *
+     * @param input - Material identifier, replacement content, and administrator.
+     * @returns Updated material with images.
+     * @rejects When authorization, validation, persistence, auditing, or logging fails.
+     */
+    async updateMaterial(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Material does not exist.");
+      const values = normalizeMaterialWrite(input);
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await logger.operation(
+        loggerMessages.database.catalog.updateMaterial,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [before] = await tx
+              .select({
+                description: schema.material.description,
+                id: schema.material.id,
+                name: schema.material.name,
+                slug: schema.material.slug,
+              })
+              .from(schema.material)
+              .where(eq(schema.material.id, input.materialId))
+              .limit(1);
+            if (!before) throw new Error("Material does not exist.");
+            const [duplicate] = await tx
+              .select({ id: schema.material.id })
+              .from(schema.material)
+              .where(
+                and(
+                  eq(
+                    sql`lower(${schema.material.name})`,
+                    values.name.toLowerCase(),
+                  ),
+                  sql`${schema.material.id} <> ${input.materialId}`,
+                ),
+              )
+              .limit(1);
+            if (duplicate) throw new Error("Material name already exists.");
+            const [after] = await tx
+              .update(schema.material)
+              .set({ ...values, updatedAt: new Date() })
+              .where(eq(schema.material.id, input.materialId))
+              .returning({
+                description: schema.material.description,
+                id: schema.material.id,
+                name: schema.material.name,
+                slug: schema.material.slug,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!after) throw new Error("Material does not exist.");
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after,
+                before,
+                definition: productAudit.materialUpdated,
+                targetId: input.materialId,
+              });
+            }
+            const images = await queryMaterialImages(tx, input.materialId);
+            return { ...after, images };
+          }),
+        actorAttributes(input.actor.clerkId, {
+          materialId: input.materialId,
+        }),
+      );
     },
     /**
      * Updates product.
@@ -4529,6 +4747,27 @@ async function productImageTargetContext(
 }
 
 /**
+ * Loads a material image target for administrative auditing.
+ *
+ * @param db - Application database.
+ * @param target - Material upload target to resolve.
+ * @returns Material context, or `null` for other or missing targets.
+ * @rejects When the database query fails.
+ */
+async function materialImageTargetContext(
+  db: Pick<Database, "select">,
+  target: UploadTarget,
+) {
+  if (target.type !== "material") return null;
+  const [row] = await db
+    .select({ materialId: schema.material.id })
+    .from(schema.material)
+    .where(eq(schema.material.id, target.id))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
  * Loads audit-safe state for a collection image target.
  *
  * @param db - Application database.
@@ -4567,6 +4806,13 @@ async function collectionImageState(
       .where(eq(schema.productImage.productId, target.id));
     return { imageIds: images.map(({ id }) => id) };
   }
+  if (target.type === "material") {
+    const images = await db
+      .select({ id: schema.materialImage.id })
+      .from(schema.materialImage)
+      .where(eq(schema.materialImage.materialId, target.id));
+    return { imageIds: images.map(({ id }) => id) };
+  }
   return {};
 }
 
@@ -4593,6 +4839,26 @@ async function collectionItemImageContext(
       eq(schema.collectionItemImage.collectionItemId, schema.collectionItem.id),
     )
     .where(eq(schema.collectionItemImage.id, imageId))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Loads material context for an image mutation.
+ *
+ * @param db - Application database.
+ * @param imageId - Material-image identifier.
+ * @returns Material image context, or `null` when unavailable.
+ * @rejects When the database query fails.
+ */
+async function materialImageContext(
+  db: Pick<Database, "select">,
+  imageId: number,
+) {
+  const [row] = await db
+    .select({ materialId: schema.materialImage.materialId })
+    .from(schema.materialImage)
+    .where(eq(schema.materialImage.id, imageId))
     .limit(1);
   return row ?? null;
 }
@@ -4640,7 +4906,12 @@ function requireCollectionAudit(
   audit: AuditService | undefined,
   targetType: UploadTarget["type"],
 ) {
-  if (targetType === "product" || targetType === "resource") return null;
+  if (
+    targetType === "product" ||
+    targetType === "material" ||
+    targetType === "resource"
+  )
+    return null;
   if (!users || !audit) throw new Error("Collection audit is not configured.");
   return { audit, users };
 }
@@ -5859,6 +6130,123 @@ function toCatalogImage(row: {
 }
 
 /**
+ * Normalizes editable material content at the service boundary.
+ *
+ * @param input - Untrusted name and optional Markdown description.
+ * @returns Trimmed values safe to persist.
+ * @throws When the name is blank or the description exceeds 5,000 characters.
+ */
+function normalizeMaterialWrite(input: {
+  /** Optional Markdown description. */
+  description?: string | null;
+  /** Material display name. */
+  name: string;
+}) {
+  const name = input.name.trim();
+  const description = input.description?.trim() || null;
+  if (!name) throw new Error("Material name is required.");
+  if (description && description.length > 5000)
+    throw new Error("Material description is too long.");
+  return { description, name };
+}
+
+/**
+ * Converts a material name to a lowercase ASCII slug.
+ *
+ * @param value - Material display name.
+ * @returns Normalized slug, possibly empty.
+ */
+function materialSlug(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-|-$/gu, "");
+}
+
+/**
+ * Generates the first available material slug under a transaction lock.
+ *
+ * @param db - Transaction used to serialize and inspect slug allocation.
+ * @param name - Material display name.
+ * @returns Stable unique slug for a newly created material.
+ * @rejects When the name cannot form a slug or database access fails.
+ */
+async function nextMaterialSlug(
+  db: Pick<Database, "execute" | "select">,
+  name: string,
+) {
+  const base = materialSlug(name);
+  if (!base) throw new Error("Material name is invalid.");
+  await db.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended('material-slug-allocation', 0))`,
+  );
+  const rows = await db
+    .select({ slug: schema.material.slug })
+    .from(schema.material);
+  const used = new Set(rows.map(({ slug }) => slug));
+  if (!used.has(base)) return base;
+  let suffix = 2;
+  while (used.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+/**
+ * Lists material images in stable display order, including soft-deleted rows.
+ *
+ * @param db - Database or transaction used for the query.
+ * @param materialId - Material whose images are returned.
+ * @returns Stored image metadata in display order.
+ * @rejects When image lookup fails.
+ */
+async function queryMaterialImages(
+  db: Pick<Database, "select">,
+  materialId: number,
+) {
+  return await db
+    .select({
+      contentType: schema.materialImage.contentType,
+      createdAt: schema.materialImage.createdAt,
+      deletedAt: schema.materialImage.deletedAt,
+      deletedByClerkId: schema.materialImage.deletedByClerkId,
+      deletedByRole: schema.materialImage.deletedByRole,
+      fileName: schema.materialImage.fileName,
+      id: schema.materialImage.id,
+      objectPath: schema.materialImage.objectPath,
+      position: schema.materialImage.position,
+      size: schema.materialImage.size,
+      url: schema.materialImage.url,
+    })
+    .from(schema.materialImage)
+    .where(eq(schema.materialImage.materialId, materialId))
+    .orderBy(asc(schema.materialImage.position), asc(schema.materialImage.id));
+}
+
+/**
+ * Loads material administration rows without changing lightweight public lookup queries.
+ *
+ * @param db - Database used for material lookup.
+ * @param materialId - Optional material identifier filter.
+ * @returns Name-sorted material content rows.
+ * @rejects When material lookup fails.
+ */
+async function queryAdminMaterialRows(db: Database, materialId?: number) {
+  return await db
+    .select({
+      description: schema.material.description,
+      id: schema.material.id,
+      name: schema.material.name,
+      slug: schema.material.slug,
+    })
+    .from(schema.material)
+    .where(
+      materialId === undefined ? undefined : eq(schema.material.id, materialId),
+    )
+    .orderBy(asc(schema.material.name));
+}
+
+/**
  * Builds privacy and moderation fields for a visibility update.
  *
  * @param input - Visibility, actor ownership, moderation state, and reason.
@@ -5925,6 +6313,26 @@ async function softDeleteCatalogImage(
   },
 ) {
   const deletedAt = new Date();
+  if (input.targetType === "material") {
+    if (!hasPermission(input.actor, "products.manage"))
+      throw new Error("Image does not exist.");
+    const [image] = await db
+      .select({ deletedAt: schema.materialImage.deletedAt })
+      .from(schema.materialImage)
+      .where(eq(schema.materialImage.id, input.imageId))
+      .limit(1);
+    if (!image) throw new Error("Image does not exist.");
+    if (image.deletedAt) return false;
+    await db
+      .update(schema.materialImage)
+      .set({
+        deletedAt,
+        deletedByClerkId: input.actor.clerkId,
+        deletedByRole: "admin",
+      })
+      .where(eq(schema.materialImage.id, input.imageId));
+    return true;
+  }
   if (input.targetType === "product") {
     const canManage = hasPermission(input.actor, "products.manage");
     const [image] = await db
@@ -6008,6 +6416,26 @@ async function restoreCatalogImage(
     targetType: CatalogImageTargetType;
   },
 ) {
+  if (input.targetType === "material") {
+    if (!hasPermission(input.actor, "products.manage"))
+      throw new Error("Image does not exist.");
+    const [image] = await db
+      .select({ id: schema.materialImage.id })
+      .from(schema.materialImage)
+      .where(
+        and(
+          eq(schema.materialImage.id, input.imageId),
+          isNotNull(schema.materialImage.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (!image) throw new Error("Image does not exist.");
+    await db
+      .update(schema.materialImage)
+      .set({ deletedAt: null, deletedByClerkId: null, deletedByRole: null })
+      .where(eq(schema.materialImage.id, input.imageId));
+    return;
+  }
   if (input.targetType === "product") {
     const [image] = await db
       .select({
@@ -6119,7 +6547,35 @@ async function listCatalogImageTrash(
   },
 ): Promise<CatalogImageTrashItem[]> {
   const { actor } = input;
-  const [products, collectionItems] = await Promise.all([
+  const [materials, products, collectionItems] = await Promise.all([
+    db
+      .select({
+        contentType: schema.materialImage.contentType,
+        createdAt: schema.materialImage.createdAt,
+        deletedAt: schema.materialImage.deletedAt,
+        deletedByClerkId: schema.materialImage.deletedByClerkId,
+        deletedByRole: schema.materialImage.deletedByRole,
+        fileName: schema.materialImage.fileName,
+        id: schema.materialImage.id,
+        objectPath: schema.materialImage.objectPath,
+        ownerClerkId: sql<string | null>`null`,
+        position: schema.materialImage.position,
+        size: schema.materialImage.size,
+        targetId: schema.material.id,
+        targetName: schema.material.name,
+        url: schema.materialImage.url,
+      })
+      .from(schema.materialImage)
+      .innerJoin(
+        schema.material,
+        eq(schema.materialImage.materialId, schema.material.id),
+      )
+      .where(
+        and(
+          isNotNull(schema.materialImage.deletedAt),
+          hasPermission(actor, "products.manage") ? undefined : sql`false`,
+        ),
+      ),
     db
       .select({
         contentType: schema.productImage.contentType,
@@ -6209,6 +6665,10 @@ async function listCatalogImageTrash(
       ),
   ]);
   return [
+    ...materials.map((image) => ({
+      ...image,
+      targetType: "material" as const,
+    })),
     ...products.map((image) => ({ ...image, targetType: "product" as const })),
     ...collectionItems.map((image) => ({
       ...image,

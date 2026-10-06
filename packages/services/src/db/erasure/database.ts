@@ -162,6 +162,13 @@ export async function eraseAccountDatabaseData(
       where uploaded_by_clerk_id = ${targetClerkId}
          or deleted_by_clerk_id = ${targetClerkId}
     `);
+    await tx.execute(sql`
+      update material_image
+      set uploaded_by_clerk_id = nullif(uploaded_by_clerk_id, ${targetClerkId}),
+          deleted_by_clerk_id = nullif(deleted_by_clerk_id, ${targetClerkId})
+      where uploaded_by_clerk_id = ${targetClerkId}
+         or deleted_by_clerk_id = ${targetClerkId}
+    `);
 
     await tx.execute(sql`
       delete from resource_notifications
@@ -245,6 +252,8 @@ export async function eraseAccountDatabaseData(
       union all select 'product.privated_by_clerk_id', count(*) from product where privated_by_clerk_id = ${targetClerkId}
       union all select 'product_image.uploaded_by_clerk_id', count(*) from product_image where uploaded_by_clerk_id = ${targetClerkId}
       union all select 'product_image.deleted_by_clerk_id', count(*) from product_image where deleted_by_clerk_id = ${targetClerkId}
+      union all select 'material_image.uploaded_by_clerk_id', count(*) from material_image where uploaded_by_clerk_id = ${targetClerkId}
+      union all select 'material_image.deleted_by_clerk_id', count(*) from material_image where deleted_by_clerk_id = ${targetClerkId}
       union all select 'user_collection.privated_by_clerk_id', count(*) from user_collection where privated_by_clerk_id = ${targetClerkId}
       union all select 'collection_item.privated_by_clerk_id', count(*) from collection_item where privated_by_clerk_id = ${targetClerkId}
       union all select 'collection_image.uploaded_by_clerk_id', count(*) from collection_image where uploaded_by_clerk_id = ${targetClerkId}

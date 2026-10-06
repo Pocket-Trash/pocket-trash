@@ -21,7 +21,11 @@ import {
   writeCollectionAudit,
 } from "../db/audit/collections.js";
 import type { AuditService } from "../db/audit/index.js";
-import { productAudit, writeProductAudit } from "../db/audit/products.js";
+import {
+  productAudit,
+  writeProductAdminAudit,
+  writeProductAudit,
+} from "../db/audit/products.js";
 import {
   loadResourceAuditContext,
   resourceAudit,
@@ -446,9 +450,10 @@ export function createStorageService(input: {
         } else {
           const collectionContext = await collectionTargetContext(tx, target);
           const productContext = await productTargetContext(tx, target);
+          const materialContext = await materialTargetContext(tx, target);
           const before = await collectionTargetImageState(tx, target);
           await attachImages(tx, { target, files, actor });
-          if (collectionContext || productContext) {
+          if (collectionContext || productContext || materialContext) {
             if (!audit) throw new Error("Collection audit is not configured.");
             const [actorUser] = await tx
               .select({ id: schema.user.id, username: schema.user.username })
@@ -485,6 +490,15 @@ export function createStorageService(input: {
                 ownerUserId: productContext.ownerUserId,
                 reason,
                 targetId: target.id,
+              });
+            } else if (materialContext) {
+              await writeProductAdminAudit(audit, tx, {
+                actor,
+                actorUser,
+                after,
+                before,
+                definition: productAudit.materialImageAdded,
+                targetId: materialContext.materialId,
               });
             }
           }
@@ -1019,6 +1033,27 @@ async function productTargetContext(
 }
 
 /**
+ * Loads a material target for administrative image auditing.
+ *
+ * @param db - Application database.
+ * @param target - Upload target to inspect.
+ * @returns Material context, or `null` for other or missing targets.
+ * @rejects When the context query fails.
+ */
+async function materialTargetContext(
+  db: Pick<Database, "select">,
+  target: UploadTarget,
+) {
+  if (target.type !== "material") return null;
+  const [row] = await db
+    .select({ materialId: schema.material.id })
+    .from(schema.material)
+    .where(eq(schema.material.id, target.id))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
  * Captures image identifiers and current-cover state for an upload target.
  *
  * @param db - Application database.
@@ -1057,6 +1092,13 @@ async function collectionTargetImageState(
       .where(eq(schema.productImage.productId, target.id));
     return { currentImageId: null, imageIds: images.map(({ id }) => id) };
   }
+  if (target.type === "material") {
+    const images = await db
+      .select({ id: schema.materialImage.id })
+      .from(schema.materialImage)
+      .where(eq(schema.materialImage.materialId, target.id));
+    return { currentImageId: null, imageIds: images.map(({ id }) => id) };
+  }
   return { currentImageId: null, imageIds: [] };
 }
 
@@ -1079,6 +1121,10 @@ async function hasSurvivingReference(
       select product_image.object_path, null::text as owner_clerk_id,
         true as protected
       from product_image
+      union all
+      select material_image.object_path, null::text as owner_clerk_id,
+        true as protected
+      from material_image
       union all
       select collection_image.object_path, users.clerk_id, false
       from collection_image

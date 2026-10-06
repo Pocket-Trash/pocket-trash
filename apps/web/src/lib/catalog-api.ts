@@ -1,4 +1,6 @@
 import type {
+  AdminMaterial,
+  AdminMaterialSummary,
   CatalogColor,
   CatalogImage,
   CatalogLookup,
@@ -39,6 +41,16 @@ export const isCatalogAdmin = createServerFn().handler(async () => {
     hasPermission(actor, "collections.manage")
   );
 });
+
+/**
+ * Reports whether the current actor may manage materials.
+ *
+ * @returns Whether the current actor has product-management permission.
+ * @rejects If actor lookup fails.
+ */
+export const canManageMaterials = createServerFn().handler(async () =>
+  hasPermission(await getActor(), "products.manage"),
+);
 /**
  * Localization key used for invalid catalog URLs.
  */
@@ -251,7 +263,13 @@ const makerSchema = z.object({
  * Schema for material names.
  */
 const materialSchema = z.object({
+  description: optionalDescriptionSchema.optional().default(""),
   name: slugNameSchema,
+});
+
+/** Schema for creating or updating an administrator-managed material. */
+const materialWriteSchema = materialSchema.extend({
+  materialId: idSchema.nullable(),
 });
 
 /**
@@ -670,17 +688,81 @@ export const createCatalogMaterial = createServerFn({ method: "POST" })
     if (!parsed.success) return validationFailure(parsed.error);
 
     const { s } = await import("@/lib/services");
-    const materials = await s.db.catalog.listMaterials();
-    const slug = nextAvailableSlug(
-      parsed.data.name,
-      materials.map((material) => material.slug),
-    );
     try {
       const material = await s.db.catalog.createMaterial({
         actor,
+        description: parsed.data.description,
         name: parsed.data.name,
-        slug,
       });
+      return { material, ok: true as const };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
+
+/**
+ * Lists every material with administrator-only content.
+ *
+ * @returns All materials ordered by name.
+ * @rejects If permission checking, service loading, or querying fails.
+ */
+export const listAdminMaterials = createServerFn({ method: "GET" }).handler(
+  async (): Promise<AdminMaterialSummary[]> => {
+    const actor = await requirePermission("products.manage");
+    const { s } = await import("@/lib/services");
+    return await s.db.catalog.listAdminMaterials(actor);
+  },
+);
+
+/**
+ * Loads one material for the administrator editor.
+ *
+ * @returns The requested material with signed image URLs, or `null` when absent.
+ * @rejects If input validation, permission checking, service loading, querying, or image signing fails.
+ */
+export const getAdminMaterial = createServerFn({ method: "GET" })
+  .validator((input: unknown) =>
+    z.object({ materialId: idSchema }).parse(input),
+  )
+  .handler(async ({ data }): Promise<AdminMaterial | null> => {
+    const actor = await requirePermission("products.manage");
+    const { s } = await import("@/lib/services");
+    const material = await s.db.catalog.getAdminMaterial(
+      data.materialId,
+      actor,
+    );
+    return material
+      ? { ...material, images: await signCatalogImageUrls(material.images) }
+      : null;
+  });
+
+/**
+ * Validates and creates or updates an administrator-managed material.
+ *
+ * @returns The saved material or a validation-aware mutation failure.
+ * @rejects If permission checking or service loading fails.
+ */
+export const saveAdminMaterial = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("products.manage");
+    const parsed = materialWriteSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+
+    const { s } = await import("@/lib/services");
+    try {
+      const material = parsed.data.materialId
+        ? await s.db.catalog.updateMaterial({
+            actor,
+            description: parsed.data.description,
+            materialId: parsed.data.materialId,
+            name: parsed.data.name,
+          })
+        : await s.db.catalog.createMaterial({
+            actor,
+            description: parsed.data.description,
+            name: parsed.data.name,
+          });
       return { material, ok: true as const };
     } catch (error) {
       return mutationFailure(error);
@@ -1345,7 +1427,7 @@ export const softDeleteCatalogImage = createServerFn({ method: "POST" })
       .object({
         imageId: idSchema,
         reason: z.string().trim().max(1000).optional(),
-        targetType: z.enum(["product", "collection_item"]),
+        targetType: z.enum(["product", "collection_item", "material"]),
       })
       .parse(input),
   )
@@ -1369,7 +1451,7 @@ export const restoreCatalogImage = createServerFn({ method: "POST" })
       .object({
         imageId: idSchema,
         reason: z.string().trim().max(1000).optional(),
-        targetType: z.enum(["product", "collection_item"]),
+        targetType: z.enum(["product", "collection_item", "material"]),
       })
       .parse(input),
   )

@@ -65,6 +65,7 @@ describe("account storage erasure", () => {
         ]),
       );
       expect(captured?.targets).not.toContain(paths.product);
+      expect(captured?.targets).not.toContain(paths.material);
 
       await expect(
         service.eraseAccountObjects(request.id, target),
@@ -84,6 +85,7 @@ describe("account storage erasure", () => {
         "bunny_logs_3_days",
       ]);
       expect(erase.mock.calls.flat()).not.toContain(paths.product);
+      expect(erase.mock.calls.flat()).not.toContain(paths.material);
       expect(erase.mock.calls.flat()).not.toContain(paths.shared);
       expect(new Set(erase.mock.calls.flat())).toEqual(
         new Set([
@@ -126,6 +128,7 @@ async function fixtures(client: PGlite, target: string, survivor: string) {
     collection: "images/dev/collections/1000/collection.png",
     item: "images/dev/collection-items/1000/item.png",
     legacy: "resources/dev/1000/v1/legacy.zip",
+    material: "images/dev/materials/1000/material.png",
     product: "images/dev/products/1000/product.png",
     queue: "resources/dev/1000/v1/queued.zip",
     resourceFile: "resources/dev/1000/v1/file.zip",
@@ -239,6 +242,17 @@ async function fixtures(client: PGlite, target: string, survivor: string) {
     `insert into product_image(product_id,position,file_name,content_type,size,sha256,object_path,url,uploaded_by_clerk_id)
       values($1,0,'product.png','image/png',1,$2,$3,$3,$4)`,
     [rowId(product.rows), hash, paths.product, target],
+  );
+  const material = await client.query<{
+    /** Inserted material identifier. */
+    id: number;
+  }>(
+    "insert into materials(name,slug) values('Erasure material','erasure-material') returning id",
+  );
+  await client.query(
+    `insert into material_image(material_id,position,file_name,content_type,size,sha256,object_path,url,uploaded_by_clerk_id)
+      values($1,0,'material.png','image/png',1,$2,$3,$3,$4)`,
+    [rowId(material.rows), "d".repeat(64), paths.material, target],
   );
   return paths;
 }

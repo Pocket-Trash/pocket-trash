@@ -80,6 +80,19 @@ export const productAudit = {
     "products.product",
   ),
   materialCreated: definition("products.material.created", "products.material"),
+  materialImageAdded: definition(
+    "products.material_image.added",
+    "products.material",
+  ),
+  materialImageDeleted: definition(
+    "products.material_image.deleted",
+    "products.material",
+  ),
+  materialImageRestored: definition(
+    "products.material_image.restored",
+    "products.material",
+  ),
+  materialUpdated: definition("products.material.updated", "products.material"),
   productCreated: definition("products.product.created", "products.product"),
   productDeleted: definition("products.product.deleted", "products.product"),
   productUpdated: definition("products.product.updated", "products.product"),

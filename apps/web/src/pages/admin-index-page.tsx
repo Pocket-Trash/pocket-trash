@@ -5,6 +5,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import {
   Bell,
+  Boxes,
   MessageSquare,
   ScrollText,
   ShieldCheck,
@@ -48,9 +49,15 @@ export function AdminIndexPage() {
     label: t("web.admin.users.title"),
     to: "/admin/users" as const,
   };
+  const materialsLink = {
+    icon: Boxes,
+    label: t("web.admin.hub.materials"),
+    to: "/admin/materials" as const,
+  };
   const primaryLinks = [
     ...(hasPermission(actor, "users.manage") ? [usersLink] : []),
     ...(hasPermission(actor, "audit.read") ? [auditLink] : []),
+    ...(hasPermission(actor, "products.manage") ? [materialsLink] : []),
     ...(hasPermission(actor, "feedback.manage") ? [feedbackLink] : []),
     ...(hasPermission(actor, "feedback.manage") ||
     hasPermission(actor, "resources.manage")

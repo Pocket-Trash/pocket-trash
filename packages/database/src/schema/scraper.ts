@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   foreignKey,
   index,
   integer,
@@ -310,6 +311,8 @@ export const material = pgTable(
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    /** Optional Markdown content shown on the public material page. */
+    description: text("description"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -322,6 +325,10 @@ export const material = pgTable(
       "materials_name_case_insensitive_unique",
     ).on(sql`lower(${table.name})`),
     slugUnique: uniqueIndex("materials_slug_unique").on(table.slug),
+    descriptionLengthValid: check(
+      "materials_description_length_valid",
+      sql`${table.description} is null or char_length(${table.description}) <= 5000`,
+    ),
   }),
 );
 

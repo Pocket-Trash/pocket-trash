@@ -58,7 +58,6 @@ function createLookup(
       return service.createMaterial({
         actor: actor("user-secret", "admin"),
         name: "bronze",
-        slug: "bronze-2",
       });
   }
 }
@@ -1203,17 +1202,22 @@ describe("catalog lookup writes", () => {
       cause: { code: "23505", constraint },
     });
     const db = {
+      execute: vi.fn().mockResolvedValue([]),
       insert: vi.fn(() => ({
         values: vi.fn(() => ({
           returning: vi.fn().mockRejectedValue(databaseError),
         })),
       })),
-      select: vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn().mockResolvedValue([]),
-          })),
-        })),
+      select: vi.fn((fields: Record<string, unknown>) => ({
+        from: vi.fn(() =>
+          Object.hasOwn(fields, "slug")
+            ? Promise.resolve([])
+            : {
+                where: vi.fn(() => ({
+                  limit: vi.fn().mockResolvedValue([]),
+                })),
+              },
+        ),
       })),
       transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
         callback(db),

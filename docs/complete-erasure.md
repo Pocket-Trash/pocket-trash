@@ -59,6 +59,7 @@ at the start of a request. Only the subject HMAC may remain on the receipt.
 | `storage_object_deletion` entries for captured paths | Internal deletion work queue | Process, then delete | A request cannot complete while any captured path remains queued; verify origin `404` before removing queue row | None |
 | `product`, product finish/material/spinner data, and shared scraper/catalog rows | Public shared catalog data; community-owned after submission | Preserve content; anonymize `owner_clerk_id` and moderation attribution | Make every matching attribution column nullable, set it to `NULL`, and verify no identifier match | None. A narrow manual removal path may delete a product record or image only after an operator verifies a personal-information, copyright, or other rights claim |
 | `product_image` and Bunny object | Public shared catalog media | Preserve object/content; anonymize uploader/deleter attribution | Make `uploaded_by_clerk_id` nullable, apply the moderation migration above, set matches to `NULL`, and verify the object still resolves | None |
+| `material_image` and Bunny object | Public shared material media | Preserve object/content; anonymize uploader/deleter attribution | Set matching uploader/deleter attribution to `NULL`, verify the row remains, and keep the Bunny object referenced | None |
 | `resource_categories` and other shared taxonomies | Public shared taxonomy | Preserve; anonymize creator/moderator attribution | Make `created_by_clerk_id` nullable, set matching fields to `NULL`, and verify taxonomy still exists and identifiers do not | None |
 | `feedback` submitted by the subject, its notifications, and votes on it | Private pending or public accepted user-authored request text and activity | Delete | Delete submissions by `submitter_clerk_id`; cascade dependent rows; verify submission IDs absent | None |
 | `feedback_votes` by the subject; surviving notification `read_by_clerk_id` | Restricted user-linked activity on another user's feedback | Delete vote; clear read attribution and `read_at` | Direct delete/update and identifier scan | None |
@@ -219,6 +220,8 @@ union all select 'product.owner_clerk_id', count(*) from product where owner_cle
 union all select 'product.privated_by_clerk_id', count(*) from product where privated_by_clerk_id = :clerk_id
 union all select 'product_image.uploaded_by_clerk_id', count(*) from product_image where uploaded_by_clerk_id = :clerk_id
 union all select 'product_image.deleted_by_clerk_id', count(*) from product_image where deleted_by_clerk_id = :clerk_id
+union all select 'material_image.uploaded_by_clerk_id', count(*) from material_image where uploaded_by_clerk_id = :clerk_id
+union all select 'material_image.deleted_by_clerk_id', count(*) from material_image where deleted_by_clerk_id = :clerk_id
 union all select 'user_collection.privated_by_clerk_id', count(*) from user_collection where privated_by_clerk_id = :clerk_id
 union all select 'collection_item.privated_by_clerk_id', count(*) from collection_item where privated_by_clerk_id = :clerk_id
 union all select 'collection_image.uploaded_by_clerk_id', count(*) from collection_image where uploaded_by_clerk_id = :clerk_id

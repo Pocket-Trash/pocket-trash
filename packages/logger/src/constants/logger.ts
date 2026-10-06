@@ -75,6 +75,8 @@ export const loggerMessages = {
       createFinish: "database.catalog.createFinish",
       createMaker: "database.catalog.createMaker",
       createMaterial: "database.catalog.createMaterial",
+      getAdminMaterial: "database.catalog.getAdminMaterial",
+      listAdminMaterials: "database.catalog.listAdminMaterials",
       createProduct: "database.catalog.createProduct",
       deleteProduct: "database.catalog.deleteProduct",
       listColorEffects: "database.catalog.listColorEffects",
@@ -82,6 +84,7 @@ export const loggerMessages = {
       listFinishes: "database.catalog.listFinishes",
       setMakerProductUrlValidity: "database.catalog.setMakerProductUrlValidity",
       updateProduct: "database.catalog.updateProduct",
+      updateMaterial: "database.catalog.updateMaterial",
     },
     collections: {
       addSpinner: "database.collections.addSpinner",
