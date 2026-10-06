@@ -226,6 +226,7 @@ const owners = [
 const product: CatalogProduct = {
   approvalStatus: "approved",
   bearing: null,
+  bodyHostedMagnetSetup: null,
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: false,
@@ -536,6 +537,55 @@ describe("ProductGrid", () => {
 });
 
 describe("ProductDetailPage", () => {
+  it("shows the live body-hosted setup as exact read-only catalog facts", () => {
+    const html = renderToStaticMarkup(
+      <ProductDetailPage
+        collectionItems={[]}
+        product={{
+          ...product,
+          bodyHostedMagnetSetup: {
+            clickCount: 4,
+            configuration: {
+              groups: [
+                {
+                  diameterMm: "6.35",
+                  grade: "N52",
+                  key: "corners",
+                  label: "Corners",
+                  thicknessMm: "3.175",
+                },
+              ],
+              label: "Medium",
+              slots: [
+                {
+                  documentedColumn: 1,
+                  documentedRow: 1,
+                  groupKey: "corners",
+                  half: "half-a",
+                  key: "A1",
+                  state: "occupied",
+                },
+              ],
+              sourceLabel: "4-click layout",
+              sourceNotes: null,
+            },
+            sourceNote: null,
+          },
+          magnetSystem: "body-hosted",
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+      />,
+    );
+
+    expect(html).toContain("web.slider.setup.clicks");
+    expect(html).toContain("Medium — 4-click layout");
+    expect(html).toContain("6.35×3.175 mm, N52");
+    expect(html).toContain("web.slider.magnet.halfA A1");
+    expect(html).not.toContain("Install");
+    expect(html).not.toContain("Custom setup");
+  });
+
   it("limits deletion controls to owners and authorized staff", () => {
     const publicHtml = renderToStaticMarkup(
       <ProductDetailPage collectionItems={[]} product={product} />,

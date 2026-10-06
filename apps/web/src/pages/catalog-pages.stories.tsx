@@ -37,6 +37,7 @@ const collectionImage = image(
 const product: CatalogProduct = {
   approvalStatus: "approved",
   bearing: "R188 hybrid ceramic",
+  bodyHostedMagnetSetup: null,
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: false,
@@ -89,6 +90,42 @@ const product: CatalogProduct = {
 const slider: CatalogProduct = {
   ...product,
   bearing: null,
+  bodyHostedMagnetSetup: {
+    clickCount: 4,
+    configuration: {
+      groups: [
+        {
+          diameterMm: "6.35",
+          grade: "N52",
+          key: "corners",
+          label: "Corners",
+          thicknessMm: "3.175",
+        },
+      ],
+      label: "Medium",
+      slots: [
+        {
+          documentedColumn: 1,
+          documentedRow: 1,
+          groupKey: "corners",
+          half: "half-a",
+          key: "A1",
+          state: "occupied",
+        },
+        {
+          documentedColumn: 1,
+          documentedRow: 1,
+          groupKey: null,
+          half: "half-b",
+          key: "B1",
+          state: "empty",
+        },
+      ],
+      sourceLabel: "4-click layout",
+      sourceNotes: null,
+    },
+    sourceNote: null,
+  },
   buttonDiameterMm: null,
   compatibilityAdvisories: [
     {

@@ -8,6 +8,7 @@ import { CollectionAddPage } from "./catalog-form-pages";
 const product: CatalogProduct = {
   approvalStatus: "approved",
   bearing: null,
+  bodyHostedMagnetSetup: null,
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: true,

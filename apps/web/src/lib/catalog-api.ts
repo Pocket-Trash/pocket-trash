@@ -113,6 +113,109 @@ const optionalUrlSchema = z
   .refine((value) => isWebUrl(normalizeOptionalUrl(value)), urlMessage)
   .transform((value) => normalizeOptionalUrl(value) || null);
 
+/**
+ * Creates an optional sourced setup text schema without inferring missing facts.
+ *
+ * @param maximum - Maximum accepted character count.
+ * @returns Schema that trims text and maps blank input to `null`.
+ */
+const optionalMagnetTextSchema = (maximum: number) =>
+  z
+    .union([z.string().max(maximum, "web.catalog.error.form"), z.null()])
+    .transform((value) => value?.trim() || null);
+
+/** One complete exact magnet group in a catalog layout. */
+const magnetGroupSchema = z.object({
+  diameterMm: positiveDecimalSchema.pipe(
+    z.string({ error: "web.slider.validation.positiveDimension" }),
+  ),
+  grade: z.string().trim().min(1, requiredMessage).max(20),
+  key: z.string().trim().min(1, requiredMessage).max(100),
+  label: z.string().trim().min(1, requiredMessage).max(100),
+  thicknessMm: positiveDecimalSchema.pipe(
+    z.string({ error: "web.slider.validation.positiveDimension" }),
+  ),
+});
+
+/** One exact Half A or Half B slot in a complete catalog layout. */
+const magnetSlotSchema = z.object({
+  documentedColumn: z.number().int().positive().nullable(),
+  documentedRow: z.number().int().positive().nullable(),
+  groupKey: z.string().trim().min(1).max(100).nullable(),
+  half: z.enum(["half-a", "half-b"]),
+  key: z.string().trim().min(1, requiredMessage).max(100),
+  state: z.enum(["occupied", "empty"]),
+});
+
+/** Body-hosted setup form contract. */
+const bodyHostedMagnetSetupSchema = z
+  .object({
+    clickCount: z.number().int().positive().nullable(),
+    configuration: z
+      .object({
+        groups: z.array(magnetGroupSchema),
+        label: z.string().trim().min(1, requiredMessage).max(100),
+        slots: z
+          .array(magnetSlotSchema)
+          .min(1, "web.slider.validation.completeConfiguration"),
+        sourceLabel: optionalMagnetTextSchema(200),
+        sourceNotes: optionalMagnetTextSchema(5000),
+      })
+      .nullable(),
+    sourceNote: optionalMagnetTextSchema(5000),
+  })
+  .superRefine(({ configuration }, context) => {
+    if (!configuration) return;
+    const groupKeys = configuration.groups.map(({ key }) => key);
+    if (new Set(groupKeys).size !== groupKeys.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["configuration", "groups"],
+      });
+    }
+    const slotKeys = configuration.slots.map(({ key }) => key);
+    if (new Set(slotKeys).size !== slotKeys.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["configuration", "slots"],
+      });
+    }
+    const referenced = new Set<string>();
+    for (const [index, slot] of configuration.slots.entries()) {
+      if (slot.state === "occupied" && !slot.groupKey) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.incompleteSlot",
+          path: ["configuration", "slots", index, "groupKey"],
+        });
+      }
+      if (slot.state === "empty" && slot.groupKey) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.overlappingGroup",
+          path: ["configuration", "slots", index, "groupKey"],
+        });
+      }
+      if (slot.groupKey && !groupKeys.includes(slot.groupKey)) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.crossConfiguration",
+          path: ["configuration", "slots", index, "groupKey"],
+        });
+      }
+      if (slot.groupKey) referenced.add(slot.groupKey);
+    }
+    if (groupKeys.some((key) => !referenced.has(key))) {
+      context.addIssue({
+        code: "custom",
+        message: "web.slider.validation.completeConfiguration",
+        path: ["configuration", "groups"],
+      });
+    }
+  });
+
 /** Schema for one reviewed, non-blocking exact-product compatibility warning. */
 const compatibilityAdvisorySchema = z.object({
   relatedProductId: idSchema,
@@ -213,6 +316,7 @@ export const finishOptionSchema = z
 export const productFormSchema = z
   .object({
     bearing: optionalBearingSchema,
+    bodyHostedMagnetSetup: bodyHostedMagnetSetupSchema.nullable().default(null),
     buttonDiameterMm: numericSpecSchema,
     compatibleButtonId: idSchema.nullable(),
     compatibilityAdvisories: z.array(compatibilityAdvisorySchema),
@@ -241,6 +345,7 @@ export const productFormSchema = z
     (
       {
         bearing,
+        bodyHostedMagnetSetup,
         compatibilityAdvisories,
         compatibilityFamilyIds,
         finishOptions,
@@ -276,6 +381,16 @@ export const productFormSchema = z
           code: "custom",
           message: "web.catalog.error.form",
           path: ["magnetSystem"],
+        });
+      }
+      if (
+        bodyHostedMagnetSetup !== null &&
+        (productTypeSlug !== "slider" || magnetSystem !== "body-hosted")
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.bodyHostedInsert",
+          path: ["bodyHostedMagnetSetup"],
         });
       }
       if (
@@ -1051,6 +1166,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     const slug = nextAvailableSlug(parsed.data.name, slugs);
     const input: ProductWriteInput = {
       actor,
+      bodyHostedMagnetSetup: parsed.data.bodyHostedMagnetSetup,
       compatibilityAdvisories: parsed.data.compatibilityAdvisories,
       compatibilityFamilyIds: parsed.data.compatibilityFamilyIds,
       description: parsed.data.description,
