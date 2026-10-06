@@ -1,6 +1,7 @@
 import type {
   CatalogApprovalAction,
   CatalogApprovalStatus,
+  CatalogBodyHostedMagnetSetup,
   CatalogFinishOption,
   CatalogProduct,
   CatalogProductType,
@@ -542,6 +543,14 @@ export function ProductDetailPage({
                   ? "web.slider.measurement.bodyOnly"
                   : "web.slider.measurement.completeBuild",
               )}
+            </Detail>
+          ) : null}
+          {product.bodyHostedMagnetSetup ? (
+            <Detail label={t("web.slider.setup.title")}>
+              <BodyHostedMagnetSetupDetails
+                setup={product.bodyHostedMagnetSetup}
+                t={t}
+              />
             </Detail>
           ) : null}
           {product.productTypeSlug === "slider-plate" ||
@@ -1783,6 +1792,97 @@ function Detail({
         {label}
       </dt>
       <dd className="mt-1">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * Renders the live catalog setup of a body-hosted slider as read-only facts.
+ *
+ * @param props - Setup and localized formatter.
+ * @returns Read-only exact setup details without install or custom controls.
+ */
+function BodyHostedMagnetSetupDetails({
+  setup,
+  t,
+}: {
+  /** Live inherent catalog setup. */
+  setup: CatalogBodyHostedMagnetSetup;
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+}) {
+  const configuration = setup.configuration;
+  return (
+    <div className="grid gap-3 rounded-md border border-border p-3">
+      <p className="m-0 text-sm">
+        <span className="font-medium">{t("web.slider.setup.clickCount")}:</span>{" "}
+        {setup.clickCount === null
+          ? t("web.slider.setup.notRecorded")
+          : t("web.slider.setup.clicks", { count: setup.clickCount })}
+      </p>
+      {setup.sourceNote ? (
+        <div>
+          <p className="m-0 text-sm font-medium">
+            {t("web.slider.setup.sourceNote")}
+          </p>
+          <p className="m-0 whitespace-pre-wrap text-sm text-muted-foreground">
+            {setup.sourceNote}
+          </p>
+        </div>
+      ) : null}
+      {configuration ? (
+        <div className="grid gap-3">
+          <p className="m-0 text-sm font-medium">
+            {t("web.slider.magnet.configuration")}: {configuration.label}
+            {configuration.sourceLabel ? ` — ${configuration.sourceLabel}` : ""}
+          </p>
+          {configuration.sourceNotes ? (
+            <p className="m-0 whitespace-pre-wrap text-sm text-muted-foreground">
+              {configuration.sourceNotes}
+            </p>
+          ) : null}
+          <ul className="m-0 grid list-none gap-2 p-0">
+            {configuration.groups.map((group) => (
+              <li
+                className="rounded border border-border p-2 text-sm"
+                key={group.key}
+              >
+                <span className="font-medium">{group.label}</span>:{" "}
+                {group.diameterMm}×{group.thicknessMm} mm, {group.grade}
+              </li>
+            ))}
+          </ul>
+          <ul className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2">
+            {configuration.slots.map((slot) => (
+              <li
+                className="rounded border border-border p-2 text-sm"
+                key={`${slot.half}-${slot.key}`}
+              >
+                <span className="font-medium">
+                  {t(
+                    slot.half === "half-a"
+                      ? "web.slider.magnet.halfA"
+                      : "web.slider.magnet.halfB",
+                  )}{" "}
+                  {slot.key}
+                </span>
+                : {t(`web.slider.magnet.state.${slot.state}`)}
+                {slot.groupKey ? ` — ${slot.groupKey}` : ""}
+                {slot.documentedRow !== null
+                  ? ` · ${t("web.slider.magnet.row")} ${slot.documentedRow}`
+                  : ""}
+                {slot.documentedColumn !== null
+                  ? ` · ${t("web.slider.magnet.column")} ${slot.documentedColumn}`
+                  : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="m-0 text-sm text-muted-foreground">
+          {t("web.slider.setup.incompleteSourceNote")}
+        </p>
+      )}
     </div>
   );
 }

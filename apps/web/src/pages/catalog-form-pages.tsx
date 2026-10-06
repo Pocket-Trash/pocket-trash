@@ -1,5 +1,6 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import type {
+  CatalogBodyHostedMagnetSetup,
   CatalogColor,
   CatalogCompatibilityFamily,
   CatalogFinishOption,
@@ -189,6 +190,11 @@ export function ProductEditor({
   const form = useForm({
     defaultValues: {
       bearing: initialProduct?.bearing ?? "",
+      bodyHostedMagnetSetup:
+        initialProduct?.bodyHostedMagnetSetup ??
+        (initialProduct?.magnetSystem === "body-hosted"
+          ? { clickCount: null, configuration: null, sourceNote: null }
+          : null),
       buttonDiameterMm: initialProduct?.buttonDiameterMm ?? null,
       compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
       compatibilityAdvisories:
@@ -627,12 +633,24 @@ export function ProductEditor({
                     ariaLabel={t("web.slider.capability.label")}
                     items={items}
                     onValueChange={(value) =>
-                      field.handleChange(
-                        value?.id === "body-hosted" ||
+                      (() => {
+                        const magnetSystem =
+                          value?.id === "body-hosted" ||
                           value?.id === "insert-driven"
-                          ? value.id
-                          : null,
-                      )
+                            ? value.id
+                            : null;
+                        field.handleChange(magnetSystem);
+                        form.setFieldValue(
+                          "bodyHostedMagnetSetup",
+                          magnetSystem === "body-hosted"
+                            ? (form.state.values.bodyHostedMagnetSetup ?? {
+                                clickCount: null,
+                                configuration: null,
+                                sourceNote: null,
+                              })
+                            : null,
+                        );
+                      })()
                     }
                     placeholder={t("web.slider.capability.label")}
                     value={
@@ -682,6 +700,25 @@ export function ProductEditor({
               );
             }}
           </form.Field>
+        ) : null}
+        {productTypeSlug === "slider" ? (
+          <form.Subscribe selector={(state) => state.values.magnetSystem}>
+            {(magnetSystem) =>
+              magnetSystem === "body-hosted" ? (
+                <form.Field name="bodyHostedMagnetSetup">
+                  {(field) =>
+                    field.state.value ? (
+                      <BodyHostedMagnetSetupEditor
+                        onChange={field.handleChange}
+                        t={t}
+                        value={field.state.value}
+                      />
+                    ) : null
+                  }
+                </form.Field>
+              ) : null
+            }
+          </form.Subscribe>
         ) : null}
         {productTypeSlug === "slider-plate" ||
         productTypeSlug === "slider-insert" ? (
@@ -997,6 +1034,509 @@ export function ProductEditor({
         </form.Subscribe>
       </div>
     </form>
+  );
+}
+
+/**
+ * Edits the single inherent setup of a body-hosted catalog slider.
+ *
+ * @param props - Current setup and replacement callback.
+ * @returns Structured setup authoring fields.
+ */
+function BodyHostedMagnetSetupEditor({
+  onChange,
+  t,
+  value,
+}: {
+  /**
+   * Replaces the complete form value.
+   *
+   * @param value - Next complete body-hosted setup.
+   */
+  onChange(value: CatalogBodyHostedMagnetSetup): void;
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+  /** Current inherent setup. */
+  value: CatalogBodyHostedMagnetSetup;
+}) {
+  const configuration = value.configuration;
+  /**
+   * Replaces or clears the single structured configuration.
+   *
+   * @param next - Next complete configuration, or `null` when undocumented.
+   * @returns Nothing.
+   */
+  const replaceConfiguration = (
+    next: NonNullable<typeof value.configuration> | null,
+  ) => onChange({ ...value, configuration: next });
+  return (
+    <fieldset className="grid gap-4 rounded-lg border border-border p-4">
+      <legend className="px-1 text-sm font-medium">
+        {t("web.slider.setup.title")}
+      </legend>
+      <Field label={t("web.slider.setup.clickCount")}>
+        <Input
+          aria-label={t("web.slider.setup.clickCount")}
+          min="1"
+          onChange={(event) =>
+            onChange({
+              ...value,
+              clickCount: event.target.value
+                ? Number(event.target.value)
+                : null,
+            })
+          }
+          step="1"
+          type="number"
+          value={value.clickCount ?? ""}
+        />
+      </Field>
+      <Field label={t("web.slider.setup.sourceNote")}>
+        <textarea
+          aria-label={t("web.slider.setup.sourceNote")}
+          className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          maxLength={5000}
+          onChange={(event) =>
+            onChange({ ...value, sourceNote: event.target.value })
+          }
+          placeholder={t("web.slider.setup.incompleteSourceNote")}
+          value={value.sourceNote ?? ""}
+        />
+      </Field>
+      {configuration ? (
+        <section className="grid gap-4 rounded-lg border border-border bg-muted/20 p-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label={t("web.slider.magnet.vocabularyLabel")}>
+              <Input
+                aria-label={t("web.slider.magnet.vocabularyLabel")}
+                maxLength={100}
+                onChange={(event) =>
+                  replaceConfiguration({
+                    ...configuration,
+                    label: event.target.value,
+                  })
+                }
+                value={configuration.label}
+              />
+            </Field>
+            <Field label={t("web.slider.setup.default")}>
+              <Input
+                aria-label={t("web.slider.setup.default")}
+                maxLength={200}
+                onChange={(event) =>
+                  replaceConfiguration({
+                    ...configuration,
+                    sourceLabel: event.target.value,
+                  })
+                }
+                value={configuration.sourceLabel ?? ""}
+              />
+            </Field>
+          </div>
+          <Field label={t("web.slider.setup.sourceNote")}>
+            <textarea
+              aria-label={t("web.slider.setup.sourceNote")}
+              className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              maxLength={5000}
+              onChange={(event) =>
+                replaceConfiguration({
+                  ...configuration,
+                  sourceNotes: event.target.value,
+                })
+              }
+              value={configuration.sourceNotes ?? ""}
+            />
+          </Field>
+          <fieldset className="grid gap-3 rounded-md border border-border p-3">
+            <legend className="px-1 text-sm font-medium">
+              {t("web.slider.magnet.groups")}
+            </legend>
+            {configuration.groups.map((group, index) => (
+              <section
+                className="grid gap-2 rounded-md border border-border bg-background p-3 md:grid-cols-3"
+                key={`${group.key}-${index}`}
+              >
+                <Field label={t("web.slider.magnet.group")}>
+                  <Input
+                    aria-label={t("web.slider.magnet.group")}
+                    onChange={(event) => {
+                      const oldKey = group.key;
+                      const key = event.target.value;
+                      replaceConfiguration({
+                        ...configuration,
+                        groups: configuration.groups.map((current, position) =>
+                          position === index ? { ...current, key } : current,
+                        ),
+                        slots: configuration.slots.map((slot) =>
+                          slot.groupKey === oldKey
+                            ? { ...slot, groupKey: key }
+                            : slot,
+                        ),
+                      });
+                    }}
+                    placeholder="group-key"
+                    value={group.key}
+                  />
+                  <Input
+                    aria-label={t("web.slider.magnet.vocabularyLabel")}
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        groups: configuration.groups.map((current, position) =>
+                          position === index
+                            ? { ...current, label: event.target.value }
+                            : current,
+                        ),
+                      })
+                    }
+                    placeholder={t("web.slider.magnet.vocabularyLabel")}
+                    value={group.label}
+                  />
+                </Field>
+                <Field label={t("web.slider.magnet.size")}>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      aria-label={t("web.archive.spec.diameter")}
+                      min="0"
+                      onChange={(event) =>
+                        replaceConfiguration({
+                          ...configuration,
+                          groups: configuration.groups.map(
+                            (current, position) =>
+                              position === index
+                                ? {
+                                    ...current,
+                                    diameterMm: event.target.value,
+                                  }
+                                : current,
+                          ),
+                        })
+                      }
+                      placeholder={t("web.archive.spec.diameter")}
+                      step="any"
+                      type="number"
+                      value={group.diameterMm ?? ""}
+                    />
+                    <Input
+                      aria-label={t("web.catalog.field.thickness")}
+                      min="0"
+                      onChange={(event) =>
+                        replaceConfiguration({
+                          ...configuration,
+                          groups: configuration.groups.map(
+                            (current, position) =>
+                              position === index
+                                ? {
+                                    ...current,
+                                    thicknessMm: event.target.value,
+                                  }
+                                : current,
+                          ),
+                        })
+                      }
+                      placeholder={t("web.catalog.field.thickness")}
+                      step="any"
+                      type="number"
+                      value={group.thicknessMm ?? ""}
+                    />
+                  </div>
+                </Field>
+                <Field label={t("web.slider.magnet.grade")}>
+                  <Input
+                    aria-label={t("web.slider.magnet.grade")}
+                    maxLength={20}
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        groups: configuration.groups.map((current, position) =>
+                          position === index
+                            ? { ...current, grade: event.target.value }
+                            : current,
+                        ),
+                      })
+                    }
+                    value={group.grade}
+                  />
+                  <Button
+                    onClick={() => {
+                      const groups = configuration.groups.filter(
+                        (_, position) => position !== index,
+                      );
+                      replaceConfiguration({
+                        ...configuration,
+                        groups,
+                        slots: configuration.slots.map((slot) =>
+                          slot.groupKey === group.key
+                            ? { ...slot, groupKey: null, state: "empty" }
+                            : slot,
+                        ),
+                      });
+                    }}
+                    type="button"
+                    variant="outline"
+                  >
+                    {t("web.action.removeSelection", {
+                      name: group.label || group.key,
+                    })}
+                  </Button>
+                </Field>
+              </section>
+            ))}
+            <Button
+              className="w-fit"
+              onClick={() => {
+                const key = `group-${configuration.groups.length + 1}`;
+                replaceConfiguration({
+                  ...configuration,
+                  groups: [
+                    ...configuration.groups,
+                    {
+                      diameterMm: "",
+                      grade: "",
+                      key,
+                      label: "",
+                      thicknessMm: "",
+                    },
+                  ],
+                });
+              }}
+              type="button"
+              variant="outline"
+            >
+              {t("web.action.confirmAdd")} {t("web.slider.magnet.group")}
+            </Button>
+          </fieldset>
+          <fieldset className="grid gap-3 rounded-md border border-border p-3">
+            <legend className="px-1 text-sm font-medium">
+              {t("web.slider.magnet.slots")}
+            </legend>
+            {configuration.slots.map((slot, index) => (
+              <section
+                className="grid gap-2 rounded-md border border-border bg-background p-3 md:grid-cols-4"
+                key={`${slot.half}-${slot.key}-${index}`}
+              >
+                <Field label={t("web.slider.magnet.slot")}>
+                  <Input
+                    aria-label={t("web.slider.magnet.slot")}
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        slots: configuration.slots.map((current, position) =>
+                          position === index
+                            ? { ...current, key: event.target.value }
+                            : current,
+                        ),
+                      })
+                    }
+                    value={slot.key}
+                  />
+                </Field>
+                <Field label={t("web.slider.magnet.halfA")}>
+                  <select
+                    aria-label={t("web.slider.magnet.halfA")}
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        slots: configuration.slots.map((current, position) =>
+                          position === index
+                            ? {
+                                ...current,
+                                half: event.target.value as "half-a" | "half-b",
+                              }
+                            : current,
+                        ),
+                      })
+                    }
+                    value={slot.half}
+                  >
+                    <option value="half-a">
+                      {t("web.slider.magnet.halfA")}
+                    </option>
+                    <option value="half-b">
+                      {t("web.slider.magnet.halfB")}
+                    </option>
+                  </select>
+                </Field>
+                <Field label={t(`web.slider.magnet.state.${slot.state}`)}>
+                  <select
+                    aria-label={t(`web.slider.magnet.state.${slot.state}`)}
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    onChange={(event) => {
+                      const state = event.target.value as "occupied" | "empty";
+                      replaceConfiguration({
+                        ...configuration,
+                        slots: configuration.slots.map((current, position) =>
+                          position === index
+                            ? {
+                                ...current,
+                                groupKey:
+                                  state === "empty" ? null : current.groupKey,
+                                state,
+                              }
+                            : current,
+                        ),
+                      });
+                    }}
+                    value={slot.state}
+                  >
+                    <option value="occupied">
+                      {t("web.slider.magnet.state.occupied")}
+                    </option>
+                    <option value="empty">
+                      {t("web.slider.magnet.state.empty")}
+                    </option>
+                  </select>
+                </Field>
+                <Field label={t("web.slider.magnet.group")}>
+                  <select
+                    aria-label={t("web.slider.magnet.group")}
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    disabled={slot.state === "empty"}
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        slots: configuration.slots.map((current, position) =>
+                          position === index
+                            ? {
+                                ...current,
+                                groupKey: event.target.value || null,
+                              }
+                            : current,
+                        ),
+                      })
+                    }
+                    value={slot.groupKey ?? ""}
+                  >
+                    <option value="">
+                      {t("web.slider.setup.notRecorded")}
+                    </option>
+                    {configuration.groups.map((group) => (
+                      <option key={group.key} value={group.key}>
+                        {group.label || group.key}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label={t("web.slider.magnet.row")}>
+                  <Input
+                    aria-label={t("web.slider.magnet.row")}
+                    min="1"
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        slots: configuration.slots.map((current, position) =>
+                          position === index
+                            ? {
+                                ...current,
+                                documentedRow: event.target.value
+                                  ? Number(event.target.value)
+                                  : null,
+                              }
+                            : current,
+                        ),
+                      })
+                    }
+                    step="1"
+                    type="number"
+                    value={slot.documentedRow ?? ""}
+                  />
+                </Field>
+                <Field label={t("web.slider.magnet.column")}>
+                  <Input
+                    aria-label={t("web.slider.magnet.column")}
+                    min="1"
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        slots: configuration.slots.map((current, position) =>
+                          position === index
+                            ? {
+                                ...current,
+                                documentedColumn: event.target.value
+                                  ? Number(event.target.value)
+                                  : null,
+                              }
+                            : current,
+                        ),
+                      })
+                    }
+                    step="1"
+                    type="number"
+                    value={slot.documentedColumn ?? ""}
+                  />
+                </Field>
+                <Button
+                  className="w-fit self-end"
+                  onClick={() =>
+                    replaceConfiguration({
+                      ...configuration,
+                      slots: configuration.slots.filter(
+                        (_, position) => position !== index,
+                      ),
+                    })
+                  }
+                  type="button"
+                  variant="outline"
+                >
+                  {t("web.action.removeSelection", { name: slot.key })}
+                </Button>
+              </section>
+            ))}
+            <Button
+              className="w-fit"
+              onClick={() =>
+                replaceConfiguration({
+                  ...configuration,
+                  slots: [
+                    ...configuration.slots,
+                    {
+                      documentedColumn: null,
+                      documentedRow: null,
+                      groupKey: null,
+                      half: "half-a",
+                      key: `A${configuration.slots.length + 1}`,
+                      state: "empty",
+                    },
+                  ],
+                })
+              }
+              type="button"
+              variant="outline"
+            >
+              {t("web.action.confirmAdd")} {t("web.slider.magnet.slot")}
+            </Button>
+          </fieldset>
+          <Button
+            className="w-fit"
+            onClick={() => replaceConfiguration(null)}
+            type="button"
+            variant="outline"
+          >
+            {t("web.action.removeSelection", {
+              name: t("web.slider.magnet.configuration"),
+            })}
+          </Button>
+        </section>
+      ) : (
+        <Button
+          className="w-fit"
+          onClick={() =>
+            replaceConfiguration({
+              groups: [],
+              label: "",
+              slots: [],
+              sourceLabel: null,
+              sourceNotes: null,
+            })
+          }
+          type="button"
+          variant="outline"
+        >
+          {t("web.action.confirmAdd")} {t("web.slider.magnet.configuration")}
+        </Button>
+      )}
+    </fieldset>
   );
 }
 
