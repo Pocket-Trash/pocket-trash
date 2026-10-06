@@ -11,19 +11,18 @@
 - Follow [`docs/documentation.md`](docs/documentation.md) when creating or storing
   repository documentation, research, findings, or engineering decision records.
 
-- After implementing features or code changes, always run:
-  - Use `$pocket-trash logger` to audit logger usage, centralized logger messages/values,
-    and forbidden `console.*` calls before validation.
-  - `pnpm format`
-  - `pnpm test`
-  - `pnpm lint`
-  - `pnpm typecheck`
+- After implementing features or code changes, run focused checks while iterating.
+  Before the final push:
+  - Use `$pocket-trash logger` as a separate AI-only audit of logger usage,
+    centralized logger messages/values, and forbidden `console.*` calls.
+  - Create the required Changeset and commit every generated artifact so the
+    worktree is clean.
+  - Run `pnpm validate:pr` for a PR targeting `main`, or
+    `pnpm validate:pr -- <base-ref>` for a stacked/non-main PR. This replaces
+    the separate routine `format`, `test`, `lint`, and `typecheck` sequence.
 - Run these additional checks only when the change can affect the covered surface:
-  - For components, stories, or Storybook configuration, run
-    `pnpm --filter @app/web test-storybook`. When stories or Storybook
-    configuration change, also run `pnpm --filter @app/web build-storybook`.
-    Use `pnpm storybook` only for manual visual inspection. See
-    [`docs/storybook.md`](docs/storybook.md).
+  - `validate:pr` runs relevant Storybook tests and builds. Use `pnpm storybook`
+    only for manual visual inspection. See [`docs/storybook.md`](docs/storybook.md).
   - After the preview deploys, run `E2E_BASE_URL=<preview-url> pnpm e2e` for
     changes to routes,
     authentication, web/API contracts, Playwright configuration, or important
@@ -40,5 +39,6 @@
 - If code changes touch `packages/logger/**`, also run `pnpm test:logger:axiom`
   when Infisical and Axiom credentials are available. If they are not available,
   report that the live logger test was skipped.
-- For changes that do not include code, such as documentation-only updates, run only `pnpm format`.
+- Documentation-only changes follow the same Changeset, commit, and
+  `validate:pr` final workflow; the domain plan skips unrelated code checks.
 - If `pnpm lint` or `pnpm format` fail, determine whether the failure was caused by changes made during the current session. If so, fix those issues before finishing.

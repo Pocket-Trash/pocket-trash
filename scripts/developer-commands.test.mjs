@@ -10,6 +10,10 @@ test("exposes the safe root E2E command", () => {
   assert.equal(scripts.e2e, "pnpm --filter @app/web test:e2e");
 });
 
+test("exposes the committed pull-request validation command", () => {
+  assert.equal(scripts["validate:pr"], "node scripts/validate-pr.mjs");
+});
+
 test("exposes the documented root development commands", () => {
   assert.equal(
     scripts.dev,
