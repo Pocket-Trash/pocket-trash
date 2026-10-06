@@ -118,6 +118,8 @@ export type {
   CatalogProduct,
   CatalogProductType,
   CatalogService,
+  CatalogTerminologyAlias,
+  CatalogTerminologyNamespace,
   CatalogViewer,
   CollectionsService,
   ProductApprovalAction,

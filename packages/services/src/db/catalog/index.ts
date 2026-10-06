@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { type Actor, hasPermission } from "../../authorization.js";
+import { normalizeCatalogSearch } from "../../catalog-terminology.js";
 import { hashLogIdentifier, loggedMutation } from "../../logging.js";
 import {
   attachImages as attachStoredImages,
@@ -86,6 +87,10 @@ const catalogNameConflictMessages: Record<string, string> = {
   pattern_name_case_insensitive_unique: "Pattern name already exists.",
   compatibility_family_maker_name_unique:
     "Compatibility family name already exists for this maker.",
+  catalog_terminology_alias_maker_concept_value_unique:
+    "Alias already exists for this maker and concept.",
+  catalog_terminology_alias_preferred_unique:
+    "A preferred alias already exists for this maker and concept.",
 };
 
 /**
@@ -110,6 +115,33 @@ export type CatalogProductType =
   | "slider-plate"
   | "spinner"
   | "spinner-button";
+
+/** Registered canonical namespace supported by catalog terminology. */
+export type CatalogTerminologyNamespace = "product-type";
+
+/** Maker-scoped catalog terminology alias exposed to clients. */
+export type CatalogTerminologyAlias = {
+  /** Registered canonical key named by the alias. */
+  canonicalKey: CatalogProductType;
+  /** Registered namespace containing the canonical key. */
+  canonicalNamespace: CatalogTerminologyNamespace;
+  /** Creation timestamp. */
+  createdAt: Date;
+  /** Database identifier. */
+  id: number;
+  /** Whether this is the maker's display term for the concept. */
+  isPreferred: boolean;
+  /** User-visible, non-localized catalog name. */
+  label: string;
+  /** Maker identifier scoping the alias. */
+  makerId: number;
+  /** Maker display name. */
+  makerName: string;
+  /** Stable comparison value. */
+  normalizedValue: string;
+  /** Last-updated timestamp. */
+  updatedAt: Date;
+};
 
 /**
  * Narrows a persisted product-type slug to the supported exhaustive union.
@@ -615,6 +647,26 @@ export type ProductWriteInput = {
  */
 export type CatalogService = {
   /**
+   * Creates an audited maker-scoped alias for a registered catalog concept.
+   *
+   * @param input - Alias label, maker, canonical concept, preference, and actor.
+   * @returns The created alias.
+   */
+  createTerminologyAlias(input: {
+    /** Authenticated catalog manager. */
+    actor: Actor;
+    /** Registered product-type key. */
+    canonicalKey: CatalogProductType;
+    /** Registered canonical namespace. */
+    canonicalNamespace: CatalogTerminologyNamespace;
+    /** Whether the alias is the maker's preferred display term. */
+    isPreferred: boolean;
+    /** Non-localized display label. */
+    label: string;
+    /** Maker identifier scoping the alias. */
+    makerId: number;
+  }): Promise<CatalogTerminologyAlias>;
+  /**
    * Creates a reviewed maker-scoped compatibility family.
    *
    * @param input - Family maker, name, slug, and authenticated catalog manager.
@@ -945,6 +997,12 @@ export type CatalogService = {
    * @rejects When the database query or operation logging fails.
    */
   listCompatibilityFamilies(): Promise<CatalogCompatibilityFamily[]>;
+  /**
+   * Lists maker-scoped terminology aliases ordered by label.
+   *
+   * @returns Registered terminology aliases.
+   */
+  listTerminologyAliases(): Promise<CatalogTerminologyAlias[]>;
   /**
    * Lists products.
    *
@@ -1888,6 +1946,81 @@ export function createCatalogService(
 ): CatalogService {
   return {
     /**
+     * Creates an audited maker-scoped catalog terminology alias.
+     *
+     * @param input - Alias concept, label, maker, preference, and actor.
+     * @returns Created terminology alias.
+     * @rejects When authorization, validation, persistence, auditing, or logging fails.
+     */
+    async createTerminologyAlias(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      if (input.canonicalNamespace !== "product-type")
+        throw new Error("Catalog terminology namespace is not registered.");
+      const canonicalKey = catalogProductType(input.canonicalKey);
+      const label = input.label.trim();
+      const normalizedValue = normalizeCatalogSearch(label);
+      if (!label || label.length > 80 || !normalizedValue)
+        throw new Error("Alias must be between 1 and 80 characters.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await loggedMutation(
+        logger,
+        loggerMessages.database.catalog.createTerminologyAlias,
+        () =>
+          db.transaction(async (tx) => {
+            const [makerRow] = await tx
+              .select({ id: schema.maker.id, name: schema.maker.name })
+              .from(schema.maker)
+              .where(eq(schema.maker.id, input.makerId))
+              .limit(1);
+            if (!makerRow) throw new Error("Maker does not exist.");
+            const [row] = await tx
+              .insert(schema.catalogTerminologyAlias)
+              .values({
+                canonicalKey,
+                canonicalNamespace: input.canonicalNamespace,
+                isPreferred: input.isPreferred,
+                label,
+                makerId: input.makerId,
+                normalizedValue,
+              })
+              .returning()
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create terminology alias.");
+            const result: CatalogTerminologyAlias = {
+              ...row,
+              canonicalKey,
+              canonicalNamespace: "product-type",
+              makerName: makerRow.name,
+            };
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: {
+                  canonicalKey,
+                  canonicalNamespace: "product-type",
+                  isPreferred: row.isPreferred,
+                  label: row.label,
+                  makerId: row.makerId,
+                  normalizedValue: row.normalizedValue,
+                },
+                definition: productAudit.terminologyAliasCreated,
+                targetId: row.id,
+              });
+            }
+            return result;
+          }),
+        actorAttributes(input.actor.clerkId, {
+          canonicalKey,
+          makerId: input.makerId,
+        }),
+      );
+    },
+    /**
      * Attaches images.
      *
      * @param input - Target, uploaded files, and authenticated actor.
@@ -2745,6 +2878,46 @@ export function createCatalogService(
               asc(schema.maker.name),
               asc(schema.compatibilityFamily.name),
             ),
+      );
+    },
+    /**
+     * Lists maker-scoped terminology aliases ordered by label.
+     *
+     * @returns Registered terminology aliases.
+     */
+    async listTerminologyAliases() {
+      return await logger.operation(
+        loggerMessages.database.catalog.listTerminologyAliases,
+        async () => {
+          const rows = await db
+            .select({
+              canonicalKey: schema.catalogTerminologyAlias.canonicalKey,
+              canonicalNamespace:
+                schema.catalogTerminologyAlias.canonicalNamespace,
+              createdAt: schema.catalogTerminologyAlias.createdAt,
+              id: schema.catalogTerminologyAlias.id,
+              isPreferred: schema.catalogTerminologyAlias.isPreferred,
+              label: schema.catalogTerminologyAlias.label,
+              makerId: schema.catalogTerminologyAlias.makerId,
+              makerName: schema.maker.name,
+              normalizedValue: schema.catalogTerminologyAlias.normalizedValue,
+              updatedAt: schema.catalogTerminologyAlias.updatedAt,
+            })
+            .from(schema.catalogTerminologyAlias)
+            .innerJoin(
+              schema.maker,
+              eq(schema.catalogTerminologyAlias.makerId, schema.maker.id),
+            )
+            .orderBy(
+              asc(schema.catalogTerminologyAlias.label),
+              asc(schema.maker.name),
+            );
+          return rows.map((row) => ({
+            ...row,
+            canonicalKey: catalogProductType(row.canonicalKey),
+            canonicalNamespace: "product-type" as const,
+          }));
+        },
       );
     },
     /**
