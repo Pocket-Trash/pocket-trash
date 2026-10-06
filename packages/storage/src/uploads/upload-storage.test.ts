@@ -114,6 +114,28 @@ describe("resource storage", () => {
     ).toBe("resources/preview/pr-52");
   });
 
+  it("creates isolated preview images as copy-on-write objects", () => {
+    const storage = createUploadStorage({
+      ...config,
+      imageFolderPrefix: "images/preview/pr-42",
+    });
+
+    expect(
+      storage.createImageTarget(
+        {
+          contentType: "image/png",
+          fileName: "replacement.png",
+          sha256: hash,
+          size: 3,
+        },
+        { entity: "products", entityId: 1000 },
+      ),
+    ).toMatchObject({
+      objectPath: `images/preview/pr-42/products/1000/${hash}.png`,
+      url: `https://cdn.pocket-trash.app/images/preview/pr-42/products/1000/${hash}.png?format=webp&quality=85`,
+    });
+  });
+
   it("uploads an allowed file without accepting an object path", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       expect(toUrl(input).href).toBe(

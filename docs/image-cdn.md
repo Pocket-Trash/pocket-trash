@@ -109,6 +109,12 @@ The API deploy workflow assigns the preview image prefix before Playwright:
 - Mutation-relevant PR previews get
   `BUNNY_IMAGE_FOLDER_PREFIX=images/preview/pr-<number>`; other previews use
   `images/preview`.
+- Preview seed rows reference immutable objects under `images/preview`.
+  Missing baseline objects are populated once from the reviewed import cache;
+  unchanged previews do not copy the full image set. These rows are marked as
+  storage-non-owned, so deleting or replacing them never queues the shared
+  object. Isolated-preview replacement uploads use the PR-specific prefix as
+  copy-on-write objects.
 - DB-changing PR scraper previews set `SCRAPER_CRON_ENABLED=true` because they
   need schema-aware scraping. PRs without DB changes set
   `SCRAPER_CRON_ENABLED=false`.

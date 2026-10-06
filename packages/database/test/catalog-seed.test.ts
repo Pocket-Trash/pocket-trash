@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  isSeedImageInTargetPrefix,
   loadKapedcSeedData,
   materialSlugForTerm,
   seedCatalog,
   seedColorEffects,
   seedColors,
   seedFinishes,
+  seedImageFolderPrefix,
+  seedKapedcImages,
   seedMakers,
   seedMaterials,
   seedProductTypes,
@@ -183,19 +184,88 @@ function createSeedDb() {
 }
 
 describe("catalog seed", () => {
-  it("recognizes images already copied into the target environment", () => {
-    expect(
-      isSeedImageInTargetPrefix(
-        "images/preview/products/1000/image.jpg",
-        "images/preview",
-      ),
-    ).toBe(true);
-    expect(
-      isSeedImageInTargetPrefix(
-        "images/preview/products/1000/image.jpg",
-        "images/preview/pr-158",
-      ),
-    ).toBe(false);
+  it("references shared immutable preview images without copying them", async () => {
+    const inserted: Array<Record<string, unknown>> = [];
+    const db = {
+      insert: vi.fn(() => ({
+        values: vi.fn(async (value: Record<string, unknown>) => {
+          inserted.push(value);
+        }),
+      })),
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({ where: vi.fn(async () => []) })),
+      })),
+      update: vi.fn(),
+    } as unknown as ReturnType<typeof createDb>;
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    const sha256 = "a".repeat(64);
+
+    const fixture = [
+      {
+        productId: 1000,
+        product: {
+          description: "Fixture",
+          images: [
+            {
+              cacheObjectPath: "imports/kapedc/1/image.png",
+              contentType: "image/png",
+              fileName: "image.png",
+              sha256,
+              size: 123,
+            },
+          ],
+          materialTerms: [],
+          name: "Fixture product",
+          slug: "fixture-product",
+          sourceUrl: "https://example.test/product",
+          type: "spinner" as const,
+        },
+      },
+    ];
+
+    try {
+      for (const previewNumber of [42, 43])
+        await seedKapedcImages(
+          db,
+          {
+            accessKey: "key",
+            cdnBaseUrl: "https://cdn.example.test",
+            endpoint: "https://storage.example.test",
+            imageFolderPrefix: `images/preview/pr-${previewNumber}`,
+            resourceFolderPrefix: `resources/preview/pr-${previewNumber}`,
+            zoneName: "zone",
+          },
+          fixture,
+        );
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+        `https://cdn.example.test/images/preview/products/1000/${sha256}.png`,
+      );
+      expect(fetchMock.mock.calls[0]?.[1]?.method).toBe("HEAD");
+      expect(String(fetchMock.mock.calls[1]?.[0])).toBe(
+        `https://cdn.example.test/images/preview/products/1000/${sha256}.png`,
+      );
+      expect(fetchMock.mock.calls[1]?.[1]?.method).toBe("HEAD");
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(seedImageFolderPrefix("images/preview/pr-42")).toBe(
+      "images/preview",
+    );
+    expect(inserted).toHaveLength(2);
+    for (const row of inserted)
+      expect(row).toEqual(
+        expect.objectContaining({
+          objectPath: `images/preview/products/1000/${sha256}.png`,
+          productId: 1000,
+          storageOwned: false,
+          uploadedByClerkId: null,
+          url: `https://cdn.example.test/images/preview/products/1000/${sha256}.png?format=webp&quality=85`,
+        }),
+      );
   });
 
   it("is idempotent and preserves the planned values", async () => {

@@ -38,6 +38,11 @@ describe("preview cleanup", () => {
       "https://storage.example/zone/images/preview/pr-52/",
       expect.objectContaining({ method: "DELETE" }),
     );
+    expect(
+      fetchMock.mock.calls.every(([url]) =>
+        /\/(images|resources)\/preview\/pr-52(?:\/|$)/u.test(String(url)),
+      ),
+    ).toBe(true);
   });
   it("rejects unsafe PRs and directory entries before deleting", async () => {
     const fetchMock = vi.fn<typeof fetch>(async () =>

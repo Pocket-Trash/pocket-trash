@@ -123,8 +123,25 @@ describe("catalog product persistence", () => {
           reason: "Ready for the catalog",
         }),
       ).resolves.toBe("approved");
+      const sharedPreviewUrl =
+        "https://cdn.example.test/images/preview/products/1000/shared.png?format=webp&quality=85";
+      await db.insert(schema.productImage).values({
+        contentType: "image/png",
+        fileName: "shared.png",
+        objectPath: "images/preview/products/1000/shared.png",
+        position: 0,
+        productId: created.id,
+        sha256: "a".repeat(64),
+        size: 1,
+        storageOwned: false,
+        url: sharedPreviewUrl,
+      });
       await expect(service.getProduct("spinner", "spinner")).resolves.toEqual(
-        expect.objectContaining({ approvalStatus: "approved", id: created.id }),
+        expect.objectContaining({
+          approvalStatus: "approved",
+          id: created.id,
+          images: [expect.objectContaining({ url: sharedPreviewUrl })],
+        }),
       );
       await expect(
         service.decideProductApproval({

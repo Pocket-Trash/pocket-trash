@@ -82,6 +82,7 @@ export async function assertNotPendingDeletion(db: StorageDb, path: string) {
 export async function queueObjectDeletions(db: StorageDb, paths: string[]) {
   for (const path of [...new Set(paths)].sort()) {
     await lockObjectPath(db, path);
+    if (!(await objectStorageIsOwned(db, path))) continue;
     const ownerClerkId = await erasableObjectOwner(db, path);
     await db.execute(
       sql`insert into storage_object_deletion(object_path, owner_clerk_id)
@@ -90,6 +91,28 @@ export async function queueObjectDeletions(db: StorageDb, paths: string[]) {
           coalesce(storage_object_deletion.owner_clerk_id, excluded.owner_clerk_id)`,
     );
   }
+}
+
+/**
+ * Reports whether the current database owns an object's storage lifecycle.
+ *
+ * Immutable preview seed images are attached to product records but owned by
+ * the shared preview baseline, so deleting a cloned record must not queue the
+ * shared object.
+ *
+ * @param db - Application database.
+ * @param path - Object-storage path to inspect.
+ * @returns Whether deletion may be owned by this database.
+ * @rejects When the ownership lookup fails.
+ */
+async function objectStorageIsOwned(db: StorageDb, path: string) {
+  const result = await db.execute<{
+    /** Explicit product-image storage ownership. */
+    storageOwned: boolean;
+  }>(
+    sql`select storage_owned as "storageOwned" from product_image where object_path = ${path} and not storage_owned limit 1`,
+  );
+  return result.rows.length === 0;
 }
 
 /**

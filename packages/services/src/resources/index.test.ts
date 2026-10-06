@@ -1099,6 +1099,8 @@ describe("resources service", () => {
             },
           ],
         };
+      if (text.includes("from product_image where object_path"))
+        return { rows: [] };
       return { rows: [{ id: 1000 }] };
     });
     const transaction = vi.fn(async (fn: (tx: unknown) => unknown) =>
