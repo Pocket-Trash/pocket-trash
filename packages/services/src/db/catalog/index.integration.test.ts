@@ -10,6 +10,79 @@ import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
 describe("catalog product persistence", () => {
+  it("normalizes, constrains, lists, and audits maker-scoped terminology aliases", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      const migrationsFolder = fileURLToPath(
+        new URL("../../../../database/drizzle", import.meta.url),
+      );
+      for (const file of readdirSync(migrationsFolder)
+        .filter((name) => name.endsWith(".sql"))
+        .sort()) {
+        await client.exec(
+          readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
+            "--> statement-breakpoint",
+            "",
+          ),
+        );
+      }
+      const [maker] = await db
+        .insert(schema.maker)
+        .values({ name: "Alias Maker" })
+        .returning({ id: schema.maker.id });
+      await db
+        .insert(schema.productType)
+        .values({ name: "Slider Insert", slug: "slider-insert" });
+      await db.insert(schema.user).values({ clerkId: "admin-alias" });
+      if (!maker) throw new Error("Alias fixtures were not created.");
+
+      const service = createDbServices(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      ).catalog;
+      const input = {
+        actor: { clerkId: "admin-alias", role: "admin" as const },
+        canonicalKey: "slider-insert" as const,
+        canonicalNamespace: "product-type" as const,
+        isPreferred: true,
+        label: "  CASSÉTTE  ",
+        makerId: maker.id,
+      };
+
+      await expect(service.createTerminologyAlias(input)).resolves.toEqual(
+        expect.objectContaining({
+          canonicalKey: "slider-insert",
+          label: "CASSÉTTE",
+          normalizedValue: "cassette",
+        }),
+      );
+      await expect(
+        service.createTerminologyAlias({
+          ...input,
+          isPreferred: false,
+          label: "cassette",
+        }),
+      ).rejects.toThrow("Alias already exists");
+      await expect(service.listTerminologyAliases()).resolves.toEqual([
+        expect.objectContaining({ makerName: "Alias Maker" }),
+      ]);
+
+      const events = await db.select().from(schema.auditEvent);
+      expect(events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: "products.terminology_alias.created",
+            permission: "products.manage",
+          }),
+        ]),
+      );
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("round-trips source details and enforces approval transitions", async () => {
     const client = new PGlite();
     const db = drizzle(client, { schema });
