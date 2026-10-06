@@ -8,6 +8,7 @@ import { type StorageDb, UploadSessionError } from "./types.js";
 
 /** Maps persisted file kinds to their attachment tables and owning target types. */
 export const fileRecords = {
+  material_image: { ...imageTargets.material, targetType: "material" },
   product_image: { ...imageTargets.product, targetType: "product" },
   collection_image: { ...imageTargets.collection, targetType: "collection" },
   collection_item_image: {

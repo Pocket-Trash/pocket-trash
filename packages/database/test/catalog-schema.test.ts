@@ -15,6 +15,8 @@ describe("catalog schema", () => {
     );
     const product = getTableConfig(schema.product);
     const productMaterial = getTableConfig(schema.productMaterial);
+    const material = getTableConfig(schema.material);
+    const materialImage = getTableConfig(schema.materialImage);
     const maker = getTableConfig(schema.maker);
     const productType = getTableConfig(schema.productType);
     const finishOption = getTableConfig(schema.finishOption);
@@ -41,6 +43,30 @@ describe("catalog schema", () => {
       "updated_at",
     ]);
     expect(productMaterial.primaryKeys).toHaveLength(1);
+    expect(productMaterial.indexes.map(({ config }) => config.name)).toContain(
+      "product_material_material_id_idx",
+    );
+    expect(
+      material.columns.find(({ name }) => name === "description")?.notNull,
+    ).toBe(false);
+    expect(material.checks.map(({ name }) => name)).toContain(
+      "materials_description_length_valid",
+    );
+    expect(materialImage.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "material_id",
+        "position",
+        "sha256",
+        "object_path",
+        "uploaded_by_clerk_id",
+        "deleted_at",
+        "deleted_by_clerk_id",
+        "deleted_by_role",
+      ]),
+    );
+    expect(materialImage.indexes.map(({ config }) => config.name)).toContain(
+      "material_image_material_id_idx",
+    );
     expect(color.columns.find(({ name }) => name === "hex")?.notNull).toBe(
       true,
     );
@@ -78,6 +104,9 @@ describe("catalog schema", () => {
       collectionItem.columns.find(({ name }) => name === "description")
         ?.notNull,
     ).toBe(false);
+    expect(collectionItem.indexes.map(({ config }) => config.name)).toContain(
+      "collection_item_material_public_idx",
+    );
     expect(
       product.columns.find(({ name }) => name === "maker_product_url_valid")
         ?.hasDefault,

@@ -589,6 +589,7 @@ export const MarkdownEditor = React.forwardRef<
           aria-orientation="horizontal"
           className="flex min-w-0 flex-nowrap gap-0.5 overflow-x-auto border-b border-input p-1"
           role="toolbar"
+          tabIndex={0}
         >
           {toolbarActions.map(({ format, icon: Icon, label: labelKey }) => (
             <Button

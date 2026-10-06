@@ -222,6 +222,20 @@ describe("account database erasure", () => {
         await row(
           client,
           `
+          select uploaded_by_clerk_id as "uploadedByClerkId",
+            deleted_by_clerk_id as "deletedByClerkId", deleted_by_role as "deletedByRole"
+          from material_image where file_name = 'preserved-material.png'
+        `,
+        ),
+      ).toEqual({
+        deletedByClerkId: null,
+        deletedByRole: "admin",
+        uploadedByClerkId: null,
+      });
+      expect(
+        await row(
+          client,
+          `
           select purchased_from_user_id as "purchasedFromUserId",
             purchased_from_user as "purchasedFromUser",
             sold_to_user_id as "soldToUserId", sold_to_user as "soldToUser",
@@ -488,6 +502,16 @@ async function seedInventory(client: PGlite) {
       'preserved-product.png', 'image/png', 10, repeat('a', 64),
       'images/products/preserved.png', 'https://cdn.test/products/preserved.png',
       'user_to_erase', now(), 'user_to_erase', 'owner'
+    );
+    insert into material_image (
+      material_id, position, file_name, content_type, size, sha256,
+      object_path, url, uploaded_by_clerk_id, deleted_at,
+      deleted_by_clerk_id, deleted_by_role
+    ) values (
+      (select id from materials where slug = 'metal'), 0,
+      'preserved-material.png', 'image/png', 10, repeat('f', 64),
+      'images/materials/metal.png', 'https://cdn.test/materials/metal.png',
+      'user_to_erase', now(), 'user_to_erase', 'admin'
     );
 
     insert into user_collection (owner_id, name, normalized_name, is_private)

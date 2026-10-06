@@ -6,6 +6,7 @@ import {
 } from "@pocket-trash/localizations";
 import {
   Bell,
+  Boxes,
   Flag,
   MessageSquare,
   ScrollText,
@@ -22,7 +23,13 @@ import {
 import { useLocale } from "@/providers/locale-provider";
 
 /** Administrator navigation section identifiers. */
-type AdminSection = "audit" | "feedback" | "notifications" | "trash" | "users";
+type AdminSection =
+  | "audit"
+  | "feedback"
+  | "materials"
+  | "notifications"
+  | "trash"
+  | "users";
 /** Content and active navigation state for an administrator page. */
 type AdminPageShellProps = Pick<AppShellProps, "breadcrumbItems" | "title"> & {
   /** Page content rendered beside the administrator navigation. */
@@ -79,6 +86,7 @@ function AdminSidebar({
   const { sessionClaims, userId } = useAuth();
   const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
   const canManageFeedback = hasPermission(actor, "feedback.manage");
+  const canManageMaterials = hasPermission(actor, "products.manage");
   const canManageResources = hasPermission(actor, "resources.manage");
   const canManageCatalog =
     hasPermission(actor, "products.manage") ||
@@ -112,6 +120,16 @@ function AdminSidebar({
             active: section === "audit",
             label: t("web.admin.audit.title"),
             to: "/admin/audit" as const,
+          },
+        ]
+      : []),
+    ...(canManageMaterials
+      ? [
+          {
+            icon: Boxes,
+            active: section === "materials",
+            label: t("web.admin.hub.materials"),
+            to: "/admin/materials" as const,
           },
         ]
       : []),

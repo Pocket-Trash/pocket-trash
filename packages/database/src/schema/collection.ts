@@ -23,6 +23,7 @@ export const catalogDeletionRoles = ["owner", "admin"] as const;
 /** Catalog entity types that can own an image. */
 export const catalogImageTargetTypes = [
   "product",
+  "material",
   "collection",
   "collection_item",
 ] as const;
@@ -156,6 +157,12 @@ export const collectionItem = pgTable(
       table.approvalStatus,
       table.isPrivate,
     ),
+    index("collection_item_material_public_idx").on(
+      table.materialId,
+      table.owned,
+      table.approvalStatus,
+      table.isPrivate,
+    ),
     check(
       "collection_item_approval_status_valid",
       sql`${table.approvalStatus} in ('pending', 'approved', 'rejected')`,
@@ -175,6 +182,56 @@ export const collectionItem = pgTable(
     check(
       "collection_item_description_length_valid",
       sql`${table.description} is null or char_length(${table.description}) <= 5000`,
+    ),
+  ],
+);
+
+/** Ordered, soft-deletable images attached to a shared material. */
+export const materialImage = pgTable(
+  "material_image",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    materialId: bigint("material_id", { mode: "number" })
+      .notNull()
+      .references(() => material.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    fileName: text("file_name").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    sha256: text("sha256").notNull(),
+    storageProvider: text("storage_provider").default("bunny").notNull(),
+    objectPath: text("object_path").notNull(),
+    url: text("url").notNull(),
+    uploadedByClerkId: text("uploaded_by_clerk_id"),
+    deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
+    deletedByClerkId: text("deleted_by_clerk_id"),
+    deletedByRole: text("deleted_by_role", { enum: catalogDeletionRoles }),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("material_image_material_id_idx").on(table.materialId),
+    unique("material_image_object_path_unique").on(table.objectPath),
+    unique("material_image_material_hash_unique").on(
+      table.materialId,
+      table.sha256,
+    ),
+    check("material_image_position_valid", sql`${table.position} >= 0`),
+    check("material_image_size_positive", sql`${table.size} > 0`),
+    check(
+      "material_image_sha256_valid",
+      sql`${table.sha256} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "material_image_deletion_metadata_consistent",
+      sql`(${table.deletedAt} is null and ${table.deletedByClerkId} is null and ${table.deletedByRole} is null) or (${table.deletedAt} is not null and ${table.deletedByRole} is not null)`,
+    ),
+    check(
+      "material_image_deleted_by_role_valid",
+      sql`${table.deletedByRole} is null or ${table.deletedByRole} in ('owner', 'admin')`,
     ),
   ],
 );
@@ -410,7 +467,10 @@ export const productMaterial = pgTable(
       .notNull()
       .references(() => material.id, { onDelete: "restrict" }),
   },
-  (table) => [primaryKey({ columns: [table.productId, table.materialId] })],
+  (table) => [
+    primaryKey({ columns: [table.productId, table.materialId] }),
+    index("product_material_material_id_idx").on(table.materialId),
+  ],
 );
 
 /**

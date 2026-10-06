@@ -23,6 +23,8 @@ export type {
   AdminFeedbackPage,
   AdminFeedbackSort,
   AdminFeedbackSortField,
+  AdminMaterial,
+  AdminMaterialSummary,
   ApprovedErasureExceptionCode,
   AuditDeliveryFailure,
   AuditEventCursor,

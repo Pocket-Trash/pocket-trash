@@ -11,6 +11,7 @@ import {
   finishOption,
   finishOptionColor,
   finishOptionFinish,
+  materialImage,
   product,
   productImage,
   productMaterial,
@@ -213,7 +214,16 @@ export const makersRelations = relations(maker, ({ many }) => ({
 export const materialsRelations = relations(material, ({ many }) => ({
   autmogPens: many(tmpAutmogPenMaterials),
   collectionItems: many(collectionItem),
+  images: many(materialImage),
   products: many(productMaterial),
+}));
+
+/** Connects a material image to its shared material. */
+export const materialImageRelations = relations(materialImage, ({ one }) => ({
+  material: one(material, {
+    fields: [materialImage.materialId],
+    references: [material.id],
+  }),
 }));
 
 /** Connects a mechanism to staged Autmog pens. */

@@ -186,6 +186,100 @@ describe("catalog product persistence", () => {
           spinDiameterMm: "54",
         }),
       );
+
+      const carbon = await service.createMaterial({
+        actor: { clerkId: "admin-test", role: "admin" },
+        description: "Lightweight composite.",
+        name: "Carbon Fiber",
+      });
+      const carbonCollision = await service.createMaterial({
+        actor: { clerkId: "admin-test", role: "admin" },
+        description: null,
+        name: "Carbon/Fiber",
+      });
+      expect(carbon).toEqual(
+        expect.objectContaining({
+          description: "Lightweight composite.",
+          slug: "carbon-fiber",
+        }),
+      );
+      expect(carbonCollision.slug).toBe("carbon-fiber-2");
+
+      const renamed = await service.updateMaterial({
+        actor: { clerkId: "admin-test", role: "admin" },
+        description: null,
+        materialId: carbon.id,
+        name: "Forged Carbon",
+      });
+      expect(renamed).toEqual(
+        expect.objectContaining({
+          description: null,
+          name: "Forged Carbon",
+          slug: "carbon-fiber",
+        }),
+      );
+      await service.attachImages({
+        actor: { clerkId: "admin-test", role: "admin" },
+        files: [
+          {
+            contentType: "image/png",
+            fileName: "carbon.png",
+            kind: "image",
+            objectPath: `images/materials/${carbon.id}/carbon.png`,
+            position: 0,
+            sha256: "a".repeat(64),
+            size: 10,
+            url: `https://cdn.test/materials/${carbon.id}/carbon.png`,
+          },
+        ],
+        target: { id: carbon.id, type: "material" },
+      });
+      const withImage = await service.getAdminMaterial(carbon.id, {
+        clerkId: "admin-test",
+        role: "admin",
+      });
+      const imageId = withImage?.images[0]?.id;
+      expect(imageId).toEqual(expect.any(Number));
+      if (!imageId) throw new Error("Material image was not created.");
+      await service.softDeleteImage({
+        actor: { clerkId: "admin-test", role: "admin" },
+        imageId,
+        targetType: "material",
+      });
+      expect(
+        (
+          await service.getAdminMaterial(carbon.id, {
+            clerkId: "admin-test",
+            role: "admin",
+          })
+        )?.images[0]?.deletedAt,
+      ).toEqual(expect.any(Date));
+      await service.restoreImage({
+        actor: { clerkId: "admin-test", role: "admin" },
+        imageId,
+        targetType: "material",
+      });
+      expect(
+        (
+          await service.getAdminMaterial(carbon.id, {
+            clerkId: "admin-test",
+            role: "admin",
+          })
+        )?.images[0]?.deletedAt,
+      ).toBeNull();
+      await expect(
+        service.getAdminMaterial(carbon.id, {
+          clerkId: "user-test",
+          role: "user",
+        }),
+      ).rejects.toThrow("Material does not exist.");
+      await expect(
+        service.listAdminMaterials({ clerkId: "admin-test", role: "admin" }),
+      ).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: carbon.id, slug: "carbon-fiber" }),
+        ]),
+      );
     } finally {
       await client.close();
     }

@@ -9,6 +9,14 @@ import {
 } from "./types.js";
 /** Maps image-upload targets to their ownership and persistence tables. */
 export const imageTargets = {
+  material: {
+    table: "material_image",
+    column: "material_id",
+    entity: "materials",
+    softDelete: true,
+    owner: sql`select null::text as owner from materials where id =`,
+    parent: "materials",
+  },
   product: {
     table: "product_image",
     column: "product_id",
@@ -77,7 +85,7 @@ export async function assertCanEditTarget(
       : sql`${imageTargets[target.type].owner} ${target.id}`;
   const result = await db.execute<{
     /** Clerk identifier of the target owner. */
-    owner: string;
+    owner: string | null;
   }>(query);
   if (
     !result.rows[0] ||
@@ -95,7 +103,7 @@ export async function assertCanEditTarget(
  */
 function permissionFor(target: UploadTarget["type"]): Permission {
   if (target === "resource") return "resources.manage";
-  if (target === "product") return "products.manage";
+  if (target === "product" || target === "material") return "products.manage";
   return "collections.manage";
 }
 /**

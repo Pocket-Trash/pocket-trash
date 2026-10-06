@@ -104,6 +104,8 @@ export {
 } from "./audit/index.js";
 
 export type {
+  AdminMaterial,
+  AdminMaterialSummary,
   CatalogApprovalAction,
   CatalogApprovalStatus,
   CatalogColor,
