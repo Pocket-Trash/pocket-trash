@@ -86,12 +86,16 @@ function option(
  */
 function item(finishOptions: CatalogFinishOption[]): FilterableCatalogItem {
   return {
+    compatibilityFamilies: [],
     finishOptions,
     makerId: 100,
     makerName: "Maker",
     materials: [lookup(10, "Titanium")],
+    patterns: [],
+    plateComponents: [],
     productTypeName: "Spinner",
     productTypeSlug: "spinner",
+    spinnerButtonComponents: [],
   };
 }
 
@@ -166,11 +170,15 @@ describe("catalog filters", () => {
       type: "spinner",
     });
     expect(search).toEqual({
+      button: undefined,
       color: [2, 1],
       fade: ["1.2"],
+      family: undefined,
       finish: undefined,
       maker: undefined,
       material: undefined,
+      pattern: undefined,
+      plate: undefined,
       q: "CASSÉTTE",
       strict: true,
       type: "spinner",
@@ -216,5 +224,94 @@ describe("catalog filters", () => {
     ]);
     expect(facets.materials.map(({ name }) => name)).toEqual(["Titanium"]);
     expect(facets.colors.map(({ name }) => name)).toEqual(["Blue"]);
+  });
+
+  it("matches pattern and family facets only from the displayed item", () => {
+    const candidate = {
+      ...item([option([blue])]),
+      compatibilityFamilies: [lookup(301, "Small family")],
+      patterns: [lookup(201, "Ripple")],
+    };
+
+    expect(
+      matchesCatalogFilters(candidate, {
+        ...emptyCatalogFilters(),
+        compatibilityFamilyIds: [301],
+        patternIds: [201],
+      }),
+    ).toBe(true);
+    expect(
+      matchesCatalogFilters(candidate, {
+        ...emptyCatalogFilters(),
+        compatibilityFamilyIds: [999],
+      }),
+    ).toBe(false);
+  });
+
+  it("matches exact components only on qualifying parent assemblies", () => {
+    const slider = {
+      ...item([]),
+      plateComponents: [lookup(401, "V2 plate")],
+      productTypeName: "Slider",
+      productTypeSlug: "slider",
+    };
+    const standalonePlate = {
+      ...item([]),
+      productTypeName: "Slider plate",
+      productTypeSlug: "slider-plate",
+    };
+    const spinner = {
+      ...item([]),
+      productTypeName: "Spinner",
+      productTypeSlug: "spinner",
+      spinnerButtonComponents: [lookup(501, "Soft click button")],
+    };
+
+    expect(
+      matchesCatalogFilters(slider, {
+        ...emptyCatalogFilters(),
+        plateIds: [401],
+      }),
+    ).toBe(true);
+    expect(
+      matchesCatalogFilters(standalonePlate, {
+        ...emptyCatalogFilters(),
+        plateIds: [401],
+      }),
+    ).toBe(false);
+    expect(
+      matchesCatalogFilters(spinner, {
+        ...emptyCatalogFilters(),
+        spinnerButtonIds: [501],
+      }),
+    ).toBe(true);
+  });
+
+  it("counts and round-trips the dedicated discovery facets", () => {
+    const candidate = {
+      ...item([]),
+      compatibilityFamilies: [lookup(301, "Small family")],
+      patterns: [lookup(201, "Ripple")],
+      plateComponents: [lookup(401, "V2 plate")],
+      spinnerButtonComponents: [lookup(501, "Soft click button")],
+    };
+    const facets = buildCatalogFacets([candidate], null);
+    expect(facets.patterns).toMatchObject([{ id: 201, count: 1 }]);
+    expect(facets.compatibilityFamilies).toMatchObject([{ id: 301, count: 1 }]);
+    expect(facets.plates).toMatchObject([{ id: 401, count: 1 }]);
+    expect(facets.spinnerButtons).toMatchObject([{ id: 501, count: 1 }]);
+
+    const search = parseCatalogFilterSearch({
+      button: "501",
+      family: "301",
+      pattern: "201",
+      plate: "401",
+    });
+    expect(filtersToSearch(filtersFromSearch(search))).toMatchObject({
+      button: [501],
+      family: [301],
+      pattern: [201],
+      plate: [401],
+    });
   });
 });

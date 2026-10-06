@@ -10,6 +10,8 @@ import type {
  * Normalized catalog filter selections used by in-memory matching.
  */
 export type CatalogFilters = {
+  /** Selected exact spinner-button product identifiers. */
+  spinnerButtonIds: number[];
   /**
    * Selected color identifiers.
    */
@@ -22,6 +24,8 @@ export type CatalogFilters = {
    * Selected finish identifiers.
    */
   finishIds: number[];
+  /** Selected reviewed compatibility-family identifiers. */
+  compatibilityFamilyIds: number[];
   /**
    * Selected maker identifiers.
    */
@@ -30,6 +34,10 @@ export type CatalogFilters = {
    * Selected material identifiers.
    */
   materialIds: number[];
+  /** Selected exact slider-plate product identifiers. */
+  plateIds: number[];
+  /** Selected appearance-pattern identifiers. */
+  patternIds: number[];
   /**
    * Selected product type, or `null` for all types.
    */
@@ -46,6 +54,8 @@ export type CatalogFilters = {
  * Optional URL-search representation of catalog filter selections.
  */
 export type CatalogFilterSearch = {
+  /** Exact spinner-button product identifiers encoded in URL search. */
+  button?: number[];
   /** Normalized free-text query encoded in URL search. */
   q?: string;
   /**
@@ -60,6 +70,8 @@ export type CatalogFilterSearch = {
    * Finish identifiers encoded in URL search.
    */
   finish?: number[];
+  /** Compatibility-family identifiers encoded in URL search. */
+  family?: number[];
   /**
    * Maker identifiers encoded in URL search.
    */
@@ -68,6 +80,10 @@ export type CatalogFilterSearch = {
    * Material identifiers encoded in URL search.
    */
   material?: number[];
+  /** Appearance-pattern identifiers encoded in URL search. */
+  pattern?: number[];
+  /** Exact slider-plate product identifiers encoded in URL search. */
+  plate?: number[];
   /**
    * Whether each filter group must contain every selected value.
    */
@@ -82,6 +98,8 @@ export type CatalogFilterSearch = {
  * Product fields required for catalog facet construction and matching.
  */
 export type FilterableCatalogItem = {
+  /** Live compatibility families on the displayed product or item. */
+  compatibilityFamilies: CatalogLookup[];
   /**
    * Finish configurations available for the item.
    */
@@ -98,6 +116,10 @@ export type FilterableCatalogItem = {
    * Available materials.
    */
   materials: CatalogLookup[];
+  /** Exact plate products included with or installed on a parent slider. */
+  plateComponents: CatalogLookup[];
+  /** Patterns offered by a product or selected on an owned item. */
+  patterns: CatalogLookup[];
   /**
    * Product-type display name.
    */
@@ -106,6 +128,8 @@ export type FilterableCatalogItem = {
    * Product-type route slug.
    */
   productTypeSlug: string;
+  /** Exact button products included with or installed on a parent spinner. */
+  spinnerButtonComponents: CatalogLookup[];
 };
 
 /**
@@ -146,6 +170,8 @@ export type CatalogFacets = {
    * Available individual colors.
    */
   colors: CatalogFacet<CatalogFinishOption["colors"][number]>[];
+  /** Available reviewed compatibility families. */
+  compatibilityFamilies: CatalogFacet[];
   /**
    * Available canonical fade color sets.
    */
@@ -171,6 +197,10 @@ export type CatalogFacets = {
    * Available materials.
    */
   materials: CatalogFacet[];
+  /** Available appearance patterns. */
+  patterns: CatalogFacet[];
+  /** Available exact slider plates represented by parent assemblies. */
+  plates: CatalogFacet[];
   /**
    * Available product types.
    */
@@ -184,6 +214,8 @@ export type CatalogFacets = {
     /** Stable URL slug. */
     slug: string;
   }>;
+  /** Available exact spinner buttons represented by parent assemblies. */
+  spinnerButtons: CatalogFacet[];
 };
 
 /**
@@ -192,11 +224,15 @@ export type CatalogFacets = {
  * @returns A fresh empty catalog-filter object.
  */
 export const emptyCatalogFilters = (): CatalogFilters => ({
+  compatibilityFamilyIds: [],
+  spinnerButtonIds: [],
   colorIds: [],
   fadeColorSets: [],
   finishIds: [],
   makerIds: [],
   materialIds: [],
+  patternIds: [],
+  plateIds: [],
   productType: null,
   query: "",
   strict: false,
@@ -223,11 +259,15 @@ export function parseCatalogFilterSearch(
     )
     .filter((value) => value.split(".").length >= 2);
   return {
+    button: numbers(search.button),
     color: numbers(search.color),
     fade: fade.length ? [...new Set(fade)] : undefined,
     finish: numbers(search.finish),
+    family: numbers(search.family),
     maker: numbers(search.maker),
     material: numbers(search.material),
+    pattern: numbers(search.pattern),
+    plate: numbers(search.plate),
     q:
       typeof search.q === "string" && search.q.trim()
         ? search.q.trim().slice(0, 120)
@@ -246,6 +286,8 @@ export function parseCatalogFilterSearch(
  */
 export function filtersFromSearch(search: CatalogFilterSearch): CatalogFilters {
   return {
+    compatibilityFamilyIds: search.family ?? [],
+    spinnerButtonIds: search.button ?? [],
     colorIds: search.color ?? [],
     fadeColorSets: (search.fade ?? []).map((value) =>
       value.split(".").map(Number),
@@ -253,6 +295,8 @@ export function filtersFromSearch(search: CatalogFilterSearch): CatalogFilters {
     finishIds: search.finish ?? [],
     makerIds: search.maker ?? [],
     materialIds: search.material ?? [],
+    patternIds: search.pattern ?? [],
+    plateIds: search.plate ?? [],
     productType: search.type ?? null,
     query: search.q ?? "",
     strict: search.strict ?? false,
@@ -267,13 +311,21 @@ export function filtersFromSearch(search: CatalogFilterSearch): CatalogFilters {
  */
 export function filtersToSearch(filters: CatalogFilters): CatalogFilterSearch {
   return {
+    button: filters.spinnerButtonIds.length
+      ? filters.spinnerButtonIds
+      : undefined,
     color: filters.colorIds.length ? filters.colorIds : undefined,
     fade: filters.fadeColorSets.length
       ? filters.fadeColorSets.map(fadeKey)
       : undefined,
     finish: filters.finishIds.length ? filters.finishIds : undefined,
+    family: filters.compatibilityFamilyIds.length
+      ? filters.compatibilityFamilyIds
+      : undefined,
     maker: filters.makerIds.length ? filters.makerIds : undefined,
     material: filters.materialIds.length ? filters.materialIds : undefined,
+    pattern: filters.patternIds.length ? filters.patternIds : undefined,
+    plate: filters.plateIds.length ? filters.plateIds : undefined,
     q: filters.query.trim() || undefined,
     strict: filters.strict ? true : undefined,
     type: filters.productType ?? undefined,
@@ -295,6 +347,10 @@ export function hasCatalogFilters(filters: CatalogFilters): boolean {
     filters.colorIds.length > 0 ||
     filters.fadeColorSets.length > 0 ||
     filters.makerIds.length > 0 ||
+    filters.patternIds.length > 0 ||
+    filters.compatibilityFamilyIds.length > 0 ||
+    filters.plateIds.length > 0 ||
+    filters.spinnerButtonIds.length > 0 ||
     filters.strict
   );
 }
@@ -354,8 +410,15 @@ export function pruneCatalogFilters(
       fadeKeys.has(fadeKey(colors)),
     ),
     finishIds: allowed(filters.finishIds, facets.finishes),
+    compatibilityFamilyIds: allowed(
+      filters.compatibilityFamilyIds,
+      facets.compatibilityFamilies,
+    ),
     makerIds: allowed(filters.makerIds, facets.makers),
     materialIds: allowed(filters.materialIds, facets.materials),
+    patternIds: allowed(filters.patternIds, facets.patterns),
+    plateIds: allowed(filters.plateIds, facets.plates),
+    spinnerButtonIds: allowed(filters.spinnerButtonIds, facets.spinnerButtons),
   };
 }
 
@@ -368,25 +431,107 @@ export function pruneCatalogFilters(
 export function productFilterItem(
   product: CatalogProduct,
 ): FilterableCatalogItem {
-  return product;
+  return {
+    compatibilityFamilies: product.compatibilityFamilies,
+    finishOptions: product.finishOptions,
+    makerId: product.makerId,
+    makerName: product.makerName,
+    materials: product.materials,
+    patterns: product.finishOptions.flatMap(({ pattern }) =>
+      pattern ? [pattern] : [],
+    ),
+    plateComponents:
+      product.productTypeSlug === "slider"
+        ? product.includedComponents.filter(
+            ({ productTypeSlug }) => productTypeSlug === "slider-plate",
+          )
+        : [],
+    productTypeName: product.productTypeName,
+    productTypeSlug: product.productTypeSlug,
+    spinnerButtonComponents:
+      product.productTypeSlug === "spinner" &&
+      product.compatibleButtonId !== null &&
+      product.compatibleButtonName
+        ? [
+            {
+              id: product.compatibleButtonId,
+              name: product.compatibleButtonName,
+              slug: String(product.compatibleButtonId),
+            },
+          ]
+        : [],
+  };
 }
 
 /**
  * Adapts a collection item to the fields required for catalog filtering.
  *
  * @param item - Collection item to adapt.
+ * @param items - Visible items used to resolve installed component products.
  * @returns The adapted filterable collection item.
  */
 export function collectionFilterItem(
   item: UserCollectionItem,
+  items: UserCollectionItem[] = [item],
 ): FilterableCatalogItem {
+  const itemsById = new Map(
+    items.map((candidate) => [candidate.collectionItemId, candidate]),
+  );
+  const installedPlate = item.installedPlateId
+    ? itemsById.get(item.installedPlateId)
+    : null;
+  const installedButton = item.installedButtonId
+    ? itemsById.get(item.installedButtonId)
+    : null;
   return {
+    compatibilityFamilies: item.compatibilityFamilies ?? [],
     finishOptions: item.finishOption ? [item.finishOption] : [],
     makerId: item.makerId,
     makerName: item.makerName,
     materials: item.material ? [item.material] : [],
+    patterns: item.finishOption?.pattern ? [item.finishOption.pattern] : [],
+    plateComponents:
+      item.productTypeSlug === "slider"
+        ? [
+            ...(item.includedComponents ?? []).filter(
+              ({ productTypeSlug }) => productTypeSlug === "slider-plate",
+            ),
+            ...(installedPlate
+              ? [
+                  {
+                    id: installedPlate.productId,
+                    name: installedPlate.name,
+                    slug: installedPlate.productSlug,
+                  },
+                ]
+              : []),
+          ]
+        : [],
     productTypeName: item.productTypeName,
     productTypeSlug: item.productTypeSlug,
+    spinnerButtonComponents:
+      item.productTypeSlug === "spinner"
+        ? [
+            ...(item.compatibleButtonId && item.compatibleButtonName
+              ? [
+                  {
+                    id: item.compatibleButtonId,
+                    name: item.compatibleButtonName,
+                    slug: String(item.compatibleButtonId),
+                  },
+                ]
+              : []),
+            ...(installedButton
+              ? [
+                  {
+                    id: installedButton.productId,
+                    name: installedButton.name,
+                    slug: installedButton.productSlug,
+                  },
+                ]
+              : []),
+          ]
+        : [],
   };
 }
 
@@ -408,6 +553,30 @@ export function matchesCatalogFilters(
     return false;
   }
   if (!matchesIds([item.makerId], filters.makerIds, filters.strict)) {
+    return false;
+  }
+  if (
+    !matchesIds(
+      item.patterns.map(({ id }) => id),
+      filters.patternIds,
+      filters.strict,
+    ) ||
+    !matchesIds(
+      item.compatibilityFamilies.map(({ id }) => id),
+      filters.compatibilityFamilyIds,
+      filters.strict,
+    ) ||
+    !matchesIds(
+      item.plateComponents.map(({ id }) => id),
+      filters.plateIds,
+      filters.strict,
+    ) ||
+    !matchesIds(
+      item.spinnerButtonComponents.map(({ id }) => id),
+      filters.spinnerButtonIds,
+      filters.strict,
+    )
+  ) {
     return false;
   }
   if (
@@ -446,6 +615,10 @@ export function buildCatalogFacets(
     ? items.filter((item) => item.productTypeSlug === productType)
     : items;
   const materials = new Map<number, CatalogFacet>();
+  const patterns = new Map<number, CatalogFacet>();
+  const compatibilityFamilies = new Map<number, CatalogFacet>();
+  const plates = new Map<number, CatalogFacet>();
+  const spinnerButtons = new Map<number, CatalogFacet>();
   const finishes = new Map<number, CatalogFacet>();
   const colors = new Map<
     number,
@@ -512,6 +685,10 @@ export function buildCatalogFacets(
 
   for (const item of scoped) {
     incrementUnique(materials, item.materials);
+    incrementUnique(patterns, item.patterns);
+    incrementUnique(compatibilityFamilies, item.compatibilityFamilies);
+    incrementUnique(plates, item.plateComponents);
+    incrementUnique(spinnerButtons, item.spinnerButtonComponents);
     incrementUnique(
       finishes,
       item.finishOptions.flatMap(({ finishes: values }) => values),
@@ -548,6 +725,7 @@ export function buildCatalogFacets(
 
   return {
     colors: sortFacets(colors.values()),
+    compatibilityFamilies: sortFacets(compatibilityFamilies.values()),
     fades: [...fades.entries()]
       .map(([key, value]) => ({
         colors:
@@ -568,9 +746,12 @@ export function buildCatalogFacets(
         right.count - left.count || left.name.localeCompare(right.name),
     ),
     materials: sortFacets(materials.values()),
+    patterns: sortFacets(patterns.values()),
+    plates: sortFacets(plates.values()),
     productTypes: [...productTypes.values()].sort((left, right) =>
       left.name.localeCompare(right.name),
     ),
+    spinnerButtons: sortFacets(spinnerButtons.values()),
   };
 }
 
