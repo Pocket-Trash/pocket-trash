@@ -854,9 +854,9 @@ describe("CollectionItemDetailPage", () => {
       />,
     );
 
-    expect(html).toContain("web.slider.setup.notRecorded");
+    expect(html).toContain("Not recorded");
     expect(html).toContain("Owner layout");
-    expect(html).toContain("web.slider.magnet.state.unknown");
+    expect(html).toContain("Unknown");
   });
 
   it("uses an insert's live advertised default until its owner records a setup", () => {
@@ -896,7 +896,9 @@ describe("CollectionItemDetailPage", () => {
       />,
     );
 
-    expect(html).toContain("web.slider.setup.defaultDescription");
+    expect(html).toContain(
+      "The live setup advertised by the catalog. It does not create a saved custom setup.",
+    );
     expect(html).toContain("Advertised layout");
     expect(html).toContain("5");
   });
