@@ -58,6 +58,8 @@ export async function collectionItemDeletionState(
       'installedButtonId', spinner.installed_button_id, 'bearing', spinner.bearing,
       'productSpinnerButtonId', button.product_spinner_button_id,
       'productSliderId', slider.product_slider_id,
+      'installedPlateId', slider.installed_plate_id,
+      'installedInsertId', slider.installed_insert_id,
       'productSliderPlateId', slider_plate.product_slider_plate_id,
       'productSliderInsertId', slider_insert.product_slider_insert_id,
       'finishOptions', coalesce((
