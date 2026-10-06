@@ -770,8 +770,8 @@ describe("CollectionItemDetailPage", () => {
       />,
     );
 
-    expect(html).toContain("web.slider.capability.bodyHosted");
-    expect(html).toContain("web.slider.setup.title");
+    expect(html).toContain("Body-hosted");
+    expect(html).toContain("Magnet setup");
     expect(html).toContain("Documented by the maker.");
     expect(html).toContain("40 mm");
     expect(html).toContain("12 mm");
