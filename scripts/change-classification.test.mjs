@@ -70,6 +70,10 @@ test("classifies representative application paths", () => {
       ["web", "preview", "safe_e2e", "mutation_e2e", "validation"],
     ],
     [
+      "apps/web/e2e/local/maker-pagination.spec.ts",
+      ["web", "safe_e2e", "validation"],
+    ],
+    [
       "apps/web/e2e/public.spec.ts",
       ["web", "preview", "safe_e2e", "validation"],
     ],

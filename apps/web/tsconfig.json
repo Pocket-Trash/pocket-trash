@@ -12,9 +12,11 @@
     ".storybook/**/*.ts",
     "__mocks__/**/*.js",
     "e2e",
+    "playwright.local.config.ts",
     "playwright.config.ts",
     "src",
     "vite.config.ts",
+    "vite.local-e2e.config.ts",
     "vitest.config.ts"
   ]
 }
