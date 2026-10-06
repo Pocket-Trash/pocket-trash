@@ -1,10 +1,9 @@
 import {
   createFileRoute,
   notFound,
-  useLocation,
+  redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { slugPattern } from "@/lib/catalog";
 import { getPublicMakerDetail } from "@/lib/catalog-api";
 import {
@@ -20,7 +19,6 @@ import {
 
 /** Shows one public maker profile and its related catalog data. */
 export const Route = createFileRoute("/makers/$slug")({
-  component: MakerDetailRoute,
   params: {
     /**
      * Validates the stable maker slug.
@@ -33,6 +31,32 @@ export const Route = createFileRoute("/makers/$slug")({
       if (!slugPattern.test(params.slug)) throw notFound();
       return params;
     },
+  },
+  /**
+   * Normalizes independent product and collection-item page query values.
+   *
+   * @param search - Raw route query values.
+   * @returns Normalized query state with first pages omitted.
+   */
+  validateSearch: parseMakerDetailSearch,
+  /**
+   * Replaces malformed or redundant page parameters with canonical search.
+   *
+   * @param context - Route pre-load context.
+   * @param context.location - Current raw route location.
+   * @param context.params - Validated maker parameters.
+   * @param context.search - Normalized maker-detail search state.
+   * @rejects With a replace redirect when the raw search is not canonical.
+   */
+  beforeLoad: async ({ location, params, search }) => {
+    if (!isCanonicalMakerSearch(location.searchStr, search)) {
+      throw redirect({
+        params,
+        replace: true,
+        search,
+        to: "/makers/$slug",
+      });
+    }
   },
   /**
    * Loads the requested public maker detail.
@@ -48,13 +72,7 @@ export const Route = createFileRoute("/makers/$slug")({
     if (!maker) throw notFound();
     return maker;
   },
-  /**
-   * Normalizes independent product and collection-item page query values.
-   *
-   * @param search - Raw route query values.
-   * @returns Normalized query state with first pages omitted.
-   */
-  validateSearch: parseMakerDetailSearch,
+  component: MakerDetailRoute,
 });
 
 /**
@@ -65,25 +83,7 @@ export const Route = createFileRoute("/makers/$slug")({
 function MakerDetailRoute() {
   const maker = Route.useLoaderData();
   const search = Route.useSearch();
-  const searchString = useLocation({
-    /**
-     * Selects the raw query string for canonicalization.
-     *
-     * @param location - Current router location.
-     * @returns The raw query string.
-     */
-    select: (location) => location.searchStr,
-  });
   const navigate = useNavigate();
-  useEffect(() => {
-    if (isCanonicalMakerSearch(searchString, search)) return;
-    void navigate({
-      params: { slug: maker.slug },
-      replace: true,
-      search,
-      to: "/makers/$slug",
-    });
-  }, [maker.slug, navigate, search, searchString]);
   /**
    * Updates one page parameter while preserving its sibling parameter.
    *
