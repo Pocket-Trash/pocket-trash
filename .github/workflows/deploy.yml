@@ -205,10 +205,46 @@ jobs:
       - name: Audit dependencies
         run: pnpm security:audit
 
+      - name: Validate preview database configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for name in NEON_API_KEY NEON_PROJECT_ID NEON_DATABASE_NAME NEON_DATABASE_USER VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_TOKEN RAILWAY_API_TOKEN RAILWAY_PROJECT_ID RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "$name is required." >&2
+              exit 1
+            fi
+          done
+
+      - name: Prepare Neon preview database
+        id: db
+        shell: bash
+        env:
+          ISOLATION_REQUIRED: ${{ needs.classify-changes.outputs.mutation_e2e == 'true' || contains(github.event.pull_request.labels.*.name, 'test:e2e') }}
+          MAX_NEON_BRANCHES: 10
+          PREVIEW_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash .github/scripts/neon-database-branch.sh prepare-preview
+
+      - name: Preflight migrations and seed on Neon PR branch
+        if: steps.db.outputs.can_deploy == 'true' && steps.db.outputs.isolated == 'true'
+        id: database_preflight
+        env:
+          BRANCH_ID: ${{ steps.db.outputs.branch_id }}
+          BRANCH_NAME: ${{ steps.db.outputs.branch_name }}
+          BUNNY_IMAGE_FOLDER_PREFIX: images/preview/pr-${{ github.event.pull_request.number }}
+          BUNNY_RESOURCE_FOLDER_PREFIX: resources/preview/pr-${{ github.event.pull_request.number }}
+          DATABASE_URL: ${{ steps.db.outputs.migration_database_url }}
+          PREVIEW_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash .github/scripts/neon-database-branch.sh preflight-preview
+
       - name: Build API workspace dependencies
         run: pnpm turbo run build --filter=@app/api
 
       - name: Validate API preview configuration
+        if: steps.db.outputs.can_deploy == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -221,6 +257,7 @@ jobs:
           done
 
       - name: Deploy API preview
+        if: steps.db.outputs.can_deploy == 'true'
         id: api_preview
         working-directory: apps/api
         shell: bash
@@ -291,6 +328,7 @@ jobs:
           echo "url=$preview_url" >> "$GITHUB_OUTPUT"
 
       - name: Validate API preview comment app configuration
+        if: steps.db.outputs.can_deploy == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -303,6 +341,7 @@ jobs:
           done
 
       - name: Create API preview comment app token
+        if: steps.db.outputs.can_deploy == 'true'
         id: api-preview-comment-token
         uses: actions/create-github-app-token@v3
         with:
@@ -314,6 +353,7 @@ jobs:
           permission-pull-requests: write
 
       - name: Comment on API preview
+        if: steps.db.outputs.can_deploy == 'true'
         uses: actions/github-script@v8
         env:
           API_PREVIEW_URL: ${{ steps.api_preview.outputs.url }}
@@ -358,32 +398,12 @@ jobs:
             }
 
       - name: Configure Vercel branch resource API URL
+        if: steps.db.outputs.can_deploy == 'true'
         shell: bash
         env:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
           API_URL: ${{ steps.api_preview.outputs.url }}
         run: bash .github/scripts/vercel-branch-database-url.sh set-resource-api-base-url
-
-      - name: Validate preview database configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          for name in NEON_API_KEY NEON_PROJECT_ID NEON_DATABASE_NAME NEON_DATABASE_USER VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_TOKEN RAILWAY_API_TOKEN RAILWAY_PROJECT_ID RAILWAY_SCRAPER_PREVIEW_SERVICE_NAME RAILWAY_SCRAPER_QUEUE_PREVIEW_SERVICE_NAME; do
-            if [[ -z "${!name:-}" ]]; then
-              echo "$name is required." >&2
-              exit 1
-            fi
-          done
-
-      - name: Prepare Neon preview database
-        id: db
-        shell: bash
-        env:
-          ISOLATION_REQUIRED: ${{ needs.classify-changes.outputs.mutation_e2e == 'true' || contains(github.event.pull_request.labels.*.name, 'test:e2e') }}
-          MAX_NEON_BRANCHES: 10
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: bash .github/scripts/neon-database-branch.sh prepare-preview
 
       - name: Configure Vercel branch database override
         if: steps.db.outputs.can_deploy == 'true' && steps.db.outputs.isolated == 'true'
@@ -437,45 +457,6 @@ jobs:
           fi
 
           bash .github/scripts/vercel-branch-database-url.sh set-resource-folder-prefix
-
-      - name: Run migrations on Neon PR branch
-        if: steps.db.outputs.can_deploy == 'true' && steps.db.outputs.isolated == 'true'
-        working-directory: packages/database
-        env:
-          BUNNY_IMAGE_FOLDER_PREFIX: images/preview/pr-${{ github.event.pull_request.number }}
-          BUNNY_RESOURCE_FOLDER_PREFIX: resources/preview/pr-${{ github.event.pull_request.number }}
-          DATABASE_URL: ${{ steps.db.outputs.migration_database_url }}
-        run: |
-          set -euo pipefail
-
-          set +e
-          pnpm exec drizzle-kit migrate --config=drizzle.config.ts
-          migration_status=$?
-          set -e
-
-          source ../../.github/scripts/ci-log.sh
-          if [[ "$migration_status" -ne 0 ]]; then
-            emit_ci_log error "ci.database.preview.migrations.failed" "$(jq -n \
-              --arg branch_name "${{ steps.db.outputs.branch_name }}" \
-              --arg branch_id "${{ steps.db.outputs.branch_id }}" \
-              --arg failure_step "drizzle-kit migrate" \
-              '{
-                branchName: $branch_name,
-                branchId: $branch_id,
-                failureStep: $failure_step
-              }')"
-            exit "$migration_status"
-          fi
-
-          emit_ci_log info "ci.database.preview.migrations.applied" "$(jq -n \
-            --arg branch_name "${{ steps.db.outputs.branch_name }}" \
-            --arg branch_id "${{ steps.db.outputs.branch_id }}" \
-            '{
-              branchName: $branch_name,
-              branchId: $branch_id
-            }')"
-
-          pnpm exec tsx scripts/seed.ts
 
       - name: Verify Neon PR branch
         if: steps.db.outputs.can_deploy == 'true' && steps.db.outputs.isolated == 'true'
@@ -884,7 +865,7 @@ jobs:
             }
 
       - name: Cleanup failed DB preview resources
-        if: ${{ always() && steps.db.outputs.isolated == 'true' && steps.db.outputs.branch_created == 'true' && (failure() || cancelled()) }}
+        if: ${{ always() && (needs.classify-changes.outputs.mutation_e2e == 'true' || contains(github.event.pull_request.labels.*.name, 'test:e2e')) && (failure() || cancelled()) }}
         shell: bash
         env:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
@@ -892,7 +873,7 @@ jobs:
         run: |
           set +e
 
-          bash .github/scripts/neon-database-branch.sh cleanup-preview
+          bash .github/scripts/neon-database-branch.sh cleanup-owned-preview
           neon_status=$?
 
           bash .github/scripts/vercel-branch-database-url.sh remove

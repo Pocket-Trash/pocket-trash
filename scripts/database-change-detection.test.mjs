@@ -151,3 +151,54 @@ test("real Neon deploy workflows retain the Drizzle migration fidelity check", (
     assert.match(source, /drizzle-kit migrate --config=drizzle\.config\.ts/u);
   }
 });
+
+test("preview database compatibility and preflight gate deployment", () => {
+  const steps = deployWorkflow.jobs.preview.steps;
+  const prepareIndex = steps.findIndex(
+    (step) => step.name === "Prepare Neon preview database",
+  );
+  const preflightIndex = steps.findIndex(
+    (step) => step.name === "Preflight migrations and seed on Neon PR branch",
+  );
+  const apiDeployIndex = steps.findIndex(
+    (step) => step.name === "Deploy API preview",
+  );
+  const vercelIndex = steps.findIndex(
+    (step) => step.name === "Configure Vercel branch database override",
+  );
+  const scraperDeployIndex = steps.findIndex(
+    (step) => step.name === "Deploy Railway scraper queue preview",
+  );
+  const cleanup = steps.find(
+    (step) => step.name === "Cleanup failed DB preview resources",
+  );
+
+  assert.ok(prepareIndex >= 0);
+  assert.ok(preflightIndex > prepareIndex);
+  assert.ok(apiDeployIndex > preflightIndex);
+  assert.ok(vercelIndex > preflightIndex);
+  assert.ok(scraperDeployIndex > preflightIndex);
+  assert.equal(
+    steps[prepareIndex].env.PREVIEW_BASE_SHA,
+    "${{ github.event.pull_request.base.sha }}",
+  );
+  assert.equal(
+    steps[preflightIndex].run,
+    "bash .github/scripts/neon-database-branch.sh preflight-preview",
+  );
+  assert.equal(
+    steps[apiDeployIndex].if,
+    "steps.db.outputs.can_deploy == 'true'",
+  );
+  assert.match(cleanup.if, /always\(\)/u);
+  assert.match(cleanup.if, /mutation_e2e/u);
+  assert.match(cleanup.if, /cancelled\(\)/u);
+  assert.doesNotMatch(cleanup.if, /branch_created/u);
+});
+
+test("preview lifecycle handles stale state and preflight failures", () => {
+  execFileSync("bash", [".github/scripts/neon-database-branch.test.sh"], {
+    cwd: new URL("..", import.meta.url),
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+});

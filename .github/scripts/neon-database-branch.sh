@@ -7,6 +7,9 @@ MAX_NEON_BRANCHES="${MAX_NEON_BRANCHES:-10}"
 NEON_PREVIEW_BRANCH_EXPIRES_DAYS="${NEON_PREVIEW_BRANCH_EXPIRES_DAYS:-14}"
 DEVELOPMENT_BRANCH_NAME="${DEVELOPMENT_BRANCH_NAME:-development}"
 PREVIEW_BRANCH_NAME="${PREVIEW_BRANCH_NAME:-preview}"
+PREVIEW_STATE_MISMATCH_EXIT_CODE=10
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PREVIEW_BRANCH_OWNERSHIP_FILE="${PREVIEW_BRANCH_OWNERSHIP_FILE:-${RUNNER_TEMP:-/tmp}/pocket-trash-preview-branch-${PR_NUMBER:-unknown}.owned}"
 
 source "$(dirname "${BASH_SOURCE[0]}")/ci-log.sh"
 
@@ -88,6 +91,85 @@ branch_id_from_list() {
 
   jq -r --arg name "$branch_name" \
     '.branches[] | select(.name == $name) | .id' <<< "$branches_json" | head -n 1
+}
+
+branch_parent_id_from_list() {
+  local branches_json="$1"
+  local branch_name="$2"
+
+  jq -r --arg name "$branch_name" \
+    '.branches[] | select(.name == $name) | .parent_id // empty' \
+    <<< "$branches_json" | head -n 1
+}
+
+run_preview_state() {
+  local command="$1"
+
+  if [[ -n "${PREVIEW_STATE_COMMAND:-}" ]]; then
+    "$PREVIEW_STATE_COMMAND" "$command"
+    return
+  fi
+
+  pnpm --dir "$REPO_ROOT/packages/database" exec tsx scripts/preview-state.ts "$command"
+}
+
+claim_preview_branch_ownership() {
+  : > "$PREVIEW_BRANCH_OWNERSHIP_FILE"
+  write_output branch_owned_by_run true
+}
+
+release_preview_branch_ownership() {
+  rm -f "$PREVIEW_BRANCH_OWNERSHIP_FILE"
+}
+
+report_preflight_failure() {
+  local failure_step="$1"
+  local failure_status="$2"
+
+  emit_ci_log error "ci.database.preview.preflight.failed" "$(jq -n \
+    --arg branch_name "$BRANCH_NAME" \
+    --arg branch_id "$BRANCH_ID" \
+    --arg failure_step "$failure_step" \
+    --arg failure_status "$failure_status" \
+    '{
+      branchName: $branch_name,
+      branchId: $branch_id,
+      failureStep: $failure_step,
+      failureStatus: ($failure_status | tonumber)
+    }')"
+
+  set +e
+  bash "${BASH_SOURCE[0]}" cleanup-owned-preview
+  local cleanup_status=$?
+  set -e
+  if [[ "$cleanup_status" -ne 0 ]]; then
+    emit_ci_log error "ci.database.preview.preflightCleanup.failed" "$(jq -n \
+      --arg branch_name "$BRANCH_NAME" \
+      --arg branch_id "$BRANCH_ID" \
+      --arg cleanup_status "$cleanup_status" \
+      '{
+        branchName: $branch_name,
+        branchId: $branch_id,
+        cleanupStatus: ($cleanup_status | tonumber)
+      }')"
+    echo "Preview preflight failed during ${failure_step}; automatic cleanup also failed. Retry cleanup-preview for preview-pr-${PR_NUMBER}." >&2
+  fi
+
+  return "$failure_status"
+}
+
+run_preflight_step() {
+  local failure_step="$1"
+  shift
+
+  set +e
+  "$@"
+  local failure_status=$?
+  set -e
+  if [[ "$failure_status" -ne 0 ]]; then
+    report_preflight_failure "$failure_step" "$failure_status"
+    return "$failure_status"
+  fi
 }
 
 branch_count_from_list() {
@@ -226,7 +308,10 @@ create_branch_from_parent() {
     --arg expires_at "$expires_at" \
     '{endpoints: [{type: "read_write"}], branch: {name: $name, parent_id: $parent_id, expires_at: $expires_at}}')"
 
-  api POST "/projects/${NEON_PROJECT_ID}/branches" "$body" > /dev/null
+  if ! api POST "/projects/${NEON_PROJECT_ID}/branches" "$body" > /dev/null; then
+    echo "Failed to create Neon branch ${branch_name}." >&2
+    return 1
+  fi
   wait_for_branch_ready "$branch_name"
 }
 
@@ -310,6 +395,8 @@ prepare_preview() {
   write_output development_branch_id "$development_branch_id"
   write_output preview_branch_id "$preview_branch_id"
   write_output branch_created false
+  write_output branch_owned_by_run false
+  release_preview_branch_ownership
 
   if [[ "$ISOLATION_REQUIRED" != "true" ]]; then
     emit_ci_log info "ci.database.preview.noPrBranch.needed" "$(jq -n \
@@ -330,6 +417,7 @@ prepare_preview() {
   fi
 
   write_output isolated true
+  require_env PREVIEW_BASE_SHA
   local target_branch_expires_at
   target_branch_expires_at="$(preview_branch_expires_at)"
   write_output branch_expires_at "$target_branch_expires_at"
@@ -354,32 +442,62 @@ prepare_preview() {
   fi
 
   if [[ -n "$target_branch_id" ]]; then
-    set_branch_expiration "$target_branch" "$target_branch_id" "$target_branch_expires_at"
-    write_output can_deploy true
-    write_output cleanup_performed false
-    write_branch_metadata "$target_branch" "$target_branch_id" "$DEVELOPMENT_BRANCH_NAME"
-    emit_ci_log info "ci.database.preview.prBranch.reused" "$(jq -n \
+    local target_parent_id
+    target_parent_id="$(branch_parent_id_from_list "$branches_json" "$target_branch")"
+    local stale_reason=""
+    if [[ "$target_parent_id" != "$development_branch_id" ]]; then
+      stale_reason="base_ancestry"
+    else
+      local target_migration_database_url
+      target_migration_database_url="$(connection_uri "$target_branch_id" false)"
+      set +e
+      DATABASE_URL="$target_migration_database_url" \
+        PREVIEW_BASE_SHA="$PREVIEW_BASE_SHA" \
+        run_preview_state check > /dev/null
+      local state_status=$?
+      set -e
+      if [[ "$state_status" -eq "$PREVIEW_STATE_MISMATCH_EXIT_CODE" ]]; then
+        stale_reason="migration_or_base"
+      elif [[ "$state_status" -ne 0 ]]; then
+        echo "Failed to inspect preview state for ${target_branch}." >&2
+        exit "$state_status"
+      fi
+    fi
+
+    if [[ -z "$stale_reason" ]]; then
+      set_branch_expiration "$target_branch" "$target_branch_id" "$target_branch_expires_at"
+      write_output can_deploy true
+      write_output cleanup_performed false
+      write_branch_metadata "$target_branch" "$target_branch_id" "$DEVELOPMENT_BRANCH_NAME"
+      emit_ci_log info "ci.database.preview.prBranch.reused" "$(jq -n \
+        --arg branch_name "$target_branch" \
+        --arg branch_id "$target_branch_id" \
+        --arg parent_branch "$DEVELOPMENT_BRANCH_NAME" \
+        '{branchName: $branch_name, branchId: $branch_id, parentBranch: $parent_branch}')"
+      mask_and_output_database_urls "$target_branch_id"
+      return
+    fi
+
+    emit_ci_log info "ci.database.preview.prBranch.stale" "$(jq -n \
       --arg branch_name "$target_branch" \
       --arg branch_id "$target_branch_id" \
-      --arg parent_branch "$DEVELOPMENT_BRANCH_NAME" \
-      '{branchName: $branch_name, branchId: $branch_id, parentBranch: $parent_branch}')"
-    mask_and_output_database_urls "$target_branch_id"
-    return
+      --arg reason "$stale_reason" \
+      '{branchName: $branch_name, branchId: $branch_id, reason: $reason}')"
+    claim_preview_branch_ownership
+    delete_branch_if_exists "$target_branch" "$branches_json"
+    target_branch_id=""
   else
     write_output cleanup_performed false
   fi
 
+  claim_preview_branch_ownership
   local cleanup_target_on_error=true
   cleanup_target_branch_on_error() {
     local exit_code=$?
 
     if [[ "$cleanup_target_on_error" == "true" ]]; then
       set +e
-      local cleanup_branches_json
-      cleanup_branches_json="$(list_branches)"
-      if [[ -n "$cleanup_branches_json" ]]; then
-        delete_branch_if_exists "$target_branch" "$cleanup_branches_json"
-      fi
+      cleanup_owned_preview
       set -e
     fi
 
@@ -403,6 +521,30 @@ prepare_preview() {
   mask_and_output_database_urls "$created_branch_id"
 }
 
+preflight_preview() {
+  require_neon_env
+  require_env PR_NUMBER
+  require_env BRANCH_NAME
+  require_env BRANCH_ID
+  require_env BUNNY_IMAGE_FOLDER_PREFIX
+  require_env BUNNY_RESOURCE_FOLDER_PREFIX
+  require_env DATABASE_URL
+  require_env PREVIEW_BASE_SHA
+
+  claim_preview_branch_ownership
+  run_preflight_step "drizzle-kit migrate" \
+    pnpm --dir "$REPO_ROOT/packages/database" exec drizzle-kit migrate --config=drizzle.config.ts || return $?
+  run_preflight_step "seed" \
+    pnpm --dir "$REPO_ROOT/packages/database" exec tsx scripts/seed.ts || return $?
+  run_preflight_step "preview-state mark" run_preview_state mark || return $?
+  release_preview_branch_ownership
+
+  emit_ci_log info "ci.database.preview.preflight.passed" "$(jq -n \
+    --arg branch_name "$BRANCH_NAME" \
+    --arg branch_id "$BRANCH_ID" \
+    '{branchName: $branch_name, branchId: $branch_id}')"
+}
+
 cleanup_preview() {
   require_neon_env
   require_env PR_NUMBER
@@ -413,6 +555,22 @@ cleanup_preview() {
 
   delete_branch_if_exists "$target_branch" "$branches_json"
   write_output target_branch "$target_branch"
+}
+
+cleanup_owned_preview() {
+  require_neon_env
+  require_env PR_NUMBER
+
+  if [[ ! -f "$PREVIEW_BRANCH_OWNERSHIP_FILE" ]]; then
+    write_output cleanup_performed false
+    emit_ci_log info "ci.database.preview.branchCleanup.skipped" "$(jq -n \
+      --arg branch_name "preview-pr-${PR_NUMBER}" \
+      '{branchName: $branch_name, reason: "not_owned_by_run"}')"
+    return
+  fi
+
+  cleanup_preview
+  release_preview_branch_ownership
 }
 
 branch_url() {
@@ -497,6 +655,12 @@ case "${1:-}" in
   cleanup-preview)
     cleanup_preview
     ;;
+  cleanup-owned-preview)
+    cleanup_owned_preview
+    ;;
+  preflight-preview)
+    preflight_preview
+    ;;
   branch-url)
     branch_url
     ;;
@@ -504,7 +668,7 @@ case "${1:-}" in
     refresh_preview
     ;;
   *)
-    echo "Usage: $0 {prepare-preview|cleanup-preview|branch-url|refresh-preview}" >&2
+    echo "Usage: $0 {prepare-preview|cleanup-preview|cleanup-owned-preview|preflight-preview|branch-url|refresh-preview}" >&2
     exit 1
     ;;
 esac

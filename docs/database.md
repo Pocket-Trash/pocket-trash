@@ -87,9 +87,26 @@ workflow creates it from `development`, runs committed migrations, and sends
 the same branch-specific `DATABASE_URL` to the Vercel web preview and Railway
 scraper preview. Production data never enters preview branches.
 
-PR updates reuse the branch and refresh its expiration. The default lifetime is
-14 days; `NEON_PREVIEW_BRANCH_EXPIRES_DAYS` may set 1–30 days. Closing the PR
-is the primary cleanup path and expiration is the fallback.
+PR updates reuse the branch and refresh its expiration only when its Neon
+parent, pull-request base commit, and ordered migration fingerprint match the
+last successful preflight. A mismatch deletes and recreates the branch from
+`development`. The preview-state CLI uses exit code `10` only for this expected
+compatibility mismatch; other nonzero exits mean the state could not be read.
+
+Migration and seed preflight finishes before API, Vercel, or Railway scraper
+deployment begins. While a branch is being created or recreated, the workflow
+records that it owns the branch lifecycle. Preflight also claims a reused
+branch while migrations and seed data are being verified. Failed preflight and
+cancellation cleanup delete only a branch actively owned by that run,
+including partial creation, while successfully preflighted reused branches
+survive unrelated deployment failures. Ownership ends after successful
+preflight. A
+branch-limit result blocks deployment without deleting another branch. Cleanup
+errors remain visible so `cleanup-preview` can be retried safely.
+
+The default lifetime is 14 days; `NEON_PREVIEW_BRANCH_EXPIRES_DAYS` may set
+1–30 days. Closing the PR is the primary cleanup path and expiration is the
+fallback.
 
 PRs without mutation-relevant changes use the shared `preview` branch and skip
 Playwright mutation fixtures. Database-changing PRs also run committed
