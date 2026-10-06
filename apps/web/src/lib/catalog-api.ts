@@ -777,7 +777,7 @@ const collectionAddSchema = z
   });
 
 /**
- * Schema for editing a collection item and its optional installed button.
+ * Schema for editing a collection item and its optional installed components.
  */
 const collectionEditSchema = z
   .object({
@@ -795,6 +795,14 @@ const collectionEditSchema = z
         finishOptionId: idSchema.nullable(),
         materialId: idSchema,
       })
+      .nullable()
+      .optional(),
+    installedInsert: z
+      .object({ collectionItemId: idSchema })
+      .nullable()
+      .optional(),
+    installedPlate: z
+      .object({ collectionItemId: idSchema })
       .nullable()
       .optional(),
     materialId: idSchema,
@@ -1720,9 +1728,9 @@ export const getPublicCollectionOwner = createServerFn({ method: "GET" })
   });
 
 /**
- * Loads a public collection item and its optional installed button.
+ * Loads a public collection item and its optional installed components.
  *
- * @returns The item and installed button, with signed images when configured, or `null` when unavailable.
+ * @returns The item and installed components, with signed images when configured, or `null` when unavailable.
  * @rejects If input validation, service loading, viewer lookup, an item query, or image signing fails.
  */
 export const getPublicCollectionItem = createServerFn({ method: "GET" })
@@ -1753,12 +1761,36 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
           viewer,
         })
       : null;
+    const [installedPlate, installedInsert] = await Promise.all([
+      item.installedPlateId
+        ? s.db.collections.getPublicItem({
+            collectionId: data.collectionId,
+            collectionItemId: item.installedPlateId,
+            ownerUserId: data.userId,
+            viewer,
+          })
+        : null,
+      item.installedInsertId
+        ? s.db.collections.getPublicItem({
+            collectionId: data.collectionId,
+            collectionItemId: item.installedInsertId,
+            ownerUserId: data.userId,
+            viewer,
+          })
+        : null,
+    ]);
     const product = (
       await s.db.catalog.listProducts(item.productTypeSlug, viewer)
     ).find(({ id }) => id === item.productId);
     return {
       installedButton: installedButton
         ? await signCollectionItem(installedButton)
+        : null,
+      installedInsert: installedInsert
+        ? await signCollectionItem(installedInsert)
+        : null,
+      installedPlate: installedPlate
+        ? await signCollectionItem(installedPlate)
         : null,
       item: await signCollectionItem(item),
       product: product
@@ -2045,9 +2077,11 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
     if (!item) {
       return {
         buttonProducts: [],
+        assemblyMoveItemCount: 1,
         collections: [],
         item: null,
         ownedButtons: [],
+        ownedSliderComponents: [],
         product: null,
       };
     }
@@ -2060,11 +2094,30 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
       s.db.collections.listOwnedCollections(actor),
     ]);
     return {
+      assemblyMoveItemCount: (() => {
+        const parent =
+          item.productTypeSlug === "slider"
+            ? item
+            : items.find(
+                ({ collectionItemId }) =>
+                  collectionItemId === item.installedOnSliderId,
+              );
+        return parent
+          ? 1 +
+              Number(parent.installedPlateId !== null) +
+              Number(parent.installedInsertId !== null)
+          : 1;
+      })(),
       buttonProducts,
       collections: await signCollectionSummaries(collections),
       item: await signCollectionItem(item),
       ownedButtons: items.filter(
         (candidate) => candidate.productTypeSlug === "spinner-button",
+      ),
+      ownedSliderComponents: items.filter(
+        (candidate) =>
+          candidate.productTypeSlug === "slider-plate" ||
+          candidate.productTypeSlug === "slider-insert",
       ),
       product: await (async () => {
         const product = products.find(({ id }) => id === item.productId);
@@ -2107,7 +2160,7 @@ export const updateCollectionItem = createServerFn({ method: "POST" })
       });
       return { ok: true as const };
     } catch (error) {
-      return mutationFailure(error);
+      return sliderAssemblyMutationFailure(error) ?? mutationFailure(error);
     }
   });
 
@@ -2444,6 +2497,34 @@ function mutationFailure(error: unknown) {
     ok: false as const,
     requiresConfirmation: false as const,
   };
+}
+
+/**
+ * Converts slider assembly domain failures into localized form errors.
+ *
+ * @param error - Candidate service error.
+ * @returns A localized mutation failure, or `null` for unrelated failures.
+ */
+function sliderAssemblyMutationFailure(error: unknown) {
+  if (!(error instanceof Error)) return null;
+  const formError = error.message.includes("Body-hosted")
+    ? "web.slider.validation.bodyHostedInsert"
+    : error.message.includes("already installed")
+      ? "web.slider.validation.alreadyInstalled"
+      : error.message.includes("compatibility family")
+        ? "web.slider.validation.incompatible"
+        : error.message.includes("slider plate does not exist") ||
+            error.message.includes("slider insert does not exist")
+          ? "web.slider.validation.exactProduct"
+          : null;
+  return formError
+    ? {
+        fieldErrors: {},
+        formError,
+        ok: false as const,
+        requiresConfirmation: false as const,
+      }
+    : null;
 }
 
 /**

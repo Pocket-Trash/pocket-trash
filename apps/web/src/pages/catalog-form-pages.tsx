@@ -3700,6 +3700,17 @@ export function CollectionAddPage({
             t={t}
           />
         ) : null}
+        {product?.productTypeSlug === "slider" &&
+        product.includedComponents.length ? (
+          <Notice>
+            <p>{t("web.slider.relationship.inclusionHelp")}</p>
+            <ul className="mt-2 grid list-disc gap-1 pl-5">
+              {product.includedComponents.map((component) => (
+                <li key={component.id}>{component.name}</li>
+              ))}
+            </ul>
+          </Notice>
+        ) : null}
         {product && collectionIsPrivate ? (
           <Notice>{t("web.collections.visibility.privateCallout")}</Notice>
         ) : null}
@@ -3983,22 +3994,28 @@ function localizedFinishLabel(
  * Renders the collection-item edit page.
  *
  * @param root0 - Existing item, product, and lookup values.
+ * @param root0.assemblyMoveItemCount - Connected assembly members moved with this item.
  * @param root0.buttonProducts - Catalog products for owned spinner buttons.
  * @param root0.collections - Collections available as destinations.
  * @param root0.item - Collection item being edited.
  * @param root0.options - Catalog lookup options.
  * @param root0.ownedButtons - Owned spinner buttons available to install.
+ * @param root0.ownedSliderComponents - Owned slider plates and inserts available to install.
  * @param root0.product - Source catalog product.
  * @returns The collection-item edit page.
  */
 export function CollectionEditPage({
+  assemblyMoveItemCount = 1,
   buttonProducts,
   collections,
   item,
   options: initialOptions,
   ownedButtons,
+  ownedSliderComponents = [],
   product,
 }: {
+  /** Connected assembly members moved with this item. */
+  assemblyMoveItemCount?: number;
   /** Catalog products for owned spinner buttons. */
   buttonProducts: CatalogProduct[];
   /** Collections available as destinations. */
@@ -4009,6 +4026,8 @@ export function CollectionEditPage({
   options: CatalogOptions;
   /** Owned spinner buttons available to install. */
   ownedButtons: UserCollectionItem[];
+  /** Owned slider components available to install. */
+  ownedSliderComponents?: UserCollectionItem[];
   /** Source catalog product. */
   product: CatalogProduct;
 }) {
@@ -4066,6 +4085,34 @@ export function CollectionEditPage({
   const selectedButtonProduct = buttonProducts.find(
     ({ id }) => id === selectedButton?.productId,
   );
+  const initialPlate = ownedSliderComponents.find(
+    ({ collectionItemId }) => collectionItemId === item.installedPlateId,
+  );
+  const initialInsert = ownedSliderComponents.find(
+    ({ collectionItemId }) => collectionItemId === item.installedInsertId,
+  );
+  const [plate, setPlate] = React.useState<ComboboxOption | null>(() =>
+    initialPlate
+      ? { id: initialPlate.collectionItemId, name: initialPlate.displayName }
+      : { id: "default", name: t("web.slider.component.noPlate") },
+  );
+  const [insert, setInsert] = React.useState<ComboboxOption | null>(() =>
+    initialInsert
+      ? { id: initialInsert.collectionItemId, name: initialInsert.displayName }
+      : { id: "default", name: t("web.slider.component.noInsert") },
+  );
+  const selectedPlate = ownedSliderComponents.find(
+    ({ collectionItemId }) => collectionItemId === plate?.id,
+  );
+  const selectedInsert = ownedSliderComponents.find(
+    ({ collectionItemId }) => collectionItemId === insert?.id,
+  );
+  const sliderComponentSelectionIsValid =
+    item.productTypeSlug !== "slider" ||
+    ((plate?.id === "default" || Boolean(selectedPlate)) &&
+      (product.magnetSystem !== "insert-driven" ||
+        insert?.id === "default" ||
+        Boolean(selectedInsert)));
   const buttonSelectionIsValid =
     item.productTypeSlug !== "spinner" ||
     button?.id === "default" ||
@@ -4082,6 +4129,7 @@ export function CollectionEditPage({
       material &&
       finishSelectionIsValid &&
       buttonSelectionIsValid &&
+      sliderComponentSelectionIsValid &&
       (!selectedButton || buttonFinishSelectionIsValid),
   );
   const submissionMode = collectionEditSubmissionMode(
@@ -4100,6 +4148,7 @@ export function CollectionEditPage({
         <div className="grid min-w-0 content-start gap-5">
           <Field label={displayNameLabel}>
             <Input
+              aria-label={displayNameLabel}
               onChange={(event) => setDisplayName(event.target.value)}
               required
               value={displayName}
@@ -4186,6 +4235,104 @@ export function CollectionEditPage({
                 value={button}
               />
             </Field>
+          ) : null}
+          {item.productTypeSlug === "slider" ? (
+            <>
+              <Field label={t("web.slider.component.installedPlate")}>
+                <CatalogCombobox
+                  ariaLabel={t("web.slider.component.installedPlate")}
+                  items={[
+                    {
+                      id: "default",
+                      name: t("web.slider.component.noPlate"),
+                    },
+                    ...ownedSliderComponents
+                      .filter(
+                        (candidate) =>
+                          candidate.productTypeSlug === "slider-plate" &&
+                          (candidate.installedOnSliderId === null ||
+                            candidate.installedOnSliderId ===
+                              item.collectionItemId),
+                      )
+                      .map(({ collectionItemId, displayName }) => ({
+                        id: collectionItemId,
+                        name: displayName,
+                      })),
+                  ]}
+                  onValueChange={setPlate}
+                  placeholder={t("web.slider.component.noPlate")}
+                  removeLabel={t("web.action.close")}
+                  showSelectedPill
+                  value={plate}
+                />
+              </Field>
+              {product.magnetSystem === "insert-driven" ? (
+                <Field label={t("web.slider.component.installedInsert")}>
+                  <CatalogCombobox
+                    ariaLabel={t("web.slider.component.installedInsert")}
+                    items={[
+                      {
+                        id: "default",
+                        name: t("web.slider.component.noInsert"),
+                      },
+                      ...ownedSliderComponents
+                        .filter(
+                          (candidate) =>
+                            candidate.productTypeSlug === "slider-insert" &&
+                            (candidate.installedOnSliderId === null ||
+                              candidate.installedOnSliderId ===
+                                item.collectionItemId),
+                        )
+                        .map(({ collectionItemId, displayName }) => ({
+                          id: collectionItemId,
+                          name: displayName,
+                        })),
+                    ]}
+                    onValueChange={setInsert}
+                    placeholder={t("web.slider.component.noInsert")}
+                    removeLabel={t("web.action.close")}
+                    showSelectedPill
+                    value={insert}
+                  />
+                </Field>
+              ) : null}
+              {collectionId !== item.collectionId ||
+              selectedPlate?.collectionId !== collectionId ||
+              selectedInsert?.collectionId !== collectionId ? (
+                <Notice>
+                  {t("web.slider.component.moveAssemblySummary", {
+                    count:
+                      1 +
+                      Number(Boolean(selectedPlate)) +
+                      Number(Boolean(selectedInsert)),
+                  })}
+                </Notice>
+              ) : null}
+              <Notice>
+                <ul className="grid gap-1">
+                  <li>
+                    {t("web.slider.component.installedPlate")}:{" "}
+                    {selectedPlate?.displayName ??
+                      t("web.slider.component.noPlate")}
+                  </li>
+                  {product.magnetSystem === "insert-driven" ? (
+                    <li>
+                      {t("web.slider.component.installedInsert")}:{" "}
+                      {selectedInsert?.displayName ??
+                        t("web.slider.component.noInsert")}
+                    </li>
+                  ) : null}
+                </ul>
+              </Notice>
+            </>
+          ) : null}
+          {item.installedOnSliderId !== null &&
+          collectionId !== item.collectionId ? (
+            <Notice>
+              {t("web.slider.component.moveAssemblySummary", {
+                count: assemblyMoveItemCount,
+              })}
+            </Notice>
           ) : null}
           {selectedButton && selectedButtonProduct ? (
             <CollectionProductFields
@@ -4399,6 +4546,23 @@ export function CollectionEditPage({
                   };
                 }
               }
+              const installedPlate =
+                item.productTypeSlug === "slider"
+                  ? plate?.id === "default"
+                    ? null
+                    : selectedPlate
+                      ? { collectionItemId: selectedPlate.collectionItemId }
+                      : undefined
+                  : undefined;
+              const installedInsert =
+                item.productTypeSlug === "slider" &&
+                product.magnetSystem === "insert-driven"
+                  ? insert?.id === "default"
+                    ? null
+                    : selectedInsert
+                      ? { collectionItemId: selectedInsert.collectionItemId }
+                      : undefined
+                  : undefined;
               const result = await updateCollectionItem({
                 data: {
                   bearing,
@@ -4413,6 +4577,9 @@ export function CollectionEditPage({
                       : Number(finish.id),
                   ...(item.productTypeSlug === "spinner"
                     ? { installedButton }
+                    : {}),
+                  ...(item.productTypeSlug === "slider"
+                    ? { installedInsert, installedPlate }
                     : {}),
                   materialId: material.id,
                   reason,
