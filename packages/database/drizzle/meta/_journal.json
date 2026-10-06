@@ -421,6 +421,13 @@
       "when": 1791278097552,
       "tag": "0059_tough_miracleman",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1791279501943,
+      "tag": "0060_cold_captain_britain",
+      "breakpoints": true
     }
   ]
 }

@@ -1200,6 +1200,26 @@ export type MagnetConfigurationTemplateValue = {
   sourceNotes: string | null;
 };
 
+/** Owner-recorded insert setup snapshot that may retain unknown positions. */
+export type OwnedSliderInsertSetupValue = {
+  /** Positive selected click count snapshot, or `null` when not recorded. */
+  clickCount: number | null;
+  /** Owner-recorded layout snapshot, or `null` when not recorded. */
+  configuration:
+    | (Omit<MagnetConfigurationTemplateValue, "slots"> & {
+        /** Ordered positions whose physical state may be unknown. */
+        slots: Array<
+          Omit<MagnetConfigurationTemplateValue["slots"][number], "state"> & {
+            /** Owner-recorded position state. */
+            state: "occupied" | "empty" | "unknown";
+          }
+        >;
+      })
+    | null;
+  /** Catalog offer copied as the authoring source, when present. */
+  sourceOfferId: number | null;
+};
+
 /** Catalog-manager authoring template copied into exact host-product offers. */
 export const magnetConfigurationTemplate = pgTable(
   "magnet_configuration_template",
@@ -1511,6 +1531,8 @@ export const collectionSliderInsert = pgTable("collection_slider_insert", {
   productSliderInsertId: bigint("product_slider_insert_id", { mode: "number" })
     .notNull()
     .references(() => productSliderInsert.id, { onDelete: "restrict" }),
+  /** Durable owner snapshot; `null` means resolve the live catalog default. */
+  setup: jsonb("setup").$type<OwnedSliderInsertSetupValue>(),
 });
 
 /** Catalog slider mapping and installed component relationships for collection items. */

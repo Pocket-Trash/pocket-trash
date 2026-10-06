@@ -1,0 +1,1 @@
+ALTER TABLE "collection_slider_insert" ADD COLUMN "setup" jsonb;
