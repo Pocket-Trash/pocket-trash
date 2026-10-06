@@ -11,6 +11,7 @@ import {
   finishOption,
   finishOptionColor,
   finishOptionFinish,
+  pattern,
   product,
   productImage,
   productMaterial,
@@ -339,6 +340,11 @@ export const colorEffectsRelations = relations(colorEffect, ({ many }) => ({
   options: many(finishOption),
 }));
 
+/** Connects a pattern to finish options that use it. */
+export const patternsRelations = relations(pattern, ({ many }) => ({
+  options: many(finishOption),
+}));
+
 /** Connects a finish option to its product or item, source and derived options, color effect, colors, and finishes. */
 export const finishOptionRelations = relations(
   finishOption,
@@ -362,6 +368,10 @@ export const finishOptionRelations = relations(
     colorEffect: one(colorEffect, {
       fields: [finishOption.colorEffectId],
       references: [colorEffect.id],
+    }),
+    pattern: one(pattern, {
+      fields: [finishOption.patternId],
+      references: [pattern.id],
     }),
     colors: many(finishOptionColor),
     finishes: many(finishOptionFinish),
