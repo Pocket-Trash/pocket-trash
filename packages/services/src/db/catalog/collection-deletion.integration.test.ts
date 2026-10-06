@@ -473,7 +473,7 @@ describe("collection deletion", () => {
         .select()
         .from(schema.auditEvent)
         .orderBy(schema.auditEvent.id);
-      expect(events).toHaveLength(4);
+      expect(events).toHaveLength(6);
       expect(events.at(-1)).toMatchObject({
         beforeState: {
           id: doomed.id,
@@ -513,7 +513,7 @@ describe("collection deletion", () => {
             .select()
             .from(schema.auditEvent)
             .orderBy(schema.auditEvent.id)
-        )[1],
+        ).find(({ id }) => id === itemEvent?.id),
       ).toMatchObject({
         actorUserId: null,
         reason: "[erased]",
@@ -543,7 +543,7 @@ describe("collection deletion", () => {
       expect(
         concurrent.filter(({ status }) => status === "rejected"),
       ).toHaveLength(1);
-      expect(await db.select().from(schema.auditEvent)).toHaveLength(5);
+      expect(await db.select().from(schema.auditEvent)).toHaveLength(7);
     } finally {
       await client.close();
     }
