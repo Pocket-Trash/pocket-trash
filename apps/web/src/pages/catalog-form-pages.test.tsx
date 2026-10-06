@@ -495,18 +495,20 @@ describe("product form conditional fields", () => {
       }),
     );
 
-    expect(html).toContain("web.slider.relationship.compatibilityFamilies");
-    expect(html).toContain("web.slider.relationship.reviewedAdvisory");
+    expect(html).toContain("Compatibility families");
+    expect(html).toContain("Reviewed advisory");
     expect(html).toContain('aria-label="Length"');
     expect(html).not.toContain('aria-label="Diameter"');
     if (productTypeSlug === "slider") {
-      expect(html).toContain('aria-label="web.slider.capability.label"');
-      expect(html).toContain('aria-label="web.slider.measurement.weightBasis"');
-      expect(html).toContain("web.slider.relationship.includedComponents");
+      expect(html).toContain('aria-label="Magnet host"');
+      expect(html).toContain('aria-label="Weight basis"');
+      expect(html).toContain("Included components");
     } else {
-      expect(html).toContain("web.slider.measurement.setLevelHelp");
-      expect(html).not.toContain('aria-label="web.slider.capability.label"');
-      expect(html).not.toContain("web.slider.relationship.includedComponents");
+      expect(html).toContain(
+        "Plate and insert measurements and weight describe the complete matched set.",
+      );
+      expect(html).not.toContain('aria-label="Magnet host"');
+      expect(html).not.toContain("Included components");
     }
   });
 });
