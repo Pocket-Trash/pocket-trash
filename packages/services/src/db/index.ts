@@ -114,6 +114,7 @@ export type {
   CatalogImageTargetType,
   CatalogImageTrashItem,
   CatalogLookup,
+  CatalogMaker,
   CatalogProduct,
   CatalogProductType,
   CatalogService,

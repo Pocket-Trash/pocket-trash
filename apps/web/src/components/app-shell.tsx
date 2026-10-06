@@ -27,6 +27,7 @@ export type AppShellProps = {
           | "/admin"
           | "/admin/feedback"
           | "/admin/materials"
+          | "/admin/makers"
           | "/admin/trash"
           | "/collections"
           | "/changelog"

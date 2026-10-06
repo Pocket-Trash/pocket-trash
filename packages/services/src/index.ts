@@ -16,6 +16,7 @@ export {
   normalizeActor,
   permissions,
 } from "./authorization.js";
+export { nextAvailableSlug, slugify, slugPattern } from "./catalog-slug.js";
 
 export { adminFeedbackArchiveStatuses } from "./db/feedback/index.js";
 export type {
@@ -44,6 +45,7 @@ export type {
   CatalogImageTargetType,
   CatalogImageTrashItem,
   CatalogLookup,
+  CatalogMaker,
   CatalogProduct,
   CatalogProductType,
   CatalogService,

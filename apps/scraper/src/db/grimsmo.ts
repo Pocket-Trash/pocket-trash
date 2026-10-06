@@ -29,6 +29,7 @@ import {
 const grimsmoMaker = {
   name: "Grimsmo",
   rootUrl: "https://grimsmoknives.com",
+  slug: "grimsmo",
 };
 
 /**

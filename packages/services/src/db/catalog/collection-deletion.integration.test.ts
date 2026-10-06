@@ -49,7 +49,7 @@ describe("collection deletion", () => {
 
       const [maker] = await db
         .insert(schema.maker)
-        .values({ name: "Deletion test maker" })
+        .values({ name: "Deletion test maker", slug: "deletion-test-maker" })
         .returning();
       const [spinnerType, buttonType] = await db
         .insert(schema.productType)
@@ -581,7 +581,7 @@ describe("collection deletion", () => {
 
       const [maker] = await db
         .insert(schema.maker)
-        .values({ name: "Item deletion maker" })
+        .values({ name: "Item deletion maker", slug: "item-deletion-maker" })
         .returning();
       const [spinnerType, buttonType] = await db
         .insert(schema.productType)

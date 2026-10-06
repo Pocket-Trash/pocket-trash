@@ -4,6 +4,7 @@ import type {
   CatalogColor,
   CatalogImage,
   CatalogLookup,
+  CatalogMaker,
   CatalogProduct,
   CatalogProductType,
   ProductWriteInput,
@@ -250,15 +251,16 @@ const productLookupSchema = z.object({
  * Schema for maker names and optional root URLs.
  */
 const makerSchema = z.object({
-  name: z.string().trim().min(1, requiredMessage),
-  rootUrl: z
-    .string()
-    .trim()
-    .refine(
-      (value) =>
-        value === "" || z.url().safeParse(normalizeOptionalUrl(value)).success,
-      urlMessage,
-    ),
+  name: slugNameSchema,
+  rootUrl: optionalUrlSchema,
+});
+
+/** Schema for creating or updating one administrated maker profile. */
+export const makerProfileSchema = z.object({
+  description: optionalDescriptionSchema,
+  makerId: idSchema.nullable(),
+  name: slugNameSchema,
+  rootUrl: optionalUrlSchema,
 });
 
 /**
@@ -668,8 +670,86 @@ export const createCatalogMaker = createServerFn({ method: "POST" })
       const maker = await s.db.catalog.createMaker({
         actor,
         name: parsed.data.name,
-        rootUrl: normalizeOptionalUrl(parsed.data.rootUrl),
+        rootUrl: parsed.data.rootUrl,
       });
+      return { maker, ok: true as const };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
+
+/**
+ * Reports whether the current actor may administer maker profiles.
+ *
+ * @returns Whether the actor has product-management permission.
+ * @rejects If actor lookup fails.
+ */
+export const canManageMakers = createServerFn().handler(async () => {
+  const actor = await getActor();
+  return hasPermission(actor, "products.manage");
+});
+
+/**
+ * Lists maker profiles for the current product administrator.
+ *
+ * @returns Name-sorted maker profiles.
+ * @rejects If authorization, service loading, or persistence fails.
+ */
+export const listAdminMakers = createServerFn({ method: "GET" }).handler(
+  async (): Promise<CatalogMaker[]> => {
+    const actor = await requirePermission("products.manage");
+    const { s } = await import("@/lib/services");
+    return await s.db.catalog.listMakersForAdmin(actor);
+  },
+);
+
+/**
+ * Loads one maker profile for the current product administrator.
+ *
+ * @returns The matching maker profile, or `null` when absent.
+ * @rejects If input validation, authorization, service loading, or persistence fails.
+ */
+export const getAdminMaker = createServerFn({ method: "GET" })
+  .validator((input: unknown) => z.object({ makerId: idSchema }).parse(input))
+  .handler(async ({ data }): Promise<CatalogMaker | null> => {
+    const actor = await requirePermission("products.manage");
+    const { s } = await import("@/lib/services");
+    return await s.db.catalog.getMakerForAdmin({
+      actor,
+      makerId: data.makerId,
+    });
+  });
+
+/**
+ * Validates and saves one maker profile for the current product administrator.
+ *
+ * @returns The saved maker or a validation-aware mutation failure.
+ * @rejects If authorization or service loading fails.
+ */
+export const saveAdminMaker = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("products.manage");
+    const parsed = makerProfileSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+
+    const { s } = await import("@/lib/services");
+    try {
+      const maker =
+        parsed.data.makerId !== null
+          ? await s.db.catalog.updateMaker({
+              actor,
+              description: parsed.data.description,
+              makerId: parsed.data.makerId,
+              name: parsed.data.name,
+              rootUrl: parsed.data.rootUrl,
+            })
+          : await s.db.catalog.createMaker({
+              actor,
+              description: parsed.data.description,
+              name: parsed.data.name,
+              rootUrl: parsed.data.rootUrl,
+            });
       return { maker, ok: true as const };
     } catch (error) {
       return mutationFailure(error);

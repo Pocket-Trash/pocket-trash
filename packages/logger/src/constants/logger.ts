@@ -83,6 +83,7 @@ export const loggerMessages = {
       listColors: "database.catalog.listColors",
       listFinishes: "database.catalog.listFinishes",
       setMakerProductUrlValidity: "database.catalog.setMakerProductUrlValidity",
+      updateMaker: "database.catalog.updateMaker",
       updateProduct: "database.catalog.updateProduct",
       updateMaterial: "database.catalog.updateMaterial",
     },

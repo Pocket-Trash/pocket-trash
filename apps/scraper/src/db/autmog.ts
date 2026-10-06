@@ -19,6 +19,7 @@ import {
 const autmogMaker = {
   name: "Autmog",
   rootUrl: "https://www.autmog.com",
+  slug: "autmog",
 };
 
 /**

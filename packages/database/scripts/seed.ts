@@ -78,14 +78,23 @@ export const seedProductTypes = [
  * @internal
  */
 export const seedMakers = [
-  { name: "Autmog", rootUrl: "https://www.autmog.com" },
-  { name: "Inventery", rootUrl: "https://www.inventery.co" },
-  { name: "KAP EDC", rootUrl: "https://www.kapedc.com" },
-  { name: "Clean EDC", rootUrl: "https://cleanedc.com" },
-  { name: "Magnus Fidgets", rootUrl: "https://magnusfidgets.com" },
+  { name: "Autmog", rootUrl: "https://www.autmog.com", slug: "autmog" },
+  {
+    name: "Inventery",
+    rootUrl: "https://www.inventery.co",
+    slug: "inventery",
+  },
+  { name: "KAP EDC", rootUrl: "https://www.kapedc.com", slug: "kap-edc" },
+  { name: "Clean EDC", rootUrl: "https://cleanedc.com", slug: "clean-edc" },
+  {
+    name: "Magnus Fidgets",
+    rootUrl: "https://magnusfidgets.com",
+    slug: "magnus-fidgets",
+  },
   {
     name: "Full Throttle Originals",
     rootUrl: "https://fullthrottleoriginals.com",
+    slug: "full-throttle-originals",
   },
 ] as const;
 
@@ -372,7 +381,9 @@ export async function seedCatalog(db: ReturnType<typeof createDb>) {
         .set({ name: value.name, rootUrl, updatedAt: new Date() })
         .where(eq(maker.id, existing.id));
     } else {
-      await db.insert(maker).values({ name: value.name, rootUrl });
+      await db
+        .insert(maker)
+        .values({ name: value.name, rootUrl, slug: value.slug });
     }
   }
 

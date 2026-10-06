@@ -116,7 +116,7 @@ export async function createMutationFixture({
 
     const [maker] = await transaction
       .insert(schema.maker)
-      .values({ name: runId })
+      .values({ name: runId, slug: runId })
       .returning({ id: schema.maker.id });
     const [material] = await transaction
       .insert(schema.material)

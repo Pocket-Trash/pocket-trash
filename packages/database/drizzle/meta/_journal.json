@@ -379,6 +379,13 @@
       "when": 1791263611019,
       "tag": "0053_cuddly_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1791302791007,
+      "tag": "0054_whole_pet_avengers",
+      "breakpoints": true
     }
   ]
 }

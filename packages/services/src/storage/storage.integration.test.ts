@@ -110,7 +110,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     );
     itemId = Number(item.rows[0].id);
     const maker = await pool.query(
-      "insert into makers(name) values('Storage test maker') returning id",
+      "insert into makers(name, slug) values('Storage test maker', 'storage-test-maker') returning id",
     );
     const type = await pool.query(
       "insert into product_types(name,slug) values('Storage test type','storage-test-type') returning id",
