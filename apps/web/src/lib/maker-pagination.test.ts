@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isCanonicalMakerSearch,
   parseMakerDetailSearch,
   parseMakerPage,
   withMakerPage,
@@ -31,5 +32,20 @@ describe("maker pagination", () => {
         0,
       ),
     ).toEqual({ collectionItemsPage: undefined, productsPage: 2 });
+  });
+
+  it("detects malformed and redundant raw page parameters", () => {
+    expect(isCanonicalMakerSearch("?productsPage=2", { productsPage: 2 })).toBe(
+      true,
+    );
+    expect(isCanonicalMakerSearch("?productsPage=0", {})).toBe(false);
+    expect(isCanonicalMakerSearch("?productsPage=nope", {})).toBe(false);
+    expect(isCanonicalMakerSearch("?collectionItemsPage=1", {})).toBe(false);
+    expect(
+      isCanonicalMakerSearch("?productsPage=02&collectionItemsPage=3", {
+        collectionItemsPage: 3,
+        productsPage: 2,
+      }),
+    ).toBe(false);
   });
 });

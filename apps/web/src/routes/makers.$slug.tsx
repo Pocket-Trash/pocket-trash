@@ -1,7 +1,14 @@
-import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  notFound,
+  useLocation,
+  useNavigate,
+} from "@tanstack/react-router";
+import { useEffect } from "react";
 import { slugPattern } from "@/lib/catalog";
 import { getPublicMakerDetail } from "@/lib/catalog-api";
 import {
+  isCanonicalMakerSearch,
   type MakerDetailSearch,
   parseMakerDetailSearch,
   withMakerPage,
@@ -58,7 +65,25 @@ export const Route = createFileRoute("/makers/$slug")({
 function MakerDetailRoute() {
   const maker = Route.useLoaderData();
   const search = Route.useSearch();
+  const searchString = useLocation({
+    /**
+     * Selects the raw query string for canonicalization.
+     *
+     * @param location - Current router location.
+     * @returns The raw query string.
+     */
+    select: (location) => location.searchStr,
+  });
   const navigate = useNavigate();
+  useEffect(() => {
+    if (isCanonicalMakerSearch(searchString, search)) return;
+    void navigate({
+      params: { slug: maker.slug },
+      replace: true,
+      search,
+      to: "/makers/$slug",
+    });
+  }, [maker.slug, navigate, search, searchString]);
   /**
    * Updates one page parameter while preserving its sibling parameter.
    *

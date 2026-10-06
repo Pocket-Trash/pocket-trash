@@ -35,6 +35,27 @@ export function parseMakerDetailSearch(
 }
 
 /**
+ * Checks whether raw maker page parameters match their normalized route state.
+ *
+ * @param searchString - Raw browser query string.
+ * @param search - Normalized maker-detail route state.
+ * @returns Whether both page parameters are already canonical.
+ */
+export function isCanonicalMakerSearch(
+  searchString: string,
+  search: MakerDetailSearch,
+) {
+  const parameters = new URLSearchParams(searchString);
+  return (["collectionItemsPage", "productsPage"] as const).every((key) => {
+    const rawValues = parameters.getAll(key);
+    const normalizedValue = search[key];
+    return normalizedValue === undefined
+      ? rawValues.length === 0
+      : rawValues.length === 1 && rawValues[0] === String(normalizedValue);
+  });
+}
+
+/**
  * Updates one zero-based controlled page while preserving its sibling page.
  *
  * @param search - Current normalized search state.
