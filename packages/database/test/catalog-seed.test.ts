@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
+  catalogSeedTimestamp,
   loadKapedcSeedData,
   materialSlugForTerm,
   seedCatalog,
@@ -614,6 +615,9 @@ describe("catalog seed", () => {
         .flatMap(({ materialTerms }) => materialTerms)
         .every((term) => materialSlugForTerm(term).length > 0),
     ).toBe(true);
+    expect(catalogSeedTimestamp(snapshot.importedAt).toISOString()).toBe(
+      snapshot.importedAt,
+    );
   });
 });
 
