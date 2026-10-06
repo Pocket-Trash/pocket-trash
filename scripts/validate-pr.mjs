@@ -87,7 +87,7 @@ export function assertKnownPaths(classification) {
  * Builds the ordered local validation plan for selected domains.
  *
  * @param {Record<string, boolean>} domains - Selected validation domains.
- * @returns {Array<{args: string[], command: string, id: string, label: string, reason: string, selected: boolean}>} Validation checks.
+ * @returns {Array<{args: string[], command: string, id: string, label: string, reason: string, requiresCredentials: boolean, selected: boolean}>} Validation checks.
  */
 export function createValidationPlan(domains) {
   return [
@@ -97,6 +97,7 @@ export function createValidationPlan(domains) {
       command: "pnpm",
       args: ["exec", "biome", "check", "--linter-enabled=false", "."],
       selected: true,
+      requiresCredentials: false,
       reason: "required for every pull request",
     },
     {
@@ -105,6 +106,7 @@ export function createValidationPlan(domains) {
       command: process.execPath,
       args: ["scripts/check-pr-changeset.mjs"],
       selected: true,
+      requiresCredentials: false,
       reason: "required for every pull request",
     },
     {
@@ -113,6 +115,7 @@ export function createValidationPlan(domains) {
       command: "pnpm",
       args: ["lint"],
       selected: domains.validation,
+      requiresCredentials: false,
       reason: "no validation-domain changes",
     },
     {
@@ -121,15 +124,26 @@ export function createValidationPlan(domains) {
       command: "pnpm",
       args: ["typecheck"],
       selected: domains.validation,
+      requiresCredentials: false,
       reason: "no validation-domain changes",
     },
     {
       id: "test",
       label: "Unit and workflow tests",
       command: "pnpm",
-      args: ["test"],
+      args: ["test:ci"],
       selected: domains.validation,
+      requiresCredentials: false,
       reason: "no validation-domain changes",
+    },
+    {
+      id: "database-chain",
+      label: "Disposable database migration chain",
+      command: "pnpm",
+      args: ["db:validate:chain"],
+      selected: domains.database,
+      requiresCredentials: false,
+      reason: "no database-domain changes",
     },
     {
       id: "api-build",
@@ -137,6 +151,7 @@ export function createValidationPlan(domains) {
       command: "pnpm",
       args: ["exec", "turbo", "run", "build", "--filter=@app/api"],
       selected: domains.api,
+      requiresCredentials: false,
       reason: "no API-domain changes",
     },
     {
@@ -145,15 +160,8 @@ export function createValidationPlan(domains) {
       command: "pnpm",
       args: ["exec", "turbo", "run", "build", "--filter=@app/scraper"],
       selected: domains.scraper,
+      requiresCredentials: false,
       reason: "no scraper-domain changes",
-    },
-    {
-      id: "web-build",
-      label: "Web build",
-      command: "pnpm",
-      args: ["exec", "turbo", "run", "build", "--filter=@app/web"],
-      selected: domains.web,
-      reason: "no web-domain changes",
     },
     {
       id: "storybook-test",
@@ -161,6 +169,7 @@ export function createValidationPlan(domains) {
       command: "pnpm",
       args: ["--filter", "@app/web", "test-storybook"],
       selected: domains.storybook,
+      requiresCredentials: false,
       reason: "no Storybook-domain changes",
     },
     {
@@ -169,7 +178,35 @@ export function createValidationPlan(domains) {
       command: "pnpm",
       args: ["--filter", "@app/web", "build-storybook"],
       selected: domains.storybook,
+      requiresCredentials: false,
       reason: "no Storybook-domain changes",
+    },
+    {
+      id: "infisical-auth",
+      label: "Infisical authentication",
+      command: "pnpm",
+      args: ["infisical:check"],
+      selected: domains.validation,
+      requiresCredentials: true,
+      reason: "no validation-domain changes",
+    },
+    {
+      id: "web-build",
+      label: "Web build",
+      command: "pnpm",
+      args: ["exec", "turbo", "run", "build", "--filter=@app/web"],
+      selected: domains.web,
+      requiresCredentials: true,
+      reason: "no web-domain changes",
+    },
+    {
+      id: "database-personal",
+      label: "Personal Neon migration history",
+      command: "pnpm",
+      args: ["db:validate:personal"],
+      selected: domains.database,
+      requiresCredentials: true,
+      reason: "no database-domain changes",
     },
   ];
 }
@@ -266,7 +303,12 @@ function main() {
   const classification = classifyChanges(context.files);
   assertKnownPaths(classification);
   const plan = createValidationPlan(classification.domains);
-  const selected = plan.filter((check) => check.selected);
+  const selected = plan
+    .filter((check) => check.selected)
+    .toSorted(
+      (left, right) =>
+        Number(left.requiresCredentials) - Number(right.requiresCredentials),
+    );
   const skipped = plan.filter((check) => !check.selected);
 
   console.log(

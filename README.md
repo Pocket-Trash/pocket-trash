@@ -128,6 +128,8 @@ suite without the Infisical authentication check.
 | `pnpm db:migrate` | Applies database migrations. |
 | `pnpm db:resolve-conflicts` | Resolves Drizzle migration history conflicts. |
 | `pnpm db:seed` | Seeds the selected database. |
+| `pnpm db:validate:chain` | Applies the repository migration chain to disposable PGlite. |
+| `pnpm db:validate:personal` | Read-only comparison of the selected personal Neon migration history. |
 | `pnpm db:view` | Opens the local database viewer. |
 | `pnpm deploy` | Deploys the production API Worker. |
 | `pnpm deploy:development` | Deploys the development API Worker. |

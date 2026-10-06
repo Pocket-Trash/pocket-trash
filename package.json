@@ -17,6 +17,8 @@
     "db:migrate": "pnpm --filter @package/database db:migrate",
     "db:resolve-conflicts": "pnpm --filter @package/database db:resolve-conflicts",
     "db:seed": "pnpm --filter @package/database db:seed",
+    "db:validate:chain": "pnpm --filter @package/database db:validate:chain",
+    "db:validate:personal": "pnpm --filter @package/database db:validate:personal",
     "db:view": "pnpm --filter @package/database db:view",
     "deploy": "pnpm --filter @app/api run deploy",
     "deploy:development": "pnpm --filter @app/api run deploy:development",
