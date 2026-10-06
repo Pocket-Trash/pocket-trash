@@ -8,9 +8,9 @@ import type {
   CatalogProduct,
   CatalogProductType,
   ProductWriteInput,
+  PublicMakerSummary,
   PublicMaterial,
   PublicMaterialSummary,
-  PublicMakerSummary,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";

@@ -124,9 +124,9 @@ export type {
   ProductApprovalStatus,
   ProductWriteInput,
   PublicCollectionOwner,
+  PublicMakerSummary,
   PublicMaterial,
   PublicMaterialSummary,
-  PublicMakerSummary,
   UserCollectionItem,
   UserCollectionSummary,
 } from "./catalog/index.js";
