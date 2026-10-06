@@ -30,6 +30,7 @@ type SidebarPath =
   | "/admin/feedback/planned"
   | "/admin/feedback/requests"
   | "/admin/materials"
+  | "/admin/makers"
   | "/admin/notifications/feedback"
   | "/admin/notifications/resources"
   | "/admin/settings/feature-flags"

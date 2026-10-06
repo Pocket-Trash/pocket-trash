@@ -1169,6 +1169,7 @@ describe("catalog lookup writes", () => {
   ] as const)("rejects a case-insensitive duplicate %s name", async (kind) => {
     const insert = vi.fn();
     const db = {
+      execute: vi.fn(),
       insert,
       select: vi.fn(() => ({
         from: vi.fn(() => ({

@@ -252,8 +252,12 @@ export const maker = pgTable(
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
     name: text("name").notNull(),
+    /** Stable URL-safe public identifier. */
+    slug: text("slug").notNull(),
     /** Canonical root URL for this scraper source. */
     rootUrl: text("root_url"),
+    /** Optional Markdown profile shown on the public maker page. */
+    description: text("description"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -262,10 +266,15 @@ export const maker = pgTable(
       .notNull(),
   },
   (table) => ({
+    descriptionLength: check(
+      "makers_description_length_check",
+      sql`${table.description} IS NULL OR char_length(${table.description}) <= 5000`,
+    ),
     nameCaseInsensitiveUnique: uniqueIndex(
       "makers_name_case_insensitive_unique",
     ).on(sql`lower(${table.name})`),
     rootUrlUnique: uniqueIndex("makers_root_url_unique").on(table.rootUrl),
+    slugUnique: uniqueIndex("makers_slug_unique").on(table.slug),
   }),
 );
 

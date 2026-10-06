@@ -224,7 +224,9 @@ async function fixtures(client: PGlite, target: string, survivor: string) {
   const maker = await client.query<{
     /** Inserted maker identifier. */
     id: number;
-  }>("insert into makers(name) values('Erasure maker') returning id");
+  }>(
+    "insert into makers(name, slug) values('Erasure maker', 'erasure-maker') returning id",
+  );
   const type = await client.query<{
     /** Inserted product-type identifier. */
     id: number;

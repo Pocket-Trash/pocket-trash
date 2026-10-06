@@ -7,6 +7,7 @@ import {
 import {
   Bell,
   Boxes,
+  Factory,
   Flag,
   MessageSquare,
   ScrollText,
@@ -27,6 +28,7 @@ type AdminSection =
   | "audit"
   | "feedback"
   | "materials"
+  | "makers"
   | "notifications"
   | "trash"
   | "users";
@@ -88,6 +90,7 @@ function AdminSidebar({
   const canManageFeedback = hasPermission(actor, "feedback.manage");
   const canManageMaterials = hasPermission(actor, "products.manage");
   const canManageResources = hasPermission(actor, "resources.manage");
+  const canManageMakers = hasPermission(actor, "products.manage");
   const canManageCatalog =
     hasPermission(actor, "products.manage") ||
     hasPermission(actor, "collections.manage");
@@ -103,6 +106,16 @@ function AdminSidebar({
    */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const primaryLinks: SidebarLink[] = [
+    ...(canManageMakers
+      ? [
+          {
+            icon: Factory,
+            active: section === "makers",
+            label: t("web.admin.makers.title"),
+            to: "/admin/makers" as const,
+          },
+        ]
+      : []),
     ...(canManageUsers
       ? [
           {

@@ -32,7 +32,7 @@ describe("product deletion", () => {
         .returning();
       const [maker] = await db
         .insert(schema.maker)
-        .values({ name: "Delete maker" })
+        .values({ name: "Delete maker", slug: "delete-maker" })
         .returning();
       const [spinnerType, buttonType] = await db
         .insert(schema.productType)

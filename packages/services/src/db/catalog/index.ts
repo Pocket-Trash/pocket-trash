@@ -16,6 +16,7 @@ import {
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { type Actor, hasPermission } from "../../authorization.js";
+import { nextAvailableSlug } from "../../catalog-slug.js";
 import { hashLogIdentifier, loggedMutation } from "../../logging.js";
 import {
   attachImages as attachStoredImages,
@@ -83,6 +84,8 @@ const catalogNameConflictMessages: Record<string, string> = {
   color_name_case_insensitive_unique: "Color name already exists.",
   finish_name_case_insensitive_unique: "Finish name already exists.",
   makers_name_case_insensitive_unique: "Maker name already exists.",
+  makers_root_url_unique: "Maker root URL already exists.",
+  makers_slug_unique: "Maker slug already exists.",
   materials_name_case_insensitive_unique: "Material name already exists.",
 };
 
@@ -127,6 +130,20 @@ export type CatalogLookup = {
   /**
    * URL-safe identifier.
    */
+  slug: string;
+};
+
+/** Maker profile shared by catalog forms and administration routes. */
+export type CatalogMaker = {
+  /** Optional Markdown profile description. */
+  description: string | null;
+  /** Database identifier. */
+  id: number;
+  /** Display name. */
+  name: string;
+  /** Optional external website root URL. */
+  rootUrl: string | null;
+  /** Stable public URL identifier. */
   slug: string;
 };
 
@@ -667,6 +684,8 @@ export type CatalogService = {
      * Authenticated actor.
      */
     actor: Actor;
+    /** Optional Markdown profile description. */
+    description?: string | null;
     /**
      * Display name.
      */
@@ -675,20 +694,7 @@ export type CatalogService = {
      * Root URL.
      */
     rootUrl: string | null;
-  }): Promise<{
-    /**
-     * Database identifier.
-     */
-    id: number;
-    /**
-     * Display name.
-     */
-    name: string;
-    /**
-     * Root URL.
-     */
-    rootUrl: string | null;
-  }>;
+  }): Promise<CatalogMaker>;
   /**
    * Creates material.
    *
@@ -765,6 +771,19 @@ export type CatalogService = {
     viewer?: CatalogViewer,
   ): Promise<CatalogProduct | null>;
   /**
+   * Returns one maker profile to an authorized product manager.
+   *
+   * @param input - Maker identifier and authenticated administrator.
+   * @returns The matching maker, or `null` when it does not exist.
+   * @rejects When authorization or persistence fails.
+   */
+  getMakerForAdmin(input: {
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** Maker identifier. */
+    makerId: number;
+  }): Promise<CatalogMaker | null>;
+  /**
    * Lists color effects.
    *
    * @returns Matching color effects.
@@ -791,22 +810,15 @@ export type CatalogService = {
    * @returns Matching makers.
    * @rejects When the database query fails.
    */
-  listMakers(): Promise<
-    Array<{
-      /**
-       * Database identifier.
-       */
-      id: number;
-      /**
-       * Display name.
-       */
-      name: string;
-      /**
-       * Root URL.
-       */
-      rootUrl: string | null;
-    }>
-  >;
+  listMakers(): Promise<CatalogMaker[]>;
+  /**
+   * Lists maker profiles for an authorized product manager.
+   *
+   * @param actor - Authenticated administrator.
+   * @returns Name-sorted maker profiles.
+   * @rejects When authorization or persistence fails.
+   */
+  listMakersForAdmin(actor: Actor): Promise<CatalogMaker[]>;
   /**
    * Lists materials.
    *
@@ -1040,6 +1052,25 @@ export type CatalogService = {
      */
     reason?: string;
   }): Promise<void>;
+  /**
+   * Updates mutable maker profile fields without changing its stable slug.
+   *
+   * @param input - Maker fields and authenticated administrator.
+   * @returns The updated maker profile.
+   * @rejects When authorization, lookup, conflicts, persistence, auditing, or operation logging fails.
+   */
+  updateMaker(input: {
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** Optional Markdown profile description. */
+    description: string | null;
+    /** Maker identifier. */
+    makerId: number;
+    /** Display name. */
+    name: string;
+    /** Optional external website root URL. */
+    rootUrl: string | null;
+  }): Promise<CatalogMaker>;
   /**
    * Updates product.
    *
@@ -2083,6 +2114,9 @@ export function createCatalogService(
         loggerMessages.database.catalog.createMaker,
         async () =>
           await db.transaction(async (tx) => {
+            await tx.execute(
+              sql`select pg_advisory_xact_lock(hashtext('makers.slug'))`,
+            );
             const [duplicate] = await tx
               .select({ id: schema.maker.id })
               .from(schema.maker)
@@ -2092,13 +2126,28 @@ export function createCatalogService(
               .limit(1);
             if (duplicate) throw new Error("Maker name already exists.");
 
+            const existingSlugs = await tx
+              .select({ slug: schema.maker.slug })
+              .from(schema.maker);
+            const slug = nextAvailableSlug(
+              input.name,
+              existingSlugs.map((maker) => maker.slug),
+            );
+
             const [row] = await tx
               .insert(schema.maker)
-              .values({ name: input.name, rootUrl: input.rootUrl })
+              .values({
+                description: input.description ?? null,
+                name: input.name,
+                rootUrl: input.rootUrl,
+                slug,
+              })
               .returning({
+                description: schema.maker.description,
                 id: schema.maker.id,
                 name: schema.maker.name,
                 rootUrl: schema.maker.rootUrl,
+                slug: schema.maker.slug,
               })
               .catch(mapCatalogNameConflict);
             if (!row) throw new Error("Failed to create maker.");
@@ -2526,12 +2575,58 @@ export function createCatalogService(
     async listMakers() {
       return await db
         .select({
+          description: schema.maker.description,
           id: schema.maker.id,
           name: schema.maker.name,
           rootUrl: schema.maker.rootUrl,
+          slug: schema.maker.slug,
         })
         .from(schema.maker)
         .orderBy(asc(schema.maker.name));
+    },
+    /**
+     * Lists maker profiles for an authorized product manager.
+     *
+     * @param actor - Authenticated administrator.
+     * @returns Name-sorted maker profiles.
+     * @rejects When authorization or persistence fails.
+     */
+    async listMakersForAdmin(actor) {
+      if (!hasPermission(actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      return await db
+        .select({
+          description: schema.maker.description,
+          id: schema.maker.id,
+          name: schema.maker.name,
+          rootUrl: schema.maker.rootUrl,
+          slug: schema.maker.slug,
+        })
+        .from(schema.maker)
+        .orderBy(asc(schema.maker.name));
+    },
+    /**
+     * Returns one maker profile to an authorized product manager.
+     *
+     * @param input - Maker identifier and authenticated administrator.
+     * @returns The matching maker, or `null` when it does not exist.
+     * @rejects When authorization or persistence fails.
+     */
+    async getMakerForAdmin(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const [maker] = await db
+        .select({
+          description: schema.maker.description,
+          id: schema.maker.id,
+          name: schema.maker.name,
+          rootUrl: schema.maker.rootUrl,
+          slug: schema.maker.slug,
+        })
+        .from(schema.maker)
+        .where(eq(schema.maker.id, input.makerId))
+        .limit(1);
+      return maker ?? null;
     },
     /**
      * Lists color effects.
@@ -2915,6 +3010,70 @@ export function createCatalogService(
           });
         }
       });
+    },
+    /**
+     * Updates mutable maker profile fields without changing its stable slug.
+     *
+     * @param input - Maker fields and authenticated administrator.
+     * @returns The updated maker profile.
+     * @rejects When authorization, lookup, conflicts, persistence, auditing, or operation logging fails.
+     */
+    async updateMaker(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await logger.operation(
+        loggerMessages.database.catalog.updateMaker,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [before] = await tx
+              .select({
+                description: schema.maker.description,
+                id: schema.maker.id,
+                name: schema.maker.name,
+                rootUrl: schema.maker.rootUrl,
+                slug: schema.maker.slug,
+              })
+              .from(schema.maker)
+              .where(eq(schema.maker.id, input.makerId))
+              .limit(1);
+            if (!before) throw new Error("Maker does not exist.");
+
+            const [after] = await tx
+              .update(schema.maker)
+              .set({
+                description: input.description,
+                name: input.name,
+                rootUrl: input.rootUrl,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.maker.id, input.makerId))
+              .returning({
+                description: schema.maker.description,
+                id: schema.maker.id,
+                name: schema.maker.name,
+                rootUrl: schema.maker.rootUrl,
+                slug: schema.maker.slug,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!after) throw new Error("Maker does not exist.");
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after,
+                before,
+                definition: productAudit.makerUpdated,
+                targetId: after.id,
+              });
+            }
+            return after;
+          }),
+        actorAttributes(input.actor.clerkId, { makerId: input.makerId }),
+      );
     },
     /**
      * Sets maker product URL validity.

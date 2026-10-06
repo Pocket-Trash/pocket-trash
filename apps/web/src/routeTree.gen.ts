@@ -57,6 +57,8 @@ import { Route as AdminFeedbackIndexRouteImport } from './routes/admin.feedback.
 import { Route as AdminFeedbackArchiveRouteImport } from './routes/admin.feedback.archive'
 import { Route as AdminFeedbackPlannedRouteImport } from './routes/admin.feedback.planned'
 import { Route as AdminFeedbackRequestsRouteImport } from './routes/admin.feedback.requests'
+import { Route as AdminMakersIndexRouteImport } from './routes/admin.makers.index'
+import { Route as AdminMakersAddRouteImport } from './routes/admin.makers.add'
 import { Route as AdminMaterialsIndexRouteImport } from './routes/admin.materials.index'
 import { Route as AdminMaterialsAddRouteImport } from './routes/admin.materials.add'
 import { Route as AdminNotificationsFeedbackRouteImport } from './routes/admin.notifications.feedback'
@@ -74,6 +76,7 @@ import { Route as UserCollectionsCollectionIdRouteImport } from './routes/user.c
 import { Route as UserCollectionsAddRouteImport } from './routes/user.collections_.add'
 import { Route as UserResourcesTrashRouteImport } from './routes/user.resources_.trash'
 import { Route as UserSettingsBetaFeaturesRouteImport } from './routes/user.settings.beta-features'
+import { Route as AdminMakersMakerIdEditRouteImport } from './routes/admin.makers.$makerId.edit'
 import { Route as AdminMaterialsMaterialIdEditRouteImport } from './routes/admin.materials.$materialId.edit'
 import { Route as CollectionsUserIdCollectionIdCollectionItemIdRouteImport } from './routes/collections_.$userId.$collectionId_.$collectionItemId'
 import { Route as ProductsProductTypeSlugProductSlugEditRouteImport } from './routes/products.$productTypeSlug.$productSlug_.edit'
@@ -320,6 +323,16 @@ const AdminFeedbackRequestsRoute = AdminFeedbackRequestsRouteImport.update({
   path: '/feedback/requests',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminMakersIndexRoute = AdminMakersIndexRouteImport.update({
+  id: '/makers/',
+  path: '/makers/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMakersAddRoute = AdminMakersAddRouteImport.update({
+  id: '/makers/add',
+  path: '/makers/add',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminMaterialsIndexRoute = AdminMaterialsIndexRouteImport.update({
   id: '/materials/',
   path: '/materials/',
@@ -413,6 +426,11 @@ const UserSettingsBetaFeaturesRoute =
     path: '/settings/beta-features',
     getParentRoute: () => UserRoute,
   } as any)
+const AdminMakersMakerIdEditRoute = AdminMakersMakerIdEditRouteImport.update({
+  id: '/makers/$makerId/edit',
+  path: '/makers/$makerId/edit',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminMaterialsMaterialIdEditRoute =
   AdminMaterialsMaterialIdEditRouteImport.update({
     id: '/materials/$materialId/edit',
@@ -492,6 +510,7 @@ export interface FileRoutesByFullPath {
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
+  '/admin/makers/add': typeof AdminMakersAddRoute
   '/admin/materials/add': typeof AdminMaterialsAddRoute
   '/admin/notifications/feedback': typeof AdminNotificationsFeedbackRoute
   '/admin/notifications/resources': typeof AdminNotificationsResourcesRoute
@@ -507,9 +526,11 @@ export interface FileRoutesByFullPath {
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/admin/feedback/': typeof AdminFeedbackIndexRoute
+  '/admin/makers/': typeof AdminMakersIndexRoute
   '/admin/materials/': typeof AdminMaterialsIndexRoute
   '/admin/settings/': typeof AdminSettingsIndexRoute
   '/admin/trash/': typeof AdminTrashIndexRoute
+  '/admin/makers/$makerId/edit': typeof AdminMakersMakerIdEditRoute
   '/admin/materials/$materialId/edit': typeof AdminMaterialsMaterialIdEditRoute
   '/collections/$userId/$collectionId/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
@@ -560,6 +581,7 @@ export interface FileRoutesByTo {
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
+  '/admin/makers/add': typeof AdminMakersAddRoute
   '/admin/materials/add': typeof AdminMaterialsAddRoute
   '/admin/notifications/feedback': typeof AdminNotificationsFeedbackRoute
   '/admin/notifications/resources': typeof AdminNotificationsResourcesRoute
@@ -575,9 +597,11 @@ export interface FileRoutesByTo {
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/admin/feedback': typeof AdminFeedbackIndexRoute
+  '/admin/makers': typeof AdminMakersIndexRoute
   '/admin/materials': typeof AdminMaterialsIndexRoute
   '/admin/settings': typeof AdminSettingsIndexRoute
   '/admin/trash': typeof AdminTrashIndexRoute
+  '/admin/makers/$makerId/edit': typeof AdminMakersMakerIdEditRoute
   '/admin/materials/$materialId/edit': typeof AdminMaterialsMaterialIdEditRoute
   '/collections/$userId/$collectionId/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
@@ -633,6 +657,7 @@ export interface FileRoutesById {
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
+  '/admin/makers/add': typeof AdminMakersAddRoute
   '/admin/materials/add': typeof AdminMaterialsAddRoute
   '/admin/notifications/feedback': typeof AdminNotificationsFeedbackRoute
   '/admin/notifications/resources': typeof AdminNotificationsResourcesRoute
@@ -648,9 +673,11 @@ export interface FileRoutesById {
   '/user/resources_/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
   '/admin/feedback/': typeof AdminFeedbackIndexRoute
+  '/admin/makers/': typeof AdminMakersIndexRoute
   '/admin/materials/': typeof AdminMaterialsIndexRoute
   '/admin/settings/': typeof AdminSettingsIndexRoute
   '/admin/trash/': typeof AdminTrashIndexRoute
+  '/admin/makers/$makerId/edit': typeof AdminMakersMakerIdEditRoute
   '/admin/materials/$materialId/edit': typeof AdminMaterialsMaterialIdEditRoute
   '/collections_/$userId/$collectionId_/$collectionItemId': typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   '/products/$productTypeSlug/$productSlug_/edit': typeof ProductsProductTypeSlugProductSlugEditRoute
@@ -707,6 +734,7 @@ export interface FileRouteTypes {
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
+    | '/admin/makers/add'
     | '/admin/materials/add'
     | '/admin/notifications/feedback'
     | '/admin/notifications/resources'
@@ -722,9 +750,11 @@ export interface FileRouteTypes {
     | '/user/resources/trash'
     | '/user/settings/beta-features'
     | '/admin/feedback/'
+    | '/admin/makers/'
     | '/admin/materials/'
     | '/admin/settings/'
     | '/admin/trash/'
+    | '/admin/makers/$makerId/edit'
     | '/admin/materials/$materialId/edit'
     | '/collections/$userId/$collectionId/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug/edit'
@@ -775,6 +805,7 @@ export interface FileRouteTypes {
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
+    | '/admin/makers/add'
     | '/admin/materials/add'
     | '/admin/notifications/feedback'
     | '/admin/notifications/resources'
@@ -790,9 +821,11 @@ export interface FileRouteTypes {
     | '/user/resources/trash'
     | '/user/settings/beta-features'
     | '/admin/feedback'
+    | '/admin/makers'
     | '/admin/materials'
     | '/admin/settings'
     | '/admin/trash'
+    | '/admin/makers/$makerId/edit'
     | '/admin/materials/$materialId/edit'
     | '/collections/$userId/$collectionId/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug/edit'
@@ -847,6 +880,7 @@ export interface FileRouteTypes {
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
+    | '/admin/makers/add'
     | '/admin/materials/add'
     | '/admin/notifications/feedback'
     | '/admin/notifications/resources'
@@ -862,9 +896,11 @@ export interface FileRouteTypes {
     | '/user/resources_/trash'
     | '/user/settings/beta-features'
     | '/admin/feedback/'
+    | '/admin/makers/'
     | '/admin/materials/'
     | '/admin/settings/'
     | '/admin/trash/'
+    | '/admin/makers/$makerId/edit'
     | '/admin/materials/$materialId/edit'
     | '/collections_/$userId/$collectionId_/$collectionItemId'
     | '/products/$productTypeSlug/$productSlug_/edit'
@@ -1244,6 +1280,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFeedbackRequestsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/makers/': {
+      id: '/admin/makers/'
+      path: '/makers'
+      fullPath: '/admin/makers/'
+      preLoaderRoute: typeof AdminMakersIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/makers/add': {
+      id: '/admin/makers/add'
+      path: '/makers/add'
+      fullPath: '/admin/makers/add'
+      preLoaderRoute: typeof AdminMakersAddRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/materials/': {
       id: '/admin/materials/'
       path: '/materials'
@@ -1363,6 +1413,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserSettingsBetaFeaturesRouteImport
       parentRoute: typeof UserRoute
     }
+    '/admin/makers/$makerId/edit': {
+      id: '/admin/makers/$makerId/edit'
+      path: '/makers/$makerId/edit'
+      fullPath: '/admin/makers/$makerId/edit'
+      preLoaderRoute: typeof AdminMakersMakerIdEditRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/materials/$materialId/edit': {
       id: '/admin/materials/$materialId/edit'
       path: '/materials/$materialId/edit'
@@ -1421,6 +1478,7 @@ interface AdminRouteChildren {
   AdminFeedbackArchiveRoute: typeof AdminFeedbackArchiveRoute
   AdminFeedbackPlannedRoute: typeof AdminFeedbackPlannedRoute
   AdminFeedbackRequestsRoute: typeof AdminFeedbackRequestsRoute
+  AdminMakersAddRoute: typeof AdminMakersAddRoute
   AdminMaterialsAddRoute: typeof AdminMaterialsAddRoute
   AdminNotificationsFeedbackRoute: typeof AdminNotificationsFeedbackRoute
   AdminNotificationsResourcesRoute: typeof AdminNotificationsResourcesRoute
@@ -1428,9 +1486,11 @@ interface AdminRouteChildren {
   AdminTrashCatalogImagesRoute: typeof AdminTrashCatalogImagesRoute
   AdminTrashResourcesRoute: typeof AdminTrashResourcesRoute
   AdminFeedbackIndexRoute: typeof AdminFeedbackIndexRoute
+  AdminMakersIndexRoute: typeof AdminMakersIndexRoute
   AdminMaterialsIndexRoute: typeof AdminMaterialsIndexRoute
   AdminSettingsIndexRoute: typeof AdminSettingsIndexRoute
   AdminTrashIndexRoute: typeof AdminTrashIndexRoute
+  AdminMakersMakerIdEditRoute: typeof AdminMakersMakerIdEditRoute
   AdminMaterialsMaterialIdEditRoute: typeof AdminMaterialsMaterialIdEditRoute
 }
 
@@ -1442,6 +1502,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminFeedbackArchiveRoute: AdminFeedbackArchiveRoute,
   AdminFeedbackPlannedRoute: AdminFeedbackPlannedRoute,
   AdminFeedbackRequestsRoute: AdminFeedbackRequestsRoute,
+  AdminMakersAddRoute: AdminMakersAddRoute,
   AdminMaterialsAddRoute: AdminMaterialsAddRoute,
   AdminNotificationsFeedbackRoute: AdminNotificationsFeedbackRoute,
   AdminNotificationsResourcesRoute: AdminNotificationsResourcesRoute,
@@ -1449,9 +1510,11 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminTrashCatalogImagesRoute: AdminTrashCatalogImagesRoute,
   AdminTrashResourcesRoute: AdminTrashResourcesRoute,
   AdminFeedbackIndexRoute: AdminFeedbackIndexRoute,
+  AdminMakersIndexRoute: AdminMakersIndexRoute,
   AdminMaterialsIndexRoute: AdminMaterialsIndexRoute,
   AdminSettingsIndexRoute: AdminSettingsIndexRoute,
   AdminTrashIndexRoute: AdminTrashIndexRoute,
+  AdminMakersMakerIdEditRoute: AdminMakersMakerIdEditRoute,
   AdminMaterialsMaterialIdEditRoute: AdminMaterialsMaterialIdEditRoute,
 }
 

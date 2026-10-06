@@ -56,7 +56,7 @@ describe("collection-item approval", () => {
         await runMigration(client, folder, file);
       const [maker] = await db
         .insert(schema.maker)
-        .values({ name: "Review maker" })
+        .values({ name: "Review maker", slug: "review-maker" })
         .returning();
       const [productType] = await db
         .insert(schema.productType)

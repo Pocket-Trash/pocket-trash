@@ -4,6 +4,7 @@ import type {
   CatalogFinishOption,
   CatalogImage,
   CatalogLookup,
+  CatalogMaker,
   CatalogProduct,
   CatalogProductType,
   UserCollectionItem,
@@ -949,14 +950,7 @@ type LookupDialogProps = (
        *
        * @param value - Created maker value.
        */
-      onCreated: (value: {
-        /** Maker identifier. */
-        id: number;
-        /** Maker name. */
-        name: string;
-        /** Optional maker website root. */
-        rootUrl: string | null;
-      }) => void;
+      onCreated: (value: CatalogMaker) => void;
     }
   | {
       /** Lookup kind created by this dialog. */

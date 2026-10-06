@@ -477,7 +477,7 @@ async function seedInventory(client: PGlite) {
     insert into user_settings (user_id)
       select id from users where clerk_id = 'user_to_erase';
 
-    insert into makers (name, root_url) values ('Shared maker', 'https://maker.test');
+    insert into makers (name, slug, root_url) values ('Shared maker', 'shared-maker', 'https://maker.test');
     insert into product_types (name, slug) values ('Spinner', 'spinner');
     insert into materials (name, slug) values ('Metal', 'metal');
     insert into product (

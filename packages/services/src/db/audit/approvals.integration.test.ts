@@ -32,7 +32,7 @@ describe("approval audit adoption", () => {
         .returning();
       const [maker] = await db
         .insert(schema.maker)
-        .values({ name: "Maker" })
+        .values({ name: "Maker", slug: "maker" })
         .returning();
       const [productType] = await db
         .insert(schema.productType)

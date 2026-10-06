@@ -1,45 +1,11 @@
+import {
+  nextAvailableSlug,
+  slugify,
+  slugPattern,
+} from "@package/services/catalog-slug";
 import { z } from "zod";
 
-/**
- * Pattern for lowercase alphanumeric slugs separated by single hyphens.
- */
-export const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-
-/**
- * Converts text to a lowercase hyphenated ASCII slug.
- *
- * @param value - Text to normalize.
- * @returns The normalized slug, possibly empty.
- */
-export function slugify(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
-/**
- * Builds a slug and appends the first available numeric suffix when needed.
- *
- * @param name - Human-readable name.
- * @param existingSlugs - Slugs already in use.
- * @returns The available base slug or suffixed slug.
- */
-export function nextAvailableSlug(
-  name: string,
-  existingSlugs: readonly string[],
-): string {
-  const base = slugify(name);
-  const used = new Set(existingSlugs);
-  if (!used.has(base)) return base;
-
-  let suffix = 2;
-  while (used.has(`${base}-${suffix}`)) suffix += 1;
-  return `${base}-${suffix}`;
-}
+export { nextAvailableSlug, slugify, slugPattern };
 
 /**
  * Trims a URL, removes trailing slashes, and maps an empty result to `null`.
