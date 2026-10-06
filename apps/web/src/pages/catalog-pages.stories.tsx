@@ -328,6 +328,31 @@ export const CollectionItem: Story = {
   ),
 };
 
+/** Standalone body-hosted slider item with live read-only catalog setup. */
+export const StandaloneSliderCollectionItem: Story = {
+  /**
+   * Renders the standalone slider collection-item story.
+   * @returns A slider item and its live catalog facts.
+   */
+  render: () => (
+    <CollectionItemDetailPage
+      item={{
+        ...item,
+        bearing: null,
+        bearingOverride: null,
+        displayName: "My Rail Slider",
+        installedButtonId: null,
+        name: slider.name,
+        productId: slider.id,
+        productSlug: slider.slug,
+        productTypeName: slider.productTypeName,
+        productTypeSlug: "slider",
+      }}
+      product={slider}
+    />
+  ),
+};
+
 /** Home page story. */
 export const Home: Story = {
   /**

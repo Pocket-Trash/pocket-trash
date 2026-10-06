@@ -3,11 +3,24 @@ import {
   collectionDeletionSchema,
   collectionItemApprovalSchema,
   collectionItemDeletionSchema,
+  collectionProductTypeIsSupported,
   collectionWriteSchema,
   productApprovalSchema,
   productDeletionSchema,
   productFormSchema,
 } from "./catalog-api";
+
+describe("collection product types", () => {
+  it.each([
+    "spinner",
+    "spinner-button",
+    "slider",
+    "slider-plate",
+    "slider-insert",
+  ])("supports standalone %s items", (productType) => {
+    expect(collectionProductTypeIsSupported(productType)).toBe(true);
+  });
+});
 
 /**
  * Baseline product-form fields combined with finish options by schema tests.
