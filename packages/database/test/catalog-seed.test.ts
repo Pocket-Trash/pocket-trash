@@ -567,6 +567,9 @@ describe("catalog seed", () => {
     await seedCatalog(state.db);
 
     expect(state.productTypes.size).toBe(seedProductTypes.length);
+    expect([...state.productTypes.keys()]).toEqual(
+      expect.arrayContaining(["slider", "slider-plate", "slider-insert"]),
+    );
     expect(state.makers.size).toBe(seedMakers.length);
     expect(state.materials.size).toBe(seedMaterials.length);
     expect(state.finishes.size).toBe(seedFinishes.length);

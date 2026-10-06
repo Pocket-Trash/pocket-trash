@@ -142,4 +142,69 @@ describe("catalog schema", () => {
       getTableConfig(schema.collectionSpinner).columns.map(({ name }) => name),
     ).toEqual(expect.arrayContaining(["bearing"]));
   });
+
+  it("models slider subtypes, reviewed compatibility, and exact inclusion separately", () => {
+    const slider = getTableConfig(schema.productSlider);
+    const plate = getTableConfig(schema.productSliderPlate);
+    const insert = getTableConfig(schema.productSliderInsert);
+    const family = getTableConfig(schema.compatibilityFamily);
+    const membership = getTableConfig(schema.productCompatibilityFamily);
+    const advisory = getTableConfig(schema.productCompatibilityAdvisory);
+    const inclusion = getTableConfig(schema.productIncludedComponent);
+
+    expect(slider.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "id",
+        "magnet_system",
+        "weight_g",
+        "weight_basis",
+        "length_mm",
+        "width_mm",
+        "thickness_mm",
+      ]),
+    );
+    expect(slider.checks.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "product_slider_magnet_system_valid",
+        "product_slider_weight_basis_consistent",
+        "product_slider_measurements_positive",
+      ]),
+    );
+    for (const subtype of [plate, insert]) {
+      expect(subtype.columns.map(({ name }) => name)).toEqual(
+        expect.arrayContaining([
+          "id",
+          "weight_g",
+          "length_mm",
+          "width_mm",
+          "thickness_mm",
+        ]),
+      );
+    }
+    expect(family.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining(["maker_id", "name", "slug"]),
+    );
+    expect(family.indexes.map(({ config }) => config.name)).toEqual(
+      expect.arrayContaining([
+        "compatibility_family_maker_name_unique",
+        "compatibility_family_maker_slug_unique",
+      ]),
+    );
+    expect(membership.primaryKeys).toHaveLength(1);
+    expect(advisory.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "product_id",
+        "related_product_id",
+        "text",
+        "reviewed_at",
+        "reviewed_by_clerk_id",
+      ]),
+    );
+    expect(inclusion.primaryKeys).toHaveLength(1);
+    expect(
+      inclusion.foreignKeys.map(
+        ({ reference }) => reference().foreignColumns[0]?.name,
+      ),
+    ).toEqual(["id", "id"]);
+  });
 });

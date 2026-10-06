@@ -525,6 +525,132 @@ export const productMaterial = pgTable(
   ],
 );
 
+/** Maker-scoped reviewed compatibility family for sliders and components. */
+export const compatibilityFamily = pgTable(
+  "compatibility_family",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    makerId: bigint("maker_id", { mode: "number" })
+      .notNull()
+      .references(() => maker.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("compatibility_family_maker_name_unique").on(
+      table.makerId,
+      sql`lower(${table.name})`,
+    ),
+    uniqueIndex("compatibility_family_maker_slug_unique").on(
+      table.makerId,
+      table.slug,
+    ),
+  ],
+);
+
+/** Reviewed many-to-many membership between products and compatibility families. */
+export const productCompatibilityFamily = pgTable(
+  "product_compatibility_family",
+  {
+    productId: bigint("product_id", { mode: "number" })
+      .notNull()
+      .references(() => product.id, { onDelete: "cascade" }),
+    compatibilityFamilyId: bigint("compatibility_family_id", {
+      mode: "number",
+    })
+      .notNull()
+      .references(() => compatibilityFamily.id, { onDelete: "restrict" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    reviewedByClerkId: text("reviewed_by_clerk_id").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.productId, table.compatibilityFamilyId],
+    }),
+    index("product_compatibility_family_family_idx").on(
+      table.compatibilityFamilyId,
+    ),
+  ],
+);
+
+/** Reviewed, non-blocking compatibility warning between two exact products. */
+export const productCompatibilityAdvisory = pgTable(
+  "product_compatibility_advisory",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    productId: bigint("product_id", { mode: "number" })
+      .notNull()
+      .references(() => product.id, { onDelete: "cascade" }),
+    relatedProductId: bigint("related_product_id", { mode: "number" })
+      .notNull()
+      .references(() => product.id, { onDelete: "restrict" }),
+    text: text("text").notNull(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    reviewedByClerkId: text("reviewed_by_clerk_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("product_compatibility_advisory_product_related_text_unique").on(
+      table.productId,
+      table.relatedProductId,
+      table.text,
+    ),
+    index("product_compatibility_advisory_related_idx").on(
+      table.relatedProductId,
+    ),
+    check(
+      "product_compatibility_advisory_distinct_products",
+      sql`${table.productId} <> ${table.relatedProductId}`,
+    ),
+    check(
+      "product_compatibility_advisory_text_valid",
+      sql`char_length(trim(${table.text})) between 1 and 1000`,
+    ),
+  ],
+);
+
+/** Exact component products sold with a parent catalog product. */
+export const productIncludedComponent = pgTable(
+  "product_included_component",
+  {
+    productId: bigint("product_id", { mode: "number" })
+      .notNull()
+      .references(() => product.id, { onDelete: "cascade" }),
+    componentProductId: bigint("component_product_id", { mode: "number" })
+      .notNull()
+      .references(() => product.id, { onDelete: "restrict" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.productId, table.componentProductId] }),
+    index("product_included_component_component_idx").on(
+      table.componentProductId,
+    ),
+    check(
+      "product_included_component_distinct_products",
+      sql`${table.productId} <> ${table.componentProductId}`,
+    ),
+  ],
+);
+
 /**
  * Builds shared identity and timestamp columns for catalog lookup tables.
  *
@@ -738,6 +864,102 @@ export const productSpinnerButton = pgTable(
   ],
 );
 
+/** Slider body measurements and explicit physical magnet-host capability. */
+export const productSlider = pgTable(
+  "product_slider",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .references(() => product.id, { onDelete: "cascade" }),
+    magnetSystem: text("magnet_system", {
+      enum: ["body-hosted", "insert-driven"],
+    }).notNull(),
+    weightG: decimal("weight_g"),
+    weightBasis: text("weight_basis", {
+      enum: ["body-only", "complete-build"],
+    }),
+    lengthMm: decimal("length_mm"),
+    widthMm: decimal("width_mm"),
+    thicknessMm: decimal("thickness_mm"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      "product_slider_magnet_system_valid",
+      sql`${table.magnetSystem} in ('body-hosted', 'insert-driven')`,
+    ),
+    check(
+      "product_slider_weight_basis_consistent",
+      sql`num_nonnulls(${table.weightG}, ${table.weightBasis}) in (0, 2)`,
+    ),
+    check(
+      "product_slider_weight_basis_valid",
+      sql`${table.weightBasis} is null or ${table.weightBasis} in ('body-only', 'complete-build')`,
+    ),
+    check(
+      "product_slider_measurements_positive",
+      sql`${table.weightG} > 0 and ${table.lengthMm} > 0 and ${table.widthMm} > 0 and ${table.thicknessMm} > 0`,
+    ),
+  ],
+);
+
+/** Optional set-level measurements for one matched slider plate pair or set. */
+export const productSliderPlate = pgTable(
+  "product_slider_plate",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .references(() => product.id, { onDelete: "cascade" }),
+    weightG: decimal("weight_g"),
+    lengthMm: decimal("length_mm"),
+    widthMm: decimal("width_mm"),
+    thicknessMm: decimal("thickness_mm"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      "product_slider_plate_measurements_positive",
+      sql`${table.weightG} > 0 and ${table.lengthMm} > 0 and ${table.widthMm} > 0 and ${table.thicknessMm} > 0`,
+    ),
+  ],
+);
+
+/** Optional set-level measurements for one slider insert or cassette set. */
+export const productSliderInsert = pgTable(
+  "product_slider_insert",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .references(() => product.id, { onDelete: "cascade" }),
+    weightG: decimal("weight_g"),
+    lengthMm: decimal("length_mm"),
+    widthMm: decimal("width_mm"),
+    thicknessMm: decimal("thickness_mm"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      "product_slider_insert_measurements_positive",
+      sql`${table.weightG} > 0 and ${table.lengthMm} > 0 and ${table.widthMm} > 0 and ${table.thicknessMm} > 0`,
+    ),
+  ],
+);
+
 /** Catalog spinner-button mappings selected for collection items. */
 export const collectionSpinnerButton = pgTable("collection_spinner_button", {
   id: bigint("id", { mode: "number" })
@@ -806,6 +1028,28 @@ export type NewCollectionItemImage = typeof collectionItemImage.$inferInsert;
 export type ProductMaterial = typeof productMaterial.$inferSelect;
 /** Values accepted when creating a product material row. */
 export type NewProductMaterial = typeof productMaterial.$inferInsert;
+/** Stored compatibility family row. */
+export type CompatibilityFamily = typeof compatibilityFamily.$inferSelect;
+/** Values accepted when creating a compatibility family row. */
+export type NewCompatibilityFamily = typeof compatibilityFamily.$inferInsert;
+/** Stored product compatibility-family membership. */
+export type ProductCompatibilityFamily =
+  typeof productCompatibilityFamily.$inferSelect;
+/** Values accepted for a product compatibility-family membership. */
+export type NewProductCompatibilityFamily =
+  typeof productCompatibilityFamily.$inferInsert;
+/** Stored reviewed product compatibility advisory. */
+export type ProductCompatibilityAdvisory =
+  typeof productCompatibilityAdvisory.$inferSelect;
+/** Values accepted for a reviewed product compatibility advisory. */
+export type NewProductCompatibilityAdvisory =
+  typeof productCompatibilityAdvisory.$inferInsert;
+/** Stored exact included-component relationship. */
+export type ProductIncludedComponent =
+  typeof productIncludedComponent.$inferSelect;
+/** Values accepted for an exact included-component relationship. */
+export type NewProductIncludedComponent =
+  typeof productIncludedComponent.$inferInsert;
 /** Stored finish row. */
 export type Finish = typeof finish.$inferSelect;
 /** Values accepted when creating a finish row. */
@@ -838,6 +1082,18 @@ export type NewProductSpinner = typeof productSpinner.$inferInsert;
 export type ProductSpinnerButton = typeof productSpinnerButton.$inferSelect;
 /** Values accepted when creating a product spinner button row. */
 export type NewProductSpinnerButton = typeof productSpinnerButton.$inferInsert;
+/** Stored slider body row. */
+export type ProductSlider = typeof productSlider.$inferSelect;
+/** Values accepted when creating a slider body row. */
+export type NewProductSlider = typeof productSlider.$inferInsert;
+/** Stored slider plate-set row. */
+export type ProductSliderPlate = typeof productSliderPlate.$inferSelect;
+/** Values accepted when creating a slider plate-set row. */
+export type NewProductSliderPlate = typeof productSliderPlate.$inferInsert;
+/** Stored slider insert-set row. */
+export type ProductSliderInsert = typeof productSliderInsert.$inferSelect;
+/** Values accepted when creating a slider insert-set row. */
+export type NewProductSliderInsert = typeof productSliderInsert.$inferInsert;
 /** Stored collection spinner row. */
 export type CollectionSpinner = typeof collectionSpinner.$inferSelect;
 /** Values accepted when creating a collection spinner row. */
