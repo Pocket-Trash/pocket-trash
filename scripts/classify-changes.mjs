@@ -48,6 +48,15 @@ const changeClassificationRules = [
     domains: ["web", "preview", "safe_e2e", "validation"],
   },
   {
+    category: "web-local-e2e",
+    paths: [
+      "apps/web/playwright.local.config.ts",
+      "apps/web/vite.local-e2e.config.ts",
+    ],
+    prefixes: ["apps/web/e2e/local/"],
+    domains: ["web", "safe_e2e", "validation"],
+  },
+  {
     category: "web-mutation-e2e",
     prefixes: ["apps/web/e2e/"],
     domains: ["web", "preview", "safe_e2e", "mutation_e2e", "validation"],

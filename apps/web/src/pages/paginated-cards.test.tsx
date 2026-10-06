@@ -3,7 +3,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PaginatedCards } from "./catalog-pages";
+import { PaginatedCards } from "@/components/paginated-cards";
 
 vi.mock("@/lib/catalog-copy", () => ({
   /**

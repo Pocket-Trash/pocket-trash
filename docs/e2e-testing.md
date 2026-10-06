@@ -22,7 +22,25 @@ The same path must contain development `CLERK_PUBLISHABLE_KEY` and
 The suite signs each test into a fresh browser context and does not save shared
 authentication state.
 
-## Local smoke tests
+## Local non-mutating regressions
+
+Run deterministic browser regressions against the current worktree:
+
+```sh
+pnpm e2e:local
+```
+
+Playwright starts a purpose-built local Vite app, waits for it, and always
+stops it after the suite. The harness uses the production router, search-param
+helpers, and responsive pagination component with in-memory fixtures. It does
+not load Infisical, Clerk test users, a database, a deployed preview, or any
+mutation-tagged test.
+
+The shared change classifier selects this suite for local web-regression
+domains during `pnpm validate:pr`. Deployed-preview smoke tests and guarded
+mutation coverage remain separate after a push.
+
+## Deployed smoke tests
 
 Install Chromium once:
 

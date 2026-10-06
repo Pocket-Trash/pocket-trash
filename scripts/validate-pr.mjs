@@ -164,6 +164,15 @@ export function createValidationPlan(domains) {
       reason: "no scraper-domain changes",
     },
     {
+      id: "local-e2e",
+      label: "Local browser regressions",
+      command: "pnpm",
+      args: ["e2e:local"],
+      selected: domains.web && domains.safe_e2e,
+      requiresCredentials: false,
+      reason: "no local web-regression domains changed",
+    },
+    {
       id: "storybook-test",
       label: "Storybook tests",
       command: "pnpm",

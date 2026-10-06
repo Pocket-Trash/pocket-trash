@@ -23,8 +23,10 @@ export default defineConfig({
   ],
   retries: process.env.CI ? 1 : 0,
   testDir: "./e2e",
-  testIgnore:
-    process.env.E2E_RUN_MUTATIONS === "true" ? undefined : /mutation\.spec\.ts/,
+  testIgnore: [
+    /local\//,
+    ...(process.env.E2E_RUN_MUTATIONS === "true" ? [] : [/mutation\.spec\.ts/]),
+  ],
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:4005",
     screenshot: "only-on-failure",
