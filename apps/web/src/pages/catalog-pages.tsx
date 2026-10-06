@@ -14,7 +14,8 @@ import type {
 } from "@package/services";
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useId, useState } from "react";
+import { CircleHelp } from "lucide-react";
+import { useEffect, useId, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
   CatalogFilterBar,
@@ -31,6 +32,11 @@ import { ProductCard } from "@/components/product-card";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { UserPageShell } from "@/components/user-page-shell";
 import { finishOptionLabel } from "@/lib/catalog";
 import {
@@ -62,6 +68,35 @@ export {
   getCatalogPageSize,
   PaginatedCards,
 } from "@/components/paginated-cards";
+
+/** Localized failure returned by a visibility server mutation. */
+type VisibilityMutationFailure = {
+  /** Primary localized error key. */
+  formError: string;
+  /** Optional secondary localized error key. */
+  formErrorDetail?: string;
+  /** Interpolation values for the secondary error. */
+  formErrorValues?: Readonly<Record<string, unknown>>;
+  /** Failure discriminator. */
+  ok: false;
+};
+
+/**
+ * Returns whether a visibility mutation returned a structured failure.
+ *
+ * @param value - Candidate server mutation result.
+ * @returns Whether the result is a localized visibility failure.
+ */
+function isMutationFailure(value: unknown): value is VisibilityMutationFailure {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "ok" in value &&
+      value.ok === false &&
+      "formError" in value &&
+      typeof value.formError === "string",
+  );
+}
 
 /**
  * Builds localized copy for catalog filters.
@@ -1662,6 +1697,8 @@ export function CollectionItemDetailPage({
               initialPrivate={item.isPrivate}
               isAdminPrivate={item.isAdminPrivate}
               isOwner={Boolean(item.isOwner)}
+              privacyInherited={item.privacyInheritedFromItemId != null}
+              savedIsPrivate={item.savedIsPrivate}
               onChange={(isPrivate, reason) =>
                 setCollectionItemVisibility({
                   data: {
@@ -1757,20 +1794,33 @@ export function CollectionItemDetailPage({
                   ) : null}
                 </div>
               ) : (
-                t("web.catalog.defaultButton")
+                t(
+                  item.installedButtonUnavailable
+                    ? "web.slider.moderation.unavailableComponent"
+                    : "web.catalog.defaultButton",
+                )
               )}
             </Detail>
           ) : null}
           {item.productTypeSlug === "slider" ? (
             <Detail label={t("web.slider.component.installedPlate")}>
-              {installedPlate?.displayName ?? t("web.slider.component.noPlate")}
+              {installedPlate?.displayName ??
+                t(
+                  item.installedPlateUnavailable
+                    ? "web.slider.moderation.unavailableComponent"
+                    : "web.slider.component.noPlate",
+                )}
             </Detail>
           ) : null}
           {item.productTypeSlug === "slider" &&
           product?.magnetSystem === "insert-driven" ? (
             <Detail label={t("web.slider.component.installedInsert")}>
               {installedInsert?.displayName ??
-                t("web.slider.component.noInsert")}
+                t(
+                  item.installedInsertUnavailable
+                    ? "web.slider.moderation.unavailableComponent"
+                    : "web.slider.component.noInsert",
+                )}
             </Detail>
           ) : null}
           {item.productTypeSlug === "spinner" && item.bearing ? (
@@ -1855,6 +1905,8 @@ export function CollectionItemDetailPage({
  * @param props.initialPrivate - Initial private state.
  * @param props.isAdminPrivate - Whether moderation forced privacy.
  * @param props.isOwner - Whether the viewer owns the resource.
+ * @param props.privacyInherited - Whether an assembly parent controls privacy.
+ * @param props.savedIsPrivate - Privacy preference restored after detaching.
  * @param props.onChange - Persists a visibility change.
  * @param props.t - Catalog translation formatter.
  * @returns The visibility control.
@@ -1865,6 +1917,8 @@ function VisibilityButton({
   initialPrivate,
   isAdminPrivate,
   isOwner,
+  privacyInherited = false,
+  savedIsPrivate,
   onChange,
   t,
 }: {
@@ -1878,6 +1932,10 @@ function VisibilityButton({
   isAdminPrivate: boolean;
   /** Whether the viewer owns the resource. */
   isOwner: boolean;
+  /** Whether an assembly parent controls the effective privacy state. */
+  privacyInherited?: boolean;
+  /** Saved privacy preference restored when an installed component detaches. */
+  savedIsPrivate?: boolean;
   /**
    * Persists a visibility change.
    *
@@ -1890,50 +1948,145 @@ function VisibilityButton({
   t: ReturnType<typeof useCatalogCopy>;
 }) {
   const [isPrivate, setIsPrivate] = useState(initialPrivate);
+  const [error, setError] = useState<string | null>(null);
   const actorIsModerating = canAdminister && !isOwner;
   const locked = disabled || (isAdminPrivate && !actorIsModerating);
 
+  if (privacyInherited) {
+    return (
+      <div className="grid justify-items-end gap-1">
+        <div className="flex items-center gap-2">
+          <PublicResourceSwitch
+            checked={!isPrivate}
+            disabled
+            onCheckedChange={() => undefined}
+          />
+          <span className="text-sm text-muted-foreground">
+            {t("web.slider.privacy.inherited")}
+          </span>
+          <Tooltip>
+            <TooltipTrigger
+              aria-label={t("web.slider.privacy.inheritedHelp")}
+              className="rounded-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              render={<button type="button" />}
+            >
+              <CircleHelp aria-hidden="true" className="size-4" />
+            </TooltipTrigger>
+            <TooltipContent className="max-w-72" side="bottom">
+              <span>{t("web.slider.privacy.inheritedDescription")}</span>
+              <span className="mt-1 block">
+                {t("web.slider.privacy.savedPreference")}
+              </span>
+              {isAdminPrivate ? (
+                <span className="mt-1 block">
+                  {t("web.slider.privacy.staffForcedPrivate")}
+                </span>
+              ) : null}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          {t(
+            savedIsPrivate
+              ? "web.resources.visibility.private"
+              : "web.resources.visibility.public",
+          )}
+        </span>
+      </div>
+    );
+  }
+
   if (!actorIsModerating) {
     return (
-      <PublicResourceSwitch
-        checked={!isPrivate}
-        disabled={locked}
-        onCheckedChange={(isPublic) => {
-          void onChange(!isPublic).then(() => setIsPrivate(!isPublic));
-        }}
-      />
+      <div className="grid justify-items-end gap-1">
+        <PublicResourceSwitch
+          checked={!isPrivate}
+          disabled={locked}
+          onCheckedChange={(isPublic) => {
+            setError(null);
+            void onChange(!isPublic).then((result) => {
+              if (isMutationFailure(result)) {
+                setError(
+                  [
+                    t(result.formError),
+                    result.formErrorDetail
+                      ? t(result.formErrorDetail, result.formErrorValues)
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" "),
+                );
+                return;
+              }
+              setIsPrivate(!isPublic);
+            });
+          }}
+        />
+        {error ? (
+          <span
+            className="max-w-80 text-right text-xs text-destructive"
+            role="alert"
+          >
+            {error}
+          </span>
+        ) : null}
+      </div>
     );
   }
 
   return (
-    <button
-      aria-pressed={!isPrivate}
-      className={buttonVariants({ variant: "outline" })}
-      disabled={locked}
-      onClick={async () => {
-        const nextPrivate = !isPrivate;
-        const reason = actorIsModerating
-          ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
-          : undefined;
-        if (actorIsModerating && !reason) return;
-        await onChange(nextPrivate, reason);
-        setIsPrivate(nextPrivate);
-      }}
-      title={
-        disabled
-          ? t("web.resources.visibility.private")
-          : isAdminPrivate
-            ? t("web.resources.visibility.adminPrivateTooltip")
-            : undefined
-      }
-      type="button"
-    >
-      {t(
-        isPrivate
-          ? "web.resources.visibility.private"
-          : "web.resources.visibility.public",
-      )}
-    </button>
+    <div className="grid justify-items-end gap-1">
+      <button
+        aria-pressed={!isPrivate}
+        className={buttonVariants({ variant: "outline" })}
+        disabled={locked}
+        onClick={async () => {
+          const nextPrivate = !isPrivate;
+          const reason = actorIsModerating
+            ? window.prompt(t("web.resources.moderation.reasonLabel"))?.trim()
+            : undefined;
+          if (actorIsModerating && !reason) return;
+          setError(null);
+          const result = await onChange(nextPrivate, reason);
+          if (isMutationFailure(result)) {
+            setError(
+              [
+                t(result.formError),
+                result.formErrorDetail
+                  ? t(result.formErrorDetail, result.formErrorValues)
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" "),
+            );
+            return;
+          }
+          setIsPrivate(nextPrivate);
+        }}
+        title={
+          disabled
+            ? t("web.resources.visibility.private")
+            : isAdminPrivate
+              ? t("web.resources.visibility.adminPrivateTooltip")
+              : undefined
+        }
+        type="button"
+      >
+        {t(
+          isPrivate
+            ? "web.resources.visibility.private"
+            : "web.resources.visibility.public",
+        )}
+      </button>
+      {error ? (
+        <span
+          className="max-w-80 text-right text-xs text-destructive"
+          role="alert"
+        >
+          {error}
+        </span>
+      ) : null}
+    </div>
   );
 }
 

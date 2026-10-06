@@ -1089,6 +1089,54 @@ describe("CollectionItemDetailPage", () => {
     );
   });
 
+  it("labels redacted installed components as unavailable instead of defaults", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        item={{
+          ...item,
+          installedInsertUnavailable: true,
+          installedPlateUnavailable: true,
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+        product={{
+          ...product,
+          magnetSystem: "insert-driven",
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+      />,
+    );
+
+    expect(
+      html.match(/web\.slider\.moderation\.unavailableComponent/g),
+    ).toHaveLength(2);
+    expect(html).not.toContain("web.slider.component.noPlate");
+    expect(html).not.toContain("web.slider.component.noInsert");
+  });
+
+  it("renders installed component privacy as a read-only inherited control", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        item={{
+          ...item,
+          canEdit: true,
+          isOwner: true,
+          privacyInheritedFromItemId: 2010,
+          savedIsPrivate: true,
+        }}
+      />,
+    );
+
+    expect(html).toContain("web.slider.privacy.inherited");
+    expect(html).toContain("web.slider.privacy.inheritedHelp");
+    expect(html).toContain("disabled");
+  });
+
   it("shows an owned slider's effective setup without filling snapshot gaps", () => {
     const item = owners[0]?.items[0];
     if (!item) throw new Error("Collection item fixture is required.");
