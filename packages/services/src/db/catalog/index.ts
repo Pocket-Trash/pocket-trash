@@ -149,6 +149,14 @@ export type CatalogMaker = {
   slug: string;
 };
 
+/** Public maker directory entry with visibility-filtered catalog totals. */
+export type PublicMakerSummary = CatalogMaker & {
+  /** Distinct public collection items associated with the maker. */
+  collectionItemCount: number;
+  /** Distinct approved public products associated with the maker. */
+  productCount: number;
+};
+
 /**
  * Catalog color lookup with its hexadecimal display value.
  */
@@ -814,6 +822,13 @@ export type CatalogService = {
    * @rejects When the database query fails.
    */
   listMakers(): Promise<CatalogMaker[]>;
+  /**
+   * Lists public maker directory summaries with database-aggregated counts.
+   *
+   * @returns Name-sorted maker summaries.
+   * @rejects When the database query fails.
+   */
+  listPublicMakers(): Promise<PublicMakerSummary[]>;
   /**
    * Lists maker profiles for an authorized product manager.
    *
@@ -2577,6 +2592,132 @@ export function createCatalogService(
      */
     async listMakers() {
       return await queryMakerProfiles(db, false);
+    },
+    /**
+     * Lists public maker directory summaries.
+     *
+     * @returns Name-sorted maker summaries with visibility-filtered counts.
+     * @rejects When the database query fails.
+     */
+    async listPublicMakers() {
+      const result = await db.execute<{
+        /** Public collection-item count. */
+        collectionItemCount: number | string;
+        /** Optional Markdown description. */
+        description: string | null;
+        /** Lead image content type. */
+        imageContentType: string | null;
+        /** Lead image creation time. */
+        imageCreatedAt: Date | null;
+        /** Lead image filename. */
+        imageFileName: string | null;
+        /** Lead image identifier. */
+        imageId: number | string | null;
+        /** Lead image object path. */
+        imageObjectPath: string | null;
+        /** Lead image position. */
+        imagePosition: number | null;
+        /** Lead image size in bytes. */
+        imageSize: number | null;
+        /** Lead image URL. */
+        imageUrl: string | null;
+        /** Maker identifier. */
+        id: number | string;
+        /** Maker display name. */
+        name: string;
+        /** Public product count. */
+        productCount: number | string;
+        /** Optional maker website. */
+        rootUrl: string | null;
+        /** Stable maker slug. */
+        slug: string;
+      }>(sql`
+        with public_products as (
+          select product.id, product.maker_id
+          from product
+          where product.approval_status = 'approved'
+            and not product.is_private
+        ), product_counts as (
+          select maker_id, count(distinct id)::int as product_count
+          from public_products
+          group by maker_id
+        ), public_items as (
+          select distinct collection_item.id, public_products.maker_id
+          from collection_item
+          join user_collection
+            on user_collection.id = collection_item.collection_id
+          left join collection_spinner
+            on collection_spinner.id = collection_item.id
+          left join collection_spinner_button
+            on collection_spinner_button.id = collection_item.id
+          join public_products
+            on public_products.id = coalesce(
+              collection_spinner.product_spinner_id,
+              collection_spinner_button.product_spinner_button_id
+            )
+          where collection_item.owned
+            and collection_item.sold_at is null
+            and collection_item.approval_status = 'approved'
+            and not collection_item.is_private
+            and not user_collection.is_private
+        ), item_counts as (
+          select maker_id, count(distinct id)::int as item_count
+          from public_items
+          group by maker_id
+        )
+        select makers.id, makers.name, makers.slug,
+          makers.root_url as "rootUrl",
+          makers.description,
+          coalesce(product_counts.product_count, 0)::int as "productCount",
+          coalesce(item_counts.item_count, 0)::int as "collectionItemCount",
+          lead_image.id as "imageId",
+          lead_image.file_name as "imageFileName",
+          lead_image.content_type as "imageContentType",
+          lead_image.size as "imageSize",
+          lead_image.object_path as "imageObjectPath",
+          lead_image.url as "imageUrl",
+          lead_image.position as "imagePosition",
+          lead_image.created_at as "imageCreatedAt"
+        from makers
+        left join product_counts on product_counts.maker_id = makers.id
+        left join item_counts on item_counts.maker_id = makers.id
+        left join lateral (
+          select maker_image.*
+          from maker_image
+          where maker_image.maker_id = makers.id
+            and maker_image.deleted_at is null
+          order by maker_image.position, maker_image.id
+          limit 1
+        ) lead_image on true
+        order by lower(makers.name), makers.id
+      `);
+      return result.rows.map((row) => ({
+        collectionItemCount: Number(row.collectionItemCount),
+        description: row.description,
+        id: Number(row.id),
+        images:
+          row.imageId === null
+            ? []
+            : [
+                {
+                  contentType: row.imageContentType ?? "image/jpeg",
+                  createdAt: row.imageCreatedAt ?? new Date(0),
+                  deletedAt: null,
+                  deletedByClerkId: null,
+                  deletedByRole: null,
+                  fileName: row.imageFileName ?? "maker",
+                  id: Number(row.imageId),
+                  objectPath: row.imageObjectPath ?? "",
+                  position: row.imagePosition ?? 0,
+                  size: row.imageSize ?? 0,
+                  url: row.imageUrl ?? "",
+                },
+              ],
+        name: row.name,
+        productCount: Number(row.productCount),
+        rootUrl: row.rootUrl,
+        slug: row.slug,
+      }));
     },
     /**
      * Lists maker profiles for an authorized product manager.

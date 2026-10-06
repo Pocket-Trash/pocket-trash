@@ -77,6 +77,7 @@ export type {
   PublicCollectionOwner,
   PublicMaterial,
   PublicMaterialSummary,
+  PublicMakerSummary,
   SubmitFeedbackInput,
   UpdateAdminFeedbackInput,
   UpdatePendingFeedbackInput,

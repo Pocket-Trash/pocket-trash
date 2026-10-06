@@ -37,6 +37,7 @@ import { Route as FeedbackMyRequestsRouteImport } from './routes/feedback.my-req
 import { Route as FeedbackNewRouteImport } from './routes/feedback.new'
 import { Route as HelpIndexRouteImport } from './routes/help.index'
 import { Route as HelpSlugRouteImport } from './routes/help.$slug'
+import { Route as MakersIndexRouteImport } from './routes/makers.index'
 import { Route as MaterialsIndexRouteImport } from './routes/materials.index'
 import { Route as MaterialsMaterialSlugRouteImport } from './routes/materials.$materialSlug'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
@@ -221,6 +222,11 @@ const HelpIndexRoute = HelpIndexRouteImport.update({
 const HelpSlugRoute = HelpSlugRouteImport.update({
   id: '/help/$slug',
   path: '/help/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MakersIndexRoute = MakersIndexRouteImport.update({
+  id: '/makers/',
+  path: '/makers/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MaterialsIndexRoute = MaterialsIndexRouteImport.update({
@@ -502,6 +508,7 @@ export interface FileRoutesByFullPath {
   '/collections/': typeof CollectionsIndexRoute
   '/feedback/': typeof FeedbackIndexRoute
   '/help/': typeof HelpIndexRoute
+  '/makers/': typeof MakersIndexRoute
   '/materials/': typeof MaterialsIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
@@ -573,6 +580,7 @@ export interface FileRoutesByTo {
   '/collections': typeof CollectionsIndexRoute
   '/feedback': typeof FeedbackIndexRoute
   '/help': typeof HelpIndexRoute
+  '/makers': typeof MakersIndexRoute
   '/materials': typeof MaterialsIndexRoute
   '/products': typeof ProductsIndexRoute
   '/resources': typeof ResourcesIndexRoute
@@ -649,6 +657,7 @@ export interface FileRoutesById {
   '/collections/': typeof CollectionsIndexRoute
   '/feedback/': typeof FeedbackIndexRoute
   '/help/': typeof HelpIndexRoute
+  '/makers/': typeof MakersIndexRoute
   '/materials/': typeof MaterialsIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
@@ -726,6 +735,7 @@ export interface FileRouteTypes {
     | '/collections/'
     | '/feedback/'
     | '/help/'
+    | '/makers/'
     | '/materials/'
     | '/products/'
     | '/resources/'
@@ -797,6 +807,7 @@ export interface FileRouteTypes {
     | '/collections'
     | '/feedback'
     | '/help'
+    | '/makers'
     | '/materials'
     | '/products'
     | '/resources'
@@ -872,6 +883,7 @@ export interface FileRouteTypes {
     | '/collections/'
     | '/feedback/'
     | '/help/'
+    | '/makers/'
     | '/materials/'
     | '/products/'
     | '/resources/'
@@ -933,6 +945,7 @@ export interface RootRouteChildren {
   ChangelogIndexRoute: typeof ChangelogIndexRoute
   CollectionsIndexRoute: typeof CollectionsIndexRoute
   HelpIndexRoute: typeof HelpIndexRoute
+  MakersIndexRoute: typeof MakersIndexRoute
   MaterialsIndexRoute: typeof MaterialsIndexRoute
   ProductsIndexRoute: typeof ProductsIndexRoute
   CollectionsEditCollectionItemIdRoute: typeof CollectionsEditCollectionItemIdRoute
@@ -1138,6 +1151,13 @@ declare module '@tanstack/react-router' {
       path: '/help/$slug'
       fullPath: '/help/$slug'
       preLoaderRoute: typeof HelpSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/makers/': {
+      id: '/makers/'
+      path: '/makers'
+      fullPath: '/makers/'
+      preLoaderRoute: typeof MakersIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/materials/': {
@@ -1622,6 +1642,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChangelogIndexRoute: ChangelogIndexRoute,
   CollectionsIndexRoute: CollectionsIndexRoute,
   HelpIndexRoute: HelpIndexRoute,
+  MakersIndexRoute: MakersIndexRoute,
   MaterialsIndexRoute: MaterialsIndexRoute,
   ProductsIndexRoute: ProductsIndexRoute,
   CollectionsEditCollectionItemIdRoute: CollectionsEditCollectionItemIdRoute,

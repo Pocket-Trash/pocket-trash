@@ -10,6 +10,7 @@ import type {
   ProductWriteInput,
   PublicMaterial,
   PublicMaterialSummary,
+  PublicMakerSummary,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
@@ -700,6 +701,25 @@ export const listAdminMakers = createServerFn({ method: "GET" }).handler(
     const actor = await requirePermission("products.manage");
     const { s } = await import("@/lib/services");
     const makers = await s.db.catalog.listMakersForAdmin(actor);
+    return await Promise.all(
+      makers.map(async (maker) => ({
+        ...maker,
+        images: await signCatalogImageUrls(maker.images),
+      })),
+    );
+  },
+);
+
+/**
+ * Lists public maker directory entries with signed lead images.
+ *
+ * @returns Public maker summaries.
+ * @rejects If service loading, aggregation, or image signing fails.
+ */
+export const listPublicMakers = createServerFn({ method: "GET" }).handler(
+  async (): Promise<PublicMakerSummary[]> => {
+    const { s } = await import("@/lib/services");
+    const makers = await s.db.catalog.listPublicMakers();
     return await Promise.all(
       makers.map(async (maker) => ({
         ...maker,

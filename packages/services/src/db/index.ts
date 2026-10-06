@@ -126,6 +126,7 @@ export type {
   PublicCollectionOwner,
   PublicMaterial,
   PublicMaterialSummary,
+  PublicMakerSummary,
   UserCollectionItem,
   UserCollectionSummary,
 } from "./catalog/index.js";
