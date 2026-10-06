@@ -18,6 +18,7 @@ const base = {
   compatibleButtonId: null,
   description: "",
   diameterMm: null,
+  finishOptions: [],
   lengthMm: null,
   makerId: 1000,
   makerProductUrl: "",
@@ -30,6 +31,11 @@ const base = {
   thicknessWithButtonMm: null,
   weightG: null,
   widthMm: null,
+  compatibilityAdvisories: [],
+  compatibilityFamilyIds: [],
+  includedComponentIds: [],
+  magnetSystem: null,
+  weightBasis: null,
 };
 
 /**
@@ -294,6 +300,67 @@ describe("product source details", () => {
         spinDiameterMm: "22",
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("slider catalog product validation", () => {
+  it.each([
+    "slider",
+    "slider-plate",
+    "slider-insert",
+  ] as const)("accepts the %s product type", (productTypeSlug) => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        magnetSystem: productTypeSlug === "slider" ? "body-hosted" : null,
+        productTypeSlug,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires an explicit slider magnet host and paired slider weight basis", () => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        productTypeSlug: "slider",
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        magnetSystem: "insert-driven",
+        productTypeSlug: "slider",
+        weightG: "120",
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        magnetSystem: "insert-driven",
+        productTypeSlug: "slider",
+        weightBasis: "complete-build",
+        weightG: "120",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("keeps exact inclusion separate from compatibility and reviewed advisories", () => {
+    const parsed = productFormSchema.parse({
+      ...base,
+      compatibilityAdvisories: [
+        { relatedProductId: 2001, text: "May require thin tape." },
+      ],
+      compatibilityFamilyIds: [3001, 3002],
+      includedComponentIds: [2000],
+      magnetSystem: "body-hosted",
+      productTypeSlug: "slider",
+    });
+
+    expect(parsed.compatibilityFamilyIds).toEqual([3001, 3002]);
+    expect(parsed.includedComponentIds).toEqual([2000]);
+    expect(parsed.compatibilityAdvisories).toEqual([
+      { relatedProductId: 2001, text: "May require thin tape." },
+    ]);
   });
 });
 
