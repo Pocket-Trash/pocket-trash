@@ -31,6 +31,7 @@ export type AppShellProps = {
           | "/collections"
           | "/changelog"
           | "/help"
+          | "/materials"
           | "/products"
           | "/notifications"
           | "/user"

@@ -37,6 +37,8 @@ import { Route as FeedbackMyRequestsRouteImport } from './routes/feedback.my-req
 import { Route as FeedbackNewRouteImport } from './routes/feedback.new'
 import { Route as HelpIndexRouteImport } from './routes/help.index'
 import { Route as HelpSlugRouteImport } from './routes/help.$slug'
+import { Route as MaterialsIndexRouteImport } from './routes/materials.index'
+import { Route as MaterialsMaterialSlugRouteImport } from './routes/materials.$materialSlug'
 import { Route as PensPenIdRouteImport } from './routes/pens.$penId'
 import { Route as ProductsIndexRouteImport } from './routes/products.index'
 import { Route as ProductsAddRouteImport } from './routes/products.add'
@@ -216,6 +218,16 @@ const HelpIndexRoute = HelpIndexRouteImport.update({
 const HelpSlugRoute = HelpSlugRouteImport.update({
   id: '/help/$slug',
   path: '/help/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MaterialsIndexRoute = MaterialsIndexRouteImport.update({
+  id: '/materials/',
+  path: '/materials/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MaterialsMaterialSlugRoute = MaterialsMaterialSlugRouteImport.update({
+  id: '/materials/$materialSlug',
+  path: '/materials/$materialSlug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PensPenIdRoute = PensPenIdRouteImport.update({
@@ -456,6 +468,7 @@ export interface FileRoutesByFullPath {
   '/feedback/my-requests': typeof FeedbackMyRequestsRoute
   '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
+  '/materials/$materialSlug': typeof MaterialsMaterialSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
   '/resources/$resourceId': typeof ResourcesResourceIdRoute
@@ -471,6 +484,7 @@ export interface FileRoutesByFullPath {
   '/collections/': typeof CollectionsIndexRoute
   '/feedback/': typeof FeedbackIndexRoute
   '/help/': typeof HelpIndexRoute
+  '/materials/': typeof MaterialsIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
@@ -522,6 +536,7 @@ export interface FileRoutesByTo {
   '/feedback/my-requests': typeof FeedbackMyRequestsRoute
   '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
+  '/materials/$materialSlug': typeof MaterialsMaterialSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
   '/resources/$resourceId': typeof ResourcesResourceIdRoute
@@ -537,6 +552,7 @@ export interface FileRoutesByTo {
   '/collections': typeof CollectionsIndexRoute
   '/feedback': typeof FeedbackIndexRoute
   '/help': typeof HelpIndexRoute
+  '/materials': typeof MaterialsIndexRoute
   '/products': typeof ProductsIndexRoute
   '/resources': typeof ResourcesIndexRoute
   '/user': typeof UserIndexRoute
@@ -593,6 +609,7 @@ export interface FileRoutesById {
   '/feedback/my-requests': typeof FeedbackMyRequestsRoute
   '/feedback/new': typeof FeedbackNewRoute
   '/help/$slug': typeof HelpSlugRoute
+  '/materials/$materialSlug': typeof MaterialsMaterialSlugRoute
   '/pens/$penId': typeof PensPenIdRoute
   '/products/add': typeof ProductsAddRoute
   '/resources/$resourceId': typeof ResourcesResourceIdRoute
@@ -608,6 +625,7 @@ export interface FileRoutesById {
   '/collections/': typeof CollectionsIndexRoute
   '/feedback/': typeof FeedbackIndexRoute
   '/help/': typeof HelpIndexRoute
+  '/materials/': typeof MaterialsIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
@@ -665,6 +683,7 @@ export interface FileRouteTypes {
     | '/feedback/my-requests'
     | '/feedback/new'
     | '/help/$slug'
+    | '/materials/$materialSlug'
     | '/pens/$penId'
     | '/products/add'
     | '/resources/$resourceId'
@@ -680,6 +699,7 @@ export interface FileRouteTypes {
     | '/collections/'
     | '/feedback/'
     | '/help/'
+    | '/materials/'
     | '/products/'
     | '/resources/'
     | '/user/'
@@ -731,6 +751,7 @@ export interface FileRouteTypes {
     | '/feedback/my-requests'
     | '/feedback/new'
     | '/help/$slug'
+    | '/materials/$materialSlug'
     | '/pens/$penId'
     | '/products/add'
     | '/resources/$resourceId'
@@ -746,6 +767,7 @@ export interface FileRouteTypes {
     | '/collections'
     | '/feedback'
     | '/help'
+    | '/materials'
     | '/products'
     | '/resources'
     | '/user'
@@ -801,6 +823,7 @@ export interface FileRouteTypes {
     | '/feedback/my-requests'
     | '/feedback/new'
     | '/help/$slug'
+    | '/materials/$materialSlug'
     | '/pens/$penId'
     | '/products/add'
     | '/resources/$resourceId'
@@ -816,6 +839,7 @@ export interface FileRouteTypes {
     | '/collections/'
     | '/feedback/'
     | '/help/'
+    | '/materials/'
     | '/products/'
     | '/resources/'
     | '/user/'
@@ -865,6 +889,7 @@ export interface RootRouteChildren {
   CollectionsUserIdRoute: typeof CollectionsUserIdRoute
   CollectionsAddRoute: typeof CollectionsAddRoute
   HelpSlugRoute: typeof HelpSlugRoute
+  MaterialsMaterialSlugRoute: typeof MaterialsMaterialSlugRoute
   PensPenIdRoute: typeof PensPenIdRoute
   ProductsAddRoute: typeof ProductsAddRoute
   SignInSplatRoute: typeof SignInSplatRoute
@@ -872,6 +897,7 @@ export interface RootRouteChildren {
   ChangelogIndexRoute: typeof ChangelogIndexRoute
   CollectionsIndexRoute: typeof CollectionsIndexRoute
   HelpIndexRoute: typeof HelpIndexRoute
+  MaterialsIndexRoute: typeof MaterialsIndexRoute
   ProductsIndexRoute: typeof ProductsIndexRoute
   CollectionsEditCollectionItemIdRoute: typeof CollectionsEditCollectionItemIdRoute
   CollectionsUserIdCollectionIdRoute: typeof CollectionsUserIdCollectionIdRoute
@@ -1076,6 +1102,20 @@ declare module '@tanstack/react-router' {
       path: '/help/$slug'
       fullPath: '/help/$slug'
       preLoaderRoute: typeof HelpSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/materials/': {
+      id: '/materials/'
+      path: '/materials'
+      fullPath: '/materials/'
+      preLoaderRoute: typeof MaterialsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/materials/$materialSlug': {
+      id: '/materials/$materialSlug'
+      path: '/materials/$materialSlug'
+      fullPath: '/materials/$materialSlug'
+      preLoaderRoute: typeof MaterialsMaterialSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pens/$penId': {
@@ -1511,6 +1551,7 @@ const rootRouteChildren: RootRouteChildren = {
   CollectionsUserIdRoute: CollectionsUserIdRoute,
   CollectionsAddRoute: CollectionsAddRoute,
   HelpSlugRoute: HelpSlugRoute,
+  MaterialsMaterialSlugRoute: MaterialsMaterialSlugRoute,
   PensPenIdRoute: PensPenIdRoute,
   ProductsAddRoute: ProductsAddRoute,
   SignInSplatRoute: SignInSplatRoute,
@@ -1518,6 +1559,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChangelogIndexRoute: ChangelogIndexRoute,
   CollectionsIndexRoute: CollectionsIndexRoute,
   HelpIndexRoute: HelpIndexRoute,
+  MaterialsIndexRoute: MaterialsIndexRoute,
   ProductsIndexRoute: ProductsIndexRoute,
   CollectionsEditCollectionItemIdRoute: CollectionsEditCollectionItemIdRoute,
   CollectionsUserIdCollectionIdRoute: CollectionsUserIdCollectionIdRoute,

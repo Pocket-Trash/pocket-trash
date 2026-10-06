@@ -226,6 +226,12 @@ export function HomePage() {
     },
     {
       image:
+        "https://cdn.pocket-trash.app/assets/static/hero-cards/products.webp",
+      key: "web.navigation.materials" as const,
+      to: "/materials" as const,
+    },
+    {
+      image:
         "https://cdn.pocket-trash.app/assets/static/hero-cards/resosurces.webp",
       key: "web.navigation.resources" as const,
       to: "/resources" as const,
@@ -234,7 +240,7 @@ export function HomePage() {
 
   return (
     <AppShell title={t("web.site.name")}>
-      <main className="grid gap-[18px] p-4 md:grid-cols-3 md:p-[18px_22px_22px]">
+      <main className="grid gap-[18px] p-4 sm:grid-cols-2 xl:grid-cols-4 md:p-[18px_22px_22px]">
         {cards.map(({ image, key, to }) => (
           <Link
             className="group overflow-hidden rounded-xl border border-border bg-card text-card-foreground transition-[border-color,transform] hover:-translate-y-0.5 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

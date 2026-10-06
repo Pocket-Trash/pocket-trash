@@ -9,6 +9,7 @@ import {
   eq,
   inArray,
   isNotNull,
+  isNull,
   notInArray,
   or,
   sql,
@@ -228,6 +229,28 @@ export type AdminMaterial = CatalogLookup & {
 export type AdminMaterialSummary = CatalogLookup & {
   /** Optional Markdown description. */
   description: string | null;
+};
+
+/** Material summary exposed by the public directory. */
+export type PublicMaterialSummary = CatalogLookup & {
+  /** Number of visible, currently owned collection items assigned directly to the material. */
+  collectionItemCount: number;
+  /** First active image in display order, or `null` when no image is available. */
+  leadImage: CatalogImage | null;
+  /** Number of visible approved products assigned to the material. */
+  productCount: number;
+};
+
+/** Material content and related public catalog records exposed by its detail page. */
+export type PublicMaterial = PublicMaterialSummary & {
+  /** Optional Markdown description. */
+  description: string | null;
+  /** Visible collection items assigned directly to this material. */
+  collectionItems: UserCollectionItem[];
+  /** Active images in stable display order. */
+  images: CatalogImage[];
+  /** Visible approved products assigned to this material. */
+  products: CatalogProduct[];
 };
 
 /**
@@ -806,6 +829,21 @@ export type CatalogService = {
       slug: string;
     }>
   >;
+  /**
+   * Lists all materials with public product and directly assigned collection-item counts.
+   *
+   * @returns Name-sorted public material summaries.
+   * @rejects When material, image, or count queries fail.
+   */
+  listPublicMaterials(): Promise<PublicMaterialSummary[]>;
+  /**
+   * Loads one material and its publicly visible related catalog records.
+   *
+   * @param materialSlug - Stable material route slug.
+   * @returns Public material detail, or `null` when the slug is unknown.
+   * @rejects When material or related catalog queries fail.
+   */
+  getPublicMaterial(materialSlug: string): Promise<PublicMaterial | null>;
   /**
    * Lists material content for product administrators.
    *
@@ -2571,6 +2609,54 @@ export function createCatalogService(
         })
         .from(schema.material)
         .orderBy(asc(schema.material.name));
+    },
+    /**
+     * Lists all materials with public product and collection-item counts.
+     *
+     * @returns Name-sorted material summaries.
+     * @rejects When material, image, or count queries fail.
+     */
+    async listPublicMaterials() {
+      return await queryPublicMaterialSummaries(db);
+    },
+    /**
+     * Loads one material with public related products and directly assigned items.
+     *
+     * @param materialSlug - Stable material route slug.
+     * @returns Material detail, or `null` when no material matches.
+     * @rejects When material or related catalog queries fail.
+     */
+    async getPublicMaterial(materialSlug) {
+      const [material] = await db
+        .select({
+          description: schema.material.description,
+          id: schema.material.id,
+          name: schema.material.name,
+          slug: schema.material.slug,
+        })
+        .from(schema.material)
+        .where(eq(schema.material.slug, materialSlug))
+        .limit(1);
+      if (!material) return null;
+
+      const [summaries, images, products, collectionItems] = await Promise.all([
+        queryPublicMaterialSummaries(db, material.id),
+        queryMaterialImages(db, material.id),
+        queryPublicMaterialProducts(db, material.id),
+        queryOwnedItems(db, undefined, undefined, {
+          materialId: material.id,
+          publicOnly: true,
+        }),
+      ]);
+      const summary = summaries[0];
+      if (!summary) return null;
+      return {
+        ...summary,
+        collectionItems,
+        description: material.description,
+        images: images.filter(({ deletedAt }) => deletedAt === null),
+        products,
+      };
     },
     /**
      * Lists material content for product administrators.
@@ -5387,12 +5473,35 @@ async function updateCollectionItemSnapshot(
 }
 
 /**
+ * Loads public products assigned to one material without hydrating unrelated products.
+ *
+ * @param db - Database used for product lookup.
+ * @param materialId - Material whose products are returned.
+ * @returns Visible approved products assigned to the material.
+ * @rejects When product identifiers or display data cannot be queried.
+ */
+async function queryPublicMaterialProducts(db: Database, materialId: number) {
+  const rows = await db
+    .select({ productId: schema.productMaterial.productId })
+    .from(schema.productMaterial)
+    .where(eq(schema.productMaterial.materialId, materialId));
+  return await queryProducts(
+    db,
+    undefined,
+    undefined,
+    undefined,
+    rows.map(({ productId }) => productId),
+  );
+}
+
+/**
  * Loads visible catalog products and their related display data.
  *
  * @param db - Database used for the query.
  * @param productTypeSlug - Optional product type filter.
  * @param productSlug - Optional product slug filter.
  * @param viewer - Optional viewer controlling private and review visibility.
+ * @param productIds - Optional product identifier filter.
  * @returns Visible catalog products in display order.
  * @rejects When the database query fails.
  */
@@ -5401,7 +5510,9 @@ async function queryProducts(
   productTypeSlug?: string,
   productSlug?: string,
   viewer?: CatalogViewer,
+  productIds?: number[],
 ): Promise<CatalogProduct[]> {
+  if (productIds?.length === 0) return [];
   const compatibleButtonProduct = alias(
     schema.product,
     "compatible_button_product",
@@ -5411,6 +5522,7 @@ async function queryProducts(
     conditions.push(eq(schema.productType.slug, productTypeSlug));
   }
   if (productSlug) conditions.push(eq(schema.product.slug, productSlug));
+  if (productIds) conditions.push(inArray(schema.product.id, productIds));
   if (!hasPermission(viewer, "products.manage")) {
     conditions.push(
       viewer?.clerkId
@@ -5782,6 +5894,10 @@ async function queryOwnedItems(
      */
     includePrivate?: boolean;
     /**
+     * Directly assigned material identifier.
+     */
+    materialId?: number;
+    /**
      * Owner database user identifier.
      */
     ownerUserId?: number;
@@ -5803,7 +5919,10 @@ async function queryOwnedItems(
     viewerCanManage?: boolean;
   } = {},
 ): Promise<UserCollectionItem[]> {
-  const conditions = [eq(schema.collectionItem.owned, true)];
+  const conditions = [
+    eq(schema.collectionItem.owned, true),
+    isNull(schema.collectionItem.soldAt),
+  ];
   if (actorClerkId !== undefined) {
     conditions.push(eq(schema.user.clerkId, actorClerkId));
   }
@@ -5815,13 +5934,16 @@ async function queryOwnedItems(
       eq(schema.collectionItem.collectionId, options.collectionId),
     );
   }
+  if (options.materialId !== undefined) {
+    conditions.push(eq(schema.collectionItem.materialId, options.materialId));
+  }
   if (options.ownerUserId !== undefined) {
     conditions.push(eq(schema.collectionItem.ownerId, options.ownerUserId));
   }
   if (options.productId !== undefined) {
     conditions.push(eq(schema.product.id, options.productId));
   }
-  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false and ${schema.collectionItem.approvalStatus} = 'approved' and ${schema.product.approvalStatus} = 'approved')`;
+  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false and ${schema.collectionItem.approvalStatus} = 'approved' and ${schema.product.approvalStatus} = 'approved' and ${schema.product.isPrivate} = false)`;
   if (options.publicOnly) {
     conditions.push(publicItem);
   } else if (!options.includePrivate) {
@@ -6244,6 +6366,142 @@ async function queryAdminMaterialRows(db: Database, materialId?: number) {
       materialId === undefined ? undefined : eq(schema.material.id, materialId),
     )
     .orderBy(asc(schema.material.name));
+}
+
+/**
+ * Loads public material cards with independently computed product and item counts.
+ *
+ * Collection counts use the item's direct material snapshot and require the item,
+ * collection, and source product all to be public. Sold items are excluded.
+ *
+ * @param db - Database used for material lookup.
+ * @param materialId - Optional material identifier filter.
+ * @returns Name-sorted public material summaries.
+ * @rejects When material, image, product, or collection queries fail.
+ */
+async function queryPublicMaterialSummaries(
+  db: Database,
+  materialId?: number,
+): Promise<PublicMaterialSummary[]> {
+  const materials = await db
+    .select({
+      id: schema.material.id,
+      name: schema.material.name,
+      slug: schema.material.slug,
+    })
+    .from(schema.material)
+    .where(
+      materialId === undefined ? undefined : eq(schema.material.id, materialId),
+    )
+    .orderBy(asc(schema.material.name));
+  if (!materials.length) return [];
+  const materialIds = materials.map(({ id }) => id);
+  const [images, productCounts, collectionItemCounts] = await Promise.all([
+    db
+      .select({
+        contentType: schema.materialImage.contentType,
+        createdAt: schema.materialImage.createdAt,
+        deletedAt: schema.materialImage.deletedAt,
+        deletedByClerkId: schema.materialImage.deletedByClerkId,
+        deletedByRole: schema.materialImage.deletedByRole,
+        fileName: schema.materialImage.fileName,
+        id: schema.materialImage.id,
+        materialId: schema.materialImage.materialId,
+        objectPath: schema.materialImage.objectPath,
+        position: schema.materialImage.position,
+        size: schema.materialImage.size,
+        url: schema.materialImage.url,
+      })
+      .from(schema.materialImage)
+      .where(
+        and(
+          inArray(schema.materialImage.materialId, materialIds),
+          isNull(schema.materialImage.deletedAt),
+        ),
+      )
+      .orderBy(
+        asc(schema.materialImage.position),
+        asc(schema.materialImage.id),
+      ),
+    db
+      .select({
+        count: count(schema.productMaterial.productId),
+        materialId: schema.productMaterial.materialId,
+      })
+      .from(schema.productMaterial)
+      .innerJoin(
+        schema.product,
+        eq(schema.productMaterial.productId, schema.product.id),
+      )
+      .where(
+        and(
+          inArray(schema.productMaterial.materialId, materialIds),
+          eq(schema.product.approvalStatus, "approved"),
+          eq(schema.product.isPrivate, false),
+        ),
+      )
+      .groupBy(schema.productMaterial.materialId),
+    db
+      .select({
+        count: count(schema.collectionItem.id),
+        materialId: schema.collectionItem.materialId,
+      })
+      .from(schema.collectionItem)
+      .innerJoin(
+        schema.userCollection,
+        eq(schema.collectionItem.collectionId, schema.userCollection.id),
+      )
+      .leftJoin(
+        schema.collectionSpinner,
+        eq(schema.collectionItem.id, schema.collectionSpinner.id),
+      )
+      .leftJoin(
+        schema.collectionSpinnerButton,
+        eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
+      )
+      .innerJoin(
+        schema.product,
+        eq(
+          schema.product.id,
+          sql`coalesce(${schema.collectionSpinner.productSpinnerId}, ${schema.collectionSpinnerButton.productSpinnerButtonId})`,
+        ),
+      )
+      .where(
+        and(
+          inArray(schema.collectionItem.materialId, materialIds),
+          eq(schema.collectionItem.owned, true),
+          isNull(schema.collectionItem.soldAt),
+          eq(schema.collectionItem.approvalStatus, "approved"),
+          eq(schema.collectionItem.isPrivate, false),
+          eq(schema.userCollection.isPrivate, false),
+          eq(schema.product.approvalStatus, "approved"),
+          eq(schema.product.isPrivate, false),
+        ),
+      )
+      .groupBy(schema.collectionItem.materialId),
+  ]);
+  const firstImageByMaterial = new Map<number, CatalogImage>();
+  for (const { materialId: imageMaterialId, ...image } of images) {
+    if (!firstImageByMaterial.has(imageMaterialId)) {
+      firstImageByMaterial.set(imageMaterialId, image);
+    }
+  }
+  const productCountByMaterial = new Map(
+    productCounts.map((row) => [row.materialId, Number(row.count)]),
+  );
+  const itemCountByMaterial = new Map(
+    collectionItemCounts.flatMap((row) =>
+      row.materialId === null
+        ? []
+        : [[row.materialId, Number(row.count)] as const],
+    ),
+  );
+  return materials.map((material) => ({
+    ...material,
+    collectionItemCount: itemCountByMaterial.get(material.id) ?? 0,
+    leadImage: firstImageByMaterial.get(material.id) ?? null,
+    productCount: productCountByMaterial.get(material.id) ?? 0,
+  }));
 }
 
 /**

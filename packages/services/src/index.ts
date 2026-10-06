@@ -73,6 +73,8 @@ export type {
   ProductApprovalStatus,
   ProductWriteInput,
   PublicCollectionOwner,
+  PublicMaterial,
+  PublicMaterialSummary,
   SubmitFeedbackInput,
   UpdateAdminFeedbackInput,
   UpdatePendingFeedbackInput,

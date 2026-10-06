@@ -7,6 +7,8 @@ import type {
   CatalogProduct,
   CatalogProductType,
   ProductWriteInput,
+  PublicMaterial,
+  PublicMaterialSummary,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
@@ -713,6 +715,54 @@ export const listAdminMaterials = createServerFn({ method: "GET" }).handler(
     return await s.db.catalog.listAdminMaterials(actor);
   },
 );
+
+/**
+ * Lists all public materials with signed lead images and public usage counts.
+ *
+ * @returns Name-sorted material summaries.
+ * @rejects If service loading, querying, or image signing fails.
+ */
+export const listPublicMaterials = createServerFn({ method: "GET" }).handler(
+  async (): Promise<PublicMaterialSummary[]> => {
+    const { s } = await import("@/lib/services");
+    return await Promise.all(
+      (await s.db.catalog.listPublicMaterials()).map(async (material) => {
+        const [leadImage] = material.leadImage
+          ? await signCatalogImageUrls([material.leadImage])
+          : [];
+        return { ...material, leadImage: leadImage ?? null };
+      }),
+    );
+  },
+);
+
+/**
+ * Loads one public material with signed gallery, product, and collection-item images.
+ *
+ * @returns Public material detail, or `null` for an unknown slug.
+ * @rejects If validation, service loading, querying, or image signing fails.
+ */
+export const getPublicMaterial = createServerFn({ method: "GET" })
+  .validator((input: unknown) =>
+    z.object({ materialSlug: z.string().regex(slugPattern) }).parse(input),
+  )
+  .handler(async ({ data }): Promise<PublicMaterial | null> => {
+    const { s } = await import("@/lib/services");
+    const material = await s.db.catalog.getPublicMaterial(data.materialSlug);
+    if (!material) return null;
+    const [images, products, collectionItems] = await Promise.all([
+      signCatalogImageUrls(material.images),
+      signCatalogProducts(material.products),
+      Promise.all(material.collectionItems.map(signCollectionItem)),
+    ]);
+    return {
+      ...material,
+      collectionItems,
+      images,
+      leadImage: images[0] ?? null,
+      products,
+    };
+  });
 
 /**
  * Loads one material for the administrator editor.
