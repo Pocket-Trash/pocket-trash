@@ -1635,6 +1635,12 @@ export type UserCollectionItem = {
    * Whether the viewer may edit the record.
    */
   canEdit: boolean;
+  /** Live reviewed compatibility families on the source product. */
+  compatibilityFamilies: CatalogCompatibilityFamily[];
+  /** Exact spinner-button product included with the source spinner. */
+  compatibleButtonId: number | null;
+  /** Display name of the included spinner button, when present. */
+  compatibleButtonName: string | null;
   /**
    * Collection is private.
    */
@@ -1675,6 +1681,8 @@ export type UserCollectionItem = {
    * Images ordered for display.
    */
   images: CatalogImage[];
+  /** Live exact components sold with the source product. */
+  includedComponents: CatalogIncludedComponent[];
   /**
    * Whether the record is private.
    */
@@ -8456,6 +8464,9 @@ async function queryOwnedItems(
     canEdit: Boolean(
       options.viewerCanManage || options.viewerClerkId === row.ownerClerkId,
     ),
+    compatibilityFamilies: [],
+    compatibleButtonId: null,
+    compatibleButtonName: null,
     collectionIsPrivate: row.collectionIsPrivate,
     collectionId: row.collectionId,
     collectionItemId: row.collectionItemId,
@@ -8469,6 +8480,7 @@ async function queryOwnedItems(
     effectiveSliderSetup: null,
     imageCount: 0,
     images: [],
+    includedComponents: [],
     isPrivate: row.isPrivate,
     isAdminPrivate:
       row.isPrivate &&
@@ -8514,7 +8526,7 @@ async function queryOwnedItems(
     options.viewerClerkId,
     options.includePrivate,
   );
-  if (items.some(({ productTypeSlug }) => productTypeSlug === "slider")) {
+  if (items.length) {
     const viewer = options.viewerClerkId
       ? {
           clerkId: options.viewerClerkId,
@@ -8531,18 +8543,22 @@ async function queryOwnedItems(
       visibleRows.map((row) => [row.collectionItemId, row]),
     );
     for (const item of items) {
-      if (item.productTypeSlug !== "slider") continue;
       const row = rowsById.get(item.collectionItemId);
-      const sliderProduct = productsById.get(item.productId);
+      const product = productsById.get(item.productId);
+      item.compatibilityFamilies = product?.compatibilityFamilies ?? [];
+      item.compatibleButtonId = product?.compatibleButtonId ?? null;
+      item.compatibleButtonName = product?.compatibleButtonName ?? null;
+      item.includedComponents = product?.includedComponents ?? [];
+      if (item.productTypeSlug !== "slider") continue;
       const insertProduct = row?.installedInsertProductId
         ? productsById.get(row.installedInsertProductId)
         : null;
       item.effectiveSliderSetup = resolveEffectiveSliderSetup({
-        bodyHostedSetup: sliderProduct?.bodyHostedMagnetSetup ?? null,
+        bodyHostedSetup: product?.bodyHostedMagnetSetup ?? null,
         installedInsertOffers: insertProduct?.insertMagnetOffers ?? [],
         installedInsertProductId: row?.installedInsertProductId ?? null,
         ownedInsertSetup: row?.installedInsertSetup ?? null,
-        sliderAdvertisedOffers: sliderProduct?.advertisedInsertOffers ?? [],
+        sliderAdvertisedOffers: product?.advertisedInsertOffers ?? [],
       });
     }
   }

@@ -166,6 +166,10 @@ describe("owned slider assemblies", () => {
           reviewedByClerkId: owner.clerkId,
         },
       ]);
+      await db.insert(schema.productIncludedComponent).values({
+        componentProductId: plateProductId,
+        productId: insertSliderProductId,
+      });
       const [primary, spares, destination] = await db
         .insert(schema.userCollection)
         .values([
@@ -237,6 +241,15 @@ describe("owned slider assemblies", () => {
         service.getOwnedItem(actor, insertSliderId),
       ).resolves.toEqual(
         expect.objectContaining({
+          compatibilityFamilies: [
+            expect.objectContaining({ id: family.id, name: family.name }),
+          ],
+          includedComponents: [
+            expect.objectContaining({
+              id: plateProductId,
+              productTypeSlug: "slider-plate",
+            }),
+          ],
           installedInsertId: null,
           installedPlateId: null,
         }),
