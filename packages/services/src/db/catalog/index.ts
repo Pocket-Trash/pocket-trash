@@ -84,6 +84,8 @@ const catalogNameConflictMessages: Record<string, string> = {
   makers_name_case_insensitive_unique: "Maker name already exists.",
   materials_name_case_insensitive_unique: "Material name already exists.",
   pattern_name_case_insensitive_unique: "Pattern name already exists.",
+  compatibility_family_maker_name_unique:
+    "Compatibility family name already exists for this maker.",
 };
 
 /**
@@ -102,7 +104,36 @@ function mapCatalogNameConflict(error: unknown): never {
 /**
  * Product category supported by the spinner catalog.
  */
-export type CatalogProductType = "spinner" | "spinner-button";
+export type CatalogProductType =
+  | "slider"
+  | "slider-insert"
+  | "slider-plate"
+  | "spinner"
+  | "spinner-button";
+
+/**
+ * Narrows a persisted product-type slug to the supported exhaustive union.
+ *
+ * @param value - Product-type slug loaded from the database.
+ * @returns The supported product type.
+ * @throws When the catalog contains an unsupported product type.
+ */
+function catalogProductType(value: string): CatalogProductType {
+  switch (value) {
+    case "slider":
+    case "slider-insert":
+    case "slider-plate":
+    case "spinner":
+    case "spinner-button":
+      return value;
+    default:
+      throw new Error(`Unsupported catalog product type: ${value}`);
+  }
+}
+/** Explicit physical host for a slider product's magnet system. */
+export type SliderMagnetSystem = "body-hosted" | "insert-driven";
+/** Meaning of a slider body's recorded weight. */
+export type SliderWeightBasis = "body-only" | "complete-build";
 /** Durable review state for a catalog product or collection item. */
 export type CatalogApprovalStatus = "approved" | "pending" | "rejected";
 /** Administrative transition accepted by a catalog approval workflow. */
@@ -128,6 +159,34 @@ export type CatalogLookup = {
    * URL-safe identifier.
    */
   slug: string;
+};
+
+/** Maker-scoped reviewed compatibility family. */
+export type CatalogCompatibilityFamily = CatalogLookup & {
+  /** Maker that defines the family. */
+  makerId: number;
+  /** Maker display name. */
+  makerName: string;
+};
+
+/** Reviewed warning that remains distinct from enforced family compatibility. */
+export type CatalogCompatibilityAdvisory = {
+  /** Advisory database identifier. */
+  id: number;
+  /** Exact related product identifier. */
+  relatedProductId: number;
+  /** Exact related product display name. */
+  relatedProductName: string;
+  /** Review timestamp. */
+  reviewedAt: Date;
+  /** Non-blocking reviewed warning text. */
+  text: string;
+};
+
+/** Exact product relationship describing a component sold with a parent. */
+export type CatalogIncludedComponent = CatalogLookup & {
+  /** Canonical component product type. */
+  productTypeSlug: "slider-insert" | "slider-plate";
 };
 
 /**
@@ -280,6 +339,10 @@ export type CatalogProduct = {
    * Durable product review state.
    */
   approvalStatus: CatalogApprovalStatus;
+  /** Reviewed non-blocking compatibility warnings. */
+  compatibilityAdvisories: CatalogCompatibilityAdvisory[];
+  /** Reviewed compatibility-family memberships. */
+  compatibilityFamilies: CatalogCompatibilityFamily[];
   /**
    * Bearing model or designation, or `null` when unspecified.
    */
@@ -328,6 +391,8 @@ export type CatalogProduct = {
    * Images ordered for display.
    */
   images: CatalogImage[];
+  /** Exact products sold as components with this product. */
+  includedComponents: CatalogIncludedComponent[];
   /**
    * Database identifier.
    */
@@ -356,6 +421,8 @@ export type CatalogProduct = {
    * Maker URL.
    */
   makerUrl: string | null;
+  /** Explicit magnet host for sliders, or `null` for other product types. */
+  magnetSystem: SliderMagnetSystem | null;
   /**
    * Materials assigned to the product.
    */
@@ -404,7 +471,7 @@ export type CatalogProduct = {
   /**
    * Product type slug.
    */
-  productTypeSlug: string;
+  productTypeSlug: CatalogProductType;
   /**
    * URL-safe identifier.
    */
@@ -429,6 +496,8 @@ export type CatalogProduct = {
    * Weight in grams.
    */
   weightG: string | null;
+  /** Meaning of a slider's weight, or `null` when no slider weight is recorded. */
+  weightBasis: SliderWeightBasis | null;
   /**
    * Width in millimetres.
    */
@@ -443,6 +512,15 @@ export type ProductWriteInput = {
    * Authenticated actor.
    */
   actor: Actor;
+  /** Reviewed non-blocking compatibility warnings. */
+  compatibilityAdvisories?: Array<{
+    /** Exact related product identifier. */
+    relatedProductId: number;
+    /** Reviewed warning text. */
+    text: string;
+  }>;
+  /** Reviewed compatibility-family identifiers. */
+  compatibilityFamilyIds?: number[];
   /**
    * Optional description.
    */
@@ -463,6 +541,8 @@ export type ProductWriteInput = {
    * Material identifiers.
    */
   materialIds: number[];
+  /** Exact component products sold with this product. */
+  includedComponentIds?: number[];
   /**
    * Display name.
    */
@@ -503,6 +583,8 @@ export type ProductWriteInput = {
      * Length in millimetres.
      */
     lengthMm?: string | null;
+    /** Explicit physical magnet host for a slider product. */
+    magnetSystem?: SliderMagnetSystem | null;
     /**
      * Spin diameter in millimetres.
      */
@@ -519,6 +601,8 @@ export type ProductWriteInput = {
      * Weight in grams.
      */
     weightG?: string | null;
+    /** Meaning of a slider body's recorded weight. */
+    weightBasis?: SliderWeightBasis | null;
     /**
      * Width in millimetres.
      */
@@ -530,6 +614,23 @@ export type ProductWriteInput = {
  * Catalog reads and audited mutations exposed to application callers.
  */
 export type CatalogService = {
+  /**
+   * Creates a reviewed maker-scoped compatibility family.
+   *
+   * @param input - Family maker, name, slug, and authenticated catalog manager.
+   * @returns Created compatibility family.
+   * @rejects When authorization, validation, persistence, auditing, or logging fails.
+   */
+  createCompatibilityFamily(input: {
+    /** Authenticated catalog manager. */
+    actor: Actor;
+    /** Maker identifier that scopes the family. */
+    makerId: number;
+    /** Display name. */
+    name: string;
+    /** URL-safe identifier. */
+    slug: string;
+  }): Promise<CatalogCompatibilityFamily>;
   /**
    * Attaches images.
    *
@@ -837,6 +938,13 @@ export type CatalogService = {
    * @rejects When the database query or operation logging fails.
    */
   listPatterns(): Promise<CatalogLookup[]>;
+  /**
+   * Lists reviewed compatibility families.
+   *
+   * @returns Compatibility families ordered by maker and name.
+   * @rejects When the database query or operation logging fails.
+   */
+  listCompatibilityFamilies(): Promise<CatalogCompatibilityFamily[]>;
   /**
    * Lists products.
    *
@@ -1904,6 +2012,60 @@ export function createCatalogService(
       );
     },
     /**
+     * Creates a reviewed maker-scoped compatibility family.
+     *
+     * @param input - Family maker, name, slug, and authenticated catalog manager.
+     * @returns Created compatibility family.
+     * @rejects When authorization, validation, persistence, auditing, or logging fails.
+     */
+    async createCompatibilityFamily(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await logger.operation(
+        loggerMessages.database.catalog.createCompatibilityFamily,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [makerRow] = await tx
+              .select({ id: schema.maker.id, name: schema.maker.name })
+              .from(schema.maker)
+              .where(eq(schema.maker.id, input.makerId))
+              .limit(1);
+            if (!makerRow) throw new Error("Maker does not exist.");
+            const [row] = await tx
+              .insert(schema.compatibilityFamily)
+              .values({
+                makerId: input.makerId,
+                name: input.name,
+                slug: input.slug,
+              })
+              .returning({
+                id: schema.compatibilityFamily.id,
+                makerId: schema.compatibilityFamily.makerId,
+                name: schema.compatibilityFamily.name,
+                slug: schema.compatibilityFamily.slug,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create compatibility family.");
+            const result = { ...row, makerName: makerRow.name };
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: result,
+                definition: productAudit.compatibilityFamilyCreated,
+                targetId: row.id,
+              });
+            }
+            return result;
+          }),
+        actorAttributes(input.actor.clerkId, { slug: input.slug }),
+      );
+    },
+    /**
      * Creates color.
      *
      * @param input - Color name, slug, hex value, and authenticated actor.
@@ -2229,17 +2391,13 @@ export function createCatalogService(
 
             await replaceProductFinishOptions(tx, row.id, input.finishOptions);
 
-            if (input.productTypeSlug === "spinner") {
-              await tx.insert(schema.productSpinner).values({
-                id: row.id,
-                ...spinnerSpecs(input.specs),
-              });
-            } else {
-              await tx.insert(schema.productSpinnerButton).values({
-                id: row.id,
-                ...buttonSpecs(input.specs),
-              });
-            }
+            await insertProductSubtype(
+              tx,
+              row.id,
+              input.productTypeSlug,
+              input.specs,
+            );
+            await replaceProductRelationships(tx, row.id, input);
             if (dependencies && actorUser) {
               const [created] = await queryProducts(
                 tx as unknown as Database,
@@ -2440,6 +2598,17 @@ export function createCatalogService(
               .from(schema.productSpinnerButton)
               .where(eq(schema.productSpinnerButton.id, row.id))
               .for("update");
+            for (const subtype of [
+              schema.productSlider,
+              schema.productSliderPlate,
+              schema.productSliderInsert,
+            ]) {
+              await tx
+                .select({ id: subtype.id })
+                .from(subtype)
+                .where(eq(subtype.id, row.id))
+                .for("update");
+            }
             const finishes = await tx
               .select({ id: schema.finishOption.id })
               .from(schema.finishOption)
@@ -2450,6 +2619,8 @@ export function createCatalogService(
             select 1 from collection_spinner where product_spinner_id = ${row.id}
             union all select 1 from collection_spinner_button where product_spinner_button_id = ${row.id}
             union all select 1 from product_spinner where compatible_button_id = ${row.id}
+            union all select 1 from product_included_component where component_product_id = ${row.id}
+            union all select 1 from product_compatibility_advisory where related_product_id = ${row.id}
             union all select 1 from finish_option selected join finish_option source on source.id = selected.source_product_finish_option_id where source.product_id = ${row.id}
             limit 1`);
             if (references.rows.length) return false;
@@ -2545,6 +2716,35 @@ export function createCatalogService(
             })
             .from(schema.colorEffect)
             .orderBy(asc(schema.colorEffect.name)),
+      );
+    },
+    /**
+     * Lists reviewed compatibility families.
+     *
+     * @returns Compatibility families ordered by maker and name.
+     * @rejects When the database query or operation logging fails.
+     */
+    async listCompatibilityFamilies() {
+      return await logger.operation(
+        loggerMessages.database.catalog.listCompatibilityFamilies,
+        async () =>
+          await db
+            .select({
+              id: schema.compatibilityFamily.id,
+              makerId: schema.compatibilityFamily.makerId,
+              makerName: schema.maker.name,
+              name: schema.compatibilityFamily.name,
+              slug: schema.compatibilityFamily.slug,
+            })
+            .from(schema.compatibilityFamily)
+            .innerJoin(
+              schema.maker,
+              eq(schema.compatibilityFamily.makerId, schema.maker.id),
+            )
+            .orderBy(
+              asc(schema.maker.name),
+              asc(schema.compatibilityFamily.name),
+            ),
       );
     },
     /**
@@ -3050,17 +3250,13 @@ export function createCatalogService(
               input.finishOptions,
             );
 
-            if (input.productTypeSlug === "spinner") {
-              await tx
-                .update(schema.productSpinner)
-                .set({ ...spinnerSpecs(input.specs), updatedAt: new Date() })
-                .where(eq(schema.productSpinner.id, input.productId));
-            } else {
-              await tx
-                .update(schema.productSpinnerButton)
-                .set({ ...buttonSpecs(input.specs), updatedAt: new Date() })
-                .where(eq(schema.productSpinnerButton.id, input.productId));
-            }
+            await updateProductSubtype(
+              tx,
+              input.productId,
+              input.productTypeSlug,
+              input.specs,
+            );
+            await replaceProductRelationships(tx, input.productId, input);
             if (dependencies && actorUser) {
               const [updated] = await queryProducts(
                 tx as unknown as Database,
@@ -4782,6 +4978,10 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     bearing: product.bearing,
     buttonDiameterMm: product.buttonDiameterMm,
     compatibleButtonId: product.compatibleButtonId,
+    compatibilityAdvisories: product.compatibilityAdvisories.map(
+      ({ id, relatedProductId }) => ({ id, relatedProductId }),
+    ),
+    compatibilityFamilyIds: product.compatibilityFamilies.map(({ id }) => id),
     description: product.description,
     diameterMm: product.diameterMm,
     finishOptions: product.finishOptions.map((option) => ({
@@ -4793,11 +4993,13 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     })),
     id: product.id,
     imageIds: product.images.map(({ id }) => id),
+    includedComponentIds: product.includedComponents.map(({ id }) => id),
     isPrivate: product.isPrivate,
     lengthMm: product.lengthMm,
     makerId: product.makerId,
     makerProductUrl: product.makerProductUrl,
     makerProductUrlValid: product.makerProductUrlValid,
+    magnetSystem: product.magnetSystem,
     materialIds: product.materials.map(({ id }) => id),
     name: product.name,
     productTypeId: product.productTypeId,
@@ -4807,6 +5009,7 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     thicknessMm: product.thicknessMm,
     thicknessWithButtonMm: product.thicknessWithButtonMm,
     weightG: product.weightG,
+    weightBasis: product.weightBasis,
     widthMm: product.widthMm,
   };
 }
@@ -5260,18 +5463,21 @@ async function queryProducts(
       buttonDiameterMm: schema.productSpinner.buttonDiameterMm,
       compatibleButtonId: schema.productSpinner.compatibleButtonId,
       compatibleButtonName: compatibleButtonProduct.name,
-      createdAt: sql<Date>`coalesce(${schema.productSpinner.createdAt}, ${schema.productSpinnerButton.createdAt})`,
+      createdAt: sql<Date>`coalesce(${schema.productSpinner.createdAt}, ${schema.productSpinnerButton.createdAt}, ${schema.productSlider.createdAt}, ${schema.productSliderPlate.createdAt}, ${schema.productSliderInsert.createdAt})`,
       description: schema.product.description,
       diameterMm: schema.productSpinnerButton.diameterMm,
       id: schema.product.id,
       isPrivate: schema.product.isPrivate,
       privatedByClerkId: schema.product.privatedByClerkId,
-      lengthMm: schema.productSpinner.lengthMm,
+      lengthMm: sql<
+        string | null
+      >`coalesce(${schema.productSpinner.lengthMm}, ${schema.productSlider.lengthMm}, ${schema.productSliderPlate.lengthMm}, ${schema.productSliderInsert.lengthMm})`,
       makerId: schema.maker.id,
       makerName: schema.maker.name,
       makerProductUrl: schema.product.makerProductUrl,
       makerProductUrlValid: schema.product.makerProductUrlValid,
       makerUrl: schema.maker.rootUrl,
+      magnetSystem: schema.productSlider.magnetSystem,
       materialId: schema.material.id,
       materialName: schema.material.name,
       materialSlug: schema.material.slug,
@@ -5284,13 +5490,16 @@ async function queryProducts(
       spinDiameterMm: schema.productSpinner.spinDiameterMm,
       thicknessMm: sql<
         string | null
-      >`coalesce(${schema.productSpinner.thicknessMm}, ${schema.productSpinnerButton.thicknessMm})`,
+      >`coalesce(${schema.productSpinner.thicknessMm}, ${schema.productSpinnerButton.thicknessMm}, ${schema.productSlider.thicknessMm}, ${schema.productSliderPlate.thicknessMm}, ${schema.productSliderInsert.thicknessMm})`,
       thicknessWithButtonMm: schema.productSpinner.thicknessWithButtonMm,
-      updatedAt: sql<Date>`coalesce(${schema.productSpinner.updatedAt}, ${schema.productSpinnerButton.updatedAt})`,
+      updatedAt: sql<Date>`coalesce(${schema.productSpinner.updatedAt}, ${schema.productSpinnerButton.updatedAt}, ${schema.productSlider.updatedAt}, ${schema.productSliderPlate.updatedAt}, ${schema.productSliderInsert.updatedAt})`,
       weightG: sql<
         string | null
-      >`coalesce(${schema.productSpinner.weightG}, ${schema.productSpinnerButton.weightG})`,
-      widthMm: schema.productSpinner.widthMm,
+      >`coalesce(${schema.productSpinner.weightG}, ${schema.productSpinnerButton.weightG}, ${schema.productSlider.weightG}, ${schema.productSliderPlate.weightG}, ${schema.productSliderInsert.weightG})`,
+      weightBasis: schema.productSlider.weightBasis,
+      widthMm: sql<
+        string | null
+      >`coalesce(${schema.productSpinner.widthMm}, ${schema.productSlider.widthMm}, ${schema.productSliderPlate.widthMm}, ${schema.productSliderInsert.widthMm})`,
     })
     .from(schema.product)
     .innerJoin(schema.maker, eq(schema.product.makerId, schema.maker.id))
@@ -5313,6 +5522,18 @@ async function queryProducts(
     .leftJoin(
       schema.productSpinnerButton,
       eq(schema.product.id, schema.productSpinnerButton.id),
+    )
+    .leftJoin(
+      schema.productSlider,
+      eq(schema.product.id, schema.productSlider.id),
+    )
+    .leftJoin(
+      schema.productSliderPlate,
+      eq(schema.product.id, schema.productSliderPlate.id),
+    )
+    .leftJoin(
+      schema.productSliderInsert,
+      eq(schema.product.id, schema.productSliderInsert.id),
     )
     .leftJoin(
       compatibleButtonProduct,
@@ -5345,12 +5566,15 @@ async function queryProducts(
         viewer?.clerkId === row.ownerClerkId ||
           hasPermission(viewer, "products.manage"),
       ),
+      compatibilityAdvisories: [],
+      compatibilityFamilies: [],
       createdAt: row.createdAt,
       description: row.description,
       diameterMm: row.diameterMm,
       finishOptions: [],
       imageCount: 0,
       images: [],
+      includedComponents: [],
       id: row.id,
       lengthMm: row.lengthMm,
       makerId: row.makerId,
@@ -5358,6 +5582,7 @@ async function queryProducts(
       makerProductUrl: row.makerProductUrl,
       makerProductUrlValid: row.makerProductUrlValid,
       makerUrl: row.makerUrl,
+      magnetSystem: row.magnetSystem,
       materials:
         row.materialId && row.materialName && row.materialSlug
           ? [
@@ -5378,13 +5603,14 @@ async function queryProducts(
       isOwner: viewer?.clerkId === row.ownerClerkId,
       productTypeId: row.productTypeId,
       productTypeName: row.productTypeName,
-      productTypeSlug: row.productTypeSlug,
+      productTypeSlug: catalogProductType(row.productTypeSlug),
       slug: row.slug,
       spinDiameterMm: row.spinDiameterMm,
       thicknessMm: row.thicknessMm,
       thicknessWithButtonMm: row.thicknessWithButtonMm,
       updatedAt: row.updatedAt,
       weightG: row.weightG,
+      weightBasis: row.weightBasis,
       widthMm: row.widthMm,
     });
   }
@@ -5392,8 +5618,143 @@ async function queryProducts(
   await Promise.all([
     loadFinishOptions(db, result),
     loadProductImages(db, result, viewer),
+    loadProductRelationships(db, result, viewer),
   ]);
   return result;
+}
+
+/**
+ * Loads reviewed compatibility and visible exact inclusion relationships.
+ *
+ * @param db - Database used for relationship queries.
+ * @param products - Hydrated products receiving relationship data.
+ * @param viewer - Optional viewer controlling related-product visibility.
+ * @rejects When a relationship query fails.
+ */
+async function loadProductRelationships(
+  db: Pick<Database, "select">,
+  products: CatalogProduct[],
+  viewer?: CatalogViewer,
+) {
+  if (!products.length) return;
+  const productIds = products.map(({ id }) => id);
+  const relatedProduct = alias(schema.product, "relationship_related_product");
+  const relatedType = alias(schema.productType, "relationship_related_type");
+  const relatedVisibility = hasPermission(viewer, "products.manage")
+    ? undefined
+    : viewer?.clerkId
+      ? sql`((${relatedProduct.approvalStatus} = 'approved' and ${relatedProduct.isPrivate} = false) or ${relatedProduct.ownerClerkId} = ${viewer.clerkId})`
+      : and(
+          eq(relatedProduct.approvalStatus, "approved"),
+          eq(relatedProduct.isPrivate, false),
+        );
+  const [families, advisories, components] = await Promise.all([
+    db
+      .select({
+        id: schema.compatibilityFamily.id,
+        makerId: schema.compatibilityFamily.makerId,
+        makerName: schema.maker.name,
+        name: schema.compatibilityFamily.name,
+        productId: schema.productCompatibilityFamily.productId,
+        slug: schema.compatibilityFamily.slug,
+      })
+      .from(schema.productCompatibilityFamily)
+      .innerJoin(
+        schema.compatibilityFamily,
+        eq(
+          schema.productCompatibilityFamily.compatibilityFamilyId,
+          schema.compatibilityFamily.id,
+        ),
+      )
+      .innerJoin(
+        schema.maker,
+        eq(schema.compatibilityFamily.makerId, schema.maker.id),
+      )
+      .where(inArray(schema.productCompatibilityFamily.productId, productIds))
+      .orderBy(asc(schema.maker.name), asc(schema.compatibilityFamily.name)),
+    db
+      .select({
+        id: schema.productCompatibilityAdvisory.id,
+        productId: schema.productCompatibilityAdvisory.productId,
+        relatedProductId: schema.productCompatibilityAdvisory.relatedProductId,
+        relatedProductName: relatedProduct.name,
+        reviewedAt: schema.productCompatibilityAdvisory.reviewedAt,
+        text: schema.productCompatibilityAdvisory.text,
+      })
+      .from(schema.productCompatibilityAdvisory)
+      .innerJoin(
+        relatedProduct,
+        eq(
+          schema.productCompatibilityAdvisory.relatedProductId,
+          relatedProduct.id,
+        ),
+      )
+      .where(
+        and(
+          inArray(schema.productCompatibilityAdvisory.productId, productIds),
+          relatedVisibility,
+        ),
+      )
+      .orderBy(asc(schema.productCompatibilityAdvisory.id)),
+    db
+      .select({
+        id: relatedProduct.id,
+        name: relatedProduct.name,
+        productId: schema.productIncludedComponent.productId,
+        productTypeSlug: relatedType.slug,
+        slug: relatedProduct.slug,
+      })
+      .from(schema.productIncludedComponent)
+      .innerJoin(
+        relatedProduct,
+        eq(
+          schema.productIncludedComponent.componentProductId,
+          relatedProduct.id,
+        ),
+      )
+      .innerJoin(relatedType, eq(relatedProduct.productTypeId, relatedType.id))
+      .where(
+        and(
+          inArray(schema.productIncludedComponent.productId, productIds),
+          relatedVisibility,
+        ),
+      )
+      .orderBy(asc(relatedProduct.name)),
+  ]);
+  const productsById = new Map(
+    products.map((product) => [product.id, product]),
+  );
+  for (const family of families) {
+    productsById.get(family.productId)?.compatibilityFamilies.push({
+      id: family.id,
+      makerId: family.makerId,
+      makerName: family.makerName,
+      name: family.name,
+      slug: family.slug,
+    });
+  }
+  for (const advisory of advisories) {
+    productsById.get(advisory.productId)?.compatibilityAdvisories.push({
+      id: advisory.id,
+      relatedProductId: advisory.relatedProductId,
+      relatedProductName: advisory.relatedProductName,
+      reviewedAt: advisory.reviewedAt,
+      text: advisory.text,
+    });
+  }
+  for (const component of components) {
+    if (
+      component.productTypeSlug !== "slider-insert" &&
+      component.productTypeSlug !== "slider-plate"
+    )
+      continue;
+    productsById.get(component.productId)?.includedComponents.push({
+      id: component.id,
+      name: component.name,
+      productTypeSlug: component.productTypeSlug,
+      slug: component.slug,
+    });
+  }
 }
 
 /**
@@ -6358,6 +6719,225 @@ async function listCatalogImageTrash(
 type CatalogTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 /**
+ * Inserts the subtype row required by one canonical product type.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - New product identifier.
+ * @param productTypeSlug - Canonical product type.
+ * @param specs - Type-specific product facts.
+ * @rejects When required facts are missing, forbidden facts are present, or persistence fails.
+ */
+async function insertProductSubtype(
+  tx: CatalogTransaction,
+  productId: number,
+  productTypeSlug: CatalogProductType,
+  specs: ProductWriteInput["specs"],
+) {
+  switch (productTypeSlug) {
+    case "spinner":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .insert(schema.productSpinner)
+        .values({ id: productId, ...spinnerSpecs(specs) });
+      return;
+    case "spinner-button":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .insert(schema.productSpinnerButton)
+        .values({ id: productId, ...buttonSpecs(specs) });
+      return;
+    case "slider":
+      await tx
+        .insert(schema.productSlider)
+        .values({ id: productId, ...sliderSpecs(specs) });
+      return;
+    case "slider-plate":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .insert(schema.productSliderPlate)
+        .values({ id: productId, ...sliderComponentSpecs(specs) });
+      return;
+    case "slider-insert":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .insert(schema.productSliderInsert)
+        .values({ id: productId, ...sliderComponentSpecs(specs) });
+  }
+}
+
+/**
+ * Updates exactly the subtype row belonging to one product.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - Product identifier.
+ * @param productTypeSlug - Canonical product type.
+ * @param specs - Type-specific product facts.
+ * @rejects When required facts are missing, forbidden facts are present, or persistence fails.
+ */
+async function updateProductSubtype(
+  tx: CatalogTransaction,
+  productId: number,
+  productTypeSlug: CatalogProductType,
+  specs: ProductWriteInput["specs"],
+) {
+  const updatedAt = new Date();
+  switch (productTypeSlug) {
+    case "spinner":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .update(schema.productSpinner)
+        .set({ ...spinnerSpecs(specs), updatedAt })
+        .where(eq(schema.productSpinner.id, productId));
+      return;
+    case "spinner-button":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .update(schema.productSpinnerButton)
+        .set({ ...buttonSpecs(specs), updatedAt })
+        .where(eq(schema.productSpinnerButton.id, productId));
+      return;
+    case "slider":
+      await tx
+        .update(schema.productSlider)
+        .set({ ...sliderSpecs(specs), updatedAt })
+        .where(eq(schema.productSlider.id, productId));
+      return;
+    case "slider-plate":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .update(schema.productSliderPlate)
+        .set({ ...sliderComponentSpecs(specs), updatedAt })
+        .where(eq(schema.productSliderPlate.id, productId));
+      return;
+    case "slider-insert":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .update(schema.productSliderInsert)
+        .set({ ...sliderComponentSpecs(specs), updatedAt })
+        .where(eq(schema.productSliderInsert.id, productId));
+  }
+}
+
+/**
+ * Replaces reviewed compatibility, advisory, and exact-inclusion relationships.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - Product identifier.
+ * @param input - Product write containing replacement relationships.
+ * @rejects When authorization, relationship validation, or persistence fails.
+ */
+async function replaceProductRelationships(
+  tx: CatalogTransaction,
+  productId: number,
+  input: ProductWriteInput,
+) {
+  const familyIds = input.compatibilityFamilyIds ?? [];
+  const componentIds = input.includedComponentIds ?? [];
+  const advisories = input.compatibilityAdvisories ?? [];
+  if (
+    (familyIds.length || componentIds.length || advisories.length) &&
+    !hasPermission(input.actor, "products.manage")
+  ) {
+    throw new Error("Product does not exist.");
+  }
+  if (new Set(familyIds).size !== familyIds.length)
+    throw new Error("Duplicate compatibility families are not allowed.");
+  if (new Set(componentIds).size !== componentIds.length)
+    throw new Error("Duplicate included components are not allowed.");
+  if (componentIds.length && input.productTypeSlug !== "slider")
+    throw new Error("Only sliders may declare included slider components.");
+
+  if (familyIds.length) {
+    const families = await tx
+      .select({ id: schema.compatibilityFamily.id })
+      .from(schema.compatibilityFamily)
+      .where(inArray(schema.compatibilityFamily.id, familyIds));
+    if (families.length !== familyIds.length)
+      throw new Error("Compatibility family does not exist.");
+  }
+  if (componentIds.length) {
+    const components = await tx
+      .select({ id: schema.product.id, type: schema.productType.slug })
+      .from(schema.product)
+      .innerJoin(
+        schema.productType,
+        eq(schema.product.productTypeId, schema.productType.id),
+      )
+      .where(inArray(schema.product.id, componentIds));
+    if (
+      components.length !== componentIds.length ||
+      components.some(
+        ({ type }) => type !== "slider-plate" && type !== "slider-insert",
+      )
+    ) {
+      throw new Error("Included product must be a slider plate or insert.");
+    }
+  }
+
+  const advisoryKeys = new Set<string>();
+  for (const advisory of advisories) {
+    const text = advisory.text.trim();
+    if (!text || text.length > 1000)
+      throw new Error("Compatibility advisory text is invalid.");
+    if (advisory.relatedProductId === productId)
+      throw new Error("A product cannot advise against itself.");
+    const key = `${advisory.relatedProductId}:${text.toLocaleLowerCase()}`;
+    if (advisoryKeys.has(key))
+      throw new Error("Duplicate compatibility advisories are not allowed.");
+    advisoryKeys.add(key);
+  }
+  if (advisories.length) {
+    const relatedIds = [
+      ...new Set(advisories.map(({ relatedProductId }) => relatedProductId)),
+    ];
+    const relatedProducts = await tx
+      .select({ id: schema.product.id })
+      .from(schema.product)
+      .where(inArray(schema.product.id, relatedIds));
+    if (relatedProducts.length !== relatedIds.length)
+      throw new Error("Advisory product does not exist.");
+  }
+
+  await tx
+    .delete(schema.productCompatibilityFamily)
+    .where(eq(schema.productCompatibilityFamily.productId, productId));
+  await tx
+    .delete(schema.productCompatibilityAdvisory)
+    .where(eq(schema.productCompatibilityAdvisory.productId, productId));
+  await tx
+    .delete(schema.productIncludedComponent)
+    .where(eq(schema.productIncludedComponent.productId, productId));
+
+  if (familyIds.length) {
+    await tx.insert(schema.productCompatibilityFamily).values(
+      familyIds.map((compatibilityFamilyId) => ({
+        compatibilityFamilyId,
+        productId,
+        reviewedByClerkId: input.actor.clerkId,
+      })),
+    );
+  }
+  if (componentIds.length) {
+    await tx.insert(schema.productIncludedComponent).values(
+      componentIds.map((componentProductId) => ({
+        componentProductId,
+        productId,
+      })),
+    );
+  }
+  if (advisories.length) {
+    await tx.insert(schema.productCompatibilityAdvisory).values(
+      advisories.map(({ relatedProductId, text }) => ({
+        productId,
+        relatedProductId,
+        reviewedByClerkId: input.actor.clerkId,
+        text: text.trim(),
+      })),
+    );
+  }
+}
+
+/**
  * Validates product material.
  *
  * @param tx - Caller-owned database transaction.
@@ -6670,6 +7250,58 @@ export function assertValidFinishOptions(
     }
     signatures.add(signature);
   }
+}
+
+/**
+ * Rejects slider-only facts on all other catalog product types.
+ *
+ * @param specs - Candidate type-specific facts.
+ * @throws When magnet capability or slider weight basis is present.
+ */
+function assertNoSliderOnlySpecs(specs: ProductWriteInput["specs"]) {
+  if (specs.magnetSystem != null || specs.weightBasis != null)
+    throw new Error("Slider-only specifications are not allowed.");
+}
+
+/**
+ * Selects slider body facts and enforces explicit magnet and weight semantics.
+ *
+ * @param specs - Slider product specifications.
+ * @returns Slider subtype columns.
+ * @throws When the magnet host is absent or weight and its basis are incomplete.
+ */
+function sliderSpecs(specs: ProductWriteInput["specs"]) {
+  if (!specs.magnetSystem)
+    throw new Error("A slider magnet system is required.");
+  const weightG = specs.weightG ?? null;
+  const weightBasis = specs.weightBasis ?? null;
+  if ((weightG === null) !== (weightBasis === null))
+    throw new Error(
+      "Slider weight and weight basis must be recorded together.",
+    );
+  return {
+    lengthMm: specs.lengthMm ?? null,
+    magnetSystem: specs.magnetSystem,
+    thicknessMm: specs.thicknessMm ?? null,
+    weightBasis,
+    weightG,
+    widthMm: specs.widthMm ?? null,
+  };
+}
+
+/**
+ * Selects set-level facts shared by slider plate and insert products.
+ *
+ * @param specs - Component product specifications.
+ * @returns Component subtype columns.
+ */
+function sliderComponentSpecs(specs: ProductWriteInput["specs"]) {
+  return {
+    lengthMm: specs.lengthMm ?? null,
+    thicknessMm: specs.thicknessMm ?? null,
+    weightG: specs.weightG ?? null,
+    widthMm: specs.widthMm ?? null,
+  };
 }
 
 /**

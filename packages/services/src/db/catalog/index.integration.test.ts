@@ -201,4 +201,175 @@ describe("catalog product persistence", () => {
       await client.close();
     }
   }, 30_000);
+
+  it("round-trips slider subtypes and keeps reviewed relationships distinct", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      const migrationsFolder = fileURLToPath(
+        new URL("../../../../database/drizzle", import.meta.url),
+      );
+      for (const file of readdirSync(migrationsFolder)
+        .filter((name) => name.endsWith(".sql"))
+        .sort()) {
+        await client.exec(
+          readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
+            "--> statement-breakpoint",
+            "",
+          ),
+        );
+      }
+      const [maker] = await db
+        .insert(schema.maker)
+        .values({ name: "Slider Maker" })
+        .returning({ id: schema.maker.id });
+      const productTypes = await db
+        .insert(schema.productType)
+        .values([
+          { name: "Slider", slug: "slider" },
+          { name: "Slider Plate", slug: "slider-plate" },
+          { name: "Slider Insert", slug: "slider-insert" },
+        ])
+        .returning({ id: schema.productType.id });
+      const [material] = await db
+        .insert(schema.material)
+        .values({ name: "Titanium", slug: "titanium" })
+        .returning({ id: schema.material.id });
+      if (!maker || productTypes.length !== 3 || !material) {
+        throw new Error("Slider fixtures were not created.");
+      }
+
+      await db
+        .insert(schema.user)
+        .values([{ clerkId: "user-test" }, { clerkId: "admin-test" }]);
+      const service = createDbServices(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      ).catalog;
+      const admin = { clerkId: "admin-test", role: "admin" as const };
+      const user = { clerkId: "user-test", role: "user" as const };
+      const family = await service.createCompatibilityFamily({
+        actor: admin,
+        makerId: maker.id,
+        name: "Rail 50",
+        slug: "rail-50",
+      });
+      const plate = await service.createProduct({
+        actor: admin,
+        finishOptions: [],
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: "Matched Plates",
+        productTypeSlug: "slider-plate",
+        slug: "matched-plates",
+        specs: {
+          lengthMm: "50",
+          thicknessMm: "4",
+          weightG: "28",
+          widthMm: "20",
+        },
+      });
+      const insert = await service.createProduct({
+        actor: admin,
+        finishOptions: [],
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: "Cassette Insert",
+        productTypeSlug: "slider-insert",
+        slug: "cassette-insert",
+        specs: {
+          lengthMm: "42",
+          thicknessMm: "3",
+          weightG: "18",
+          widthMm: "16",
+        },
+      });
+      const slider = await service.createProduct({
+        actor: admin,
+        compatibilityAdvisories: [
+          {
+            relatedProductId: insert.id,
+            text: "Requires the revised spring pack.",
+          },
+        ],
+        compatibilityFamilyIds: [family.id],
+        finishOptions: [],
+        includedComponentIds: [plate.id, insert.id],
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: "Rail Slider",
+        productTypeSlug: "slider",
+        slug: "rail-slider",
+        specs: {
+          lengthMm: "52",
+          magnetSystem: "body-hosted",
+          thicknessMm: "12",
+          weightBasis: "complete-build",
+          weightG: "96",
+          widthMm: "24",
+        },
+      });
+
+      expect(slider).toEqual(
+        expect.objectContaining({
+          magnetSystem: "body-hosted",
+          weightBasis: "complete-build",
+          weightG: "96",
+        }),
+      );
+      expect(slider.compatibilityFamilies).toEqual([
+        expect.objectContaining({ id: family.id, makerId: maker.id }),
+      ]);
+      expect(slider.includedComponents).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: plate.id,
+            productTypeSlug: "slider-plate",
+          }),
+          expect.objectContaining({
+            id: insert.id,
+            productTypeSlug: "slider-insert",
+          }),
+        ]),
+      );
+      expect(slider.compatibilityAdvisories).toEqual([
+        expect.objectContaining({
+          relatedProductId: insert.id,
+          text: "Requires the revised spring pack.",
+        }),
+      ]);
+      expect(plate).toEqual(
+        expect.objectContaining({
+          lengthMm: "50",
+          magnetSystem: null,
+          weightBasis: null,
+          weightG: "28",
+        }),
+      );
+      await expect(
+        service.createProduct({
+          actor: user,
+          compatibilityFamilyIds: [family.id],
+          finishOptions: [],
+          makerId: maker.id,
+          materialIds: [material.id],
+          name: "Unreviewed Slider",
+          productTypeSlug: "slider",
+          slug: "unreviewed-slider",
+          specs: { magnetSystem: "insert-driven" },
+        }),
+      ).rejects.toThrow("Product does not exist.");
+      await expect(
+        service.deleteProduct({
+          actor: admin,
+          confirmed: true,
+          productId: plate.id,
+          reason: "Remove referenced component",
+        }),
+      ).resolves.toBe(false);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
 });
