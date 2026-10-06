@@ -231,6 +231,8 @@ const product: CatalogProduct = {
   canEdit: false,
   compatibleButtonId: null,
   compatibleButtonName: null,
+  compatibilityAdvisories: [],
+  compatibilityFamilies: [],
   createdAt: new Date(0),
   description: null,
   diameterMm: null,
@@ -238,6 +240,7 @@ const product: CatalogProduct = {
   id: 1,
   imageCount: 0,
   images: [],
+  includedComponents: [],
   isAdminPrivate: false,
   isPrivate: false,
   lengthMm: null,
@@ -246,6 +249,7 @@ const product: CatalogProduct = {
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
+  magnetSystem: null,
   materials: [],
   name: "Catla",
   ownerClerkId: "user_1002",
@@ -258,6 +262,7 @@ const product: CatalogProduct = {
   thicknessWithButtonMm: null,
   updatedAt: new Date(0),
   weightG: null,
+  weightBasis: null,
   widthMm: null,
 };
 

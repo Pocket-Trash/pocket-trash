@@ -347,43 +347,41 @@ export function ProductDetailPage({
 }) {
   const t = useCatalogCopy();
   const navigate = useNavigate();
-  if (
-    product.productTypeSlug !== "spinner" &&
-    product.productTypeSlug !== "spinner-button"
-  ) {
-    return (
-      <AppShell
-        breadcrumbItems={[
-          { label: t("web.navigation.products"), to: "/products" },
-        ]}
-        title={product.name}
-      >
-        <main className="mx-auto max-w-3xl p-6">
-          <EmptyState>{t("web.catalog.notImplemented")}</EmptyState>
-        </main>
-      </AppShell>
-    );
+  let specs: Array<[TranslationKey, string | null, string]>;
+  switch (product.productTypeSlug) {
+    case "spinner":
+      specs = [
+        ["web.archive.spec.weight", product.weightG, "g"],
+        ["web.archive.spec.length", product.lengthMm, "mm"],
+        ["web.catalog.field.width", product.widthMm, "mm"],
+        ["web.catalog.field.thickness", product.thicknessMm, "mm"],
+        [
+          "web.catalog.field.thicknessWithButton",
+          product.thicknessWithButtonMm,
+          "mm",
+        ],
+        ["web.catalog.field.buttonDiameter", product.buttonDiameterMm, "mm"],
+        ["web.catalog.field.spinDiameter", product.spinDiameterMm, "mm"],
+      ];
+      break;
+    case "spinner-button":
+      specs = [
+        ["web.archive.spec.weight", product.weightG, "g"],
+        ["web.archive.spec.diameter", product.diameterMm, "mm"],
+        ["web.catalog.field.thickness", product.thicknessMm, "mm"],
+      ];
+      break;
+    case "slider":
+    case "slider-insert":
+    case "slider-plate":
+      specs = [
+        ["web.archive.spec.weight", product.weightG, "g"],
+        ["web.archive.spec.length", product.lengthMm, "mm"],
+        ["web.catalog.field.width", product.widthMm, "mm"],
+        ["web.catalog.field.thickness", product.thicknessMm, "mm"],
+      ];
+      break;
   }
-  const specs: Array<[TranslationKey, string | null, string]> =
-    product.productTypeSlug === "spinner"
-      ? [
-          ["web.archive.spec.weight", product.weightG, "g"],
-          ["web.archive.spec.length", product.lengthMm, "mm"],
-          ["web.catalog.field.width", product.widthMm, "mm"],
-          ["web.catalog.field.thickness", product.thicknessMm, "mm"],
-          [
-            "web.catalog.field.thicknessWithButton",
-            product.thicknessWithButtonMm,
-            "mm",
-          ],
-          ["web.catalog.field.buttonDiameter", product.buttonDiameterMm, "mm"],
-          ["web.catalog.field.spinDiameter", product.spinDiameterMm, "mm"],
-        ]
-      : [
-          ["web.archive.spec.weight", product.weightG, "g"],
-          ["web.archive.spec.diameter", product.diameterMm, "mm"],
-          ["web.catalog.field.thickness", product.thicknessMm, "mm"],
-        ];
 
   return (
     <AppShell
@@ -392,13 +390,16 @@ export function ProductDetailPage({
       ]}
       headerActions={
         <div className="flex items-center gap-2">
-          <Link
-            className={buttonVariants({ variant: "outline" })}
-            search={{ product: product.id }}
-            to="/collections/add"
-          >
-            {t("web.action.addToCollection")}
-          </Link>
+          {product.productTypeSlug === "spinner" ||
+          product.productTypeSlug === "spinner-button" ? (
+            <Link
+              className={buttonVariants({ variant: "outline" })}
+              search={{ product: product.id }}
+              to="/collections/add"
+            >
+              {t("web.action.addToCollection")}
+            </Link>
+          ) : null}
           {product.canEdit ? (
             <>
               <Link
@@ -522,6 +523,30 @@ export function ProductDetailPage({
               {product.bearing}
             </Detail>
           ) : null}
+          {product.productTypeSlug === "slider" && product.magnetSystem ? (
+            <Detail label={t("web.slider.capability.label")}>
+              {t(
+                product.magnetSystem === "body-hosted"
+                  ? "web.slider.capability.bodyHosted"
+                  : "web.slider.capability.insertDriven",
+              )}
+            </Detail>
+          ) : null}
+          {product.productTypeSlug === "slider" && product.weightBasis ? (
+            <Detail label={t("web.slider.measurement.weightBasis")}>
+              {t(
+                product.weightBasis === "body-only"
+                  ? "web.slider.measurement.bodyOnly"
+                  : "web.slider.measurement.completeBuild",
+              )}
+            </Detail>
+          ) : null}
+          {product.productTypeSlug === "slider-plate" ||
+          product.productTypeSlug === "slider-insert" ? (
+            <Detail label={t("web.slider.measurement.basis")}>
+              {t("web.slider.measurement.setLevel")}
+            </Detail>
+          ) : null}
           {specs.map(([key, value, unit]) =>
             value ? (
               <Detail key={key} label={t(key)}>
@@ -529,6 +554,36 @@ export function ProductDetailPage({
               </Detail>
             ) : null,
           )}
+          {product.compatibilityFamilies.length ? (
+            <Detail label={t("web.slider.relationship.compatibilityFamilies")}>
+              {product.compatibilityFamilies
+                .map(({ makerName, name }) => `${makerName}: ${name}`)
+                .join(", ")}
+            </Detail>
+          ) : null}
+          {product.includedComponents.length ? (
+            <Detail label={t("web.slider.relationship.includedComponents")}>
+              <ul className="grid gap-1">
+                {product.includedComponents.map((component) => (
+                  <li key={component.id}>{component.name}</li>
+                ))}
+              </ul>
+            </Detail>
+          ) : null}
+          {product.compatibilityAdvisories.length ? (
+            <Detail label={t("web.slider.relationship.reviewedAdvisory")}>
+              <ul className="grid gap-1">
+                {product.compatibilityAdvisories.map((advisory) => (
+                  <li key={advisory.id}>
+                    <span className="font-medium">
+                      {advisory.relatedProductName}:
+                    </span>{" "}
+                    {advisory.text}
+                  </li>
+                ))}
+              </ul>
+            </Detail>
+          ) : null}
         </dl>
         <section className="grid gap-4">
           <h2 className="text-lg font-semibold">

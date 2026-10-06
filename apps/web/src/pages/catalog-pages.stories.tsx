@@ -42,6 +42,8 @@ const product: CatalogProduct = {
   canEdit: false,
   compatibleButtonId: null,
   compatibleButtonName: null,
+  compatibilityAdvisories: [],
+  compatibilityFamilies: [],
   createdAt: new Date("2026-01-01"),
   description: "A **compact** spinner.",
   diameterMm: "50.8",
@@ -57,6 +59,7 @@ const product: CatalogProduct = {
   id: 1000,
   imageCount: 1,
   images: [productImage],
+  includedComponents: [],
   isAdminPrivate: false,
   isPrivate: false,
   lengthMm: null,
@@ -65,6 +68,7 @@ const product: CatalogProduct = {
   makerProductUrl: "https://www.kapedc.com/products/katla",
   makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
+  magnetSystem: null,
   materials: [{ id: 1000, name: "Titanium", slug: "titanium" }],
   name: "Katla",
   ownerClerkId: "user_storybook",
@@ -77,7 +81,55 @@ const product: CatalogProduct = {
   thicknessWithButtonMm: null,
   updatedAt: new Date("2026-01-02"),
   weightG: "90",
+  weightBasis: null,
   widthMm: null,
+};
+
+/** Slider catalog fixture covering capability and reviewed relationships. */
+const slider: CatalogProduct = {
+  ...product,
+  bearing: null,
+  buttonDiameterMm: null,
+  compatibilityAdvisories: [
+    {
+      id: 2100,
+      relatedProductId: 2200,
+      relatedProductName: "Cassette insert",
+      reviewedAt: new Date("2026-01-02"),
+      text: "Requires the revised spring pack.",
+    },
+  ],
+  compatibilityFamilies: [
+    {
+      id: 2000,
+      makerId: product.makerId,
+      makerName: product.makerName,
+      name: "Rail 50",
+      slug: "rail-50",
+    },
+  ],
+  diameterMm: null,
+  id: 2000,
+  includedComponents: [
+    {
+      id: 2200,
+      name: "Matched plates",
+      productTypeSlug: "slider-plate",
+      slug: "matched-plates",
+    },
+  ],
+  lengthMm: "52",
+  magnetSystem: "body-hosted",
+  name: "Rail Slider",
+  productTypeId: 2000,
+  productTypeName: "Slider",
+  productTypeSlug: "slider",
+  slug: "rail-slider",
+  spinDiameterMm: null,
+  thicknessMm: "12",
+  weightBasis: "complete-build",
+  weightG: "96",
+  widthMm: "24",
 };
 
 /** User collection shared by the stories. */
@@ -255,6 +307,15 @@ export const ProductDetail: Story = {
   render: () => (
     <ProductDetailPage collectionItems={[item]} product={product} />
   ),
+};
+
+/** Slider product detail with explicit capability and reviewed relationships. */
+export const SliderProductDetail: Story = {
+  /**
+   * Renders the slider detail story.
+   * @returns A slider catalog detail fixture.
+   */
+  render: () => <ProductDetailPage product={slider} />,
 };
 
 /** Approval-decision spy returning the approved state for story interactions. */
