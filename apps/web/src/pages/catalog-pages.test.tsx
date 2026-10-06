@@ -6,12 +6,14 @@ import type {
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ProductCard } from "@/components/product-card";
+import { emptyCatalogFilters } from "@/lib/catalog-filters";
 import {
   CollectionItemDetailPage,
   CollectionPage,
   getCatalogPageSize,
   ProductDetailPage,
   ProductGrid,
+  ProductsPage,
   PublicCollectionsPage,
   UserCollectionsPage,
 } from "./catalog-pages";
@@ -192,6 +194,9 @@ const owners = [
         collectionIsPrivate: false,
         collectionItemId: 2000,
         collectionName: "Daily Carry",
+        compatibilityFamilies: [],
+        compatibleButtonId: null,
+        compatibleButtonName: null,
         displayName: "My Catla",
         description: null,
         descriptionOverride: null,
@@ -204,6 +209,7 @@ const owners = [
         installedInsertId: null,
         installedOnSliderId: null,
         installedPlateId: null,
+        includedComponents: [],
         isAdminPrivate: false,
         isPrivate: false,
         makerId: 1,
@@ -326,6 +332,62 @@ describe("PublicCollectionsPage", () => {
     expect(html).toContain("width=640");
     expect(html).toContain("Page 1 of 2");
   });
+
+  it("returns a collection when its parent slider has the selected installed plate", () => {
+    const owner = owners[0];
+    const collection = owner?.collections[0];
+    const sourceItem = owner?.items[0];
+    if (!owner || !collection || !sourceItem) {
+      throw new Error("Public collection fixtures are required.");
+    }
+    const otherCollection = {
+      ...collection,
+      id: 1002,
+      name: "Other collection",
+    };
+    const installedPlate = {
+      ...sourceItem,
+      collectionItemId: 2001,
+      displayName: "Standalone selected plate",
+      installedOnSliderId: 2000,
+      name: "V2 plate",
+      productId: 401,
+      productSlug: "v2-plate",
+      productTypeName: "Slider plate",
+      productTypeSlug: "slider-plate" as const,
+    };
+    const parentSlider = {
+      ...sourceItem,
+      displayName: "Qualifying parent slider",
+      installedPlateId: installedPlate.collectionItemId,
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+    };
+    const unrelated = {
+      ...sourceItem,
+      collectionId: otherCollection.id,
+      collectionItemId: 2002,
+      displayName: "Unrelated slider",
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+    };
+
+    const html = renderToStaticMarkup(
+      <PublicCollectionsPage
+        filters={{ ...emptyCatalogFilters(), plateIds: [401] }}
+        owners={[
+          {
+            ...owner,
+            collections: [collection, otherCollection],
+            items: [parentSlider, installedPlate, unrelated],
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain("Daily Carry");
+    expect(html).not.toContain("Other collection");
+  });
 });
 
 describe("UserCollectionsPage", () => {
@@ -431,6 +493,121 @@ describe("CollectionPage", () => {
 
     expect(html).not.toContain("LIST_ONLY_BEARING");
     expect(html).not.toContain("LIST_ONLY_DESCRIPTION");
+  });
+
+  it("shows the qualifying parent assembly and omits its standalone plate", () => {
+    const collection = owners[0]?.collections[0];
+    const sourceItem = owners[0]?.items[0];
+    if (!collection || !sourceItem) {
+      throw new Error("Collection fixtures are required.");
+    }
+    const installedPlate = {
+      ...sourceItem,
+      collectionItemId: 2001,
+      displayName: "Standalone selected plate",
+      installedOnSliderId: sourceItem.collectionItemId,
+      name: "V2 plate",
+      productId: 401,
+      productSlug: "v2-plate",
+      productTypeName: "Slider plate",
+      productTypeSlug: "slider-plate" as const,
+    };
+    const parentSlider = {
+      ...sourceItem,
+      displayName: "Qualifying parent slider",
+      installedPlateId: installedPlate.collectionItemId,
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+    };
+
+    const html = renderToStaticMarkup(
+      <CollectionPage
+        collection={collection}
+        filters={{ ...emptyCatalogFilters(), plateIds: [401] }}
+        items={[parentSlider, installedPlate]}
+      />,
+    );
+
+    expect(html).toContain("Qualifying parent slider");
+    expect(html).not.toContain("Standalone selected plate");
+  });
+
+  it("matches only the owned item's selected pattern snapshot", () => {
+    const collection = owners[0]?.collections[0];
+    const sourceItem = owners[0]?.items[0];
+    if (!collection || !sourceItem) {
+      throw new Error("Collection fixtures are required.");
+    }
+    const selectedPattern = { id: 201, name: "Ripple", slug: "ripple" };
+    const ownedSlider = {
+      ...sourceItem,
+      displayName: "Ripple owned slider",
+      finishOption: {
+        colorEffect: null,
+        colors: [],
+        finishes: [],
+        id: 1001,
+        pattern: selectedPattern,
+      },
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+    };
+
+    const selectedHtml = renderToStaticMarkup(
+      <CollectionPage
+        collection={collection}
+        filters={{
+          ...emptyCatalogFilters(),
+          patternIds: [selectedPattern.id],
+        }}
+        items={[ownedSlider]}
+      />,
+    );
+    const unselectedHtml = renderToStaticMarkup(
+      <CollectionPage
+        collection={collection}
+        filters={{ ...emptyCatalogFilters(), patternIds: [202] }}
+        items={[ownedSlider]}
+      />,
+    );
+
+    expect(selectedHtml).toContain("Ripple owned slider");
+    expect(unselectedHtml).not.toContain("Ripple owned slider");
+  });
+
+  it("matches an installed spinner button through its parent spinner only", () => {
+    const collection = owners[0]?.collections[0];
+    const sourceItem = owners[0]?.items[0];
+    if (!collection || !sourceItem) {
+      throw new Error("Collection fixtures are required.");
+    }
+    const installedButton = {
+      ...sourceItem,
+      collectionItemId: 2001,
+      displayName: "Standalone selected button",
+      installedOnSliderId: sourceItem.collectionItemId,
+      name: "Soft click button",
+      productId: 501,
+      productSlug: "soft-click-button",
+      productTypeName: "Spinner button",
+      productTypeSlug: "spinner-button" as const,
+    };
+    const parentSpinner = {
+      ...sourceItem,
+      displayName: "Qualifying parent spinner",
+      installedButtonId: installedButton.collectionItemId,
+    };
+
+    const html = renderToStaticMarkup(
+      <CollectionPage
+        collection={collection}
+        filters={{ ...emptyCatalogFilters(), spinnerButtonIds: [501] }}
+        items={[parentSpinner, installedButton]}
+      />,
+    );
+
+    expect(html).toContain("Qualifying parent spinner");
+    expect(html).not.toContain("Standalone selected button");
   });
 
   it("shows a paginated image gallery beside the collection summary", () => {
@@ -542,6 +719,104 @@ describe("ProductGrid", () => {
     expect(html).toContain("Product 12");
     expect(html).not.toContain("Product 13");
     expect(html).toContain("Page 1 of 2");
+  });
+});
+
+describe("ProductsPage", () => {
+  it("matches any offered pattern together with the live family and included plate", () => {
+    const ripple = { id: 201, name: "Ripple", slug: "ripple" };
+    const qualifying = {
+      ...product,
+      compatibilityFamilies: [
+        {
+          id: 301,
+          makerId: 1,
+          makerName: "KAP EDC",
+          name: "Small family",
+          slug: "small-family",
+        },
+      ],
+      finishOptions: [
+        {
+          colorEffect: null,
+          colors: [],
+          finishes: [],
+          id: 1001,
+          pattern: null,
+        },
+        {
+          colorEffect: null,
+          colors: [],
+          finishes: [],
+          id: 1002,
+          pattern: ripple,
+        },
+      ],
+      includedComponents: [
+        {
+          id: 401,
+          name: "V2 plate",
+          productTypeSlug: "slider-plate" as const,
+          slug: "v2-plate",
+        },
+      ],
+      name: "Qualifying catalog slider",
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+      slug: "qualifying-slider",
+    };
+    const unrelated = {
+      ...product,
+      id: 2,
+      name: "Unrelated catalog slider",
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+      slug: "unrelated-slider",
+    };
+
+    const html = renderToStaticMarkup(
+      <ProductsPage
+        filters={{
+          ...emptyCatalogFilters(),
+          compatibilityFamilyIds: [301],
+          patternIds: [ripple.id],
+          plateIds: [401],
+        }}
+        products={[qualifying, unrelated]}
+      />,
+    );
+
+    expect(html).toContain("Qualifying catalog slider");
+    expect(html).not.toContain("Unrelated catalog slider");
+  });
+
+  it("matches a spinner by its exact compatible button product", () => {
+    const qualifying = {
+      ...product,
+      compatibleButtonId: 501,
+      compatibleButtonName: "Soft click button",
+      name: "Qualifying catalog spinner",
+      slug: "qualifying-spinner",
+    };
+    const unrelated = {
+      ...product,
+      id: 2,
+      name: "Unrelated catalog spinner",
+      slug: "unrelated-spinner",
+    };
+
+    const html = renderToStaticMarkup(
+      <ProductsPage
+        filters={{
+          ...emptyCatalogFilters(),
+          spinnerButtonIds: [501],
+        }}
+        products={[qualifying, unrelated]}
+      />,
+    );
+
+    expect(html).toContain("Qualifying catalog spinner");
+    expect(html).not.toContain("Unrelated catalog spinner");
   });
 });
 
