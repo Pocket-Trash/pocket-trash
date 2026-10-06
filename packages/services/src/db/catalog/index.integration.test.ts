@@ -486,6 +486,42 @@ describe("catalog product persistence", () => {
         name: "Rail Slider",
         productTypeSlug: "slider",
         slug: "rail-slider",
+        bodyHostedMagnetSetup: {
+          clickCount: 4,
+          configuration: {
+            label: "Medium",
+            sourceLabel: "4-click layout",
+            sourceNotes: null,
+            groups: [
+              {
+                diameterMm: "6.35",
+                grade: "n52",
+                key: "corners",
+                label: "Corners",
+                thicknessMm: "3.175",
+              },
+            ],
+            slots: [
+              {
+                documentedColumn: 1,
+                documentedRow: 1,
+                groupKey: "corners",
+                half: "half-a",
+                key: "A1",
+                state: "occupied",
+              },
+              {
+                documentedColumn: 1,
+                documentedRow: 1,
+                groupKey: null,
+                half: "half-b",
+                key: "B1",
+                state: "empty",
+              },
+            ],
+          },
+          sourceNote: null,
+        },
         specs: {
           lengthMm: "52",
           magnetSystem: "body-hosted",
@@ -498,6 +534,38 @@ describe("catalog product persistence", () => {
 
       expect(slider).toEqual(
         expect.objectContaining({
+          bodyHostedMagnetSetup: {
+            clickCount: 4,
+            configuration: {
+              label: "Medium",
+              sourceLabel: "4-click layout",
+              sourceNotes: null,
+              groups: [
+                expect.objectContaining({
+                  diameterMm: "6.35",
+                  grade: "N52",
+                  key: "corners",
+                  label: "Corners",
+                  thicknessMm: "3.175",
+                }),
+              ],
+              slots: [
+                expect.objectContaining({
+                  groupKey: "corners",
+                  half: "half-a",
+                  key: "A1",
+                  state: "occupied",
+                }),
+                expect.objectContaining({
+                  groupKey: null,
+                  half: "half-b",
+                  key: "B1",
+                  state: "empty",
+                }),
+              ],
+            },
+            sourceNote: null,
+          },
           magnetSystem: "body-hosted",
           weightBasis: "complete-build",
           weightG: "96",
@@ -532,6 +600,63 @@ describe("catalog product persistence", () => {
           weightG: "28",
         }),
       );
+      await expect(
+        service.createProduct({
+          actor: admin,
+          bodyHostedMagnetSetup: {
+            clickCount: 0,
+            configuration: null,
+            sourceNote: "The maker documents an incomplete layout.",
+          },
+          finishOptions: [],
+          makerId: maker.id,
+          materialIds: [material.id],
+          name: "Invalid body setup",
+          productTypeSlug: "slider",
+          slug: "invalid-body-setup",
+          specs: { magnetSystem: "body-hosted" },
+        }),
+      ).rejects.toThrow("Click count must be a positive integer");
+      await expect(
+        service.createProduct({
+          actor: admin,
+          bodyHostedMagnetSetup: {
+            clickCount: 2,
+            configuration: {
+              label: "Small",
+              sourceLabel: null,
+              sourceNotes: null,
+              groups: [
+                {
+                  diameterMm: "6",
+                  grade: "N42",
+                  key: "center",
+                  label: "Center",
+                  thicknessMm: "3",
+                },
+              ],
+              slots: [
+                {
+                  documentedColumn: null,
+                  documentedRow: null,
+                  groupKey: "missing",
+                  half: "half-a",
+                  key: "A1",
+                  state: "occupied",
+                },
+              ],
+            },
+            sourceNote: null,
+          },
+          finishOptions: [],
+          makerId: maker.id,
+          materialIds: [material.id],
+          name: "Cross configuration reference",
+          productTypeSlug: "slider",
+          slug: "cross-configuration-reference",
+          specs: { magnetSystem: "body-hosted" },
+        }),
+      ).rejects.toThrow("Magnet group does not belong to this configuration");
       await expect(
         service.createProduct({
           actor: user,
