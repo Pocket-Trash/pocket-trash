@@ -79,6 +79,7 @@ function catalogFilterCopy(
     clear: t("web.action.clearAllFilters"),
     close: t("web.action.close"),
     colors: t("web.catalog.field.colors"),
+    compatibilityFamily: t("web.slider.filter.compatibilityFamily"),
     description: t("web.catalog.filter.description"),
     /**
      * Formats a fade option name.
@@ -101,12 +102,23 @@ function catalogFilterCopy(
      * @returns The localized additional-options label.
      */
     moreOptions: (label) => t("web.catalog.filter.moreOptions", { label }),
+    pattern: t("web.slider.filter.pattern"),
+    plate: t("web.slider.filter.plate"),
     productType: t("web.catalog.field.productType"),
     productTypeAll: t("web.catalog.filter.productTypeAll"),
+    /**
+     * Formats the polite matching-result announcement.
+     *
+     * @param count - Current matching result count.
+     * @returns Localized matching-result announcement.
+     */
+    resultsAnnouncement: (count) =>
+      t("web.slider.filter.resultsAnnouncement", { count }),
     searchLabel: t("web.slider.search.label"),
     searchPlaceholder: t("web.slider.search.placeholder"),
     selectMaker: t("web.catalog.selectMaker"),
     selectProductType: t("web.catalog.selectProductType"),
+    spinnerButton: t("web.slider.filter.spinnerButton"),
   };
 }
 
@@ -320,6 +332,7 @@ export function ProductsPage({
             facets={facets}
             filters={filters}
             onChange={onFiltersChange}
+            resultCount={filtered.length}
           />
         ) : undefined
       }
@@ -753,7 +766,12 @@ export function PublicCollectionsPage({
   const matchingCollectionIds = new Set(
     publicItems
       .filter((item) => {
-        if (!matchesCatalogFilters(collectionFilterItem(item), filters))
+        if (
+          !matchesCatalogFilters(
+            collectionFilterItem(item, publicItems),
+            filters,
+          )
+        )
           return false;
         return Boolean(
           matchCatalogSearch(
@@ -793,7 +811,7 @@ export function PublicCollectionsPage({
         left.collection.updatedAt.getTime(),
     );
   const facets = buildCatalogFacets(
-    publicItems.map(collectionFilterItem),
+    publicItems.map((item) => collectionFilterItem(item, publicItems)),
     filters.productType,
   );
   return (
@@ -805,6 +823,7 @@ export function PublicCollectionsPage({
             facets={facets}
             filters={filters}
             onChange={onFiltersChange}
+            resultCount={collections.length}
           />
         ) : undefined
       }
@@ -942,7 +961,7 @@ export function UserCollectionsPage({
   const matchingIds = new Set(
     items
       .filter((item) => {
-        if (!matchesCatalogFilters(collectionFilterItem(item), filters))
+        if (!matchesCatalogFilters(collectionFilterItem(item, items), filters))
           return false;
         return Boolean(
           matchCatalogSearch(
@@ -970,7 +989,7 @@ export function UserCollectionsPage({
     ? collections.filter(({ id }) => matchingIds.has(id))
     : collections;
   const facets = buildCatalogFacets(
-    items.map(collectionFilterItem),
+    items.map((item) => collectionFilterItem(item, items)),
     filters.productType,
   );
   const addCollection = (
@@ -995,6 +1014,7 @@ export function UserCollectionsPage({
             facets={facets}
             filters={filters}
             onChange={onFiltersChange}
+            resultCount={filtered.length}
           />
         ) : (
           <div className="flex justify-end">{addCollection}</div>
@@ -1078,7 +1098,7 @@ export function CollectionPage({
   const t = useCatalogCopy();
   const searchMatches = new Map<number, CatalogSearchMatch>();
   const filtered = items.filter((item) => {
-    if (!matchesCatalogFilters(collectionFilterItem(item), filters))
+    if (!matchesCatalogFilters(collectionFilterItem(item, items), filters))
       return false;
     const match = matchCatalogSearch(
       {
@@ -1101,7 +1121,7 @@ export function CollectionPage({
     return match !== null;
   });
   const facets = buildCatalogFacets(
-    items.map(collectionFilterItem),
+    items.map((item) => collectionFilterItem(item, items)),
     filters.productType,
   );
   const filterBar = onFiltersChange ? (
@@ -1110,6 +1130,7 @@ export function CollectionPage({
       facets={facets}
       filters={filters}
       onChange={onFiltersChange}
+      resultCount={filtered.length}
     />
   ) : null;
   const headerActions = (
