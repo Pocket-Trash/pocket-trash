@@ -47,6 +47,10 @@ interface MakerDetailPageProps {
   productsPage: number;
 }
 
+/** Responsive grid shared by both related-catalog sections. */
+const relatedCatalogGridClassName =
+  "grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_3_*_18px)_/_4)),1fr))]";
+
 /**
  * Renders a maker profile with independently paginated catalog grids.
  *
@@ -153,7 +157,7 @@ function RelatedProducts({
       >
         {(visibleProducts) =>
           visibleProducts.length ? (
-            <div className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_3_*_18px)_/_4)),1fr))]">
+            <div className={relatedCatalogGridClassName}>
               {visibleProducts.map((product) => (
                 <div
                   className="group relative h-full focus-within:ring-2 focus-within:ring-ring"
@@ -176,7 +180,9 @@ function RelatedProducts({
                     imageAlt={t("web.resources.detail.imageAlt", {
                       name: product.name,
                     })}
-                    imageCountLabel={`${t("web.resources.upload.imagesLabel")}: ${product.imageCount}`}
+                    imageCountLabel={t("web.makers.imageCount", {
+                      count: product.imageCount,
+                    })}
                     materialCountLabel={t("web.catalog.materialCount", {
                       count: product.materials.length,
                     })}
@@ -242,7 +248,7 @@ function RelatedCollectionItems({
       >
         {(visibleItems) =>
           visibleItems.length ? (
-            <div className="grid grid-cols-1 gap-[18px] min-[481px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(max(240px,calc((100%_-_3_*_18px)_/_4)),1fr))]">
+            <div className={relatedCatalogGridClassName}>
               {visibleItems.map((item) => (
                 <CollectionItemCard item={item} key={item.collectionItemId} />
               ))}
@@ -297,7 +303,10 @@ function CollectionItemCard({ item }: CollectionItemCardProps) {
       <div className="p-5">
         <h3 className="font-semibold">{item.displayName}</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          {item.productTypeName} · {item.makerName}
+          {t("web.makers.productMakerAttribution", {
+            maker: item.makerName,
+            productType: item.productTypeName,
+          })}
         </p>
         {item.material ? (
           <p className="mt-3 text-xs text-muted-foreground">

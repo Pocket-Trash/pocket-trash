@@ -163,12 +163,14 @@ export function PaginatedCards<T>({
 }: PaginatedCardsProps<T>) {
   const t = useCatalogCopy();
   const [pageSize, setPageSize] = useState(12);
+  const [viewportMeasured, setViewportMeasured] = useState(false);
   const [renderedItems, setRenderedItems] = useState(items);
   const [requestedPage, setRequestedPage] = useState(0);
   useEffect(() => {
     /** Synchronizes the page size with the current catalog grid width. */
     const updatePageSize = () => {
       setPageSize(getCatalogPageSize(window.innerWidth, widePageSize));
+      setViewportMeasured(true);
     };
     updatePageSize();
     window.addEventListener("resize", updatePageSize);
@@ -184,10 +186,14 @@ export function PaginatedCards<T>({
     Math.min(controlledPage ?? requestedPage, pageCount - 1),
   );
   useEffect(() => {
-    if (controlledPage !== undefined && controlledPage !== page) {
+    if (
+      viewportMeasured &&
+      controlledPage !== undefined &&
+      controlledPage !== page
+    ) {
       onPageChange?.(page, { replace: true });
     }
-  }, [controlledPage, onPageChange, page]);
+  }, [controlledPage, onPageChange, page, viewportMeasured]);
   /**
    * Applies a user-requested page to controlled or local state.
    *
