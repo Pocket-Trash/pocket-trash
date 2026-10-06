@@ -198,7 +198,11 @@ const owners = [
         finishOption: null,
         imageCount: 0,
         images: [],
+        hasGrandfatheredInstallation: false,
         installedButtonId: null,
+        installedInsertId: null,
+        installedOnSliderId: null,
+        installedPlateId: null,
         isAdminPrivate: false,
         isPrivate: false,
         makerId: 1,
@@ -735,6 +739,34 @@ describe("CollectionItemDetailPage", () => {
     expect(html).toContain("40 mm");
     expect(html).toContain("12 mm");
     expect(html).not.toContain("Build from scratch");
+  });
+
+  it("shows installed slider components and grandfathered compatibility warnings", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const slider = {
+      ...product,
+      magnetSystem: "insert-driven" as const,
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+    };
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        installedInsert={{ ...item, displayName: "Installed insert" }}
+        installedPlate={{ ...item, displayName: "Installed plate" }}
+        item={{
+          ...item,
+          hasGrandfatheredInstallation: true,
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+        product={slider}
+      />,
+    );
+
+    expect(html).toContain("Installed plate");
+    expect(html).toContain("Installed insert");
+    expect(html).toContain("web.slider.component.grandfatheredWarning");
   });
 
   it("shows approval actions only to administrators while owners retain review status and editing", () => {

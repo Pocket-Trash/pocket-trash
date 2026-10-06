@@ -364,6 +364,43 @@ describe("finish option editor", () => {
     expect(html).toContain(">Button</legend>");
     expect(html.match(/<fieldset/g)).toHaveLength(2);
   });
+
+  it("offers only available slider components and restores the installed assembly", () => {
+    const slider = {
+      ...productFixture(3000, "Slider", "slider"),
+      magnetSystem: "insert-driven" as const,
+    };
+    const plate = productFixture(3001, "Plate", "slider-plate");
+    const insert = productFixture(3002, "Insert", "slider-insert");
+    const sliderItem = {
+      ...collectionFixture(30, slider, 3001),
+      installedPlateId: 31,
+    };
+    const plateItem = collectionFixture(31, plate, 3002);
+    const insertItem = collectionFixture(32, insert, 3003);
+    const busyPlate = {
+      ...collectionFixture(33, plate, 3004),
+      displayName: "Busy plate",
+      installedOnSliderId: 999,
+    };
+
+    const html = renderToStaticMarkup(
+      createElement(CollectionEditPage, {
+        buttonProducts: [],
+        collections: [],
+        item: sliderItem,
+        options: emptyCatalogOptions,
+        ownedButtons: [],
+        ownedSliderComponents: [plateItem, insertItem, busyPlate],
+        product: slider,
+      }),
+    );
+
+    expect(html).toContain("web.slider.component.installedPlate");
+    expect(html).toContain("web.slider.component.installedInsert");
+    expect(html).toContain("Plate");
+    expect(html).not.toContain("Busy plate");
+  });
 });
 
 describe("collection edit submission", () => {
@@ -691,6 +728,48 @@ describe("collection add form", () => {
     expect(html).not.toContain('aria-label="Bearing"');
     expect(html).not.toContain('aria-label="Button"');
   });
+
+  it("presents included slider components as explicit suggestions only", () => {
+    const product = {
+      ...productFixture(1200, "Suggested slider", "slider"),
+      includedComponents: [
+        {
+          id: 1201,
+          name: "Suggested plate",
+          productTypeSlug: "slider-plate" as const,
+          slug: "suggested-plate",
+        },
+        {
+          id: 1202,
+          name: "Suggested insert",
+          productTypeSlug: "slider-insert" as const,
+          slug: "suggested-insert",
+        },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      createElement(CollectionAddPage, {
+        collections: [],
+        defaultCollectionName: "Tester's Collection",
+        initialProductId: product.id,
+        options: {
+          ...emptyCatalogOptions,
+          productTypes: [
+            {
+              id: product.productTypeId,
+              name: product.productTypeName,
+              slug: "slider",
+            },
+          ],
+        },
+        products: [product],
+      }),
+    );
+
+    expect(html).toContain("web.slider.relationship.inclusionHelp");
+    expect(html).toContain("Suggested plate");
+    expect(html).toContain("Suggested insert");
+  });
 });
 
 /**
@@ -800,9 +879,13 @@ function collectionFixture(
     finishOption: product.finishOptions[0] ?? null,
     imageCount: 0,
     images: [],
+    hasGrandfatheredInstallation: false,
     isAdminPrivate: false,
     isPrivate: false,
     installedButtonId: null,
+    installedInsertId: null,
+    installedOnSliderId: null,
+    installedPlateId: null,
     makerId: product.makerId,
     makerName: product.makerName,
     makerUrl: product.makerUrl,

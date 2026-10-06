@@ -1638,19 +1638,27 @@ function approvalStatusLabel(
 /**
  * Renders one collection item with its effective product details.
  *
- * @param props - Collection item data, live catalog product, and installed button, when present.
+ * @param props - Collection item data, live catalog product, and installed components, when present.
  * @param props.installedButton - Installed spinner button, when present.
+ * @param props.installedInsert - Installed slider insert, when present.
+ * @param props.installedPlate - Installed slider plate, when present.
  * @param props.item - Collection item to display.
  * @param props.product - Live catalog facts for the exact owned product.
  * @returns The collection item detail page.
  */
 export function CollectionItemDetailPage({
   installedButton = null,
+  installedInsert = null,
+  installedPlate = null,
   item,
   product = null,
 }: {
   /** Installed spinner button, when present. */
   installedButton?: UserCollectionItem | null;
+  /** Installed slider insert, when present. */
+  installedInsert?: UserCollectionItem | null;
+  /** Installed slider plate, when present. */
+  installedPlate?: UserCollectionItem | null;
   /** Collection item to display. */
   item: UserCollectionItem;
   /** Live catalog facts for the exact owned product. */
@@ -1735,6 +1743,14 @@ export function CollectionItemDetailPage({
             {t("web.resources.moderation.privateBadge")}
           </Badge>
         ) : null}
+        {item.hasGrandfatheredInstallation ? (
+          <p
+            className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground"
+            role="status"
+          >
+            {t("web.slider.component.grandfatheredWarning")}
+          </p>
+        ) : null}
         {[...ownImages, ...productImages][0] ? (
           <img
             alt={t("web.resources.detail.imageAlt", {
@@ -1781,6 +1797,18 @@ export function CollectionItemDetailPage({
               ) : (
                 t("web.catalog.defaultButton")
               )}
+            </Detail>
+          ) : null}
+          {item.productTypeSlug === "slider" ? (
+            <Detail label={t("web.slider.component.installedPlate")}>
+              {installedPlate?.displayName ?? t("web.slider.component.noPlate")}
+            </Detail>
+          ) : null}
+          {item.productTypeSlug === "slider" &&
+          product?.magnetSystem === "insert-driven" ? (
+            <Detail label={t("web.slider.component.installedInsert")}>
+              {installedInsert?.displayName ??
+                t("web.slider.component.noInsert")}
             </Detail>
           ) : null}
           {item.productTypeSlug === "spinner" && item.bearing ? (

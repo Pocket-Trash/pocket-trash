@@ -101,6 +101,14 @@ const products: CatalogProduct[] = [
       sourceNote: "Documented maker setup",
     },
     id: 3000,
+    includedComponents: [
+      {
+        id: 3001,
+        name: "Included plate",
+        productTypeSlug: "slider-plate",
+        slug: "included-plate",
+      },
+    ],
     magnetSystem: "body-hosted",
     name: "Standalone slider",
     productTypeId: 3,
