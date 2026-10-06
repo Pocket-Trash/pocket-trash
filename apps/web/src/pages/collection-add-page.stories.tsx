@@ -22,6 +22,7 @@ const product: CatalogProduct = {
       colors: [],
       finishes: [{ id: 1002, name: "Polished", slug: "polished" }],
       id: 1003,
+      pattern: null,
     },
   ],
   imageCount: 0,
@@ -98,6 +99,7 @@ const meta = {
       finishes: [],
       makers: [],
       materials: [],
+      patterns: [],
       spinnerButtons: [],
       productTypes: [
         { id: 1, name: "Spinner", slug: "spinner" },

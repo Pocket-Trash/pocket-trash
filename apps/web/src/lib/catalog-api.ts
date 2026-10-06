@@ -135,9 +135,21 @@ export const finishOptionSchema = z
     colorEffectId: idSchema.nullable(),
     colorEffectSlug: z.enum(["solid", "fade"]).nullable(),
     colorIds: z.array(idSchema),
-    finishIds: z.array(idSchema).min(1, "web.catalog.error.finishRequired"),
+    finishIds: z.array(idSchema),
+    patternId: idSchema.nullable(),
   })
   .superRefine((option, context) => {
+    if (
+      option.finishIds.length === 0 &&
+      option.colorIds.length === 0 &&
+      option.patternId === null
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["finishIds"],
+      });
+    }
     if (new Set(option.finishIds).size !== option.finishIds.length) {
       context.addIssue({
         code: "custom",
@@ -198,9 +210,7 @@ export const productFormSchema = z
     compatibleButtonId: idSchema.nullable(),
     description: optionalDescriptionSchema,
     diameterMm: numericSpecSchema,
-    finishOptions: z
-      .array(finishOptionSchema)
-      .min(1, "web.catalog.error.finishOptionRequired"),
+    finishOptions: z.array(finishOptionSchema),
     lengthMm: numericSpecSchema,
     makerId: idSchema,
     makerProductUrl: optionalUrlSchema,
@@ -228,8 +238,8 @@ export const productFormSchema = z
         });
       }
       const signatures = finishOptions.map(
-        ({ colorEffectId, colorIds, finishIds }) =>
-          `${finishIds.join(",")}|${colorEffectId ?? ""}|${colorIds.join(",")}`,
+        ({ colorEffectId, colorIds, finishIds, patternId }) =>
+          `${finishIds.join(",")}|${colorEffectId ?? ""}|${colorIds.join(",")}|${patternId ?? ""}`,
       );
       if (new Set(signatures).size !== signatures.length) {
         context.addIssue({
@@ -282,6 +292,8 @@ const materialWriteSchema = materialSchema.extend({
  * Schema for finish names.
  */
 const finishSchema = z.object({ name: slugNameSchema });
+/** Schema for pattern names. */
+const patternSchema = z.object({ name: slugNameSchema });
 /**
  * Schema for color names and six-digit uppercase hexadecimal values.
  */
@@ -401,7 +413,7 @@ const collectionAddSchema = z
     const finishCount = [input.finishOptionId, input.customFinish].filter(
       (value) => value !== null,
     ).length;
-    if (finishCount !== 1) {
+    if (finishCount > 1) {
       context.addIssue({
         code: "custom",
         message: "web.catalog.error.productFinishRequired",
@@ -412,16 +424,15 @@ const collectionAddSchema = z
       input.buttonFinishOptionId,
       input.buttonCustomFinish,
     ].filter((value) => value !== null).length;
-    const selectedButtonValues = [
-      input.buttonProductId,
-      input.buttonMaterialId,
-      buttonFinishCount === 1 ? true : null,
-    ].filter((value) => value !== null).length;
     if (
-      (selectedButtonValues !== 0 && selectedButtonValues !== 3) ||
       buttonFinishCount > 1 ||
-      (input.productTypeSlug !== "spinner" && selectedButtonValues > 0) ||
-      (input.buttonProductId === null && buttonFinishCount > 0)
+      (input.productTypeSlug !== "spinner" &&
+        (input.buttonProductId !== null ||
+          input.buttonMaterialId !== null ||
+          buttonFinishCount > 0)) ||
+      (input.buttonProductId === null &&
+        (input.buttonMaterialId !== null || buttonFinishCount > 0)) ||
+      (input.buttonProductId !== null && input.buttonMaterialId === null)
     ) {
       context.addIssue({
         code: "custom",
@@ -513,6 +524,10 @@ export type CatalogOptions = {
    */
   materials: Awaited<ReturnType<typeof listMaterials>>;
   /**
+   * Available patterns.
+   */
+  patterns: Awaited<ReturnType<typeof listPatterns>>;
+  /**
    * Available product types.
    */
   productTypes: Awaited<ReturnType<typeof listProductTypes>>;
@@ -538,6 +553,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       finishes,
       makers,
       materials,
+      patterns,
       productTypes,
       spinnerButtons,
     ] = await Promise.all([
@@ -546,6 +562,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       listFinishes(),
       listMakers(),
       listMaterials(),
+      listPatterns(),
       listProductTypes(),
       s.db.catalog.listProducts("spinner-button", viewer),
     ]);
@@ -555,6 +572,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       finishes,
       makers,
       materials,
+      patterns,
       productTypes,
       spinnerButtons,
     };
@@ -982,6 +1000,38 @@ export const createCatalogFinish = createServerFn({ method: "POST" })
   });
 
 /**
+ * Validates and creates a uniquely slugged pattern for an authorized product manager.
+ *
+ * @returns The created pattern or a validation-aware mutation failure.
+ * @rejects If permission checking, service loading, or existing-pattern lookup fails.
+ */
+export const createCatalogPattern = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(
+    async ({ data }): Promise<CatalogLookupMutationResult<"pattern">> => {
+      const actor = await requirePermission("products.manage");
+      const parsed = patternSchema.safeParse(data);
+      if (!parsed.success) return validationFailure(parsed.error);
+
+      const { s } = await import("@/lib/services");
+      const patterns = await s.db.catalog.listPatterns();
+      try {
+        const pattern = await s.db.catalog.createPattern({
+          actor,
+          name: parsed.data.name,
+          slug: nextAvailableSlug(
+            parsed.data.name,
+            patterns.map(({ slug }) => slug),
+          ),
+        });
+        return { ok: true as const, pattern };
+      } catch (error) {
+        return mutationFailure(error);
+      }
+    },
+  );
+
+/**
  * Validates and creates a uniquely slugged color for an authorized product manager.
  *
  * @returns The created color or a validation-aware mutation failure.
@@ -1059,10 +1109,11 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       actor,
       description: parsed.data.description,
       finishOptions: parsed.data.finishOptions.map(
-        ({ colorEffectId, colorIds, finishIds }) => ({
+        ({ colorEffectId, colorIds, finishIds, patternId }) => ({
           colorEffectId,
           colorIds,
           finishIds,
+          patternId,
         }),
       ),
       makerId: parsed.data.makerId,
@@ -1808,6 +1859,7 @@ function toFinishWriteOption(
     colorEffectId: option.colorEffectId,
     colorIds: option.colorIds,
     finishIds: option.finishIds,
+    patternId: option.patternId,
   };
 }
 
@@ -1864,6 +1916,17 @@ async function listFinishes(): Promise<CatalogLookup[]> {
 async function listMaterials() {
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listMaterials();
+}
+
+/**
+ * Loads catalog patterns.
+ *
+ * @returns A promise resolving to catalog patterns.
+ * @rejects If the service module or pattern query fails.
+ */
+async function listPatterns(): Promise<CatalogLookup[]> {
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listPatterns();
 }
 
 /**
