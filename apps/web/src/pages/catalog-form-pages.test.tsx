@@ -14,6 +14,7 @@ import {
   CollectionProductFields,
   collectionEditSubmissionMode,
   FinishOptionsEditor,
+  ownedInsertSetupAfterLayoutChange,
   ProductEditor,
 } from "./catalog-form-pages";
 
@@ -400,6 +401,87 @@ describe("finish option editor", () => {
     expect(html).toContain("Installed insert");
     expect(html).toContain("Plate");
     expect(html).not.toContain("Busy plate");
+  });
+
+  it("offers live defaults, exact offers, and custom owned insert setups", () => {
+    const insert = {
+      ...productFixture(3100, "Setup insert", "slider-insert"),
+      insertClickOptions: [
+        { clickCount: 3, id: 4100, insertionPosition: 0 },
+        { clickCount: 5, id: 4101, insertionPosition: 1 },
+      ],
+      insertMagnetOffers: [
+        {
+          clickCount: 5,
+          clickOptionId: 4101,
+          configuration: {
+            groups: [],
+            label: "Catalog layout",
+            slots: [
+              {
+                documentedColumn: null,
+                documentedRow: null,
+                groupKey: null,
+                half: "half-a" as const,
+                key: "A1",
+                state: "empty" as const,
+              },
+            ],
+            sourceLabel: null,
+            sourceNotes: null,
+          },
+          copiedFromTemplateId: null,
+          id: 4200,
+          insertProductId: 3100,
+          isAdvertisedDefault: true,
+        },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      createElement(CollectionEditPage, {
+        buttonProducts: [],
+        collections: [],
+        item: {
+          ...collectionFixture(41, insert, 3101),
+          ownedInsertSetup: {
+            clickCount: 3,
+            configuration: null,
+            sourceOfferId: null,
+          },
+        },
+        options: emptyCatalogOptions,
+        ownedButtons: [],
+        product: insert,
+      }),
+    );
+
+    expect(html).toContain("web.slider.setup.default");
+    expect(html).toContain("web.slider.setup.selectOffer");
+    expect(html).toContain("web.slider.setup.fromScratch");
+    expect(html).toContain("web.slider.setup.clickCount");
+    expect(html.indexOf(">3<")).toBeLessThan(html.indexOf(">5<"));
+  });
+
+  it("clears a linked click option after any layout edit", () => {
+    expect(
+      ownedInsertSetupAfterLayoutChange(
+        {
+          clickOptionId: 4101,
+          configuration: null,
+          sourceOfferId: 4200,
+        },
+        {
+          groups: [],
+          label: "Observed",
+          slots: [],
+          sourceLabel: null,
+          sourceNotes: null,
+        },
+      ),
+    ).toMatchObject({
+      clickOptionId: null,
+      sourceOfferId: 4200,
+    });
   });
 });
 
@@ -882,6 +964,7 @@ function collectionFixture(
     imageCount: 0,
     images: [],
     hasGrandfatheredInstallation: false,
+    effectiveSliderSetup: null,
     isAdminPrivate: false,
     isPrivate: false,
     installedButtonId: null,
@@ -893,6 +976,7 @@ function collectionFixture(
     makerUrl: product.makerUrl,
     material: product.materials[0] ?? null,
     name: product.name,
+    ownedInsertSetup: null,
     ownerClerkId: "user_test",
     ownerUsername: "tester",
     ownerUserId: 1,

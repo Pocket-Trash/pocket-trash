@@ -6,9 +6,11 @@ import type {
   CatalogFinishOption,
   CatalogImage,
   CatalogLookup,
+  CatalogMagnetConfiguration,
   CatalogProduct,
   CatalogProductType,
   CatalogTerminologyAlias,
+  OwnedMagnetConfiguration,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
@@ -747,7 +749,11 @@ export function ProductEditor({
                   {(field) =>
                     field.state.value ? (
                       <BodyHostedMagnetSetupEditor
-                        onChange={field.handleChange}
+                        onChange={(setup) =>
+                          field.handleChange(
+                            setup as CatalogBodyHostedMagnetSetup,
+                          )
+                        }
                         t={t}
                         value={field.state.value}
                       />
@@ -1305,7 +1311,8 @@ function InsertHostedMagnetOptionsEditor({
           <BodyHostedMagnetSetupEditor
             legend={t("web.slider.setup.offer")}
             onChange={(setup) => {
-              const configuration = setup.configuration;
+              const configuration =
+                setup.configuration as CatalogMagnetConfiguration | null;
               if (!configuration) return;
               onChange({
                 ...value,
@@ -1319,7 +1326,7 @@ function InsertHostedMagnetOptionsEditor({
             t={t}
             value={{
               clickCount: offer.clickCount,
-              configuration: offer.configuration,
+              configuration: offer.configuration as CatalogMagnetConfiguration,
               sourceNote: null,
             }}
           />
@@ -1491,13 +1498,23 @@ function SliderInsertOfferEditor({
   );
 }
 
+/** Setup shape shared by catalog and owner-recorded layout editors. */
+type EditableMagnetSetup = Omit<
+  CatalogBodyHostedMagnetSetup,
+  "configuration"
+> & {
+  /** Catalog-complete or owner-recorded layout. */
+  configuration: OwnedMagnetConfiguration | null;
+};
+
 /**
- * Edits the single inherent setup of a body-hosted catalog slider.
+ * Edits one catalog-complete or owner-recorded magnet setup.
  *
  * @param props - Current setup and replacement callback.
  * @returns Structured setup authoring fields.
  */
 function BodyHostedMagnetSetupEditor({
+  allowUnknown = false,
   legend,
   onChange,
   showClickCount = true,
@@ -1505,6 +1522,8 @@ function BodyHostedMagnetSetupEditor({
   t,
   value,
 }: {
+  /** Whether owner-recorded positions may use the unknown state. */
+  allowUnknown?: boolean;
   /** Optional fieldset legend override. */
   legend?: string;
   /**
@@ -1512,7 +1531,7 @@ function BodyHostedMagnetSetupEditor({
    *
    * @param value - Next complete body-hosted setup.
    */
-  onChange(value: CatalogBodyHostedMagnetSetup): void;
+  onChange(value: EditableMagnetSetup): void;
   /** Whether to show the body-level click count field. */
   showClickCount?: boolean;
   /** Whether to show the incomplete-layout note field. */
@@ -1520,7 +1539,7 @@ function BodyHostedMagnetSetupEditor({
   /** Localized catalog message formatter. */
   t: ReturnType<typeof useCatalogCopy>;
   /** Current inherent setup. */
-  value: CatalogBodyHostedMagnetSetup;
+  value: EditableMagnetSetup;
 }) {
   const configuration = value.configuration;
   /**
@@ -1830,7 +1849,10 @@ function BodyHostedMagnetSetupEditor({
                     aria-label={t(`web.slider.magnet.state.${slot.state}`)}
                     className="h-9 rounded-md border border-input bg-background px-3 text-sm"
                     onChange={(event) => {
-                      const state = event.target.value as "occupied" | "empty";
+                      const state = event.target.value as
+                        | "occupied"
+                        | "empty"
+                        | "unknown";
                       replaceConfiguration({
                         ...configuration,
                         slots: configuration.slots.map((current, position) =>
@@ -1838,7 +1860,9 @@ function BodyHostedMagnetSetupEditor({
                             ? {
                                 ...current,
                                 groupKey:
-                                  state === "empty" ? null : current.groupKey,
+                                  state === "occupied"
+                                    ? current.groupKey
+                                    : null,
                                 state,
                               }
                             : current,
@@ -1853,13 +1877,18 @@ function BodyHostedMagnetSetupEditor({
                     <option value="empty">
                       {t("web.slider.magnet.state.empty")}
                     </option>
+                    {allowUnknown ? (
+                      <option value="unknown">
+                        {t("web.slider.magnet.state.unknown")}
+                      </option>
+                    ) : null}
                   </select>
                 </Field>
                 <Field label={t("web.slider.magnet.group")}>
                   <select
                     aria-label={t("web.slider.magnet.group")}
                     className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    disabled={slot.state === "empty"}
+                    disabled={slot.state !== "occupied"}
                     onChange={(event) =>
                       replaceConfiguration({
                         ...configuration,
@@ -2003,6 +2032,161 @@ function BodyHostedMagnetSetupEditor({
           {t("web.action.confirmAdd")} {t("web.slider.magnet.configuration")}
         </Button>
       )}
+    </fieldset>
+  );
+}
+
+/**
+ * Edits the durable setup snapshot for one owned slider insert.
+ *
+ * @param props - Exact insert product, setup draft, copy, and replacement callback.
+ * @returns Default, copied-offer, and custom setup controls.
+ */
+function OwnedInsertSetupEditor({
+  onChange,
+  product,
+  t,
+  value,
+}: {
+  /**
+   * Replaces the snapshot draft, or clears it for live catalog defaults.
+   *
+   * @param value - Next owner setup draft, or `null` for live defaults.
+   * @param layoutChanged - Whether a layout edit must clear the click link.
+   * @returns Nothing.
+   */
+  onChange(value: OwnedInsertSetupDraft | null, layoutChanged?: boolean): void;
+  /** Exact insert product owning every selectable option. */
+  product: CatalogProduct;
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+  /** Current durable snapshot draft, or `null` for live defaults. */
+  value: OwnedInsertSetupDraft | null;
+}) {
+  const clickOptions = [...product.insertClickOptions].sort(
+    (left, right) => left.insertionPosition - right.insertionPosition,
+  );
+  const earliestClickOption = clickOptions[0] ?? null;
+  return (
+    <fieldset className="grid gap-4 rounded-lg border border-border p-4">
+      <legend className="px-1 text-sm font-medium">
+        {t("web.slider.setup.title")}
+      </legend>
+      <label className="grid gap-1 rounded-md border border-border p-3 text-sm">
+        <span className="flex items-center gap-2 font-medium">
+          <input
+            checked={value === null}
+            name="owned-insert-setup-mode"
+            onChange={() => onChange(null)}
+            type="radio"
+          />
+          {t("web.slider.setup.default")}
+        </span>
+        <span className="text-muted-foreground">
+          {t("web.slider.setup.defaultDescription")}
+        </span>
+      </label>
+      {product.insertMagnetOffers.length ? (
+        <Field label={t("web.slider.setup.selectOffer")}>
+          <select
+            aria-label={t("web.slider.setup.selectOffer")}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            onChange={(event) => {
+              const offer = product.insertMagnetOffers.find(
+                ({ id }) => id === Number(event.target.value),
+              );
+              if (!offer) return;
+              onChange({
+                clickOptionId:
+                  offer.clickOptionId ?? earliestClickOption?.id ?? null,
+                configuration: offer.configuration,
+                sourceOfferId: offer.id,
+              });
+            }}
+            value={value?.sourceOfferId ?? ""}
+          >
+            <option value="">{t("web.slider.setup.selectOffer")}</option>
+            {product.insertMagnetOffers.map((offer) => (
+              <option key={offer.id} value={offer.id}>
+                {offer.configuration.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      ) : null}
+      <Button
+        className="w-fit"
+        onClick={() =>
+          onChange({
+            clickOptionId: earliestClickOption?.id ?? null,
+            configuration: {
+              groups: [],
+              label: "",
+              slots: [
+                {
+                  documentedColumn: null,
+                  documentedRow: null,
+                  groupKey: null,
+                  half: "half-a",
+                  key: "A1",
+                  state: "unknown",
+                },
+              ],
+              sourceLabel: null,
+              sourceNotes: null,
+            },
+            sourceOfferId: null,
+          })
+        }
+        type="button"
+        variant="outline"
+      >
+        {t("web.slider.setup.fromScratch")}
+      </Button>
+      {value ? (
+        <>
+          <Field label={t("web.slider.setup.clickCount")}>
+            <select
+              aria-label={t("web.slider.setup.clickCount")}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  clickOptionId: event.target.value
+                    ? Number(event.target.value)
+                    : null,
+                })
+              }
+              value={value.clickOptionId ?? ""}
+            >
+              <option value="">{t("web.slider.setup.notRecorded")}</option>
+              {clickOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.clickCount}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <BodyHostedMagnetSetupEditor
+            allowUnknown
+            legend={t("web.slider.setup.custom")}
+            onChange={(setup) =>
+              onChange(
+                ownedInsertSetupAfterLayoutChange(value, setup.configuration),
+                true,
+              )
+            }
+            showClickCount={false}
+            showSourceNote={false}
+            t={t}
+            value={{
+              clickCount: null,
+              configuration: value.configuration,
+              sourceNote: null,
+            }}
+          />
+        </>
+      ) : null}
     </fieldset>
   );
 }
@@ -3996,6 +4180,30 @@ function localizedFinishLabel(
   });
 }
 
+/** Editable owned-insert setup sent to the collection service. */
+type OwnedInsertSetupDraft = {
+  /** Current exact-product click option selected by the owner. */
+  clickOptionId: number | null;
+  /** Owner-recorded layout snapshot. */
+  configuration: OwnedMagnetConfiguration | null;
+  /** Current exact-product offer copied as the authoring source. */
+  sourceOfferId: number | null;
+};
+
+/**
+ * Applies an owned layout edit and clears the linked click selection.
+ *
+ * @param current - Existing setup draft.
+ * @param configuration - Replacement owner-recorded layout.
+ * @returns Updated setup draft with no selected click option.
+ */
+export function ownedInsertSetupAfterLayoutChange(
+  current: OwnedInsertSetupDraft,
+  configuration: OwnedMagnetConfiguration | null,
+): OwnedInsertSetupDraft {
+  return { ...current, clickOptionId: null, configuration };
+}
+
 /**
  * Renders the collection-item edit page.
  *
@@ -4064,6 +4272,26 @@ export function CollectionEditPage({
       : null,
   );
   const [customFinish, setCustomFinish] = React.useState(emptyFinishOption);
+  const [insertSetup, setInsertSetup] =
+    React.useState<OwnedInsertSetupDraft | null>(() => {
+      if (!item.ownedInsertSetup) return null;
+      return {
+        clickOptionId:
+          product.insertClickOptions.find(
+            ({ clickCount }) =>
+              clickCount === item.ownedInsertSetup?.clickCount,
+          )?.id ?? null,
+        configuration: item.ownedInsertSetup.configuration,
+        sourceOfferId: product.insertMagnetOffers.some(
+          ({ id }) => id === item.ownedInsertSetup?.sourceOfferId,
+        )
+          ? item.ownedInsertSetup.sourceOfferId
+          : null,
+      };
+    });
+  const [insertSetupDirty, setInsertSetupDirty] = React.useState(false);
+  const [insertSetupClickCleared, setInsertSetupClickCleared] =
+    React.useState(false);
   const initialButton = ownedButtons.find(
     ({ collectionItemId }) => collectionItemId === item.installedButtonId,
   );
@@ -4202,6 +4430,27 @@ export function CollectionEditPage({
             product={product}
             t={t}
           />
+          {item.productTypeSlug === "slider-insert" ? (
+            <>
+              <OwnedInsertSetupEditor
+                onChange={(next, layoutChanged = false) => {
+                  if (layoutChanged && insertSetup?.clickOptionId !== null) {
+                    setInsertSetupClickCleared(true);
+                  } else if (!layoutChanged) {
+                    setInsertSetupClickCleared(false);
+                  }
+                  setInsertSetup(next);
+                  setInsertSetupDirty(true);
+                }}
+                product={product}
+                t={t}
+                value={insertSetup}
+              />
+              {insertSetupClickCleared ? (
+                <Notice>{t("web.slider.setup.clickCountCleared")}</Notice>
+              ) : null}
+            </>
+          ) : null}
           {item.productTypeSlug === "spinner" ? (
             <Field label={t("web.catalog.field.button")}>
               <CatalogCombobox
@@ -4586,6 +4835,10 @@ export function CollectionEditPage({
                     : {}),
                   ...(item.productTypeSlug === "slider"
                     ? { installedInsert, installedPlate }
+                    : {}),
+                  ...(item.productTypeSlug === "slider-insert" &&
+                  insertSetupDirty
+                    ? { insertSetup }
                     : {}),
                   materialId: material.id,
                   reason,

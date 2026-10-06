@@ -196,6 +196,7 @@ const owners = [
         description: null,
         descriptionOverride: null,
         finishOption: null,
+        effectiveSliderSetup: null,
         imageCount: 0,
         images: [],
         hasGrandfatheredInstallation: false,
@@ -213,6 +214,7 @@ const owners = [
         ownerClerkId: "user_1002",
         ownerUsername: "royanger",
         ownerUserId: 1002,
+        ownedInsertSetup: null,
         productId: 1,
         productSlug: "catla",
         productImages: [],
@@ -769,6 +771,93 @@ describe("CollectionItemDetailPage", () => {
     expect(html).toContain(
       "This installation can remain connected, but reinstalling will use current compatibility.",
     );
+  });
+
+  it("shows an owned slider's effective setup without filling snapshot gaps", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        item={{
+          ...item,
+          effectiveSliderSetup: {
+            clickCount: null,
+            configuration: {
+              groups: [],
+              label: "Owner layout",
+              slots: [
+                {
+                  documentedColumn: null,
+                  documentedRow: null,
+                  groupKey: null,
+                  half: "half-a",
+                  key: "A1",
+                  state: "unknown",
+                },
+              ],
+              sourceLabel: null,
+              sourceNotes: null,
+            },
+            isLiveCatalog: false,
+            source: "owned-insert",
+          },
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+        product={{
+          ...product,
+          magnetSystem: "insert-driven",
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+      />,
+    );
+
+    expect(html).toContain("web.slider.setup.notRecorded");
+    expect(html).toContain("Owner layout");
+    expect(html).toContain("web.slider.magnet.state.unknown");
+  });
+
+  it("uses an insert's live advertised default until its owner records a setup", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const configuration = {
+      groups: [],
+      label: "Advertised layout",
+      slots: [],
+      sourceLabel: null,
+      sourceNotes: null,
+    };
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        item={{
+          ...item,
+          ownedInsertSetup: null,
+          productTypeName: "Slider insert",
+          productTypeSlug: "slider-insert",
+        }}
+        product={{
+          ...product,
+          insertMagnetOffers: [
+            {
+              clickCount: 5,
+              clickOptionId: 3000,
+              configuration,
+              copiedFromTemplateId: null,
+              id: 4000,
+              insertProductId: product.id,
+              isAdvertisedDefault: true,
+            },
+          ],
+          productTypeName: "Slider insert",
+          productTypeSlug: "slider-insert",
+        }}
+      />,
+    );
+
+    expect(html).toContain("web.slider.setup.defaultDescription");
+    expect(html).toContain("Advertised layout");
+    expect(html).toContain("5");
   });
 
   it("shows approval actions only to administrators while owners retain review status and editing", () => {

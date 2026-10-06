@@ -6,6 +6,8 @@ import type {
   CatalogProduct,
   CatalogProductType,
   CatalogTerminologyAlias,
+  EffectiveSliderSetup,
+  OwnedSliderInsertSetup,
   PublicCollectionOwner,
   UserCollectionItem,
   UserCollectionSummary,
@@ -1669,6 +1671,34 @@ export function CollectionItemDetailPage({
   const productImages = item.productImages.filter(
     ({ deletedAt }) => !deletedAt,
   );
+  const insertAdvertisedDefault = product?.insertMagnetOffers.find(
+    ({ isAdvertisedDefault }) => isAdvertisedDefault,
+  );
+  const displayedSliderSetup:
+    | CatalogBodyHostedMagnetSetup
+    | EffectiveSliderSetup
+    | OwnedSliderInsertSetup
+    | null =
+    item.productTypeSlug === "slider"
+      ? (item.effectiveSliderSetup ?? product?.bodyHostedMagnetSetup ?? null)
+      : item.productTypeSlug === "slider-insert"
+        ? (item.ownedInsertSetup ??
+          (insertAdvertisedDefault
+            ? {
+                clickCount: insertAdvertisedDefault.clickCount,
+                configuration: insertAdvertisedDefault.configuration,
+                sourceOfferId: insertAdvertisedDefault.id,
+              }
+            : null))
+        : null;
+  const usesLiveInsertDefault =
+    (item.productTypeSlug === "slider-insert" &&
+      item.ownedInsertSetup === null &&
+      insertAdvertisedDefault !== undefined) ||
+    (item.productTypeSlug === "slider" &&
+      item.effectiveSliderSetup?.isLiveCatalog === true &&
+      (item.effectiveSliderSetup.source === "slider-default" ||
+        item.effectiveSliderSetup.source === "insert-default"));
   return (
     <AppShell
       breadcrumbItems={[
@@ -1825,10 +1855,16 @@ export function CollectionItemDetailPage({
               )}
             </Detail>
           ) : null}
-          {product?.bodyHostedMagnetSetup ? (
+          {displayedSliderSetup ? (
             <Detail label={t("web.slider.setup.title")}>
+              {usesLiveInsertDefault ? (
+                <p className="mb-2 text-sm text-muted-foreground">
+                  {t("web.slider.setup.defaultDescription")}
+                </p>
+              ) : null}
               <BodyHostedMagnetSetupDetails
-                setup={product.bodyHostedMagnetSetup}
+                missingConfigurationLabel={t("web.slider.setup.notRecorded")}
+                setup={displayedSliderSetup}
                 t={t}
               />
             </Detail>
@@ -2003,15 +2039,22 @@ function Detail({
  * @returns Read-only exact setup details without install or custom controls.
  */
 function BodyHostedMagnetSetupDetails({
+  missingConfigurationLabel,
   setup,
   t,
 }: {
+  /** Optional copy used when an owner snapshot omitted its layout. */
+  missingConfigurationLabel?: string;
   /** Live inherent catalog setup. */
-  setup: CatalogBodyHostedMagnetSetup;
+  setup:
+    | CatalogBodyHostedMagnetSetup
+    | EffectiveSliderSetup
+    | OwnedSliderInsertSetup;
   /** Localized catalog message formatter. */
   t: ReturnType<typeof useCatalogCopy>;
 }) {
   const configuration = setup.configuration;
+  const sourceNote = "sourceNote" in setup ? setup.sourceNote : null;
   return (
     <div className="grid gap-3 rounded-md border border-border p-3">
       <p className="m-0 text-sm">
@@ -2020,13 +2063,13 @@ function BodyHostedMagnetSetupDetails({
           ? t("web.slider.setup.notRecorded")
           : t("web.slider.setup.clicks", { count: setup.clickCount })}
       </p>
-      {setup.sourceNote ? (
+      {sourceNote ? (
         <div>
           <p className="m-0 text-sm font-medium">
             {t("web.slider.setup.sourceNote")}
           </p>
           <p className="m-0 whitespace-pre-wrap text-sm text-muted-foreground">
-            {setup.sourceNote}
+            {sourceNote}
           </p>
         </div>
       ) : null}
@@ -2080,7 +2123,8 @@ function BodyHostedMagnetSetupDetails({
         </div>
       ) : (
         <p className="m-0 text-sm text-muted-foreground">
-          {t("web.slider.setup.incompleteSourceNote")}
+          {missingConfigurationLabel ??
+            t("web.slider.setup.incompleteSourceNote")}
         </p>
       )}
     </div>

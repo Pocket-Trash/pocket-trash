@@ -210,6 +210,72 @@ const magnetConfigurationSchema = z
     }
   });
 
+/** Owner-recorded layout contract that additionally permits unknown positions. */
+const ownedMagnetConfigurationSchema = z
+  .object({
+    groups: z.array(magnetGroupSchema),
+    label: z.string().trim().min(1, requiredMessage).max(100),
+    slots: z
+      .array(
+        magnetSlotSchema.extend({
+          state: z.enum(["occupied", "empty", "unknown"]),
+        }),
+      )
+      .min(1, "web.slider.validation.completeConfiguration"),
+    sourceLabel: optionalMagnetTextSchema(200),
+    sourceNotes: optionalMagnetTextSchema(5000),
+  })
+  .superRefine((configuration, context) => {
+    const groupKeys = configuration.groups.map(({ key }) => key);
+    const slotKeys = configuration.slots.map(({ key }) => key);
+    if (new Set(groupKeys).size !== groupKeys.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["configuration", "groups"],
+      });
+    }
+    if (new Set(slotKeys).size !== slotKeys.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["configuration", "slots"],
+      });
+    }
+    const referenced = new Set<string>();
+    for (const [index, slot] of configuration.slots.entries()) {
+      if (slot.state === "occupied" && !slot.groupKey) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.incompleteSlot",
+          path: ["configuration", "slots", index, "groupKey"],
+        });
+      }
+      if (slot.state !== "occupied" && slot.groupKey) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.overlappingGroup",
+          path: ["configuration", "slots", index, "groupKey"],
+        });
+      }
+      if (slot.groupKey && !groupKeys.includes(slot.groupKey)) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.crossConfiguration",
+          path: ["configuration", "slots", index, "groupKey"],
+        });
+      }
+      if (slot.groupKey) referenced.add(slot.groupKey);
+    }
+    if (groupKeys.some((key) => !referenced.has(key))) {
+      context.addIssue({
+        code: "custom",
+        message: "web.slider.validation.completeConfiguration",
+        path: ["configuration", "groups"],
+      });
+    }
+  });
+
 /** Body-hosted setup form contract. */
 const bodyHostedMagnetSetupSchema = z.object({
   clickCount: z.number().int().positive().nullable(),
@@ -779,6 +845,14 @@ const collectionEditSchema = z
       .optional(),
     installedPlate: z
       .object({ collectionItemId: idSchema })
+      .nullable()
+      .optional(),
+    insertSetup: z
+      .object({
+        clickOptionId: idSchema.nullable(),
+        configuration: ownedMagnetConfigurationSchema.nullable(),
+        sourceOfferId: idSchema.nullable(),
+      })
       .nullable()
       .optional(),
     materialId: idSchema,
