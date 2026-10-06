@@ -4,6 +4,9 @@ import {
   collectionImage,
   collectionItem,
   collectionItemImage,
+  collectionSlider,
+  collectionSliderInsert,
+  collectionSliderPlate,
   collectionSpinner,
   collectionSpinnerButton,
   color,
@@ -310,6 +313,18 @@ export const collectionItemRelations = relations(
     spinnerButton: one(collectionSpinnerButton, {
       fields: [collectionItem.id],
       references: [collectionSpinnerButton.id],
+    }),
+    slider: one(collectionSlider, {
+      fields: [collectionItem.id],
+      references: [collectionSlider.id],
+    }),
+    sliderInsert: one(collectionSliderInsert, {
+      fields: [collectionItem.id],
+      references: [collectionSliderInsert.id],
+    }),
+    sliderPlate: one(collectionSliderPlate, {
+      fields: [collectionItem.id],
+      references: [collectionSliderPlate.id],
     }),
   }),
 );
