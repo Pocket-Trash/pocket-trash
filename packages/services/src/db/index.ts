@@ -106,6 +106,7 @@ export {
 export type {
   CatalogApprovalAction,
   CatalogApprovalStatus,
+  CatalogBodyHostedMagnetSetup,
   CatalogColor,
   CatalogCompatibilityAdvisory,
   CatalogCompatibilityFamily,
@@ -115,6 +116,9 @@ export type {
   CatalogImageTrashItem,
   CatalogIncludedComponent,
   CatalogLookup,
+  CatalogMagnetConfiguration,
+  CatalogMagnetGroup,
+  CatalogMagnetSlot,
   CatalogProduct,
   CatalogProductType,
   CatalogService,

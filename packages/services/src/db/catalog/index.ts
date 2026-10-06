@@ -363,6 +363,60 @@ export type ProductWriteFinishOption = {
   patternId?: number | null;
 };
 
+/** Exact magnet group within one catalog configuration. */
+export type CatalogMagnetGroup = {
+  /** Positive diameter in millimetres, retained at database precision. */
+  diameterMm: string;
+  /** Normalized uppercase grade text. */
+  grade: string;
+  /** Stable key scoped to the configuration. */
+  key: string;
+  /** Global vocabulary label. */
+  label: string;
+  /** Positive thickness in millimetres, retained at database precision. */
+  thicknessMm: string;
+};
+
+/** Exact source-relative position in one complete catalog configuration. */
+export type CatalogMagnetSlot = {
+  /** Source-documented column, when present. */
+  documentedColumn: number | null;
+  /** Source-documented row, when present. */
+  documentedRow: number | null;
+  /** Group key for an occupied slot; `null` for an empty slot. */
+  groupKey: string | null;
+  /** Physical slider half named by the source-relative contract. */
+  half: "half-a" | "half-b";
+  /** Stable source-relative slot key. */
+  key: string;
+  /** Complete catalog state; unknown is intentionally unsupported. */
+  state: "occupied" | "empty";
+};
+
+/** Complete structured layout for one body-hosted catalog slider. */
+export type CatalogMagnetConfiguration = {
+  /** Ordered magnet groups. */
+  groups: CatalogMagnetGroup[];
+  /** Global configuration vocabulary label. */
+  label: string;
+  /** Optional source-relative layout label. */
+  sourceLabel: string | null;
+  /** Optional notes accompanying a complete source layout. */
+  sourceNotes: string | null;
+  /** Ordered exact slots across Half A and Half B. */
+  slots: CatalogMagnetSlot[];
+};
+
+/** Inherent, immutable-at-collection-time setup of a body-hosted slider. */
+export type CatalogBodyHostedMagnetSetup = {
+  /** Positive inherent click count, or `null` when undocumented. */
+  clickCount: number | null;
+  /** Complete structured configuration, or `null` when undocumented. */
+  configuration: CatalogMagnetConfiguration | null;
+  /** Sourced note retained instead of inferring an incomplete layout. */
+  sourceNote: string | null;
+};
+
 /**
  * Fully hydrated catalog product returned to callers.
  */
@@ -379,6 +433,8 @@ export type CatalogProduct = {
    * Bearing model or designation, or `null` when unspecified.
    */
   bearing: string | null;
+  /** Live inherent setup for a body-hosted slider. */
+  bodyHostedMagnetSetup: CatalogBodyHostedMagnetSetup | null;
   /**
    * Button diameter in millimetres.
    */
@@ -544,6 +600,8 @@ export type ProductWriteInput = {
    * Authenticated actor.
    */
   actor: Actor;
+  /** Complete inherent setup or sourced incomplete-layout note. */
+  bodyHostedMagnetSetup?: CatalogBodyHostedMagnetSetup | null;
   /** Reviewed non-blocking compatibility warnings. */
   compatibilityAdvisories?: Array<{
     /** Exact related product identifier. */
@@ -2532,6 +2590,7 @@ export function createCatalogService(
               input.productTypeSlug,
               input.specs,
             );
+            await replaceBodyHostedMagnetSetup(tx, row.id, input, true);
             await replaceProductRelationships(tx, row.id, input);
             if (dependencies && actorUser) {
               const [created] = await queryProducts(
@@ -3434,6 +3493,12 @@ export function createCatalogService(
               input.productId,
               input.productTypeSlug,
               input.specs,
+            );
+            await replaceBodyHostedMagnetSetup(
+              tx,
+              input.productId,
+              input,
+              false,
             );
             await replaceProductRelationships(tx, input.productId, input);
             if (dependencies && actorUser) {
@@ -5155,6 +5220,7 @@ function requireProductAudit(
 function productAuditState(product: CatalogProduct): AuditJsonObject {
   return {
     bearing: product.bearing,
+    bodyHostedMagnetSetup: product.bodyHostedMagnetSetup ?? null,
     buttonDiameterMm: product.buttonDiameterMm,
     compatibleButtonId: product.compatibleButtonId,
     compatibilityAdvisories: product.compatibilityAdvisories.map(
@@ -5645,6 +5711,7 @@ async function queryProducts(
       createdAt: sql<Date>`coalesce(${schema.productSpinner.createdAt}, ${schema.productSpinnerButton.createdAt}, ${schema.productSlider.createdAt}, ${schema.productSliderPlate.createdAt}, ${schema.productSliderInsert.createdAt})`,
       description: schema.product.description,
       diameterMm: schema.productSpinnerButton.diameterMm,
+      inherentClickCount: schema.productSlider.inherentClickCount,
       id: schema.product.id,
       isPrivate: schema.product.isPrivate,
       privatedByClerkId: schema.product.privatedByClerkId,
@@ -5657,6 +5724,7 @@ async function queryProducts(
       makerProductUrlValid: schema.product.makerProductUrlValid,
       makerUrl: schema.maker.rootUrl,
       magnetSystem: schema.productSlider.magnetSystem,
+      magnetSetupSourceNote: schema.productSlider.magnetSetupSourceNote,
       materialId: schema.material.id,
       materialName: schema.material.name,
       materialSlug: schema.material.slug,
@@ -5742,6 +5810,14 @@ async function queryProducts(
     products.set(row.id, {
       approvalStatus: row.approvalStatus,
       bearing: row.bearing,
+      bodyHostedMagnetSetup:
+        row.magnetSystem === "body-hosted"
+          ? {
+              clickCount: row.inherentClickCount,
+              configuration: null,
+              sourceNote: row.magnetSetupSourceNote,
+            }
+          : null,
       buttonDiameterMm: row.buttonDiameterMm,
       compatibleButtonId: row.compatibleButtonId,
       compatibleButtonName: row.compatibleButtonName,
@@ -5803,8 +5879,136 @@ async function queryProducts(
     loadFinishOptions(db, result),
     loadProductImages(db, result, viewer),
     loadProductRelationships(db, result, viewer),
+    loadProductMagnetConfigurations(db, result),
   ]);
   return result;
+}
+
+/**
+ * Hydrates complete body-hosted magnet configurations without inferring gaps.
+ *
+ * @param db - Database used for exact configuration reads.
+ * @param products - Products receiving their live catalog setup.
+ * @rejects When exact configuration rows cannot be queried.
+ */
+async function loadProductMagnetConfigurations(
+  db: Pick<Database, "select">,
+  products: CatalogProduct[],
+) {
+  const bodyHosted = products.filter(
+    (product) => product.bodyHostedMagnetSetup,
+  );
+  if (!bodyHosted.length) return;
+  const productIds = bodyHosted.map(({ id }) => id);
+  const configurations = await db
+    .select({
+      label: schema.magnetConfigurationLabel.name,
+      productId: schema.productMagnetConfiguration.productId,
+      sourceLabel: schema.productMagnetConfiguration.sourceLabel,
+      sourceNotes: schema.productMagnetConfiguration.sourceNotes,
+    })
+    .from(schema.productMagnetConfiguration)
+    .innerJoin(
+      schema.magnetConfigurationLabel,
+      eq(
+        schema.productMagnetConfiguration.configurationLabelId,
+        schema.magnetConfigurationLabel.id,
+      ),
+    )
+    .where(inArray(schema.productMagnetConfiguration.productId, productIds));
+  if (!configurations.length) return;
+  const configurationIds = configurations.map(({ productId }) => productId);
+  const [groups, slots] = await Promise.all([
+    db
+      .select({
+        configurationProductId:
+          schema.productMagnetGroup.configurationProductId,
+        diameterMm: schema.productMagnetGroup.diameterMm,
+        grade: schema.productMagnetGroup.grade,
+        key: schema.productMagnetGroup.groupKey,
+        label: schema.magnetGroupLabel.name,
+        thicknessMm: schema.productMagnetGroup.thicknessMm,
+      })
+      .from(schema.productMagnetGroup)
+      .innerJoin(
+        schema.magnetGroupLabel,
+        eq(schema.productMagnetGroup.groupLabelId, schema.magnetGroupLabel.id),
+      )
+      .where(
+        inArray(
+          schema.productMagnetGroup.configurationProductId,
+          configurationIds,
+        ),
+      )
+      .orderBy(asc(schema.productMagnetGroup.displayOrder)),
+    db
+      .select({
+        configurationProductId: schema.productMagnetSlot.configurationProductId,
+        documentedColumn: schema.productMagnetSlot.documentedColumn,
+        documentedRow: schema.productMagnetSlot.documentedRow,
+        groupKey: schema.productMagnetGroup.groupKey,
+        half: schema.productMagnetSlot.half,
+        key: schema.productMagnetSlot.slotKey,
+        state: schema.productMagnetSlot.state,
+      })
+      .from(schema.productMagnetSlot)
+      .leftJoin(
+        schema.productMagnetGroup,
+        and(
+          eq(schema.productMagnetSlot.groupId, schema.productMagnetGroup.id),
+          eq(
+            schema.productMagnetSlot.configurationProductId,
+            schema.productMagnetGroup.configurationProductId,
+          ),
+        ),
+      )
+      .where(
+        inArray(
+          schema.productMagnetSlot.configurationProductId,
+          configurationIds,
+        ),
+      )
+      .orderBy(asc(schema.productMagnetSlot.displayOrder)),
+  ]);
+  const byProductId = new Map(
+    bodyHosted.map((product) => [product.id, product]),
+  );
+  for (const configuration of configurations) {
+    const setup = byProductId.get(
+      configuration.productId,
+    )?.bodyHostedMagnetSetup;
+    if (!setup) continue;
+    setup.configuration = {
+      groups: groups
+        .filter(
+          ({ configurationProductId }) =>
+            configurationProductId === configuration.productId,
+        )
+        .map((group) => ({
+          diameterMm: group.diameterMm,
+          grade: group.grade,
+          key: group.key,
+          label: group.label,
+          thicknessMm: group.thicknessMm,
+        })),
+      label: configuration.label,
+      slots: slots
+        .filter(
+          ({ configurationProductId }) =>
+            configurationProductId === configuration.productId,
+        )
+        .map((slot) => ({
+          documentedColumn: slot.documentedColumn,
+          documentedRow: slot.documentedRow,
+          groupKey: slot.groupKey,
+          half: slot.half,
+          key: slot.key,
+          state: slot.state,
+        })),
+      sourceLabel: configuration.sourceLabel,
+      sourceNotes: configuration.sourceNotes,
+    };
+  }
 }
 
 /**
@@ -6930,6 +7134,330 @@ async function touchProductUpdatedAt(
     .update(schema.product)
     .set({ updatedAt: new Date() })
     .where(eq(schema.product.id, productId));
+}
+
+/** Normalized exact setup ready for atomic replacement. */
+type NormalizedBodyHostedMagnetSetup = CatalogBodyHostedMagnetSetup;
+
+/**
+ * Replaces the inherent body-hosted setup while preserving undocumented facts as nulls.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - Slider product identifier.
+ * @param input - Product write carrying the candidate setup.
+ * @param creating - Whether this is the initial product write.
+ * @rejects When setup facts are invalid for the product or cannot be persisted.
+ */
+async function replaceBodyHostedMagnetSetup(
+  tx: CatalogTransaction,
+  productId: number,
+  input: ProductWriteInput,
+  creating: boolean,
+) {
+  if (input.bodyHostedMagnetSetup === undefined && !creating) return;
+  if (
+    input.bodyHostedMagnetSetup !== null &&
+    input.bodyHostedMagnetSetup !== undefined &&
+    (input.productTypeSlug !== "slider" ||
+      input.specs.magnetSystem !== "body-hosted")
+  ) {
+    throw new Error("Only body-hosted sliders may define an inherent setup.");
+  }
+  if (input.productTypeSlug !== "slider") return;
+  const normalized = normalizeBodyHostedMagnetSetup(
+    input.specs.magnetSystem === "body-hosted"
+      ? (input.bodyHostedMagnetSetup ?? null)
+      : null,
+  );
+  await tx
+    .update(schema.productSlider)
+    .set({
+      inherentClickCount: normalized?.clickCount ?? null,
+      magnetSetupSourceNote: normalized?.sourceNote ?? null,
+    })
+    .where(eq(schema.productSlider.id, productId));
+  await tx
+    .delete(schema.productMagnetConfiguration)
+    .where(eq(schema.productMagnetConfiguration.productId, productId));
+  const configuration = normalized?.configuration;
+  if (!configuration) return;
+
+  const configurationLabelId = await getOrCreateMagnetConfigurationLabel(
+    tx,
+    configuration.label,
+  );
+  await tx.insert(schema.productMagnetConfiguration).values({
+    configurationLabelId,
+    productId,
+    sourceLabel: configuration.sourceLabel,
+    sourceNotes: configuration.sourceNotes,
+  });
+  const groupsByKey = new Map<string, number>();
+  for (const [displayOrder, group] of configuration.groups.entries()) {
+    const groupLabelId = await getOrCreateMagnetGroupLabel(tx, group.label);
+    const [created] = await tx
+      .insert(schema.productMagnetGroup)
+      .values({
+        configurationProductId: productId,
+        diameterMm: group.diameterMm,
+        displayOrder,
+        grade: group.grade,
+        groupKey: group.key,
+        groupLabelId,
+        thicknessMm: group.thicknessMm,
+      })
+      .returning({ id: schema.productMagnetGroup.id });
+    if (!created) throw new Error("Failed to create magnet group.");
+    groupsByKey.set(group.key, created.id);
+  }
+  await tx.insert(schema.productMagnetSlot).values(
+    configuration.slots.map((slot, displayOrder) => ({
+      configurationProductId: productId,
+      displayOrder,
+      documentedColumn: slot.documentedColumn,
+      documentedRow: slot.documentedRow,
+      groupId: slot.groupKey ? (groupsByKey.get(slot.groupKey) ?? null) : null,
+      half: slot.half,
+      slotKey: slot.key,
+      state: slot.state,
+    })),
+  );
+}
+
+/**
+ * Validates and normalizes one body-hosted setup without inventing missing facts.
+ *
+ * @param setup - Candidate setup or undocumented state.
+ * @returns Normalized setup suitable for persistence.
+ * @throws When a catalog configuration is incomplete or internally inconsistent.
+ */
+function normalizeBodyHostedMagnetSetup(
+  setup: CatalogBodyHostedMagnetSetup | null,
+): NormalizedBodyHostedMagnetSetup | null {
+  if (!setup) return null;
+  const clickCount = setup.clickCount;
+  if (
+    clickCount !== null &&
+    (!Number.isSafeInteger(clickCount) || clickCount <= 0)
+  ) {
+    throw new Error("Click count must be a positive integer.");
+  }
+  const sourceNote = normalizeBoundedText(setup.sourceNote, 5000);
+  if (!setup.configuration) {
+    return { clickCount, configuration: null, sourceNote };
+  }
+  const configuration = setup.configuration;
+  const label = normalizeRequiredVocabulary(configuration.label);
+  const sourceLabel = normalizeBoundedText(configuration.sourceLabel, 200);
+  const sourceNotes = normalizeBoundedText(configuration.sourceNotes, 5000);
+  if (!configuration.slots.length)
+    throw new Error("A structured magnet configuration requires slots.");
+
+  const groupKeys = new Set<string>();
+  const referencedGroupKeys = new Set<string>();
+  const groups = configuration.groups.map((candidate) => {
+    const key = normalizeStableKey(candidate.key);
+    if (groupKeys.has(key))
+      throw new Error("Magnet group keys must be unique.");
+    groupKeys.add(key);
+    return {
+      diameterMm: normalizePositiveDecimal(candidate.diameterMm),
+      grade: normalizeMagnetGrade(candidate.grade),
+      key,
+      label: normalizeRequiredVocabulary(candidate.label),
+      thicknessMm: normalizePositiveDecimal(candidate.thicknessMm),
+    };
+  });
+  const slotKeys = new Set<string>();
+  const slots = configuration.slots.map((candidate) => {
+    const key = normalizeStableKey(candidate.key);
+    if (slotKeys.has(key)) throw new Error("Magnet slot keys must be unique.");
+    slotKeys.add(key);
+    if (candidate.half !== "half-a" && candidate.half !== "half-b")
+      throw new Error("A magnet slot requires Half A or Half B.");
+    if (candidate.state !== "occupied" && candidate.state !== "empty")
+      throw new Error("Catalog magnet slots cannot be unknown.");
+    const groupKey = candidate.groupKey
+      ? normalizeStableKey(candidate.groupKey)
+      : null;
+    if (candidate.state === "occupied" && !groupKey)
+      throw new Error("An occupied magnet slot requires a group.");
+    if (candidate.state === "empty" && groupKey)
+      throw new Error("An empty magnet slot cannot belong to a group.");
+    if (groupKey && !groupKeys.has(groupKey))
+      throw new Error("Magnet group does not belong to this configuration.");
+    if (groupKey) referencedGroupKeys.add(groupKey);
+    return {
+      documentedColumn: normalizeDocumentedPosition(candidate.documentedColumn),
+      documentedRow: normalizeDocumentedPosition(candidate.documentedRow),
+      groupKey,
+      half: candidate.half,
+      key,
+      state: candidate.state,
+    };
+  });
+  if (groups.some(({ key }) => !referencedGroupKeys.has(key)))
+    throw new Error("Every magnet group must contain an occupied slot.");
+  return {
+    clickCount,
+    configuration: {
+      groups,
+      label,
+      slots,
+      sourceLabel,
+      sourceNotes,
+    },
+    sourceNote,
+  };
+}
+
+/**
+ * Returns a trimmed optional string while enforcing its storage bound.
+ *
+ * @param value - Candidate optional text.
+ * @param maximum - Maximum stored character count.
+ * @returns Trimmed text or `null`.
+ * @throws When nonblank text exceeds the storage bound.
+ */
+function normalizeBoundedText(value: string | null, maximum: number) {
+  const normalized = value?.trim() || null;
+  if (normalized && normalized.length > maximum)
+    throw new Error("Magnet setup text is too long.");
+  return normalized;
+}
+
+/**
+ * Returns one nonblank stable source key.
+ *
+ * @param value - Candidate key.
+ * @returns Trimmed stable key.
+ * @throws When the key is blank or too long.
+ */
+function normalizeStableKey(value: string) {
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 100)
+    throw new Error("Magnet setup key is invalid.");
+  return normalized;
+}
+
+/**
+ * Returns one normalized global vocabulary name.
+ *
+ * @param value - Candidate vocabulary label.
+ * @returns Unicode-normalized, whitespace-collapsed label.
+ * @throws When the label is blank or too long.
+ */
+function normalizeRequiredVocabulary(value: string) {
+  const normalized = value.normalize("NFKC").trim().replace(/\s+/g, " ");
+  if (!normalized || normalized.length > 100)
+    throw new Error("Magnet vocabulary label is invalid.");
+  return normalized;
+}
+
+/**
+ * Returns a positive arbitrary-precision decimal string.
+ *
+ * @param value - Candidate metric dimension.
+ * @returns Validated decimal text without reducing precision.
+ * @throws When the dimension is not a positive plain decimal.
+ */
+function normalizePositiveDecimal(value: string) {
+  const normalized = value.trim();
+  if (
+    normalized.length > 50 ||
+    !/^\d+(?:\.\d+)?$/.test(normalized) ||
+    !Number.isFinite(Number(normalized)) ||
+    Number(normalized) <= 0
+  ) {
+    throw new Error("Magnet dimensions must be positive decimals.");
+  }
+  return normalized;
+}
+
+/**
+ * Returns normalized conservative magnet grade text.
+ *
+ * @param value - Candidate magnet grade.
+ * @returns Trimmed uppercase grade.
+ * @throws When the grade contains unsupported characters or length.
+ */
+function normalizeMagnetGrade(value: string) {
+  const normalized = value.trim().toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9+_-]{0,19}$/.test(normalized))
+    throw new Error("Magnet grade is invalid.");
+  return normalized;
+}
+
+/**
+ * Returns a positive source-documented row or column.
+ *
+ * @param value - Candidate documented position.
+ * @returns Positive integer or `null` when undocumented.
+ * @throws When a documented position is not a positive safe integer.
+ */
+function normalizeDocumentedPosition(value: number | null) {
+  if (value === null) return null;
+  if (!Number.isSafeInteger(value) || value <= 0)
+    throw new Error("Documented magnet positions must be positive integers.");
+  return value;
+}
+
+/**
+ * Creates or reuses one global configuration vocabulary row.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param name - Normalized display label.
+ * @returns Global configuration-label identifier.
+ * @rejects When the vocabulary row cannot be written or loaded.
+ */
+async function getOrCreateMagnetConfigurationLabel(
+  tx: CatalogTransaction,
+  name: string,
+) {
+  const normalizedName = name.toLocaleLowerCase("en-US");
+  const [created] = await tx
+    .insert(schema.magnetConfigurationLabel)
+    .values({ name, normalizedName })
+    .onConflictDoNothing({
+      target: schema.magnetConfigurationLabel.normalizedName,
+    })
+    .returning({ id: schema.magnetConfigurationLabel.id });
+  if (created) return created.id;
+  const [existing] = await tx
+    .select({ id: schema.magnetConfigurationLabel.id })
+    .from(schema.magnetConfigurationLabel)
+    .where(eq(schema.magnetConfigurationLabel.normalizedName, normalizedName))
+    .limit(1);
+  if (!existing) throw new Error("Failed to load magnet configuration label.");
+  return existing.id;
+}
+
+/**
+ * Creates or reuses one global group vocabulary row.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param name - Normalized display label.
+ * @returns Global group-label identifier.
+ * @rejects When the vocabulary row cannot be written or loaded.
+ */
+async function getOrCreateMagnetGroupLabel(
+  tx: CatalogTransaction,
+  name: string,
+) {
+  const normalizedName = name.toLocaleLowerCase("en-US");
+  const [created] = await tx
+    .insert(schema.magnetGroupLabel)
+    .values({ name, normalizedName })
+    .onConflictDoNothing({ target: schema.magnetGroupLabel.normalizedName })
+    .returning({ id: schema.magnetGroupLabel.id });
+  if (created) return created.id;
+  const [existing] = await tx
+    .select({ id: schema.magnetGroupLabel.id })
+    .from(schema.magnetGroupLabel)
+    .where(eq(schema.magnetGroupLabel.normalizedName, normalizedName))
+    .limit(1);
+  if (!existing) throw new Error("Failed to load magnet group label.");
+  return existing.id;
 }
 
 /**
