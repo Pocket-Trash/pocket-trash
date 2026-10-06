@@ -227,6 +227,12 @@ export function HomePage() {
     {
       image:
         "https://cdn.pocket-trash.app/assets/static/hero-cards/products.webp",
+      key: "web.navigation.makers" as const,
+      to: "/makers" as const,
+    },
+    {
+      image:
+        "https://cdn.pocket-trash.app/assets/static/hero-cards/products.webp",
       key: "web.navigation.materials" as const,
       to: "/materials" as const,
     },

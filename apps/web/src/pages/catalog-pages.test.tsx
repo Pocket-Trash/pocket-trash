@@ -17,6 +17,25 @@ import {
   UserCollectionsPage,
 } from "./catalog-pages";
 
+describe("HomePage", () => {
+  it("renders Products, Collections, Makers, Materials, and Resources in order", () => {
+    const html = renderToStaticMarkup(<HomePage />);
+    const labels = [
+      "Products",
+      "Collections",
+      "Makers",
+      "Materials",
+      "Resources",
+    ].map((label) => html.indexOf(`>${label}<`));
+
+    expect(labels.every((index) => index >= 0)).toBe(true);
+    expect(labels).toEqual([...labels].sort((a, b) => a - b));
+    expect(
+      html.match(/src="[^"]*hero-cards\/products.webp[^"]*"/g),
+    ).toHaveLength(3);
+  });
+});
+
 vi.mock("@tanstack/react-router", () => ({
   /**
    * Returns the navigation spy used by static page tests.
@@ -261,27 +280,6 @@ const product: CatalogProduct = {
   weightG: null,
   widthMm: null,
 };
-
-describe("HomePage", () => {
-  it("orders Products, Collections, Materials, and Resources and reuses the product hero", () => {
-    const html = renderToStaticMarkup(<HomePage />);
-    const products = html.indexOf('href="/products"');
-    const collections = html.indexOf('href="/collections"');
-    const materials = html.indexOf('href="/materials"');
-    const resources = html.indexOf('href="/resources"');
-
-    expect(products).toBeGreaterThan(-1);
-    expect(products).toBeLessThan(collections);
-    expect(collections).toBeLessThan(materials);
-    expect(materials).toBeLessThan(resources);
-    expect(html.slice(products, collections)).toContain(
-      "hero-cards/products.webp",
-    );
-    expect(html.slice(materials, resources)).toContain(
-      "hero-cards/products.webp",
-    );
-  });
-});
 
 describe("getCatalogPageSize", () => {
   it("matches the requested compact, regular, and wide card counts", () => {
