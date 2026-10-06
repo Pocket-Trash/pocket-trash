@@ -56,6 +56,15 @@ export class CollectionButtonAlreadyInstalledError extends Error {
   }
 }
 
+/** Error raised when a slider component is already installed elsewhere. */
+export class CollectionSliderComponentAlreadyInstalledError extends Error {
+  /** Creates the error reported when a plate or insert is assigned elsewhere. */
+  constructor() {
+    super("Collection component is already installed on another slider.");
+    this.name = "CollectionSliderComponentAlreadyInstalledError";
+  }
+}
+
 /**
  * Returns the violated PostgreSQL unique-constraint name.
  *
@@ -1571,6 +1580,14 @@ export type UserCollectionItem = {
    * Installed button identifier.
    */
   installedButtonId: number | null;
+  /** Whether any uninterrupted slider-component installation no longer matches current compatibility metadata. */
+  hasGrandfatheredInstallation: boolean;
+  /** Installed slider insert collection-item identifier. */
+  installedInsertId: number | null;
+  /** Slider collection-item identifier that currently hosts this component. */
+  installedOnSliderId: number | null;
+  /** Installed slider plate collection-item identifier. */
+  installedPlateId: number | null;
   /**
    * Maker identifier.
    */
@@ -2243,6 +2260,16 @@ export type CollectionsService = {
        * Material identifier.
        */
       materialId: number;
+    } | null;
+    /** Slider insert to install, or `null` to detach the current insert. */
+    installedInsert?: {
+      /** Owned slider insert collection-item identifier. */
+      collectionItemId: number;
+    } | null;
+    /** Slider plate to install, or `null` to detach the current plate. */
+    installedPlate?: {
+      /** Owned slider plate collection-item identifier. */
+      collectionItemId: number;
     } | null;
     /**
      * Material identifier.
@@ -5288,6 +5315,16 @@ export function createCollectionsService(
               .from(schema.collectionSpinnerButton)
               .where(eq(schema.collectionSpinnerButton.id, item.id))
               .for("update");
+            await tx
+              .select({ id: schema.collectionSliderPlate.id })
+              .from(schema.collectionSliderPlate)
+              .where(eq(schema.collectionSliderPlate.id, item.id))
+              .for("update");
+            await tx
+              .select({ id: schema.collectionSliderInsert.id })
+              .from(schema.collectionSliderInsert)
+              .where(eq(schema.collectionSliderInsert.id, item.id))
+              .for("update");
             const detachedSpinners = await tx
               .select({
                 id: schema.collectionSpinner.id,
@@ -5296,6 +5333,21 @@ export function createCollectionsService(
               .from(schema.collectionSpinner)
               .where(eq(schema.collectionSpinner.installedButtonId, item.id))
               .orderBy(asc(schema.collectionSpinner.id))
+              .for("update");
+            const detachedSliders = await tx
+              .select({
+                id: schema.collectionSlider.id,
+                installedInsertId: schema.collectionSlider.installedInsertId,
+                installedPlateId: schema.collectionSlider.installedPlateId,
+              })
+              .from(schema.collectionSlider)
+              .where(
+                or(
+                  eq(schema.collectionSlider.installedPlateId, item.id),
+                  eq(schema.collectionSlider.installedInsertId, item.id),
+                ),
+              )
+              .orderBy(asc(schema.collectionSlider.id))
               .for("update");
             const [before] = await collectionItemDeletionState(tx, [item.id]);
             if (!before) throw new Error("Collection item does not exist.");
@@ -5318,12 +5370,15 @@ export function createCollectionsService(
               reason,
               targetId: item.id,
               definition: collectionAudit.itemDeleted,
-              before: { ...before, detachedSpinners },
+              before: { ...before, detachedSliders, detachedSpinners },
               after: {
                 deleted: true,
                 collectionId: item.collectionId,
+                detachedSliderIds: detachedSliders.map(({ id }) => id),
                 detachedSpinnerIds: detachedSpinners.map(({ id }) => id),
                 retainedButtonId: before.installedButtonId ?? null,
+                retainedInsertId: before.installedInsertId ?? null,
+                retainedPlateId: before.installedPlateId ?? null,
                 queuedImageCount: new Set(
                   images.map(({ objectPath }) => objectPath),
                 ).size,
@@ -5853,8 +5908,11 @@ export function createCollectionsService(
                 description: schema.collectionItem.description,
                 displayName: schema.collectionItem.displayName,
                 installedButtonId: schema.collectionSpinner.installedButtonId,
+                installedInsertId: schema.collectionSlider.installedInsertId,
+                installedPlateId: schema.collectionSlider.installedPlateId,
                 isPrivate: schema.collectionItem.isPrivate,
                 materialId: schema.collectionItem.materialId,
+                magnetSystem: schema.productSlider.magnetSystem,
                 ownerId: schema.collectionItem.ownerId,
                 sliderProductId: schema.collectionSlider.productSliderId,
                 sliderInsertProductId:
@@ -5875,6 +5933,13 @@ export function createCollectionsService(
               .leftJoin(
                 schema.collectionSlider,
                 eq(schema.collectionItem.id, schema.collectionSlider.id),
+              )
+              .leftJoin(
+                schema.productSlider,
+                eq(
+                  schema.collectionSlider.productSliderId,
+                  schema.productSlider.id,
+                ),
               )
               .leftJoin(
                 schema.collectionSliderPlate,
@@ -5912,6 +5977,8 @@ export function createCollectionsService(
               displayName: item.displayName,
               id: input.collectionItemId,
               installedButtonId: item.installedButtonId,
+              installedInsertId: item.installedInsertId,
+              installedPlateId: item.installedPlateId,
               isPrivate: item.isPrivate,
               materialId: item.materialId,
             };
@@ -5931,9 +5998,15 @@ export function createCollectionsService(
               throw new Error("Collection does not exist.");
 
             if (item.collectionId !== targetCollectionId) {
-              const linkedItemIds = [input.collectionItemId];
+              const linkedItemIds = new Set([input.collectionItemId]);
               if (item.installedButtonId !== null) {
-                linkedItemIds.push(item.installedButtonId);
+                linkedItemIds.add(item.installedButtonId);
+              }
+              if (item.installedPlateId !== null) {
+                linkedItemIds.add(item.installedPlateId);
+              }
+              if (item.installedInsertId !== null) {
+                linkedItemIds.add(item.installedInsertId);
               }
               const linkedSpinners = await tx
                 .select({ id: schema.collectionSpinner.id })
@@ -5944,14 +6017,40 @@ export function createCollectionsService(
                     input.collectionItemId,
                   ),
                 );
-              linkedItemIds.push(...linkedSpinners.map(({ id }) => id));
+              for (const { id } of linkedSpinners) linkedItemIds.add(id);
+              const linkedSliders = await tx
+                .select({
+                  id: schema.collectionSlider.id,
+                  installedInsertId: schema.collectionSlider.installedInsertId,
+                  installedPlateId: schema.collectionSlider.installedPlateId,
+                })
+                .from(schema.collectionSlider)
+                .where(
+                  or(
+                    eq(
+                      schema.collectionSlider.installedPlateId,
+                      input.collectionItemId,
+                    ),
+                    eq(
+                      schema.collectionSlider.installedInsertId,
+                      input.collectionItemId,
+                    ),
+                  ),
+                );
+              for (const slider of linkedSliders) {
+                linkedItemIds.add(slider.id);
+                if (slider.installedPlateId !== null)
+                  linkedItemIds.add(slider.installedPlateId);
+                if (slider.installedInsertId !== null)
+                  linkedItemIds.add(slider.installedInsertId);
+              }
               await tx
                 .update(schema.collectionItem)
                 .set({
                   collectionId: targetCollectionId,
                   updatedAt: new Date(),
                 })
-                .where(inArray(schema.collectionItem.id, linkedItemIds));
+                .where(inArray(schema.collectionItem.id, [...linkedItemIds]));
               await Promise.all([
                 touchCollection(tx, item.collectionId),
                 touchCollection(tx, targetCollectionId),
@@ -6055,6 +6154,83 @@ export function createCollectionsService(
                 throw error;
               }
             }
+            if (
+              input.installedPlate !== undefined ||
+              input.installedInsert !== undefined
+            ) {
+              if (item.sliderProductId === null) {
+                throw new Error("Collection item is not a slider.");
+              }
+              if (
+                input.installedInsert !== undefined &&
+                input.installedInsert !== null &&
+                item.magnetSystem !== "insert-driven"
+              ) {
+                throw new Error("Body-hosted sliders cannot install inserts.");
+              }
+              const installedPlateId =
+                input.installedPlate === undefined
+                  ? item.installedPlateId
+                  : (input.installedPlate?.collectionItemId ?? null);
+              const installedInsertId =
+                input.installedInsert === undefined
+                  ? item.installedInsertId
+                  : (input.installedInsert?.collectionItemId ?? null);
+              for (const candidate of [
+                input.installedPlate !== undefined &&
+                input.installedPlate !== null &&
+                input.installedPlate.collectionItemId !== item.installedPlateId
+                  ? {
+                      collectionItemId: input.installedPlate.collectionItemId,
+                      componentType: "plate" as const,
+                    }
+                  : null,
+                input.installedInsert !== undefined &&
+                input.installedInsert !== null &&
+                input.installedInsert.collectionItemId !==
+                  item.installedInsertId
+                  ? {
+                      collectionItemId: input.installedInsert.collectionItemId,
+                      componentType: "insert" as const,
+                    }
+                  : null,
+              ]) {
+                if (!candidate) continue;
+                const component = await validateSliderComponentInstallation(
+                  tx,
+                  {
+                    ...candidate,
+                    ownerId: item.ownerId,
+                    sliderCollectionItemId: input.collectionItemId,
+                    sliderProductId: item.sliderProductId,
+                  },
+                );
+                await tx
+                  .update(schema.collectionItem)
+                  .set({
+                    collectionId: targetCollectionId,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(schema.collectionItem.id, component.id));
+              }
+              try {
+                await tx
+                  .update(schema.collectionSlider)
+                  .set({ installedInsertId, installedPlateId })
+                  .where(
+                    eq(schema.collectionSlider.id, input.collectionItemId),
+                  );
+              } catch (error) {
+                const constraint = uniqueConstraint(error);
+                if (
+                  constraint === "collection_slider_installed_plate_unique" ||
+                  constraint === "collection_slider_installed_insert_unique"
+                ) {
+                  throw new CollectionSliderComponentAlreadyInstalledError();
+                }
+                throw error;
+              }
+            }
             await touchCollection(tx, targetCollectionId);
             const after = {
               ...before,
@@ -6068,6 +6244,14 @@ export function createCollectionsService(
                 input.installedButton === undefined
                   ? item.installedButtonId
                   : (input.installedButton?.collectionItemId ?? null),
+              installedInsertId:
+                input.installedInsert === undefined
+                  ? item.installedInsertId
+                  : (input.installedInsert?.collectionItemId ?? null),
+              installedPlateId:
+                input.installedPlate === undefined
+                  ? item.installedPlateId
+                  : (input.installedPlate?.collectionItemId ?? null),
               materialId: input.materialId,
             };
             await writeCollectionAudit(audit, tx, {
@@ -6097,6 +6281,8 @@ export function createCollectionsService(
         actorAttributes(input.actor.clerkId, {
           collectionItemId: input.collectionItemId,
           installedButtonId: input.installedButton?.collectionItemId,
+          installedInsertId: input.installedInsert?.collectionItemId,
+          installedPlateId: input.installedPlate?.collectionItemId,
           materialId: input.materialId,
         }),
       );
@@ -7890,7 +8076,41 @@ async function queryOwnedItems(
       colorEffectName: schema.colorEffect.name,
       colorEffectSlug: schema.colorEffect.slug,
       finishOptionId: schema.finishOption.id,
+      hasGrandfatheredInstallation: sql<boolean>`case
+        when ${schema.collectionSlider.id} is null then false
+        when ${schema.collectionSlider.installedPlateId} is not null and not exists (
+          select 1
+          from product_compatibility_family slider_family
+          inner join product_compatibility_family component_family
+            on component_family.compatibility_family_id = slider_family.compatibility_family_id
+          where slider_family.product_id = ${schema.collectionSlider.productSliderId}
+            and component_family.product_id = (
+              select product_slider_plate_id
+              from collection_slider_plate
+              where id = ${schema.collectionSlider.installedPlateId}
+            )
+        ) then true
+        when ${schema.collectionSlider.installedInsertId} is not null and not exists (
+          select 1
+          from product_compatibility_family slider_family
+          inner join product_compatibility_family component_family
+            on component_family.compatibility_family_id = slider_family.compatibility_family_id
+          where slider_family.product_id = ${schema.collectionSlider.productSliderId}
+            and component_family.product_id = (
+              select product_slider_insert_id
+              from collection_slider_insert
+              where id = ${schema.collectionSlider.installedInsertId}
+            )
+        ) then true
+        else false
+      end`,
       installedButtonId: schema.collectionSpinner.installedButtonId,
+      installedInsertId: schema.collectionSlider.installedInsertId,
+      installedOnSliderId: sql<number | null>`coalesce(
+        (select id from collection_slider where installed_plate_id = ${schema.collectionItem.id}),
+        (select id from collection_slider where installed_insert_id = ${schema.collectionItem.id})
+      )`,
+      installedPlateId: schema.collectionSlider.installedPlateId,
       isPrivate: schema.collectionItem.isPrivate,
       privatedByClerkId: schema.collectionItem.privatedByClerkId,
       makerId: schema.maker.id,
@@ -8030,7 +8250,11 @@ async function queryOwnedItems(
       row.isPrivate &&
       row.privatedByClerkId !== null &&
       row.privatedByClerkId !== row.ownerClerkId,
+    hasGrandfatheredInstallation: row.hasGrandfatheredInstallation,
     installedButtonId: row.installedButtonId,
+    installedInsertId: row.installedInsertId,
+    installedOnSliderId: row.installedOnSliderId,
+    installedPlateId: row.installedPlateId,
     isOwner: options.viewerClerkId === row.ownerClerkId,
     makerId: row.makerId,
     makerName: row.makerName,
@@ -9041,6 +9265,106 @@ async function listCatalogImageTrash(
  * Caller-owned database transaction used for atomic catalog writes.
  */
 type CatalogTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+/**
+ * Validates a new slider-component installation against current ownership and catalog metadata.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param input - Slider, owner, component, and expected component type.
+ * @returns The validated component item and product identifiers.
+ * @rejects When the component is unavailable, installed elsewhere, unreviewed, or incompatible.
+ */
+async function validateSliderComponentInstallation(
+  tx: CatalogTransaction,
+  input: {
+    /** Owned component collection-item identifier. */
+    collectionItemId: number;
+    /** Expected component subtype. */
+    componentType: "insert" | "plate";
+    /** Owner shared by every assembly member. */
+    ownerId: number;
+    /** Parent slider collection-item identifier. */
+    sliderCollectionItemId: number;
+    /** Parent slider catalog product identifier. */
+    sliderProductId: number;
+  },
+) {
+  const componentProductColumn =
+    input.componentType === "plate"
+      ? schema.collectionSliderPlate.productSliderPlateId
+      : schema.collectionSliderInsert.productSliderInsertId;
+  const componentTable =
+    input.componentType === "plate"
+      ? schema.collectionSliderPlate
+      : schema.collectionSliderInsert;
+  const [component] = await tx
+    .select({
+      approvalStatus: schema.collectionItem.approvalStatus,
+      collectionId: schema.collectionItem.collectionId,
+      id: schema.collectionItem.id,
+      productApprovalStatus: schema.product.approvalStatus,
+      productId: componentProductColumn,
+    })
+    .from(componentTable)
+    .innerJoin(
+      schema.collectionItem,
+      eq(componentTable.id, schema.collectionItem.id),
+    )
+    .innerJoin(schema.product, eq(componentProductColumn, schema.product.id))
+    .where(
+      and(
+        eq(componentTable.id, input.collectionItemId),
+        eq(schema.collectionItem.ownerId, input.ownerId),
+        eq(schema.collectionItem.owned, true),
+      ),
+    )
+    .limit(1);
+  if (
+    !component ||
+    component.approvalStatus === "rejected" ||
+    component.productApprovalStatus !== "approved"
+  ) {
+    throw new Error(`Installed slider ${input.componentType} does not exist.`);
+  }
+
+  const [existingInstallation] = await tx
+    .select({ id: schema.collectionSlider.id })
+    .from(schema.collectionSlider)
+    .where(
+      and(
+        input.componentType === "plate"
+          ? eq(schema.collectionSlider.installedPlateId, input.collectionItemId)
+          : eq(
+              schema.collectionSlider.installedInsertId,
+              input.collectionItemId,
+            ),
+        sql`${schema.collectionSlider.id} <> ${input.sliderCollectionItemId}`,
+      ),
+    )
+    .limit(1);
+  if (existingInstallation) {
+    throw new CollectionSliderComponentAlreadyInstalledError();
+  }
+
+  const [sharedFamily] = await tx
+    .select({ id: schema.productCompatibilityFamily.compatibilityFamilyId })
+    .from(schema.productCompatibilityFamily)
+    .innerJoin(
+      alias(schema.productCompatibilityFamily, "component_family"),
+      sql`component_family.compatibility_family_id = ${schema.productCompatibilityFamily.compatibilityFamilyId}
+        and component_family.product_id = ${component.productId}`,
+    )
+    .where(
+      eq(schema.productCompatibilityFamily.productId, input.sliderProductId),
+    )
+    .limit(1);
+  if (!sharedFamily) {
+    throw new Error(
+      `Installed slider ${input.componentType} does not share a compatibility family.`,
+    );
+  }
+  return component;
+}
 
 /**
  * Marks a catalog product as meaningfully updated inside its caller transaction.
