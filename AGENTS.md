@@ -8,6 +8,9 @@
   add or modify. Follow `/docs/jsdoc.md`. `pnpm lint:jsdoc` checks every eligible
   declaration in tracked, hand-authored source, including untouched declarations;
   staging and Git base refs do not restrict coverage.
+- Follow [`docs/documentation.md`](docs/documentation.md) when creating or storing
+  repository documentation, research, findings, or engineering decision records.
+
 - After implementing features or code changes, always run:
   - Use `$pocket-trash logger` to audit logger usage, centralized logger messages/values,
     and forbidden `console.*` calls before validation.
