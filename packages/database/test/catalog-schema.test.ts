@@ -151,6 +151,9 @@ describe("catalog schema", () => {
     const membership = getTableConfig(schema.productCompatibilityFamily);
     const advisory = getTableConfig(schema.productCompatibilityAdvisory);
     const inclusion = getTableConfig(schema.productIncludedComponent);
+    const configuration = getTableConfig(schema.productMagnetConfiguration);
+    const magnetGroup = getTableConfig(schema.productMagnetGroup);
+    const magnetSlot = getTableConfig(schema.productMagnetSlot);
 
     expect(slider.columns.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
@@ -161,6 +164,8 @@ describe("catalog schema", () => {
         "length_mm",
         "width_mm",
         "thickness_mm",
+        "inherent_click_count",
+        "magnet_setup_source_note",
       ]),
     );
     expect(slider.checks.map(({ name }) => name)).toEqual(
@@ -201,6 +206,39 @@ describe("catalog schema", () => {
       ]),
     );
     expect(inclusion.primaryKeys).toHaveLength(1);
+    expect(configuration.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "product_id",
+        "configuration_label_id",
+        "source_label",
+        "source_notes",
+      ]),
+    );
+    expect(magnetGroup.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "configuration_product_id",
+        "group_key",
+        "diameter_mm",
+        "thickness_mm",
+        "grade",
+        "display_order",
+      ]),
+    );
+    expect(magnetSlot.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "configuration_product_id",
+        "slot_key",
+        "half",
+        "state",
+        "group_id",
+        "documented_row",
+        "documented_column",
+        "display_order",
+      ]),
+    );
+    expect(magnetSlot.columns.map(({ name }) => name)).not.toEqual(
+      expect.arrayContaining(["polarity", "x", "y", "x_mm", "y_mm"]),
+    );
     expect(
       inclusion.foreignKeys.map(
         ({ reference }) => reference().foreignColumns[0]?.name,

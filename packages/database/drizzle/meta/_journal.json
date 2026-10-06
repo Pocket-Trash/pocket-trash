@@ -421,6 +421,13 @@
       "when": 1791335965283,
       "tag": "0059_mighty_felicia_hardy",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1791336212881,
+      "tag": "0060_common_mercury",
+      "breakpoints": true
     }
   ]
 }

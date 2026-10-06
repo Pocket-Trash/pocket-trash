@@ -927,6 +927,9 @@ export const productSlider = pgTable(
     magnetSystem: text("magnet_system", {
       enum: ["body-hosted", "insert-driven"],
     }).notNull(),
+    inherentClickCount: integer("inherent_click_count"),
+    /** Source text retained when a complete layout is not documented. */
+    magnetSetupSourceNote: text("magnet_setup_source_note"),
     weightG: decimal("weight_g"),
     weightBasis: text("weight_basis", {
       enum: ["body-only", "complete-build"],
@@ -957,6 +960,222 @@ export const productSlider = pgTable(
     check(
       "product_slider_measurements_positive",
       sql`${table.weightG} > 0 and ${table.lengthMm} > 0 and ${table.widthMm} > 0 and ${table.thicknessMm} > 0`,
+    ),
+    check(
+      "product_slider_inherent_click_count_positive",
+      sql`${table.inherentClickCount} is null or ${table.inherentClickCount} > 0`,
+    ),
+    check(
+      "product_slider_setup_source_note_valid",
+      sql`${table.magnetSetupSourceNote} is null or char_length(trim(${table.magnetSetupSourceNote})) between 1 and 5000`,
+    ),
+  ],
+);
+
+/** Global vocabulary used to name exact magnet configurations. */
+export const magnetConfigurationLabel = pgTable(
+  "magnet_configuration_label",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    name: text("name").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("magnet_configuration_label_normalized_name_unique").on(
+      table.normalizedName,
+    ),
+    check(
+      "magnet_configuration_label_name_valid",
+      sql`char_length(trim(${table.name})) between 1 and 100`,
+    ),
+  ],
+);
+
+/** Global vocabulary used to name magnet groups within configurations. */
+export const magnetGroupLabel = pgTable(
+  "magnet_group_label",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    name: text("name").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("magnet_group_label_normalized_name_unique").on(
+      table.normalizedName,
+    ),
+    check(
+      "magnet_group_label_name_valid",
+      sql`char_length(trim(${table.name})) between 1 and 100`,
+    ),
+  ],
+);
+
+/** The single inherent structured layout of one body-hosted slider. */
+export const productMagnetConfiguration = pgTable(
+  "product_magnet_configuration",
+  {
+    productId: bigint("product_id", { mode: "number" })
+      .primaryKey()
+      .references(() => productSlider.id, { onDelete: "cascade" }),
+    configurationLabelId: bigint("configuration_label_id", {
+      mode: "number",
+    })
+      .notNull()
+      .references(() => magnetConfigurationLabel.id, {
+        onDelete: "restrict",
+      }),
+    /** Optional source-relative layout name, without inferred semantics. */
+    sourceLabel: text("source_label"),
+    /** Optional notes attached to an otherwise complete sourced layout. */
+    sourceNotes: text("source_notes"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      "product_magnet_configuration_source_label_valid",
+      sql`${table.sourceLabel} is null or char_length(trim(${table.sourceLabel})) between 1 and 200`,
+    ),
+    check(
+      "product_magnet_configuration_source_notes_valid",
+      sql`${table.sourceNotes} is null or char_length(trim(${table.sourceNotes})) between 1 and 5000`,
+    ),
+  ],
+);
+
+/** Exact magnet dimensions and grade shared by one or more occupied slots. */
+export const productMagnetGroup = pgTable(
+  "product_magnet_group",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    configurationProductId: bigint("configuration_product_id", {
+      mode: "number",
+    })
+      .notNull()
+      .references(() => productMagnetConfiguration.productId, {
+        onDelete: "cascade",
+      }),
+    groupKey: text("group_key").notNull(),
+    groupLabelId: bigint("group_label_id", { mode: "number" })
+      .notNull()
+      .references(() => magnetGroupLabel.id, { onDelete: "restrict" }),
+    /** Arbitrary-precision metric value preserves exact inch conversions. */
+    diameterMm: decimal("diameter_mm").notNull(),
+    /** Arbitrary-precision metric value preserves exact inch conversions. */
+    thicknessMm: decimal("thickness_mm").notNull(),
+    grade: text("grade").notNull(),
+    displayOrder: integer("display_order").notNull(),
+  },
+  (table) => [
+    unique("product_magnet_group_id_configuration_unique").on(
+      table.id,
+      table.configurationProductId,
+    ),
+    unique("product_magnet_group_configuration_key_unique").on(
+      table.configurationProductId,
+      table.groupKey,
+    ),
+    unique("product_magnet_group_configuration_order_unique").on(
+      table.configurationProductId,
+      table.displayOrder,
+    ),
+    check(
+      "product_magnet_group_key_valid",
+      sql`char_length(trim(${table.groupKey})) between 1 and 100`,
+    ),
+    check(
+      "product_magnet_group_dimensions_positive",
+      sql`${table.diameterMm} > 0 and ${table.thicknessMm} > 0`,
+    ),
+    check(
+      "product_magnet_group_grade_normalized",
+      sql`${table.grade} ~ '^[A-Z0-9][A-Z0-9+_-]{0,19}$'`,
+    ),
+    check(
+      "product_magnet_group_display_order_nonnegative",
+      sql`${table.displayOrder} >= 0`,
+    ),
+  ],
+);
+
+/** One exact, source-relative position in a complete catalog layout. */
+export const productMagnetSlot = pgTable(
+  "product_magnet_slot",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    configurationProductId: bigint("configuration_product_id", {
+      mode: "number",
+    })
+      .notNull()
+      .references(() => productMagnetConfiguration.productId, {
+        onDelete: "cascade",
+      }),
+    slotKey: text("slot_key").notNull(),
+    half: text("half", { enum: ["half-a", "half-b"] }).notNull(),
+    state: text("state", { enum: ["occupied", "empty"] }).notNull(),
+    groupId: bigint("group_id", { mode: "number" }),
+    documentedRow: integer("documented_row"),
+    documentedColumn: integer("documented_column"),
+    displayOrder: integer("display_order").notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.groupId, table.configurationProductId],
+      foreignColumns: [
+        productMagnetGroup.id,
+        productMagnetGroup.configurationProductId,
+      ],
+      name: "product_magnet_slot_group_configuration_fk",
+    }).onDelete("restrict"),
+    unique("product_magnet_slot_configuration_key_unique").on(
+      table.configurationProductId,
+      table.slotKey,
+    ),
+    unique("product_magnet_slot_configuration_order_unique").on(
+      table.configurationProductId,
+      table.displayOrder,
+    ),
+    check(
+      "product_magnet_slot_key_valid",
+      sql`char_length(trim(${table.slotKey})) between 1 and 100`,
+    ),
+    check(
+      "product_magnet_slot_half_valid",
+      sql`${table.half} in ('half-a', 'half-b')`,
+    ),
+    check(
+      "product_magnet_slot_state_valid",
+      sql`${table.state} in ('occupied', 'empty')`,
+    ),
+    check(
+      "product_magnet_slot_state_group_consistent",
+      sql`(${table.state} = 'occupied' and ${table.groupId} is not null) or (${table.state} = 'empty' and ${table.groupId} is null)`,
+    ),
+    check(
+      "product_magnet_slot_documented_position_positive",
+      sql`(${table.documentedRow} is null or ${table.documentedRow} > 0) and (${table.documentedColumn} is null or ${table.documentedColumn} > 0)`,
+    ),
+    check(
+      "product_magnet_slot_display_order_nonnegative",
+      sql`${table.displayOrder} >= 0`,
     ),
   ],
 );
@@ -1145,6 +1364,30 @@ export type NewProductSpinnerButton = typeof productSpinnerButton.$inferInsert;
 export type ProductSlider = typeof productSlider.$inferSelect;
 /** Values accepted when creating a slider body row. */
 export type NewProductSlider = typeof productSlider.$inferInsert;
+/** Stored global magnet-configuration vocabulary label. */
+export type MagnetConfigurationLabel =
+  typeof magnetConfigurationLabel.$inferSelect;
+/** Values accepted for a global magnet-configuration vocabulary label. */
+export type NewMagnetConfigurationLabel =
+  typeof magnetConfigurationLabel.$inferInsert;
+/** Stored global magnet-group vocabulary label. */
+export type MagnetGroupLabel = typeof magnetGroupLabel.$inferSelect;
+/** Values accepted for a global magnet-group vocabulary label. */
+export type NewMagnetGroupLabel = typeof magnetGroupLabel.$inferInsert;
+/** Stored inherent product magnet configuration. */
+export type ProductMagnetConfiguration =
+  typeof productMagnetConfiguration.$inferSelect;
+/** Values accepted for an inherent product magnet configuration. */
+export type NewProductMagnetConfiguration =
+  typeof productMagnetConfiguration.$inferInsert;
+/** Stored magnet group in a product configuration. */
+export type ProductMagnetGroup = typeof productMagnetGroup.$inferSelect;
+/** Values accepted for a magnet group in a product configuration. */
+export type NewProductMagnetGroup = typeof productMagnetGroup.$inferInsert;
+/** Stored exact magnet slot in a product configuration. */
+export type ProductMagnetSlot = typeof productMagnetSlot.$inferSelect;
+/** Values accepted for an exact magnet slot in a product configuration. */
+export type NewProductMagnetSlot = typeof productMagnetSlot.$inferInsert;
 /** Stored slider plate-set row. */
 export type ProductSliderPlate = typeof productSliderPlate.$inferSelect;
 /** Values accepted when creating a slider plate-set row. */
