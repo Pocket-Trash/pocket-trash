@@ -96,6 +96,7 @@ export const loggerMessages = {
     collections: {
       addSpinner: "database.collections.addSpinner",
       addSpinnerButton: "database.collections.addSpinnerButton",
+      addSliderProduct: "database.collections.addSliderProduct",
       create: "database.collections.create",
       delete: "database.collections.delete",
       deleteItem: "database.collections.deleteItem",

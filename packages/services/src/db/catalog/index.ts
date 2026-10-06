@@ -1744,6 +1744,35 @@ export type CollectionsService = {
     newCollection?: CollectionWriteInput | null;
   }): Promise<number>;
   /**
+   * Adds one standalone slider, plate set, or insert set to a collection.
+   *
+   * @param input - Collection, exact catalog product, appearance snapshot, and actor.
+   * @returns Identifier of the created collection item.
+   * @rejects When the product type, material, authorization, persistence, auditing, or logging fails.
+   */
+  addSliderProduct(input: {
+    /** Authenticated actor. */
+    actor: Actor;
+    /** Collection identifier. */
+    collectionId?: number | null;
+    /** Optional custom finish snapshot. */
+    customFinish: ProductWriteFinishOption | null;
+    /** Optional description override. */
+    description?: string | null;
+    /** Display name override. */
+    displayName: string;
+    /** Optional catalog finish option to snapshot. */
+    finishOptionId: number | null;
+    /** Required selected material. */
+    materialId: number;
+    /** Optional collection created with the item. */
+    newCollection?: CollectionWriteInput | null;
+    /** Exact catalog product identifier. */
+    productId: number;
+    /** Exact standalone slider product subtype. */
+    productTypeSlug: "slider" | "slider-insert" | "slider-plate";
+  }): Promise<number>;
+  /**
    * Creates collection.
    *
    * @param input - Collection values and authenticated actor.
@@ -4143,6 +4172,113 @@ export function createCollectionsService(
       );
     },
     /**
+     * Adds one standalone slider product without creating related component items.
+     *
+     * @param input - Exact product, collection, appearance snapshot, and actor.
+     * @returns Identifier of the created collection item.
+     * @rejects When validation, authorization, persistence, auditing, or logging fails.
+     */
+    async addSliderProduct(input) {
+      return await logger.operation(
+        loggerMessages.database.collections.addSliderProduct,
+        async () => {
+          const owner = await users.ensure({ clerkId: input.actor.clerkId });
+          return await db.transaction(async (tx) => {
+            const resolvedCollection = await resolveCollectionForWrite(tx, {
+              collectionId: input.collectionId ?? null,
+              newCollection: input.newCollection ?? null,
+              ownerId: owner.id,
+            });
+            if (resolvedCollection.created) {
+              await writeCollectionAudit(audit, tx, {
+                actor: input.actor,
+                actorUser: owner,
+                after: {
+                  id: resolvedCollection.id,
+                  isPrivate: resolvedCollection.created.isPrivate,
+                  ...validatedCollectionValues(resolvedCollection.created),
+                },
+                definition: collectionAudit.collectionCreated,
+                ownerUserId: owner.id,
+                targetId: resolvedCollection.id,
+              });
+            }
+            await assertProductMaterial(tx, input.productId, input.materialId);
+            const [product] = await tx
+              .select({ slug: schema.productType.slug })
+              .from(schema.product)
+              .innerJoin(
+                schema.productType,
+                eq(schema.product.productTypeId, schema.productType.id),
+              )
+              .where(eq(schema.product.id, input.productId))
+              .limit(1);
+            if (product?.slug !== input.productTypeSlug) {
+              throw new Error("Collection product type does not match.");
+            }
+            const [item] = await tx
+              .insert(schema.collectionItem)
+              .values({
+                collectionId: resolvedCollection.id,
+                ...(input.description !== undefined
+                  ? {
+                      description: normalizeOptionalDescription(
+                        input.description,
+                      ),
+                    }
+                  : {}),
+                displayName: input.displayName,
+                materialId: input.materialId,
+                ownerId: owner.id,
+              })
+              .returning({ id: schema.collectionItem.id });
+            if (!item) throw new Error("Failed to create collection item.");
+            if (input.productTypeSlug === "slider") {
+              await tx.insert(schema.collectionSlider).values({
+                id: item.id,
+                productSliderId: input.productId,
+              });
+            } else if (input.productTypeSlug === "slider-plate") {
+              await tx.insert(schema.collectionSliderPlate).values({
+                id: item.id,
+                productSliderPlateId: input.productId,
+              });
+            } else {
+              await tx.insert(schema.collectionSliderInsert).values({
+                id: item.id,
+                productSliderInsertId: input.productId,
+              });
+            }
+            await createCollectionFinishOption(tx, {
+              collectionItemId: item.id,
+              customFinish: input.customFinish,
+              productFinishOptionId: input.finishOptionId,
+              productId: input.productId,
+            });
+            await touchCollection(tx, resolvedCollection.id);
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser: owner,
+              after: {
+                collectionId: resolvedCollection.id,
+                description: normalizeOptionalDescription(input.description),
+                displayName: input.displayName,
+                id: item.id,
+                materialId: input.materialId,
+                productId: input.productId,
+                productTypeSlug: input.productTypeSlug,
+              },
+              definition: collectionAudit.itemCreated,
+              ownerUserId: owner.id,
+              targetId: item.id,
+            });
+            return item.id;
+          });
+        },
+        actorAttributes(input.actor.clerkId, { productId: input.productId }),
+      );
+    },
+    /**
      * Counts owned products.
      *
      * @param input - Actor and product identifiers to count.
@@ -4159,6 +4295,9 @@ export function createCollectionsService(
           count: count(schema.collectionItem.id),
           spinnerId: schema.collectionSpinner.productSpinnerId,
           buttonId: schema.collectionSpinnerButton.productSpinnerButtonId,
+          sliderId: schema.collectionSlider.productSliderId,
+          sliderInsertId: schema.collectionSliderInsert.productSliderInsertId,
+          sliderPlateId: schema.collectionSliderPlate.productSliderPlateId,
         })
         .from(schema.collectionItem)
         .leftJoin(
@@ -4169,6 +4308,18 @@ export function createCollectionsService(
           schema.collectionSpinnerButton,
           eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
         )
+        .leftJoin(
+          schema.collectionSlider,
+          eq(schema.collectionItem.id, schema.collectionSlider.id),
+        )
+        .leftJoin(
+          schema.collectionSliderPlate,
+          eq(schema.collectionItem.id, schema.collectionSliderPlate.id),
+        )
+        .leftJoin(
+          schema.collectionSliderInsert,
+          eq(schema.collectionItem.id, schema.collectionSliderInsert.id),
+        )
         .where(
           and(
             eq(schema.collectionItem.ownerId, owner.id),
@@ -4178,10 +4329,18 @@ export function createCollectionsService(
         .groupBy(
           schema.collectionSpinner.productSpinnerId,
           schema.collectionSpinnerButton.productSpinnerButtonId,
+          schema.collectionSlider.productSliderId,
+          schema.collectionSliderPlate.productSliderPlateId,
+          schema.collectionSliderInsert.productSliderInsertId,
         );
       const result: Record<number, number> = {};
       for (const row of rows) {
-        const productId = row.spinnerId ?? row.buttonId;
+        const productId =
+          row.spinnerId ??
+          row.buttonId ??
+          row.sliderId ??
+          row.sliderPlateId ??
+          row.sliderInsertId;
         if (productId !== null && productIds.includes(productId)) {
           result[productId] = Number(row.count);
         }
@@ -5022,6 +5181,11 @@ export function createCollectionsService(
                 isPrivate: schema.collectionItem.isPrivate,
                 materialId: schema.collectionItem.materialId,
                 ownerId: schema.collectionItem.ownerId,
+                sliderProductId: schema.collectionSlider.productSliderId,
+                sliderInsertProductId:
+                  schema.collectionSliderInsert.productSliderInsertId,
+                sliderPlateProductId:
+                  schema.collectionSliderPlate.productSliderPlateId,
                 spinnerProductId: schema.collectionSpinner.productSpinnerId,
               })
               .from(schema.collectionItem)
@@ -5032,6 +5196,18 @@ export function createCollectionsService(
               .leftJoin(
                 schema.collectionSpinnerButton,
                 eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
+              )
+              .leftJoin(
+                schema.collectionSlider,
+                eq(schema.collectionItem.id, schema.collectionSlider.id),
+              )
+              .leftJoin(
+                schema.collectionSliderPlate,
+                eq(schema.collectionItem.id, schema.collectionSliderPlate.id),
+              )
+              .leftJoin(
+                schema.collectionSliderInsert,
+                eq(schema.collectionItem.id, schema.collectionSliderInsert.id),
               )
               .where(
                 and(
@@ -5046,7 +5222,12 @@ export function createCollectionsService(
               )
               .limit(1);
             const productId =
-              item?.spinnerProductId ?? item?.buttonProductId ?? null;
+              item?.spinnerProductId ??
+              item?.buttonProductId ??
+              item?.sliderProductId ??
+              item?.sliderPlateProductId ??
+              item?.sliderInsertProductId ??
+              null;
             if (!item || productId === null) {
               throw new Error("Collection item does not exist.");
             }
@@ -6941,6 +7122,10 @@ async function queryOwnedItems(
         schema.finishOption.sourceProductFinishOptionId,
       spinnerId: schema.collectionSpinner.id,
       buttonId: schema.collectionSpinnerButton.id,
+      sliderId: schema.collectionSlider.id,
+      sliderInsertId: schema.collectionSliderInsert.id,
+      sliderPlateId: schema.collectionSliderPlate.id,
+      productTypeSlug: schema.productType.slug,
       updatedAt: schema.collectionItem.updatedAt,
     })
     .from(schema.collectionItem)
@@ -6973,11 +7158,23 @@ async function queryOwnedItems(
       schema.collectionSpinnerButton,
       eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
     )
+    .leftJoin(
+      schema.collectionSlider,
+      eq(schema.collectionItem.id, schema.collectionSlider.id),
+    )
+    .leftJoin(
+      schema.collectionSliderPlate,
+      eq(schema.collectionItem.id, schema.collectionSliderPlate.id),
+    )
+    .leftJoin(
+      schema.collectionSliderInsert,
+      eq(schema.collectionItem.id, schema.collectionSliderInsert.id),
+    )
     .innerJoin(
       schema.product,
       eq(
         schema.product.id,
-        sql`coalesce(${schema.collectionSpinner.productSpinnerId}, ${schema.collectionSpinnerButton.productSpinnerButtonId})`,
+        sql`coalesce(${schema.collectionSpinner.productSpinnerId}, ${schema.collectionSpinnerButton.productSpinnerButtonId}, ${schema.collectionSlider.productSliderId}, ${schema.collectionSliderPlate.productSliderPlateId}, ${schema.collectionSliderInsert.productSliderInsertId})`,
       ),
     )
     .innerJoin(schema.maker, eq(schema.product.makerId, schema.maker.id))
@@ -7061,7 +7258,11 @@ async function queryOwnedItems(
     productId: row.productId,
     productSlug: row.productSlug,
     productTypeName: row.productTypeName,
-    productTypeSlug: row.spinnerId ? "spinner" : "spinner-button",
+    productTypeSlug: row.productTypeSlug
+      ? catalogProductType(row.productTypeSlug)
+      : row.spinnerId
+        ? "spinner"
+        : "spinner-button",
     productImages: [],
     sourceProductFinishOptionId: row.sourceProductFinishOptionId,
   }));
