@@ -699,7 +699,13 @@ export const listAdminMakers = createServerFn({ method: "GET" }).handler(
   async (): Promise<CatalogMaker[]> => {
     const actor = await requirePermission("products.manage");
     const { s } = await import("@/lib/services");
-    return await s.db.catalog.listMakersForAdmin(actor);
+    const makers = await s.db.catalog.listMakersForAdmin(actor);
+    return await Promise.all(
+      makers.map(async (maker) => ({
+        ...maker,
+        images: await signCatalogImageUrls(maker.images),
+      })),
+    );
   },
 );
 
@@ -714,10 +720,13 @@ export const getAdminMaker = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<CatalogMaker | null> => {
     const actor = await requirePermission("products.manage");
     const { s } = await import("@/lib/services");
-    return await s.db.catalog.getMakerForAdmin({
+    const maker = await s.db.catalog.getMakerForAdmin({
       actor,
       makerId: data.makerId,
     });
+    return maker
+      ? { ...maker, images: await signCatalogImageUrls(maker.images) }
+      : null;
   });
 
 /**
@@ -1557,7 +1566,7 @@ export const softDeleteCatalogImage = createServerFn({ method: "POST" })
       .object({
         imageId: idSchema,
         reason: z.string().trim().max(1000).optional(),
-        targetType: z.enum(["product", "collection_item", "material"]),
+        targetType: z.enum(["maker", "material", "product", "collection_item"]),
       })
       .parse(input),
   )
@@ -1581,7 +1590,7 @@ export const restoreCatalogImage = createServerFn({ method: "POST" })
       .object({
         imageId: idSchema,
         reason: z.string().trim().max(1000).optional(),
-        targetType: z.enum(["product", "collection_item", "material"]),
+        targetType: z.enum(["maker", "material", "product", "collection_item"]),
       })
       .parse(input),
   )

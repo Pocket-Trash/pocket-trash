@@ -9,6 +9,7 @@ import { type StorageDb, UploadSessionError } from "./types.js";
 /** Maps persisted file kinds to their attachment tables and owning target types. */
 export const fileRecords = {
   material_image: { ...imageTargets.material, targetType: "material" },
+  maker_image: { ...imageTargets.maker, targetType: "maker" },
   product_image: { ...imageTargets.product, targetType: "product" },
   collection_image: { ...imageTargets.collection, targetType: "collection" },
   collection_item_image: {
@@ -105,6 +106,9 @@ async function erasableObjectOwner(db: StorageDb, path: string) {
     clerkId: string;
   }>(sql`
     select distinct owned.clerk_id as "clerkId" from (
+      select null::text as clerk_id, maker_image.object_path
+      from maker_image
+      union all
       select users.clerk_id, collection_image.object_path
       from collection_image
       join user_collection on user_collection.id = collection_image.collection_id

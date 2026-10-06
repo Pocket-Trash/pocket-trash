@@ -11,6 +11,7 @@ import {
   finishOption,
   finishOptionColor,
   finishOptionFinish,
+  makerImage,
   materialImage,
   product,
   productImage,
@@ -207,7 +208,16 @@ export const makersRelations = relations(maker, ({ many }) => ({
   autmogPens: many(tmpAutmogPens),
   grimsmoKnives: many(tmpGrimsmoKnives),
   grimsmoPens: many(tmpGrimsmoPens),
+  images: many(makerImage),
   products: many(product),
+}));
+
+/** Connects a maker image to its maker profile. */
+export const makerImageRelations = relations(makerImage, ({ one }) => ({
+  maker: one(maker, {
+    fields: [makerImage.makerId],
+    references: [maker.id],
+  }),
 }));
 
 /** Connects a material to catalog products, collection items, and staged Autmog pens. */

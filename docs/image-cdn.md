@@ -1,6 +1,6 @@
 # Image CDN
 
-Pocket Trash uses Bunny for product and collection image storage and delivery.
+Pocket Trash uses Bunny for maker, product, and collection image storage and delivery.
 Shared upload, update, and delete behavior lives in `@package/storage` and is
 exposed to apps through `@package/services`.
 
@@ -84,7 +84,7 @@ Bunny Optimizer performs conversion, resizing, and compression at delivery time.
 ## Image Paths
 
 Display images use `{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{id}/{sha256}.{ext}`.
-The entity values are `products`, `collections`, `collection-items`, and `resources`.
+The entity values are `makers`, `products`, `collections`, `collection-items`, and `resources`.
 Uploaded filenames use the SHA-256 of the original bytes and the original extension.
 
 Scraper images use the same path builder, with a source image ID instead of the hash when it contains only letters, digits, underscores and hyphens; otherwise the original image bytes supply the SHA-256 hash. Product owner IDs remain `tmp_products.id`; variation owner IDs remain `<tmp-products-id>-<tmp-product-variations-id>`. Autmog pen images are product-level, while Grimsmo images are variation-level. Previously persisted URLs are not automatically rewritten. New or retried uploads use the original file extension and byte-hash fallback instead of the previous `.webp` extension and metadata `sourceHash` fallback.
@@ -152,9 +152,13 @@ Preview cleanup runs `pnpm --filter @package/storage cleanup:preview` once to de
 
 The scraper and upload service use the same validated image path builder:
 `{BUNNY_IMAGE_FOLDER_PREFIX}/{entity}/{entityId}/{name}.{ext}`.
-Entities are `products`, `collections`, `collection-items`, and `resources`.
+Entities are `makers`, `products`, `collections`, `collection-items`, and `resources`.
 Uploaded names are the SHA-256 of the original bytes. Scraper names use the source image ID when available, otherwise the same SHA-256 rule. Variation owner keys remain unchanged.
 
 `BUNNY_IMAGE_FOLDER_PREFIX` is required by the API Worker as well as the scraper and web storage configuration. The deploy workflow sets it alongside the resource prefix for each environment.
 
-The services `signImages` helper signs uploaded product, collection, collection-item and resource images at render, then applies Bunny Dynamic Image API parameters. Tokens last 120 seconds. Enforcing tokens on the `images/*` CDN namespace remains a separate Bunny dashboard change; scraper delivery is unchanged.
+The services `signImages` helper signs uploaded maker, product, collection,
+collection-item, and resource images at render, then applies Bunny Dynamic Image
+API parameters. Tokens last 120 seconds. Enforcing tokens on the `images/*` CDN
+namespace remains a separate Bunny dashboard change; scraper delivery is
+unchanged.

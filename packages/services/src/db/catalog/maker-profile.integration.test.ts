@@ -108,12 +108,59 @@ describe("maker profile persistence", () => {
         }),
       );
       expect(second.slug).toBe("cafe-works-2");
+      const [image] = await db
+        .insert(schema.makerImage)
+        .values({
+          contentType: "image/png",
+          fileName: "maker.png",
+          makerId: first.id,
+          objectPath: "images/makers/cafe-works/maker.png",
+          position: 0,
+          sha256: "a".repeat(64),
+          size: 10,
+          uploadedByClerkId: admin.clerkId,
+          url: "https://cdn.test/maker.png",
+        })
+        .returning({ id: schema.makerImage.id });
+      if (!image) throw new Error("Maker image was not created.");
+      expect(
+        await service.getMakerForAdmin({ actor: admin, makerId: first.id }),
+      ).toEqual(
+        expect.objectContaining({
+          images: [expect.objectContaining({ id: image.id, position: 0 })],
+        }),
+      );
       await expect(service.listMakersForAdmin(user)).rejects.toThrow(
         "Product does not exist.",
       );
       await expect(
         service.getMakerForAdmin({ actor: user, makerId: first.id }),
       ).rejects.toThrow("Product does not exist.");
+      await expect(
+        service.softDeleteImage({
+          actor: user,
+          imageId: image.id,
+          targetType: "maker",
+        }),
+      ).rejects.toThrow("Image does not exist.");
+      await service.softDeleteImage({
+        actor: admin,
+        imageId: image.id,
+        targetType: "maker",
+      });
+      expect(
+        (await service.getMakerForAdmin({ actor: admin, makerId: first.id }))
+          ?.images[0]?.deletedByRole,
+      ).toBe("admin");
+      await service.restoreImage({
+        actor: admin,
+        imageId: image.id,
+        targetType: "maker",
+      });
+      expect(
+        (await service.getMakerForAdmin({ actor: admin, makerId: first.id }))
+          ?.images[0]?.deletedAt,
+      ).toBeNull();
       const updated = await service.updateMaker({
         actor: admin,
         description: null,

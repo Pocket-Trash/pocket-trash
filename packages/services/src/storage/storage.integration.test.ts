@@ -92,7 +92,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     "base64",
   );
   const pdf = new TextEncoder().encode("%PDF-1.7 test");
-  let productId: number, collectionId: number, itemId: number;
+  let productId: number, collectionId: number, itemId: number, makerId: number;
   beforeAll(async () => {
     const user = await pool.query(
       "insert into users(clerk_id) values($1) returning id",
@@ -112,6 +112,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
     const maker = await pool.query(
       "insert into makers(name, slug) values('Storage test maker', 'storage-test-maker') returning id",
     );
+    makerId = Number(maker.rows[0].id);
     const type = await pool.query(
       "insert into product_types(name,slug) values('Storage test type','storage-test-type') returning id",
     );
@@ -153,6 +154,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
    *
    * @param session - Reserved session and its upload descriptors.
    * @param bytes - File contents keyed by original filename.
+   * @param uploadActor - Actor that owns the upload session.
    * @rejects When bytes are missing or a service upload fails.
    */
   async function put(
@@ -170,6 +172,12 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       }>;
     },
     bytes: Record<string, Uint8Array>,
+    uploadActor: {
+      /** Clerk account identifier. */
+      clerkId: string;
+      /** Authorization role. */
+      role: "admin" | "user";
+    } = actor,
   ) {
     for (const file of session.uploads) {
       const body = bytes[file.fileName];
@@ -177,7 +185,7 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       await service.upload(
         session.id,
         file.id,
-        actor,
+        uploadActor,
         new Request("https://api.test/upload", {
           method: "PUT",
           body: new Uint8Array(body),
@@ -189,6 +197,48 @@ describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
       );
     }
   }
+  it("restricts maker uploads to product managers and preserves ordered shared images", async () => {
+    const firstBytes = new Uint8Array([...image, 31]);
+    const secondBytes = new Uint8Array([...image, 32]);
+    const files = [
+      await manifest(firstBytes, "image", "maker-first.png", "image/png"),
+      await manifest(secondBytes, "image", "maker-second.png", "image/png"),
+    ];
+    const value = { target: { type: "maker", id: makerId }, files } as const;
+
+    await expect(service.create(value, actor)).rejects.toMatchObject({
+      code: "session_not_found",
+      status: 404,
+    });
+    const session = await service.create(value, admin);
+    await put(
+      session,
+      {
+        "maker-first.png": firstBytes,
+        "maker-second.png": secondBytes,
+      },
+      admin,
+    );
+    await service.completeUpload(session.id, admin);
+
+    const rows = (
+      await pool.query(
+        "select position, object_path from maker_image where maker_id=$1 order by position",
+        [makerId],
+      )
+    ).rows;
+    expect(rows.map(({ position }) => position)).toEqual([0, 1]);
+    expect(rows[0]?.object_path).toContain(`/makers/${makerId}/`);
+    await expect(
+      service.create(
+        {
+          target: { type: "maker", id: makerId },
+          files: [files[0]],
+        },
+        admin,
+      ),
+    ).rejects.toMatchObject({ code: "duplicate_active" });
+  });
   it("creates no draft, completes atomically, reserves versions and retains original image bytes", async () => {
     const files = [
       await manifest(pdf, "file", "design.pdf", "application/pdf"),

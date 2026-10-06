@@ -20,8 +20,11 @@ import { user } from "./users.js";
 
 /** Roles allowed to soft-delete catalog images. */
 export const catalogDeletionRoles = ["owner", "admin"] as const;
+/** Roles allowed to soft-delete maker images. */
+export const makerImageDeletionRoles = ["admin"] as const;
 /** Catalog entity types that can own an image. */
 export const catalogImageTargetTypes = [
+  "maker",
   "product",
   "material",
   "collection",
@@ -352,6 +355,53 @@ export const product = pgTable(
     check(
       "product_description_length_valid",
       sql`${table.description} is null or char_length(${table.description}) <= 5000`,
+    ),
+  ],
+);
+
+/** Ordered images attached to a maker profile. */
+export const makerImage = pgTable(
+  "maker_image",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    makerId: bigint("maker_id", { mode: "number" })
+      .notNull()
+      .references(() => maker.id, { onDelete: "cascade" }),
+    /** Stable zero-based display order within the maker profile. */
+    position: integer("position").notNull(),
+    fileName: text("file_name").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    /** Exact-byte duplicate-detection hash. */
+    sha256: text("sha256").notNull(),
+    storageProvider: text("storage_provider").default("bunny").notNull(),
+    objectPath: text("object_path").notNull(),
+    /** Unsigned CDN URL stored for the image. */
+    url: text("url").notNull(),
+    uploadedByClerkId: text("uploaded_by_clerk_id"),
+    deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
+    deletedByClerkId: text("deleted_by_clerk_id"),
+    deletedByRole: text("deleted_by_role", { enum: makerImageDeletionRoles }),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("maker_image_maker_id_idx").on(table.makerId),
+    unique("maker_image_object_path_unique").on(table.objectPath),
+    unique("maker_image_maker_hash_unique").on(table.makerId, table.sha256),
+    check("maker_image_position_valid", sql`${table.position} >= 0`),
+    check("maker_image_size_positive", sql`${table.size} > 0`),
+    check("maker_image_sha256_valid", sql`${table.sha256} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "maker_image_deletion_metadata_consistent",
+      sql`(${table.deletedAt} is null and ${table.deletedByClerkId} is null and ${table.deletedByRole} is null) or (${table.deletedAt} is not null and ${table.deletedByRole} is not null)`,
+    ),
+    check(
+      "maker_image_deleted_by_role_valid",
+      sql`${table.deletedByRole} is null or ${table.deletedByRole} = 'admin'`,
     ),
   ],
 );

@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 /** Entity types that can own an upload session. */
 export const uploadTargetTypes = [
+  "maker",
   "product",
   "material",
   "collection",
@@ -50,7 +51,7 @@ export const uploadSession = pgTable(
     index("upload_session_owner_idx").on(t.uploaderClerkId),
     check(
       "upload_session_target_type_valid",
-      sql`${t.targetType} in ('product', 'material', 'collection', 'collection_item', 'resource')`,
+      sql`${t.targetType} in ('maker', 'product', 'material', 'collection', 'collection_item', 'resource')`,
     ),
     check("upload_session_target_id_valid", sql`${t.targetId} > 0`),
     check(

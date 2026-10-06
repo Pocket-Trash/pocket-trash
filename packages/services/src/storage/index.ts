@@ -84,6 +84,7 @@ export type UploadManifest = z.infer<typeof uploadManifestSchema>;
 export const uploadSessionLifetimeMs = 60 * 60 * 1000;
 /** Persisted attachment kinds accepted by file deletion. */
 export const fileTypes = [
+  "maker_image",
   "product_image",
   "collection_image",
   "collection_item_image",
@@ -451,9 +452,15 @@ export function createStorageService(input: {
           const collectionContext = await collectionTargetContext(tx, target);
           const productContext = await productTargetContext(tx, target);
           const materialContext = await materialTargetContext(tx, target);
+          const makerContext = await makerTargetContext(tx, target);
           const before = await collectionTargetImageState(tx, target);
           await attachImages(tx, { target, files, actor });
-          if (collectionContext || productContext || materialContext) {
+          if (
+            collectionContext ||
+            productContext ||
+            materialContext ||
+            makerContext
+          ) {
             if (!audit) throw new Error("Collection audit is not configured.");
             const [actorUser] = await tx
               .select({ id: schema.user.id, username: schema.user.username })
@@ -499,6 +506,16 @@ export function createStorageService(input: {
                 before,
                 definition: productAudit.materialImageAdded,
                 targetId: materialContext.materialId,
+              });
+            } else if (makerContext) {
+              await writeProductAdminAudit(audit, tx, {
+                actor,
+                actorUser,
+                after,
+                before,
+                definition: productAudit.makerImageAdded,
+                reason,
+                targetId: target.id,
               });
             }
           }
@@ -1054,6 +1071,27 @@ async function materialTargetContext(
 }
 
 /**
+ * Confirms that an upload target is an existing maker profile.
+ *
+ * @param db - Application database.
+ * @param target - Upload target to inspect.
+ * @returns Maker context, or `null` for other or missing targets.
+ * @rejects When the context query fails.
+ */
+async function makerTargetContext(
+  db: Pick<Database, "select">,
+  target: UploadTarget,
+) {
+  if (target.type !== "maker") return null;
+  const [row] = await db
+    .select({ id: schema.maker.id })
+    .from(schema.maker)
+    .where(eq(schema.maker.id, target.id))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
  * Captures image identifiers and current-cover state for an upload target.
  *
  * @param db - Application database.
@@ -1065,6 +1103,13 @@ async function collectionTargetImageState(
   db: Pick<Database, "select">,
   target: UploadTarget,
 ) {
+  if (target.type === "maker") {
+    const images = await db
+      .select({ id: schema.makerImage.id })
+      .from(schema.makerImage)
+      .where(eq(schema.makerImage.makerId, target.id));
+    return { currentImageId: null, imageIds: images.map(({ id }) => id) };
+  }
   if (target.type === "collection") {
     const images = await db
       .select({
@@ -1118,6 +1163,10 @@ async function hasSurvivingReference(
 ) {
   const result = await db.execute(sql`
     select 1 from (
+      select maker_image.object_path, null::text as owner_clerk_id,
+        true as protected
+      from maker_image
+      union all
       select product_image.object_path, null::text as owner_clerk_id,
         true as protected
       from product_image

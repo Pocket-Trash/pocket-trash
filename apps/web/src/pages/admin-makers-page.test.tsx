@@ -2,6 +2,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { AdminMakerFormPage, AdminMakersPage } from "./admin-makers-page";
 
+vi.mock("@clerk/tanstack-react-start", () => ({
+  /**
+   * Returns a stable authentication test double.
+   *
+   * @returns Authentication token helper.
+   */
+  useAuth: () => ({ getToken: vi.fn().mockResolvedValue("token") }),
+}));
+
 vi.mock("@pocket-trash/localizations", () => ({
   /**
    * Returns the localization key as stable test copy.
@@ -84,6 +93,7 @@ describe("maker administration pages", () => {
           {
             description: null,
             id: 1000,
+            images: [],
             name: "Autmog",
             rootUrl: "https://autmog.com",
             slug: "autmog",
@@ -96,6 +106,7 @@ describe("maker administration pages", () => {
     expect(html).toContain("autmog");
     expect(html).toContain("web.action.addMaker");
     expect(html).toContain('aria-label="web.admin.makers.editMaker"');
+    expect(html).toContain("web.admin.makers.imagesEmpty");
   });
 
   it("keeps the persisted slug read-only while editing a renamed maker", () => {
@@ -104,6 +115,7 @@ describe("maker administration pages", () => {
         maker={{
           description: "Profile",
           id: 1000,
+          images: [],
           name: "Renamed Autmog",
           rootUrl: null,
           slug: "autmog",
@@ -115,5 +127,52 @@ describe("maker administration pages", () => {
     expect(html).toContain('value="autmog"');
     expect(html).toContain("readOnly");
     expect(html).toContain("Profile");
+  });
+
+  it("renders active and archived maker-image controls", () => {
+    const html = renderToStaticMarkup(
+      <AdminMakerFormPage
+        maker={{
+          description: null,
+          id: 1000,
+          images: [
+            {
+              contentType: "image/png",
+              createdAt: new Date("2026-01-01"),
+              deletedAt: null,
+              deletedByClerkId: null,
+              deletedByRole: null,
+              fileName: "lead.png",
+              id: 1001,
+              objectPath: "makers/1000/lead.png",
+              position: 0,
+              size: 10,
+              url: "https://cdn.test/lead.png",
+            },
+            {
+              contentType: "image/png",
+              createdAt: new Date("2026-01-02"),
+              deletedAt: new Date("2026-01-03"),
+              deletedByClerkId: "admin",
+              deletedByRole: "admin",
+              fileName: "archived.png",
+              id: 1002,
+              objectPath: "makers/1000/archived.png",
+              position: 1,
+              size: 10,
+              url: "https://cdn.test/archived.png",
+            },
+          ],
+          name: "Autmog",
+          rootUrl: null,
+          slug: "autmog",
+        }}
+      />,
+    );
+
+    expect(html).toContain("lead.png");
+    expect(html).toContain("archived.png");
+    expect(html).toContain("web.resources.action.delete");
+    expect(html).toContain("web.resources.action.restore");
   });
 });

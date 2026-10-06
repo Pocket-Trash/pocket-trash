@@ -209,6 +209,22 @@ describe("account database erasure", () => {
           select uploaded_by_clerk_id as "uploadedByClerkId",
             deleted_by_clerk_id as "deletedByClerkId", deleted_by_role as "deletedByRole",
             deleted_at is not null as "keptDeletionTime"
+          from maker_image where file_name = 'preserved-maker.png'
+        `,
+        ),
+      ).toEqual({
+        deletedByClerkId: null,
+        deletedByRole: "admin",
+        keptDeletionTime: true,
+        uploadedByClerkId: null,
+      });
+      expect(
+        await row(
+          client,
+          `
+          select uploaded_by_clerk_id as "uploadedByClerkId",
+            deleted_by_clerk_id as "deletedByClerkId", deleted_by_role as "deletedByRole",
+            deleted_at is not null as "keptDeletionTime"
           from product_image where file_name = 'preserved-product.png'
         `,
         ),
@@ -478,6 +494,16 @@ async function seedInventory(client: PGlite) {
       select id from users where clerk_id = 'user_to_erase';
 
     insert into makers (name, slug, root_url) values ('Shared maker', 'shared-maker', 'https://maker.test');
+    insert into maker_image (
+      maker_id, position, file_name, content_type, size, sha256,
+      object_path, url, uploaded_by_clerk_id, deleted_at,
+      deleted_by_clerk_id, deleted_by_role
+    ) values (
+      (select id from makers where name = 'Shared maker'), 0,
+      'preserved-maker.png', 'image/png', 10, repeat('b', 64),
+      'images/makers/preserved.png', 'https://cdn.test/makers/preserved.png',
+      'user_to_erase', now(), 'user_to_erase', 'admin'
+    );
     insert into product_types (name, slug) values ('Spinner', 'spinner');
     insert into materials (name, slug) values ('Metal', 'metal');
     insert into product (
