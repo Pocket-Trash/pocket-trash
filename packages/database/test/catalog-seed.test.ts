@@ -41,6 +41,8 @@ function createSeedDb() {
       name: string;
       /** Normalized maker root URL. */
       rootUrl: string | null;
+      /** Stable maker slug. */
+      slug: string;
     }
   >();
   const materials = new Map<
@@ -112,6 +114,7 @@ function createSeedDb() {
                 id: makers.size + 1000,
                 name: value.name,
                 rootUrl: value.rootUrl ?? null,
+                slug: value.slug ?? "",
               });
             } else if (table === material && value.slug) {
               materials.set(value.slug, { name: value.name, slug: value.slug });
@@ -215,7 +218,9 @@ describe("catalog seed", () => {
     expect(state.colorEffects.get("fade")?.name).toBe("Fade");
     expect(state.materials.get("bronze")?.name).toBe("Bronze");
     expect(state.makers.get("autmog")?.rootUrl).toBe("https://www.autmog.com");
+    expect(state.makers.get("autmog")?.slug).toBe("autmog");
     expect(state.makers.get("kap edc")?.rootUrl).toBe("https://www.kapedc.com");
+    expect(state.makers.get("kap edc")?.slug).toBe("kap-edc");
   });
 
   it("contains every approved KAP product and unique gallery image", async () => {

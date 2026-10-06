@@ -9,7 +9,7 @@ DECLARE
 	used_slugs text[] := ARRAY[]::text[];
 BEGIN
 	FOR record_row IN SELECT "id", "name" FROM "makers" ORDER BY "id" LOOP
-		base_slug := trim(both '-' from regexp_replace(lower(trim(record_row."name")), '[^a-z0-9]+', '-', 'g'));
+		base_slug := trim(both '-' from regexp_replace(regexp_replace(normalize(lower(trim(record_row."name")), NFKD), U&'[\0300-\036f]', '', 'g'), '[^a-z0-9]+', '-', 'g'));
 		IF base_slug = '' THEN
 			base_slug := 'maker';
 		END IF;

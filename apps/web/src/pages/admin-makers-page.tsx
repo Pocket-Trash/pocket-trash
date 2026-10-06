@@ -43,9 +43,13 @@ export function AdminMakersPage({ makers }: AdminMakersPageProperties) {
    * Formats maker-administration copy for the active locale.
    *
    * @param key - Localization key.
+   * @param values - Translation interpolation values.
    * @returns Localized maker-administration copy.
    */
-  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
+  const t = (
+    key: TranslationKey,
+    values: Readonly<Record<string, unknown>> = {},
+  ) => formatTranslation(key, values, locale);
 
   return (
     <AdminPageShell section="makers" title={t("web.admin.makers.title")}>
@@ -79,7 +83,9 @@ export function AdminMakersPage({ makers }: AdminMakersPageProperties) {
                   </div>
                 </div>
                 <Link
-                  aria-label={`${t("web.action.edit")}: ${maker.name}`}
+                  aria-label={t("web.admin.makers.editMaker", {
+                    name: maker.name,
+                  })}
                   className={cn(
                     buttonVariants({ variant: "outline" }),
                     "w-full",
@@ -126,11 +132,15 @@ export function AdminMakerFormPage({ maker }: AdminMakerFormPageProperties) {
    * Formats maker-form copy for the active locale.
    *
    * @param key - Localization key.
+   * @param values - Translation interpolation values.
    * @returns Localized maker-form copy.
    */
-  const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
+  const t = (
+    key: TranslationKey,
+    values: Readonly<Record<string, unknown>> = {},
+  ) => formatTranslation(key, values, locale);
   const title = maker
-    ? `${t("web.action.edit")}: ${maker.name}`
+    ? t("web.admin.makers.editMaker", { name: maker.name })
     : t("web.action.addMaker");
 
   /**
