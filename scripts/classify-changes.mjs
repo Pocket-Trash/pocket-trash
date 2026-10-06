@@ -3,8 +3,8 @@ import { appendFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-/** Validation domains emitted for GitHub Actions jobs. */
-const domains = [
+/** Validation domains emitted for local checks and GitHub Actions jobs. */
+export const validationDomains = [
   "api",
   "scraper",
   "web",
@@ -19,14 +19,151 @@ const domains = [
 /** Absolute repository root used by local and CI checks. */
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
+/** Every validation domain for conservative rules and failures. */
+const allDomains = [...validationDomains];
+
+/**
+ * Ordered path-to-domain rules shared by local and CI validation.
+ *
+ * Empty `domains` intentionally classify a path as no-code. More specific
+ * rules must precede broader prefixes.
+ */
+const changeClassificationRules = [
+  {
+    category: "documentation",
+    paths: [
+      ".github/pull_request_template.md",
+      "AGENTS.md",
+      "CHANGELOG.md",
+      "CLAUDE.md",
+      "README.md",
+      "scrapers/README.md",
+    ],
+    prefixes: [".agents/", ".changeset/", ".claude/", "docs/"],
+    domains: [],
+  },
+  {
+    category: "web-public-e2e",
+    paths: ["apps/web/e2e/public.spec.ts"],
+    domains: ["web", "preview", "safe_e2e", "validation"],
+  },
+  {
+    category: "web-mutation-e2e",
+    prefixes: ["apps/web/e2e/"],
+    domains: ["web", "preview", "safe_e2e", "mutation_e2e", "validation"],
+  },
+  {
+    category: "web-mutation-capable",
+    paths: ["apps/web/package.json", "apps/web/playwright.config.ts"],
+    prefixes: ["apps/web/src/"],
+    domains: [
+      "web",
+      "storybook",
+      "preview",
+      "safe_e2e",
+      "mutation_e2e",
+      "validation",
+    ],
+  },
+  {
+    category: "web",
+    prefixes: ["apps/web/"],
+    domains: ["web", "storybook", "preview", "safe_e2e", "validation"],
+  },
+  {
+    category: "api",
+    prefixes: ["apps/api/"],
+    domains: ["api", "preview", "safe_e2e", "mutation_e2e", "validation"],
+  },
+  {
+    category: "scraper",
+    prefixes: ["apps/scraper/"],
+    domains: ["scraper", "preview", "validation"],
+  },
+  {
+    category: "shared-runtime",
+    prefixes: ["packages/feature-flags/", "packages/storage/"],
+    domains: [
+      "api",
+      "scraper",
+      "web",
+      "storybook",
+      "preview",
+      "safe_e2e",
+      "mutation_e2e",
+      "validation",
+    ],
+  },
+  {
+    category: "shared-markdown",
+    prefixes: ["packages/markdown/"],
+    domains: [
+      "scraper",
+      "web",
+      "storybook",
+      "preview",
+      "safe_e2e",
+      "validation",
+    ],
+  },
+  {
+    category: "validation-tooling",
+    prefixes: [
+      "packages/github-discord-notifier/",
+      "packages/infisical-runner/",
+      "packages/json-data/",
+      "packages/lint/",
+    ],
+    domains: ["validation"],
+  },
+  {
+    category: "shared-foundation",
+    prefixes: [
+      "packages/database/",
+      "packages/logger/",
+      "packages/services/",
+      "packages/tsconfig/",
+    ],
+    domains: allDomains,
+  },
+  {
+    category: "repository-validation",
+    paths: [
+      ".gitignore",
+      ".infisical.json",
+      ".railwayignore",
+      "biome.json",
+      "commitlint.config.cjs",
+      "eslint.config.mjs",
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "railway.json",
+      "security-audit-exceptions.json",
+      "skills-lock.json",
+      "tsconfig.json",
+      "turbo.json",
+    ],
+    prefixes: [
+      ".github/scripts/",
+      ".github/workflows/",
+      ".githooks/",
+      "patches/",
+      "scrapers/",
+      "scripts/",
+    ],
+    domains: allDomains,
+  },
+];
+
 /**
  * Creates a result with every validation domain set to the same value.
  *
  * @param {boolean} value - Relevance assigned to every domain.
- * @returns {Record<string, boolean>} Complete classifier result.
+ * @returns {Record<string, boolean>} Complete domain result.
  */
 function everyDomain(value) {
-  return Object.fromEntries(domains.map((domain) => [domain, value]));
+  return Object.fromEntries(validationDomains.map((domain) => [domain, value]));
 }
 
 /**
@@ -40,6 +177,37 @@ function enable(result, ...enabled) {
 }
 
 /**
+ * Finds the first explicit classification rule for a repository path.
+ *
+ * @param {string} file - Repository-relative path.
+ * @returns {(typeof changeClassificationRules)[number] | undefined} Rule, if known.
+ */
+function findRule(file) {
+  return changeClassificationRules.find(
+    (rule) =>
+      rule.paths?.includes(file) ||
+      rule.prefixes?.some((prefix) => file.startsWith(prefix)),
+  );
+}
+
+/**
+ * Builds a complete classification response.
+ *
+ * @param {Record<string, boolean>} domains - Selected validation domains.
+ * @param {object} [details] - Classification metadata.
+ * @param {"diff-failed" | "malformed-input" | null} [details.error] - Failure type.
+ * @param {string[]} [details.noCodePaths] - Intentionally non-code paths.
+ * @param {string[]} [details.unknownPaths] - Paths missing an explicit rule.
+ * @returns {{domains: Record<string, boolean>, error: "diff-failed" | "malformed-input" | null, noCodePaths: string[], unknownPaths: string[]}} Classification response.
+ */
+function response(
+  domains,
+  { error = null, noCodePaths = [], unknownPaths = [] } = {},
+) {
+  return { domains, error, noCodePaths, unknownPaths };
+}
+
+/**
  * Classifies changed repository paths for CI, previews, Storybook, and E2E.
  *
  * @param {unknown[]} files - Changed repository-relative paths.
@@ -49,7 +217,7 @@ function enable(result, ...enabled) {
  * @param {string} [options.eventLabel] - Label changed by this event.
  * @param {string} [options.eventName] - GitHub event name.
  * @param {string[]} [options.labels] - Labels currently attached to the PR.
- * @returns {Record<string, boolean>} Complete classifier result.
+ * @returns {{domains: Record<string, boolean>, error: "diff-failed" | "malformed-input" | null, noCodePaths: string[], unknownPaths: string[]}} Classification response.
  */
 export function classifyChanges(
   files,
@@ -61,130 +229,45 @@ export function classifyChanges(
     labels = [],
   } = {},
 ) {
+  if (diffFailed) {
+    return response(everyDomain(true), { error: "diff-failed" });
+  }
+
   if (
-    diffFailed ||
     !Array.isArray(files) ||
-    files.some((file) => typeof file !== "string")
+    files.some((file) => typeof file !== "string" || file.length === 0)
   ) {
-    return everyDomain(true);
+    return response(everyDomain(true), { error: "malformed-input" });
   }
 
   const labelEvent =
     eventName === "pull_request" && ["labeled", "unlabeled"].includes(action);
-  const result = everyDomain(false);
+  const domains = everyDomain(false);
+  const noCodePaths = [];
+  const unknownPaths = [];
 
   if (!labelEvent) {
     for (const file of files) {
-      if (
-        file.startsWith("docs/") ||
-        file.startsWith(".changeset/") ||
-        file.endsWith(".md")
-      ) {
+      const rule = findRule(file);
+
+      if (!rule) {
+        unknownPaths.push(file);
         continue;
       }
 
-      if (
-        [
-          "package.json",
-          "pnpm-lock.yaml",
-          "pnpm-workspace.yaml",
-          "turbo.json",
-        ].includes(file) ||
-        file.startsWith("packages/database/") ||
-        file.startsWith("packages/services/") ||
-        file.startsWith("packages/logger/") ||
-        file.startsWith("packages/tsconfig/") ||
-        file === "scripts/classify-changes.mjs" ||
-        file === "scripts/change-classification.test.mjs" ||
-        file === ".github/workflows/ci.yml"
-      ) {
-        enable(result, ...domains);
-        continue;
-      }
-
-      if (file.startsWith("apps/api/")) {
-        enable(
-          result,
-          "api",
-          "preview",
-          "safe_e2e",
-          "mutation_e2e",
-          "validation",
-        );
-        continue;
-      }
-
-      if (file.startsWith("apps/scraper/")) {
-        enable(result, "scraper", "preview", "validation");
-        continue;
-      }
-
-      if (file.startsWith("apps/web/")) {
-        enable(result, "web", "preview", "safe_e2e", "validation");
-        if (!file.startsWith("apps/web/e2e/")) enable(result, "storybook");
-        if (
-          file.startsWith("apps/web/src/") ||
-          (file.startsWith("apps/web/e2e/") &&
-            !file.endsWith("public.spec.ts")) ||
-          file === "apps/web/package.json" ||
-          file === "apps/web/playwright.config.ts"
-        ) {
-          enable(result, "mutation_e2e");
-        }
-        continue;
-      }
-
-      if (
-        file.startsWith("packages/feature-flags/") ||
-        file.startsWith("packages/storage/")
-      ) {
-        enable(
-          result,
-          "api",
-          "scraper",
-          "web",
-          "storybook",
-          "preview",
-          "safe_e2e",
-          "mutation_e2e",
-          "validation",
-        );
-        continue;
-      }
-
-      if (file.startsWith("packages/markdown/")) {
-        enable(
-          result,
-          "scraper",
-          "web",
-          "storybook",
-          "preview",
-          "safe_e2e",
-          "validation",
-        );
-        continue;
-      }
-
-      if (
-        file.startsWith("packages/github-discord-notifier/") ||
-        file.startsWith("packages/infisical-runner/") ||
-        file.startsWith("packages/json-data/") ||
-        file.startsWith("packages/lint/")
-      ) {
-        enable(result, "validation");
-        continue;
-      }
-
-      return everyDomain(true);
+      if (rule.domains.length === 0) noCodePaths.push(file);
+      else enable(domains, ...rule.domains);
     }
   }
+
+  if (unknownPaths.length > 0) enable(domains, ...validationDomains);
 
   if (
     labels.includes("test:storybook") &&
     (!labelEvent ||
       (action === "labeled" && (eventLabel ?? labels[0]) === "test:storybook"))
   ) {
-    enable(result, "storybook");
+    enable(domains, "storybook");
   }
 
   if (
@@ -192,10 +275,10 @@ export function classifyChanges(
     (!labelEvent ||
       (action === "labeled" && (eventLabel ?? labels[0]) === "test:e2e"))
   ) {
-    enable(result, "preview", "safe_e2e", "mutation_e2e");
+    enable(domains, "preview", "safe_e2e", "mutation_e2e");
   }
 
-  return result;
+  return response(domains, { noCodePaths, unknownPaths });
 }
 
 /**
@@ -227,10 +310,10 @@ export function getChangedFiles({ baseSha, headSha, cwd = repoRoot }) {
 
 /** Writes classifier outputs for GitHub Actions, failing open on diff errors. */
 function main() {
-  let result;
+  let classification;
 
   try {
-    result = classifyChanges(
+    classification = classifyChanges(
       getChangedFiles({
         baseSha: process.env.BASE_SHA,
         headSha: process.env.HEAD_SHA,
@@ -243,12 +326,16 @@ function main() {
       },
     );
   } catch {
-    result = everyDomain(true);
+    classification = response(everyDomain(true), { error: "diff-failed" });
   }
 
-  const output = `${Object.entries(result)
-    .map(([domain, relevant]) => `${domain}=${relevant}`)
-    .join("\n")}\n`;
+  const output = `${[
+    ...Object.entries(classification.domains).map(
+      ([domain, relevant]) => `${domain}=${relevant}`,
+    ),
+    `unknown_paths=${JSON.stringify(classification.unknownPaths)}`,
+    `classification_error=${classification.error ?? ""}`,
+  ].join("\n")}\n`;
 
   if (process.env.GITHUB_OUTPUT)
     appendFileSync(process.env.GITHUB_OUTPUT, output);

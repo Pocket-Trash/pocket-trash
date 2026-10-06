@@ -5,20 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 
-import { classifyChanges } from "./classify-changes.mjs";
-
-/** Validation domains emitted by the change classifier. */
-const domains = [
-  "api",
-  "scraper",
-  "web",
-  "database",
-  "storybook",
-  "preview",
-  "safe_e2e",
-  "mutation_e2e",
-  "validation",
-];
+import { classifyChanges, validationDomains } from "./classify-changes.mjs";
 
 /** Parsed CI workflow under test. */
 const ciWorkflow = parse(
@@ -34,18 +21,40 @@ const deployWorkflow = parse(
 );
 
 /**
- * Builds a complete expected classifier result.
+ * Builds a complete expected domain result.
  *
  * @param {string[]} enabled - Domains expected to be relevant.
- * @returns {Record<string, boolean>} Complete expected result.
+ * @returns {Record<string, boolean>} Complete expected domain result.
  */
-function expected(...enabled) {
+function expectedDomains(...enabled) {
   return Object.fromEntries(
-    domains.map((domain) => [domain, enabled.includes(domain)]),
+    validationDomains.map((domain) => [domain, enabled.includes(domain)]),
   );
 }
 
-test("classifies application and package changes by affected domain", () => {
+/**
+ * Builds a complete expected classification response.
+ *
+ * @param {string[]} enabled - Domains expected to be relevant.
+ * @param {object} [details] - Expected classification metadata.
+ * @param {"diff-failed" | "malformed-input" | null} [details.error] - Failure type.
+ * @param {string[]} [details.noCodePaths] - Intentionally non-code paths.
+ * @param {string[]} [details.unknownPaths] - Unclassified paths.
+ * @returns {{domains: Record<string, boolean>, error: "diff-failed" | "malformed-input" | null, noCodePaths: string[], unknownPaths: string[]}} Expected response.
+ */
+function expected(
+  enabled,
+  { error = null, noCodePaths = [], unknownPaths = [] } = {},
+) {
+  return {
+    domains: expectedDomains(...enabled),
+    error,
+    noCodePaths,
+    unknownPaths,
+  };
+}
+
+test("classifies representative application paths", () => {
   for (const [path, enabled] of [
     [
       "apps/api/src/index.ts",
@@ -60,48 +69,119 @@ test("classifies application and package changes by affected domain", () => {
       "apps/web/e2e/collection-covers.spec.ts",
       ["web", "preview", "safe_e2e", "mutation_e2e", "validation"],
     ],
-    ["packages/database/src/schema/product.ts", domains],
+    [
+      "apps/web/e2e/public.spec.ts",
+      ["web", "preview", "safe_e2e", "validation"],
+    ],
   ]) {
-    assert.deepEqual(classifyChanges([path]), expected(...enabled), path);
+    assert.deepEqual(classifyChanges([path]), expected(enabled), path);
   }
 });
 
-test("classifies shared dependencies and root build configuration conservatively", () => {
+test("classifies package paths by affected domains", () => {
+  for (const [path, enabled] of [
+    ["packages/database/src/schema/product.ts", validationDomains],
+    ["packages/services/src/index.ts", validationDomains],
+    [
+      "packages/markdown/src/index.ts",
+      ["scraper", "web", "storybook", "preview", "safe_e2e", "validation"],
+    ],
+    ["packages/lint/index.mjs", ["validation"]],
+  ]) {
+    assert.deepEqual(classifyChanges([path]), expected(enabled), path);
+  }
+});
+
+test("classifies workflow and root build configuration conservatively", () => {
   for (const path of [
-    "packages/services/src/index.ts",
-    "packages/logger/src/index.ts",
-    "packages/tsconfig/base.json",
+    ".github/workflows/ci.yml",
+    ".github/scripts/ci-log.sh",
     "package.json",
     "pnpm-lock.yaml",
     "turbo.json",
   ]) {
-    assert.deepEqual(classifyChanges([path]), expected(...domains), path);
+    assert.deepEqual(
+      classifyChanges([path]),
+      expected(validationDomains),
+      path,
+    );
   }
 });
 
-test("skips documentation-only changes and fails open for unknown paths", () => {
+test("explicitly classifies every tracked repository path", () => {
+  const paths = execFileSync("git", ["ls-files"], {
+    encoding: "utf8",
+    cwd: fileURLToPath(new URL("..", import.meta.url)),
+  })
+    .trim()
+    .split("\n")
+    .filter(Boolean);
+
+  assert.deepEqual(classifyChanges(paths).unknownPaths, []);
+});
+
+test("returns intentional no-code paths explicitly", () => {
+  const paths = ["docs/storybook.md", ".changeset/calm-rules.md", "README.md"];
+
   assert.deepEqual(
-    classifyChanges(["docs/storybook.md", ".changeset/calm-rules.md"]),
-    expected(),
-  );
-  assert.deepEqual(
-    classifyChanges(["tools/new-config.toml"]),
-    expected(...domains),
-  );
-  assert.deepEqual(classifyChanges([null]), expected(...domains));
-  assert.deepEqual(
-    classifyChanges([], { diffFailed: true }),
-    expected(...domains),
+    classifyChanges(paths),
+    expected([], { noCodePaths: paths }),
   );
 });
 
-test("CLI fails open when the base commit is missing or malformed", () => {
+test("mixed known paths return an order-independent union", () => {
+  const paths = ["apps/api/src/index.ts", "apps/scraper/src/index.ts"];
+  const enabled = [
+    "api",
+    "scraper",
+    "preview",
+    "safe_e2e",
+    "mutation_e2e",
+    "validation",
+  ];
+
+  assert.deepEqual(classifyChanges(paths), expected(enabled));
+  assert.deepEqual(classifyChanges([...paths].reverse()), expected(enabled));
+});
+
+test("returns every unknown path and enables every domain", () => {
+  const unknownPaths = [
+    "tools/new-config.toml",
+    "new-root-file.json",
+    "new-area/README.md",
+  ];
+
+  assert.deepEqual(
+    classifyChanges(["apps/web/vite.config.ts", ...unknownPaths]),
+    expected(validationDomains, { unknownPaths }),
+  );
+});
+
+test("reports malformed input and diff failures conservatively", () => {
+  for (const files of [null, [null], [""], "apps/web/src/index.ts"]) {
+    assert.deepEqual(
+      classifyChanges(files),
+      expected(validationDomains, { error: "malformed-input" }),
+    );
+  }
+
+  assert.deepEqual(
+    classifyChanges([], { diffFailed: true }),
+    expected(validationDomains, { error: "diff-failed" }),
+  );
+});
+
+test("CLI fails open and exposes a stable error when the diff is unavailable", () => {
   const script = fileURLToPath(
     new URL("./classify-changes.mjs", import.meta.url),
   );
-  const allRelevant = `${Object.entries(expected(...domains))
-    .map(([domain, relevant]) => `${domain}=${relevant}`)
-    .join("\n")}\n`;
+  const allRelevant = `${[
+    ...Object.entries(expectedDomains(...validationDomains)).map(
+      ([domain, relevant]) => `${domain}=${relevant}`,
+    ),
+    "unknown_paths=[]",
+    "classification_error=diff-failed",
+  ].join("\n")}\n`;
 
   for (const baseSha of [undefined, "not-a-commit"]) {
     assert.equal(
@@ -120,27 +200,27 @@ test("CLI fails open when the base commit is missing or malformed", () => {
   }
 });
 
-test("applies persistent label overrides without rerunning unrelated jobs", () => {
+test("applies persistent label overrides additively", () => {
   assert.deepEqual(
     classifyChanges(["docs/storybook.md"], {
       action: "labeled",
       labels: ["test:storybook"],
     }),
-    expected("storybook"),
-  );
-  assert.deepEqual(
-    classifyChanges(["docs/storybook.md"], {
-      action: "synchronize",
-      labels: ["test:storybook"],
-    }),
-    expected("storybook"),
+    expected(["storybook"]),
   );
   assert.deepEqual(
     classifyChanges(["apps/api/src/index.ts"], {
-      action: "labeled",
-      labels: ["triage"],
+      action: "synchronize",
+      labels: ["test:storybook"],
     }),
-    expected(),
+    expected([
+      "api",
+      "storybook",
+      "preview",
+      "safe_e2e",
+      "mutation_e2e",
+      "validation",
+    ]),
   );
   assert.deepEqual(
     classifyChanges(["apps/api/src/index.ts"], {
@@ -148,7 +228,7 @@ test("applies persistent label overrides without rerunning unrelated jobs", () =
       eventLabel: "triage",
       labels: ["test:storybook", "triage"],
     }),
-    expected(),
+    expected([]),
   );
   assert.deepEqual(
     classifyChanges(["docs/e2e-testing.md"], {
@@ -156,25 +236,25 @@ test("applies persistent label overrides without rerunning unrelated jobs", () =
       eventLabel: "test:e2e",
       labels: ["test:e2e"],
     }),
-    expected("preview", "safe_e2e", "mutation_e2e"),
+    expected(["preview", "safe_e2e", "mutation_e2e"]),
   );
   assert.deepEqual(
-    classifyChanges(["docs/e2e-testing.md"], {
+    classifyChanges(["apps/scraper/src/index.ts"], {
       action: "synchronize",
       labels: ["test:e2e"],
     }),
-    expected("preview", "safe_e2e", "mutation_e2e"),
+    expected(["scraper", "preview", "safe_e2e", "mutation_e2e", "validation"]),
   );
 });
 
-test("uses the same conservative rules for pushes to main", () => {
+test("uses the same explicit rules for pushes to main", () => {
   assert.deepEqual(
     classifyChanges(["apps/scraper/src/index.ts"], { eventName: "push" }),
-    expected("scraper", "preview", "validation"),
+    expected(["scraper", "preview", "validation"]),
   );
   assert.deepEqual(
     classifyChanges(["unknown.config.js"], { eventName: "push" }),
-    expected(...domains),
+    expected(validationDomains, { unknownPaths: ["unknown.config.js"] }),
   );
 });
 
