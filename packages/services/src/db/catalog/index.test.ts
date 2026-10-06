@@ -32,7 +32,7 @@ const actor = (
  */
 function createLookup(
   service: ReturnType<typeof createCatalogService>,
-  kind: "color" | "finish" | "maker" | "material",
+  kind: "color" | "finish" | "maker" | "material" | "pattern",
 ) {
   switch (kind) {
     case "color":
@@ -56,6 +56,12 @@ function createLookup(
       });
     case "material":
       return service.createMaterial({
+        actor: actor("user-secret", "admin"),
+        name: "bronze",
+        slug: "bronze-2",
+      });
+    case "pattern":
+      return service.createPattern({
         actor: actor("user-secret", "admin"),
         name: "bronze",
         slug: "bronze-2",
@@ -460,11 +466,11 @@ describe("collection catalog writes", () => {
       [
         [{ id: 900 }],
         [{ materialId: 1201 }],
-        [{ colorEffectId: null }],
+        [{ colorEffectId: null, patternId: 1203 }],
         [{ finishId: 1202, position: 0 }],
         [],
         [{ materialId: 1101 }],
-        [{ colorEffectId: null }],
+        [{ colorEffectId: null, patternId: 1103 }],
         [{ finishId: 1102, position: 0 }],
         [],
       ],
@@ -502,6 +508,7 @@ describe("collection catalog writes", () => {
           value: {
             collectionItemId: 2000,
             colorEffectId: null,
+            patternId: 1203,
             position: 0,
             sourceProductFinishOptionId: 1202,
           },
@@ -533,7 +540,7 @@ describe("collection catalog writes", () => {
       [
         [{ id: 900 }],
         [{ materialId: 1101 }],
-        [{ colorEffectId: null }],
+        [{ colorEffectId: null, patternId: 1103 }],
         [{ finishId: 1102, position: 0 }],
         [],
       ],
@@ -578,6 +585,7 @@ describe("collection catalog writes", () => {
         value: {
           collectionItemId: 2001,
           colorEffectId: null,
+          patternId: 1103,
           position: 0,
           sourceProductFinishOptionId: 1102,
         },
@@ -587,6 +595,33 @@ describe("collection catalog writes", () => {
         value: [{ finishId: 1102, finishOptionId: 3001, position: 0 }],
       },
     ]);
+  });
+
+  it("stores a collection item without an appearance snapshot", async () => {
+    const { service, writes } = setup(
+      [[{ id: 2001 }]],
+      [[{ id: 900 }], [{ materialId: 1101 }]],
+    );
+
+    await expect(
+      service.addSpinner({
+        actor: actor("user-secret"),
+        buttonCustomFinish: null,
+        buttonFinishOptionId: null,
+        buttonMaterialId: null,
+        buttonProductId: null,
+        collectionId: 900,
+        displayName: "My spinner",
+        spinnerCustomFinish: null,
+        spinnerFinishOptionId: null,
+        spinnerMaterialId: 1101,
+        spinnerProductId: 1100,
+      }),
+    ).resolves.toEqual({ buttonItemId: null, spinnerItemId: 2001 });
+
+    expect(writes.some(({ table }) => table === schema.finishOption)).toBe(
+      false,
+    );
   });
 
   it("stores a private custom finish with ordered fade colors", async () => {
@@ -602,6 +637,7 @@ describe("collection catalog writes", () => {
           colorEffectId: 10,
           colorIds: [22, 21],
           finishIds: [31, 32],
+          patternId: 33,
         },
         finishOptionId: null,
         collectionId: 900,
@@ -618,6 +654,7 @@ describe("collection catalog writes", () => {
           value: {
             collectionItemId: 2000,
             colorEffectId: 10,
+            patternId: 33,
             position: 0,
           },
         },
@@ -1167,6 +1204,7 @@ describe("catalog lookup writes", () => {
     "finish",
     "maker",
     "material",
+    "pattern",
   ] as const)("rejects a case-insensitive duplicate %s name", async (kind) => {
     const insert = vi.fn();
     const db = {
@@ -1198,6 +1236,7 @@ describe("catalog lookup writes", () => {
     ["finish", "finish_name_case_insensitive_unique", "Finish"],
     ["maker", "makers_name_case_insensitive_unique", "Maker"],
     ["material", "materials_name_case_insensitive_unique", "Material"],
+    ["pattern", "pattern_name_case_insensitive_unique", "Pattern"],
   ] as const)("maps a concurrent duplicate %s name to the existing domain error", async (kind, constraint, label) => {
     const databaseError = new Error("Query failed", {
       cause: { code: "23505", constraint },
@@ -1244,6 +1283,24 @@ describe("catalog finish validation", () => {
             colorEffectId: 1001,
             colorIds: [1000, 1001],
             finishIds: [1000, 1001],
+            patternId: null,
+          },
+        ],
+        effects,
+      ),
+    ).not.toThrow();
+  });
+
+  it("accepts no appearance options and a pattern-only option", () => {
+    expect(() => assertValidFinishOptions([], effects)).not.toThrow();
+    expect(() =>
+      assertValidFinishOptions(
+        [
+          {
+            colorEffectId: null,
+            colorIds: [],
+            finishIds: [],
+            patternId: 1002,
           },
         ],
         effects,
@@ -1256,21 +1313,25 @@ describe("catalog finish validation", () => {
       colorEffectId: null,
       colorIds: [],
       finishIds: [],
+      patternId: null,
     },
     {
       colorEffectId: 1001,
       colorIds: [1000],
       finishIds: [1000],
+      patternId: null,
     },
     {
       colorEffectId: 1000,
       colorIds: [1000, 1001],
       finishIds: [1000],
+      patternId: null,
     },
     {
       colorEffectId: null,
       colorIds: [],
       finishIds: [1000, 1000],
+      patternId: null,
     },
   ])("rejects an invalid option", (option) => {
     expect(() => assertValidFinishOptions([option], effects)).toThrow();
@@ -1281,6 +1342,7 @@ describe("catalog finish validation", () => {
       colorEffectId: null,
       colorIds: [] as number[],
       finishIds: [1000],
+      patternId: null,
     };
     expect(() => assertValidFinishOptions([option, option], effects)).toThrow(
       /duplicate/i,

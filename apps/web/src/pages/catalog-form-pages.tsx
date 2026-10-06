@@ -48,6 +48,7 @@ import {
   createCatalogFinish,
   createCatalogMaker,
   createCatalogMaterial,
+  createCatalogPattern,
   deleteCollectionItem,
   deleteUserCollection,
   finishOptionSchema,
@@ -197,15 +198,9 @@ export function ProductEditor({
                   : null,
             colorIds: option.colors.map(({ id }) => id),
             finishIds: option.finishes.map(({ id }) => id),
+            patternId: option.pattern?.id ?? null,
           }))
-        : [
-            {
-              colorEffectId: null,
-              colorEffectSlug: null,
-              colorIds: [],
-              finishIds: [],
-            },
-          ],
+        : [],
       lengthMm: initialProduct?.lengthMm ?? null,
       makerId: initialProduct?.makerId ?? 0,
       makerProductUrl: initialProduct?.makerProductUrl ?? "",
@@ -700,10 +695,11 @@ const emptyFinishOption = (): FinishOptionFormValue => ({
   colorEffectSlug: null,
   colorIds: [],
   finishIds: [],
+  patternId: null,
 });
 
 /**
- * Renders editable finish options for a catalog product.
+ * Renders editable appearance options for catalog products and collection items.
  *
  * @param root0 - Finish option editor properties.
  * @returns The finish option fields.
@@ -768,7 +764,7 @@ export function FinishOptionsEditor({
   return (
     <fieldset className="grid gap-4 rounded-lg border border-border p-4">
       <legend className="px-1 text-sm font-medium">
-        {t("web.catalog.field.finishOptions")}
+        {t("web.slider.appearance.label")}
       </legend>
       {value.map((option, index) => {
         const effectOptions = options.colorEffects.map((effect) => ({
@@ -788,10 +784,13 @@ export function FinishOptionsEditor({
         );
         const selectedEffect =
           effectOptions.find(({ id }) => id === option.colorEffectId) ?? null;
+        const selectedPattern =
+          options.patterns.find(({ id }) => id === option.patternId) ?? null;
         const preview = finishOptionLabel({
           colorEffect: selectedEffect,
           colors: selectedColors,
           finishes: selectedFinishes,
+          pattern: selectedPattern,
         });
 
         return (
@@ -888,6 +887,34 @@ export function FinishOptionsEditor({
                 />
               </Field>
             ) : null}
+            <Field label={t("web.slider.appearance.pattern")}>
+              <CatalogCombobox
+                ariaLabel={t("web.slider.appearance.pattern")}
+                items={options.patterns}
+                onValueChange={(pattern) =>
+                  update(index, {
+                    ...option,
+                    patternId: pattern ? Number(pattern.id) : null,
+                  })
+                }
+                placeholder={t("web.slider.appearance.selectPattern")}
+                removeLabel={t("web.action.close")}
+                value={selectedPattern}
+              />
+              <LookupDialog
+                kind="pattern"
+                onCreated={(pattern) => {
+                  onOptionsChange((current) => ({
+                    ...current,
+                    patterns: [...current.patterns, pattern].sort((a, b) =>
+                      a.name.localeCompare(b.name),
+                    ),
+                  }));
+                  update(index, { ...option, patternId: pattern.id });
+                }}
+                t={t}
+              />
+            </Field>
             {preview ? (
               <p className="text-sm text-muted-foreground">
                 {t("web.catalog.finishPreview", { finish: preview })}
@@ -970,7 +997,7 @@ type LookupDialogProps = (
     }
   | {
       /** Lookup kind created by this dialog. */
-      kind: "finish" | "material";
+      kind: "finish" | "material" | "pattern";
       /**
        * Receives a newly created finish or material.
        *
@@ -1006,6 +1033,7 @@ function LookupDialog(props: LookupDialogProps) {
     finish: "web.action.addFinish",
     maker: "web.action.addMaker",
     material: "web.action.addMaterial",
+    pattern: "web.slider.appearance.pattern",
   }[kind] as TranslationKey;
 
   /**
@@ -1038,6 +1066,14 @@ function LookupDialog(props: LookupDialogProps) {
         return;
       }
       props.onCreated(result.finish);
+    } else if (props.kind === "pattern") {
+      const result = await createCatalogPattern({ data: { name } });
+      if (!result.ok) {
+        setFieldErrors(result.fieldErrors);
+        setError(result.formError);
+        return;
+      }
+      props.onCreated(result.pattern);
     } else {
       const result = await createCatalogColor({ data: { hex, name } });
       if (!result.ok) {
@@ -1878,13 +1914,11 @@ export function CollectionAddPage({
       !displayName.trim() ||
       selectedCollectionId === null ||
       !material ||
-      !finish ||
-      (finish.id === "custom" && !customFinishIsValid) ||
+      (finish?.id === "custom" && !customFinishIsValid) ||
       !productTypeIsSupported(product.productTypeSlug) ||
       (selectedButton &&
         (!buttonMaterial ||
-          !buttonFinish ||
-          (buttonFinish.id === "custom" && !buttonCustomFinishIsValid)))
+          (buttonFinish?.id === "custom" && !buttonCustomFinishIsValid)))
     ) {
       return;
     }
@@ -1947,10 +1981,11 @@ export function CollectionAddPage({
         buttonProductId: selectedButton?.id ?? null,
         collectionId: selectedCollectionId === -1 ? null : selectedCollectionId,
         confirmed,
-        customFinish: finish.id === "custom" ? customFinish : null,
+        customFinish: finish?.id === "custom" ? customFinish : null,
         displayName,
         description: currentDescription,
-        finishOptionId: finish.id === "custom" ? null : Number(finish.id),
+        finishOptionId:
+          finish?.id === "custom" ? null : finish ? Number(finish.id) : null,
         materialId: material.id,
         newCollection:
           selectedCollectionId === -1 && newCollection
@@ -2641,22 +2676,17 @@ export function CollectionEditPage({
   const buttonSelectionIsValid =
     item.productTypeSlug !== "spinner" ||
     button?.id === "default" ||
-    Boolean(
-      selectedButton && selectedButtonProduct && buttonMaterial && buttonFinish,
-    );
+    Boolean(selectedButton && selectedButtonProduct && buttonMaterial);
   const finishSelectionIsValid =
-    Boolean(finish) &&
-    (finish?.id !== "custom" ||
-      finishOptionSchema.safeParse(customFinish).success);
+    finish?.id !== "custom" ||
+    finishOptionSchema.safeParse(customFinish).success;
   const buttonFinishSelectionIsValid =
-    Boolean(buttonFinish) &&
-    (buttonFinish?.id !== "custom" ||
-      finishOptionSchema.safeParse(buttonCustomFinish).success);
+    buttonFinish?.id !== "custom" ||
+    finishOptionSchema.safeParse(buttonCustomFinish).success;
   const detailsAreValid = Boolean(
     displayName.trim() &&
       description.length <= 5000 &&
       material &&
-      finish &&
       finishSelectionIsValid &&
       buttonSelectionIsValid &&
       (!selectedButton || buttonFinishSelectionIsValid),

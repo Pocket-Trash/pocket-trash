@@ -80,6 +80,7 @@ export const productAudit = {
     "products.product",
   ),
   materialCreated: definition("products.material.created", "products.material"),
+  patternCreated: definition("products.pattern.created", "products.pattern"),
   productCreated: definition("products.product.created", "products.product"),
   productDeleted: definition("products.product.deleted", "products.product"),
   productUpdated: definition("products.product.updated", "products.product"),

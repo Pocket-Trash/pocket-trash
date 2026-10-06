@@ -41,6 +41,7 @@ const validFinishOptions = [
     colorEffectSlug: null,
     colorIds: [],
     finishIds: [1000],
+    patternId: null,
   },
 ];
 
@@ -99,11 +100,11 @@ describe("product deletion", () => {
   });
 });
 
-describe("product finish options", () => {
-  it("requires one option with at least one finish", () => {
+describe("product appearance options", () => {
+  it("accepts no options and pattern-only options but rejects an empty option", () => {
     expect(
       productFormSchema.safeParse({ ...base, finishOptions: [] }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       productFormSchema.safeParse({
         ...base,
@@ -113,6 +114,21 @@ describe("product finish options", () => {
             colorEffectSlug: null,
             colorIds: [],
             finishIds: [],
+            patternId: 1000,
+          },
+        ],
+      }).success,
+    ).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        finishOptions: [
+          {
+            colorEffectId: null,
+            colorEffectSlug: null,
+            colorIds: [],
+            finishIds: [],
+            patternId: null,
           },
         ],
       }).success,
@@ -129,6 +145,7 @@ describe("product finish options", () => {
             colorEffectSlug: "fade",
             colorIds: [],
             finishIds: [1000],
+            patternId: null,
           },
         ],
       }).success,
@@ -142,6 +159,7 @@ describe("product finish options", () => {
             colorEffectSlug: "fade",
             colorIds: [1000],
             finishIds: [1000],
+            patternId: null,
           },
         ],
       }).success,
@@ -155,6 +173,7 @@ describe("product finish options", () => {
             colorEffectSlug: "solid",
             colorIds: [1000, 1001],
             finishIds: [1000],
+            patternId: null,
           },
         ],
       }).success,
@@ -171,6 +190,7 @@ describe("product finish options", () => {
             colorEffectSlug: null,
             colorIds: [],
             finishIds: [1000, 1000],
+            patternId: null,
           },
         ],
       }).success,
@@ -184,12 +204,14 @@ describe("product finish options", () => {
             colorEffectSlug: null,
             colorIds: [],
             finishIds: [1000],
+            patternId: null,
           },
           {
             colorEffectId: null,
             colorEffectSlug: null,
             colorIds: [],
             finishIds: [1000],
+            patternId: null,
           },
         ],
       }).success,

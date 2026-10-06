@@ -24,6 +24,7 @@ const product: CatalogProduct = {
         { id: 1000, name: "Machine finished", slug: "machine-finished" },
       ],
       id: 1000,
+      pattern: null,
     },
   ],
   id: 1000,

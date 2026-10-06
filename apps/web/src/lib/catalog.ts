@@ -111,7 +111,7 @@ export function filterButtonsByDiameter<
 }
 
 /**
- * Builds a finish label from finish, color, and color-effect names.
+ * Builds an appearance label from finish, color, pattern, and color-effect names.
  *
  * @param option - Finish option to label.
  * @returns The composed finish label, possibly empty.
@@ -140,13 +140,22 @@ export function finishOptionLabel(option: {
      */
     name: string;
   }>;
+  /** Optional reusable pattern. */
+  pattern?: {
+    /** Human-readable display name. */
+    name: string;
+  } | null;
 }): string {
   const colors = option.colors.map(({ name }) => name);
   const colorLabel =
     option.colorEffect?.slug === "fade"
       ? `${colors.join(" → ")} ${option.colorEffect.name}`
       : colors.join(" + ");
-  return [option.finishes.map(({ name }) => name).join(" + "), colorLabel]
+  return [
+    option.finishes.map(({ name }) => name).join(" + "),
+    colorLabel,
+    option.pattern?.name ?? "",
+  ]
     .filter(Boolean)
     .join(" · ");
 }

@@ -83,6 +83,7 @@ const catalogNameConflictMessages: Record<string, string> = {
   finish_name_case_insensitive_unique: "Finish name already exists.",
   makers_name_case_insensitive_unique: "Maker name already exists.",
   materials_name_case_insensitive_unique: "Material name already exists.",
+  pattern_name_case_insensitive_unique: "Pattern name already exists.",
 };
 
 /**
@@ -140,7 +141,7 @@ export type CatalogColor = CatalogLookup & {
 };
 
 /**
- * Finish option with its effect, colors, and finish layers.
+ * Appearance option with its optional pattern, effect, colors, and finish layers.
  */
 export type CatalogFinishOption = {
   /**
@@ -159,6 +160,10 @@ export type CatalogFinishOption = {
    * Finish-option database identifier.
    */
   id: number;
+  /**
+   * Reusable surface pattern, or `null` for none.
+   */
+  pattern: CatalogLookup | null;
 };
 
 /**
@@ -261,6 +266,10 @@ export type ProductWriteFinishOption = {
    * Finish identifiers.
    */
   finishIds: number[];
+  /**
+   * Pattern identifier.
+   */
+  patternId?: number | null;
 };
 
 /**
@@ -686,6 +695,21 @@ export type CatalogService = {
     slug: string;
   }>;
   /**
+   * Creates pattern.
+   *
+   * @param input - Pattern name, slug, and authenticated actor.
+   * @returns Created pattern.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
+  createPattern(input: {
+    /** Authenticated actor. */
+    actor: Actor;
+    /** Display name. */
+    name: string;
+    /** URL-safe identifier. */
+    slug: string;
+  }): Promise<CatalogLookup>;
+  /**
    * Creates product.
    *
    * @param input - Product fields, finish options, and authenticated actor.
@@ -806,6 +830,13 @@ export type CatalogService = {
       slug: string;
     }>
   >;
+  /**
+   * Lists patterns.
+   *
+   * @returns Matching patterns.
+   * @rejects When the database query or operation logging fails.
+   */
+  listPatterns(): Promise<CatalogLookup[]>;
   /**
    * Lists products.
    *
@@ -2081,6 +2112,60 @@ export function createCatalogService(
       );
     },
     /**
+     * Creates pattern.
+     *
+     * @param input - Pattern name, slug, and authenticated actor.
+     * @returns Created pattern.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
+    async createPattern(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await logger.operation(
+        loggerMessages.database.catalog.createPattern,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [duplicate] = await tx
+              .select({ id: schema.pattern.id })
+              .from(schema.pattern)
+              .where(
+                eq(
+                  sql`lower(${schema.pattern.name})`,
+                  input.name.toLowerCase(),
+                ),
+              )
+              .limit(1);
+            if (duplicate) throw new Error("Pattern name already exists.");
+
+            const [row] = await tx
+              .insert(schema.pattern)
+              .values({ name: input.name, slug: input.slug })
+              .returning({
+                id: schema.pattern.id,
+                name: schema.pattern.name,
+                slug: schema.pattern.slug,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create pattern.");
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: row,
+                definition: productAudit.patternCreated,
+                targetId: row.id,
+              });
+            }
+            return row;
+          }),
+        actorAttributes(input.actor.clerkId, { slug: input.slug }),
+      );
+    },
+    /**
      * Creates product.
      *
      * @param input - Product fields, finish options, and authenticated actor.
@@ -2101,6 +2186,8 @@ export function createCatalogService(
             .where(eq(schema.productType.slug, input.productTypeSlug))
             .limit(1);
           if (!type) throw new Error("Product type does not exist.");
+          if (!input.materialIds.length)
+            throw new Error("At least one material is required.");
           await validateFinishOptions(db, input.finishOptions);
 
           const productId = await db.transaction(async (tx) => {
@@ -2518,6 +2605,26 @@ export function createCatalogService(
         .orderBy(asc(schema.material.name));
     },
     /**
+     * Lists patterns.
+     *
+     * @returns Matching patterns.
+     * @rejects When the database query or operation logging fails.
+     */
+    async listPatterns() {
+      return await logger.operation(
+        loggerMessages.database.catalog.listPatterns,
+        async () =>
+          await db
+            .select({
+              id: schema.pattern.id,
+              name: schema.pattern.name,
+              slug: schema.pattern.slug,
+            })
+            .from(schema.pattern)
+            .orderBy(asc(schema.pattern.name)),
+      );
+    },
+    /**
      * Lists products.
      *
      * @param productTypeSlug - Product type slug.
@@ -2849,6 +2956,8 @@ export function createCatalogService(
       return await logger.operation(
         loggerMessages.database.catalog.updateProduct,
         async () => {
+          if (!input.materialIds.length)
+            throw new Error("At least one material is required.");
           await validateFinishOptions(db, input.finishOptions);
           await db.transaction(async (tx) => {
             const [existing] = await tx
@@ -3174,10 +3283,10 @@ export function createCollectionsService(
             if (input.buttonProductId !== null) {
               if (
                 input.buttonMaterialId === null ||
-                (input.buttonFinishOptionId === null) ===
-                  (input.buttonCustomFinish === null)
+                (input.buttonFinishOptionId !== null &&
+                  input.buttonCustomFinish !== null)
               ) {
-                throw new Error("Button material and finish are required.");
+                throw new Error("Button material is required.");
               }
               await assertProductMaterial(
                 tx,
@@ -4680,6 +4789,7 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
       colorIds: option.colors.map(({ id }) => id),
       finishIds: option.finishes.map(({ id }) => id),
       id: option.id,
+      patternId: option.pattern?.id ?? null,
     })),
     id: product.id,
     imageIds: product.images.map(({ id }) => id),
@@ -5094,25 +5204,17 @@ async function updateCollectionItemSnapshot(
     .set({ materialId: input.materialId })
     .where(eq(schema.collectionItem.id, input.collectionItemId));
 
+  await tx
+    .delete(schema.finishOption)
+    .where(eq(schema.finishOption.collectionItemId, input.collectionItemId));
   if (input.customFinish !== null || input.finishOptionId !== null) {
-    await tx
-      .delete(schema.finishOption)
-      .where(eq(schema.finishOption.collectionItemId, input.collectionItemId));
     await createCollectionFinishOption(tx, {
       collectionItemId: input.collectionItemId,
       customFinish: input.customFinish,
       productFinishOptionId: input.finishOptionId,
       productId: input.productId,
     });
-    return;
   }
-
-  const [finish] = await tx
-    .select({ id: schema.finishOption.id })
-    .from(schema.finishOption)
-    .where(eq(schema.finishOption.collectionItemId, input.collectionItemId))
-    .limit(1);
-  if (!finish) throw new Error("A finish is required.");
 }
 
 /**
@@ -5371,12 +5473,19 @@ async function loadFinishOptions(
       colorEffectName: schema.colorEffect.name,
       colorEffectSlug: schema.colorEffect.slug,
       id: schema.finishOption.id,
+      patternId: schema.pattern.id,
+      patternName: schema.pattern.name,
+      patternSlug: schema.pattern.slug,
       productId: schema.finishOption.productId,
     })
     .from(schema.finishOption)
     .leftJoin(
       schema.colorEffect,
       eq(schema.finishOption.colorEffectId, schema.colorEffect.id),
+    )
+    .leftJoin(
+      schema.pattern,
+      eq(schema.finishOption.patternId, schema.pattern.id),
     )
     .where(
       inArray(
@@ -5428,6 +5537,12 @@ async function loadFinishOptionComponents(
      * Database identifier.
      */
     id: number;
+    /** Pattern identifier. */
+    patternId: number | null;
+    /** Pattern name. */
+    patternName: string | null;
+    /** Pattern slug. */
+    patternSlug: string | null;
   }>,
 ): Promise<Map<number, CatalogFinishOption>> {
   if (!options.length) return new Map();
@@ -5482,6 +5597,14 @@ async function loadFinishOptionComponents(
         .filter(({ finishOptionId }) => finishOptionId === option.id)
         .map(({ id, name, slug }) => ({ id, name, slug })),
       id: option.id,
+      pattern:
+        option.patternId && option.patternName && option.patternSlug
+          ? {
+              id: option.patternId,
+              name: option.patternName,
+              slug: option.patternSlug,
+            }
+          : null,
     });
   }
   return result;
@@ -5592,6 +5715,9 @@ async function queryOwnedItems(
       productId: schema.product.id,
       productSlug: schema.product.slug,
       productTypeName: schema.productType.name,
+      patternId: schema.pattern.id,
+      patternName: schema.pattern.name,
+      patternSlug: schema.pattern.slug,
       sourceProductFinishOptionId:
         schema.finishOption.sourceProductFinishOptionId,
       spinnerId: schema.collectionSpinner.id,
@@ -5615,6 +5741,10 @@ async function queryOwnedItems(
     .leftJoin(
       schema.colorEffect,
       eq(schema.finishOption.colorEffectId, schema.colorEffect.id),
+    )
+    .leftJoin(
+      schema.pattern,
+      eq(schema.finishOption.patternId, schema.pattern.id),
     )
     .leftJoin(
       schema.collectionSpinner,
@@ -5659,6 +5789,9 @@ async function queryOwnedItems(
               colorEffectName: row.colorEffectName,
               colorEffectSlug: row.colorEffectSlug,
               id: row.finishOptionId,
+              patternId: row.patternId,
+              patternName: row.patternName,
+              patternSlug: row.patternSlug,
             },
           ]
         : [],
@@ -6266,7 +6399,10 @@ async function copyProductFinishOption(
   collectionItemId: number,
 ) {
   const [source] = await tx
-    .select({ colorEffectId: schema.finishOption.colorEffectId })
+    .select({
+      colorEffectId: schema.finishOption.colorEffectId,
+      patternId: schema.finishOption.patternId,
+    })
     .from(schema.finishOption)
     .where(
       and(
@@ -6294,26 +6430,27 @@ async function copyProductFinishOption(
     .from(schema.finishOptionColor)
     .where(eq(schema.finishOptionColor.finishOptionId, sourceFinishOptionId))
     .orderBy(asc(schema.finishOptionColor.position));
-  if (!finishes.length) throw new Error("Finish option has no finishes.");
-
   const [snapshot] = await tx
     .insert(schema.finishOption)
     .values({
       collectionItemId,
       colorEffectId: source.colorEffectId,
+      patternId: source.patternId,
       position: 0,
       sourceProductFinishOptionId: sourceFinishOptionId,
     })
     .returning({ id: schema.finishOption.id });
   if (!snapshot) throw new Error("Failed to create finish snapshot.");
 
-  await tx.insert(schema.finishOptionFinish).values(
-    finishes.map(({ finishId, position }) => ({
-      finishId,
-      finishOptionId: snapshot.id,
-      position,
-    })),
-  );
+  if (finishes.length) {
+    await tx.insert(schema.finishOptionFinish).values(
+      finishes.map(({ finishId, position }) => ({
+        finishId,
+        finishOptionId: snapshot.id,
+        position,
+      })),
+    );
+  }
   if (colors.length) {
     await tx.insert(schema.finishOptionColor).values(
       colors.map(({ colorId, position }) => ({
@@ -6353,12 +6490,11 @@ async function createCollectionFinishOption(
     productId: number;
   },
 ) {
-  if (
-    (input.productFinishOptionId === null) ===
-    (input.customFinish === null)
-  ) {
-    throw new Error("Select one finish option.");
+  if (input.productFinishOptionId !== null && input.customFinish !== null) {
+    throw new Error("Select at most one appearance option.");
   }
+  if (input.productFinishOptionId === null && input.customFinish === null)
+    return;
   if (input.productFinishOptionId !== null) {
     await copyProductFinishOption(
       tx,
@@ -6370,25 +6506,28 @@ async function createCollectionFinishOption(
   }
 
   const customFinish = input.customFinish;
-  if (!customFinish) throw new Error("A finish is required.");
+  if (!customFinish) return;
   await validateFinishOptions(tx, [customFinish]);
   const [option] = await tx
     .insert(schema.finishOption)
     .values({
       collectionItemId: input.collectionItemId,
       colorEffectId: customFinish.colorEffectId,
+      patternId: customFinish.patternId ?? null,
       position: 0,
     })
     .returning({ id: schema.finishOption.id });
   if (!option) throw new Error("Failed to create finish snapshot.");
 
-  await tx.insert(schema.finishOptionFinish).values(
-    customFinish.finishIds.map((finishId, position) => ({
-      finishId,
-      finishOptionId: option.id,
-      position,
-    })),
-  );
+  if (customFinish.finishIds.length) {
+    await tx.insert(schema.finishOptionFinish).values(
+      customFinish.finishIds.map((finishId, position) => ({
+        finishId,
+        finishOptionId: option.id,
+        position,
+      })),
+    );
+  }
   if (customFinish.colorIds.length) {
     await tx.insert(schema.finishOptionColor).values(
       customFinish.colorIds.map((colorId, position) => ({
@@ -6422,19 +6561,22 @@ async function replaceProductFinishOptions(
       .insert(schema.finishOption)
       .values({
         colorEffectId: option.colorEffectId,
+        patternId: option.patternId ?? null,
         position,
         productId,
       })
       .returning({ id: schema.finishOption.id });
     if (!row) throw new Error("Failed to create finish option.");
 
-    await tx.insert(schema.finishOptionFinish).values(
-      option.finishIds.map((finishId, componentPosition) => ({
-        finishId,
-        finishOptionId: row.id,
-        position: componentPosition,
-      })),
-    );
+    if (option.finishIds.length) {
+      await tx.insert(schema.finishOptionFinish).values(
+        option.finishIds.map((finishId, componentPosition) => ({
+          finishId,
+          finishOptionId: row.id,
+          position: componentPosition,
+        })),
+      );
+    }
     if (option.colorIds.length) {
       await tx.insert(schema.finishOptionColor).values(
         option.colorIds.map((colorId, componentPosition) => ({
@@ -6458,9 +6600,6 @@ async function validateFinishOptions(
   db: Pick<Database, "select">,
   options: ProductWriteFinishOption[],
 ) {
-  if (!options.length)
-    throw new Error("At least one finish option is required.");
-
   const effectIds = [
     ...new Set(
       options.flatMap(({ colorEffectId }) =>
@@ -6488,14 +6627,17 @@ export function assertValidFinishOptions(
   options: ProductWriteFinishOption[],
   effects: Array<Pick<CatalogLookup, "id" | "slug">>,
 ) {
-  if (!options.length)
-    throw new Error("At least one finish option is required.");
-
   const effectsById = new Map(effects.map((effect) => [effect.id, effect]));
   const signatures = new Set<string>();
 
   for (const option of options) {
-    if (!option.finishIds.length) throw new Error("A finish is required.");
+    if (
+      !option.finishIds.length &&
+      !option.colorIds.length &&
+      option.patternId == null
+    ) {
+      throw new Error("An appearance option requires a visible component.");
+    }
     if (new Set(option.finishIds).size !== option.finishIds.length) {
       throw new Error("Duplicate finishes are not allowed.");
     }
@@ -6522,7 +6664,7 @@ export function assertValidFinishOptions(
       throw new Error("A solid finish requires exactly one color.");
     }
 
-    const signature = `${option.finishIds.join(",")}|${option.colorEffectId ?? ""}|${option.colorIds.join(",")}`;
+    const signature = `${option.finishIds.join(",")}|${option.colorEffectId ?? ""}|${option.colorIds.join(",")}|${option.patternId ?? ""}`;
     if (signatures.has(signature)) {
       throw new Error("Duplicate finish options are not allowed.");
     }
