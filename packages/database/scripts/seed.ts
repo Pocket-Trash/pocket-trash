@@ -69,6 +69,8 @@ export const seedProductTypes = [
   { name: "Spinner", slug: "spinner" },
   { name: "Spinner Button", slug: "spinner-button" },
   { name: "Slider", slug: "slider" },
+  { name: "Slider Plate", slug: "slider-plate" },
+  { name: "Slider Insert", slug: "slider-insert" },
   { name: "Fountain Pen", slug: "fountain-pen" },
 ] as const;
 
