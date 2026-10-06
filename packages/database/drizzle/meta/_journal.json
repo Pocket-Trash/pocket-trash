@@ -414,6 +414,13 @@
       "when": 1791277333852,
       "tag": "0058_thin_white_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1791278097552,
+      "tag": "0059_tough_miracleman",
+      "breakpoints": true
     }
   ]
 }

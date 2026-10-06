@@ -1493,16 +1493,6 @@ export const collectionSpinner = pgTable(
   ],
 );
 
-/** Catalog slider mapping selected for a standalone collection item. */
-export const collectionSlider = pgTable("collection_slider", {
-  id: bigint("id", { mode: "number" })
-    .primaryKey()
-    .references(() => collectionItem.id, { onDelete: "cascade" }),
-  productSliderId: bigint("product_slider_id", { mode: "number" })
-    .notNull()
-    .references(() => productSlider.id, { onDelete: "restrict" }),
-});
-
 /** Catalog slider plate-set mapping selected for a standalone collection item. */
 export const collectionSliderPlate = pgTable("collection_slider_plate", {
   id: bigint("id", { mode: "number" })
@@ -1522,6 +1512,35 @@ export const collectionSliderInsert = pgTable("collection_slider_insert", {
     .notNull()
     .references(() => productSliderInsert.id, { onDelete: "restrict" }),
 });
+
+/** Catalog slider mapping and installed component relationships for collection items. */
+export const collectionSlider = pgTable(
+  "collection_slider",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .references(() => collectionItem.id, { onDelete: "cascade" }),
+    productSliderId: bigint("product_slider_id", { mode: "number" })
+      .notNull()
+      .references(() => productSlider.id, { onDelete: "restrict" }),
+    /** Owned plate set currently installed on this slider. */
+    installedPlateId: bigint("installed_plate_id", {
+      mode: "number",
+    }).references(() => collectionSliderPlate.id, { onDelete: "set null" }),
+    /** Owned insert set currently installed on this slider. */
+    installedInsertId: bigint("installed_insert_id", {
+      mode: "number",
+    }).references(() => collectionSliderInsert.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    uniqueIndex("collection_slider_installed_plate_unique")
+      .on(table.installedPlateId)
+      .where(sql`${table.installedPlateId} is not null`),
+    uniqueIndex("collection_slider_installed_insert_unique")
+      .on(table.installedInsertId)
+      .where(sql`${table.installedInsertId} is not null`),
+  ],
+);
 
 /** Stored collection item row. */
 export type CollectionItem = typeof collectionItem.$inferSelect;
