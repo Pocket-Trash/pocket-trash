@@ -553,6 +553,58 @@ export function ProductDetailPage({
               />
             </Detail>
           ) : null}
+          {product.insertClickOptions.length ? (
+            <Detail label={t("web.slider.setup.clickCount")}>
+              {product.insertClickOptions
+                .map(({ clickCount }) =>
+                  t("web.slider.setup.clicks", { count: clickCount }),
+                )
+                .join(", ")}
+            </Detail>
+          ) : null}
+          {product.insertMagnetOffers.length ? (
+            <Detail label={t("web.slider.setup.availableOffers")}>
+              <ul className="grid gap-3">
+                {product.insertMagnetOffers.map((offer) => (
+                  <li
+                    className="grid gap-2 rounded-md border border-border p-3"
+                    key={offer.id}
+                  >
+                    <span className="font-medium">
+                      {offer.configuration.label}
+                      {offer.isAdvertisedDefault
+                        ? ` · ${t("web.slider.setup.advertisedDefault")}`
+                        : ""}
+                    </span>
+                    <BodyHostedMagnetSetupDetails
+                      setup={{
+                        clickCount: offer.clickCount,
+                        configuration: offer.configuration,
+                        sourceNote: null,
+                      }}
+                      t={t}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </Detail>
+          ) : null}
+          {product.advertisedInsertOffers.length ? (
+            <Detail label={t("web.slider.setup.availableOffers")}>
+              <ul className="grid gap-3">
+                {product.advertisedInsertOffers.map((offer) => (
+                  <li key={offer.id}>
+                    <span className="font-medium">
+                      {offer.insertProductName}: {offer.configuration.label}
+                    </span>
+                    {offer.isSliderAdvertisedDefault
+                      ? ` · ${t("web.slider.setup.default")}`
+                      : ""}
+                  </li>
+                ))}
+              </ul>
+            </Detail>
+          ) : null}
           {product.productTypeSlug === "slider-plate" ||
           product.productTypeSlug === "slider-insert" ? (
             <Detail label={t("web.slider.measurement.basis")}>

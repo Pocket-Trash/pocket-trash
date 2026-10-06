@@ -212,8 +212,11 @@ describe("finish option editor", () => {
   it("renders the owned material and product finish choices", () => {
     const product: CatalogProduct = {
       approvalStatus: "approved",
+      advertisedInsertOffers: [],
       bearing: null,
       bodyHostedMagnetSetup: null,
+      insertClickOptions: [],
+      insertMagnetOffers: [],
       buttonDiameterMm: null,
       canAdminister: false,
       canEdit: true,
@@ -521,6 +524,9 @@ describe("product form conditional fields", () => {
       );
       expect(html).not.toContain('aria-label="Magnet host"');
       expect(html).not.toContain("Included components");
+      if (productTypeSlug === "slider-insert") {
+        expect(html).toContain("Available insert setups");
+      }
     }
   });
 });
@@ -679,11 +685,14 @@ function productFixture(
 ): CatalogProduct {
   return {
     approvalStatus: "approved",
+    advertisedInsertOffers: [],
     bearing: null,
     bodyHostedMagnetSetup:
       productTypeSlug === "slider"
         ? { clickCount: null, configuration: null, sourceNote: null }
         : null,
+    insertClickOptions: [],
+    insertMagnetOffers: [],
     buttonDiameterMm: null,
     canAdminister: false,
     canEdit: true,

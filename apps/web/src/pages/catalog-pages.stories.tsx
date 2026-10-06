@@ -38,8 +38,11 @@ const collectionImage = image(
 /** Catalog product shared by the stories. */
 const product: CatalogProduct = {
   approvalStatus: "approved",
+  advertisedInsertOffers: [],
   bearing: "R188 hybrid ceramic",
   bodyHostedMagnetSetup: null,
+  insertClickOptions: [],
+  insertMagnetOffers: [],
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: false,
