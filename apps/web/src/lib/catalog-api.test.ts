@@ -362,6 +362,64 @@ describe("slider catalog product validation", () => {
       { relatedProductId: 2001, text: "May require thin tape." },
     ]);
   });
+
+  it("accepts complete exact body-hosted layouts and rejects incomplete slots", () => {
+    const bodyHostedMagnetSetup = {
+      clickCount: 4,
+      configuration: {
+        groups: [
+          {
+            diameterMm: "6.35",
+            grade: "N52",
+            key: "corners",
+            label: "Corners",
+            thicknessMm: "3.175",
+          },
+        ],
+        label: "Medium",
+        slots: [
+          {
+            documentedColumn: 1,
+            documentedRow: 1,
+            groupKey: "corners",
+            half: "half-a" as const,
+            key: "A1",
+            state: "occupied" as const,
+          },
+        ],
+        sourceLabel: null,
+        sourceNotes: null,
+      },
+      sourceNote: null,
+    };
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        bodyHostedMagnetSetup,
+        magnetSystem: "body-hosted",
+        productTypeSlug: "slider",
+      }).success,
+    ).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        bodyHostedMagnetSetup: {
+          ...bodyHostedMagnetSetup,
+          configuration: {
+            ...bodyHostedMagnetSetup.configuration,
+            slots: [
+              {
+                ...bodyHostedMagnetSetup.configuration.slots[0],
+                groupKey: null,
+              },
+            ],
+          },
+        },
+        magnetSystem: "body-hosted",
+        productTypeSlug: "slider",
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("product approval", () => {

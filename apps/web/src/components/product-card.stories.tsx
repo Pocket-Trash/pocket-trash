@@ -8,6 +8,7 @@ import { ProductCard } from "./product-card";
 const product: CatalogProduct = {
   approvalStatus: "approved",
   bearing: null,
+  bodyHostedMagnetSetup: null,
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: true,

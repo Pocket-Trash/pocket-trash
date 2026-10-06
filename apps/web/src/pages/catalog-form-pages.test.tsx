@@ -213,6 +213,7 @@ describe("finish option editor", () => {
     const product: CatalogProduct = {
       approvalStatus: "approved",
       bearing: null,
+      bodyHostedMagnetSetup: null,
       buttonDiameterMm: null,
       canAdminister: false,
       canEdit: true,
@@ -511,6 +512,8 @@ describe("product form conditional fields", () => {
     if (productTypeSlug === "slider") {
       expect(html).toContain('aria-label="Magnet host"');
       expect(html).toContain('aria-label="Weight basis"');
+      expect(html).toContain('aria-label="Click count"');
+      expect(html).toContain("Magnet configuration");
       expect(html).toContain("Included components");
     } else {
       expect(html).toContain(
@@ -677,6 +680,10 @@ function productFixture(
   return {
     approvalStatus: "approved",
     bearing: null,
+    bodyHostedMagnetSetup:
+      productTypeSlug === "slider"
+        ? { clickCount: null, configuration: null, sourceNote: null }
+        : null,
     buttonDiameterMm: null,
     canAdminister: false,
     canEdit: true,
