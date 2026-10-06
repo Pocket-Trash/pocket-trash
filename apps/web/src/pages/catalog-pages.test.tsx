@@ -619,10 +619,10 @@ describe("ProductDetailPage", () => {
       />,
     );
 
-    expect(html).toContain("web.slider.setup.clicks");
+    expect(html).toContain("4 clicks");
     expect(html).toContain("Medium — 4-click layout");
     expect(html).toContain("6.35×3.175 mm, N52");
-    expect(html).toContain("web.slider.magnet.halfA A1");
+    expect(html).toContain("Half A A1");
     expect(html).not.toContain("Install");
     expect(html).not.toContain("Custom setup");
   });
