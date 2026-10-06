@@ -98,6 +98,8 @@ const copy = {
   productTypeAll: "All product types",
   selectMaker: "Select makers",
   selectProductType: "Select product type",
+  searchLabel: "Search catalog and collections",
+  searchPlaceholder: "Search products, makers, types, aliases, or owners",
 } satisfies CatalogFilterCopy;
 
 /**

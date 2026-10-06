@@ -12,6 +12,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -127,6 +128,10 @@ export type CatalogFilterCopy = {
    * Placeholder for the product-type combobox.
    */
   selectProductType: string;
+  /** Accessible label for shared catalog search. */
+  searchLabel: string;
+  /** Placeholder for shared catalog search. */
+  searchPlaceholder: string;
 };
 
 /**
@@ -250,6 +255,18 @@ export function CatalogFilterBar({
       ref={desktopRootRef}
     >
       <div className="flex min-w-0 flex-wrap items-end gap-1.5">
+        <div className="grid min-w-52 flex-1 gap-1 text-xs font-semibold text-foreground">
+          <label htmlFor={advancedId + "-search"}>{copy.searchLabel}</label>
+          <Input
+            id={advancedId + "-search"}
+            onChange={(event) =>
+              onChange({ ...filters, query: event.target.value })
+            }
+            placeholder={copy.searchPlaceholder}
+            type="search"
+            value={filters.query}
+          />
+        </div>
         <div className="grid min-w-40 gap-1 text-xs font-semibold text-foreground">
           <span>{copy.productType}</span>
           <CatalogCombobox
@@ -258,10 +275,11 @@ export function CatalogFilterBar({
             onValueChange={(value) =>
               onChange({
                 ...filters,
-                productType:
-                  value?.id === "spinner" || value?.id === "spinner-button"
-                    ? value.id
-                    : null,
+                productType: facets.productTypes.some(
+                  ({ slug }) => slug === value?.id,
+                )
+                  ? (value?.id as CatalogFilters["productType"])
+                  : null,
               })
             }
             placeholder={copy.selectProductType}

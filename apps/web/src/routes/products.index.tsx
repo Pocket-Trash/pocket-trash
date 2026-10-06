@@ -1,5 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { listCatalogProducts } from "@/lib/catalog-api";
+import {
+  listCatalogProducts,
+  listCatalogTerminologyAliases,
+} from "@/lib/catalog-api";
 import { parseCatalogFilterSearch } from "@/lib/catalog-filters";
 import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { ProductsPage } from "@/pages/catalog-pages";
@@ -15,7 +18,13 @@ export const Route = createFileRoute("/products/")({
    * @returns Catalog products available to the directory.
    * @rejects When catalog products cannot be loaded.
    */
-  loader: () => listCatalogProducts(),
+  loader: async () => {
+    const [products, aliases] = await Promise.all([
+      listCatalogProducts(),
+      listCatalogTerminologyAliases(),
+    ]);
+    return { aliases, products };
+  },
   component: ProductsRoute,
 });
 
@@ -34,7 +43,8 @@ function ProductsRoute() {
     <ProductsPage
       filters={filters}
       onFiltersChange={setFilters}
-      products={Route.useLoaderData()}
+      aliases={Route.useLoaderData().aliases}
+      products={Route.useLoaderData().products}
     />
   );
 }
