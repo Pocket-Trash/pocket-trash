@@ -702,6 +702,41 @@ describe("ProductDetailPage", () => {
 });
 
 describe("CollectionItemDetailPage", () => {
+  it("shows live body-hosted slider facts as read-only details", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const slider = {
+      ...product,
+      bodyHostedMagnetSetup: {
+        clickCount: 3,
+        configuration: null,
+        sourceNote: "Documented by the maker.",
+      },
+      magnetSystem: "body-hosted" as const,
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+      thicknessMm: "12",
+      widthMm: "40",
+    };
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        item={{
+          ...item,
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+        product={slider}
+      />,
+    );
+
+    expect(html).toContain("web.slider.capability.bodyHosted");
+    expect(html).toContain("web.slider.setup.title");
+    expect(html).toContain("Documented by the maker.");
+    expect(html).toContain("40 mm");
+    expect(html).toContain("12 mm");
+    expect(html).not.toContain("Build from scratch");
+  });
+
   it("shows approval actions only to administrators while owners retain review status and editing", () => {
     const item = owners[0]?.items[0];
     if (!item) throw new Error("Collection item fixture is required.");

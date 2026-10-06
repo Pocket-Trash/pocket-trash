@@ -1638,19 +1638,23 @@ function approvalStatusLabel(
 /**
  * Renders one collection item with its effective product details.
  *
- * @param props - Collection item data and its installed button, when present.
+ * @param props - Collection item data, live catalog product, and installed button, when present.
  * @param props.installedButton - Installed spinner button, when present.
  * @param props.item - Collection item to display.
+ * @param props.product - Live catalog facts for the exact owned product.
  * @returns The collection item detail page.
  */
 export function CollectionItemDetailPage({
   installedButton = null,
   item,
+  product = null,
 }: {
   /** Installed spinner button, when present. */
   installedButton?: UserCollectionItem | null;
   /** Collection item to display. */
   item: UserCollectionItem;
+  /** Live catalog facts for the exact owned product. */
+  product?: CatalogProduct | null;
 }) {
   const t = useCatalogCopy();
   const ownImages = item.images.filter(({ deletedAt }) => !deletedAt);
@@ -1782,6 +1786,33 @@ export function CollectionItemDetailPage({
           {item.productTypeSlug === "spinner" && item.bearing ? (
             <Detail label={t("web.catalog.field.bearing")}>
               {item.bearing}
+            </Detail>
+          ) : null}
+          {product?.productTypeSlug === "slider" && product.magnetSystem ? (
+            <Detail label={t("web.slider.capability.label")}>
+              {t(
+                product.magnetSystem === "body-hosted"
+                  ? "web.slider.capability.bodyHosted"
+                  : "web.slider.capability.insertDriven",
+              )}
+            </Detail>
+          ) : null}
+          {product?.bodyHostedMagnetSetup ? (
+            <Detail label={t("web.slider.setup.title")}>
+              <BodyHostedMagnetSetupDetails
+                setup={product.bodyHostedMagnetSetup}
+                t={t}
+              />
+            </Detail>
+          ) : null}
+          {product?.widthMm ? (
+            <Detail label={t("web.catalog.field.width")}>
+              {product.widthMm} mm
+            </Detail>
+          ) : null}
+          {product?.thicknessMm ? (
+            <Detail label={t("web.catalog.field.thickness")}>
+              {product.thicknessMm} mm
             </Detail>
           ) : null}
         </dl>

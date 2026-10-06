@@ -93,6 +93,20 @@ const products: CatalogProduct[] = [
     productTypeName: "Spinner button",
     productTypeSlug: "spinner-button",
   },
+  {
+    ...product,
+    bodyHostedMagnetSetup: {
+      clickCount: 3,
+      configuration: null,
+      sourceNote: "Documented maker setup",
+    },
+    id: 3000,
+    magnetSystem: "body-hosted",
+    name: "Standalone slider",
+    productTypeId: 3,
+    productTypeName: "Slider",
+    productTypeSlug: "slider",
+  },
 ];
 
 /** Collection form fixtures and the standard app providers. */
@@ -114,6 +128,7 @@ const meta = {
       productTypes: [
         { id: 1, name: "Spinner", slug: "spinner" },
         { id: 2, name: "Spinner button", slug: "spinner-button" },
+        { id: 3, name: "Slider", slug: "slider" },
       ],
     },
     products,
@@ -214,6 +229,11 @@ export const Preselected: Story = {
     await userEvent.click(chooser);
     await expect(search).not.toBeVisible();
   },
+};
+
+/** Standalone slider creation without spinner-only controls. */
+export const StandaloneSlider: Story = {
+  args: { initialProductId: 3000 },
 };
 
 /** Direct visits retain the open product-type chooser. */

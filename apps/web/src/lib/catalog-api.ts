@@ -57,8 +57,8 @@ const productTypeSchema = z.enum([
   "spinner",
   "spinner-button",
 ]);
-/** Product types supported by the collection editor before slider ownership lands. */
-const collectionProductTypeSchema = z.enum(["spinner", "spinner-button"]);
+/** Product types supported by the standalone collection-item editor. */
+const collectionProductTypeSchema = productTypeSchema;
 /**
  * Schema for positive integer identifiers.
  */
@@ -1356,43 +1356,60 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
         };
       }
 
-      const collectionItemId =
-        parsed.data.productTypeSlug === "spinner"
-          ? (
-              await s.db.collections.addSpinner({
-                actor,
-                bearing: parsed.data.bearing,
-                buttonCustomFinish: parsed.data.buttonCustomFinish
-                  ? toFinishWriteOption(parsed.data.buttonCustomFinish)
-                  : null,
-                buttonFinishOptionId: parsed.data.buttonFinishOptionId,
-                buttonMaterialId: parsed.data.buttonMaterialId,
-                buttonProductId: parsed.data.buttonProductId,
-                spinnerFinishOptionId: parsed.data.finishOptionId,
-                spinnerCustomFinish: parsed.data.customFinish
-                  ? toFinishWriteOption(parsed.data.customFinish)
-                  : null,
-                spinnerMaterialId: parsed.data.materialId,
-                spinnerProductId: parsed.data.productId,
-                collectionId: parsed.data.collectionId,
-                displayName: parsed.data.displayName,
-                description: parsed.data.description,
-                newCollection: parsed.data.newCollection,
-              })
-            ).spinnerItemId
-          : await s.db.collections.addSpinnerButton({
-              actor,
-              customFinish: parsed.data.customFinish
-                ? toFinishWriteOption(parsed.data.customFinish)
-                : null,
-              finishOptionId: parsed.data.finishOptionId,
-              materialId: parsed.data.materialId,
-              collectionId: parsed.data.collectionId,
-              displayName: parsed.data.displayName,
-              description: parsed.data.description,
-              newCollection: parsed.data.newCollection,
-              productId: parsed.data.productId,
-            });
+      let collectionItemId: number;
+      if (parsed.data.productTypeSlug === "spinner") {
+        collectionItemId = (
+          await s.db.collections.addSpinner({
+            actor,
+            bearing: parsed.data.bearing,
+            buttonCustomFinish: parsed.data.buttonCustomFinish
+              ? toFinishWriteOption(parsed.data.buttonCustomFinish)
+              : null,
+            buttonFinishOptionId: parsed.data.buttonFinishOptionId,
+            buttonMaterialId: parsed.data.buttonMaterialId,
+            buttonProductId: parsed.data.buttonProductId,
+            spinnerFinishOptionId: parsed.data.finishOptionId,
+            spinnerCustomFinish: parsed.data.customFinish
+              ? toFinishWriteOption(parsed.data.customFinish)
+              : null,
+            spinnerMaterialId: parsed.data.materialId,
+            spinnerProductId: parsed.data.productId,
+            collectionId: parsed.data.collectionId,
+            displayName: parsed.data.displayName,
+            description: parsed.data.description,
+            newCollection: parsed.data.newCollection,
+          })
+        ).spinnerItemId;
+      } else if (parsed.data.productTypeSlug === "spinner-button") {
+        collectionItemId = await s.db.collections.addSpinnerButton({
+          actor,
+          customFinish: parsed.data.customFinish
+            ? toFinishWriteOption(parsed.data.customFinish)
+            : null,
+          finishOptionId: parsed.data.finishOptionId,
+          materialId: parsed.data.materialId,
+          collectionId: parsed.data.collectionId,
+          displayName: parsed.data.displayName,
+          description: parsed.data.description,
+          newCollection: parsed.data.newCollection,
+          productId: parsed.data.productId,
+        });
+      } else {
+        collectionItemId = await s.db.collections.addSliderProduct({
+          actor,
+          collectionId: parsed.data.collectionId,
+          customFinish: parsed.data.customFinish
+            ? toFinishWriteOption(parsed.data.customFinish)
+            : null,
+          description: parsed.data.description,
+          displayName: parsed.data.displayName,
+          finishOptionId: parsed.data.finishOptionId,
+          materialId: parsed.data.materialId,
+          newCollection: parsed.data.newCollection,
+          productId: parsed.data.productId,
+          productTypeSlug: parsed.data.productTypeSlug,
+        });
+      }
       const item = await s.db.collections.getOwnedItem(actor, collectionItemId);
       if (!item) throw new Error("Failed to load collection item.");
       return {
@@ -1472,11 +1489,17 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
           viewer,
         })
       : null;
+    const product = (
+      await s.db.catalog.listProducts(item.productTypeSlug, viewer)
+    ).find(({ id }) => id === item.productId);
     return {
       installedButton: installedButton
         ? await signCollectionItem(installedButton)
         : null,
       item: await signCollectionItem(item),
+      product: product
+        ? ((await signCatalogProducts([product]))[0] ?? null)
+        : null,
     };
   });
 
@@ -2301,15 +2324,12 @@ export function productTypeIsSupported(
 /**
  * Checks whether a product type is supported by the current collection editor.
  *
- * Slider catalog records deliberately fail closed here until the slider ownership
- * model is implemented by ENG-356.
- *
  * @param value - Candidate product-type slug.
  * @returns Whether the collection editor can safely create an owned item.
  */
 export function collectionProductTypeIsSupported(
   value: string,
-): value is "spinner" | "spinner-button" {
+): value is CatalogProductType {
   return collectionProductTypeSchema.safeParse(value).success;
 }
 

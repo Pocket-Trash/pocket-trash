@@ -660,6 +660,37 @@ describe("collection add form", () => {
     );
     expect(html).not.toContain('aria-label="Bearing"');
   });
+
+  it.each([
+    "slider",
+    "slider-plate",
+    "slider-insert",
+  ] as const)("offers standalone %s collection items without spinner-only controls", (productTypeSlug) => {
+    const product = productFixture(1100, "Slider product", productTypeSlug);
+    const html = renderToStaticMarkup(
+      createElement(CollectionAddPage, {
+        collections: [],
+        defaultCollectionName: "Tester's Collection",
+        initialProductId: product.id,
+        options: {
+          ...emptyCatalogOptions,
+          productTypes: [
+            {
+              id: product.productTypeId,
+              name: product.productTypeName,
+              slug: productTypeSlug,
+            },
+          ],
+        },
+        products: [product],
+      }),
+    );
+
+    expect(html).toContain("Slider product");
+    expect(html).not.toContain("Unsupported product type");
+    expect(html).not.toContain('aria-label="Bearing"');
+    expect(html).not.toContain('aria-label="Button"');
+  });
 });
 
 /**
@@ -783,7 +814,7 @@ function collectionFixture(
     productId: product.id,
     productSlug: product.slug,
     productTypeName: product.productTypeName,
-    productTypeSlug: product.productTypeSlug as "spinner" | "spinner-button",
+    productTypeSlug: product.productTypeSlug,
     productImages: [],
     sourceProductFinishOptionId,
   };
