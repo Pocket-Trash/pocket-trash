@@ -536,6 +536,117 @@ export type CatalogSliderInsertOffer = CatalogInsertMagnetOffer & {
   isSliderAdvertisedDefault: boolean;
 };
 
+/** Source-relative position in an owner-recorded insert setup. */
+export type OwnedMagnetSlot = Omit<CatalogMagnetSlot, "state"> & {
+  /** Owner-recorded state, including an explicitly unknown position. */
+  state: CatalogMagnetSlot["state"] | "unknown";
+};
+
+/** Owner-recorded magnet layout snapshot. */
+export type OwnedMagnetConfiguration = Omit<
+  CatalogMagnetConfiguration,
+  "slots"
+> & {
+  /** Ordered owner-recorded positions. */
+  slots: OwnedMagnetSlot[];
+};
+
+/** Durable setup snapshot belonging to one owned insert. */
+export type OwnedSliderInsertSetup = {
+  /** Selected positive click-count snapshot, or `null` when not recorded. */
+  clickCount: number | null;
+  /** Owner-recorded layout snapshot, or `null` when not recorded. */
+  configuration: OwnedMagnetConfiguration | null;
+  /** Catalog offer copied as an authoring source, when present. */
+  sourceOfferId: number | null;
+};
+
+/** Effective setup displayed for an owned slider. */
+export type EffectiveSliderSetup = {
+  /** Effective click count, or `null` when not recorded. */
+  clickCount: number | null;
+  /** Effective layout, or `null` when not recorded. */
+  configuration: OwnedMagnetConfiguration | null;
+  /** Whether the values are resolved live from current catalog metadata. */
+  isLiveCatalog: boolean;
+  /** Physical or catalog source selected by the fallback rules. */
+  source:
+    | "body-hosted"
+    | "owned-insert"
+    | "slider-default"
+    | "insert-default"
+    | "not-recorded";
+};
+
+/**
+ * Resolves an owned slider's effective setup without blending partial snapshots.
+ *
+ * @param input - Physical host, installed insert, owned snapshot, and live catalog offers.
+ * @returns The effective setup and its provenance.
+ */
+export function resolveEffectiveSliderSetup(input: {
+  /** Inherent body-hosted setup, when the body is the physical host. */
+  bodyHostedSetup: CatalogBodyHostedMagnetSetup | null;
+  /** Live offers belonging to the installed insert product. */
+  installedInsertOffers: CatalogInsertMagnetOffer[];
+  /** Exact installed insert product identifier, when installed. */
+  installedInsertProductId: number | null;
+  /** Durable owner snapshot on the installed insert, when recorded. */
+  ownedInsertSetup: OwnedSliderInsertSetup | null;
+  /** Offers explicitly associated with the slider product. */
+  sliderAdvertisedOffers: CatalogSliderInsertOffer[];
+}): EffectiveSliderSetup {
+  if (input.bodyHostedSetup) {
+    return {
+      clickCount: input.bodyHostedSetup.clickCount,
+      configuration: input.bodyHostedSetup.configuration,
+      isLiveCatalog: true,
+      source: "body-hosted",
+    };
+  }
+  if (input.installedInsertProductId !== null && input.ownedInsertSetup) {
+    return {
+      clickCount: input.ownedInsertSetup.clickCount,
+      configuration: input.ownedInsertSetup.configuration,
+      isLiveCatalog: false,
+      source: "owned-insert",
+    };
+  }
+  const sliderDefault = input.sliderAdvertisedOffers.find(
+    (offer) =>
+      offer.isSliderAdvertisedDefault &&
+      (input.installedInsertProductId === null ||
+        offer.insertProductId === input.installedInsertProductId),
+  );
+  if (sliderDefault) {
+    return {
+      clickCount: sliderDefault.clickCount,
+      configuration: sliderDefault.configuration,
+      isLiveCatalog: true,
+      source: "slider-default",
+    };
+  }
+  const insertDefault = input.installedInsertOffers.find(
+    (offer) =>
+      offer.isAdvertisedDefault &&
+      offer.insertProductId === input.installedInsertProductId,
+  );
+  if (insertDefault) {
+    return {
+      clickCount: insertDefault.clickCount,
+      configuration: insertDefault.configuration,
+      isLiveCatalog: true,
+      source: "insert-default",
+    };
+  }
+  return {
+    clickCount: null,
+    configuration: null,
+    isLiveCatalog: false,
+    source: "not-recorded",
+  };
+}
+
 /** Catalog-manager-only reusable authoring source. */
 export type CatalogMagnetConfigurationTemplate = {
   /** Family scope target, when family-scoped. */
@@ -1582,12 +1693,16 @@ export type UserCollectionItem = {
   installedButtonId: number | null;
   /** Whether any uninterrupted slider-component installation no longer matches current compatibility metadata. */
   hasGrandfatheredInstallation: boolean;
+  /** Effective physical or catalog-derived setup for an owned slider. */
+  effectiveSliderSetup: EffectiveSliderSetup | null;
   /** Installed slider insert collection-item identifier. */
   installedInsertId: number | null;
   /** Slider collection-item identifier that currently hosts this component. */
   installedOnSliderId: number | null;
   /** Installed slider plate collection-item identifier. */
   installedPlateId: number | null;
+  /** Durable setup recorded on an owned insert, or `null` for live defaults. */
+  ownedInsertSetup: OwnedSliderInsertSetup | null;
   /**
    * Maker identifier.
    */
@@ -2270,6 +2385,15 @@ export type CollectionsService = {
     installedPlate?: {
       /** Owned slider plate collection-item identifier. */
       collectionItemId: number;
+    } | null;
+    /** Owned insert setup snapshot, or `null` to return to live defaults. */
+    insertSetup?: {
+      /** Current exact-product click option selected by the owner. */
+      clickOptionId: number | null;
+      /** Owner-recorded configuration, including explicit unknown positions. */
+      configuration: OwnedMagnetConfiguration | null;
+      /** Current exact-product offer copied as the authoring source. */
+      sourceOfferId: number | null;
     } | null;
     /**
      * Material identifier.
@@ -5910,6 +6034,7 @@ export function createCollectionsService(
                 installedButtonId: schema.collectionSpinner.installedButtonId,
                 installedInsertId: schema.collectionSlider.installedInsertId,
                 installedPlateId: schema.collectionSlider.installedPlateId,
+                insertSetup: schema.collectionSliderInsert.setup,
                 isPrivate: schema.collectionItem.isPrivate,
                 materialId: schema.collectionItem.materialId,
                 magnetSystem: schema.productSlider.magnetSystem,
@@ -5979,6 +6104,7 @@ export function createCollectionsService(
               installedButtonId: item.installedButtonId,
               installedInsertId: item.installedInsertId,
               installedPlateId: item.installedPlateId,
+              insertSetup: item.insertSetup,
               isPrivate: item.isPrivate,
               materialId: item.materialId,
             };
@@ -6231,6 +6357,84 @@ export function createCollectionsService(
                 throw error;
               }
             }
+            let normalizedInsertSetup = item.insertSetup;
+            if (input.insertSetup !== undefined) {
+              if (item.sliderInsertProductId === null) {
+                throw new Error("Collection item is not a slider insert.");
+              }
+              let setup: OwnedSliderInsertSetup | null = null;
+              if (input.insertSetup !== null) {
+                const [clickOption, sourceOffer] = await Promise.all([
+                  input.insertSetup.clickOptionId === null
+                    ? null
+                    : tx
+                        .select({
+                          clickCount:
+                            schema.productInsertClickOption.clickCount,
+                        })
+                        .from(schema.productInsertClickOption)
+                        .where(
+                          and(
+                            eq(
+                              schema.productInsertClickOption.id,
+                              input.insertSetup.clickOptionId,
+                            ),
+                            eq(
+                              schema.productInsertClickOption.insertProductId,
+                              item.sliderInsertProductId,
+                            ),
+                          ),
+                        )
+                        .limit(1)
+                        .then(([row]) => row ?? null),
+                  input.insertSetup.sourceOfferId === null
+                    ? null
+                    : tx
+                        .select({ id: schema.productInsertMagnetOffer.id })
+                        .from(schema.productInsertMagnetOffer)
+                        .where(
+                          and(
+                            eq(
+                              schema.productInsertMagnetOffer.id,
+                              input.insertSetup.sourceOfferId,
+                            ),
+                            eq(
+                              schema.productInsertMagnetOffer.insertProductId,
+                              item.sliderInsertProductId,
+                            ),
+                          ),
+                        )
+                        .limit(1)
+                        .then(([row]) => row ?? null),
+                ]);
+                if (input.insertSetup.clickOptionId !== null && !clickOption) {
+                  throw new Error(
+                    "Insert click option does not belong to this product.",
+                  );
+                }
+                if (input.insertSetup.sourceOfferId !== null && !sourceOffer) {
+                  throw new Error(
+                    "Insert setup offer does not belong to this product.",
+                  );
+                }
+                setup = {
+                  clickCount: clickOption?.clickCount ?? null,
+                  configuration: input.insertSetup.configuration
+                    ? normalizeOwnedMagnetConfiguration(
+                        input.insertSetup.configuration,
+                      )
+                    : null,
+                  sourceOfferId: sourceOffer?.id ?? null,
+                };
+              }
+              normalizedInsertSetup = setup;
+              await tx
+                .update(schema.collectionSliderInsert)
+                .set({ setup })
+                .where(
+                  eq(schema.collectionSliderInsert.id, input.collectionItemId),
+                );
+            }
             await touchCollection(tx, targetCollectionId);
             const after = {
               ...before,
@@ -6252,6 +6456,10 @@ export function createCollectionsService(
                 input.installedPlate === undefined
                   ? item.installedPlateId
                   : (input.installedPlate?.collectionItemId ?? null),
+              insertSetup:
+                input.insertSetup === undefined
+                  ? item.insertSetup
+                  : normalizedInsertSetup,
               materialId: input.materialId,
             };
             await writeCollectionAudit(audit, tx, {
@@ -6283,6 +6491,10 @@ export function createCollectionsService(
           installedButtonId: input.installedButton?.collectionItemId,
           installedInsertId: input.installedInsert?.collectionItemId,
           installedPlateId: input.installedPlate?.collectionItemId,
+          insertSetupRecorded:
+            input.insertSetup === undefined
+              ? undefined
+              : input.insertSetup !== null,
           materialId: input.materialId,
         }),
       );
@@ -8111,6 +8323,16 @@ async function queryOwnedItems(
         (select id from collection_slider where installed_insert_id = ${schema.collectionItem.id})
       )`,
       installedPlateId: schema.collectionSlider.installedPlateId,
+      installedInsertProductId: sql<number | null>`(
+        select product_slider_insert_id
+        from collection_slider_insert
+        where id = ${schema.collectionSlider.installedInsertId}
+      )`,
+      installedInsertSetup: sql<OwnedSliderInsertSetup | null>`(
+        select setup
+        from collection_slider_insert
+        where id = ${schema.collectionSlider.installedInsertId}
+      )`,
       isPrivate: schema.collectionItem.isPrivate,
       privatedByClerkId: schema.collectionItem.privatedByClerkId,
       makerId: schema.maker.id,
@@ -8136,6 +8358,7 @@ async function queryOwnedItems(
       buttonId: schema.collectionSpinnerButton.id,
       sliderId: schema.collectionSlider.id,
       sliderInsertId: schema.collectionSliderInsert.id,
+      ownedInsertSetup: schema.collectionSliderInsert.setup,
       sliderPlateId: schema.collectionSliderPlate.id,
       productTypeSlug: schema.productType.slug,
       updatedAt: schema.collectionItem.updatedAt,
@@ -8243,6 +8466,7 @@ async function queryOwnedItems(
     finishOption: row.finishOptionId
       ? (finishOptions.get(row.finishOptionId) ?? null)
       : null,
+    effectiveSliderSetup: null,
     imageCount: 0,
     images: [],
     isPrivate: row.isPrivate,
@@ -8255,6 +8479,7 @@ async function queryOwnedItems(
     installedInsertId: row.installedInsertId,
     installedOnSliderId: row.installedOnSliderId,
     installedPlateId: row.installedPlateId,
+    ownedInsertSetup: row.ownedInsertSetup,
     isOwner: options.viewerClerkId === row.ownerClerkId,
     makerId: row.makerId,
     makerName: row.makerName,
@@ -8289,6 +8514,38 @@ async function queryOwnedItems(
     options.viewerClerkId,
     options.includePrivate,
   );
+  if (items.some(({ productTypeSlug }) => productTypeSlug === "slider")) {
+    const viewer = options.viewerClerkId
+      ? {
+          clerkId: options.viewerClerkId,
+          role: options.viewerCanManage
+            ? ("admin" as const)
+            : ("user" as const),
+        }
+      : undefined;
+    const products = await queryProducts(db, undefined, undefined, viewer);
+    const productsById = new Map(
+      products.map((product) => [product.id, product]),
+    );
+    const rowsById = new Map(
+      visibleRows.map((row) => [row.collectionItemId, row]),
+    );
+    for (const item of items) {
+      if (item.productTypeSlug !== "slider") continue;
+      const row = rowsById.get(item.collectionItemId);
+      const sliderProduct = productsById.get(item.productId);
+      const insertProduct = row?.installedInsertProductId
+        ? productsById.get(row.installedInsertProductId)
+        : null;
+      item.effectiveSliderSetup = resolveEffectiveSliderSetup({
+        bodyHostedSetup: sliderProduct?.bodyHostedMagnetSetup ?? null,
+        installedInsertOffers: insertProduct?.insertMagnetOffers ?? [],
+        installedInsertProductId: row?.installedInsertProductId ?? null,
+        ownedInsertSetup: row?.installedInsertSetup ?? null,
+        sliderAdvertisedOffers: sliderProduct?.advertisedInsertOffers ?? [],
+      });
+    }
+  }
   return items;
 }
 
@@ -9856,6 +10113,75 @@ function normalizeCatalogMagnetConfiguration(
       throw new Error("An occupied magnet slot requires a group.");
     if (candidate.state === "empty" && groupKey)
       throw new Error("An empty magnet slot cannot belong to a group.");
+    if (groupKey && !groupKeys.has(groupKey))
+      throw new Error("Magnet group does not belong to this configuration.");
+    if (groupKey) referencedGroupKeys.add(groupKey);
+    return {
+      documentedColumn: normalizeDocumentedPosition(candidate.documentedColumn),
+      documentedRow: normalizeDocumentedPosition(candidate.documentedRow),
+      groupKey,
+      half: candidate.half,
+      key,
+      state: candidate.state,
+    };
+  });
+  if (groups.some(({ key }) => !referencedGroupKeys.has(key)))
+    throw new Error("Every magnet group must contain an occupied slot.");
+  return { groups, label, slots, sourceLabel, sourceNotes };
+}
+
+/**
+ * Validates an owner-recorded layout while preserving explicit unknown positions.
+ *
+ * @param configuration - Candidate owner snapshot.
+ * @returns Normalized durable owner snapshot.
+ * @throws When keys, dimensions, groups, or slot states are inconsistent.
+ */
+function normalizeOwnedMagnetConfiguration(
+  configuration: OwnedMagnetConfiguration,
+): OwnedMagnetConfiguration {
+  const label = normalizeRequiredVocabulary(configuration.label);
+  const sourceLabel = normalizeBoundedText(configuration.sourceLabel, 200);
+  const sourceNotes = normalizeBoundedText(configuration.sourceNotes, 5000);
+  if (!configuration.slots.length)
+    throw new Error("An owned magnet configuration requires positions.");
+
+  const groupKeys = new Set<string>();
+  const referencedGroupKeys = new Set<string>();
+  const groups = configuration.groups.map((candidate) => {
+    const key = normalizeStableKey(candidate.key);
+    if (groupKeys.has(key))
+      throw new Error("Magnet group keys must be unique.");
+    groupKeys.add(key);
+    return {
+      diameterMm: normalizePositiveDecimal(candidate.diameterMm),
+      grade: normalizeMagnetGrade(candidate.grade),
+      key,
+      label: normalizeRequiredVocabulary(candidate.label),
+      thicknessMm: normalizePositiveDecimal(candidate.thicknessMm),
+    };
+  });
+  const slotKeys = new Set<string>();
+  const slots = configuration.slots.map((candidate) => {
+    const key = normalizeStableKey(candidate.key);
+    if (slotKeys.has(key)) throw new Error("Magnet slot keys must be unique.");
+    slotKeys.add(key);
+    if (candidate.half !== "half-a" && candidate.half !== "half-b")
+      throw new Error("A magnet slot requires Half A or Half B.");
+    if (
+      candidate.state !== "occupied" &&
+      candidate.state !== "empty" &&
+      candidate.state !== "unknown"
+    ) {
+      throw new Error("Owned magnet slot state is invalid.");
+    }
+    const groupKey = candidate.groupKey
+      ? normalizeStableKey(candidate.groupKey)
+      : null;
+    if (candidate.state === "occupied" && !groupKey)
+      throw new Error("An occupied magnet slot requires a group.");
+    if (candidate.state !== "occupied" && groupKey)
+      throw new Error("Only an occupied magnet slot may belong to a group.");
     if (groupKey && !groupKeys.has(groupKey))
       throw new Error("Magnet group does not belong to this configuration.");
     if (groupKey) referencedGroupKeys.add(groupKey);
