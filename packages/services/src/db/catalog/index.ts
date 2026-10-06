@@ -2206,6 +2206,8 @@ export function createCatalogService(
             );
             const before = await collectionImageState(tx, input.target);
             await attachStoredImages(tx, input);
+            if (input.target.type === "product" && input.files.length)
+              await touchProductUpdatedAt(tx, input.target.id);
             if (collectionContext) {
               const after = await collectionImageState(tx, input.target);
               if (!collectionDependencies || !actorUser)
@@ -2819,7 +2821,6 @@ export function createCatalogService(
                 approvalDecidedAt: occurredAt,
                 approvalDecisionReason: reason,
                 approvalStatus,
-                updatedAt: occurredAt,
               })
               .where(eq(schema.product.id, input.productId));
             await writeProductAdminAudit(audit, tx, {
@@ -3661,6 +3662,7 @@ export function createCatalogService(
               actorIsModerating,
               isPrivate: input.isPrivate,
               reason: input.reason,
+              touchUpdatedAt: false,
             }),
           )
           .where(eq(schema.product.id, input.productId));
@@ -3783,7 +3785,10 @@ export function createCatalogService(
             }
             await tx
               .update(schema.product)
-              .set({ makerProductUrlValid: input.makerProductUrlValid })
+              .set({
+                makerProductUrlValid: input.makerProductUrlValid,
+                updatedAt: new Date(),
+              })
               .where(eq(schema.product.id, input.productId));
             if (dependencies && actorUser) {
               await writeProductAdminAudit(dependencies.audit, tx, {
@@ -4081,6 +4086,7 @@ export function createCatalogService(
                   : {}),
                 name: input.name,
                 slug: input.slug,
+                updatedAt: new Date(),
               })
               .where(eq(schema.product.id, input.productId));
             await tx
@@ -6440,7 +6446,7 @@ async function queryProducts(
         string | null
       >`coalesce(${schema.productSpinner.thicknessMm}, ${schema.productSpinnerButton.thicknessMm}, ${schema.productSlider.thicknessMm}, ${schema.productSliderPlate.thicknessMm}, ${schema.productSliderInsert.thicknessMm})`,
       thicknessWithButtonMm: schema.productSpinner.thicknessWithButtonMm,
-      updatedAt: sql<Date>`coalesce(${schema.productSpinner.updatedAt}, ${schema.productSpinnerButton.updatedAt}, ${schema.productSlider.updatedAt}, ${schema.productSliderPlate.updatedAt}, ${schema.productSliderInsert.updatedAt})`,
+      updatedAt: schema.product.updatedAt,
       weightG: sql<
         string | null
       >`coalesce(${schema.productSpinner.weightG}, ${schema.productSpinnerButton.weightG}, ${schema.productSlider.weightG}, ${schema.productSliderPlate.weightG}, ${schema.productSliderInsert.weightG})`,
@@ -6488,7 +6494,12 @@ async function queryProducts(
       eq(schema.productSpinner.compatibleButtonId, compatibleButtonProduct.id),
     )
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(asc(schema.product.name), asc(schema.material.name));
+    .orderBy(
+      desc(schema.product.updatedAt),
+      asc(schema.product.name),
+      asc(schema.product.id),
+      asc(schema.material.name),
+    );
 
   const products = new Map<number, CatalogProduct>();
   for (const row of rows) {
@@ -7660,6 +7671,8 @@ function privacyUpdate(input: {
    * Administrative reason for the operation.
    */
   reason?: string;
+  /** Whether this visibility change also represents a meaningful content update. */
+  touchUpdatedAt?: boolean;
 }) {
   return input.isPrivate
     ? {
@@ -7667,14 +7680,14 @@ function privacyUpdate(input: {
         privateReason: input.actorIsModerating ? input.reason?.trim() : "",
         privatedAt: new Date(),
         privatedByClerkId: input.actorClerkId,
-        updatedAt: new Date(),
+        ...(input.touchUpdatedAt === false ? {} : { updatedAt: new Date() }),
       }
     : {
         isPrivate: false,
         privateReason: null,
         privatedAt: null,
         privatedByClerkId: null,
-        updatedAt: new Date(),
+        ...(input.touchUpdatedAt === false ? {} : { updatedAt: new Date() }),
       };
 }
 
@@ -7750,6 +7763,7 @@ async function softDeleteCatalogImage(
       .select({
         deletedAt: schema.productImage.deletedAt,
         ownerClerkId: schema.product.ownerClerkId,
+        productId: schema.product.id,
       })
       .from(schema.productImage)
       .innerJoin(
@@ -7771,6 +7785,10 @@ async function softDeleteCatalogImage(
         deletedByRole: actorIsModerating ? "admin" : "owner",
       })
       .where(eq(schema.productImage.id, input.imageId));
+    await db
+      .update(schema.product)
+      .set({ updatedAt: deletedAt })
+      .where(eq(schema.product.id, image.productId));
     return true;
   }
   const [image] = await db
@@ -7875,6 +7893,7 @@ async function restoreCatalogImage(
         deletedByClerkId: schema.productImage.deletedByClerkId,
         deletedByRole: schema.productImage.deletedByRole,
         ownerClerkId: schema.product.ownerClerkId,
+        productId: schema.product.id,
       })
       .from(schema.productImage)
       .innerJoin(
@@ -7888,11 +7907,16 @@ async function restoreCatalogImage(
         ),
       )
       .limit(1);
+    if (!image) throw new Error("Image does not exist.");
     assertCanRestoreImage(image, input.actor, "products.manage");
     await db
       .update(schema.productImage)
       .set({ deletedAt: null, deletedByClerkId: null, deletedByRole: null })
       .where(eq(schema.productImage.id, input.imageId));
+    await db
+      .update(schema.product)
+      .set({ updatedAt: new Date() })
+      .where(eq(schema.product.id, image.productId));
     return;
   }
   const [image] = await db
@@ -8142,6 +8166,23 @@ async function listCatalogImageTrash(
  * Caller-owned database transaction used for atomic catalog writes.
  */
 type CatalogTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+/**
+ * Marks a catalog product as meaningfully updated inside its caller transaction.
+ *
+ * @param tx - Caller-owned catalog transaction.
+ * @param productId - Product whose public content changed.
+ * @rejects When the canonical product timestamp cannot be updated.
+ */
+async function touchProductUpdatedAt(
+  tx: CatalogTransaction,
+  productId: number,
+) {
+  await tx
+    .update(schema.product)
+    .set({ updatedAt: new Date() })
+    .where(eq(schema.product.id, productId));
+}
 
 /**
  * Inserts the subtype row required by one canonical product type.
