@@ -67,6 +67,10 @@ export const productAudit = {
     "products.compatibility_family.created",
     "products.compatibility_family",
   ),
+  terminologyAliasCreated: definition(
+    "products.terminology_alias.created",
+    "products.terminology_alias",
+  ),
   productApproved: definition("products.product.approved", "products.product"),
   productRejected: definition("products.product.rejected", "products.product"),
   productApprovalReversed: definition(
