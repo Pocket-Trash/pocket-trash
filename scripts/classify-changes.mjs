@@ -16,6 +16,27 @@ export const validationDomains = [
   "validation",
 ];
 
+/** Mutation Playwright specifications grouped by the product area they change. */
+export const mutationE2eSpecs = {
+  collections: [
+    "e2e/collection-covers.spec.ts",
+    "e2e/collection-lifecycle.spec.ts",
+    "e2e/collection-selection.spec.ts",
+    "e2e/public-collections.spec.ts",
+  ],
+  infrastructure: ["e2e/mutation.spec.ts"],
+  makers: ["e2e/makers.spec.ts"],
+  settings: ["e2e/authenticated.spec.ts"],
+};
+
+/** Every mutation domain used for conservative or explicit full-suite runs. */
+const allMutationDomains = Object.keys(mutationE2eSpecs);
+
+/** Every mutation specification in stable domain order. */
+export const allMutationE2eSpecs = allMutationDomains.flatMap(
+  (domain) => mutationE2eSpecs[domain],
+);
+
 /** Absolute repository root used by local and CI checks. */
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -57,22 +78,82 @@ const changeClassificationRules = [
     domains: ["web", "safe_e2e", "validation"],
   },
   {
+    category: "web-mutation-settings-e2e",
+    paths: ["apps/web/e2e/authenticated.spec.ts"],
+    domains: ["web", "preview", "safe_e2e", "validation"],
+    mutationDomains: ["settings"],
+  },
+  {
+    category: "web-mutation-settings-source",
+    patterns: [/^apps\/web\/src\/.*(?:settings|theme).*$/u],
+    domains: ["web", "storybook", "preview", "safe_e2e", "validation"],
+    mutationDomains: ["settings"],
+  },
+  {
+    category: "web-mutation-catalog-source",
+    paths: [
+      "apps/web/src/lib/catalog-api.test.ts",
+      "apps/web/src/lib/catalog-api.ts",
+      "apps/web/src/pages/catalog-form-pages.test.tsx",
+      "apps/web/src/pages/catalog-form-pages.tsx",
+    ],
+    domains: ["web", "storybook", "preview", "safe_e2e", "validation"],
+    mutationDomains: ["collections", "makers"],
+  },
+  {
+    category: "web-mutation-makers-e2e",
+    paths: ["apps/web/e2e/makers.spec.ts"],
+    domains: ["web", "preview", "safe_e2e", "validation"],
+    mutationDomains: ["makers"],
+  },
+  {
+    category: "web-mutation-makers-source",
+    patterns: [/^apps\/web\/src\/.*maker.*$/u],
+    domains: ["web", "storybook", "preview", "safe_e2e", "validation"],
+    mutationDomains: ["makers"],
+  },
+  {
+    category: "web-mutation-collections-e2e",
+    patterns: [/^apps\/web\/e2e\/.*collection.*\.spec\.ts$/u],
+    domains: ["web", "preview", "safe_e2e", "validation"],
+    mutationDomains: ["collections"],
+  },
+  {
+    category: "web-mutation-collections-source",
+    paths: [
+      "apps/web/src/lib/upload-sessions.test.ts",
+      "apps/web/src/lib/upload-sessions.ts",
+      "apps/web/src/pages/catalog-pages.test.tsx",
+      "apps/web/src/pages/catalog-pages.tsx",
+    ],
+    patterns: [/^apps\/web\/src\/.*collection.*$/u],
+    domains: ["web", "storybook", "preview", "safe_e2e", "validation"],
+    mutationDomains: ["collections"],
+  },
+  {
+    category: "web-mutation-infrastructure",
+    paths: [
+      "apps/web/e2e/auth.ts",
+      "apps/web/e2e/global.setup.ts",
+      "apps/web/e2e/mutation-fixture.ts",
+      "apps/web/e2e/mutation-guard.test.ts",
+      "apps/web/e2e/mutation-guard.ts",
+      "apps/web/e2e/mutation.spec.ts",
+      "apps/web/package.json",
+      "apps/web/playwright.config.ts",
+    ],
+    domains: ["web", "preview", "safe_e2e", "validation"],
+    mutationDomains: allMutationDomains,
+  },
+  {
     category: "web-mutation-e2e",
     prefixes: ["apps/web/e2e/"],
-    domains: ["web", "preview", "safe_e2e", "mutation_e2e", "validation"],
+    domains: ["web", "preview", "safe_e2e", "validation"],
   },
   {
     category: "web-mutation-capable",
-    paths: ["apps/web/package.json", "apps/web/playwright.config.ts"],
     prefixes: ["apps/web/src/"],
-    domains: [
-      "web",
-      "storybook",
-      "preview",
-      "safe_e2e",
-      "mutation_e2e",
-      "validation",
-    ],
+    domains: ["web", "storybook", "preview", "safe_e2e", "validation"],
   },
   {
     category: "web",
@@ -82,7 +163,8 @@ const changeClassificationRules = [
   {
     category: "api",
     prefixes: ["apps/api/"],
-    domains: ["api", "preview", "safe_e2e", "mutation_e2e", "validation"],
+    domains: ["api", "preview", "safe_e2e", "validation"],
+    mutationDomains: allMutationDomains,
   },
   {
     category: "scraper",
@@ -102,6 +184,7 @@ const changeClassificationRules = [
       "mutation_e2e",
       "validation",
     ],
+    mutationDomains: allMutationDomains,
   },
   {
     category: "shared-markdown",
@@ -134,6 +217,7 @@ const changeClassificationRules = [
       "packages/tsconfig/",
     ],
     domains: allDomains,
+    mutationDomains: allMutationDomains,
   },
   {
     category: "repository-validation",
@@ -162,6 +246,7 @@ const changeClassificationRules = [
       "scripts/",
     ],
     domains: allDomains,
+    mutationDomains: allMutationDomains,
   },
 ];
 
@@ -195,7 +280,20 @@ function findRule(file) {
   return changeClassificationRules.find(
     (rule) =>
       rule.paths?.includes(file) ||
-      rule.prefixes?.some((prefix) => file.startsWith(prefix)),
+      rule.prefixes?.some((prefix) => file.startsWith(prefix)) ||
+      rule.patterns?.some((pattern) => pattern.test(file)),
+  );
+}
+
+/**
+ * Resolves mutation domains to a stable de-duplicated Playwright spec list.
+ *
+ * @param {Set<string>} domains - Mutation product areas selected by changes.
+ * @returns {string[]} Playwright spec paths for the selected areas.
+ */
+function selectMutationSpecs(domains) {
+  return allMutationDomains.flatMap((domain) =>
+    domains.has(domain) ? mutationE2eSpecs[domain] : [],
   );
 }
 
@@ -207,13 +305,19 @@ function findRule(file) {
  * @param {"diff-failed" | "malformed-input" | null} [details.error] - Failure type.
  * @param {string[]} [details.noCodePaths] - Intentionally non-code paths.
  * @param {string[]} [details.unknownPaths] - Paths missing an explicit rule.
- * @returns {{domains: Record<string, boolean>, error: "diff-failed" | "malformed-input" | null, noCodePaths: string[], unknownPaths: string[]}} Classification response.
+ * @param {string[]} [details.mutationSpecs] - Selected mutation Playwright specs.
+ * @returns {{domains: Record<string, boolean>, error: "diff-failed" | "malformed-input" | null, mutationSpecs: string[], noCodePaths: string[], unknownPaths: string[]}} Classification response.
  */
 function response(
   domains,
-  { error = null, noCodePaths = [], unknownPaths = [] } = {},
+  {
+    error = null,
+    mutationSpecs = [],
+    noCodePaths = [],
+    unknownPaths = [],
+  } = {},
 ) {
-  return { domains, error, noCodePaths, unknownPaths };
+  return { domains, error, mutationSpecs, noCodePaths, unknownPaths };
 }
 
 /**
@@ -226,7 +330,7 @@ function response(
  * @param {string} [options.eventLabel] - Label changed by this event.
  * @param {string} [options.eventName] - GitHub event name.
  * @param {string[]} [options.labels] - Labels currently attached to the PR.
- * @returns {{domains: Record<string, boolean>, error: "diff-failed" | "malformed-input" | null, noCodePaths: string[], unknownPaths: string[]}} Classification response.
+ * @returns {{domains: Record<string, boolean>, error: "diff-failed" | "malformed-input" | null, mutationSpecs: string[], noCodePaths: string[], unknownPaths: string[]}} Classification response.
  */
 export function classifyChanges(
   files,
@@ -239,19 +343,26 @@ export function classifyChanges(
   } = {},
 ) {
   if (diffFailed) {
-    return response(everyDomain(true), { error: "diff-failed" });
+    return response(everyDomain(true), {
+      error: "diff-failed",
+      mutationSpecs: allMutationE2eSpecs,
+    });
   }
 
   if (
     !Array.isArray(files) ||
     files.some((file) => typeof file !== "string" || file.length === 0)
   ) {
-    return response(everyDomain(true), { error: "malformed-input" });
+    return response(everyDomain(true), {
+      error: "malformed-input",
+      mutationSpecs: allMutationE2eSpecs,
+    });
   }
 
   const labelEvent =
     eventName === "pull_request" && ["labeled", "unlabeled"].includes(action);
   const domains = everyDomain(false);
+  const mutationDomains = new Set();
   const noCodePaths = [];
   const unknownPaths = [];
 
@@ -264,10 +375,17 @@ export function classifyChanges(
     }
 
     if (rule.domains.length === 0) noCodePaths.push(file);
-    else if (!labelEvent) enable(domains, ...rule.domains);
+    else if (!labelEvent) {
+      enable(domains, ...rule.domains);
+      for (const domain of rule.mutationDomains ?? [])
+        mutationDomains.add(domain);
+    }
   }
 
-  if (unknownPaths.length > 0) enable(domains, ...validationDomains);
+  if (unknownPaths.length > 0) {
+    enable(domains, ...validationDomains);
+    for (const domain of allMutationDomains) mutationDomains.add(domain);
+  }
 
   if (
     labels.includes("test:storybook") &&
@@ -283,9 +401,12 @@ export function classifyChanges(
       (action === "labeled" && (eventLabel ?? labels[0]) === "test:e2e"))
   ) {
     enable(domains, "preview", "safe_e2e", "mutation_e2e");
+    for (const domain of allMutationDomains) mutationDomains.add(domain);
   }
 
-  return response(domains, { noCodePaths, unknownPaths });
+  const mutationSpecs = selectMutationSpecs(mutationDomains);
+  domains.mutation_e2e = mutationSpecs.length > 0;
+  return response(domains, { mutationSpecs, noCodePaths, unknownPaths });
 }
 
 /**
@@ -333,13 +454,17 @@ function main() {
       },
     );
   } catch {
-    classification = response(everyDomain(true), { error: "diff-failed" });
+    classification = response(everyDomain(true), {
+      error: "diff-failed",
+      mutationSpecs: allMutationE2eSpecs,
+    });
   }
 
   const output = `${[
     ...Object.entries(classification.domains).map(
       ([domain, relevant]) => `${domain}=${relevant}`,
     ),
+    `mutation_e2e_specs=${JSON.stringify(classification.mutationSpecs)}`,
     `unknown_paths=${JSON.stringify(classification.unknownPaths)}`,
     `classification_error=${classification.error ?? ""}`,
   ].join("\n")}\n`;
