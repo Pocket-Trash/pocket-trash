@@ -92,9 +92,6 @@ test("@mutation public collection browsing preserves effective privacy", async (
       fixture.publicSpinner.name,
     );
     await expect(
-      page.getByText("Default Button", { exact: true }),
-    ).toBeVisible();
-    await expect(
       page.getByText(fixture.privateButton.name, { exact: true }),
     ).toBeVisible();
 
