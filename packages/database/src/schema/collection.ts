@@ -423,6 +423,8 @@ export const productImage = pgTable(
     sha256: text("sha256").notNull(),
     storageProvider: text("storage_provider").default("bunny").notNull(),
     objectPath: text("object_path").notNull(),
+    /** Whether this database owns the underlying object lifecycle. */
+    storageOwned: boolean("storage_owned").default(true).notNull(),
     url: text("url").notNull(),
     uploadedByClerkId: text("uploaded_by_clerk_id"),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),

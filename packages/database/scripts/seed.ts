@@ -3,7 +3,11 @@ import { readFile } from "node:fs/promises";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { eq, inArray } from "drizzle-orm";
-import { createUploadStorage } from "../../storage/src/index.js";
+import {
+  createUploadStorage,
+  type UploadStorage,
+  type UploadTarget,
+} from "../../storage/src/index.js";
 import { createDb } from "../src/client.js";
 import { createDatabaseEnv } from "../src/env.schema.js";
 import {
@@ -281,19 +285,19 @@ export function materialSlugForTerm(term: string): string {
 }
 
 /**
- * Reports whether a seeded image already belongs to the selected environment.
+ * Selects the immutable image namespace used by catalog seed records.
  *
- * @param objectPath - Stored Bunny image object path.
- * @param imageFolderPrefix - Selected environment image prefix.
- * @returns Whether the object path is inside the selected prefix.
+ * Isolated previews reference the shared preview baseline. Preview seed rows
+ * are non-owned; development and production own their configured objects.
+ *
+ * @param imageFolderPrefix - Environment image namespace.
+ * @returns Image namespace that owns immutable seed objects.
  */
-export function isSeedImageInTargetPrefix(
-  objectPath: string,
-  imageFolderPrefix: string,
-): boolean {
-  return objectPath.startsWith(
-    `${imageFolderPrefix.replace(/^\/+|\/+$/gu, "")}/`,
-  );
+export function seedImageFolderPrefix(imageFolderPrefix: string): string {
+  const normalized = imageFolderPrefix.replace(/^\/+|\/+$/gu, "");
+  return /^images\/preview\/pr-[1-9]\d*$/u.test(normalized)
+    ? "images/preview"
+    : normalized;
 }
 
 /**
@@ -507,7 +511,7 @@ export async function seedKapedcProducts(
 }
 
 /**
- * Copies each cached KAP image into the selected environment prefix.
+ * Seeds each KAP image from the environment-owned or shared baseline prefix.
  *
  * @param db - Database client receiving image records.
  * @param config - Bunny storage settings for the selected environment.
@@ -519,12 +523,14 @@ export async function seedKapedcImages(
   config: SeedBunnyConfig,
   seededProducts: SeededKapedcProduct[],
 ): Promise<void> {
+  const seedFolderPrefix = seedImageFolderPrefix(config.imageFolderPrefix);
+  const storageOwned = seedFolderPrefix !== "images/preview";
   const storage = createUploadStorage({
     accessKey: config.accessKey,
     cdnBaseUrl: config.cdnBaseUrl,
     endpoint: config.endpoint,
     folderPrefix: config.resourceFolderPrefix,
-    imageFolderPrefix: config.imageFolderPrefix,
+    imageFolderPrefix: seedFolderPrefix,
     zoneName: config.zoneName,
   });
 
@@ -536,46 +542,62 @@ export async function seedKapedcImages(
         objectPath: productImage.objectPath,
         position: productImage.position,
         sha256: productImage.sha256,
+        storageOwned: productImage.storageOwned,
+        uploadedByClerkId: productImage.uploadedByClerkId,
+        url: productImage.url,
       })
       .from(productImage)
       .where(eq(productImage.productId, seeded.productId));
     for (const [position, source] of seeded.product.images.entries()) {
-      const matching = images.find(({ sha256 }) => sha256 === source.sha256);
-      if (
-        matching?.deletedAt === null &&
-        isSeedImageInTargetPrefix(matching.objectPath, config.imageFolderPrefix)
-      ) {
-        if (matching.position !== position)
-          await db
-            .update(productImage)
-            .set({ position })
-            .where(eq(productImage.id, matching.id));
-        continue;
-      }
-
-      const bytes = await downloadCacheObject(config, source.cacheObjectPath);
-      if (
-        bytes.byteLength !== source.size ||
-        createHash("sha256").update(bytes).digest("hex") !== source.sha256
-      ) {
-        throw new Error(
-          `Cached image verification failed for ${seeded.product.name}.`,
-        );
-      }
       const target = storage.createImageTarget(source, {
         entity: "products",
         entityId: seeded.productId,
       });
+      const matching = images.find(({ sha256 }) => sha256 === source.sha256);
+      if (
+        matching?.deletedAt === null &&
+        matching.objectPath === target.objectPath
+      ) {
+        if (!storageOwned)
+          await ensureSeedImage({
+            config,
+            productName: seeded.product.name,
+            source,
+            storage,
+            storageOwned,
+            target,
+          });
+        const uploadedByClerkId = storageOwned ? seedOwnerClerkId : null;
+        if (
+          matching.position !== position ||
+          matching.storageOwned !== storageOwned ||
+          matching.uploadedByClerkId !== uploadedByClerkId ||
+          matching.url !== target.url
+        )
+          await db
+            .update(productImage)
+            .set({
+              position,
+              storageOwned,
+              uploadedByClerkId,
+              url: target.url,
+            })
+            .where(eq(productImage.id, matching.id));
+        continue;
+      }
+
       const targetAlreadyReferenced = images.some(
         ({ objectPath }) => objectPath === target.objectPath,
       );
 
       try {
-        await storage.putImage({
-          body: bytes,
-          contentLength: target.size,
-          contentType: target.contentType,
-          objectPath: target.objectPath,
+        await ensureSeedImage({
+          config,
+          productName: seeded.product.name,
+          source,
+          storage,
+          storageOwned,
+          target,
         });
         const imageValues = {
           contentType: target.contentType,
@@ -588,7 +610,8 @@ export async function seedKapedcImages(
           sha256: target.sha256,
           size: target.size,
           storageProvider: "bunny",
-          uploadedByClerkId: seedOwnerClerkId,
+          storageOwned,
+          uploadedByClerkId: storageOwned ? seedOwnerClerkId : null,
           url: target.url,
         };
         if (matching) {
@@ -603,12 +626,68 @@ export async function seedKapedcImages(
           });
         }
       } catch (error) {
-        if (!targetAlreadyReferenced)
+        if (storageOwned && !targetAlreadyReferenced)
           await storage.delete(target.objectPath).catch(() => undefined);
         throw error;
       }
     }
   }
+}
+
+/**
+ * Reuses an available immutable seed object or uploads its verified cache
+ * source when the selected environment owns the object or the shared baseline
+ * has not been populated yet.
+ *
+ * @param input - Seed source, target, storage, and ownership context.
+ * @rejects When availability checks, cache verification, or upload fails.
+ */
+async function ensureSeedImage(input: {
+  /** Bunny settings used to read the import cache. */
+  config: SeedBunnyConfig;
+  /** Product name used in verification errors. */
+  productName: string;
+  /** Reviewed seed-image metadata. */
+  source: KapedcSeedImage;
+  /** Storage client for the selected seed namespace. */
+  storage: UploadStorage;
+  /** Whether this database owns the target object. */
+  storageOwned: boolean;
+  /** Content-addressed seed image target. */
+  target: UploadTarget;
+}): Promise<void> {
+  if (!input.storageOwned) {
+    const url = new URL(input.target.url);
+    url.search = "";
+    const response = await fetch(url, {
+      method: "HEAD",
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (response.ok) return;
+    if (response.status !== 404)
+      throw new Error(
+        `Shared seed image availability check failed: ${response.status}.`,
+      );
+  }
+
+  const bytes = await downloadCacheObject(
+    input.config,
+    input.source.cacheObjectPath,
+  );
+  if (
+    bytes.byteLength !== input.source.size ||
+    createHash("sha256").update(bytes).digest("hex") !== input.source.sha256
+  ) {
+    throw new Error(
+      `Cached image verification failed for ${input.productName}.`,
+    );
+  }
+  await input.storage.putImage({
+    body: bytes,
+    contentLength: input.target.size,
+    contentType: input.target.contentType,
+    objectPath: input.target.objectPath,
+  });
 }
 
 /**
