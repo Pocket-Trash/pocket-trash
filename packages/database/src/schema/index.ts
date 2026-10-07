@@ -1,4 +1,5 @@
 export * from "./audit.js";
+export * from "./catalog-import.js";
 export * from "./collection.js";
 export * from "./enums.js";
 export * from "./erasure.js";
