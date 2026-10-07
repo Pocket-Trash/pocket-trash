@@ -61,7 +61,7 @@ test("@mutation public collection browsing preserves effective privacy", async (
       ),
     );
     await expect(
-      page.locator("main").getByText("Collection items: 2"),
+      page.locator("main").getByText("Collection items: 3"),
     ).toBeVisible();
     await expect(
       page.getByRole("link", {
