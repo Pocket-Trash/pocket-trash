@@ -44,8 +44,6 @@ const base = {
   thicknessWithButtonMm: null,
   weightG: null,
   widthMm: null,
-  compatibilityAdvisories: [],
-  compatibilityFamilyIds: [],
   includedComponentIds: [],
   magnetSystem: null,
   weightBasis: null,
@@ -357,23 +355,15 @@ describe("slider catalog product validation", () => {
     ).toBe(true);
   });
 
-  it("keeps exact inclusion separate from compatibility and reviewed advisories", () => {
+  it("accepts exact included components for sliders", () => {
     const parsed = productFormSchema.parse({
       ...base,
-      compatibilityAdvisories: [
-        { relatedProductId: 2001, text: "May require thin tape." },
-      ],
-      compatibilityFamilyIds: [3001, 3002],
       includedComponentIds: [2000],
       magnetSystem: "body-hosted",
       productTypeSlug: "slider",
     });
 
-    expect(parsed.compatibilityFamilyIds).toEqual([3001, 3002]);
     expect(parsed.includedComponentIds).toEqual([2000]);
-    expect(parsed.compatibilityAdvisories).toEqual([
-      { relatedProductId: 2001, text: "May require thin tape." },
-    ]);
   });
 
   it("accepts complete exact body-hosted layouts and rejects incomplete slots", () => {

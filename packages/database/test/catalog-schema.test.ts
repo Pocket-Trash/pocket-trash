@@ -143,13 +143,10 @@ describe("catalog schema", () => {
     ).toEqual(expect.arrayContaining(["bearing"]));
   });
 
-  it("models slider subtypes, reviewed compatibility, and exact inclusion separately", () => {
+  it("models slider subtypes and exact inclusion without compatibility metadata", () => {
     const slider = getTableConfig(schema.productSlider);
     const plate = getTableConfig(schema.productSliderPlate);
     const insert = getTableConfig(schema.productSliderInsert);
-    const family = getTableConfig(schema.compatibilityFamily);
-    const membership = getTableConfig(schema.productCompatibilityFamily);
-    const advisory = getTableConfig(schema.productCompatibilityAdvisory);
     const inclusion = getTableConfig(schema.productIncludedComponent);
     const configuration = getTableConfig(schema.productMagnetConfiguration);
     const magnetGroup = getTableConfig(schema.productMagnetGroup);
@@ -158,7 +155,6 @@ describe("catalog schema", () => {
     const insertOffer = getTableConfig(schema.productInsertMagnetOffer);
     const insertOfferGroup = getTableConfig(schema.productInsertMagnetGroup);
     const insertOfferSlot = getTableConfig(schema.productInsertMagnetSlot);
-    const template = getTableConfig(schema.magnetConfigurationTemplate);
     const sliderOffer = getTableConfig(schema.productSliderInsertOffer);
 
     expect(slider.columns.map(({ name }) => name)).toEqual(
@@ -192,25 +188,6 @@ describe("catalog schema", () => {
         ]),
       );
     }
-    expect(family.columns.map(({ name }) => name)).toEqual(
-      expect.arrayContaining(["maker_id", "name", "slug"]),
-    );
-    expect(family.indexes.map(({ config }) => config.name)).toEqual(
-      expect.arrayContaining([
-        "compatibility_family_maker_name_unique",
-        "compatibility_family_maker_slug_unique",
-      ]),
-    );
-    expect(membership.primaryKeys).toHaveLength(1);
-    expect(advisory.columns.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        "product_id",
-        "related_product_id",
-        "text",
-        "reviewed_at",
-        "reviewed_by_clerk_id",
-      ]),
-    );
     expect(inclusion.primaryKeys).toHaveLength(1);
     expect(configuration.columns.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
@@ -266,7 +243,6 @@ describe("catalog schema", () => {
         "configuration_label_id",
         "click_option_id",
         "is_advertised_default",
-        "copied_from_template_id",
       ]),
     );
     expect(insertOffer.indexes.map(({ config }) => config.name)).toContain(
@@ -283,15 +259,6 @@ describe("catalog schema", () => {
     );
     expect(insertOfferSlot.columns.map(({ name }) => name)).not.toEqual(
       expect.arrayContaining(["polarity", "x", "y", "x_mm", "y_mm"]),
-    );
-    expect(template.columns.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        "name",
-        "scope",
-        "maker_id",
-        "compatibility_family_id",
-        "configuration",
-      ]),
     );
     expect(sliderOffer.columns.map(({ name }) => name)).toEqual(
       expect.arrayContaining([

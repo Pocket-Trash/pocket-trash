@@ -249,7 +249,6 @@ const copy = {
   clear: "Clear",
   close: "Close",
   colors: "Colour",
-  compatibilityFamily: "Compatibility family",
   description: "Filter the catalog",
   /**
    * Provides the fade name test double.
@@ -295,7 +294,6 @@ const copy = {
  */
 const facets = {
   colors: [],
-  compatibilityFamilies: [],
   fades: [],
   finishes: [],
   makers: [],
@@ -310,7 +308,6 @@ const facets = {
  * Empty controlled filter state used by panel tests.
  */
 const filters = {
-  compatibilityFamilyIds: [],
   spinnerButtonIds: [],
   colorIds: [],
   fadeColorSets: [],
@@ -404,9 +401,6 @@ describe("CatalogFilterBar", () => {
           copy={copy}
           facets={{
             ...facets,
-            compatibilityFamilies: [
-              { count: 2, id: 20, name: "Small family", slug: "small-family" },
-            ],
             patterns: [{ count: 3, id: 30, name: "Ripple", slug: "ripple" }],
             plates: [{ count: 1, id: 40, name: "V2 plate", slug: "v2-plate" }],
             spinnerButtons: [

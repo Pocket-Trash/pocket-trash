@@ -71,9 +71,6 @@ export const loggerMessages = {
     catalog: {
       attachImages: "database.catalog.attachImages",
       selectCollectionCover: "database.catalog.selectCollectionCover",
-      createCompatibilityFamily: "database.catalog.createCompatibilityFamily",
-      createMagnetConfigurationTemplate:
-        "database.catalog.createMagnetConfigurationTemplate",
       createTerminologyAlias: "database.catalog.createTerminologyAlias",
       createColor: "database.catalog.createColor",
       createFinish: "database.catalog.createFinish",
@@ -85,9 +82,6 @@ export const loggerMessages = {
       createProduct: "database.catalog.createProduct",
       deleteProduct: "database.catalog.deleteProduct",
       listColorEffects: "database.catalog.listColorEffects",
-      listCompatibilityFamilies: "database.catalog.listCompatibilityFamilies",
-      listMagnetConfigurationTemplates:
-        "database.catalog.listMagnetConfigurationTemplates",
       listTerminologyAliases: "database.catalog.listTerminologyAliases",
       listColors: "database.catalog.listColors",
       listFinishes: "database.catalog.listFinishes",

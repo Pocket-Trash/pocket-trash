@@ -24,8 +24,6 @@ export type CatalogFilters = {
    * Selected finish identifiers.
    */
   finishIds: number[];
-  /** Selected reviewed compatibility-family identifiers. */
-  compatibilityFamilyIds: number[];
   /**
    * Selected maker identifiers.
    */
@@ -70,8 +68,6 @@ export type CatalogFilterSearch = {
    * Finish identifiers encoded in URL search.
    */
   finish?: number[];
-  /** Compatibility-family identifiers encoded in URL search. */
-  family?: number[];
   /**
    * Maker identifiers encoded in URL search.
    */
@@ -98,8 +94,6 @@ export type CatalogFilterSearch = {
  * Product fields required for catalog facet construction and matching.
  */
 export type FilterableCatalogItem = {
-  /** Live compatibility families on the displayed product or item. */
-  compatibilityFamilies: CatalogLookup[];
   /**
    * Finish configurations available for the item.
    */
@@ -170,8 +164,6 @@ export type CatalogFacets = {
    * Available individual colors.
    */
   colors: CatalogFacet<CatalogFinishOption["colors"][number]>[];
-  /** Available reviewed compatibility families. */
-  compatibilityFamilies: CatalogFacet[];
   /**
    * Available canonical fade color sets.
    */
@@ -224,7 +216,6 @@ export type CatalogFacets = {
  * @returns A fresh empty catalog-filter object.
  */
 export const emptyCatalogFilters = (): CatalogFilters => ({
-  compatibilityFamilyIds: [],
   spinnerButtonIds: [],
   colorIds: [],
   fadeColorSets: [],
@@ -263,7 +254,6 @@ export function parseCatalogFilterSearch(
     color: numbers(search.color),
     fade: fade.length ? [...new Set(fade)] : undefined,
     finish: numbers(search.finish),
-    family: numbers(search.family),
     maker: numbers(search.maker),
     material: numbers(search.material),
     pattern: numbers(search.pattern),
@@ -286,7 +276,6 @@ export function parseCatalogFilterSearch(
  */
 export function filtersFromSearch(search: CatalogFilterSearch): CatalogFilters {
   return {
-    compatibilityFamilyIds: search.family ?? [],
     spinnerButtonIds: search.button ?? [],
     colorIds: search.color ?? [],
     fadeColorSets: (search.fade ?? []).map((value) =>
@@ -319,9 +308,6 @@ export function filtersToSearch(filters: CatalogFilters): CatalogFilterSearch {
       ? filters.fadeColorSets.map(fadeKey)
       : undefined,
     finish: filters.finishIds.length ? filters.finishIds : undefined,
-    family: filters.compatibilityFamilyIds.length
-      ? filters.compatibilityFamilyIds
-      : undefined,
     maker: filters.makerIds.length ? filters.makerIds : undefined,
     material: filters.materialIds.length ? filters.materialIds : undefined,
     pattern: filters.patternIds.length ? filters.patternIds : undefined,
@@ -348,7 +334,6 @@ export function hasCatalogFilters(filters: CatalogFilters): boolean {
     filters.fadeColorSets.length > 0 ||
     filters.makerIds.length > 0 ||
     filters.patternIds.length > 0 ||
-    filters.compatibilityFamilyIds.length > 0 ||
     filters.plateIds.length > 0 ||
     filters.spinnerButtonIds.length > 0 ||
     filters.strict
@@ -410,10 +395,6 @@ export function pruneCatalogFilters(
       fadeKeys.has(fadeKey(colors)),
     ),
     finishIds: allowed(filters.finishIds, facets.finishes),
-    compatibilityFamilyIds: allowed(
-      filters.compatibilityFamilyIds,
-      facets.compatibilityFamilies,
-    ),
     makerIds: allowed(filters.makerIds, facets.makers),
     materialIds: allowed(filters.materialIds, facets.materials),
     patternIds: allowed(filters.patternIds, facets.patterns),
@@ -432,7 +413,6 @@ export function productFilterItem(
   product: CatalogProduct,
 ): FilterableCatalogItem {
   return {
-    compatibilityFamilies: product.compatibilityFamilies,
     finishOptions: product.finishOptions,
     makerId: product.makerId,
     makerName: product.makerName,
@@ -484,7 +464,6 @@ export function collectionFilterItem(
     ? itemsById.get(item.installedButtonId)
     : null;
   return {
-    compatibilityFamilies: item.compatibilityFamilies ?? [],
     finishOptions: item.finishOption ? [item.finishOption] : [],
     makerId: item.makerId,
     makerName: item.makerName,
@@ -562,11 +541,6 @@ export function matchesCatalogFilters(
       filters.strict,
     ) ||
     !matchesIds(
-      item.compatibilityFamilies.map(({ id }) => id),
-      filters.compatibilityFamilyIds,
-      filters.strict,
-    ) ||
-    !matchesIds(
       item.plateComponents.map(({ id }) => id),
       filters.plateIds,
       filters.strict,
@@ -616,7 +590,6 @@ export function buildCatalogFacets(
     : items;
   const materials = new Map<number, CatalogFacet>();
   const patterns = new Map<number, CatalogFacet>();
-  const compatibilityFamilies = new Map<number, CatalogFacet>();
   const plates = new Map<number, CatalogFacet>();
   const spinnerButtons = new Map<number, CatalogFacet>();
   const finishes = new Map<number, CatalogFacet>();
@@ -686,7 +659,6 @@ export function buildCatalogFacets(
   for (const item of scoped) {
     incrementUnique(materials, item.materials);
     incrementUnique(patterns, item.patterns);
-    incrementUnique(compatibilityFamilies, item.compatibilityFamilies);
     incrementUnique(plates, item.plateComponents);
     incrementUnique(spinnerButtons, item.spinnerButtonComponents);
     incrementUnique(
@@ -725,7 +697,6 @@ export function buildCatalogFacets(
 
   return {
     colors: sortFacets(colors.values()),
-    compatibilityFamilies: sortFacets(compatibilityFamilies.values()),
     fades: [...fades.entries()]
       .map(([key, value]) => ({
         colors:

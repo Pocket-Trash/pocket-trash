@@ -107,7 +107,6 @@ const emptyCustomFinish = {
 /** Empty catalog option lists used by form tests. */
 const emptyCatalogOptions = {
   colorEffects: [],
-  compatibilityFamilies: [],
   colors: [],
   finishes: [],
   makers: [],
@@ -171,7 +170,6 @@ describe("finish option editor", () => {
             { id: 1000, name: "Solid", slug: "solid" },
             { id: 1001, name: "Fade", slug: "fade" },
           ],
-          compatibilityFamilies: [],
           colors: [
             { id: 1000, name: "Blue", slug: "blue" },
             { id: 1001, name: "Purple", slug: "purple" },
@@ -223,8 +221,6 @@ describe("finish option editor", () => {
       canEdit: true,
       compatibleButtonId: null,
       compatibleButtonName: null,
-      compatibilityAdvisories: [],
-      compatibilityFamilies: [],
       createdAt: new Date(0),
       description: null,
       diameterMm: null,
@@ -431,7 +427,6 @@ describe("finish option editor", () => {
             sourceLabel: null,
             sourceNotes: null,
           },
-          copiedFromTemplateId: null,
           id: 4200,
           insertProductId: 3100,
           isAdvertisedDefault: true,
@@ -593,15 +588,6 @@ describe("product form conditional fields", () => {
         initialProduct: product,
         options: {
           ...emptyCatalogOptions,
-          compatibilityFamilies: [
-            {
-              id: 3000,
-              makerId: product.makerId,
-              makerName: product.makerName,
-              name: "Rail 50",
-              slug: "rail-50",
-            },
-          ],
           makers: [
             {
               description: null,
@@ -625,8 +611,8 @@ describe("product form conditional fields", () => {
       }),
     );
 
-    expect(html).toContain("Compatibility families");
-    expect(html).toContain("Reviewed advisory");
+    expect(html).not.toContain("Compatibility families");
+    expect(html).not.toContain("Reviewed advisory");
     expect(html).toContain("Maker terminology");
     expect(html).toContain("Add terminology alias");
     expect(html).toContain('aria-label="Length"');
@@ -892,8 +878,6 @@ function productFixture(
     canEdit: true,
     compatibleButtonId: null,
     compatibleButtonName: null,
-    compatibilityAdvisories: [],
-    compatibilityFamilies: [],
     createdAt: new Date(0),
     description: null,
     diameterMm: null,
@@ -966,7 +950,6 @@ function collectionFixture(
     collectionItemId,
     collectionIsPrivate: false,
     collectionName: "Test collection",
-    compatibilityFamilies: [],
     compatibleButtonId: null,
     compatibleButtonName: null,
     displayName: product.name,
@@ -975,7 +958,6 @@ function collectionFixture(
     finishOption: product.finishOptions[0] ?? null,
     imageCount: 0,
     images: [],
-    hasGrandfatheredInstallation: false,
     effectiveSliderSetup: null,
     isAdminPrivate: false,
     isPrivate: false,

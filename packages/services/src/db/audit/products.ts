@@ -63,14 +63,6 @@ function definition(action: string, targetType: string) {
 
 /** Audit event definitions for product mutations. */
 export const productAudit = {
-  compatibilityFamilyCreated: definition(
-    "products.compatibility_family.created",
-    "products.compatibility_family",
-  ),
-  magnetConfigurationTemplateCreated: definition(
-    "products.magnet_configuration_template.created",
-    "products.magnet_configuration_template",
-  ),
   terminologyAliasCreated: definition(
     "products.terminology_alias.created",
     "products.terminology_alias",

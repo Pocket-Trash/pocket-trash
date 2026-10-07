@@ -526,37 +526,6 @@ export const productMaterial = pgTable(
   ],
 );
 
-/** Maker-scoped reviewed compatibility family for sliders and components. */
-export const compatibilityFamily = pgTable(
-  "compatibility_family",
-  {
-    id: bigint("id", { mode: "number" })
-      .primaryKey()
-      .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    makerId: bigint("maker_id", { mode: "number" })
-      .notNull()
-      .references(() => maker.id, { onDelete: "restrict" }),
-    name: text("name").notNull(),
-    slug: text("slug").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    uniqueIndex("compatibility_family_maker_name_unique").on(
-      table.makerId,
-      sql`lower(${table.name})`,
-    ),
-    uniqueIndex("compatibility_family_maker_slug_unique").on(
-      table.makerId,
-      table.slug,
-    ),
-  ],
-);
-
 /** Maker-scoped catalog terminology mapped to a registered canonical concept. */
 export const catalogTerminologyAlias = pgTable(
   "catalog_terminology_alias",
@@ -606,78 +575,6 @@ export const catalogTerminologyAlias = pgTable(
     check(
       "catalog_terminology_alias_normalized_value_valid",
       sql`char_length(${table.normalizedValue}) between 1 and 80 and ${table.normalizedValue} = lower(trim(${table.normalizedValue}))`,
-    ),
-  ],
-);
-
-/** Reviewed many-to-many membership between products and compatibility families. */
-export const productCompatibilityFamily = pgTable(
-  "product_compatibility_family",
-  {
-    productId: bigint("product_id", { mode: "number" })
-      .notNull()
-      .references(() => product.id, { onDelete: "cascade" }),
-    compatibilityFamilyId: bigint("compatibility_family_id", {
-      mode: "number",
-    })
-      .notNull()
-      .references(() => compatibilityFamily.id, { onDelete: "restrict" }),
-    reviewedAt: timestamp("reviewed_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    reviewedByClerkId: text("reviewed_by_clerk_id").notNull(),
-  },
-  (table) => [
-    primaryKey({
-      columns: [table.productId, table.compatibilityFamilyId],
-    }),
-    index("product_compatibility_family_family_idx").on(
-      table.compatibilityFamilyId,
-    ),
-  ],
-);
-
-/** Reviewed, non-blocking compatibility warning between two exact products. */
-export const productCompatibilityAdvisory = pgTable(
-  "product_compatibility_advisory",
-  {
-    id: bigint("id", { mode: "number" })
-      .primaryKey()
-      .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    productId: bigint("product_id", { mode: "number" })
-      .notNull()
-      .references(() => product.id, { onDelete: "cascade" }),
-    relatedProductId: bigint("related_product_id", { mode: "number" })
-      .notNull()
-      .references(() => product.id, { onDelete: "restrict" }),
-    text: text("text").notNull(),
-    reviewedAt: timestamp("reviewed_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    reviewedByClerkId: text("reviewed_by_clerk_id").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    unique("product_compatibility_advisory_product_related_text_unique").on(
-      table.productId,
-      table.relatedProductId,
-      table.text,
-    ),
-    index("product_compatibility_advisory_related_idx").on(
-      table.relatedProductId,
-    ),
-    check(
-      "product_compatibility_advisory_distinct_products",
-      sql`${table.productId} <> ${table.relatedProductId}`,
-    ),
-    check(
-      "product_compatibility_advisory_text_valid",
-      sql`char_length(trim(${table.text})) between 1 and 1000`,
     ),
   ],
 );
@@ -1275,7 +1172,7 @@ export const productInsertClickOption = pgTable(
 );
 
 /** Exact configuration JSON stored by a catalog-authoring template. */
-export type MagnetConfigurationTemplateValue = {
+export type MagnetConfigurationValue = {
   /** Ordered exact magnet groups. */
   groups: Array<{
     /** Exact diameter in millimetres. */
@@ -1318,10 +1215,10 @@ export type OwnedSliderInsertSetupValue = {
   clickCount: number | null;
   /** Owner-recorded layout snapshot, or `null` when not recorded. */
   configuration:
-    | (Omit<MagnetConfigurationTemplateValue, "slots"> & {
+    | (Omit<MagnetConfigurationValue, "slots"> & {
         /** Ordered positions whose physical state may be unknown. */
         slots: Array<
-          Omit<MagnetConfigurationTemplateValue["slots"][number], "state"> & {
+          Omit<MagnetConfigurationValue["slots"][number], "state"> & {
             /** Owner-recorded position state. */
             state: "occupied" | "empty" | "unknown";
           }
@@ -1331,52 +1228,6 @@ export type OwnedSliderInsertSetupValue = {
   /** Catalog offer copied as the authoring source, when present. */
   sourceOfferId: number | null;
 };
-
-/** Catalog-manager authoring template copied into exact host-product offers. */
-export const magnetConfigurationTemplate = pgTable(
-  "magnet_configuration_template",
-  {
-    id: bigint("id", { mode: "number" })
-      .primaryKey()
-      .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    name: text("name").notNull(),
-    normalizedName: text("normalized_name").notNull(),
-    scope: text("scope", { enum: ["global", "maker", "family"] }).notNull(),
-    makerId: bigint("maker_id", { mode: "number" }).references(() => maker.id, {
-      onDelete: "cascade",
-    }),
-    compatibilityFamilyId: bigint("compatibility_family_id", {
-      mode: "number",
-    }).references(() => compatibilityFamily.id, { onDelete: "cascade" }),
-    configuration: jsonb("configuration")
-      .$type<MagnetConfigurationTemplateValue>()
-      .notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    unique("magnet_configuration_template_scope_name_unique")
-      .on(
-        table.scope,
-        table.makerId,
-        table.compatibilityFamilyId,
-        table.normalizedName,
-      )
-      .nullsNotDistinct(),
-    check(
-      "magnet_configuration_template_name_valid",
-      sql`char_length(trim(${table.name})) between 1 and 100`,
-    ),
-    check(
-      "magnet_configuration_template_scope_valid",
-      sql`(${table.scope} = 'global' and num_nonnulls(${table.makerId}, ${table.compatibilityFamilyId}) = 0) or (${table.scope} = 'maker' and ${table.makerId} is not null and ${table.compatibilityFamilyId} is null) or (${table.scope} = 'family' and ${table.makerId} is null and ${table.compatibilityFamilyId} is not null)`,
-    ),
-  ],
-);
 
 /** Complete magnet-layout offer belonging to one exact insert product. */
 export const productInsertMagnetOffer = pgTable(
@@ -1399,11 +1250,6 @@ export const productInsertMagnetOffer = pgTable(
     isAdvertisedDefault: boolean("is_advertised_default")
       .default(false)
       .notNull(),
-    copiedFromTemplateId: bigint("copied_from_template_id", {
-      mode: "number",
-    }).references(() => magnetConfigurationTemplate.id, {
-      onDelete: "set null",
-    }),
     sourceLabel: text("source_label"),
     sourceNotes: text("source_notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -1704,28 +1550,12 @@ export type NewCollectionItemImage = typeof collectionItemImage.$inferInsert;
 export type ProductMaterial = typeof productMaterial.$inferSelect;
 /** Values accepted when creating a product material row. */
 export type NewProductMaterial = typeof productMaterial.$inferInsert;
-/** Stored compatibility family row. */
-export type CompatibilityFamily = typeof compatibilityFamily.$inferSelect;
-/** Values accepted when creating a compatibility family row. */
-export type NewCompatibilityFamily = typeof compatibilityFamily.$inferInsert;
 /** Stored maker-scoped catalog terminology alias. */
 export type CatalogTerminologyAlias =
   typeof catalogTerminologyAlias.$inferSelect;
 /** Values accepted when creating a catalog terminology alias. */
 export type NewCatalogTerminologyAlias =
   typeof catalogTerminologyAlias.$inferInsert;
-/** Stored product compatibility-family membership. */
-export type ProductCompatibilityFamily =
-  typeof productCompatibilityFamily.$inferSelect;
-/** Values accepted for a product compatibility-family membership. */
-export type NewProductCompatibilityFamily =
-  typeof productCompatibilityFamily.$inferInsert;
-/** Stored reviewed product compatibility advisory. */
-export type ProductCompatibilityAdvisory =
-  typeof productCompatibilityAdvisory.$inferSelect;
-/** Values accepted for a reviewed product compatibility advisory. */
-export type NewProductCompatibilityAdvisory =
-  typeof productCompatibilityAdvisory.$inferInsert;
 /** Stored exact included-component relationship. */
 export type ProductIncludedComponent =
   typeof productIncludedComponent.$inferSelect;
@@ -1806,12 +1636,6 @@ export type ProductInsertClickOption =
 /** Values accepted for an insert click-count option. */
 export type NewProductInsertClickOption =
   typeof productInsertClickOption.$inferInsert;
-/** Stored catalog-authoring magnet configuration template. */
-export type MagnetConfigurationTemplate =
-  typeof magnetConfigurationTemplate.$inferSelect;
-/** Values accepted for a catalog-authoring magnet configuration template. */
-export type NewMagnetConfigurationTemplate =
-  typeof magnetConfigurationTemplate.$inferInsert;
 /** Stored exact insert-hosted magnet offer. */
 export type ProductInsertMagnetOffer =
   typeof productInsertMagnetOffer.$inferSelect;

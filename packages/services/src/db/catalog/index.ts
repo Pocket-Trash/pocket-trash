@@ -149,8 +149,6 @@ const catalogNameConflictMessages: Record<string, string> = {
   makers_slug_unique: "Maker slug already exists.",
   materials_name_case_insensitive_unique: "Material name already exists.",
   pattern_name_case_insensitive_unique: "Pattern name already exists.",
-  compatibility_family_maker_name_unique:
-    "Compatibility family name already exists for this maker.",
   catalog_terminology_alias_maker_concept_value_unique:
     "Alias already exists for this maker and concept.",
   catalog_terminology_alias_preferred_unique:
@@ -287,28 +285,6 @@ export type PublicMakerDetail = CatalogMaker & {
   collectionItems: UserCollectionItem[];
   /** Distinct approved public products associated with the maker. */
   products: CatalogProduct[];
-};
-
-/** Maker-scoped reviewed compatibility family. */
-export type CatalogCompatibilityFamily = CatalogLookup & {
-  /** Maker that defines the family. */
-  makerId: number;
-  /** Maker display name. */
-  makerName: string;
-};
-
-/** Reviewed warning that remains distinct from enforced family compatibility. */
-export type CatalogCompatibilityAdvisory = {
-  /** Advisory database identifier. */
-  id: number;
-  /** Exact related product identifier. */
-  relatedProductId: number;
-  /** Exact related product display name. */
-  relatedProductName: string;
-  /** Review timestamp. */
-  reviewedAt: Date;
-  /** Non-blocking reviewed warning text. */
-  text: string;
 };
 
 /** Exact product relationship describing a component sold with a parent. */
@@ -569,8 +545,6 @@ export type CatalogInsertMagnetOffer = {
   clickCount: number | null;
   /** Complete exact offer snapshot. */
   configuration: CatalogMagnetConfiguration;
-  /** Authoring template provenance, when copied from a template. */
-  copiedFromTemplateId: number | null;
   /** Database identifier. */
   id: number;
   /** Exact host insert product identifier. */
@@ -698,22 +672,6 @@ export function resolveEffectiveSliderSetup(input: {
   };
 }
 
-/** Catalog-manager-only reusable authoring source. */
-export type CatalogMagnetConfigurationTemplate = {
-  /** Family scope target, when family-scoped. */
-  compatibilityFamilyId: number | null;
-  /** Complete exact authoring configuration. */
-  configuration: CatalogMagnetConfiguration;
-  /** Database identifier. */
-  id: number;
-  /** Maker scope target, when maker-scoped. */
-  makerId: number | null;
-  /** Manager-facing template name. */
-  name: string;
-  /** Authoring visibility scope. */
-  scope: "global" | "maker" | "family";
-};
-
 /**
  * Fully hydrated catalog product returned to callers.
  */
@@ -722,10 +680,6 @@ export type CatalogProduct = {
    * Durable product review state.
    */
   approvalStatus: CatalogApprovalStatus;
-  /** Reviewed non-blocking compatibility warnings. */
-  compatibilityAdvisories: CatalogCompatibilityAdvisory[];
-  /** Reviewed compatibility-family memberships. */
-  compatibilityFamilies: CatalogCompatibilityFamily[];
   /**
    * Bearing model or designation, or `null` when unspecified.
    */
@@ -907,15 +861,6 @@ export type ProductWriteInput = {
   actor: Actor;
   /** Complete inherent setup or sourced incomplete-layout note. */
   bodyHostedMagnetSetup?: CatalogBodyHostedMagnetSetup | null;
-  /** Reviewed non-blocking compatibility warnings. */
-  compatibilityAdvisories?: Array<{
-    /** Exact related product identifier. */
-    relatedProductId: number;
-    /** Reviewed warning text. */
-    text: string;
-  }>;
-  /** Reviewed compatibility-family identifiers. */
-  compatibilityFamilyIds?: number[];
   /**
    * Optional description.
    */
@@ -955,8 +900,6 @@ export type ProductWriteInput = {
       clickCount: number | null;
       /** Complete exact configuration snapshot. */
       configuration: CatalogMagnetConfiguration;
-      /** Optional manager template provenance. */
-      copiedFromTemplateId?: number | null;
       /** Existing offer identifier retained across updates. */
       id?: number;
       /** Whether this is the insert product's advertised default. */
@@ -1054,44 +997,6 @@ export type CatalogService = {
     /** Maker identifier scoping the alias. */
     makerId: number;
   }): Promise<CatalogTerminologyAlias>;
-  /**
-   * Creates a reviewed maker-scoped compatibility family.
-   *
-   * @param input - Family maker, name, slug, and authenticated catalog manager.
-   * @returns Created compatibility family.
-   * @rejects When authorization, validation, persistence, auditing, or logging fails.
-   */
-  createCompatibilityFamily(input: {
-    /** Authenticated catalog manager. */
-    actor: Actor;
-    /** Maker identifier that scopes the family. */
-    makerId: number;
-    /** Display name. */
-    name: string;
-    /** URL-safe identifier. */
-    slug: string;
-  }): Promise<CatalogCompatibilityFamily>;
-  /**
-   * Creates a catalog-manager-only exact configuration authoring template.
-   *
-   * @param input - Template scope, name, configuration, and authenticated actor.
-   * @returns Created reusable authoring template.
-   * @rejects When authorization, validation, persistence, auditing, or logging fails.
-   */
-  createMagnetConfigurationTemplate(input: {
-    /** Authenticated catalog manager. */
-    actor: Actor;
-    /** Family scope target, required only for family scope. */
-    compatibilityFamilyId: number | null;
-    /** Complete exact configuration copied by future offers. */
-    configuration: CatalogMagnetConfiguration;
-    /** Maker scope target, required only for maker scope. */
-    makerId: number | null;
-    /** Manager-facing template name. */
-    name: string;
-    /** Visibility scope used by catalog authoring. */
-    scope: "global" | "maker" | "family";
-  }): Promise<CatalogMagnetConfigurationTemplate>;
   /**
    * Attaches images.
    *
@@ -1447,23 +1352,6 @@ export type CatalogService = {
    */
   listPatterns(): Promise<CatalogLookup[]>;
   /**
-   * Lists reviewed compatibility families.
-   *
-   * @returns Compatibility families ordered by maker and name.
-   * @rejects When the database query or operation logging fails.
-   */
-  listCompatibilityFamilies(): Promise<CatalogCompatibilityFamily[]>;
-  /**
-   * Lists authoring templates only for catalog managers.
-   *
-   * @param viewer - Viewer whose catalog permissions control access.
-   * @returns Reusable exact configuration templates or an empty list.
-   * @rejects When the database query or operation logging fails.
-   */
-  listMagnetConfigurationTemplates(
-    viewer?: CatalogViewer,
-  ): Promise<CatalogMagnetConfigurationTemplate[]>;
-  /**
    * Lists maker-scoped terminology aliases ordered by label.
    *
    * @returns Registered terminology aliases.
@@ -1686,8 +1574,6 @@ export type UserCollectionItem = {
    * Whether the viewer may edit the record.
    */
   canEdit: boolean;
-  /** Live reviewed compatibility families on the source product. */
-  compatibilityFamilies: CatalogCompatibilityFamily[];
   /** Exact spinner-button product included with the source spinner. */
   compatibleButtonId: number | null;
   /** Display name of the included spinner button, when present. */
@@ -1754,8 +1640,6 @@ export type UserCollectionItem = {
   installedButtonId: number | null;
   /** Whether an installed button exists but is unavailable to this viewer. */
   installedButtonUnavailable?: boolean;
-  /** Whether any uninterrupted slider-component installation no longer matches current compatibility metadata. */
-  hasGrandfatheredInstallation: boolean;
   /** Effective physical or catalog-derived setup for an owned slider. */
   effectiveSliderSetup: EffectiveSliderSetup | null;
   /** Installed slider insert collection-item identifier. */
@@ -2727,139 +2611,6 @@ export function createCatalogService(
       );
     },
     /**
-     * Creates a reviewed maker-scoped compatibility family.
-     *
-     * @param input - Family maker, name, slug, and authenticated catalog manager.
-     * @returns Created compatibility family.
-     * @rejects When authorization, validation, persistence, auditing, or logging fails.
-     */
-    async createCompatibilityFamily(input) {
-      if (!hasPermission(input.actor, "products.manage"))
-        throw new Error("Product does not exist.");
-      const dependencies = requireProductAudit(users, audit);
-      const actorUser = dependencies
-        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
-        : null;
-      return await logger.operation(
-        loggerMessages.database.catalog.createCompatibilityFamily,
-        async () =>
-          await db.transaction(async (tx) => {
-            const [makerRow] = await tx
-              .select({ id: schema.maker.id, name: schema.maker.name })
-              .from(schema.maker)
-              .where(eq(schema.maker.id, input.makerId))
-              .limit(1);
-            if (!makerRow) throw new Error("Maker does not exist.");
-            const [row] = await tx
-              .insert(schema.compatibilityFamily)
-              .values({
-                makerId: input.makerId,
-                name: input.name,
-                slug: input.slug,
-              })
-              .returning({
-                id: schema.compatibilityFamily.id,
-                makerId: schema.compatibilityFamily.makerId,
-                name: schema.compatibilityFamily.name,
-                slug: schema.compatibilityFamily.slug,
-              })
-              .catch(mapCatalogNameConflict);
-            if (!row) throw new Error("Failed to create compatibility family.");
-            const result = { ...row, makerName: makerRow.name };
-            if (dependencies && actorUser) {
-              await writeProductAdminAudit(dependencies.audit, tx, {
-                actor: input.actor,
-                actorUser,
-                after: result,
-                definition: productAudit.compatibilityFamilyCreated,
-                targetId: row.id,
-              });
-            }
-            return result;
-          }),
-        actorAttributes(input.actor.clerkId, { slug: input.slug }),
-      );
-    },
-    /**
-     * Creates an audited catalog-manager configuration template.
-     *
-     * @param input - Template scope, exact configuration, and actor.
-     * @returns Created reusable authoring template.
-     * @rejects When authorization, validation, persistence, auditing, or logging fails.
-     */
-    async createMagnetConfigurationTemplate(input) {
-      if (!hasPermission(input.actor, "products.manage"))
-        throw new Error("Product does not exist.");
-      const name = normalizeRequiredVocabulary(input.name);
-      const normalizedName = normalizeCatalogSearch(name);
-      const configuration = normalizeCatalogMagnetConfiguration(
-        input.configuration,
-      );
-      if (
-        (input.scope === "global" &&
-          (input.makerId !== null || input.compatibilityFamilyId !== null)) ||
-        (input.scope === "maker" &&
-          (input.makerId === null || input.compatibilityFamilyId !== null)) ||
-        (input.scope === "family" &&
-          (input.makerId !== null || input.compatibilityFamilyId === null))
-      ) {
-        throw new Error("Magnet configuration template scope is invalid.");
-      }
-      const dependencies = requireProductAudit(users, audit);
-      const actorUser = dependencies
-        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
-        : null;
-      return await logger.operation(
-        loggerMessages.database.catalog.createMagnetConfigurationTemplate,
-        async () =>
-          await db.transaction(async (tx) => {
-            const [row] = await tx
-              .insert(schema.magnetConfigurationTemplate)
-              .values({
-                compatibilityFamilyId: input.compatibilityFamilyId,
-                configuration,
-                makerId: input.makerId,
-                name,
-                normalizedName,
-                scope: input.scope,
-              })
-              .returning()
-              .catch(mapCatalogNameConflict);
-            if (!row)
-              throw new Error(
-                "Failed to create magnet configuration template.",
-              );
-            const result: CatalogMagnetConfigurationTemplate = {
-              compatibilityFamilyId: row.compatibilityFamilyId,
-              configuration: normalizeCatalogMagnetConfiguration(
-                row.configuration,
-              ),
-              id: row.id,
-              makerId: row.makerId,
-              name: row.name,
-              scope: row.scope,
-            };
-            if (dependencies && actorUser) {
-              await writeProductAdminAudit(dependencies.audit, tx, {
-                actor: input.actor,
-                actorUser,
-                after: {
-                  compatibilityFamilyId: result.compatibilityFamilyId,
-                  configuration: result.configuration,
-                  makerId: result.makerId,
-                  name: result.name,
-                  scope: result.scope,
-                },
-                definition: productAudit.magnetConfigurationTemplateCreated,
-                targetId: row.id,
-              });
-            }
-            return result;
-          }),
-        actorAttributes(input.actor.clerkId),
-      );
-    },
-    /**
      * Creates color.
      *
      * @param input - Color name, slug, hex value, and authenticated actor.
@@ -3437,7 +3188,6 @@ export function createCatalogService(
             union all select 1 from collection_spinner_button where product_spinner_button_id = ${row.id}
             union all select 1 from product_spinner where compatible_button_id = ${row.id}
             union all select 1 from product_included_component where component_product_id = ${row.id}
-            union all select 1 from product_compatibility_advisory where related_product_id = ${row.id}
             union all select 1 from finish_option selected join finish_option source on source.id = selected.source_product_finish_option_id where source.product_id = ${row.id}
             limit 1`);
             if (references.rows.length) return false;
@@ -3706,65 +3456,6 @@ export function createCatalogService(
             })
             .from(schema.colorEffect)
             .orderBy(asc(schema.colorEffect.name)),
-      );
-    },
-    /**
-     * Lists reviewed compatibility families.
-     *
-     * @returns Compatibility families ordered by maker and name.
-     * @rejects When the database query or operation logging fails.
-     */
-    async listCompatibilityFamilies() {
-      return await logger.operation(
-        loggerMessages.database.catalog.listCompatibilityFamilies,
-        async () =>
-          await db
-            .select({
-              id: schema.compatibilityFamily.id,
-              makerId: schema.compatibilityFamily.makerId,
-              makerName: schema.maker.name,
-              name: schema.compatibilityFamily.name,
-              slug: schema.compatibilityFamily.slug,
-            })
-            .from(schema.compatibilityFamily)
-            .innerJoin(
-              schema.maker,
-              eq(schema.compatibilityFamily.makerId, schema.maker.id),
-            )
-            .orderBy(
-              asc(schema.maker.name),
-              asc(schema.compatibilityFamily.name),
-            ),
-      );
-    },
-    /**
-     * Lists exact configuration templates only to catalog managers.
-     *
-     * @param viewer - Viewer whose manager permission controls access.
-     * @returns Visible authoring templates.
-     */
-    async listMagnetConfigurationTemplates(viewer) {
-      if (!hasPermission(viewer, "products.manage")) return [];
-      return await logger.operation(
-        loggerMessages.database.catalog.listMagnetConfigurationTemplates,
-        async () => {
-          const rows = await db
-            .select()
-            .from(schema.magnetConfigurationTemplate)
-            .orderBy(asc(schema.magnetConfigurationTemplate.name));
-          return rows.map(
-            (row): CatalogMagnetConfigurationTemplate => ({
-              compatibilityFamilyId: row.compatibilityFamilyId,
-              configuration: normalizeCatalogMagnetConfiguration(
-                row.configuration,
-              ),
-              id: row.id,
-              makerId: row.makerId,
-              name: row.name,
-              scope: row.scope,
-            }),
-          );
-        },
       );
     },
     /**
@@ -6584,7 +6275,6 @@ export function createCollectionsService(
                     ...candidate,
                     ownerId: item.ownerId,
                     sliderCollectionItemId: input.collectionItemId,
-                    sliderProductId: item.sliderProductId,
                     parentIsPublic:
                       item.approvalStatus === "approved" &&
                       !item.isPrivate &&
@@ -7138,10 +6828,6 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     bodyHostedMagnetSetup: product.bodyHostedMagnetSetup ?? null,
     buttonDiameterMm: product.buttonDiameterMm,
     compatibleButtonId: product.compatibleButtonId,
-    compatibilityAdvisories: product.compatibilityAdvisories.map(
-      ({ id, relatedProductId }) => ({ id, relatedProductId }),
-    ),
-    compatibilityFamilyIds: product.compatibilityFamilies.map(({ id }) => id),
     description: product.description,
     diameterMm: product.diameterMm,
     finishOptions: product.finishOptions.map((option) => ({
@@ -7807,8 +7493,6 @@ async function queryProducts(
         viewer?.clerkId === row.ownerClerkId ||
           hasPermission(viewer, "products.manage"),
       ),
-      compatibilityAdvisories: [],
-      compatibilityFamilies: [],
       createdAt: row.createdAt,
       description: row.description,
       diameterMm: row.diameterMm,
@@ -8078,8 +7762,6 @@ async function loadInsertHostedMagnetOptions(
     .select({
       clickCount: schema.productInsertClickOption.clickCount,
       clickOptionId: schema.productInsertMagnetOffer.clickOptionId,
-      copiedFromTemplateId:
-        schema.productInsertMagnetOffer.copiedFromTemplateId,
       id: schema.productInsertMagnetOffer.id,
       insertProductId: schema.productInsertMagnetOffer.insertProductId,
       insertProductName: schema.product.name,
@@ -8198,7 +7880,6 @@ async function loadInsertHostedMagnetOptions(
         sourceLabel: offer.sourceLabel,
         sourceNotes: offer.sourceNotes,
       },
-      copiedFromTemplateId: offer.copiedFromTemplateId,
       id: offer.id,
       insertProductId: offer.insertProductId,
       isAdvertisedDefault: offer.isAdvertisedDefault,
@@ -8222,7 +7903,7 @@ async function loadInsertHostedMagnetOptions(
 }
 
 /**
- * Loads reviewed compatibility and visible exact inclusion relationships.
+ * Loads visible exact inclusion relationships.
  *
  * @param db - Database used for relationship queries.
  * @param products - Hydrated products receiving relationship data.
@@ -8246,100 +7927,30 @@ async function loadProductRelationships(
           eq(relatedProduct.approvalStatus, "approved"),
           eq(relatedProduct.isPrivate, false),
         );
-  const [families, advisories, components] = await Promise.all([
-    db
-      .select({
-        id: schema.compatibilityFamily.id,
-        makerId: schema.compatibilityFamily.makerId,
-        makerName: schema.maker.name,
-        name: schema.compatibilityFamily.name,
-        productId: schema.productCompatibilityFamily.productId,
-        slug: schema.compatibilityFamily.slug,
-      })
-      .from(schema.productCompatibilityFamily)
-      .innerJoin(
-        schema.compatibilityFamily,
-        eq(
-          schema.productCompatibilityFamily.compatibilityFamilyId,
-          schema.compatibilityFamily.id,
-        ),
-      )
-      .innerJoin(
-        schema.maker,
-        eq(schema.compatibilityFamily.makerId, schema.maker.id),
-      )
-      .where(inArray(schema.productCompatibilityFamily.productId, productIds))
-      .orderBy(asc(schema.maker.name), asc(schema.compatibilityFamily.name)),
-    db
-      .select({
-        id: schema.productCompatibilityAdvisory.id,
-        productId: schema.productCompatibilityAdvisory.productId,
-        relatedProductId: schema.productCompatibilityAdvisory.relatedProductId,
-        relatedProductName: relatedProduct.name,
-        reviewedAt: schema.productCompatibilityAdvisory.reviewedAt,
-        text: schema.productCompatibilityAdvisory.text,
-      })
-      .from(schema.productCompatibilityAdvisory)
-      .innerJoin(
-        relatedProduct,
-        eq(
-          schema.productCompatibilityAdvisory.relatedProductId,
-          relatedProduct.id,
-        ),
-      )
-      .where(
-        and(
-          inArray(schema.productCompatibilityAdvisory.productId, productIds),
-          relatedVisibility,
-        ),
-      )
-      .orderBy(asc(schema.productCompatibilityAdvisory.id)),
-    db
-      .select({
-        id: relatedProduct.id,
-        name: relatedProduct.name,
-        productId: schema.productIncludedComponent.productId,
-        productTypeSlug: relatedType.slug,
-        slug: relatedProduct.slug,
-      })
-      .from(schema.productIncludedComponent)
-      .innerJoin(
-        relatedProduct,
-        eq(
-          schema.productIncludedComponent.componentProductId,
-          relatedProduct.id,
-        ),
-      )
-      .innerJoin(relatedType, eq(relatedProduct.productTypeId, relatedType.id))
-      .where(
-        and(
-          inArray(schema.productIncludedComponent.productId, productIds),
-          relatedVisibility,
-        ),
-      )
-      .orderBy(asc(relatedProduct.name)),
-  ]);
+  const components = await db
+    .select({
+      id: relatedProduct.id,
+      name: relatedProduct.name,
+      productId: schema.productIncludedComponent.productId,
+      productTypeSlug: relatedType.slug,
+      slug: relatedProduct.slug,
+    })
+    .from(schema.productIncludedComponent)
+    .innerJoin(
+      relatedProduct,
+      eq(schema.productIncludedComponent.componentProductId, relatedProduct.id),
+    )
+    .innerJoin(relatedType, eq(relatedProduct.productTypeId, relatedType.id))
+    .where(
+      and(
+        inArray(schema.productIncludedComponent.productId, productIds),
+        relatedVisibility,
+      ),
+    )
+    .orderBy(asc(relatedProduct.name));
   const productsById = new Map(
     products.map((product) => [product.id, product]),
   );
-  for (const family of families) {
-    productsById.get(family.productId)?.compatibilityFamilies.push({
-      id: family.id,
-      makerId: family.makerId,
-      makerName: family.makerName,
-      name: family.name,
-      slug: family.slug,
-    });
-  }
-  for (const advisory of advisories) {
-    productsById.get(advisory.productId)?.compatibilityAdvisories.push({
-      id: advisory.id,
-      relatedProductId: advisory.relatedProductId,
-      relatedProductName: advisory.relatedProductName,
-      reviewedAt: advisory.reviewedAt,
-      text: advisory.text,
-    });
-  }
   for (const component of components) {
     if (
       component.productTypeSlug !== "slider-insert" &&
@@ -8679,34 +8290,6 @@ async function queryOwnedItems(
       colorEffectName: schema.colorEffect.name,
       colorEffectSlug: schema.colorEffect.slug,
       finishOptionId: schema.finishOption.id,
-      hasGrandfatheredInstallation: sql<boolean>`case
-        when ${schema.collectionSlider.id} is null then false
-        when ${schema.collectionSlider.installedPlateId} is not null and not exists (
-          select 1
-          from product_compatibility_family slider_family
-          inner join product_compatibility_family component_family
-            on component_family.compatibility_family_id = slider_family.compatibility_family_id
-          where slider_family.product_id = ${schema.collectionSlider.productSliderId}
-            and component_family.product_id = (
-              select product_slider_plate_id
-              from collection_slider_plate
-              where id = ${schema.collectionSlider.installedPlateId}
-            )
-        ) then true
-        when ${schema.collectionSlider.installedInsertId} is not null and not exists (
-          select 1
-          from product_compatibility_family slider_family
-          inner join product_compatibility_family component_family
-            on component_family.compatibility_family_id = slider_family.compatibility_family_id
-          where slider_family.product_id = ${schema.collectionSlider.productSliderId}
-            and component_family.product_id = (
-              select product_slider_insert_id
-              from collection_slider_insert
-              where id = ${schema.collectionSlider.installedInsertId}
-            )
-        ) then true
-        else false
-      end`,
       installedButtonId: schema.collectionSpinner.installedButtonId,
       installedButtonPubliclyAvailable: sql<boolean>`case
         when ${schema.collectionSpinner.installedButtonId} is null then true
@@ -8925,7 +8508,6 @@ async function queryOwnedItems(
       canEdit: Boolean(
         options.viewerCanManage || options.viewerClerkId === row.ownerClerkId,
       ),
-      compatibilityFamilies: [],
       compatibleButtonId: null,
       compatibleButtonName: null,
       collectionIsPrivate: row.collectionIsPrivate,
@@ -8948,7 +8530,6 @@ async function queryOwnedItems(
         row.isPrivate &&
         row.privatedByClerkId !== null &&
         row.privatedByClerkId !== row.ownerClerkId,
-      hasGrandfatheredInstallation: row.hasGrandfatheredInstallation,
       installedButtonId: installedButtonUnavailable
         ? null
         : row.installedButtonId,
@@ -9016,7 +8597,6 @@ async function queryOwnedItems(
     for (const item of items) {
       const row = rowsById.get(item.collectionItemId);
       const product = productsById.get(item.productId);
-      item.compatibilityFamilies = product?.compatibilityFamilies ?? [];
       item.compatibleButtonId = product?.compatibleButtonId ?? null;
       item.compatibleButtonName = product?.compatibleButtonName ?? null;
       item.includedComponents = product?.includedComponents ?? [];
@@ -10165,7 +9745,7 @@ async function assertCollectionAssembliesMayBePublic(
  * @param tx - Caller-owned database transaction.
  * @param input - Slider, owner, component, and expected component type.
  * @returns The validated component item and product identifiers.
- * @rejects When the component is unavailable, installed elsewhere, unreviewed, or incompatible.
+ * @rejects When the component is unavailable, installed elsewhere, or unreviewed.
  */
 async function validateSliderComponentInstallation(
   tx: CatalogTransaction,
@@ -10178,8 +9758,6 @@ async function validateSliderComponentInstallation(
     ownerId: number;
     /** Parent slider collection-item identifier. */
     sliderCollectionItemId: number;
-    /** Parent slider catalog product identifier. */
-    sliderProductId: number;
     /** Whether the parent would be publicly visible after installation. */
     parentIsPublic: boolean;
   },
@@ -10247,23 +9825,6 @@ async function validateSliderComponentInstallation(
     throw new CollectionSliderComponentAlreadyInstalledError();
   }
 
-  const [sharedFamily] = await tx
-    .select({ id: schema.productCompatibilityFamily.compatibilityFamilyId })
-    .from(schema.productCompatibilityFamily)
-    .innerJoin(
-      alias(schema.productCompatibilityFamily, "component_family"),
-      sql`component_family.compatibility_family_id = ${schema.productCompatibilityFamily.compatibilityFamilyId}
-        and component_family.product_id = ${component.productId}`,
-    )
-    .where(
-      eq(schema.productCompatibilityFamily.productId, input.sliderProductId),
-    )
-    .limit(1);
-  if (!sharedFamily) {
-    throw new Error(
-      `Installed slider ${input.componentType} does not share a compatibility family.`,
-    );
-  }
   return component;
 }
 
@@ -10483,35 +10044,6 @@ async function replaceInsertHostedMagnetOptions(
     const configuration = normalizeCatalogMagnetConfiguration(
       offer.configuration,
     );
-    const copiedFromTemplateId = offer.copiedFromTemplateId ?? null;
-    if (copiedFromTemplateId !== null) {
-      if (!hasPermission(input.actor, "products.manage"))
-        throw new Error("Product does not exist.");
-      const [template] = await tx
-        .select({
-          compatibilityFamilyId:
-            schema.magnetConfigurationTemplate.compatibilityFamilyId,
-          id: schema.magnetConfigurationTemplate.id,
-          makerId: schema.magnetConfigurationTemplate.makerId,
-          scope: schema.magnetConfigurationTemplate.scope,
-        })
-        .from(schema.magnetConfigurationTemplate)
-        .where(eq(schema.magnetConfigurationTemplate.id, copiedFromTemplateId))
-        .limit(1);
-      if (!template)
-        throw new Error("Magnet configuration template does not exist.");
-      if (
-        (template.scope === "maker" && template.makerId !== input.makerId) ||
-        (template.scope === "family" &&
-          !input.compatibilityFamilyIds?.includes(
-            template.compatibilityFamilyId ?? 0,
-          ))
-      ) {
-        throw new Error(
-          "Magnet configuration template is outside this product scope.",
-        );
-      }
-    }
     const configurationLabelId = await getOrCreateMagnetConfigurationLabel(
       tx,
       configuration.label,
@@ -10527,7 +10059,6 @@ async function replaceInsertHostedMagnetOptions(
         .values({
           clickOptionId,
           configurationLabelId,
-          copiedFromTemplateId,
           insertProductId: productId,
           isAdvertisedDefault: offer.isAdvertisedDefault,
           sourceLabel: configuration.sourceLabel,
@@ -10542,7 +10073,6 @@ async function replaceInsertHostedMagnetOptions(
         .set({
           clickOptionId,
           configurationLabelId,
-          copiedFromTemplateId,
           isAdvertisedDefault: offer.isAdvertisedDefault,
           sourceLabel: configuration.sourceLabel,
           sourceNotes: configuration.sourceNotes,
@@ -11093,7 +10623,7 @@ async function updateProductSubtype(
 }
 
 /**
- * Replaces reviewed compatibility, advisory, and exact-inclusion relationships.
+ * Replaces exact-inclusion relationships.
  *
  * @param tx - Caller-owned product transaction.
  * @param productId - Product identifier.
@@ -11105,30 +10635,15 @@ async function replaceProductRelationships(
   productId: number,
   input: ProductWriteInput,
 ) {
-  const familyIds = input.compatibilityFamilyIds ?? [];
   const componentIds = input.includedComponentIds ?? [];
-  const advisories = input.compatibilityAdvisories ?? [];
-  if (
-    (familyIds.length || componentIds.length || advisories.length) &&
-    !hasPermission(input.actor, "products.manage")
-  ) {
+  if (componentIds.length && !hasPermission(input.actor, "products.manage")) {
     throw new Error("Product does not exist.");
   }
-  if (new Set(familyIds).size !== familyIds.length)
-    throw new Error("Duplicate compatibility families are not allowed.");
   if (new Set(componentIds).size !== componentIds.length)
     throw new Error("Duplicate included components are not allowed.");
   if (componentIds.length && input.productTypeSlug !== "slider")
     throw new Error("Only sliders may declare included slider components.");
 
-  if (familyIds.length) {
-    const families = await tx
-      .select({ id: schema.compatibilityFamily.id })
-      .from(schema.compatibilityFamily)
-      .where(inArray(schema.compatibilityFamily.id, familyIds));
-    if (families.length !== familyIds.length)
-      throw new Error("Compatibility family does not exist.");
-  }
   if (componentIds.length) {
     const components = await tx
       .select({ id: schema.product.id, type: schema.productType.slug })
@@ -11148,64 +10663,15 @@ async function replaceProductRelationships(
     }
   }
 
-  const advisoryKeys = new Set<string>();
-  for (const advisory of advisories) {
-    const text = advisory.text.trim();
-    if (!text || text.length > 1000)
-      throw new Error("Compatibility advisory text is invalid.");
-    if (advisory.relatedProductId === productId)
-      throw new Error("A product cannot advise against itself.");
-    const key = `${advisory.relatedProductId}:${text.toLocaleLowerCase()}`;
-    if (advisoryKeys.has(key))
-      throw new Error("Duplicate compatibility advisories are not allowed.");
-    advisoryKeys.add(key);
-  }
-  if (advisories.length) {
-    const relatedIds = [
-      ...new Set(advisories.map(({ relatedProductId }) => relatedProductId)),
-    ];
-    const relatedProducts = await tx
-      .select({ id: schema.product.id })
-      .from(schema.product)
-      .where(inArray(schema.product.id, relatedIds));
-    if (relatedProducts.length !== relatedIds.length)
-      throw new Error("Advisory product does not exist.");
-  }
-
-  await tx
-    .delete(schema.productCompatibilityFamily)
-    .where(eq(schema.productCompatibilityFamily.productId, productId));
-  await tx
-    .delete(schema.productCompatibilityAdvisory)
-    .where(eq(schema.productCompatibilityAdvisory.productId, productId));
   await tx
     .delete(schema.productIncludedComponent)
     .where(eq(schema.productIncludedComponent.productId, productId));
 
-  if (familyIds.length) {
-    await tx.insert(schema.productCompatibilityFamily).values(
-      familyIds.map((compatibilityFamilyId) => ({
-        compatibilityFamilyId,
-        productId,
-        reviewedByClerkId: input.actor.clerkId,
-      })),
-    );
-  }
   if (componentIds.length) {
     await tx.insert(schema.productIncludedComponent).values(
       componentIds.map((componentProductId) => ({
         componentProductId,
         productId,
-      })),
-    );
-  }
-  if (advisories.length) {
-    await tx.insert(schema.productCompatibilityAdvisory).values(
-      advisories.map(({ relatedProductId, text }) => ({
-        productId,
-        relatedProductId,
-        reviewedByClerkId: input.actor.clerkId,
-        text: text.trim(),
       })),
     );
   }

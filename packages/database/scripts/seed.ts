@@ -14,7 +14,6 @@ import { createDatabaseEnv } from "../src/env.schema.js";
 import {
   color,
   colorEffect,
-  compatibilityFamily,
   finish,
   finishOption,
   finishOptionColor,
@@ -25,7 +24,6 @@ import {
   material,
   pattern,
   product,
-  productCompatibilityFamily,
   productImage,
   productIncludedComponent,
   productInsertClickOption,
@@ -250,8 +248,6 @@ export type SliderFixtureMagnetConfiguration = {
 
 /** One catalog product in the deterministic development slider fixture. */
 export type SliderFixtureProduct = {
-  /** Maker-scoped compatibility-family slug, when assigned. */
-  compatibilityFamily: string | null;
   /** Insert product selected as the advertised default, when applicable. */
   defaultInsertSlug: string | null;
   /** Deterministic generated gallery images. */
@@ -310,7 +306,6 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
         const hasCompleteConfiguration = makerIndex === 0 && productIndex === 0;
         const hasIncompleteSource = makerIndex === 1 && productIndex === 2;
         return {
-          compatibilityFamily: `${fixtureMaker.slug}-standard`,
           defaultInsertSlug: bodyHosted
             ? null
             : `${fixtureMaker.slug}-demo-insert`,
@@ -343,7 +338,6 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
     ...sliderFixtureMakers.map((fixtureMaker, index): SliderFixtureProduct => {
       const slug = `${fixtureMaker.slug}-demo-plate`;
       return {
-        compatibilityFamily: `${fixtureMaker.slug}-standard`,
         defaultInsertSlug: null,
         images: [
           { key: `${slug}-primary` },
@@ -366,7 +360,6 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
     ...sliderFixtureMakers.map((fixtureMaker, index): SliderFixtureProduct => {
       const slug = `${fixtureMaker.slug}-demo-insert`;
       return {
-        compatibilityFamily: `${fixtureMaker.slug}-standard`,
         defaultInsertSlug: null,
         images: [
           { key: `${slug}-primary` },
@@ -1066,30 +1059,6 @@ export async function seedSliderFixtures(
       "Slider fixture lookups are missing after catalog seeding.",
     );
 
-  const familyIds = new Map<string, number>();
-  for (const fixtureMaker of sliderFixtureMakers) {
-    const makerId = makersByName.get(fixtureMaker.name);
-    if (!makerId)
-      throw new Error(`Slider fixture maker ${fixtureMaker.name} is missing.`);
-    const familySlug = `${fixtureMaker.slug}-standard`;
-    const updatedAt = new Date("2026-08-01T12:00:00.000Z");
-    const [family] = await db
-      .insert(compatibilityFamily)
-      .values({
-        makerId,
-        name: `${fixtureMaker.name} Standard`,
-        slug: familySlug,
-        updatedAt,
-      })
-      .onConflictDoUpdate({
-        set: { name: `${fixtureMaker.name} Standard`, updatedAt },
-        target: [compatibilityFamily.makerId, compatibilityFamily.slug],
-      })
-      .returning({ id: compatibilityFamily.id });
-    if (!family) throw new Error(`Failed to seed family ${familySlug}.`);
-    familyIds.set(familySlug, family.id);
-  }
-
   const productIds = new Map<string, number>();
   for (const fixtureProduct of sliderFixtureCatalog.products) {
     const makerId = makersByName.get(fixtureProduct.maker);
@@ -1224,33 +1193,6 @@ export async function seedSliderFixtures(
         })
         .onConflictDoNothing(),
     ]);
-    if (fixtureProduct.compatibilityFamily) {
-      const compatibilityFamilyId = familyIds.get(
-        fixtureProduct.compatibilityFamily,
-      );
-      if (!compatibilityFamilyId)
-        throw new Error(
-          `Fixture family ${fixtureProduct.compatibilityFamily} is missing.`,
-        );
-      await db
-        .insert(productCompatibilityFamily)
-        .values({
-          compatibilityFamilyId,
-          productId: seededProduct.id,
-          reviewedAt: updatedAt,
-          reviewedByClerkId: sliderFixtureOwnerClerkId,
-        })
-        .onConflictDoUpdate({
-          set: {
-            reviewedAt: updatedAt,
-            reviewedByClerkId: sliderFixtureOwnerClerkId,
-          },
-          target: [
-            productCompatibilityFamily.productId,
-            productCompatibilityFamily.compatibilityFamilyId,
-          ],
-        });
-    }
   }
 
   const [configurationLabel] = await db

@@ -86,7 +86,6 @@ function option(
  */
 function item(finishOptions: CatalogFinishOption[]): FilterableCatalogItem {
   return {
-    compatibilityFamilies: [],
     finishOptions,
     makerId: 100,
     makerName: "Maker",
@@ -226,26 +225,18 @@ describe("catalog filters", () => {
     expect(facets.colors.map(({ name }) => name)).toEqual(["Blue"]);
   });
 
-  it("matches pattern and family facets only from the displayed item", () => {
+  it("matches pattern facets only from the displayed item", () => {
     const candidate = {
       ...item([option([blue])]),
-      compatibilityFamilies: [lookup(301, "Small family")],
       patterns: [lookup(201, "Ripple")],
     };
 
     expect(
       matchesCatalogFilters(candidate, {
         ...emptyCatalogFilters(),
-        compatibilityFamilyIds: [301],
         patternIds: [201],
       }),
     ).toBe(true);
-    expect(
-      matchesCatalogFilters(candidate, {
-        ...emptyCatalogFilters(),
-        compatibilityFamilyIds: [999],
-      }),
-    ).toBe(false);
   });
 
   it("matches exact components only on qualifying parent assemblies", () => {
@@ -290,14 +281,12 @@ describe("catalog filters", () => {
   it("counts and round-trips the dedicated discovery facets", () => {
     const candidate = {
       ...item([]),
-      compatibilityFamilies: [lookup(301, "Small family")],
       patterns: [lookup(201, "Ripple")],
       plateComponents: [lookup(401, "V2 plate")],
       spinnerButtonComponents: [lookup(501, "Soft click button")],
     };
     const facets = buildCatalogFacets([candidate], null);
     expect(facets.patterns).toMatchObject([{ id: 201, count: 1 }]);
-    expect(facets.compatibilityFamilies).toMatchObject([{ id: 301, count: 1 }]);
     expect(facets.plates).toMatchObject([{ id: 401, count: 1 }]);
     expect(facets.spinnerButtons).toMatchObject([{ id: 501, count: 1 }]);
 
@@ -309,9 +298,9 @@ describe("catalog filters", () => {
     });
     expect(filtersToSearch(filtersFromSearch(search))).toMatchObject({
       button: [501],
-      family: [301],
       pattern: [201],
       plate: [401],
     });
+    expect(search).not.toHaveProperty("family");
   });
 });
