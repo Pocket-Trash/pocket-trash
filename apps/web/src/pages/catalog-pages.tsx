@@ -15,7 +15,7 @@ import type {
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CircleHelp } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
   CatalogFilterBar,

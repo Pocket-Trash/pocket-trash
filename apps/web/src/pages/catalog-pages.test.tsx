@@ -1110,11 +1110,9 @@ describe("CollectionItemDetailPage", () => {
       />,
     );
 
-    expect(
-      html.match(/web\.slider\.moderation\.unavailableComponent/g),
-    ).toHaveLength(2);
-    expect(html).not.toContain("web.slider.component.noPlate");
-    expect(html).not.toContain("web.slider.component.noInsert");
+    expect(html.match(/Unavailable component/g)).toHaveLength(2);
+    expect(html).not.toContain("No plate installed");
+    expect(html).not.toContain("No insert installed");
   });
 
   it("renders installed component privacy as a read-only inherited control", () => {
@@ -1132,8 +1130,10 @@ describe("CollectionItemDetailPage", () => {
       />,
     );
 
-    expect(html).toContain("web.slider.privacy.inherited");
-    expect(html).toContain("web.slider.privacy.inheritedHelp");
+    expect(html).toContain("Inherited privacy");
+    expect(html).toContain(
+      "Use the information button with a pointer, keyboard, or touch to learn why this privacy setting is read-only.",
+    );
     expect(html).toContain("disabled");
   });
 
