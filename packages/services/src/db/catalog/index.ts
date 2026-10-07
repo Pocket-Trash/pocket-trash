@@ -7349,6 +7349,40 @@ async function touchCollection(tx: CatalogTransaction, collectionId: number) {
 }
 
 /**
+ * Builds the effective privacy expression for an owned collection item.
+ *
+ * Installed components inherit their parent assembly's privacy unless staff
+ * forced the component private. The surrounding query must join the owning
+ * user so staff moderation can be distinguished from the owner's saved
+ * preference.
+ *
+ * @returns SQL expression resolving the item's effective private state.
+ */
+function effectiveCollectionItemIsPrivate() {
+  return sql<boolean>`case
+    when ${schema.collectionItem.isPrivate} = true
+      and ${schema.collectionItem.privatedByClerkId} is not null
+      and ${schema.collectionItem.privatedByClerkId} <> ${schema.user.clerkId}
+      then true
+    else coalesce(
+      (select parent.is_private
+         from collection_spinner assembly
+         inner join collection_item parent on parent.id = assembly.id
+        where assembly.installed_button_id = ${schema.collectionItem.id}),
+      (select parent.is_private
+         from collection_slider assembly
+         inner join collection_item parent on parent.id = assembly.id
+        where assembly.installed_plate_id = ${schema.collectionItem.id}),
+      (select parent.is_private
+         from collection_slider assembly
+         inner join collection_item parent on parent.id = assembly.id
+        where assembly.installed_insert_id = ${schema.collectionItem.id}),
+      ${schema.collectionItem.isPrivate}
+    )
+  end`;
+}
+
+/**
  * Lists collections visible to the requested viewer.
  *
  * @param db - Application database.
@@ -7435,6 +7469,7 @@ async function queryCollections(
             row.ownerClerkId === options.viewerClerkId,
         )
         .map(({ id }) => id);
+  const effectiveItemIsPrivate = effectiveCollectionItemIsPrivate();
   const [counts, covers] = await Promise.all([
     db
       .select({
@@ -7442,13 +7477,14 @@ async function queryCollections(
         itemCount: count(schema.collectionItem.id),
       })
       .from(schema.collectionItem)
+      .innerJoin(schema.user, eq(schema.collectionItem.ownerId, schema.user.id))
       .where(
         and(
           inArray(schema.collectionItem.collectionId, collectionIds),
           eq(schema.collectionItem.owned, true),
           or(
             and(
-              eq(schema.collectionItem.isPrivate, false),
+              sql`${effectiveItemIsPrivate} = false`,
               eq(schema.collectionItem.approvalStatus, "approved"),
             ),
             unrestrictedCollectionIds.length
@@ -8589,27 +8625,7 @@ async function queryOwnedItems(
     (select id from collection_slider where installed_plate_id = ${schema.collectionItem.id}),
     (select id from collection_slider where installed_insert_id = ${schema.collectionItem.id})
   )`;
-  const effectiveItemIsPrivate = sql<boolean>`case
-    when ${schema.collectionItem.isPrivate} = true
-      and ${schema.collectionItem.privatedByClerkId} is not null
-      and ${schema.collectionItem.privatedByClerkId} <> ${schema.user.clerkId}
-      then true
-    else coalesce(
-      (select parent.is_private
-         from collection_spinner assembly
-         inner join collection_item parent on parent.id = assembly.id
-        where assembly.installed_button_id = ${schema.collectionItem.id}),
-      (select parent.is_private
-         from collection_slider assembly
-         inner join collection_item parent on parent.id = assembly.id
-        where assembly.installed_plate_id = ${schema.collectionItem.id}),
-      (select parent.is_private
-         from collection_slider assembly
-         inner join collection_item parent on parent.id = assembly.id
-        where assembly.installed_insert_id = ${schema.collectionItem.id}),
-      ${schema.collectionItem.isPrivate}
-    )
-  end`;
+  const effectiveItemIsPrivate = effectiveCollectionItemIsPrivate();
   const conditions = [
     eq(schema.collectionItem.owned, true),
     isNull(schema.collectionItem.soldAt),

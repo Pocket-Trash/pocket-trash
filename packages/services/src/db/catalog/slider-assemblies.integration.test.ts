@@ -310,6 +310,12 @@ describe("owned slider assemblies", () => {
         materialId: material.id,
       });
       await expect(
+        service.getPublicCollection({
+          collectionId: primary.id,
+          ownerUserId: owner.id,
+        }),
+      ).resolves.toEqual(expect.objectContaining({ itemCount: 4 }));
+      await expect(
         service.getOwnedItem(actor, spinnerButtonId),
       ).resolves.toEqual(
         expect.objectContaining({
