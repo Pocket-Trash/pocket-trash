@@ -82,13 +82,13 @@ if [[ "$*" == *"scripts/seed.ts"* ]]; then
   printf 'BUNNY_IMAGE_FOLDER_PREFIX=%s\n' "$BUNNY_IMAGE_FOLDER_PREFIX" >> "$PNPM_LOG_FILE"
   printf 'BUNNY_RESOURCE_FOLDER_PREFIX=%s\n' "$BUNNY_RESOURCE_FOLDER_PREFIX" >> "$PNPM_LOG_FILE"
 fi
-if [[ "$CURL_SCENARIO" == "preflight-migration-failure" || "$CURL_SCENARIO" == "reused-preflight-failure" ]] && [[ "$*" == *"drizzle-kit migrate"* ]]; then
+if [[ "$CURL_SCENARIO" == "preflight-migration-failure" || "$CURL_SCENARIO" == "reused-preflight-failure" ]] && [[ "$*" == *"db:migrate:direct"* ]]; then
   exit 41
 fi
 if [[ "$CURL_SCENARIO" == "preflight-seed-failure" && "$*" == *"scripts/seed.ts"* ]]; then
   exit 42
 fi
-if [[ "$CURL_SCENARIO" == "preflight-cleanup-failure" && "$*" == *"drizzle-kit migrate"* ]]; then
+if [[ "$CURL_SCENARIO" == "preflight-cleanup-failure" && "$*" == *"db:migrate:direct"* ]]; then
   exit 43
 fi
 EOF
@@ -202,7 +202,7 @@ if run_branch_command preflight-migration-failure preflight-preview > /dev/null 
   echo "Expected migration preflight to fail." >&2
   exit 1
 fi
-grep -F 'drizzle-kit migrate' "$test_dir/preflight-migration-failure-pnpm-log" > /dev/null
+grep -F 'db:migrate:direct' "$test_dir/preflight-migration-failure-pnpm-log" > /dev/null
 ! grep -F 'scripts/seed.ts' "$test_dir/preflight-migration-failure-pnpm-log" > /dev/null
 grep -F 'DELETE https://neon.example.test/projects/test-project/branches/br_target' "$test_dir/preflight-migration-failure-curl-log" > /dev/null
 [[ ! -f "$test_dir/preflight-migration-failure-state" ]]
@@ -211,7 +211,7 @@ if run_branch_command preflight-seed-failure preflight-preview > /dev/null 2>&1;
   echo "Expected seed preflight to fail." >&2
   exit 1
 fi
-grep -F 'drizzle-kit migrate' "$test_dir/preflight-seed-failure-pnpm-log" > /dev/null
+grep -F 'db:migrate:direct' "$test_dir/preflight-seed-failure-pnpm-log" > /dev/null
 grep -F 'scripts/seed.ts' "$test_dir/preflight-seed-failure-pnpm-log" > /dev/null
 grep -Fx 'BUNNY_IMAGE_FOLDER_PREFIX=images/preview/pr-42' "$test_dir/preflight-seed-failure-pnpm-log" > /dev/null
 grep -Fx 'BUNNY_RESOURCE_FOLDER_PREFIX=resources/preview/pr-42' "$test_dir/preflight-seed-failure-pnpm-log" > /dev/null
@@ -229,7 +229,7 @@ grep -F 'DELETE https://neon.example.test/projects/test-project/branches/br_targ
 
 # Successful preflight migrates, seeds, and records the durable compatibility marker.
 run_branch_command preflight-success preflight-preview > /dev/null
-grep -F 'drizzle-kit migrate' "$test_dir/preflight-success-pnpm-log" > /dev/null
+grep -F 'db:migrate:direct' "$test_dir/preflight-success-pnpm-log" > /dev/null
 grep -F 'scripts/seed.ts' "$test_dir/preflight-success-pnpm-log" > /dev/null
 grep -Fx 'BUNNY_IMAGE_FOLDER_PREFIX=images/preview/pr-42' "$test_dir/preflight-success-pnpm-log" > /dev/null
 grep -Fx 'BUNNY_RESOURCE_FOLDER_PREFIX=resources/preview/pr-42' "$test_dir/preflight-success-pnpm-log" > /dev/null

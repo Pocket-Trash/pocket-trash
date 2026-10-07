@@ -32,7 +32,7 @@ async function main(): Promise<void> {
 
   console.log(`Personal Neon migration state: ${comparison.state}.`);
   console.log(comparison.summary);
-  if (comparison.state !== "exact") {
+  if (comparison.state !== "exact" && comparison.state !== "reconciled") {
     throw new Error(comparison.guidance);
   }
 }

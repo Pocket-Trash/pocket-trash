@@ -15,6 +15,12 @@ import {
 const expected: MigrationRecord[] = [
   { createdAt: 100, hash: "aaa", tag: "0000_first" },
   { createdAt: 200, hash: "bbb", tag: "0001_second" },
+  {
+    createdAt: 300,
+    hash: "repair",
+    tag: "0066_repair_rebased_slider_history",
+  },
+  { createdAt: 400, hash: "after", tag: "0067_after_repair" },
 ];
 
 /** Applied form of the expected history. */
@@ -27,7 +33,7 @@ describe("compareMigrationHistories", () => {
   test.each([
     ["exact", applied],
     ["behind", applied.slice(0, 1)],
-    ["ahead", [...applied, { createdAt: 300, hash: "ccc" }]],
+    ["ahead", [...applied, { createdAt: 500, hash: "ccc" }]],
     ["reordered", [...applied].reverse()],
     ["diverged", [{ createdAt: 100, hash: "changed" }]],
     ["missing-history", null],
@@ -40,6 +46,25 @@ describe("compareMigrationHistories", () => {
     if (state !== "exact") {
       expect(comparison.guidance).toMatch(/Do not|Never/u);
     }
+  });
+
+  test("accepts a divergent prefix after the forward repair marker", () => {
+    const comparison = compareMigrationHistories(expected, [
+      { createdAt: 50, hash: "legacy" },
+      { createdAt: 300, hash: "repair" },
+      { createdAt: 400, hash: "after" },
+    ]);
+
+    expect(comparison.state).toBe("reconciled");
+  });
+
+  test("reports a reconciled database behind later migrations", () => {
+    const comparison = compareMigrationHistories(expected, [
+      { createdAt: 50, hash: "legacy" },
+      { createdAt: 300, hash: "repair" },
+    ]);
+
+    expect(comparison.state).toBe("behind");
   });
 });
 
