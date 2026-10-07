@@ -480,7 +480,14 @@ describe("product form conditional fields", () => {
             },
           ],
           makers: [
-            { id: product.makerId, name: product.makerName, rootUrl: null },
+            {
+              description: null,
+              id: product.makerId,
+              images: [],
+              name: product.makerName,
+              rootUrl: null,
+              slug: "slider-maker",
+            },
           ],
           productTypes: [
             {

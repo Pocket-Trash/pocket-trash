@@ -333,7 +333,7 @@ describe("catalog product persistence", () => {
       }
       const [maker] = await db
         .insert(schema.maker)
-        .values({ name: "Slider Maker" })
+        .values({ name: "Slider Maker", slug: "slider-maker" })
         .returning({ id: schema.maker.id });
       const productTypes = await db
         .insert(schema.productType)

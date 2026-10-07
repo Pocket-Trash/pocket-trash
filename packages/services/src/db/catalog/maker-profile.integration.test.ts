@@ -198,13 +198,13 @@ describe("maker profile persistence", () => {
       await client.exec(`
         insert into users (clerk_id) values ('directory-owner');
         insert into makers (name, slug) values ('Directory Maker', 'directory-maker');
-        insert into product_types (name, slug) values ('Directory Spinner', 'directory-spinner');
+        insert into product_types (name, slug) values ('Spinner', 'spinner');
         insert into product (
           product_type_id, maker_id, name, slug, approval_status, is_private
         ) values
-          ((select id from product_types where slug = 'directory-spinner'), (select id from makers where slug = 'directory-maker'), 'Public product', 'public-product', 'approved', false),
-          ((select id from product_types where slug = 'directory-spinner'), (select id from makers where slug = 'directory-maker'), 'Pending product', 'pending-product', 'pending', false),
-          ((select id from product_types where slug = 'directory-spinner'), (select id from makers where slug = 'directory-maker'), 'Private product', 'private-product', 'approved', true);
+          ((select id from product_types where slug = 'spinner'), (select id from makers where slug = 'directory-maker'), 'Public product', 'public-product', 'approved', false),
+          ((select id from product_types where slug = 'spinner'), (select id from makers where slug = 'directory-maker'), 'Pending product', 'pending-product', 'pending', false),
+          ((select id from product_types where slug = 'spinner'), (select id from makers where slug = 'directory-maker'), 'Private product', 'private-product', 'approved', true);
         insert into product_spinner (id)
           select id from product where slug in ('public-product', 'pending-product', 'private-product');
         insert into user_collection (owner_id, name, normalized_name, is_private)
