@@ -146,9 +146,9 @@ test("PR mutation isolation is independent of migration detection", () => {
   );
 });
 
-test("real Neon deploy workflows retain the Drizzle migration fidelity check", () => {
+test("real Neon deploy workflows use the repair-aware migration runner", () => {
   for (const source of deploymentSources) {
-    assert.match(source, /drizzle-kit migrate --config=drizzle\.config\.ts/u);
+    assert.match(source, /db:migrate:direct/u);
   }
 });
 
