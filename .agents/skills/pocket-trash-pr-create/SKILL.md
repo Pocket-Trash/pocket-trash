@@ -25,17 +25,21 @@ suggest a branch, create a branch, push, fetch, or create a PR from `main`.
 1. Confirm the current branch is not `main`.
 2. Determine the PR base branch. Default to `main` unless the user specifies a
    different base.
-3. Inspect branch state:
+3. Fetch the selected base with `git fetch origin <base>` so stacked and remote
+   bases are current before inspecting branch history.
+4. Check whether a PR already exists for the branch:
+   `gh pr list --head <branch> --json url,title,state`. If one exists, do not
+   publish more work or create a duplicate; return its URL and use
+   `$pocket-trash-pr-update` for later changes.
+5. Inspect branch state:
    - `git status --short --branch`
-   - `git log --oneline <base>..HEAD`
-4. Read `./docs/changesets.md` when it exists and
+   - `git log --oneline origin/<base>..HEAD`
+6. Read `./docs/changesets.md` when it exists and
    `./.github/pull_request_template.md`.
-5. If there are no commits on the branch relative to the base branch, stop and
+7. If there are no commits on the branch relative to the base branch, stop and
    report that there is nothing to open a PR for.
-6. If there are uncommitted changes, mention them clearly. Do not include them
-   in the PR description as completed work.
-7. Create or update branch Changeset files before pushing:
-   - Inspect changed `.changeset/*.md` files relative to the base.
+8. Create or update branch Changeset files before final validation:
+   - Inspect changed `.changeset/*.md` files relative to `origin/<base>`.
    - If none exists, create one under `.changeset/`.
    - If one exists and no longer matches the branch, update it.
    - Use the affected package name from `package.json`. In a single-package
@@ -52,13 +56,33 @@ suggest a branch, create a branch, push, fetch, or create a PR from `main`.
         confirmation is required.
    - Keep the Changeset description succinct, terse, human friendly, and
      changelog-ready.
-8. Push the branch when it has no upstream or the remote is behind:
-   `git push -u origin <branch>`.
-9. Check whether a PR already exists for the branch:
-   `gh pr list --head <branch> --json url,title,state`.
-10. If no PR exists, create one:
+9. Commit the complete branch state before final validation:
+   - Generate or refresh every artifact the repository expects in the PR.
+   - Include the current Changeset and generated artifacts in logical commits
+     using `$pocket-trash-commit`.
+   - Require `git status --porcelain` to be empty. Do not validate or publish a
+     partially committed state. If unrelated user changes prevent a clean state,
+     stop and preserve them.
+10. Run the repository's final validation on the exact clean commit that will be
+    pushed. This workflow is identical in Codex and Claude Code:
+
+- When the root `package.json` exposes `validate:pr`, run
+  `pnpm validate:pr -- origin/<base>`.
+- Otherwise, read the repository's `AGENTS.md` and run its documented
+  repository-specific validation. The skills, CLI, and localizations
+  repositories keep their own required validation suites; do not require them to
+  expose Pocket Trash's `validate:pr` command.
+- If validation writes or regenerates a tracked file, commit it and rerun the
+  complete selected validation until the worktree is clean.
+- If validation fails, stop. Do not run `git push` or create or edit PR
+  metadata. Preserve the commits and working tree for correction.
+
+11. Immediately after successful validation and its final clean-worktree check,
+    push the branch when it has no upstream or the remote is behind:
+    `git push -u origin <branch>`.
+12. Create the PR only after the push succeeds:
     `gh pr create --base <base> --head <branch> --title "<title>" --body "<body>"`.
-11. Return the PR URL and a concise summary of the created PR.
+13. Return the PR URL and a concise summary of the created PR.
 
 ## Title And Body
 
