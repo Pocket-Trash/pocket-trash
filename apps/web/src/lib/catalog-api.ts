@@ -1133,8 +1133,8 @@ export const createCatalogCompatibilityFamily = createServerFn({
       } catch (error) {
         return mutationFailure(error);
       }
-   },
- );
+    },
+  );
 
 /**
  * Validates and creates a uniquely slugged finish for an authorized product manager.
