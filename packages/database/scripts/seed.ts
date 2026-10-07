@@ -252,6 +252,48 @@ type SeedBunnyConfig = {
   zoneName: string;
 };
 
+/** Maximum Bunny attempts for one idempotent seed request. */
+const bunnySeedMaxAttempts = 4;
+
+/** Initial delay before retrying a transient Bunny seed request. */
+const bunnySeedBackoffMs = 100;
+
+/** HTTP statuses that indicate a bounded Bunny seed retry may succeed. */
+const retryableBunnySeedStatuses = new Set([408, 429, 500, 502, 503, 504]);
+
+/** Fetch cause codes that identify a transient network failure. */
+const retryableBunnySeedErrorCodes = new Set([
+  "EAI_AGAIN",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ETIMEDOUT",
+  "UND_ERR_BODY_TIMEOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_SOCKET",
+]);
+
+/** Identifies a Bunny response that is safe for the seed to retry. */
+class TransientBunnySeedError extends Error {}
+
+/**
+ * Consumes one Bunny seed response within its retry attempt.
+ *
+ * @template T - Consumed response type.
+ */
+type BunnySeedResponseConsumer<T> = {
+  /**
+   * Consumes a Bunny response.
+   *
+   * @param response - Bunny response to consume.
+   * @returns Consumed response value.
+   * @rejects When reading or transforming the response fails.
+   */
+  (response: Response): Promise<T>;
+};
+
 /** Seed product paired with its database identifier. */
 type SeededKapedcProduct = {
   /** Reviewed product data. */
@@ -529,6 +571,19 @@ export async function seedKapedcImages(
     accessKey: config.accessKey,
     cdnBaseUrl: config.cdnBaseUrl,
     endpoint: config.endpoint,
+    /**
+     * Classifies transient storage responses for the operation retry loop.
+     *
+     * @param request - Bunny request URL or object.
+     * @param init - Bunny request options.
+     * @returns The permanent or successful Bunny response.
+     * @rejects When Bunny returns a transient response or the request fails.
+     */
+    fetch: async (request, init) => {
+      const response = await fetch(request, init);
+      await rejectTransientBunnySeedResponse(response);
+      return response;
+    },
     folderPrefix: config.resourceFolderPrefix,
     imageFolderPrefix: seedFolderPrefix,
     zoneName: config.zoneName,
@@ -627,7 +682,10 @@ export async function seedKapedcImages(
         }
       } catch (error) {
         if (storageOwned && !targetAlreadyReferenced)
-          await storage.delete(target.objectPath).catch(() => undefined);
+          await bunnySeedOperation(
+            "image cleanup",
+            async () => await storage.delete(target.objectPath),
+          ).catch(() => undefined);
         throw error;
       }
     }
@@ -659,10 +717,15 @@ async function ensureSeedImage(input: {
   if (!input.storageOwned) {
     const url = new URL(input.target.url);
     url.search = "";
-    const response = await fetch(url, {
-      method: "HEAD",
-      signal: AbortSignal.timeout(30_000),
-    });
+    const response = await bunnySeedRequest(
+      "shared image availability check",
+      async () =>
+        await fetch(url, {
+          method: "HEAD",
+          signal: AbortSignal.timeout(30_000),
+        }),
+      async (response) => response,
+    );
     if (response.ok) return;
     if (response.status !== 404)
       throw new Error(
@@ -682,12 +745,16 @@ async function ensureSeedImage(input: {
       `Cached image verification failed for ${input.productName}.`,
     );
   }
-  await input.storage.putImage({
-    body: bytes,
-    contentLength: input.target.size,
-    contentType: input.target.contentType,
-    objectPath: input.target.objectPath,
-  });
+  await bunnySeedOperation(
+    "image upload",
+    async () =>
+      await input.storage.putImage({
+        body: bytes,
+        contentLength: input.target.size,
+        contentType: input.target.contentType,
+        objectPath: input.target.objectPath,
+      }),
+  );
 }
 
 /**
@@ -722,16 +789,128 @@ async function downloadCacheObject(
   if (!/^imports\/kapedc\/\d+\/[a-zA-Z0-9._-]+$/u.test(objectPath))
     throw new Error("Invalid KAP image cache path.");
   const encodedPath = objectPath.split("/").map(encodeURIComponent).join("/");
-  const response = await fetch(
-    `${config.endpoint.replace(/\/+$/u, "")}/${encodeURIComponent(config.zoneName)}/${encodedPath}`,
-    {
-      headers: { AccessKey: config.accessKey },
-      signal: AbortSignal.timeout(30_000),
-    },
+  const result = await bunnySeedRequest(
+    "image cache download",
+    async () =>
+      await fetch(
+        `${config.endpoint.replace(/\/+$/u, "")}/${encodeURIComponent(config.zoneName)}/${encodedPath}`,
+        {
+          headers: { AccessKey: config.accessKey },
+          signal: AbortSignal.timeout(30_000),
+        },
+      ),
+    async (response) => ({
+      bytes: response.ok ? new Uint8Array(await response.arrayBuffer()) : null,
+      response,
+    }),
   );
-  if (!response.ok)
-    throw new Error(`Bunny image cache download failed: ${response.status}.`);
-  return new Uint8Array(await response.arrayBuffer());
+  if (!result.response.ok)
+    throw new Error(
+      `Bunny image cache download failed: ${result.response.status}.`,
+    );
+  if (!result.bytes) throw new Error("Bunny image cache download was empty.");
+  return result.bytes;
+}
+
+/**
+ * Runs one idempotent Bunny seed request with bounded exponential backoff.
+ *
+ * Only timeouts, network failures, rate limits, and selected server statuses
+ * retry. Permanent responses remain available to the caller for immediate,
+ * operation-specific failure handling.
+ *
+ * @template T - Consumed response type.
+ * @param operation - Human-readable seed operation for exhaustion errors.
+ * @param request - Idempotent Bunny request to attempt.
+ * @param consume - Response consumer that must complete within the attempt.
+ * @returns The consumed value from the first permanent or successful response.
+ * @rejects When a permanent request error occurs or transient attempts exhaust.
+ */
+async function bunnySeedRequest<T>(
+  operation: string,
+  request: () => Promise<Response>,
+  consume: BunnySeedResponseConsumer<T>,
+): Promise<T> {
+  return await bunnySeedOperation(operation, async () => {
+    const response = await request();
+    await rejectTransientBunnySeedResponse(response);
+    try {
+      return await consume(response);
+    } catch (error) {
+      if (isTransientBunnySeedError(error))
+        await response.body?.cancel().catch(() => undefined);
+      throw error;
+    }
+  });
+}
+
+/**
+ * Rejects a retryable Bunny response after releasing its body.
+ *
+ * @param response - Bunny response to classify.
+ * @rejects When the response status is transient.
+ */
+async function rejectTransientBunnySeedResponse(
+  response: Response,
+): Promise<void> {
+  if (!retryableBunnySeedStatuses.has(response.status)) return;
+  await response.body?.cancel().catch(() => undefined);
+  throw new TransientBunnySeedError(`Bunny returned ${response.status}.`);
+}
+
+/**
+ * Runs one idempotent Bunny seed operation with bounded exponential backoff.
+ *
+ * @template T - Operation result type.
+ * @param operation - Human-readable seed operation for exhaustion errors.
+ * @param attemptOperation - Complete idempotent operation to retry.
+ * @returns The first successful operation result.
+ * @rejects When a permanent error occurs or transient attempts exhaust.
+ */
+async function bunnySeedOperation<T>(
+  operation: string,
+  attemptOperation: () => Promise<T>,
+): Promise<T> {
+  let lastFailure: unknown;
+  for (let attempt = 1; attempt <= bunnySeedMaxAttempts; attempt += 1) {
+    try {
+      return await attemptOperation();
+    } catch (error) {
+      if (!isTransientBunnySeedError(error)) throw error;
+      lastFailure = error;
+    }
+
+    if (attempt === bunnySeedMaxAttempts)
+      throw new Error(
+        `Bunny seed ${operation} failed after ${attempt} attempts. It is safe to rerun pnpm db:seed after Bunny recovers.`,
+        { cause: lastFailure },
+      );
+    await new Promise<void>((resolve) =>
+      setTimeout(resolve, bunnySeedBackoffMs * 2 ** (attempt - 1)),
+    );
+  }
+
+  throw new Error(`Bunny seed ${operation} retry invariant failed.`);
+}
+
+/**
+ * Reports whether a rejected Bunny request is safe to retry.
+ *
+ * @param error - Request rejection to classify.
+ * @returns Whether the rejection represents a timeout or network failure.
+ */
+function isTransientBunnySeedError(error: unknown): boolean {
+  const cause =
+    error instanceof TypeError && error.cause && typeof error.cause === "object"
+      ? error.cause
+      : null;
+  const code = cause && "code" in cause ? cause.code : null;
+  return (
+    error instanceof TransientBunnySeedError ||
+    (error instanceof Error &&
+      (error.name === "AbortError" || error.name === "TimeoutError")) ||
+    (typeof code === "string" && retryableBunnySeedErrorCodes.has(code))
+  );
 }
 
 /**

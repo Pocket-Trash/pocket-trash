@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
   loadKapedcSeedData,
@@ -183,6 +184,71 @@ function createSeedDb() {
   };
 }
 
+/**
+ * Creates one isolated-preview image seed input.
+ *
+ * @param previewNumber - Pull-request namespace number.
+ * @returns Bunny configuration, reviewed product fixture, and image digest.
+ */
+function createImageSeedInput(previewNumber = 42) {
+  const sha256 = "a".repeat(64);
+  return {
+    config: {
+      accessKey: "key",
+      cdnBaseUrl: "https://cdn.example.test",
+      endpoint: "https://storage.example.test",
+      imageFolderPrefix: `images/preview/pr-${previewNumber}`,
+      resourceFolderPrefix: `resources/preview/pr-${previewNumber}`,
+      zoneName: "zone",
+    },
+    seededProducts: [
+      {
+        productId: 1000,
+        product: {
+          description: "Fixture",
+          images: [
+            {
+              cacheObjectPath: "imports/kapedc/1/image.png",
+              contentType: "image/png" as const,
+              fileName: "image.png",
+              sha256,
+              size: 123,
+            },
+          ],
+          materialTerms: [],
+          name: "Fixture product",
+          slug: "fixture-product",
+          sourceUrl: "https://example.test/product",
+          type: "spinner" as const,
+        },
+      },
+    ],
+    sha256,
+  };
+}
+
+/**
+ * Creates a stateful image-record database fake for retry and rerun tests.
+ *
+ * @returns Database fake, persisted rows, and insertion spy.
+ */
+function createImageSeedDb() {
+  const rows: Array<Record<string, unknown>> = [];
+  const insertValues = vi.fn(async (value: Record<string, unknown>) => {
+    rows.push({ deletedAt: null, id: rows.length + 1, ...value });
+  });
+  const db = {
+    insert: vi.fn(() => ({ values: insertValues })),
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({ where: vi.fn(async () => rows) })),
+    })),
+    update: vi.fn(() => ({
+      set: vi.fn(() => ({ where: vi.fn(async () => undefined) })),
+    })),
+  } as unknown as ReturnType<typeof createDb>;
+  return { db, insertValues, rows };
+}
+
 describe("catalog seed", () => {
   it("references shared immutable preview images without copying them", async () => {
     const inserted: Array<Record<string, unknown>> = [];
@@ -266,6 +332,232 @@ describe("catalog seed", () => {
           url: `https://cdn.example.test/images/preview/products/1000/${sha256}.png?format=webp&quality=85`,
         }),
       );
+  });
+
+  it("recovers from timeout, rate-limit, and transient server failures", async () => {
+    const { config, seededProducts } = createImageSeedInput();
+    const { db, insertValues } = createImageSeedDb();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new DOMException("Timed out", "TimeoutError"))
+      .mockResolvedValueOnce(new Response(null, { status: 429 }))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    try {
+      await seedKapedcImages(db, config, seededProducts);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(insertValues).toHaveBeenCalledOnce();
+  });
+
+  it("retries a refused Bunny connection", async () => {
+    const { config, seededProducts } = createImageSeedInput();
+    const { db, insertValues } = createImageSeedDb();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(
+        new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    try {
+      await seedKapedcImages(db, config, seededProducts);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(insertValues).toHaveBeenCalledOnce();
+  });
+
+  it("retries a content-addressed upload without duplicating its row", async () => {
+    const { config, seededProducts } = createImageSeedInput();
+    const source = seededProducts[0]?.product.images[0];
+    if (!source) throw new Error("Image seed fixture is missing.");
+    const bytes = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB9sAAAAASUVORK5CYII=",
+      "base64",
+    );
+    source.sha256 = createHash("sha256").update(bytes).digest("hex");
+    source.size = bytes.byteLength;
+    const { db, insertValues, rows } = createImageSeedDb();
+    const uploadedBodies: Uint8Array[] = [];
+    let uploadAttempts = 0;
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (_request, init) => {
+        if (init?.method === "HEAD") return new Response(null, { status: 404 });
+        if (init?.method === "PUT") {
+          uploadedBodies.push(
+            new Uint8Array(await new Response(init.body).arrayBuffer()),
+          );
+          uploadAttempts += 1;
+          return new Response(null, {
+            status: uploadAttempts === 1 ? 503 : 201,
+          });
+        }
+        return new Response(new Uint8Array(bytes).buffer, { status: 200 });
+      });
+
+    try {
+      await seedKapedcImages(db, config, seededProducts);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      expect(fetchMock.mock.calls.map(([, init]) => init?.method)).toEqual([
+        "HEAD",
+        undefined,
+        "PUT",
+        "PUT",
+      ]);
+      expect(uploadedBodies).toEqual([
+        new Uint8Array(bytes),
+        new Uint8Array(bytes),
+      ]);
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(insertValues).toHaveBeenCalledOnce();
+    expect(rows).toHaveLength(1);
+  });
+
+  it("retries a timeout while reading the cache response body", async () => {
+    const { config, seededProducts } = createImageSeedInput();
+    const source = seededProducts[0]?.product.images[0];
+    if (!source) throw new Error("Image seed fixture is missing.");
+    const bytes = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB9sAAAAASUVORK5CYII=",
+      "base64",
+    );
+    source.sha256 = createHash("sha256").update(bytes).digest("hex");
+    source.size = bytes.byteLength;
+    const { db, insertValues } = createImageSeedDb();
+    const timedOutResponse = new Response(null, { status: 200 });
+    vi.spyOn(timedOutResponse, "arrayBuffer").mockRejectedValue(
+      new DOMException("Timed out", "TimeoutError"),
+    );
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(timedOutResponse)
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array(bytes).buffer, { status: 200 }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+
+    try {
+      await seedKapedcImages(db, config, seededProducts);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(insertValues).toHaveBeenCalledOnce();
+  });
+
+  it("fails permanent Bunny responses immediately", async () => {
+    const { config, seededProducts } = createImageSeedInput();
+    const { db, insertValues } = createImageSeedDb();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 401 }));
+
+    try {
+      await expect(
+        seedKapedcImages(db, config, seededProducts),
+      ).rejects.toThrow("Shared seed image availability check failed: 401.");
+      expect(fetchMock).toHaveBeenCalledOnce();
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(insertValues).not.toHaveBeenCalled();
+  });
+
+  it("fails permanent rejected client errors immediately", async () => {
+    const { config, seededProducts } = createImageSeedInput();
+    const { db, insertValues } = createImageSeedDb();
+    const error = new TypeError("Invalid URL");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockRejectedValue(error);
+
+    try {
+      await expect(seedKapedcImages(db, config, seededProducts)).rejects.toBe(
+        error,
+      );
+      expect(fetchMock).toHaveBeenCalledOnce();
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(insertValues).not.toHaveBeenCalled();
+  });
+
+  it("fails cache validation without retrying or uploading", async () => {
+    const { config, seededProducts } = createImageSeedInput();
+    const { db, insertValues } = createImageSeedDb();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(new Response("bad", { status: 200 }));
+
+    try {
+      await expect(
+        seedKapedcImages(db, config, seededProducts),
+      ).rejects.toThrow(
+        "Cached image verification failed for Fixture product.",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(insertValues).not.toHaveBeenCalled();
+  });
+
+  it("reports bounded retry exhaustion with safe rerun guidance", async () => {
+    const { config, seededProducts } = createImageSeedInput();
+    const { db, insertValues } = createImageSeedDb();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 503 }));
+
+    try {
+      await expect(
+        seedKapedcImages(db, config, seededProducts),
+      ).rejects.toThrow(
+        "Bunny seed shared image availability check failed after 4 attempts. It is safe to rerun pnpm db:seed after Bunny recovers.",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(insertValues).not.toHaveBeenCalled();
+  });
+
+  it("reruns idempotently without duplicate rows or object uploads", async () => {
+    const { config, seededProducts } = createImageSeedInput();
+    const { db, insertValues, rows } = createImageSeedDb();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+
+    try {
+      await seedKapedcImages(db, config, seededProducts);
+      await seedKapedcImages(db, config, seededProducts);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(
+        fetchMock.mock.calls.every(([, init]) => init?.method === "HEAD"),
+      ).toBe(true);
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(insertValues).toHaveBeenCalledOnce();
+    expect(rows).toHaveLength(1);
   });
 
   it("is idempotent and preserves the planned values", async () => {
