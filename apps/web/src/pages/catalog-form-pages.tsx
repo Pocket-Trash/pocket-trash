@@ -4257,6 +4257,12 @@ export function CollectionEditPage({
   const [bearing, setBearing] = React.useState(item.bearingOverride ?? "");
   const [options, setOptions] = React.useState(initialOptions);
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [formErrorDetail, setFormErrorDetail] = React.useState<{
+    /** Secondary localized error key. */
+    key: string;
+    /** Interpolation values for the secondary error. */
+    values?: Readonly<Record<string, unknown>>;
+  } | null>(null);
   const [material, setMaterial] = React.useState<CatalogLookup | null>(
     item.material,
   );
@@ -4598,7 +4604,14 @@ export function CollectionEditPage({
               t={t}
             />
           ) : null}
-          {formError ? <Notice>{t(formError)}</Notice> : null}
+          {formError ? (
+            <Notice>
+              {t(formError)}
+              {formErrorDetail
+                ? ` ${t(formErrorDetail.key, formErrorDetail.values)}`
+                : null}
+            </Notice>
+          ) : null}
           {item.canEdit ? (
             <PermanentDeletionControls
               name={item.displayName}
@@ -4697,6 +4710,7 @@ export function CollectionEditPage({
                 : undefined;
               if (moderating && !reason) return;
               setFormError(null);
+              setFormErrorDetail(null);
               const imageError = validateImages(images, locale);
               if (imageError) {
                 setFormError(imageError.key);
@@ -4845,6 +4859,22 @@ export function CollectionEditPage({
                 });
               } else {
                 setFormError(result.formError);
+                setFormErrorDetail(
+                  "formErrorDetail" in result &&
+                    typeof result.formErrorDetail === "string"
+                    ? {
+                        key: result.formErrorDetail,
+                        values:
+                          "formErrorValues" in result &&
+                          typeof result.formErrorValues === "object" &&
+                          result.formErrorValues !== null
+                            ? (result.formErrorValues as Readonly<
+                                Record<string, unknown>
+                              >)
+                            : undefined,
+                      }
+                    : null,
+                );
               }
             }}
             type="button"

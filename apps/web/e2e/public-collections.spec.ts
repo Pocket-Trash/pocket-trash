@@ -32,7 +32,7 @@ test("@mutation public collection browsing preserves effective privacy", async (
       .getByRole("article")
       .filter({ hasText: fixture.publicCollection.name });
     await expect(publicCard).toContainText(fixture.ownerUsername);
-    await expect(publicCard).toContainText("Collection items: 2");
+    await expect(publicCard).toContainText("Collection items: 3");
     const emptyCard = page
       .getByRole("article")
       .filter({ hasText: fixture.emptyCollection.name });
@@ -61,7 +61,7 @@ test("@mutation public collection browsing preserves effective privacy", async (
       ),
     );
     await expect(
-      page.locator("main").getByText("Collection items: 2"),
+      page.locator("main").getByText("Collection items: 3"),
     ).toBeVisible();
     await expect(
       page.getByRole("link", {
@@ -76,8 +76,11 @@ test("@mutation public collection browsing preserves effective privacy", async (
       }),
     ).toBeVisible();
     await expect(
-      page.getByText(fixture.privateButton.name, { exact: true }),
-    ).toHaveCount(0);
+      page.getByRole("link", {
+        exact: true,
+        name: fixture.privateButton.name,
+      }),
+    ).toBeVisible();
 
     await page
       .getByRole("link", {
@@ -89,18 +92,15 @@ test("@mutation public collection browsing preserves effective privacy", async (
       fixture.publicSpinner.name,
     );
     await expect(
-      page.getByText("Default Button", { exact: true }),
-    ).toBeVisible();
-    await expect(
       page.getByText(fixture.privateButton.name, { exact: true }),
-    ).toHaveCount(0);
+    ).toBeVisible();
 
     await page.goto(
       `/collections/${fixture.ownerId}/${fixture.publicCollection.id}/${fixture.privateButton.id}`,
     );
-    await expect(
-      page.getByRole("heading", { name: "Page unavailable" }),
-    ).toBeVisible();
+    await expect(page.locator('span[aria-current="page"]')).toHaveText(
+      fixture.privateButton.name,
+    );
     await page.goto(
       `/collections/${fixture.ownerId}/${fixture.privateCollection.id}`,
     );

@@ -65,6 +65,57 @@ export class CollectionSliderComponentAlreadyInstalledError extends Error {
   }
 }
 
+/** Error raised when an installed component tries to control inherited privacy. */
+export class CollectionItemPrivacyInheritedError extends Error {
+  /** Parent assembly item that owns the effective privacy state. */
+  readonly parentCollectionItemId: number;
+
+  /**
+   * Creates the inherited-privacy error.
+   *
+   * @param parentCollectionItemId - Parent assembly controlling privacy.
+   */
+  constructor(parentCollectionItemId: number) {
+    super("Privacy is inherited from the installed parent.");
+    this.name = "CollectionItemPrivacyInheritedError";
+    this.parentCollectionItemId = parentCollectionItemId;
+  }
+}
+
+/** Error raised when a component makes a public assembly unsafe to expose. */
+export class CollectionAssemblyPrivacyBlockedError extends Error {
+  /** Safe component label suitable for localized error interpolation. */
+  readonly blockerName: string;
+
+  /** Component kind that blocked the operation. */
+  readonly componentType: "spinner-button" | "slider-insert" | "slider-plate";
+
+  /** Whether publishing or installation was blocked. */
+  readonly operation: "install" | "publish";
+
+  /**
+   * Creates an assembly privacy blocker error.
+   *
+   * @param input - Safe blocker label, component type, and blocked operation.
+   */
+  constructor(input: {
+    /** Safe component label suitable for display. */
+    blockerName: string;
+    /** Kind of installed assembly component. */
+    componentType: "spinner-button" | "slider-insert" | "slider-plate";
+    /** Public operation rejected by the blocker. */
+    operation: "install" | "publish";
+  }) {
+    super(
+      `${input.componentType} “${input.blockerName}” blocks this ${input.operation} operation.`,
+    );
+    this.name = "CollectionAssemblyPrivacyBlockedError";
+    this.blockerName = input.blockerName;
+    this.componentType = input.componentType;
+    this.operation = input.operation;
+  }
+}
+
 /**
  * Returns the violated PostgreSQL unique-constraint name.
  *
@@ -1687,6 +1738,8 @@ export type UserCollectionItem = {
    * Whether the record is private.
    */
   isPrivate: boolean;
+  /** Saved owner/staff preference restored after the item is detached. */
+  savedIsPrivate?: boolean;
   /**
    * Whether staff forced the record private.
    */
@@ -1699,16 +1752,24 @@ export type UserCollectionItem = {
    * Installed button identifier.
    */
   installedButtonId: number | null;
+  /** Whether an installed button exists but is unavailable to this viewer. */
+  installedButtonUnavailable?: boolean;
   /** Whether any uninterrupted slider-component installation no longer matches current compatibility metadata. */
   hasGrandfatheredInstallation: boolean;
   /** Effective physical or catalog-derived setup for an owned slider. */
   effectiveSliderSetup: EffectiveSliderSetup | null;
   /** Installed slider insert collection-item identifier. */
   installedInsertId: number | null;
+  /** Whether an installed insert exists but is unavailable to this viewer. */
+  installedInsertUnavailable?: boolean;
+  /** Parent assembly item whose privacy currently controls this component. */
+  privacyInheritedFromItemId?: number | null;
   /** Slider collection-item identifier that currently hosts this component. */
   installedOnSliderId: number | null;
   /** Installed slider plate collection-item identifier. */
   installedPlateId: number | null;
+  /** Whether an installed plate exists but is unavailable to this viewer. */
+  installedPlateUnavailable?: boolean;
   /** Durable setup recorded on an owned insert, or `null` for live defaults. */
   ownedInsertSetup: OwnedSliderInsertSetup | null;
   /**
@@ -5481,6 +5542,38 @@ export function createCollectionsService(
               )
               .orderBy(asc(schema.collectionSlider.id))
               .for("update");
+            const [deletedAssembly] = await tx
+              .select({
+                installedButtonId: schema.collectionSpinner.installedButtonId,
+                installedInsertId: schema.collectionSlider.installedInsertId,
+                installedPlateId: schema.collectionSlider.installedPlateId,
+                isPrivate: schema.collectionItem.isPrivate,
+              })
+              .from(schema.collectionItem)
+              .leftJoin(
+                schema.collectionSpinner,
+                eq(schema.collectionItem.id, schema.collectionSpinner.id),
+              )
+              .leftJoin(
+                schema.collectionSlider,
+                eq(schema.collectionItem.id, schema.collectionSlider.id),
+              )
+              .where(eq(schema.collectionItem.id, item.id))
+              .limit(1);
+            const installedChildren = [
+              deletedAssembly?.installedButtonId ?? null,
+              deletedAssembly?.installedPlateId ?? null,
+              deletedAssembly?.installedInsertId ?? null,
+            ].filter((id): id is number => id !== null);
+            const installedChildPrivacy = installedChildren.length
+              ? await tx
+                  .select({
+                    id: schema.collectionItem.id,
+                    savedIsPrivate: schema.collectionItem.isPrivate,
+                  })
+                  .from(schema.collectionItem)
+                  .where(inArray(schema.collectionItem.id, installedChildren))
+              : [];
             const [before] = await collectionItemDeletionState(tx, [item.id]);
             if (!before) throw new Error("Collection item does not exist.");
             const images = await tx
@@ -5494,6 +5587,62 @@ export function createCollectionsService(
             await tx
               .delete(schema.collectionItem)
               .where(eq(schema.collectionItem.id, item.id));
+            for (const spinner of detachedSpinners) {
+              await writeCollectionAudit(audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: { installedButtonId: null },
+                before: { installedButtonId: spinner.installedButtonId },
+                definition: collectionAudit.itemUpdated,
+                ownerUserId: item.ownerId,
+                reason,
+                targetId: spinner.id,
+              });
+            }
+            for (const slider of detachedSliders) {
+              await writeCollectionAudit(audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: {
+                  installedInsertId:
+                    slider.installedInsertId === item.id
+                      ? null
+                      : slider.installedInsertId,
+                  installedPlateId:
+                    slider.installedPlateId === item.id
+                      ? null
+                      : slider.installedPlateId,
+                },
+                before: {
+                  installedInsertId: slider.installedInsertId,
+                  installedPlateId: slider.installedPlateId,
+                },
+                definition: collectionAudit.itemUpdated,
+                ownerUserId: item.ownerId,
+                reason,
+                targetId: slider.id,
+              });
+            }
+            for (const child of installedChildPrivacy) {
+              await writeCollectionAudit(audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: {
+                  effectiveIsPrivate: child.savedIsPrivate,
+                  inheritedFromItemId: null,
+                  savedIsPrivate: child.savedIsPrivate,
+                },
+                before: {
+                  effectiveIsPrivate: deletedAssembly?.isPrivate ?? false,
+                  inheritedFromItemId: item.id,
+                  savedIsPrivate: child.savedIsPrivate,
+                },
+                definition: collectionAudit.itemUpdated,
+                ownerUserId: item.ownerId,
+                reason,
+                targetId: child.id,
+              });
+            }
             await touchCollection(tx, item.collectionId);
             await writeCollectionAudit(audit, tx, {
               actor: input.actor,
@@ -5821,6 +5970,9 @@ export function createCollectionsService(
         ) {
           throw new Error("Collection is private by an administrator.");
         }
+        if (collection.isPrivate && !input.isPrivate) {
+          await assertCollectionAssembliesMayBePublic(tx, input.collectionId);
+        }
         const before = {
           description: collection.description,
           id: input.collectionId,
@@ -5889,6 +6041,12 @@ export function createCollectionsService(
               !actorIsModerating
             ) {
               throw new Error("Collection is private by an administrator.");
+            }
+            if (row.isPrivate && !input.isPrivate) {
+              await assertCollectionAssembliesMayBePublic(
+                tx,
+                input.collectionId,
+              );
             }
             const values = validatedCollectionValues(input);
             const before = {
@@ -5973,15 +6131,39 @@ export function createCollectionsService(
       await db.transaction(async (tx) => {
         const [item] = await tx
           .select({
+            collectionIsPrivate: schema.userCollection.isPrivate,
+            installedButtonId: schema.collectionSpinner.installedButtonId,
+            installedInsertId: schema.collectionSlider.installedInsertId,
+            installedPlateId: schema.collectionSlider.installedPlateId,
+            installedParentId: sql<number | null>`coalesce(
+              (select id from collection_spinner where installed_button_id = ${schema.collectionItem.id}),
+              (select id from collection_slider where installed_plate_id = ${schema.collectionItem.id}),
+              (select id from collection_slider where installed_insert_id = ${schema.collectionItem.id})
+            )`,
             isPrivate: schema.collectionItem.isPrivate,
             ownerId: schema.collectionItem.ownerId,
             privatedByClerkId: schema.collectionItem.privatedByClerkId,
           })
           .from(schema.collectionItem)
+          .innerJoin(
+            schema.userCollection,
+            eq(schema.collectionItem.collectionId, schema.userCollection.id),
+          )
+          .leftJoin(
+            schema.collectionSpinner,
+            eq(schema.collectionItem.id, schema.collectionSpinner.id),
+          )
+          .leftJoin(
+            schema.collectionSlider,
+            eq(schema.collectionItem.id, schema.collectionSlider.id),
+          )
           .where(eq(schema.collectionItem.id, input.collectionItemId))
           .limit(1);
         if (!item || (item.ownerId !== actorUser.id && !canManage))
           throw new Error("Collection item does not exist.");
+        if (item.installedParentId != null) {
+          throw new CollectionItemPrivacyInheritedError(item.installedParentId);
+        }
         const actorIsModerating = item.ownerId !== actorUser.id;
         if (
           !input.isPrivate &&
@@ -5990,6 +6172,17 @@ export function createCollectionsService(
           !actorIsModerating
         ) {
           throw new Error("Collection item is private by an administrator.");
+        }
+        const installedComponentIds = [
+          item.installedButtonId,
+          item.installedPlateId,
+          item.installedInsertId,
+        ].filter((id): id is number => id !== null);
+        if (item.isPrivate && !input.isPrivate && !item.collectionIsPrivate) {
+          await assertAssemblyComponentsMayBePublic(tx, {
+            componentIds: installedComponentIds,
+            operation: "publish",
+          });
         }
         const before = {
           id: input.collectionItemId,
@@ -6016,6 +6209,49 @@ export function createCollectionsService(
           reason: input.reason,
           targetId: input.collectionItemId,
         });
+        if (
+          item.isPrivate !== input.isPrivate &&
+          installedComponentIds.length
+        ) {
+          const components = await tx
+            .select({
+              id: schema.collectionItem.id,
+              ownerClerkId: schema.user.clerkId,
+              privatedByClerkId: schema.collectionItem.privatedByClerkId,
+              savedIsPrivate: schema.collectionItem.isPrivate,
+            })
+            .from(schema.collectionItem)
+            .innerJoin(
+              schema.user,
+              eq(schema.collectionItem.ownerId, schema.user.id),
+            )
+            .where(inArray(schema.collectionItem.id, installedComponentIds));
+          for (const component of components) {
+            const staffForcedPrivate = Boolean(
+              component.savedIsPrivate &&
+                component.privatedByClerkId !== null &&
+                component.privatedByClerkId !== component.ownerClerkId,
+            );
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser,
+              after: {
+                effectiveIsPrivate: staffForcedPrivate || input.isPrivate,
+                inheritedFromItemId: input.collectionItemId,
+                savedIsPrivate: component.savedIsPrivate,
+              },
+              before: {
+                effectiveIsPrivate: staffForcedPrivate || item.isPrivate,
+                inheritedFromItemId: input.collectionItemId,
+                savedIsPrivate: component.savedIsPrivate,
+              },
+              definition: collectionAudit.itemVisibilityChanged,
+              ownerUserId: item.ownerId,
+              reason: input.reason,
+              targetId: component.id,
+            });
+          }
+        }
       });
     },
     /**
@@ -6034,6 +6270,7 @@ export function createCollectionsService(
           await db.transaction(async (tx) => {
             const [item] = await tx
               .select({
+                approvalStatus: schema.collectionItem.approvalStatus,
                 buttonProductId:
                   schema.collectionSpinnerButton.productSpinnerButtonId,
                 collectionId: schema.collectionItem.collectionId,
@@ -6119,7 +6356,10 @@ export function createCollectionsService(
 
             const targetCollectionId = input.collectionId ?? item.collectionId;
             const [targetCollection] = await tx
-              .select({ id: schema.userCollection.id })
+              .select({
+                id: schema.userCollection.id,
+                isPrivate: schema.userCollection.isPrivate,
+              })
               .from(schema.userCollection)
               .where(
                 and(
@@ -6226,7 +6466,9 @@ export function createCollectionsService(
               if (input.installedButton !== null) {
                 const [button] = await tx
                   .select({
+                    approvalStatus: schema.collectionItem.approvalStatus,
                     id: schema.collectionSpinnerButton.id,
+                    ownerId: schema.collectionItem.ownerId,
                     productId:
                       schema.collectionSpinnerButton.productSpinnerButtonId,
                   })
@@ -6244,17 +6486,23 @@ export function createCollectionsService(
                         schema.collectionSpinnerButton.id,
                         input.installedButton.collectionItemId,
                       ),
-                      canManage
-                        ? undefined
-                        : owner
-                          ? eq(schema.collectionItem.ownerId, owner.id)
-                          : sql`false`,
+                      eq(schema.collectionItem.ownerId, item.ownerId),
                       eq(schema.collectionItem.owned, true),
                     ),
                   )
                   .limit(1);
                 if (!button) {
                   throw new Error("Installed button does not exist.");
+                }
+                if (
+                  item.approvalStatus === "approved" &&
+                  !item.isPrivate &&
+                  !targetCollection.isPrivate
+                ) {
+                  await assertAssemblyComponentsMayBePublic(tx, {
+                    componentIds: [button.id],
+                    operation: "install",
+                  });
                 }
                 await tx
                   .update(schema.collectionItem)
@@ -6337,6 +6585,10 @@ export function createCollectionsService(
                     ownerId: item.ownerId,
                     sliderCollectionItemId: input.collectionItemId,
                     sliderProductId: item.sliderProductId,
+                    parentIsPublic:
+                      item.approvalStatus === "approved" &&
+                      !item.isPrivate &&
+                      !targetCollection.isPrivate,
                   },
                 );
                 await tx
@@ -6442,6 +6694,95 @@ export function createCollectionsService(
                 .where(
                   eq(schema.collectionSliderInsert.id, input.collectionItemId),
                 );
+            }
+            const membershipChanges = [
+              input.installedButton === undefined
+                ? null
+                : {
+                    afterId: input.installedButton?.collectionItemId ?? null,
+                    beforeId: item.installedButtonId,
+                  },
+              input.installedPlate === undefined
+                ? null
+                : {
+                    afterId: input.installedPlate?.collectionItemId ?? null,
+                    beforeId: item.installedPlateId,
+                  },
+              input.installedInsert === undefined
+                ? null
+                : {
+                    afterId: input.installedInsert?.collectionItemId ?? null,
+                    beforeId: item.installedInsertId,
+                  },
+            ].filter(
+              (change): change is NonNullable<typeof change> =>
+                change !== null && change.afterId !== change.beforeId,
+            );
+            const changedComponentIds = [
+              ...new Set(
+                membershipChanges.flatMap(({ afterId, beforeId }) =>
+                  [beforeId, afterId].filter((id): id is number => id !== null),
+                ),
+              ),
+            ];
+            const savedPrivacyById = new Map(
+              changedComponentIds.length
+                ? (
+                    await tx
+                      .select({
+                        id: schema.collectionItem.id,
+                        isPrivate: schema.collectionItem.isPrivate,
+                      })
+                      .from(schema.collectionItem)
+                      .where(
+                        inArray(schema.collectionItem.id, changedComponentIds),
+                      )
+                  ).map((component) => [component.id, component.isPrivate])
+                : [],
+            );
+            for (const { afterId, beforeId } of membershipChanges) {
+              if (beforeId !== null) {
+                const savedIsPrivate = savedPrivacyById.get(beforeId) ?? false;
+                await writeCollectionAudit(audit, tx, {
+                  actor: input.actor,
+                  actorUser: owner,
+                  after: {
+                    effectiveIsPrivate: savedIsPrivate,
+                    inheritedFromItemId: null,
+                    savedIsPrivate,
+                  },
+                  before: {
+                    effectiveIsPrivate: item.isPrivate,
+                    inheritedFromItemId: input.collectionItemId,
+                    savedIsPrivate,
+                  },
+                  definition: collectionAudit.itemUpdated,
+                  ownerUserId: item.ownerId,
+                  reason: input.reason,
+                  targetId: beforeId,
+                });
+              }
+              if (afterId !== null) {
+                const savedIsPrivate = savedPrivacyById.get(afterId) ?? false;
+                await writeCollectionAudit(audit, tx, {
+                  actor: input.actor,
+                  actorUser: owner,
+                  after: {
+                    effectiveIsPrivate: item.isPrivate,
+                    inheritedFromItemId: input.collectionItemId,
+                    savedIsPrivate,
+                  },
+                  before: {
+                    effectiveIsPrivate: savedIsPrivate,
+                    inheritedFromItemId: null,
+                    savedIsPrivate,
+                  },
+                  definition: collectionAudit.itemUpdated,
+                  ownerUserId: item.ownerId,
+                  reason: input.reason,
+                  targetId: afterId,
+                });
+              }
             }
             await touchCollection(tx, targetCollectionId);
             const after = {
@@ -7008,6 +7349,40 @@ async function touchCollection(tx: CatalogTransaction, collectionId: number) {
 }
 
 /**
+ * Builds the effective privacy expression for an owned collection item.
+ *
+ * Installed components inherit their parent assembly's privacy unless staff
+ * forced the component private. The surrounding query must join the owning
+ * user so staff moderation can be distinguished from the owner's saved
+ * preference.
+ *
+ * @returns SQL expression resolving the item's effective private state.
+ */
+function effectiveCollectionItemIsPrivate() {
+  return sql<boolean>`case
+    when ${schema.collectionItem.isPrivate} = true
+      and ${schema.collectionItem.privatedByClerkId} is not null
+      and ${schema.collectionItem.privatedByClerkId} <> ${schema.user.clerkId}
+      then true
+    else coalesce(
+      (select parent.is_private
+         from collection_spinner assembly
+         inner join collection_item parent on parent.id = assembly.id
+        where assembly.installed_button_id = ${schema.collectionItem.id}),
+      (select parent.is_private
+         from collection_slider assembly
+         inner join collection_item parent on parent.id = assembly.id
+        where assembly.installed_plate_id = ${schema.collectionItem.id}),
+      (select parent.is_private
+         from collection_slider assembly
+         inner join collection_item parent on parent.id = assembly.id
+        where assembly.installed_insert_id = ${schema.collectionItem.id}),
+      ${schema.collectionItem.isPrivate}
+    )
+  end`;
+}
+
+/**
  * Lists collections visible to the requested viewer.
  *
  * @param db - Application database.
@@ -7094,6 +7469,7 @@ async function queryCollections(
             row.ownerClerkId === options.viewerClerkId,
         )
         .map(({ id }) => id);
+  const effectiveItemIsPrivate = effectiveCollectionItemIsPrivate();
   const [counts, covers] = await Promise.all([
     db
       .select({
@@ -7101,13 +7477,14 @@ async function queryCollections(
         itemCount: count(schema.collectionItem.id),
       })
       .from(schema.collectionItem)
+      .innerJoin(schema.user, eq(schema.collectionItem.ownerId, schema.user.id))
       .where(
         and(
           inArray(schema.collectionItem.collectionId, collectionIds),
           eq(schema.collectionItem.owned, true),
           or(
             and(
-              eq(schema.collectionItem.isPrivate, false),
+              sql`${effectiveItemIsPrivate} = false`,
               eq(schema.collectionItem.approvalStatus, "approved"),
             ),
             unrestrictedCollectionIds.length
@@ -8243,6 +8620,12 @@ async function queryOwnedItems(
     viewerCanManage?: boolean;
   } = {},
 ): Promise<UserCollectionItem[]> {
+  const privacyInheritedFromItemId = sql<number | null>`coalesce(
+    (select id from collection_spinner where installed_button_id = ${schema.collectionItem.id}),
+    (select id from collection_slider where installed_plate_id = ${schema.collectionItem.id}),
+    (select id from collection_slider where installed_insert_id = ${schema.collectionItem.id})
+  )`;
+  const effectiveItemIsPrivate = effectiveCollectionItemIsPrivate();
   const conditions = [
     eq(schema.collectionItem.owned, true),
     isNull(schema.collectionItem.soldAt),
@@ -8270,7 +8653,7 @@ async function queryOwnedItems(
   if (options.productId !== undefined) {
     conditions.push(eq(schema.product.id, options.productId));
   }
-  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${schema.collectionItem.isPrivate} = false and ${schema.collectionItem.soldAt} is null and ${schema.collectionItem.approvalStatus} = 'approved' and ${schema.product.approvalStatus} = 'approved' and ${schema.product.isPrivate} = false)`;
+  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${effectiveItemIsPrivate} = false and ${schema.collectionItem.soldAt} is null and ${schema.collectionItem.approvalStatus} = 'approved' and ${schema.product.approvalStatus} = 'approved' and ${schema.product.isPrivate} = false)`;
   if (options.publicOnly) {
     conditions.push(publicItem);
   } else if (!options.includePrivate) {
@@ -8325,12 +8708,69 @@ async function queryOwnedItems(
         else false
       end`,
       installedButtonId: schema.collectionSpinner.installedButtonId,
+      installedButtonPubliclyAvailable: sql<boolean>`case
+        when ${schema.collectionSpinner.installedButtonId} is null then true
+        else exists (
+          select 1
+          from collection_item component
+          inner join users component_owner on component_owner.id = component.owner_id
+          inner join collection_spinner_button button on button.id = component.id
+          inner join product component_product on component_product.id = button.product_spinner_button_id
+          where component.id = ${schema.collectionSpinner.installedButtonId}
+            and component.approval_status = 'approved'
+            and component_product.approval_status = 'approved'
+            and component_product.is_private = false
+            and not (
+              component.is_private = true
+              and component.privated_by_clerk_id is not null
+              and component.privated_by_clerk_id <> component_owner.clerk_id
+            )
+        )
+      end`,
       installedInsertId: schema.collectionSlider.installedInsertId,
+      installedInsertPubliclyAvailable: sql<boolean>`case
+        when ${schema.collectionSlider.installedInsertId} is null then true
+        else exists (
+          select 1
+          from collection_item component
+          inner join users component_owner on component_owner.id = component.owner_id
+          inner join collection_slider_insert slider_insert on slider_insert.id = component.id
+          inner join product component_product on component_product.id = slider_insert.product_slider_insert_id
+          where component.id = ${schema.collectionSlider.installedInsertId}
+            and component.approval_status = 'approved'
+            and component_product.approval_status = 'approved'
+            and component_product.is_private = false
+            and not (
+              component.is_private = true
+              and component.privated_by_clerk_id is not null
+              and component.privated_by_clerk_id <> component_owner.clerk_id
+            )
+        )
+      end`,
       installedOnSliderId: sql<number | null>`coalesce(
         (select id from collection_slider where installed_plate_id = ${schema.collectionItem.id}),
         (select id from collection_slider where installed_insert_id = ${schema.collectionItem.id})
       )`,
       installedPlateId: schema.collectionSlider.installedPlateId,
+      installedPlatePubliclyAvailable: sql<boolean>`case
+        when ${schema.collectionSlider.installedPlateId} is null then true
+        else exists (
+          select 1
+          from collection_item component
+          inner join users component_owner on component_owner.id = component.owner_id
+          inner join collection_slider_plate slider_plate on slider_plate.id = component.id
+          inner join product component_product on component_product.id = slider_plate.product_slider_plate_id
+          where component.id = ${schema.collectionSlider.installedPlateId}
+            and component.approval_status = 'approved'
+            and component_product.approval_status = 'approved'
+            and component_product.is_private = false
+            and not (
+              component.is_private = true
+              and component.privated_by_clerk_id is not null
+              and component.privated_by_clerk_id <> component_owner.clerk_id
+            )
+        )
+      end`,
       installedInsertProductId: sql<number | null>`(
         select product_slider_insert_id
         from collection_slider_insert
@@ -8341,7 +8781,9 @@ async function queryOwnedItems(
         from collection_slider_insert
         where id = ${schema.collectionSlider.installedInsertId}
       )`,
-      isPrivate: schema.collectionItem.isPrivate,
+      isPrivate: effectiveItemIsPrivate,
+      privacyInheritedFromItemId,
+      savedIsPrivate: schema.collectionItem.isPrivate,
       privatedByClerkId: schema.collectionItem.privatedByClerkId,
       makerId: schema.maker.id,
       makerName: schema.maker.name,
@@ -8456,70 +8898,99 @@ async function queryOwnedItems(
         : [],
     ),
   );
-  const items: UserCollectionItem[] = visibleRows.map((row) => ({
-    approvalStatus: row.approvalStatus,
-    bearing: row.bearingOverride ?? row.productBearing,
-    bearingOverride: row.bearingOverride,
-    canAdminister: Boolean(options.viewerCanManage),
-    canEdit: Boolean(
+  const items: UserCollectionItem[] = visibleRows.map((row) => {
+    const canSeeUnavailableComponents = Boolean(
       options.viewerCanManage || options.viewerClerkId === row.ownerClerkId,
-    ),
-    compatibilityFamilies: [],
-    compatibleButtonId: null,
-    compatibleButtonName: null,
-    collectionIsPrivate: row.collectionIsPrivate,
-    collectionId: row.collectionId,
-    collectionItemId: row.collectionItemId,
-    collectionName: row.collectionName,
-    displayName: row.displayName,
-    description: row.descriptionOverride ?? row.productDescription,
-    descriptionOverride: row.descriptionOverride,
-    finishOption: row.finishOptionId
-      ? (finishOptions.get(row.finishOptionId) ?? null)
-      : null,
-    effectiveSliderSetup: null,
-    imageCount: 0,
-    images: [],
-    includedComponents: [],
-    isPrivate: row.isPrivate,
-    isAdminPrivate:
-      row.isPrivate &&
-      row.privatedByClerkId !== null &&
-      row.privatedByClerkId !== row.ownerClerkId,
-    hasGrandfatheredInstallation: row.hasGrandfatheredInstallation,
-    installedButtonId: row.installedButtonId,
-    installedInsertId: row.installedInsertId,
-    installedOnSliderId: row.installedOnSliderId,
-    installedPlateId: row.installedPlateId,
-    ownedInsertSetup: row.ownedInsertSetup,
-    isOwner: options.viewerClerkId === row.ownerClerkId,
-    makerId: row.makerId,
-    makerName: row.makerName,
-    makerSlug: row.makerSlug,
-    makerUrl: row.makerUrl,
-    material:
-      row.materialId && row.materialName && row.materialSlug
-        ? {
-            id: row.materialId,
-            name: row.materialName,
-            slug: row.materialSlug,
-          }
+    );
+    const installedButtonUnavailable = Boolean(
+      row.installedButtonId !== null &&
+        !row.installedButtonPubliclyAvailable &&
+        !canSeeUnavailableComponents,
+    );
+    const installedInsertUnavailable = Boolean(
+      row.installedInsertId !== null &&
+        !row.installedInsertPubliclyAvailable &&
+        !canSeeUnavailableComponents,
+    );
+    const installedPlateUnavailable = Boolean(
+      row.installedPlateId !== null &&
+        !row.installedPlatePubliclyAvailable &&
+        !canSeeUnavailableComponents,
+    );
+    return {
+      approvalStatus: row.approvalStatus,
+      bearing: row.bearingOverride ?? row.productBearing,
+      bearingOverride: row.bearingOverride,
+      canAdminister: Boolean(options.viewerCanManage),
+      canEdit: Boolean(
+        options.viewerCanManage || options.viewerClerkId === row.ownerClerkId,
+      ),
+      compatibilityFamilies: [],
+      compatibleButtonId: null,
+      compatibleButtonName: null,
+      collectionIsPrivate: row.collectionIsPrivate,
+      collectionId: row.collectionId,
+      collectionItemId: row.collectionItemId,
+      collectionName: row.collectionName,
+      displayName: row.displayName,
+      description: row.descriptionOverride ?? row.productDescription,
+      descriptionOverride: row.descriptionOverride,
+      finishOption: row.finishOptionId
+        ? (finishOptions.get(row.finishOptionId) ?? null)
         : null,
-    name: row.name,
-    ownerClerkId: row.ownerClerkId,
-    ownerUsername: row.ownerUsername,
-    ownerUserId: row.ownerUserId,
-    productId: row.productId,
-    productSlug: row.productSlug,
-    productTypeName: row.productTypeName,
-    productTypeSlug: row.productTypeSlug
-      ? catalogProductType(row.productTypeSlug)
-      : row.spinnerId
-        ? "spinner"
-        : "spinner-button",
-    productImages: [],
-    sourceProductFinishOptionId: row.sourceProductFinishOptionId,
-  }));
+      effectiveSliderSetup: null,
+      imageCount: 0,
+      images: [],
+      includedComponents: [],
+      isPrivate: row.isPrivate,
+      savedIsPrivate: row.savedIsPrivate,
+      isAdminPrivate:
+        row.isPrivate &&
+        row.privatedByClerkId !== null &&
+        row.privatedByClerkId !== row.ownerClerkId,
+      hasGrandfatheredInstallation: row.hasGrandfatheredInstallation,
+      installedButtonId: installedButtonUnavailable
+        ? null
+        : row.installedButtonId,
+      installedButtonUnavailable,
+      installedInsertId: installedInsertUnavailable
+        ? null
+        : row.installedInsertId,
+      installedInsertUnavailable,
+      installedOnSliderId: row.installedOnSliderId,
+      installedPlateId: installedPlateUnavailable ? null : row.installedPlateId,
+      installedPlateUnavailable,
+      privacyInheritedFromItemId: row.privacyInheritedFromItemId,
+      ownedInsertSetup: row.ownedInsertSetup,
+      isOwner: options.viewerClerkId === row.ownerClerkId,
+      makerId: row.makerId,
+      makerName: row.makerName,
+      makerSlug: row.makerSlug,
+      makerUrl: row.makerUrl,
+      material:
+        row.materialId && row.materialName && row.materialSlug
+          ? {
+              id: row.materialId,
+              name: row.materialName,
+              slug: row.materialSlug,
+            }
+          : null,
+      name: row.name,
+      ownerClerkId: row.ownerClerkId,
+      ownerUsername: row.ownerUsername,
+      ownerUserId: row.ownerUserId,
+      productId: row.productId,
+      productSlug: row.productSlug,
+      productTypeName: row.productTypeName,
+      productTypeSlug: row.productTypeSlug
+        ? catalogProductType(row.productTypeSlug)
+        : row.spinnerId
+          ? "spinner"
+          : "spinner-button",
+      productImages: [],
+      sourceProductFinishOptionId: row.sourceProductFinishOptionId,
+    };
+  });
   await loadCollectionImages(
     db,
     items,
@@ -9540,6 +10011,155 @@ async function listCatalogImageTrash(
 type CatalogTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 /**
+ * Rejects a public assembly operation when an installed component is not
+ * independently eligible for public catalog disclosure.
+ *
+ * Owner-selected privacy is intentionally ignored while the component is
+ * installed. Staff moderation, approval, and product visibility remain hard
+ * blockers.
+ *
+ * @param tx - Caller-owned transaction containing the assembly mutation.
+ * @param input - Component identifiers and public operation being validated.
+ * @returns Completion after all components pass public eligibility checks.
+ * @rejects When a component is missing, unavailable, or staff-private.
+ */
+async function assertAssemblyComponentsMayBePublic(
+  tx: CatalogTransaction,
+  input: {
+    /** Installed collection-item identifiers to validate. */
+    componentIds: number[];
+    /** Public operation that would disclose the components. */
+    operation: "install" | "publish";
+  },
+) {
+  if (!input.componentIds.length) return;
+  const components = await tx
+    .select({
+      approvalStatus: schema.collectionItem.approvalStatus,
+      displayName: sql<string>`coalesce(${schema.collectionItem.displayName}, ${schema.product.name})`,
+      id: schema.collectionItem.id,
+      isPrivate: schema.collectionItem.isPrivate,
+      ownerClerkId: schema.user.clerkId,
+      privatedByClerkId: schema.collectionItem.privatedByClerkId,
+      productApprovalStatus: schema.product.approvalStatus,
+      productIsPrivate: schema.product.isPrivate,
+      productTypeSlug: schema.productType.slug,
+    })
+    .from(schema.collectionItem)
+    .innerJoin(schema.user, eq(schema.collectionItem.ownerId, schema.user.id))
+    .leftJoin(
+      schema.collectionSpinnerButton,
+      eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
+    )
+    .leftJoin(
+      schema.collectionSliderPlate,
+      eq(schema.collectionItem.id, schema.collectionSliderPlate.id),
+    )
+    .leftJoin(
+      schema.collectionSliderInsert,
+      eq(schema.collectionItem.id, schema.collectionSliderInsert.id),
+    )
+    .innerJoin(
+      schema.product,
+      eq(
+        schema.product.id,
+        sql`coalesce(${schema.collectionSpinnerButton.productSpinnerButtonId}, ${schema.collectionSliderPlate.productSliderPlateId}, ${schema.collectionSliderInsert.productSliderInsertId})`,
+      ),
+    )
+    .innerJoin(
+      schema.productType,
+      eq(schema.product.productTypeId, schema.productType.id),
+    )
+    .where(inArray(schema.collectionItem.id, input.componentIds))
+    .orderBy(asc(schema.collectionItem.id));
+  for (const component of components) {
+    const staffForcedPrivate =
+      component.isPrivate &&
+      component.privatedByClerkId !== null &&
+      component.privatedByClerkId !== component.ownerClerkId;
+    if (
+      staffForcedPrivate ||
+      component.approvalStatus !== "approved" ||
+      component.productApprovalStatus !== "approved" ||
+      component.productIsPrivate
+    ) {
+      const componentType = component.productTypeSlug;
+      if (
+        componentType !== "spinner-button" &&
+        componentType !== "slider-plate" &&
+        componentType !== "slider-insert"
+      ) {
+        throw new Error("Installed assembly component does not exist.");
+      }
+      throw new CollectionAssemblyPrivacyBlockedError({
+        blockerName: component.displayName,
+        componentType,
+        operation: input.operation,
+      });
+    }
+  }
+  if (components.length !== new Set(input.componentIds).size) {
+    throw new Error("Installed assembly component does not exist.");
+  }
+}
+
+/**
+ * Ensures every assembly that a collection publication would expose is safe.
+ *
+ * @param tx - Caller-owned transaction containing the collection mutation.
+ * @param collectionId - Collection whose public assemblies are validated.
+ * @returns Completion after all public assemblies pass eligibility checks.
+ * @rejects When an installed component is missing, unavailable, or staff-private.
+ */
+async function assertCollectionAssembliesMayBePublic(
+  tx: CatalogTransaction,
+  collectionId: number,
+) {
+  const [spinners, sliders] = await Promise.all([
+    tx
+      .select({ componentId: schema.collectionSpinner.installedButtonId })
+      .from(schema.collectionSpinner)
+      .innerJoin(
+        schema.collectionItem,
+        eq(schema.collectionSpinner.id, schema.collectionItem.id),
+      )
+      .where(
+        and(
+          eq(schema.collectionItem.collectionId, collectionId),
+          eq(schema.collectionItem.isPrivate, false),
+          isNotNull(schema.collectionSpinner.installedButtonId),
+        ),
+      ),
+    tx
+      .select({
+        installedInsertId: schema.collectionSlider.installedInsertId,
+        installedPlateId: schema.collectionSlider.installedPlateId,
+      })
+      .from(schema.collectionSlider)
+      .innerJoin(
+        schema.collectionItem,
+        eq(schema.collectionSlider.id, schema.collectionItem.id),
+      )
+      .where(
+        and(
+          eq(schema.collectionItem.collectionId, collectionId),
+          eq(schema.collectionItem.isPrivate, false),
+        ),
+      ),
+  ]);
+  await assertAssemblyComponentsMayBePublic(tx, {
+    componentIds: [
+      ...spinners.map(({ componentId }) => componentId),
+      ...sliders.flatMap(({ installedInsertId, installedPlateId }) => [
+        installedPlateId,
+        installedInsertId,
+      ]),
+    ].filter((id): id is number => id !== null),
+    operation: "publish",
+  });
+}
+
+/**
  * Validates a new slider-component installation against current ownership and catalog metadata.
  *
  * @param tx - Caller-owned database transaction.
@@ -9560,6 +10180,8 @@ async function validateSliderComponentInstallation(
     sliderCollectionItemId: number;
     /** Parent slider catalog product identifier. */
     sliderProductId: number;
+    /** Whether the parent would be publicly visible after installation. */
+    parentIsPublic: boolean;
   },
 ) {
   const componentProductColumn =
@@ -9598,6 +10220,12 @@ async function validateSliderComponentInstallation(
     component.productApprovalStatus !== "approved"
   ) {
     throw new Error(`Installed slider ${input.componentType} does not exist.`);
+  }
+  if (input.parentIsPublic) {
+    await assertAssemblyComponentsMayBePublic(tx, {
+      componentIds: [component.id],
+      operation: "install",
+    });
   }
 
   const [existingInstallation] = await tx

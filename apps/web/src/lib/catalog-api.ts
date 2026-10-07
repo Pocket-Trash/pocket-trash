@@ -18,6 +18,10 @@ import type {
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
+import {
+  CollectionAssemblyPrivacyBlockedError,
+  CollectionItemPrivacyInheritedError,
+} from "@package/services";
 import { hasPermission } from "@package/services/authorization";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -2429,10 +2433,15 @@ export const setCollectionItemVisibility = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requireActor();
     const { s } = await import("@/lib/services");
-    await s.db.collections.setItemVisibility({
-      actor,
-      ...data,
-    });
+    try {
+      await s.db.collections.setItemVisibility({
+        actor,
+        ...data,
+      });
+      return { ok: true as const };
+    } catch (error) {
+      return sliderAssemblyMutationFailure(error) ?? mutationFailure(error);
+    }
   });
 
 /**
@@ -2580,6 +2589,27 @@ function mutationFailure(error: unknown) {
  * @returns A localized mutation failure, or `null` for unrelated failures.
  */
 function sliderAssemblyMutationFailure(error: unknown) {
+  if (error instanceof CollectionAssemblyPrivacyBlockedError) {
+    return {
+      fieldErrors: {},
+      formError:
+        error.operation === "install"
+          ? "web.slider.moderation.installBlocked"
+          : "web.slider.moderation.publicBlocked",
+      formErrorDetail: "web.slider.privacy.blockingComponent",
+      formErrorValues: { component: error.blockerName },
+      ok: false as const,
+      requiresConfirmation: false as const,
+    };
+  }
+  if (error instanceof CollectionItemPrivacyInheritedError) {
+    return {
+      fieldErrors: {},
+      formError: "web.slider.privacy.inheritedDescription",
+      ok: false as const,
+      requiresConfirmation: false as const,
+    };
+  }
   if (!(error instanceof Error)) return null;
   const formError = error.message.includes("Body-hosted")
     ? "web.slider.validation.bodyHostedInsert"
