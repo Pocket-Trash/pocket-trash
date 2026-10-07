@@ -43,6 +43,7 @@ jobs:
       preview: ${{ steps.classify.outputs.preview }}
       safe_e2e: ${{ steps.classify.outputs.safe_e2e }}
       mutation_e2e: ${{ steps.classify.outputs.mutation_e2e }}
+      mutation_e2e_specs: ${{ steps.classify.outputs.mutation_e2e_specs }}
       validation: ${{ steps.classify.outputs.validation }}
 
     steps:
@@ -66,6 +67,7 @@ jobs:
             for domain in api scraper web database storybook preview safe_e2e mutation_e2e validation; do
               echo "$domain=true" >> "$GITHUB_OUTPUT"
             done
+            echo 'mutation_e2e_specs=["e2e/collection-covers.spec.ts","e2e/collection-lifecycle.spec.ts","e2e/collection-selection.spec.ts","e2e/public-collections.spec.ts","e2e/mutation.spec.ts","e2e/makers.spec.ts","e2e/authenticated.spec.ts"]' >> "$GITHUB_OUTPUT"
           fi
 
   preview:
@@ -994,8 +996,11 @@ jobs:
           E2E_DATABASE_BRANCH: preview-pr-${{ github.event.pull_request.number }}
           E2E_PR_NUMBER: ${{ github.event.pull_request.number }}
           E2E_RUN_MUTATIONS: "true"
+          E2E_MUTATION_SPECS: ${{ needs.classify-changes.outputs.mutation_e2e_specs }}
           E2E_VERCEL_DEPLOYMENT_ID: ${{ needs.preview.outputs.deployment_id }}
-        run: pnpm --filter @app/web exec playwright test --grep @mutation
+        run: |
+          readarray -t mutation_specs < <(jq -r '.[]' <<< "$E2E_MUTATION_SPECS")
+          pnpm --filter @app/web exec playwright test "${mutation_specs[@]}" --grep @mutation
 
       - name: Upload failed Playwright report
         if: failure()

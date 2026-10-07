@@ -5,7 +5,12 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 
-import { classifyChanges, validationDomains } from "./classify-changes.mjs";
+import {
+  allMutationE2eSpecs,
+  classifyChanges,
+  mutationE2eSpecs,
+  validationDomains,
+} from "./classify-changes.mjs";
 
 /** Parsed CI workflow under test. */
 const ciWorkflow = parse(
@@ -38,24 +43,31 @@ function expectedDomains(...enabled) {
  * @param {string[]} enabled - Domains expected to be relevant.
  * @param {object} [details] - Expected classification metadata.
  * @param {"diff-failed" | "malformed-input" | null} [details.error] - Failure type.
+ * @param {string[]} [details.mutationSpecs] - Selected mutation Playwright specs.
  * @param {string[]} [details.noCodePaths] - Intentionally non-code paths.
  * @param {string[]} [details.unknownPaths] - Unclassified paths.
- * @returns {{domains: Record<string, boolean>, error: "diff-failed" | "malformed-input" | null, noCodePaths: string[], unknownPaths: string[]}} Expected response.
+ * @returns {{domains: Record<string, boolean>, error: "diff-failed" | "malformed-input" | null, mutationSpecs: string[], noCodePaths: string[], unknownPaths: string[]}} Expected response.
  */
 function expected(
   enabled,
-  { error = null, noCodePaths = [], unknownPaths = [] } = {},
+  {
+    error = null,
+    mutationSpecs = enabled.includes("mutation_e2e") ? allMutationE2eSpecs : [],
+    noCodePaths = [],
+    unknownPaths = [],
+  } = {},
 ) {
   return {
     domains: expectedDomains(...enabled),
     error,
+    mutationSpecs,
     noCodePaths,
     unknownPaths,
   };
 }
 
 test("classifies representative application paths", () => {
-  for (const [path, enabled] of [
+  for (const [path, enabled, details] of [
     [
       "apps/api/src/index.ts",
       ["api", "preview", "safe_e2e", "mutation_e2e", "validation"],
@@ -63,11 +75,12 @@ test("classifies representative application paths", () => {
     ["apps/scraper/src/index.ts", ["scraper", "preview", "validation"]],
     [
       "apps/web/src/components/product-card.tsx",
-      ["web", "storybook", "preview", "safe_e2e", "mutation_e2e", "validation"],
+      ["web", "storybook", "preview", "safe_e2e", "validation"],
     ],
     [
       "apps/web/e2e/collection-covers.spec.ts",
       ["web", "preview", "safe_e2e", "mutation_e2e", "validation"],
+      { mutationSpecs: mutationE2eSpecs.collections },
     ],
     [
       "apps/web/e2e/local/maker-pagination.spec.ts",
@@ -78,8 +91,27 @@ test("classifies representative application paths", () => {
       ["web", "preview", "safe_e2e", "validation"],
     ],
   ]) {
-    assert.deepEqual(classifyChanges([path]), expected(enabled), path);
+    assert.deepEqual(classifyChanges([path]), expected(enabled, details), path);
   }
+});
+
+test("selects the union of mutation specs for explicit changed domains", () => {
+  const paths = [
+    "apps/web/src/components/theme-toggle.tsx",
+    "apps/web/src/pages/maker-detail-page.tsx",
+  ];
+  const mutationSpecs = [
+    ...mutationE2eSpecs.makers,
+    ...mutationE2eSpecs.settings,
+  ];
+
+  assert.deepEqual(
+    classifyChanges(paths),
+    expected(
+      ["web", "storybook", "preview", "safe_e2e", "mutation_e2e", "validation"],
+      { mutationSpecs },
+    ),
+  );
 });
 
 test("classifies package paths by affected domains", () => {
@@ -122,6 +154,27 @@ test("explicitly classifies every tracked repository path", () => {
     .filter(Boolean);
 
   assert.deepEqual(classifyChanges(paths).unknownPaths, []);
+});
+
+test("assigns every mutation specification to an explicit domain", () => {
+  const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
+  const specs = execFileSync("git", ["ls-files", "apps/web/e2e/*.spec.ts"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+  })
+    .trim()
+    .split("\n")
+    .filter(
+      (path) =>
+        path &&
+        readFileSync(new URL(`../${path}`, import.meta.url), "utf8").includes(
+          "@mutation",
+        ),
+    )
+    .map((path) => path.replace(/^apps\/web\//u, ""))
+    .sort();
+
+  assert.deepEqual([...allMutationE2eSpecs].sort(), specs);
 });
 
 test("returns intentional no-code paths explicitly", () => {
@@ -183,6 +236,7 @@ test("CLI fails open and exposes a stable error when the diff is unavailable", (
     ...Object.entries(expectedDomains(...validationDomains)).map(
       ([domain, relevant]) => `${domain}=${relevant}`,
     ),
+    `mutation_e2e_specs=${JSON.stringify(allMutationE2eSpecs)}`,
     "unknown_paths=[]",
     "classification_error=diff-failed",
   ].join("\n")}\n`;
@@ -290,6 +344,10 @@ test("CI keeps required names and gates jobs with one classifier", () => {
     jobs["classify-changes"].outputs.unknown_paths,
     "${{ steps.classify.outputs.unknown_paths }}",
   );
+  assert.equal(
+    jobs["classify-changes"].outputs.mutation_e2e_specs,
+    "${{ steps.classify.outputs.mutation_e2e_specs }}",
+  );
 
   assert.equal(jobs.classification.name, "Classification");
   assert.equal(jobs.classification.needs, "classify-changes");
@@ -370,6 +428,18 @@ test("Deploy gates preview work and runs Playwright in a separate job", () => {
   assert.ok(e2eSteps.some((step) => step.name === "Run safe E2E smoke tests"));
   assert.ok(
     e2eSteps.some((step) => step.name === "Run isolated E2E mutation fixtures"),
+  );
+  const mutationStep = e2eSteps.find(
+    (step) => step.name === "Run isolated E2E mutation fixtures",
+  );
+  assert.equal(
+    mutationStep.env.E2E_MUTATION_SPECS,
+    "${{ needs.classify-changes.outputs.mutation_e2e_specs }}",
+  );
+  assert.match(mutationStep.run, /readarray -t mutation_specs/u);
+  assert.match(
+    mutationStep.run,
+    /"\$\{mutation_specs\[@\]\}" --grep @mutation/u,
   );
   assert.ok(
     e2eSteps.some((step) => step.name === "Upload failed Playwright report"),

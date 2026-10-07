@@ -26,6 +26,9 @@ test("deployed preview smoke and guarded mutation suites remain enabled", () => 
   const workflow = read(".github/workflows/deploy.yml");
 
   assert.match(workflow, /test:e2e:ci/u);
-  assert.match(workflow, /playwright test --grep @mutation/u);
+  assert.match(
+    workflow,
+    /playwright test "\$\{mutation_specs\[@\]\}" --grep @mutation/u,
+  );
   assert.match(workflow, /Verify isolated mutation preview/u);
 });

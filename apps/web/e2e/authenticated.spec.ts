@@ -1,3 +1,4 @@
+import type { Locator, Page } from "playwright/test";
 import { expect, test } from "./auth";
 
 test.use({ trace: "off" });
@@ -58,14 +59,14 @@ test("@mutation regular user theme persists after reload", async ({
   }
 
   const originalTheme = page.getByRole("button", { name: originalThemeName });
+  const nextThemeName = originalThemeName === "Dark" ? "Light" : "Dark";
   const nextTheme = page.getByRole("button", {
-    name: originalThemeName === "Dark" ? "Light" : "Dark",
+    name: nextThemeName,
   });
   let changed = false;
 
   try {
-    await nextTheme.click();
-    await expect(nextTheme).toBeEnabled();
+    await selectThemeAndWaitForPersistence(page, nextTheme, nextThemeName);
     changed = true;
 
     await page.reload();
@@ -73,8 +74,51 @@ test("@mutation regular user theme persists after reload", async ({
   } finally {
     if (changed) {
       await page.goto("/user/settings");
-      await originalTheme.click();
-      await expect(originalTheme).toBeEnabled();
+      await selectThemeAndWaitForPersistence(
+        page,
+        originalTheme,
+        originalThemeName,
+      );
+      await page.reload();
+      await expect(originalTheme).toHaveAttribute("aria-pressed", "true");
     }
   }
 });
+
+/**
+ * Selects a theme and waits for its authenticated settings request to finish.
+ *
+ * @param page - Browser page issuing the settings request.
+ * @param themeButton - Theme option to select.
+ * @param themeName - Theme name expected in the request payload.
+ * @returns Nothing after persistence succeeds and controls are enabled again.
+ * @rejects When persistence fails or no matching settings request completes.
+ */
+async function selectThemeAndWaitForPersistence(
+  page: Page,
+  themeButton: Locator,
+  themeName: "Dark" | "Light" | "System",
+): Promise<void> {
+  const theme = themeName.toLowerCase();
+  const responsePromise = page.waitForResponse((response) => {
+    const request = response.request();
+    return (
+      request.method() === "POST" &&
+      request.postData()?.includes("theme") === true &&
+      request.postData()?.includes(theme) === true
+    );
+  });
+  const savingTransition = (async () => {
+    await expect(themeButton).toBeDisabled();
+    await expect(themeButton).toBeEnabled();
+  })();
+
+  await themeButton.click();
+  await Promise.any([
+    responsePromise.then((response) => {
+      expect(response.ok()).toBe(true);
+    }),
+    savingTransition,
+  ]);
+  await expect(themeButton).toBeEnabled();
+}
