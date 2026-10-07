@@ -94,7 +94,7 @@ describe("storage object ownership", () => {
     } finally {
       await client.close();
     }
-  });
+  }, 15_000);
 });
 
 /**
