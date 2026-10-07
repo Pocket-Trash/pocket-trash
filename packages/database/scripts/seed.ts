@@ -303,7 +303,7 @@ const sliderFixtureMakers = [
 export const sliderFixtureCatalog: SliderFixtureCatalog = {
   products: [
     ...sliderFixtureMakers.flatMap((fixtureMaker, makerIndex) =>
-      Array.from({ length: 7 }, (_, productIndex) => {
+      Array.from({ length: 7 }, (_, productIndex): SliderFixtureProduct => {
         const ordinal = makerIndex * 7 + productIndex + 1;
         const slug = `${fixtureMaker.slug}-demo-slider-${String(productIndex + 1).padStart(2, "0")}`;
         const bodyHosted = productIndex % 2 === 0;
@@ -340,7 +340,7 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
         };
       }),
     ),
-    ...sliderFixtureMakers.map((fixtureMaker, index) => {
+    ...sliderFixtureMakers.map((fixtureMaker, index): SliderFixtureProduct => {
       const slug = `${fixtureMaker.slug}-demo-plate`;
       return {
         compatibilityFamily: `${fixtureMaker.slug}-standard`,
@@ -363,7 +363,7 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
         updatedAt: new Date(Date.UTC(2026, 8, 1 + index, 12)).toISOString(),
       };
     }),
-    ...sliderFixtureMakers.map((fixtureMaker, index) => {
+    ...sliderFixtureMakers.map((fixtureMaker, index): SliderFixtureProduct => {
       const slug = `${fixtureMaker.slug}-demo-insert`;
       return {
         compatibilityFamily: `${fixtureMaker.slug}-standard`,

@@ -34,7 +34,7 @@ describe("owned slider assemblies", () => {
         .returning();
       const [maker] = await db
         .insert(schema.maker)
-        .values({ name: "Assembly maker" })
+        .values({ name: "Assembly maker", slug: "assembly-maker" })
         .returning();
       const [material] = await db
         .insert(schema.material)

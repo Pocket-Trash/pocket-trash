@@ -34,7 +34,7 @@ describe("owned slider insert setups", () => {
         .returning();
       const [maker] = await db
         .insert(schema.maker)
-        .values({ name: "Setup maker" })
+        .values({ name: "Setup maker", slug: "setup-maker" })
         .returning();
       const [material] = await db
         .insert(schema.material)

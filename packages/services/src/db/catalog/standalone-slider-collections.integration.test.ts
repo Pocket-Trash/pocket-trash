@@ -34,7 +34,7 @@ describe("standalone slider collection items", () => {
         .returning();
       const [maker] = await db
         .insert(schema.maker)
-        .values({ name: "Slider maker" })
+        .values({ name: "Slider maker", slug: "slider-maker" })
         .returning();
       const [material] = await db
         .insert(schema.material)
