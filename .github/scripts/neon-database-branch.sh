@@ -532,8 +532,8 @@ preflight_preview() {
   require_env PREVIEW_BASE_SHA
 
   claim_preview_branch_ownership
-  run_preflight_step "drizzle-kit migrate" \
-    pnpm --dir "$REPO_ROOT/packages/database" exec drizzle-kit migrate --config=drizzle.config.ts || return $?
+  run_preflight_step "database migration" \
+    pnpm --dir "$REPO_ROOT/packages/database" db:migrate:direct || return $?
   run_preflight_step "seed" \
     pnpm --dir "$REPO_ROOT/packages/database" exec tsx scripts/seed.ts || return $?
   run_preflight_step "preview-state mark" run_preview_state mark || return $?

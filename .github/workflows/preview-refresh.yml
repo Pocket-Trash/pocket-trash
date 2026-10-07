@@ -70,7 +70,7 @@ jobs:
           set -euo pipefail
 
           set +e
-          pnpm exec drizzle-kit migrate --config=drizzle.config.ts
+          pnpm db:migrate:direct
           migration_status=$?
           set -e
 
@@ -79,7 +79,7 @@ jobs:
             emit_ci_log error "ci.database.preview.migrations.failed" "$(jq -n \
               --arg branch_name "${{ steps.preview_db.outputs.branch_name }}" \
               --arg branch_id "${{ steps.preview_db.outputs.branch_id }}" \
-              --arg failure_step "drizzle-kit migrate" \
+              --arg failure_step "database migration" \
               '{
                 branchName: $branch_name,
                 branchId: $branch_id,

@@ -29,6 +29,7 @@ export type AppliedMigration = {
 /** Supported relationships between repository and database histories. */
 export type MigrationHistoryState =
   | "exact"
+  | "reconciled"
   | "behind"
   | "ahead"
   | "diverged"
@@ -137,6 +138,7 @@ export function loadRepositoryMigrations(
  * @param expected - Repository migrations in journal order.
  * @param applied - Applied rows in insertion order, or `null` when no history table exists.
  * @returns Classified state with safe repair guidance.
+ * @throws When the repository reconciliation marker is malformed.
  */
 export function compareMigrationHistories(
   expected: readonly MigrationRecord[],
@@ -159,6 +161,43 @@ export function compareMigrationHistories(
       summary: `Migration history exactly matches all ${expected.length} repository migrations.`,
       guidance: "No repair is needed.",
     };
+  }
+
+  const reconciliationIndex = expected.findIndex(
+    ({ tag }) => tag === "0066_repair_rebased_slider_history",
+  );
+  if (reconciliationIndex >= 0) {
+    const reconciliationKey = expectedKeys[reconciliationIndex];
+    if (!reconciliationKey) {
+      throw new Error("Migration reconciliation marker is malformed.");
+    }
+    const appliedReconciliationIndex = appliedKeys.indexOf(reconciliationKey);
+    if (appliedReconciliationIndex >= 0) {
+      const expectedSuffix = expectedKeys.slice(reconciliationIndex);
+      const appliedSuffix = appliedKeys.slice(appliedReconciliationIndex);
+      if (
+        appliedSuffix.length <= expectedSuffix.length &&
+        arraysEqual(
+          appliedSuffix,
+          expectedSuffix.slice(0, appliedSuffix.length),
+        )
+      ) {
+        if (appliedSuffix.length < expectedSuffix.length) {
+          return {
+            state: "behind",
+            summary: `The reconciled database is ${expectedSuffix.length - appliedSuffix.length} migration(s) behind the repository.`,
+            guidance:
+              "Confirm the selected database is your personal Neon branch, run pnpm db:migrate, and rerun validation. Never migrate production from a local command.",
+          };
+        }
+        return {
+          state: "reconciled",
+          summary:
+            "Migration history contains the forward reconciliation marker and matches every later repository migration.",
+          guidance: "No repair is needed.",
+        };
+      }
+    }
   }
 
   if (
