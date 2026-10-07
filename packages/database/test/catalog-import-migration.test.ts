@@ -15,7 +15,7 @@ describe("catalog import migration", () => {
 
   beforeAll(async () => {
     const migration = readFileSync(
-      new URL("../drizzle/0061_ambiguous_frog_thor.sql", import.meta.url),
+      new URL("../drizzle/0065_rare_warhawk.sql", import.meta.url),
       "utf8",
     ).replaceAll("--> statement-breakpoint", "");
     await database.exec(migration);
