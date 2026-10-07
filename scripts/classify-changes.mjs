@@ -90,6 +90,17 @@ const changeClassificationRules = [
     mutationDomains: ["settings"],
   },
   {
+    category: "web-mutation-catalog-source",
+    paths: [
+      "apps/web/src/lib/catalog-api.test.ts",
+      "apps/web/src/lib/catalog-api.ts",
+      "apps/web/src/pages/catalog-form-pages.test.tsx",
+      "apps/web/src/pages/catalog-form-pages.tsx",
+    ],
+    domains: ["web", "storybook", "preview", "safe_e2e", "validation"],
+    mutationDomains: ["collections", "makers"],
+  },
+  {
     category: "web-mutation-makers-e2e",
     paths: ["apps/web/e2e/makers.spec.ts"],
     domains: ["web", "preview", "safe_e2e", "validation"],
@@ -109,6 +120,12 @@ const changeClassificationRules = [
   },
   {
     category: "web-mutation-collections-source",
+    paths: [
+      "apps/web/src/lib/upload-sessions.test.ts",
+      "apps/web/src/lib/upload-sessions.ts",
+      "apps/web/src/pages/catalog-pages.test.tsx",
+      "apps/web/src/pages/catalog-pages.tsx",
+    ],
     patterns: [/^apps\/web\/src\/.*collection.*$/u],
     domains: ["web", "storybook", "preview", "safe_e2e", "validation"],
     mutationDomains: ["collections"],

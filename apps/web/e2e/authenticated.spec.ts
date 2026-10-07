@@ -63,25 +63,23 @@ test("@mutation regular user theme persists after reload", async ({
   const nextTheme = page.getByRole("button", {
     name: nextThemeName,
   });
-  let changed = false;
 
   try {
     await selectThemeAndWaitForPersistence(page, nextTheme, nextThemeName);
-    changed = true;
 
     await page.reload();
     await expect(nextTheme).toHaveAttribute("aria-pressed", "true");
   } finally {
-    if (changed) {
-      await page.goto("/user/settings");
+    await page.goto("/user/settings");
+    if ((await originalTheme.getAttribute("aria-pressed")) !== "true") {
       await selectThemeAndWaitForPersistence(
         page,
         originalTheme,
         originalThemeName,
       );
-      await page.reload();
-      await expect(originalTheme).toHaveAttribute("aria-pressed", "true");
     }
+    await page.reload();
+    await expect(originalTheme).toHaveAttribute("aria-pressed", "true");
   }
 });
 
@@ -114,7 +112,7 @@ async function selectThemeAndWaitForPersistence(
   })();
 
   await themeButton.click();
-  await Promise.any([
+  await Promise.all([
     responsePromise.then((response) => {
       expect(response.ok()).toBe(true);
     }),

@@ -114,6 +114,43 @@ test("selects the union of mutation specs for explicit changed domains", () => {
   );
 });
 
+test("classifies shared mutation surfaces by every affected product domain", () => {
+  const catalogMutationSpecs = [
+    ...mutationE2eSpecs.collections,
+    ...mutationE2eSpecs.makers,
+  ];
+  const enabled = [
+    "web",
+    "storybook",
+    "preview",
+    "safe_e2e",
+    "mutation_e2e",
+    "validation",
+  ];
+
+  for (const path of [
+    "apps/web/src/lib/catalog-api.ts",
+    "apps/web/src/pages/catalog-form-pages.tsx",
+  ]) {
+    assert.deepEqual(
+      classifyChanges([path]),
+      expected(enabled, { mutationSpecs: catalogMutationSpecs }),
+      path,
+    );
+  }
+
+  for (const path of [
+    "apps/web/src/lib/upload-sessions.ts",
+    "apps/web/src/pages/catalog-pages.tsx",
+  ]) {
+    assert.deepEqual(
+      classifyChanges([path]),
+      expected(enabled, { mutationSpecs: mutationE2eSpecs.collections }),
+      path,
+    );
+  }
+});
+
 test("classifies package paths by affected domains", () => {
   for (const [path, enabled] of [
     ["packages/database/src/schema/product.ts", validationDomains],

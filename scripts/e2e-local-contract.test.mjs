@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+import { allMutationE2eSpecs } from "./classify-changes.mjs";
+
 /**
  * Reads one repository file for a static workflow contract.
  *
@@ -31,4 +33,11 @@ test("deployed preview smoke and guarded mutation suites remain enabled", () => 
     /playwright test "\$\{mutation_specs\[@\]\}" --grep @mutation/u,
   );
   assert.match(workflow, /Verify isolated mutation preview/u);
+});
+
+test("workflow classifier fallbacks retain the complete mutation suite", () => {
+  const fallback = `echo 'mutation_e2e_specs=${JSON.stringify(allMutationE2eSpecs)}' >> "$GITHUB_OUTPUT"`;
+
+  assert.ok(read(".github/workflows/ci.yml").includes(fallback));
+  assert.ok(read(".github/workflows/deploy.yml").includes(fallback));
 });
