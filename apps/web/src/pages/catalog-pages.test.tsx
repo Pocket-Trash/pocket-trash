@@ -6,6 +6,7 @@ import type {
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ProductCard } from "@/components/product-card";
+import { emptyCatalogFilters } from "@/lib/catalog-filters";
 import {
   CollectionItemDetailPage,
   CollectionPage,
@@ -14,6 +15,7 @@ import {
   PaginatedCards,
   ProductDetailPage,
   ProductGrid,
+  ProductsPage,
   PublicCollectionsPage,
   UserCollectionsPage,
 } from "./catalog-pages";
@@ -213,13 +215,22 @@ const owners = [
         collectionIsPrivate: false,
         collectionItemId: 2000,
         collectionName: "Daily Carry",
+        compatibilityFamilies: [],
+        compatibleButtonId: null,
+        compatibleButtonName: null,
         displayName: "My Catla",
         description: null,
         descriptionOverride: null,
         finishOption: null,
+        effectiveSliderSetup: null,
         imageCount: 0,
         images: [],
+        hasGrandfatheredInstallation: false,
         installedButtonId: null,
+        installedInsertId: null,
+        installedOnSliderId: null,
+        installedPlateId: null,
+        includedComponents: [],
         isAdminPrivate: false,
         isPrivate: false,
         makerId: 1,
@@ -231,6 +242,7 @@ const owners = [
         ownerClerkId: "user_1002",
         ownerUsername: "royanger",
         ownerUserId: 1002,
+        ownedInsertSetup: null,
         productId: 1,
         productSlug: "catla",
         productImages: [],
@@ -247,12 +259,18 @@ const owners = [
 /** Catalog product fixture used by page tests. */
 const product: CatalogProduct = {
   approvalStatus: "approved",
+  advertisedInsertOffers: [],
   bearing: null,
+  bodyHostedMagnetSetup: null,
+  insertClickOptions: [],
+  insertMagnetOffers: [],
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: false,
   compatibleButtonId: null,
   compatibleButtonName: null,
+  compatibilityAdvisories: [],
+  compatibilityFamilies: [],
   createdAt: new Date(0),
   description: null,
   diameterMm: null,
@@ -260,6 +278,7 @@ const product: CatalogProduct = {
   id: 1,
   imageCount: 0,
   images: [],
+  includedComponents: [],
   isAdminPrivate: false,
   isPrivate: false,
   lengthMm: null,
@@ -269,6 +288,7 @@ const product: CatalogProduct = {
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
+  magnetSystem: null,
   materials: [],
   name: "Catla",
   ownerClerkId: "user_1002",
@@ -281,6 +301,7 @@ const product: CatalogProduct = {
   thicknessWithButtonMm: null,
   updatedAt: new Date(0),
   weightG: null,
+  weightBasis: null,
   widthMm: null,
 };
 
@@ -351,6 +372,62 @@ describe("PublicCollectionsPage", () => {
     expect(html).not.toContain("collection-5.webp");
     expect(html).toContain("width=640");
     expect(html).toContain("Page 1 of 2");
+  });
+
+  it("returns a collection when its parent slider has the selected installed plate", () => {
+    const owner = owners[0];
+    const collection = owner?.collections[0];
+    const sourceItem = owner?.items[0];
+    if (!owner || !collection || !sourceItem) {
+      throw new Error("Public collection fixtures are required.");
+    }
+    const otherCollection = {
+      ...collection,
+      id: 1002,
+      name: "Other collection",
+    };
+    const installedPlate = {
+      ...sourceItem,
+      collectionItemId: 2001,
+      displayName: "Standalone selected plate",
+      installedOnSliderId: 2000,
+      name: "V2 plate",
+      productId: 401,
+      productSlug: "v2-plate",
+      productTypeName: "Slider plate",
+      productTypeSlug: "slider-plate" as const,
+    };
+    const parentSlider = {
+      ...sourceItem,
+      displayName: "Qualifying parent slider",
+      installedPlateId: installedPlate.collectionItemId,
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+    };
+    const unrelated = {
+      ...sourceItem,
+      collectionId: otherCollection.id,
+      collectionItemId: 2002,
+      displayName: "Unrelated slider",
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+    };
+
+    const html = renderToStaticMarkup(
+      <PublicCollectionsPage
+        filters={{ ...emptyCatalogFilters(), plateIds: [401] }}
+        owners={[
+          {
+            ...owner,
+            collections: [collection, otherCollection],
+            items: [parentSlider, installedPlate, unrelated],
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain("Daily Carry");
+    expect(html).not.toContain("Other collection");
   });
 });
 
@@ -457,6 +534,121 @@ describe("CollectionPage", () => {
 
     expect(html).not.toContain("LIST_ONLY_BEARING");
     expect(html).not.toContain("LIST_ONLY_DESCRIPTION");
+  });
+
+  it("shows the qualifying parent assembly and omits its standalone plate", () => {
+    const collection = owners[0]?.collections[0];
+    const sourceItem = owners[0]?.items[0];
+    if (!collection || !sourceItem) {
+      throw new Error("Collection fixtures are required.");
+    }
+    const installedPlate = {
+      ...sourceItem,
+      collectionItemId: 2001,
+      displayName: "Standalone selected plate",
+      installedOnSliderId: sourceItem.collectionItemId,
+      name: "V2 plate",
+      productId: 401,
+      productSlug: "v2-plate",
+      productTypeName: "Slider plate",
+      productTypeSlug: "slider-plate" as const,
+    };
+    const parentSlider = {
+      ...sourceItem,
+      displayName: "Qualifying parent slider",
+      installedPlateId: installedPlate.collectionItemId,
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+    };
+
+    const html = renderToStaticMarkup(
+      <CollectionPage
+        collection={collection}
+        filters={{ ...emptyCatalogFilters(), plateIds: [401] }}
+        items={[parentSlider, installedPlate]}
+      />,
+    );
+
+    expect(html).toContain("Qualifying parent slider");
+    expect(html).not.toContain("Standalone selected plate");
+  });
+
+  it("matches only the owned item's selected pattern snapshot", () => {
+    const collection = owners[0]?.collections[0];
+    const sourceItem = owners[0]?.items[0];
+    if (!collection || !sourceItem) {
+      throw new Error("Collection fixtures are required.");
+    }
+    const selectedPattern = { id: 201, name: "Ripple", slug: "ripple" };
+    const ownedSlider = {
+      ...sourceItem,
+      displayName: "Ripple owned slider",
+      finishOption: {
+        colorEffect: null,
+        colors: [],
+        finishes: [],
+        id: 1001,
+        pattern: selectedPattern,
+      },
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+    };
+
+    const selectedHtml = renderToStaticMarkup(
+      <CollectionPage
+        collection={collection}
+        filters={{
+          ...emptyCatalogFilters(),
+          patternIds: [selectedPattern.id],
+        }}
+        items={[ownedSlider]}
+      />,
+    );
+    const unselectedHtml = renderToStaticMarkup(
+      <CollectionPage
+        collection={collection}
+        filters={{ ...emptyCatalogFilters(), patternIds: [202] }}
+        items={[ownedSlider]}
+      />,
+    );
+
+    expect(selectedHtml).toContain("Ripple owned slider");
+    expect(unselectedHtml).not.toContain("Ripple owned slider");
+  });
+
+  it("matches an installed spinner button through its parent spinner only", () => {
+    const collection = owners[0]?.collections[0];
+    const sourceItem = owners[0]?.items[0];
+    if (!collection || !sourceItem) {
+      throw new Error("Collection fixtures are required.");
+    }
+    const installedButton = {
+      ...sourceItem,
+      collectionItemId: 2001,
+      displayName: "Standalone selected button",
+      installedOnSliderId: sourceItem.collectionItemId,
+      name: "Soft click button",
+      productId: 501,
+      productSlug: "soft-click-button",
+      productTypeName: "Spinner button",
+      productTypeSlug: "spinner-button" as const,
+    };
+    const parentSpinner = {
+      ...sourceItem,
+      displayName: "Qualifying parent spinner",
+      installedButtonId: installedButton.collectionItemId,
+    };
+
+    const html = renderToStaticMarkup(
+      <CollectionPage
+        collection={collection}
+        filters={{ ...emptyCatalogFilters(), spinnerButtonIds: [501] }}
+        items={[parentSpinner, installedButton]}
+      />,
+    );
+
+    expect(html).toContain("Qualifying parent spinner");
+    expect(html).not.toContain("Standalone selected button");
   });
 
   it("shows a paginated image gallery beside the collection summary", () => {
@@ -571,7 +763,201 @@ describe("ProductGrid", () => {
   });
 });
 
+describe("ProductsPage", () => {
+  it("matches any offered pattern together with the live family and included plate", () => {
+    const ripple = { id: 201, name: "Ripple", slug: "ripple" };
+    const qualifying = {
+      ...product,
+      compatibilityFamilies: [
+        {
+          id: 301,
+          makerId: 1,
+          makerName: "KAP EDC",
+          name: "Small family",
+          slug: "small-family",
+        },
+      ],
+      finishOptions: [
+        {
+          colorEffect: null,
+          colors: [],
+          finishes: [],
+          id: 1001,
+          pattern: null,
+        },
+        {
+          colorEffect: null,
+          colors: [],
+          finishes: [],
+          id: 1002,
+          pattern: ripple,
+        },
+      ],
+      includedComponents: [
+        {
+          id: 401,
+          name: "V2 plate",
+          productTypeSlug: "slider-plate" as const,
+          slug: "v2-plate",
+        },
+      ],
+      name: "Qualifying catalog slider",
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+      slug: "qualifying-slider",
+    };
+    const unrelated = {
+      ...product,
+      id: 2,
+      name: "Unrelated catalog slider",
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+      slug: "unrelated-slider",
+    };
+
+    const html = renderToStaticMarkup(
+      <ProductsPage
+        filters={{
+          ...emptyCatalogFilters(),
+          compatibilityFamilyIds: [301],
+          patternIds: [ripple.id],
+          plateIds: [401],
+        }}
+        products={[qualifying, unrelated]}
+      />,
+    );
+
+    expect(html).toContain("Qualifying catalog slider");
+    expect(html).not.toContain("Unrelated catalog slider");
+  });
+
+  it("matches a spinner by its exact compatible button product", () => {
+    const qualifying = {
+      ...product,
+      compatibleButtonId: 501,
+      compatibleButtonName: "Soft click button",
+      name: "Qualifying catalog spinner",
+      slug: "qualifying-spinner",
+    };
+    const unrelated = {
+      ...product,
+      id: 2,
+      name: "Unrelated catalog spinner",
+      slug: "unrelated-spinner",
+    };
+
+    const html = renderToStaticMarkup(
+      <ProductsPage
+        filters={{
+          ...emptyCatalogFilters(),
+          spinnerButtonIds: [501],
+        }}
+        products={[qualifying, unrelated]}
+      />,
+    );
+
+    expect(html).toContain("Qualifying catalog spinner");
+    expect(html).not.toContain("Unrelated catalog spinner");
+  });
+});
+
 describe("ProductDetailPage", () => {
+  it("shows the live body-hosted setup as exact read-only catalog facts", () => {
+    const html = renderToStaticMarkup(
+      <ProductDetailPage
+        collectionItems={[]}
+        product={{
+          ...product,
+          bodyHostedMagnetSetup: {
+            clickCount: 4,
+            configuration: {
+              groups: [
+                {
+                  diameterMm: "6.35",
+                  grade: "N52",
+                  key: "corners",
+                  label: "Corners",
+                  thicknessMm: "3.175",
+                },
+              ],
+              label: "Medium",
+              slots: [
+                {
+                  documentedColumn: 1,
+                  documentedRow: 1,
+                  groupKey: "corners",
+                  half: "half-a",
+                  key: "A1",
+                  state: "occupied",
+                },
+              ],
+              sourceLabel: "4-click layout",
+              sourceNotes: null,
+            },
+            sourceNote: null,
+          },
+          magnetSystem: "body-hosted",
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+      />,
+    );
+
+    expect(html).toContain("4 clicks");
+    expect(html).toContain("Medium — 4-click layout");
+    expect(html).toContain("6.35×3.175 mm, N52");
+    expect(html).toContain("Half A A1");
+    expect(html).not.toContain("Install");
+    expect(html).not.toContain("Custom setup");
+  });
+
+  it("distinguishes insert offers and slider advertised defaults", () => {
+    const configuration = {
+      groups: [],
+      label: "Medium",
+      slots: [
+        {
+          documentedColumn: null,
+          documentedRow: null,
+          groupKey: null,
+          half: "half-a" as const,
+          key: "A1",
+          state: "empty" as const,
+        },
+      ],
+      sourceLabel: null,
+      sourceNotes: null,
+    };
+    const html = renderToStaticMarkup(
+      <ProductDetailPage
+        collectionItems={[]}
+        product={{
+          ...product,
+          advertisedInsertOffers: [
+            {
+              clickCount: 3,
+              clickOptionId: 3000,
+              configuration,
+              copiedFromTemplateId: null,
+              id: 4000,
+              insertProductId: 2000,
+              insertProductName: "Maker Insert",
+              isAdvertisedDefault: true,
+              isSliderAdvertisedDefault: true,
+            },
+          ],
+          magnetSystem: "insert-driven",
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+      />,
+    );
+
+    expect(html).toContain("Available insert setups");
+    expect(html).toContain("Maker Insert: Medium");
+    expect(html).toContain("Default setup");
+  });
+
   it("limits deletion controls to owners and authorized staff", () => {
     const publicHtml = renderToStaticMarkup(
       <ProductDetailPage collectionItems={[]} product={product} />,
@@ -638,6 +1024,160 @@ describe("ProductDetailPage", () => {
 });
 
 describe("CollectionItemDetailPage", () => {
+  it("shows live body-hosted slider facts as read-only details", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const slider = {
+      ...product,
+      bodyHostedMagnetSetup: {
+        clickCount: 3,
+        configuration: null,
+        sourceNote: "Documented by the maker.",
+      },
+      magnetSystem: "body-hosted" as const,
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+      thicknessMm: "12",
+      widthMm: "40",
+    };
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        item={{
+          ...item,
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+        product={slider}
+      />,
+    );
+
+    expect(html).toContain("Body-hosted");
+    expect(html).toContain("Magnet setup");
+    expect(html).toContain("Documented by the maker.");
+    expect(html).toContain("40 mm");
+    expect(html).toContain("12 mm");
+    expect(html).not.toContain("Build from scratch");
+  });
+
+  it("shows installed slider components and grandfathered compatibility warnings", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const slider = {
+      ...product,
+      magnetSystem: "insert-driven" as const,
+      productTypeName: "Slider",
+      productTypeSlug: "slider" as const,
+    };
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        installedInsert={{ ...item, displayName: "Installed insert" }}
+        installedPlate={{ ...item, displayName: "Installed plate" }}
+        item={{
+          ...item,
+          hasGrandfatheredInstallation: true,
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+        product={slider}
+      />,
+    );
+
+    expect(html).toContain("Installed plate");
+    expect(html).toContain("Installed insert");
+    expect(html).toContain(
+      "This installation can remain connected, but reinstalling will use current compatibility.",
+    );
+  });
+
+  it("shows an owned slider's effective setup without filling snapshot gaps", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        item={{
+          ...item,
+          effectiveSliderSetup: {
+            clickCount: null,
+            configuration: {
+              groups: [],
+              label: "Owner layout",
+              slots: [
+                {
+                  documentedColumn: null,
+                  documentedRow: null,
+                  groupKey: null,
+                  half: "half-a",
+                  key: "A1",
+                  state: "unknown",
+                },
+              ],
+              sourceLabel: null,
+              sourceNotes: null,
+            },
+            isLiveCatalog: false,
+            source: "owned-insert",
+          },
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+        product={{
+          ...product,
+          magnetSystem: "insert-driven",
+          productTypeName: "Slider",
+          productTypeSlug: "slider",
+        }}
+      />,
+    );
+
+    expect(html).toContain("Not recorded");
+    expect(html).toContain("Owner layout");
+    expect(html).toContain("Unknown");
+  });
+
+  it("uses an insert's live advertised default until its owner records a setup", () => {
+    const item = owners[0]?.items[0];
+    if (!item) throw new Error("Collection item fixture is required.");
+    const configuration = {
+      groups: [],
+      label: "Advertised layout",
+      slots: [],
+      sourceLabel: null,
+      sourceNotes: null,
+    };
+    const html = renderToStaticMarkup(
+      <CollectionItemDetailPage
+        item={{
+          ...item,
+          ownedInsertSetup: null,
+          productTypeName: "Slider insert",
+          productTypeSlug: "slider-insert",
+        }}
+        product={{
+          ...product,
+          insertMagnetOffers: [
+            {
+              clickCount: 5,
+              clickOptionId: 3000,
+              configuration,
+              copiedFromTemplateId: null,
+              id: 4000,
+              insertProductId: product.id,
+              isAdvertisedDefault: true,
+            },
+          ],
+          productTypeName: "Slider insert",
+          productTypeSlug: "slider-insert",
+        }}
+      />,
+    );
+
+    expect(html).toContain(
+      "The live setup advertised by the catalog. It does not create a saved custom setup.",
+    );
+    expect(html).toContain("Advertised layout");
+    expect(html).toContain("5");
+  });
+
   it("shows approval actions only to administrators while owners retain review status and editing", () => {
     const item = owners[0]?.items[0];
     if (!item) throw new Error("Collection item fixture is required.");

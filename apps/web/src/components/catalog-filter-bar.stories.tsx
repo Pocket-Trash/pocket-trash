@@ -39,6 +39,9 @@ const colors = [
  */
 const facets = {
   colors,
+  compatibilityFamilies: [
+    { count: 4, id: 20, name: "Small family", slug: "small-family" },
+  ],
   fades: [{ colors: [blue, purple], count: 6, key: "1.2" }],
   finishes: [
     { count: 12, id: 1, name: "Anodized", slug: "anodized" },
@@ -57,9 +60,14 @@ const facets = {
     { count: 4, id: 5, name: "Stainless steel", slug: "stainless-steel" },
     { count: 2, id: 6, name: "Aluminum", slug: "aluminum" },
   ],
+  patterns: [{ count: 5, id: 30, name: "Ripple", slug: "ripple" }],
+  plates: [{ count: 3, id: 40, name: "V2 plate", slug: "v2-plate" }],
   productTypes: [
     { count: 20, name: "Spinner", slug: "spinner" },
     { count: 8, name: "Spinner button", slug: "spinner-button" },
+  ],
+  spinnerButtons: [
+    { count: 6, id: 50, name: "Soft click button", slug: "soft-click" },
   ],
 } satisfies CatalogFacets;
 /**
@@ -72,6 +80,7 @@ const copy = {
   clear: "Clear",
   close: "Remove",
   colors: "Colour",
+  compatibilityFamily: "Compatibility family",
   description: "Filter the catalog",
   /**
    * Builds a story label for a color fade.
@@ -94,10 +103,22 @@ const copy = {
    * @returns The overflow-options label.
    */
   moreOptions: (label) => `More ${label}`,
+  pattern: "Pattern",
+  plate: "Slider plate",
   productType: "Product type",
   productTypeAll: "All product types",
+  /**
+   * Builds the story result announcement.
+   *
+   * @param count - Matching result count.
+   * @returns Story result announcement.
+   */
+  resultsAnnouncement: (count) => `${count} matching results`,
   selectMaker: "Select makers",
   selectProductType: "Select product type",
+  spinnerButton: "Spinner button",
+  searchLabel: "Search catalog and collections",
+  searchPlaceholder: "Search products, makers, types, aliases, or owners",
 } satisfies CatalogFilterCopy;
 
 /**
@@ -114,6 +135,7 @@ const meta = {
      * @returns No value.
      */
     onChange: () => undefined,
+    resultCount: 20,
   },
   component: CatalogFilterBar,
   decorators: [
@@ -197,6 +219,8 @@ export const FilterInteraction: Story = {
 
     await userEvent.click(canvas.getByRole("button", { name: "More filters" }));
     const page = within(canvasElement.ownerDocument.body);
+    await expect(page.getByText("20 matching results")).toBeInTheDocument();
+    await userEvent.click(page.getByLabelText("V2 plate"));
     await userEvent.click(page.getByRole("combobox", { name: "Maker" }));
     await userEvent.click(await page.findByRole("option", { name: "KAP EDC" }));
     await expect(

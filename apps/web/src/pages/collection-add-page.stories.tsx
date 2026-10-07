@@ -7,12 +7,18 @@ import { CollectionAddPage } from "./catalog-form-pages";
 /** Catalog product used by the chooser interaction stories. */
 const product: CatalogProduct = {
   approvalStatus: "approved",
+  advertisedInsertOffers: [],
   bearing: null,
+  bodyHostedMagnetSetup: null,
+  insertClickOptions: [],
+  insertMagnetOffers: [],
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: true,
   compatibleButtonId: null,
   compatibleButtonName: null,
+  compatibilityAdvisories: [],
+  compatibilityFamilies: [],
   createdAt: new Date(0),
   description: null,
   diameterMm: null,
@@ -22,10 +28,12 @@ const product: CatalogProduct = {
       colors: [],
       finishes: [{ id: 1002, name: "Polished", slug: "polished" }],
       id: 1003,
+      pattern: null,
     },
   ],
   imageCount: 0,
   images: [],
+  includedComponents: [],
   id: 1000,
   lengthMm: null,
   makerId: 1,
@@ -34,6 +42,7 @@ const product: CatalogProduct = {
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: null,
+  magnetSystem: null,
   materials: [{ id: 1001, name: "Bronze", slug: "bronze" }],
   name: "Product 1",
   ownerClerkId: "user_test",
@@ -48,6 +57,7 @@ const product: CatalogProduct = {
   thicknessWithButtonMm: null,
   updatedAt: new Date(0),
   weightG: null,
+  weightBasis: null,
   widthMm: null,
 };
 
@@ -84,6 +94,28 @@ const products: CatalogProduct[] = [
     productTypeName: "Spinner button",
     productTypeSlug: "spinner-button",
   },
+  {
+    ...product,
+    bodyHostedMagnetSetup: {
+      clickCount: 3,
+      configuration: null,
+      sourceNote: "Documented maker setup",
+    },
+    id: 3000,
+    includedComponents: [
+      {
+        id: 3001,
+        name: "Included plate",
+        productTypeSlug: "slider-plate",
+        slug: "included-plate",
+      },
+    ],
+    magnetSystem: "body-hosted",
+    name: "Standalone slider",
+    productTypeId: 3,
+    productTypeName: "Slider",
+    productTypeSlug: "slider",
+  },
 ];
 
 /** Collection form fixtures and the standard app providers. */
@@ -94,14 +126,18 @@ const meta = {
     initialProductId: 1000,
     options: {
       colorEffects: [],
+      compatibilityFamilies: [],
       colors: [],
       finishes: [],
       makers: [],
       materials: [],
+      patterns: [],
+      relationshipProducts: [],
       spinnerButtons: [],
       productTypes: [
         { id: 1, name: "Spinner", slug: "spinner" },
         { id: 2, name: "Spinner button", slug: "spinner-button" },
+        { id: 3, name: "Slider", slug: "slider" },
       ],
     },
     products,
@@ -202,6 +238,11 @@ export const Preselected: Story = {
     await userEvent.click(chooser);
     await expect(search).not.toBeVisible();
   },
+};
+
+/** Standalone slider creation without spinner-only controls. */
+export const StandaloneSlider: Story = {
+  args: { initialProductId: 3000 },
 };
 
 /** Direct visits retain the open product-type chooser. */

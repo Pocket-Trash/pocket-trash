@@ -2,11 +2,14 @@ import type {
   AdminMaterial,
   AdminMaterialSummary,
   CatalogColor,
+  CatalogCompatibilityFamily,
   CatalogImage,
   CatalogLookup,
+  CatalogMagnetConfigurationTemplate,
   CatalogMaker,
   CatalogProduct,
   CatalogProductType,
+  CatalogTerminologyAlias,
   ProductWriteInput,
   PublicMakerDetail,
   PublicMakerSummary,
@@ -64,7 +67,15 @@ const urlMessage = "web.catalog.error.url";
 /**
  * Schema for supported catalog product-type slugs.
  */
-const productTypeSchema = z.enum(["spinner", "spinner-button"]);
+const productTypeSchema = z.enum([
+  "slider",
+  "slider-insert",
+  "slider-plate",
+  "spinner",
+  "spinner-button",
+]);
+/** Product types supported by the standalone collection-item editor. */
+const collectionProductTypeSchema = productTypeSchema;
 /**
  * Schema for positive integer identifiers.
  */
@@ -88,6 +99,14 @@ const slugNameSchema = z
  * Schema for a non-empty trimmed display name.
  */
 const displayNameSchema = z.string().trim().min(1, requiredMessage);
+/** Schema for a maker-scoped alias of a registered product type. */
+const terminologyAliasSchema = z.object({
+  canonicalKey: productTypeSchema,
+  canonicalNamespace: z.literal("product-type"),
+  isPreferred: z.boolean(),
+  label: z.string().trim().min(1, requiredMessage).max(80),
+  makerId: idSchema,
+});
 /**
  * Schema that preserves nonblank descriptions, limits them to 5,000 characters, and maps whitespace-only values to `null`.
  */
@@ -113,6 +132,232 @@ const optionalUrlSchema = z
   .transform((value) => normalizeOptionalUrl(value) || null);
 
 /**
+ * Creates an optional sourced setup text schema without inferring missing facts.
+ *
+ * @param maximum - Maximum accepted character count.
+ * @returns Schema that trims text and maps blank input to `null`.
+ */
+const optionalMagnetTextSchema = (maximum: number) =>
+  z
+    .union([z.string().max(maximum, "web.catalog.error.form"), z.null()])
+    .transform((value) => value?.trim() || null);
+
+/** One complete exact magnet group in a catalog layout. */
+const magnetGroupSchema = z.object({
+  diameterMm: positiveDecimalSchema.pipe(
+    z.string({ error: "web.slider.validation.positiveDimension" }),
+  ),
+  grade: z.string().trim().min(1, requiredMessage).max(20),
+  key: z.string().trim().min(1, requiredMessage).max(100),
+  label: z.string().trim().min(1, requiredMessage).max(100),
+  thicknessMm: positiveDecimalSchema.pipe(
+    z.string({ error: "web.slider.validation.positiveDimension" }),
+  ),
+});
+
+/** One exact Half A or Half B slot in a complete catalog layout. */
+const magnetSlotSchema = z.object({
+  documentedColumn: z.number().int().positive().nullable(),
+  documentedRow: z.number().int().positive().nullable(),
+  groupKey: z.string().trim().min(1).max(100).nullable(),
+  half: z.enum(["half-a", "half-b"]),
+  key: z.string().trim().min(1, requiredMessage).max(100),
+  state: z.enum(["occupied", "empty"]),
+});
+
+/** Complete exact catalog magnet configuration form contract. */
+const magnetConfigurationSchema = z
+  .object({
+    groups: z.array(magnetGroupSchema),
+    label: z.string().trim().min(1, requiredMessage).max(100),
+    slots: z
+      .array(magnetSlotSchema)
+      .min(1, "web.slider.validation.completeConfiguration"),
+    sourceLabel: optionalMagnetTextSchema(200),
+    sourceNotes: optionalMagnetTextSchema(5000),
+  })
+  .superRefine((configuration, context) => {
+    const groupKeys = configuration.groups.map(({ key }) => key);
+    if (new Set(groupKeys).size !== groupKeys.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["configuration", "groups"],
+      });
+    }
+    const slotKeys = configuration.slots.map(({ key }) => key);
+    if (new Set(slotKeys).size !== slotKeys.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["configuration", "slots"],
+      });
+    }
+    const referenced = new Set<string>();
+    for (const [index, slot] of configuration.slots.entries()) {
+      if (slot.state === "occupied" && !slot.groupKey) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.incompleteSlot",
+          path: ["configuration", "slots", index, "groupKey"],
+        });
+      }
+      if (slot.state === "empty" && slot.groupKey) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.overlappingGroup",
+          path: ["configuration", "slots", index, "groupKey"],
+        });
+      }
+      if (slot.groupKey && !groupKeys.includes(slot.groupKey)) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.crossConfiguration",
+          path: ["configuration", "slots", index, "groupKey"],
+        });
+      }
+      if (slot.groupKey) referenced.add(slot.groupKey);
+    }
+    if (groupKeys.some((key) => !referenced.has(key))) {
+      context.addIssue({
+        code: "custom",
+        message: "web.slider.validation.completeConfiguration",
+        path: ["configuration", "groups"],
+      });
+    }
+  });
+
+/** Owner-recorded layout contract that additionally permits unknown positions. */
+const ownedMagnetConfigurationSchema = z
+  .object({
+    groups: z.array(magnetGroupSchema),
+    label: z.string().trim().min(1, requiredMessage).max(100),
+    slots: z
+      .array(
+        magnetSlotSchema.extend({
+          state: z.enum(["occupied", "empty", "unknown"]),
+        }),
+      )
+      .min(1, "web.slider.validation.completeConfiguration"),
+    sourceLabel: optionalMagnetTextSchema(200),
+    sourceNotes: optionalMagnetTextSchema(5000),
+  })
+  .superRefine((configuration, context) => {
+    const groupKeys = configuration.groups.map(({ key }) => key);
+    const slotKeys = configuration.slots.map(({ key }) => key);
+    if (new Set(groupKeys).size !== groupKeys.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["configuration", "groups"],
+      });
+    }
+    if (new Set(slotKeys).size !== slotKeys.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["configuration", "slots"],
+      });
+    }
+    const referenced = new Set<string>();
+    for (const [index, slot] of configuration.slots.entries()) {
+      if (slot.state === "occupied" && !slot.groupKey) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.incompleteSlot",
+          path: ["configuration", "slots", index, "groupKey"],
+        });
+      }
+      if (slot.state !== "occupied" && slot.groupKey) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.overlappingGroup",
+          path: ["configuration", "slots", index, "groupKey"],
+        });
+      }
+      if (slot.groupKey && !groupKeys.includes(slot.groupKey)) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.crossConfiguration",
+          path: ["configuration", "slots", index, "groupKey"],
+        });
+      }
+      if (slot.groupKey) referenced.add(slot.groupKey);
+    }
+    if (groupKeys.some((key) => !referenced.has(key))) {
+      context.addIssue({
+        code: "custom",
+        message: "web.slider.validation.completeConfiguration",
+        path: ["configuration", "groups"],
+      });
+    }
+  });
+
+/** Body-hosted setup form contract. */
+const bodyHostedMagnetSetupSchema = z.object({
+  clickCount: z.number().int().positive().nullable(),
+  configuration: magnetConfigurationSchema.nullable(),
+  sourceNote: optionalMagnetTextSchema(5000),
+});
+
+/** Insert-owned click counts and complete exact configuration offers. */
+const insertHostedMagnetOptionsSchema = z
+  .object({
+    clickCounts: z.array(z.number().int().positive()),
+    offers: z.array(
+      z.object({
+        clickCount: z.number().int().positive().nullable(),
+        configuration: magnetConfigurationSchema,
+        copiedFromTemplateId: idSchema.nullable().optional(),
+        id: idSchema.nullable().default(null),
+        isAdvertisedDefault: z.boolean(),
+      }),
+    ),
+  })
+  .superRefine(({ clickCounts, offers }, context) => {
+    if (new Set(clickCounts).size !== clickCounts.length) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["clickCounts"],
+      });
+    }
+    if (
+      offers.filter(({ isAdvertisedDefault }) => isAdvertisedDefault).length > 1
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["offers"],
+      });
+    }
+    for (const [index, offer] of offers.entries()) {
+      if (
+        offer.clickCount !== null &&
+        !clickCounts.includes(offer.clickCount)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["offers", index, "clickCount"],
+        });
+      }
+    }
+  });
+
+/** Exact insert offers merchandised by an insert-driven slider. */
+const advertisedInsertOfferSchema = z.object({
+  isAdvertisedDefault: z.boolean(),
+  offerId: idSchema,
+});
+
+/** Schema for one reviewed, non-blocking exact-product compatibility warning. */
+const compatibilityAdvisorySchema = z.object({
+  relatedProductId: idSchema,
+  text: z.string().trim().min(1, requiredMessage).max(1000),
+});
+
+/**
  * Checks whether an optional URL uses HTTP or HTTPS.
  *
  * @param value - Optional URL text to validate.
@@ -135,9 +380,21 @@ export const finishOptionSchema = z
     colorEffectId: idSchema.nullable(),
     colorEffectSlug: z.enum(["solid", "fade"]).nullable(),
     colorIds: z.array(idSchema),
-    finishIds: z.array(idSchema).min(1, "web.catalog.error.finishRequired"),
+    finishIds: z.array(idSchema),
+    patternId: idSchema.nullable(),
   })
   .superRefine((option, context) => {
+    if (
+      option.finishIds.length === 0 &&
+      option.colorIds.length === 0 &&
+      option.patternId === null
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["finishIds"],
+      });
+    }
     if (new Set(option.finishIds).size !== option.finishIds.length) {
       context.addIssue({
         code: "custom",
@@ -193,17 +450,24 @@ export const finishOptionSchema = z
  */
 export const productFormSchema = z
   .object({
+    advertisedInsertOffers: z.array(advertisedInsertOfferSchema).default([]),
     bearing: optionalBearingSchema,
+    bodyHostedMagnetSetup: bodyHostedMagnetSetupSchema.nullable().default(null),
     buttonDiameterMm: numericSpecSchema,
     compatibleButtonId: idSchema.nullable(),
+    compatibilityAdvisories: z.array(compatibilityAdvisorySchema),
+    compatibilityFamilyIds: z.array(idSchema),
     description: optionalDescriptionSchema,
     diameterMm: numericSpecSchema,
-    finishOptions: z
-      .array(finishOptionSchema)
-      .min(1, "web.catalog.error.finishOptionRequired"),
+    finishOptions: z.array(finishOptionSchema),
+    includedComponentIds: z.array(idSchema),
+    insertHostedMagnetOptions: insertHostedMagnetOptionsSchema
+      .nullable()
+      .default(null),
     lengthMm: numericSpecSchema,
     makerId: idSchema,
     makerProductUrl: optionalUrlSchema,
+    magnetSystem: z.enum(["body-hosted", "insert-driven"]).nullable(),
     materialIds: z.array(idSchema).min(1, requiredMessage),
     name: slugNameSchema,
     productId: idSchema.nullable(),
@@ -213,10 +477,29 @@ export const productFormSchema = z
     thicknessMm: numericSpecSchema,
     thicknessWithButtonMm: numericSpecSchema,
     weightG: numericSpecSchema,
+    weightBasis: z.enum(["body-only", "complete-build"]).nullable(),
     widthMm: numericSpecSchema,
   })
   .superRefine(
-    ({ bearing, finishOptions, productTypeSlug, spinDiameterMm }, context) => {
+    (
+      {
+        bearing,
+        bodyHostedMagnetSetup,
+        advertisedInsertOffers,
+        compatibilityAdvisories,
+        compatibilityFamilyIds,
+        finishOptions,
+        includedComponentIds,
+        insertHostedMagnetOptions,
+        magnetSystem,
+        productId,
+        productTypeSlug,
+        spinDiameterMm,
+        weightBasis,
+        weightG,
+      },
+      context,
+    ) => {
       if (
         productTypeSlug !== "spinner" &&
         (bearing !== null || spinDiameterMm !== null)
@@ -227,9 +510,124 @@ export const productFormSchema = z
           path: [bearing !== null ? "bearing" : "spinDiameterMm"],
         });
       }
+      if (
+        insertHostedMagnetOptions !== null &&
+        productTypeSlug !== "slider-insert"
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.bodyHostedInsert",
+          path: ["insertHostedMagnetOptions"],
+        });
+      }
+      if (
+        advertisedInsertOffers.length &&
+        (productTypeSlug !== "slider" || magnetSystem !== "insert-driven")
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["advertisedInsertOffers"],
+        });
+      }
+      if (
+        advertisedInsertOffers.length &&
+        advertisedInsertOffers.filter(({ isAdvertisedDefault }) =>
+          Boolean(isAdvertisedDefault),
+        ).length !== 1
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["advertisedInsertOffers"],
+        });
+      }
+      if (productTypeSlug === "slider" && magnetSystem === null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.capabilityRequired",
+          path: ["magnetSystem"],
+        });
+      }
+      if (productTypeSlug !== "slider" && magnetSystem !== null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["magnetSystem"],
+        });
+      }
+      if (
+        bodyHostedMagnetSetup !== null &&
+        (productTypeSlug !== "slider" || magnetSystem !== "body-hosted")
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.bodyHostedInsert",
+          path: ["bodyHostedMagnetSetup"],
+        });
+      }
+      if (
+        productTypeSlug === "slider" &&
+        (weightG === null) !== (weightBasis === null)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: [weightG === null ? "weightG" : "weightBasis"],
+        });
+      }
+      if (productTypeSlug !== "slider" && weightBasis !== null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["weightBasis"],
+        });
+      }
+      if (productTypeSlug !== "slider" && includedComponentIds.length) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["includedComponentIds"],
+        });
+      }
+      for (const [path, ids] of [
+        ["compatibilityFamilyIds", compatibilityFamilyIds],
+        ["includedComponentIds", includedComponentIds],
+      ] as const) {
+        if (new Set(ids).size !== ids.length) {
+          context.addIssue({
+            code: "custom",
+            message: "web.catalog.error.form",
+            path: [path],
+          });
+        }
+      }
+      const advisoryKeys = compatibilityAdvisories.map(
+        ({ relatedProductId, text }) =>
+          `${relatedProductId}:${text.toLocaleLowerCase()}`,
+      );
+      if (new Set(advisoryKeys).size !== advisoryKeys.length) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["compatibilityAdvisories"],
+        });
+      }
+      if (
+        productId !== null &&
+        compatibilityAdvisories.some(
+          ({ relatedProductId }) => relatedProductId === productId,
+        )
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["compatibilityAdvisories"],
+        });
+      }
       const signatures = finishOptions.map(
-        ({ colorEffectId, colorIds, finishIds }) =>
-          `${finishIds.join(",")}|${colorEffectId ?? ""}|${colorIds.join(",")}`,
+        ({ colorEffectId, colorIds, finishIds, patternId }) =>
+          `${finishIds.join(",")}|${colorEffectId ?? ""}|${colorIds.join(",")}|${patternId ?? ""}`,
       );
       if (new Set(signatures).size !== signatures.length) {
         context.addIssue({
@@ -282,6 +680,13 @@ const materialWriteSchema = materialSchema.extend({
  * Schema for finish names.
  */
 const finishSchema = z.object({ name: slugNameSchema });
+/** Schema for pattern names. */
+const patternSchema = z.object({ name: slugNameSchema });
+/** Schema for maker-scoped compatibility-family names. */
+const compatibilityFamilySchema = z.object({
+  makerId: idSchema,
+  name: slugNameSchema,
+});
 /**
  * Schema for color names and six-digit uppercase hexadecimal values.
  */
@@ -395,13 +800,13 @@ const collectionAddSchema = z
     materialId: idSchema,
     newCollection: collectionWriteSchema.nullable().optional().default(null),
     productId: idSchema,
-    productTypeSlug: productTypeSchema,
+    productTypeSlug: collectionProductTypeSchema,
   })
   .superRefine((input, context) => {
     const finishCount = [input.finishOptionId, input.customFinish].filter(
       (value) => value !== null,
     ).length;
-    if (finishCount !== 1) {
+    if (finishCount > 1) {
       context.addIssue({
         code: "custom",
         message: "web.catalog.error.productFinishRequired",
@@ -412,16 +817,15 @@ const collectionAddSchema = z
       input.buttonFinishOptionId,
       input.buttonCustomFinish,
     ].filter((value) => value !== null).length;
-    const selectedButtonValues = [
-      input.buttonProductId,
-      input.buttonMaterialId,
-      buttonFinishCount === 1 ? true : null,
-    ].filter((value) => value !== null).length;
     if (
-      (selectedButtonValues !== 0 && selectedButtonValues !== 3) ||
       buttonFinishCount > 1 ||
-      (input.productTypeSlug !== "spinner" && selectedButtonValues > 0) ||
-      (input.buttonProductId === null && buttonFinishCount > 0)
+      (input.productTypeSlug !== "spinner" &&
+        (input.buttonProductId !== null ||
+          input.buttonMaterialId !== null ||
+          buttonFinishCount > 0)) ||
+      (input.buttonProductId === null &&
+        (input.buttonMaterialId !== null || buttonFinishCount > 0)) ||
+      (input.buttonProductId !== null && input.buttonMaterialId === null)
     ) {
       context.addIssue({
         code: "custom",
@@ -439,7 +843,7 @@ const collectionAddSchema = z
   });
 
 /**
- * Schema for editing a collection item and its optional installed button.
+ * Schema for editing a collection item and its optional installed components.
  */
 const collectionEditSchema = z
   .object({
@@ -456,6 +860,22 @@ const collectionEditSchema = z
         customFinish: finishOptionSchema.nullable(),
         finishOptionId: idSchema.nullable(),
         materialId: idSchema,
+      })
+      .nullable()
+      .optional(),
+    installedInsert: z
+      .object({ collectionItemId: idSchema })
+      .nullable()
+      .optional(),
+    installedPlate: z
+      .object({ collectionItemId: idSchema })
+      .nullable()
+      .optional(),
+    insertSetup: z
+      .object({
+        clickOptionId: idSchema.nullable(),
+        configuration: ownedMagnetConfigurationSchema.nullable(),
+        sourceOfferId: idSchema.nullable(),
       })
       .nullable()
       .optional(),
@@ -488,14 +908,23 @@ const collectionEditSchema = z
  */
 export type ProductFormInput = z.input<typeof productFormSchema>;
 
+/** Fully parsed product form value used by controlled editors. */
+export type ProductFormValue = z.output<typeof productFormSchema>;
+
 /**
  * Lookup values and spinner buttons required by catalog forms.
  */
 export type CatalogOptions = {
+  /** Catalog-manager-only exact configuration authoring templates. */
+  magnetConfigurationTemplates?: CatalogMagnetConfigurationTemplate[];
+  /** Maker-scoped registered catalog terminology aliases. */
+  terminologyAliases?: CatalogTerminologyAlias[];
   /**
    * Available color effects.
    */
   colorEffects: Awaited<ReturnType<typeof listColorEffects>>;
+  /** Reviewed maker-scoped compatibility families. */
+  compatibilityFamilies: Awaited<ReturnType<typeof listCompatibilityFamilies>>;
   /**
    * Available catalog colors.
    */
@@ -513,9 +942,15 @@ export type CatalogOptions = {
    */
   materials: Awaited<ReturnType<typeof listMaterials>>;
   /**
+   * Available patterns.
+   */
+  patterns: Awaited<ReturnType<typeof listPatterns>>;
+  /**
    * Available product types.
    */
   productTypes: Awaited<ReturnType<typeof listProductTypes>>;
+  /** Visible products available for exact relationship selection. */
+  relationshipProducts: CatalogProduct[];
   /**
    * Visible spinner-button products.
    */
@@ -534,32 +969,55 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
     const viewer = await getResourceViewer();
     const [
       colorEffects,
+      compatibilityFamilies,
       colors,
       finishes,
       makers,
+      magnetConfigurationTemplates,
       materials,
+      patterns,
       productTypes,
+      relationshipProducts,
       spinnerButtons,
+      terminologyAliases,
     ] = await Promise.all([
       listColorEffects(),
+      listCompatibilityFamilies(),
       listColors(),
       listFinishes(),
       listMakers(),
+      s.db.catalog.listMagnetConfigurationTemplates(viewer),
       listMaterials(),
+      listPatterns(),
       listProductTypes(),
+      s.db.catalog.listProducts(undefined, viewer),
       s.db.catalog.listProducts("spinner-button", viewer),
+      s.db.catalog.listTerminologyAliases(),
     ]);
     return {
       colorEffects,
+      compatibilityFamilies,
       colors,
       finishes,
       makers,
+      magnetConfigurationTemplates,
       materials,
+      patterns,
       productTypes,
+      relationshipProducts,
       spinnerButtons,
+      terminologyAliases,
     };
   },
 );
+
+/** Lists registered catalog terminology aliases for shared client-side search. */
+export const listCatalogTerminologyAliases = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<CatalogTerminologyAlias[]> => {
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listTerminologyAliases();
+});
 
 /**
  * Lists visible products, optionally limited to one product type.
@@ -952,6 +1410,69 @@ export const saveAdminMaterial = createServerFn({ method: "POST" })
   });
 
 /**
+ * Validates and creates a maker-scoped reviewed compatibility family.
+ *
+ * @returns The created family or a validation-aware mutation failure.
+ * @rejects If permission checking, service loading, or family lookup fails.
+ */
+export const createCatalogCompatibilityFamily = createServerFn({
+  method: "POST",
+})
+  .validator((input: unknown) => input)
+  .handler(
+    async ({
+      data,
+    }): Promise<
+      CatalogLookupMutationResult<
+        "compatibilityFamily",
+        CatalogCompatibilityFamily
+      >
+    > => {
+      const actor = await requirePermission("products.manage");
+      const parsed = compatibilityFamilySchema.safeParse(data);
+      if (!parsed.success) return validationFailure(parsed.error);
+      const { s } = await import("@/lib/services");
+      const families = await s.db.catalog.listCompatibilityFamilies();
+      try {
+        const compatibilityFamily =
+          await s.db.catalog.createCompatibilityFamily({
+            actor,
+            makerId: parsed.data.makerId,
+            name: parsed.data.name,
+            slug: nextAvailableSlug(
+              parsed.data.name,
+              families
+                .filter(({ makerId }) => makerId === parsed.data.makerId)
+                .map(({ slug }) => slug),
+            ),
+          });
+        return { compatibilityFamily, ok: true as const };
+      } catch (error) {
+        return mutationFailure(error);
+      }
+    },
+  );
+
+/** Validates and creates an audited maker-scoped catalog terminology alias. */
+export const createCatalogTerminologyAlias = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("products.manage");
+    const parsed = terminologyAliasSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+    const { s } = await import("@/lib/services");
+    try {
+      const terminologyAlias = await s.db.catalog.createTerminologyAlias({
+        actor,
+        ...parsed.data,
+      });
+      return { ok: true as const, terminologyAlias };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
+
+/**
  * Validates and creates a uniquely slugged finish for an authorized product manager.
  *
  * @returns The created finish or a validation-aware mutation failure.
@@ -980,6 +1501,38 @@ export const createCatalogFinish = createServerFn({ method: "POST" })
       return mutationFailure(error);
     }
   });
+
+/**
+ * Validates and creates a uniquely slugged pattern for an authorized product manager.
+ *
+ * @returns The created pattern or a validation-aware mutation failure.
+ * @rejects If permission checking, service loading, or existing-pattern lookup fails.
+ */
+export const createCatalogPattern = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(
+    async ({ data }): Promise<CatalogLookupMutationResult<"pattern">> => {
+      const actor = await requirePermission("products.manage");
+      const parsed = patternSchema.safeParse(data);
+      if (!parsed.success) return validationFailure(parsed.error);
+
+      const { s } = await import("@/lib/services");
+      const patterns = await s.db.catalog.listPatterns();
+      try {
+        const pattern = await s.db.catalog.createPattern({
+          actor,
+          name: parsed.data.name,
+          slug: nextAvailableSlug(
+            parsed.data.name,
+            patterns.map(({ slug }) => slug),
+          ),
+        });
+        return { ok: true as const, pattern };
+      } catch (error) {
+        return mutationFailure(error);
+      }
+    },
+  );
 
 /**
  * Validates and creates a uniquely slugged color for an authorized product manager.
@@ -1057,17 +1610,34 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     const slug = nextAvailableSlug(parsed.data.name, slugs);
     const input: ProductWriteInput = {
       actor,
+      advertisedInsertOffers: parsed.data.advertisedInsertOffers,
+      bodyHostedMagnetSetup: parsed.data.bodyHostedMagnetSetup,
+      compatibilityAdvisories: parsed.data.compatibilityAdvisories,
+      compatibilityFamilyIds: parsed.data.compatibilityFamilyIds,
       description: parsed.data.description,
       finishOptions: parsed.data.finishOptions.map(
-        ({ colorEffectId, colorIds, finishIds }) => ({
+        ({ colorEffectId, colorIds, finishIds, patternId }) => ({
           colorEffectId,
           colorIds,
           finishIds,
+          patternId,
         }),
       ),
       makerId: parsed.data.makerId,
       makerProductUrl: parsed.data.makerProductUrl,
       materialIds: parsed.data.materialIds,
+      includedComponentIds: parsed.data.includedComponentIds,
+      insertHostedMagnetOptions: parsed.data.insertHostedMagnetOptions
+        ? {
+            ...parsed.data.insertHostedMagnetOptions,
+            offers: parsed.data.insertHostedMagnetOptions.offers.map(
+              ({ id, ...offer }) => ({
+                ...offer,
+                ...(id === null ? {} : { id }),
+              }),
+            ),
+          }
+        : null,
       name: parsed.data.name,
       productTypeSlug: parsed.data.productTypeSlug,
       reason: parsed.data.reason,
@@ -1078,10 +1648,12 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
         compatibleButtonId: parsed.data.compatibleButtonId,
         diameterMm: parsed.data.diameterMm,
         lengthMm: parsed.data.lengthMm,
+        magnetSystem: parsed.data.magnetSystem,
         spinDiameterMm: parsed.data.spinDiameterMm,
         thicknessMm: parsed.data.thicknessMm,
         thicknessWithButtonMm: parsed.data.thicknessWithButtonMm,
         weightG: parsed.data.weightG,
+        weightBasis: parsed.data.weightBasis,
         widthMm: parsed.data.widthMm,
       },
     };
@@ -1130,43 +1702,60 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
         };
       }
 
-      const collectionItemId =
-        parsed.data.productTypeSlug === "spinner"
-          ? (
-              await s.db.collections.addSpinner({
-                actor,
-                bearing: parsed.data.bearing,
-                buttonCustomFinish: parsed.data.buttonCustomFinish
-                  ? toFinishWriteOption(parsed.data.buttonCustomFinish)
-                  : null,
-                buttonFinishOptionId: parsed.data.buttonFinishOptionId,
-                buttonMaterialId: parsed.data.buttonMaterialId,
-                buttonProductId: parsed.data.buttonProductId,
-                spinnerFinishOptionId: parsed.data.finishOptionId,
-                spinnerCustomFinish: parsed.data.customFinish
-                  ? toFinishWriteOption(parsed.data.customFinish)
-                  : null,
-                spinnerMaterialId: parsed.data.materialId,
-                spinnerProductId: parsed.data.productId,
-                collectionId: parsed.data.collectionId,
-                displayName: parsed.data.displayName,
-                description: parsed.data.description,
-                newCollection: parsed.data.newCollection,
-              })
-            ).spinnerItemId
-          : await s.db.collections.addSpinnerButton({
-              actor,
-              customFinish: parsed.data.customFinish
-                ? toFinishWriteOption(parsed.data.customFinish)
-                : null,
-              finishOptionId: parsed.data.finishOptionId,
-              materialId: parsed.data.materialId,
-              collectionId: parsed.data.collectionId,
-              displayName: parsed.data.displayName,
-              description: parsed.data.description,
-              newCollection: parsed.data.newCollection,
-              productId: parsed.data.productId,
-            });
+      let collectionItemId: number;
+      if (parsed.data.productTypeSlug === "spinner") {
+        collectionItemId = (
+          await s.db.collections.addSpinner({
+            actor,
+            bearing: parsed.data.bearing,
+            buttonCustomFinish: parsed.data.buttonCustomFinish
+              ? toFinishWriteOption(parsed.data.buttonCustomFinish)
+              : null,
+            buttonFinishOptionId: parsed.data.buttonFinishOptionId,
+            buttonMaterialId: parsed.data.buttonMaterialId,
+            buttonProductId: parsed.data.buttonProductId,
+            spinnerFinishOptionId: parsed.data.finishOptionId,
+            spinnerCustomFinish: parsed.data.customFinish
+              ? toFinishWriteOption(parsed.data.customFinish)
+              : null,
+            spinnerMaterialId: parsed.data.materialId,
+            spinnerProductId: parsed.data.productId,
+            collectionId: parsed.data.collectionId,
+            displayName: parsed.data.displayName,
+            description: parsed.data.description,
+            newCollection: parsed.data.newCollection,
+          })
+        ).spinnerItemId;
+      } else if (parsed.data.productTypeSlug === "spinner-button") {
+        collectionItemId = await s.db.collections.addSpinnerButton({
+          actor,
+          customFinish: parsed.data.customFinish
+            ? toFinishWriteOption(parsed.data.customFinish)
+            : null,
+          finishOptionId: parsed.data.finishOptionId,
+          materialId: parsed.data.materialId,
+          collectionId: parsed.data.collectionId,
+          displayName: parsed.data.displayName,
+          description: parsed.data.description,
+          newCollection: parsed.data.newCollection,
+          productId: parsed.data.productId,
+        });
+      } else {
+        collectionItemId = await s.db.collections.addSliderProduct({
+          actor,
+          collectionId: parsed.data.collectionId,
+          customFinish: parsed.data.customFinish
+            ? toFinishWriteOption(parsed.data.customFinish)
+            : null,
+          description: parsed.data.description,
+          displayName: parsed.data.displayName,
+          finishOptionId: parsed.data.finishOptionId,
+          materialId: parsed.data.materialId,
+          newCollection: parsed.data.newCollection,
+          productId: parsed.data.productId,
+          productTypeSlug: parsed.data.productTypeSlug,
+        });
+      }
       const item = await s.db.collections.getOwnedItem(actor, collectionItemId);
       if (!item) throw new Error("Failed to load collection item.");
       return {
@@ -1213,9 +1802,9 @@ export const getPublicCollectionOwner = createServerFn({ method: "GET" })
   });
 
 /**
- * Loads a public collection item and its optional installed button.
+ * Loads a public collection item and its optional installed components.
  *
- * @returns The item and installed button, with signed images when configured, or `null` when unavailable.
+ * @returns The item and installed components, with signed images when configured, or `null` when unavailable.
  * @rejects If input validation, service loading, viewer lookup, an item query, or image signing fails.
  */
 export const getPublicCollectionItem = createServerFn({ method: "GET" })
@@ -1246,11 +1835,41 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
           viewer,
         })
       : null;
+    const [installedPlate, installedInsert] = await Promise.all([
+      item.installedPlateId
+        ? s.db.collections.getPublicItem({
+            collectionId: data.collectionId,
+            collectionItemId: item.installedPlateId,
+            ownerUserId: data.userId,
+            viewer,
+          })
+        : null,
+      item.installedInsertId
+        ? s.db.collections.getPublicItem({
+            collectionId: data.collectionId,
+            collectionItemId: item.installedInsertId,
+            ownerUserId: data.userId,
+            viewer,
+          })
+        : null,
+    ]);
+    const product = (
+      await s.db.catalog.listProducts(item.productTypeSlug, viewer)
+    ).find(({ id }) => id === item.productId);
     return {
       installedButton: installedButton
         ? await signCollectionItem(installedButton)
         : null,
+      installedInsert: installedInsert
+        ? await signCollectionItem(installedInsert)
+        : null,
+      installedPlate: installedPlate
+        ? await signCollectionItem(installedPlate)
+        : null,
       item: await signCollectionItem(item),
+      product: product
+        ? ((await signCatalogProducts([product]))[0] ?? null)
+        : null,
     };
   });
 
@@ -1532,9 +2151,11 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
     if (!item) {
       return {
         buttonProducts: [],
+        assemblyMoveItemCount: 1,
         collections: [],
         item: null,
         ownedButtons: [],
+        ownedSliderComponents: [],
         product: null,
       };
     }
@@ -1547,11 +2168,30 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
       s.db.collections.listOwnedCollections(actor),
     ]);
     return {
+      assemblyMoveItemCount: (() => {
+        const parent =
+          item.productTypeSlug === "slider"
+            ? item
+            : items.find(
+                ({ collectionItemId }) =>
+                  collectionItemId === item.installedOnSliderId,
+              );
+        return parent
+          ? 1 +
+              Number(parent.installedPlateId !== null) +
+              Number(parent.installedInsertId !== null)
+          : 1;
+      })(),
       buttonProducts,
       collections: await signCollectionSummaries(collections),
       item: await signCollectionItem(item),
       ownedButtons: items.filter(
         (candidate) => candidate.productTypeSlug === "spinner-button",
+      ),
+      ownedSliderComponents: items.filter(
+        (candidate) =>
+          candidate.productTypeSlug === "slider-plate" ||
+          candidate.productTypeSlug === "slider-insert",
       ),
       product: await (async () => {
         const product = products.find(({ id }) => id === item.productId);
@@ -1594,7 +2234,7 @@ export const updateCollectionItem = createServerFn({ method: "POST" })
       });
       return { ok: true as const };
     } catch (error) {
-      return mutationFailure(error);
+      return sliderAssemblyMutationFailure(error) ?? mutationFailure(error);
     }
   });
 
@@ -1808,6 +2448,7 @@ function toFinishWriteOption(
     colorEffectId: option.colorEffectId,
     colorIds: option.colorIds,
     finishIds: option.finishIds,
+    patternId: option.patternId,
   };
 }
 
@@ -1831,6 +2472,17 @@ async function listMakers() {
 async function listColorEffects(): Promise<CatalogLookup[]> {
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listColorEffects();
+}
+
+/**
+ * Loads reviewed compatibility families.
+ *
+ * @returns A promise resolving to maker-scoped compatibility families.
+ * @rejects If the service module or family query fails.
+ */
+async function listCompatibilityFamilies() {
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listCompatibilityFamilies();
 }
 
 /**
@@ -1864,6 +2516,17 @@ async function listFinishes(): Promise<CatalogLookup[]> {
 async function listMaterials() {
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listMaterials();
+}
+
+/**
+ * Loads catalog patterns.
+ *
+ * @returns A promise resolving to catalog patterns.
+ * @rejects If the service module or pattern query fails.
+ */
+async function listPatterns(): Promise<CatalogLookup[]> {
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listPatterns();
 }
 
 /**
@@ -1908,6 +2571,34 @@ function mutationFailure(error: unknown) {
     ok: false as const,
     requiresConfirmation: false as const,
   };
+}
+
+/**
+ * Converts slider assembly domain failures into localized form errors.
+ *
+ * @param error - Candidate service error.
+ * @returns A localized mutation failure, or `null` for unrelated failures.
+ */
+function sliderAssemblyMutationFailure(error: unknown) {
+  if (!(error instanceof Error)) return null;
+  const formError = error.message.includes("Body-hosted")
+    ? "web.slider.validation.bodyHostedInsert"
+    : error.message.includes("already installed")
+      ? "web.slider.validation.alreadyInstalled"
+      : error.message.includes("compatibility family")
+        ? "web.slider.validation.incompatible"
+        : error.message.includes("slider plate does not exist") ||
+            error.message.includes("slider insert does not exist")
+          ? "web.slider.validation.exactProduct"
+          : null;
+  return formError
+    ? {
+        fieldErrors: {},
+        formError,
+        ok: false as const,
+        requiresConfirmation: false as const,
+      }
+    : null;
 }
 
 /**
@@ -2047,6 +2738,18 @@ export function productTypeIsSupported(
   value: string,
 ): value is CatalogProductType {
   return productTypeSchema.safeParse(value).success;
+}
+
+/**
+ * Checks whether a product type is supported by the current collection editor.
+ *
+ * @param value - Candidate product-type slug.
+ * @returns Whether the collection editor can safely create an owned item.
+ */
+export function collectionProductTypeIsSupported(
+  value: string,
+): value is CatalogProductType {
+  return collectionProductTypeSchema.safeParse(value).success;
 }
 
 /**

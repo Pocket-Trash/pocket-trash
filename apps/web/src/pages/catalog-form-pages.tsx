@@ -1,12 +1,17 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import type {
+  CatalogBodyHostedMagnetSetup,
   CatalogColor,
+  CatalogCompatibilityFamily,
   CatalogFinishOption,
   CatalogImage,
   CatalogLookup,
+  CatalogMagnetConfiguration,
   CatalogMaker,
   CatalogProduct,
   CatalogProductType,
+  CatalogTerminologyAlias,
+  OwnedMagnetConfiguration,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
@@ -45,14 +50,19 @@ import { filterButtonsByDiameter, finishOptionLabel } from "@/lib/catalog";
 import {
   addCollectionProduct,
   type CatalogOptions,
+  collectionProductTypeIsSupported,
   createCatalogColor,
+  createCatalogCompatibilityFamily,
   createCatalogFinish,
   createCatalogMaker,
   createCatalogMaterial,
+  createCatalogPattern,
+  createCatalogTerminologyAlias,
   deleteCollectionItem,
   deleteUserCollection,
   finishOptionSchema,
   type ProductFormInput,
+  type ProductFormValue,
   productFormSchema,
   productSlugPreview,
   productTypeIsSupported,
@@ -140,6 +150,19 @@ export function ProductFormPage({
   );
 }
 
+/** Controlled editor value keeps text inputs as strings before schema parsing. */
+type ProductEditorValue = Omit<
+  ProductFormValue,
+  "bearing" | "description" | "makerProductUrl"
+> & {
+  /** Bearing text before blank normalization. */
+  bearing: string;
+  /** Markdown description before blank normalization. */
+  description: string;
+  /** Maker URL before blank normalization. */
+  makerProductUrl: string;
+};
+
 /**
  * Renders the product fields shared by add and edit flows.
  *
@@ -180,46 +203,80 @@ export function ProductEditor({
   const [formError, setFormError] = React.useState<string | null>(null);
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
   const [descriptionLoading, setDescriptionLoading] = React.useState(true);
+  const defaultValues: ProductEditorValue = {
+    advertisedInsertOffers:
+      initialProduct?.advertisedInsertOffers.map(
+        ({ id, isSliderAdvertisedDefault }) => ({
+          isAdvertisedDefault: isSliderAdvertisedDefault,
+          offerId: id,
+        }),
+      ) ?? [],
+    bearing: initialProduct?.bearing ?? "",
+    bodyHostedMagnetSetup:
+      initialProduct?.bodyHostedMagnetSetup ??
+      (initialProduct?.magnetSystem === "body-hosted"
+        ? { clickCount: null, configuration: null, sourceNote: null }
+        : null),
+    buttonDiameterMm: initialProduct?.buttonDiameterMm ?? null,
+    compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
+    compatibilityAdvisories:
+      initialProduct?.compatibilityAdvisories.map(
+        ({ relatedProductId, text }) => ({ relatedProductId, text }),
+      ) ?? [],
+    compatibilityFamilyIds:
+      initialProduct?.compatibilityFamilies.map(({ id }) => id) ?? [],
+    description: initialProduct?.description ?? "",
+    diameterMm: initialProduct?.diameterMm ?? null,
+    finishOptions: initialProduct?.finishOptions.length
+      ? initialProduct.finishOptions.map((option) => ({
+          colorEffectId: option.colorEffect?.id ?? null,
+          colorEffectSlug:
+            option.colorEffect?.slug === "solid"
+              ? ("solid" as const)
+              : option.colorEffect?.slug === "fade"
+                ? ("fade" as const)
+                : null,
+          colorIds: option.colors.map(({ id }) => id),
+          finishIds: option.finishes.map(({ id }) => id),
+          patternId: option.pattern?.id ?? null,
+        }))
+      : [],
+    includedComponentIds:
+      initialProduct?.includedComponents.map(({ id }) => id) ?? [],
+    insertHostedMagnetOptions:
+      productTypeSlug === "slider-insert"
+        ? {
+            clickCounts:
+              initialProduct?.insertClickOptions.map(
+                ({ clickCount }) => clickCount,
+              ) ?? [],
+            offers:
+              initialProduct?.insertMagnetOffers.map((offer) => ({
+                clickCount: offer.clickCount,
+                configuration: offer.configuration,
+                copiedFromTemplateId: offer.copiedFromTemplateId,
+                id: offer.id,
+                isAdvertisedDefault: offer.isAdvertisedDefault,
+              })) ?? [],
+          }
+        : null,
+    lengthMm: initialProduct?.lengthMm ?? null,
+    makerId: initialProduct?.makerId ?? 0,
+    makerProductUrl: initialProduct?.makerProductUrl ?? "",
+    magnetSystem: initialProduct?.magnetSystem ?? null,
+    materialIds: initialProduct?.materials.map(({ id }) => id) ?? [],
+    name: initialProduct?.name ?? "",
+    productId: initialProduct?.id ?? null,
+    productTypeSlug,
+    spinDiameterMm: initialProduct?.spinDiameterMm ?? null,
+    thicknessMm: initialProduct?.thicknessMm ?? null,
+    thicknessWithButtonMm: initialProduct?.thicknessWithButtonMm ?? null,
+    weightG: initialProduct?.weightG ?? null,
+    weightBasis: initialProduct?.weightBasis ?? null,
+    widthMm: initialProduct?.widthMm ?? null,
+  };
   const form = useForm({
-    defaultValues: {
-      bearing: initialProduct?.bearing ?? "",
-      buttonDiameterMm: initialProduct?.buttonDiameterMm ?? null,
-      compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
-      description: initialProduct?.description ?? "",
-      diameterMm: initialProduct?.diameterMm ?? null,
-      finishOptions: initialProduct?.finishOptions.length
-        ? initialProduct.finishOptions.map((option) => ({
-            colorEffectId: option.colorEffect?.id ?? null,
-            colorEffectSlug:
-              option.colorEffect?.slug === "solid"
-                ? ("solid" as const)
-                : option.colorEffect?.slug === "fade"
-                  ? ("fade" as const)
-                  : null,
-            colorIds: option.colors.map(({ id }) => id),
-            finishIds: option.finishes.map(({ id }) => id),
-          }))
-        : [
-            {
-              colorEffectId: null,
-              colorEffectSlug: null,
-              colorIds: [],
-              finishIds: [],
-            },
-          ],
-      lengthMm: initialProduct?.lengthMm ?? null,
-      makerId: initialProduct?.makerId ?? 0,
-      makerProductUrl: initialProduct?.makerProductUrl ?? "",
-      materialIds: initialProduct?.materials.map(({ id }) => id) ?? [],
-      name: initialProduct?.name ?? "",
-      productId: initialProduct?.id ?? null,
-      productTypeSlug,
-      spinDiameterMm: initialProduct?.spinDiameterMm ?? null,
-      thicknessMm: initialProduct?.thicknessMm ?? null,
-      thicknessWithButtonMm: initialProduct?.thicknessWithButtonMm ?? null,
-      weightG: initialProduct?.weightG ?? null,
-      widthMm: initialProduct?.widthMm ?? null,
-    },
+    defaultValues,
     /**
      * Saves the current product editor values.
      *
@@ -383,6 +440,43 @@ export function ProductEditor({
             );
           }}
         </form.Field>
+        <form.Subscribe selector={(state) => state.values.makerId}>
+          {(makerId) =>
+            makerId > 0 ? (
+              <Field label={t("web.slider.alias.managementLabel")}>
+                {(options.terminologyAliases ?? [])
+                  .filter(
+                    (alias) =>
+                      alias.makerId === makerId &&
+                      alias.canonicalKey === productTypeSlug,
+                  )
+                  .map((alias) => (
+                    <p className="text-sm" key={alias.id}>
+                      {alias.label}
+                      {alias.isPreferred
+                        ? ` · ${t("web.slider.alias.preferred")}`
+                        : ""}
+                    </p>
+                  ))}
+                <LookupDialog
+                  canonicalKey={productTypeSlug}
+                  kind="terminologyAlias"
+                  makerId={makerId}
+                  onCreated={(terminologyAlias) =>
+                    setOptions((current) => ({
+                      ...current,
+                      terminologyAliases: [
+                        ...(current.terminologyAliases ?? []),
+                        terminologyAlias,
+                      ],
+                    }))
+                  }
+                  t={t}
+                />
+              </Field>
+            ) : null
+          }
+        </form.Subscribe>
         <form.Field name="makerProductUrl">
           {(field) => (
             <Field label={t("web.catalog.field.makerProductUrl")}>
@@ -441,6 +535,65 @@ export function ProductEditor({
           }}
         </form.Field>
 
+        <form.Subscribe selector={(state) => state.values.makerId}>
+          {(makerId) => (
+            <form.Field name="compatibilityFamilyIds">
+              {(field) => {
+                const families = options.compatibilityFamilies.filter(
+                  (family) => family.makerId === makerId,
+                );
+                const selected = families.filter(({ id }) =>
+                  field.state.value.includes(id),
+                );
+                return (
+                  <Field
+                    label={t("web.slider.relationship.compatibilityFamilies")}
+                  >
+                    <CatalogMultiCombobox
+                      ariaLabel={t(
+                        "web.slider.relationship.compatibilityFamilies",
+                      )}
+                      items={families}
+                      onValueChange={(values) =>
+                        field.handleChange(values.map(({ id }) => Number(id)))
+                      }
+                      placeholder={t(
+                        "web.slider.relationship.compatibilityFamilies",
+                      )}
+                      removeLabel={t("web.action.close")}
+                      value={selected}
+                    />
+                    {makerId > 0 ? (
+                      <LookupDialog
+                        kind="compatibilityFamily"
+                        makerId={makerId}
+                        onCreated={(family) => {
+                          setOptions((current) => ({
+                            ...current,
+                            compatibilityFamilies: [
+                              ...current.compatibilityFamilies,
+                              family,
+                            ].sort((a, b) => a.name.localeCompare(b.name)),
+                          }));
+                          field.handleChange([...field.state.value, family.id]);
+                        }}
+                        t={t}
+                      />
+                    ) : null}
+                    <p className="text-xs text-muted-foreground">
+                      {t("web.slider.relationship.compatibilityHelp")}
+                    </p>
+                    <FieldError
+                      error={serverErrors.compatibilityFamilyIds?.[0]}
+                      t={t}
+                    />
+                  </Field>
+                );
+              }}
+            </form.Field>
+          )}
+        </form.Subscribe>
+
         <form.Field mode="array" name="finishOptions">
           {(field) => (
             <FinishOptionsEditor
@@ -464,7 +617,9 @@ export function ProductEditor({
               "buttonDiameterMm",
               "spinDiameterMm",
             ] as const)
-          : (["weightG", "diameterMm", "thicknessMm"] as const)
+          : productTypeSlug === "spinner-button"
+            ? (["weightG", "diameterMm", "thicknessMm"] as const)
+            : (["weightG", "lengthMm", "widthMm", "thicknessMm"] as const)
         ).map((name) => {
           const labels = {
             buttonDiameterMm: "web.catalog.field.buttonDiameter",
@@ -500,6 +655,292 @@ export function ProductEditor({
             </form.Field>
           );
         })}
+        {productTypeSlug === "slider" ? (
+          <form.Field name="magnetSystem">
+            {(field) => {
+              const items = [
+                {
+                  id: "body-hosted",
+                  name: t("web.slider.capability.bodyHosted"),
+                },
+                {
+                  id: "insert-driven",
+                  name: t("web.slider.capability.insertDriven"),
+                },
+              ];
+              return (
+                <Field label={t("web.slider.capability.label")}>
+                  <CatalogCombobox
+                    ariaLabel={t("web.slider.capability.label")}
+                    items={items}
+                    onValueChange={(value) =>
+                      (() => {
+                        const magnetSystem =
+                          value?.id === "body-hosted" ||
+                          value?.id === "insert-driven"
+                            ? value.id
+                            : null;
+                        field.handleChange(magnetSystem);
+                        form.setFieldValue(
+                          "bodyHostedMagnetSetup",
+                          magnetSystem === "body-hosted"
+                            ? (form.state.values.bodyHostedMagnetSetup ?? {
+                                clickCount: null,
+                                configuration: null,
+                                sourceNote: null,
+                              })
+                            : null,
+                        );
+                      })()
+                    }
+                    placeholder={t("web.slider.capability.label")}
+                    value={
+                      items.find(({ id }) => id === field.state.value) ?? null
+                    }
+                  />
+                  <FieldError error={serverErrors.magnetSystem?.[0]} t={t} />
+                </Field>
+              );
+            }}
+          </form.Field>
+        ) : null}
+        {productTypeSlug === "slider" ? (
+          <form.Field name="weightBasis">
+            {(field) => {
+              const items = [
+                {
+                  id: "body-only",
+                  name: t("web.slider.measurement.bodyOnly"),
+                },
+                {
+                  id: "complete-build",
+                  name: t("web.slider.measurement.completeBuild"),
+                },
+              ];
+              return (
+                <Field label={t("web.slider.measurement.weightBasis")}>
+                  <CatalogCombobox
+                    ariaLabel={t("web.slider.measurement.weightBasis")}
+                    items={items}
+                    onValueChange={(value) =>
+                      field.handleChange(
+                        value?.id === "body-only" ||
+                          value?.id === "complete-build"
+                          ? value.id
+                          : null,
+                      )
+                    }
+                    placeholder={t("web.slider.measurement.weightBasis")}
+                    removeLabel={t("web.action.close")}
+                    value={
+                      items.find(({ id }) => id === field.state.value) ?? null
+                    }
+                  />
+                  <FieldError error={serverErrors.weightBasis?.[0]} t={t} />
+                </Field>
+              );
+            }}
+          </form.Field>
+        ) : null}
+        {productTypeSlug === "slider" ? (
+          <form.Subscribe selector={(state) => state.values.magnetSystem}>
+            {(magnetSystem) =>
+              magnetSystem === "body-hosted" ? (
+                <form.Field name="bodyHostedMagnetSetup">
+                  {(field) =>
+                    field.state.value ? (
+                      <BodyHostedMagnetSetupEditor
+                        onChange={(setup) =>
+                          field.handleChange(
+                            setup as CatalogBodyHostedMagnetSetup,
+                          )
+                        }
+                        t={t}
+                        value={field.state.value}
+                      />
+                    ) : null
+                  }
+                </form.Field>
+              ) : null
+            }
+          </form.Subscribe>
+        ) : null}
+        {productTypeSlug === "slider-insert" ? (
+          <form.Field name="insertHostedMagnetOptions">
+            {(field) =>
+              field.state.value ? (
+                <InsertHostedMagnetOptionsEditor
+                  onChange={field.handleChange}
+                  t={t}
+                  templates={options.magnetConfigurationTemplates ?? []}
+                  value={field.state.value}
+                />
+              ) : null
+            }
+          </form.Field>
+        ) : null}
+        {productTypeSlug === "slider" ? (
+          <form.Subscribe selector={(state) => state.values.magnetSystem}>
+            {(magnetSystem) =>
+              magnetSystem === "insert-driven" ? (
+                <form.Field name="advertisedInsertOffers">
+                  {(field) => (
+                    <SliderInsertOfferEditor
+                      onChange={field.handleChange}
+                      offers={options.relationshipProducts.flatMap((product) =>
+                        product.productTypeSlug === "slider-insert"
+                          ? product.insertMagnetOffers.map((offer) => ({
+                              ...offer,
+                              insertProductName: product.name,
+                            }))
+                          : [],
+                      )}
+                      t={t}
+                      value={field.state.value}
+                    />
+                  )}
+                </form.Field>
+              ) : null
+            }
+          </form.Subscribe>
+        ) : null}
+        {productTypeSlug === "slider-plate" ||
+        productTypeSlug === "slider-insert" ? (
+          <p className="text-xs text-muted-foreground">
+            {t("web.slider.measurement.setLevelHelp")}
+          </p>
+        ) : null}
+        {productTypeSlug === "slider" ? (
+          <form.Field name="includedComponentIds">
+            {(field) => {
+              const items = options.relationshipProducts.filter(
+                (candidate) =>
+                  candidate.id !== initialProduct?.id &&
+                  (candidate.productTypeSlug === "slider-plate" ||
+                    candidate.productTypeSlug === "slider-insert"),
+              );
+              const selected = items.filter(({ id }) =>
+                field.state.value.includes(id),
+              );
+              return (
+                <Field label={t("web.slider.relationship.includedComponents")}>
+                  <CatalogMultiCombobox
+                    ariaLabel={t("web.slider.relationship.includedComponents")}
+                    items={items}
+                    onValueChange={(values) =>
+                      field.handleChange(values.map(({ id }) => Number(id)))
+                    }
+                    placeholder={t(
+                      "web.slider.relationship.includedComponents",
+                    )}
+                    removeLabel={t("web.action.close")}
+                    value={selected}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t("web.slider.relationship.includedHelp")}
+                  </p>
+                  <FieldError
+                    error={serverErrors.includedComponentIds?.[0]}
+                    t={t}
+                  />
+                </Field>
+              );
+            }}
+          </form.Field>
+        ) : null}
+        <form.Field mode="array" name="compatibilityAdvisories">
+          {(field) => (
+            <fieldset className="grid gap-3 rounded-lg border border-border p-4">
+              <legend className="px-1 text-sm font-medium">
+                {t("web.slider.relationship.reviewedAdvisory")}
+              </legend>
+              {field.state.value.map((advisory, index) => {
+                const selected =
+                  options.relationshipProducts.find(
+                    ({ id }) => id === advisory.relatedProductId,
+                  ) ?? null;
+                return (
+                  <section
+                    className="grid gap-3 rounded-lg border border-border bg-background p-3"
+                    key={`${advisory.relatedProductId}-${index}`}
+                  >
+                    <CatalogCombobox
+                      ariaLabel={t("web.slider.relationship.reviewedAdvisory")}
+                      items={options.relationshipProducts.filter(
+                        ({ id }) => id !== initialProduct?.id,
+                      )}
+                      onValueChange={(value) =>
+                        field.handleChange(
+                          field.state.value.map((current, position) =>
+                            position === index
+                              ? {
+                                  ...current,
+                                  relatedProductId: Number(value?.id ?? 0),
+                                }
+                              : current,
+                          ),
+                        )
+                      }
+                      placeholder={t(
+                        "web.slider.relationship.reviewedAdvisory",
+                      )}
+                      value={selected}
+                    />
+                    <textarea
+                      aria-label={t("web.slider.relationship.reviewedAdvisory")}
+                      className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      maxLength={1000}
+                      onChange={(event) =>
+                        field.handleChange(
+                          field.state.value.map((current, position) =>
+                            position === index
+                              ? { ...current, text: event.target.value }
+                              : current,
+                          ),
+                        )
+                      }
+                      value={advisory.text}
+                    />
+                    <Button
+                      className="w-fit"
+                      onClick={() =>
+                        field.handleChange(
+                          field.state.value.filter(
+                            (_, position) => position !== index,
+                          ),
+                        )
+                      }
+                      type="button"
+                      variant="outline"
+                    >
+                      {t("web.action.removeCompatibilityAdvisory")}
+                    </Button>
+                  </section>
+                );
+              })}
+              <Button
+                className="w-fit"
+                onClick={() =>
+                  field.handleChange([
+                    ...field.state.value,
+                    { relatedProductId: 0, text: "" },
+                  ])
+                }
+                type="button"
+                variant="outline"
+              >
+                {t("web.action.addCompatibilityAdvisory")}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                {t("web.slider.relationship.advisoryHelp")}
+              </p>
+              <FieldError
+                error={serverErrors.compatibilityAdvisories?.[0]}
+                t={t}
+              />
+            </fieldset>
+          )}
+        </form.Field>
         {productTypeSlug === "spinner" ? (
           <form.Field name="bearing">
             {(field) => (
@@ -680,6 +1121,1077 @@ export function ProductEditor({
   );
 }
 
+/** Insert-hosted authoring form value. */
+type InsertHostedMagnetOptionsValue = NonNullable<
+  ProductFormValue["insertHostedMagnetOptions"]
+>;
+
+/** Slider offer-association form value. */
+type SliderInsertOfferValue = ProductFormValue["advertisedInsertOffers"];
+
+/**
+ * Edits insertion-ordered click counts and exact offers for one insert product.
+ *
+ * @param props - Current options and replacement callback.
+ * @returns Insert option and offer authoring controls.
+ */
+function InsertHostedMagnetOptionsEditor({
+  onChange,
+  t,
+  templates,
+  value,
+}: {
+  /**
+   * Replaces all insert-hosted options.
+   *
+   * @param value - Next insert-hosted options.
+   */
+  onChange(value: InsertHostedMagnetOptionsValue): void;
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+  /** Catalog-manager-only reusable authoring templates. */
+  templates: Array<{
+    /** Complete configuration copied into an offer snapshot. */
+    configuration: InsertHostedMagnetOptionsValue["offers"][number]["configuration"];
+    /** Template identifier retained as authoring provenance. */
+    id: number;
+    /** Manager-facing template name. */
+    name: string;
+  }>;
+  /** Current insert-hosted options. */
+  value: InsertHostedMagnetOptionsValue;
+}) {
+  return (
+    <fieldset className="grid gap-4 rounded-lg border border-border p-4">
+      <legend className="px-1 text-sm font-medium">
+        {t("web.slider.setup.availableOffers")}
+      </legend>
+      <fieldset className="grid gap-3 rounded-md border border-border p-3">
+        <legend className="px-1 text-sm font-medium">
+          {t("web.slider.setup.clickCount")}
+        </legend>
+        {value.clickCounts.map((clickCount, index) => (
+          <div className="flex items-end gap-2" key={`${clickCount}-${index}`}>
+            <Field label={t("web.slider.setup.clickCount")}>
+              <Input
+                aria-label={t("web.slider.setup.clickCount")}
+                min="1"
+                onChange={(event) =>
+                  onChange({
+                    ...value,
+                    clickCounts: value.clickCounts.map((current, position) =>
+                      position === index ? Number(event.target.value) : current,
+                    ),
+                  })
+                }
+                step="1"
+                type="number"
+                value={clickCount || ""}
+              />
+            </Field>
+            <Button
+              onClick={() =>
+                onChange({
+                  clickCounts: value.clickCounts.filter(
+                    (_, position) => position !== index,
+                  ),
+                  offers: value.offers.map((offer) =>
+                    offer.clickCount === clickCount
+                      ? { ...offer, clickCount: null }
+                      : offer,
+                  ),
+                })
+              }
+              type="button"
+              variant="outline"
+            >
+              {t("web.action.removeSelection", { name: String(clickCount) })}
+            </Button>
+          </div>
+        ))}
+        <Button
+          className="w-fit"
+          onClick={() =>
+            onChange({ ...value, clickCounts: [...value.clickCounts, 0] })
+          }
+          type="button"
+          variant="outline"
+        >
+          {t("web.action.confirmAdd")} {t("web.slider.setup.clickCount")}
+        </Button>
+      </fieldset>
+      {value.offers.map((offer, index) => (
+        <section
+          className="grid gap-3 rounded-md border border-border p-3"
+          key={offer.id ?? `new-${index}`}
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label={t("web.slider.setup.clickCount")}>
+              <select
+                aria-label={t("web.slider.setup.clickCount")}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                onChange={(event) =>
+                  onChange({
+                    ...value,
+                    offers: value.offers.map((current, position) =>
+                      position === index
+                        ? {
+                            ...current,
+                            clickCount: event.target.value
+                              ? Number(event.target.value)
+                              : null,
+                          }
+                        : current,
+                    ),
+                  })
+                }
+                value={offer.clickCount ?? ""}
+              >
+                <option value="">{t("web.slider.setup.notRecorded")}</option>
+                {value.clickCounts
+                  .filter((count) => count > 0)
+                  .map((count) => (
+                    <option key={count} value={count}>
+                      {count}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                checked={offer.isAdvertisedDefault}
+                onChange={(event) =>
+                  onChange({
+                    ...value,
+                    offers: value.offers.map((current, position) => ({
+                      ...current,
+                      isAdvertisedDefault:
+                        position === index ? event.target.checked : false,
+                    })),
+                  })
+                }
+                type="checkbox"
+              />
+              {t("web.slider.setup.advertisedDefault")}
+            </label>
+          </div>
+          {templates.length ? (
+            <Field label={t("web.slider.setup.copyAndCustomize")}>
+              <select
+                aria-label={t("web.slider.setup.copyAndCustomize")}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                onChange={(event) => {
+                  const template = templates.find(
+                    ({ id }) => id === Number(event.target.value),
+                  );
+                  if (!template) return;
+                  onChange({
+                    ...value,
+                    offers: value.offers.map((current, position) =>
+                      position === index
+                        ? {
+                            ...current,
+                            configuration: template.configuration,
+                            copiedFromTemplateId: template.id,
+                          }
+                        : current,
+                    ),
+                  });
+                }}
+                value={offer.copiedFromTemplateId ?? ""}
+              >
+                <option value="">{t("web.slider.setup.selectOffer")}</option>
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+          <BodyHostedMagnetSetupEditor
+            legend={t("web.slider.setup.offer")}
+            onChange={(setup) => {
+              const configuration =
+                setup.configuration as CatalogMagnetConfiguration | null;
+              if (!configuration) return;
+              onChange({
+                ...value,
+                offers: value.offers.map((current, position) =>
+                  position === index ? { ...current, configuration } : current,
+                ),
+              });
+            }}
+            showClickCount={false}
+            showSourceNote={false}
+            t={t}
+            value={{
+              clickCount: offer.clickCount,
+              configuration: offer.configuration as CatalogMagnetConfiguration,
+              sourceNote: null,
+            }}
+          />
+          <Button
+            className="w-fit"
+            onClick={() =>
+              onChange({
+                ...value,
+                offers: value.offers.filter(
+                  (_, position) => position !== index,
+                ),
+              })
+            }
+            type="button"
+            variant="outline"
+          >
+            {t("web.action.removeSelection", {
+              name: offer.configuration.label || t("web.slider.setup.offer"),
+            })}
+          </Button>
+        </section>
+      ))}
+      <Button
+        className="w-fit"
+        onClick={() =>
+          onChange({
+            ...value,
+            offers: [
+              ...value.offers,
+              {
+                clickCount: null,
+                configuration: {
+                  groups: [],
+                  label: "",
+                  slots: [
+                    {
+                      documentedColumn: null,
+                      documentedRow: null,
+                      groupKey: null,
+                      half: "half-a",
+                      key: "A1",
+                      state: "empty",
+                    },
+                  ],
+                  sourceLabel: null,
+                  sourceNotes: null,
+                },
+                copiedFromTemplateId: null,
+                id: null,
+                isAdvertisedDefault: false,
+              },
+            ],
+          })
+        }
+        type="button"
+        variant="outline"
+      >
+        {t("web.action.confirmAdd")} {t("web.slider.setup.offer")}
+      </Button>
+    </fieldset>
+  );
+}
+
+/**
+ * Selects exact insert offers merchandised for one insert-driven slider.
+ *
+ * @param props - Available offers, selected associations, and replacement callback.
+ * @returns Exact-offer selection with one required slider default.
+ */
+function SliderInsertOfferEditor({
+  offers,
+  onChange,
+  t,
+  value,
+}: {
+  /** Exact offers from visible insert products. */
+  offers: Array<{
+    /** Exact insert offer identifier. */
+    id: number;
+    /** Exact host insert product name. */
+    insertProductName: string;
+    /** Minimal configuration facts used by the selector label. */
+    configuration: {
+      /** Global configuration vocabulary label. */
+      label: string;
+    };
+  }>;
+  /**
+   * Replaces the exact associations.
+   *
+   * @param value - Next slider-to-offer associations.
+   */
+  onChange(value: SliderInsertOfferValue): void;
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+  /** Current slider associations. */
+  value: SliderInsertOfferValue;
+}) {
+  return (
+    <fieldset className="grid gap-3 rounded-lg border border-border p-4">
+      <legend className="px-1 text-sm font-medium">
+        {t("web.slider.setup.availableOffers")}
+      </legend>
+      {offers.length ? (
+        offers.map((offer) => {
+          const selected = value.find(({ offerId }) => offerId === offer.id);
+          return (
+            <div
+              className="flex flex-wrap items-center gap-4 rounded-md border border-border p-3"
+              key={offer.id}
+            >
+              <label className="flex flex-1 items-center gap-2 text-sm">
+                <input
+                  checked={Boolean(selected)}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      onChange([
+                        ...value,
+                        {
+                          isAdvertisedDefault: value.length === 0,
+                          offerId: offer.id,
+                        },
+                      ]);
+                      return;
+                    }
+                    const remaining = value.filter(
+                      ({ offerId }) => offerId !== offer.id,
+                    );
+                    onChange(
+                      selected?.isAdvertisedDefault && remaining.length
+                        ? remaining.map((current, index) => ({
+                            ...current,
+                            isAdvertisedDefault: index === 0,
+                          }))
+                        : remaining,
+                    );
+                  }}
+                  type="checkbox"
+                />
+                {offer.insertProductName} · {offer.configuration.label}
+              </label>
+              {selected ? (
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    checked={selected.isAdvertisedDefault}
+                    name="slider-advertised-default"
+                    onChange={() =>
+                      onChange(
+                        value.map((current) => ({
+                          ...current,
+                          isAdvertisedDefault: current.offerId === offer.id,
+                        })),
+                      )
+                    }
+                    type="radio"
+                  />
+                  {t("web.slider.setup.advertisedDefault")}
+                </label>
+              ) : null}
+            </div>
+          );
+        })
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {t("web.slider.empty.noOffers")}
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
+/** Setup shape shared by catalog and owner-recorded layout editors. */
+type EditableMagnetSetup = Omit<
+  CatalogBodyHostedMagnetSetup,
+  "configuration"
+> & {
+  /** Catalog-complete or owner-recorded layout. */
+  configuration: OwnedMagnetConfiguration | null;
+};
+
+/**
+ * Edits one catalog-complete or owner-recorded magnet setup.
+ *
+ * @param props - Current setup and replacement callback.
+ * @returns Structured setup authoring fields.
+ */
+function BodyHostedMagnetSetupEditor({
+  allowUnknown = false,
+  legend,
+  onChange,
+  showClickCount = true,
+  showSourceNote = true,
+  t,
+  value,
+}: {
+  /** Whether owner-recorded positions may use the unknown state. */
+  allowUnknown?: boolean;
+  /** Optional fieldset legend override. */
+  legend?: string;
+  /**
+   * Replaces the complete form value.
+   *
+   * @param value - Next complete body-hosted setup.
+   */
+  onChange(value: EditableMagnetSetup): void;
+  /** Whether to show the body-level click count field. */
+  showClickCount?: boolean;
+  /** Whether to show the incomplete-layout note field. */
+  showSourceNote?: boolean;
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+  /** Current inherent setup. */
+  value: EditableMagnetSetup;
+}) {
+  const configuration = value.configuration;
+  /**
+   * Replaces or clears the single structured configuration.
+   *
+   * @param next - Next complete configuration, or `null` when undocumented.
+   * @returns Nothing.
+   */
+  const replaceConfiguration = (
+    next: NonNullable<typeof value.configuration> | null,
+  ) => onChange({ ...value, configuration: next });
+  return (
+    <fieldset className="grid gap-4 rounded-lg border border-border p-4">
+      <legend className="px-1 text-sm font-medium">
+        {legend ?? t("web.slider.setup.title")}
+      </legend>
+      {showClickCount ? (
+        <Field label={t("web.slider.setup.clickCount")}>
+          <Input
+            aria-label={t("web.slider.setup.clickCount")}
+            min="1"
+            onChange={(event) =>
+              onChange({
+                ...value,
+                clickCount: event.target.value
+                  ? Number(event.target.value)
+                  : null,
+              })
+            }
+            step="1"
+            type="number"
+            value={value.clickCount ?? ""}
+          />
+        </Field>
+      ) : null}
+      {showSourceNote ? (
+        <Field label={t("web.slider.setup.sourceNote")}>
+          <textarea
+            aria-label={t("web.slider.setup.sourceNote")}
+            className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            maxLength={5000}
+            onChange={(event) =>
+              onChange({ ...value, sourceNote: event.target.value })
+            }
+            placeholder={t("web.slider.setup.incompleteSourceNote")}
+            value={value.sourceNote ?? ""}
+          />
+        </Field>
+      ) : null}
+      {configuration ? (
+        <section className="grid gap-4 rounded-lg border border-border bg-muted/20 p-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label={t("web.slider.magnet.vocabularyLabel")}>
+              <Input
+                aria-label={t("web.slider.magnet.vocabularyLabel")}
+                maxLength={100}
+                onChange={(event) =>
+                  replaceConfiguration({
+                    ...configuration,
+                    label: event.target.value,
+                  })
+                }
+                value={configuration.label}
+              />
+            </Field>
+            <Field label={t("web.slider.setup.default")}>
+              <Input
+                aria-label={t("web.slider.setup.default")}
+                maxLength={200}
+                onChange={(event) =>
+                  replaceConfiguration({
+                    ...configuration,
+                    sourceLabel: event.target.value,
+                  })
+                }
+                value={configuration.sourceLabel ?? ""}
+              />
+            </Field>
+          </div>
+          <Field label={t("web.slider.setup.sourceNote")}>
+            <textarea
+              aria-label={t("web.slider.setup.sourceNote")}
+              className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              maxLength={5000}
+              onChange={(event) =>
+                replaceConfiguration({
+                  ...configuration,
+                  sourceNotes: event.target.value,
+                })
+              }
+              value={configuration.sourceNotes ?? ""}
+            />
+          </Field>
+          <fieldset className="grid gap-3 rounded-md border border-border p-3">
+            <legend className="px-1 text-sm font-medium">
+              {t("web.slider.magnet.groups")}
+            </legend>
+            {configuration.groups.map((group, index) => (
+              <section
+                className="grid gap-2 rounded-md border border-border bg-background p-3 md:grid-cols-3"
+                key={`${group.key}-${index}`}
+              >
+                <Field label={t("web.slider.magnet.group")}>
+                  <Input
+                    aria-label={t("web.slider.magnet.group")}
+                    onChange={(event) => {
+                      const oldKey = group.key;
+                      const key = event.target.value;
+                      replaceConfiguration({
+                        ...configuration,
+                        groups: configuration.groups.map((current, position) =>
+                          position === index ? { ...current, key } : current,
+                        ),
+                        slots: configuration.slots.map((slot) =>
+                          slot.groupKey === oldKey
+                            ? { ...slot, groupKey: key }
+                            : slot,
+                        ),
+                      });
+                    }}
+                    placeholder="group-key"
+                    value={group.key}
+                  />
+                  <Input
+                    aria-label={t("web.slider.magnet.vocabularyLabel")}
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        groups: configuration.groups.map((current, position) =>
+                          position === index
+                            ? { ...current, label: event.target.value }
+                            : current,
+                        ),
+                      })
+                    }
+                    placeholder={t("web.slider.magnet.vocabularyLabel")}
+                    value={group.label}
+                  />
+                </Field>
+                <Field label={t("web.slider.magnet.size")}>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      aria-label={t("web.archive.spec.diameter")}
+                      min="0"
+                      onChange={(event) =>
+                        replaceConfiguration({
+                          ...configuration,
+                          groups: configuration.groups.map(
+                            (current, position) =>
+                              position === index
+                                ? {
+                                    ...current,
+                                    diameterMm: event.target.value,
+                                  }
+                                : current,
+                          ),
+                        })
+                      }
+                      placeholder={t("web.archive.spec.diameter")}
+                      step="any"
+                      type="number"
+                      value={group.diameterMm ?? ""}
+                    />
+                    <Input
+                      aria-label={t("web.catalog.field.thickness")}
+                      min="0"
+                      onChange={(event) =>
+                        replaceConfiguration({
+                          ...configuration,
+                          groups: configuration.groups.map(
+                            (current, position) =>
+                              position === index
+                                ? {
+                                    ...current,
+                                    thicknessMm: event.target.value,
+                                  }
+                                : current,
+                          ),
+                        })
+                      }
+                      placeholder={t("web.catalog.field.thickness")}
+                      step="any"
+                      type="number"
+                      value={group.thicknessMm ?? ""}
+                    />
+                  </div>
+                </Field>
+                <Field label={t("web.slider.magnet.grade")}>
+                  <Input
+                    aria-label={t("web.slider.magnet.grade")}
+                    maxLength={20}
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        groups: configuration.groups.map((current, position) =>
+                          position === index
+                            ? { ...current, grade: event.target.value }
+                            : current,
+                        ),
+                      })
+                    }
+                    value={group.grade}
+                  />
+                  <Button
+                    onClick={() => {
+                      const groups = configuration.groups.filter(
+                        (_, position) => position !== index,
+                      );
+                      replaceConfiguration({
+                        ...configuration,
+                        groups,
+                        slots: configuration.slots.map((slot) =>
+                          slot.groupKey === group.key
+                            ? { ...slot, groupKey: null, state: "empty" }
+                            : slot,
+                        ),
+                      });
+                    }}
+                    type="button"
+                    variant="outline"
+                  >
+                    {t("web.action.removeSelection", {
+                      name: group.label || group.key,
+                    })}
+                  </Button>
+                </Field>
+              </section>
+            ))}
+            <Button
+              className="w-fit"
+              onClick={() => {
+                const key = `group-${configuration.groups.length + 1}`;
+                replaceConfiguration({
+                  ...configuration,
+                  groups: [
+                    ...configuration.groups,
+                    {
+                      diameterMm: "",
+                      grade: "",
+                      key,
+                      label: "",
+                      thicknessMm: "",
+                    },
+                  ],
+                });
+              }}
+              type="button"
+              variant="outline"
+            >
+              {t("web.action.confirmAdd")} {t("web.slider.magnet.group")}
+            </Button>
+          </fieldset>
+          <fieldset className="grid gap-3 rounded-md border border-border p-3">
+            <legend className="px-1 text-sm font-medium">
+              {t("web.slider.magnet.slots")}
+            </legend>
+            {configuration.slots.map((slot, index) => (
+              <section
+                className="grid gap-2 rounded-md border border-border bg-background p-3 md:grid-cols-4"
+                key={`${slot.half}-${slot.key}-${index}`}
+              >
+                <Field label={t("web.slider.magnet.slot")}>
+                  <Input
+                    aria-label={t("web.slider.magnet.slot")}
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        slots: configuration.slots.map((current, position) =>
+                          position === index
+                            ? { ...current, key: event.target.value }
+                            : current,
+                        ),
+                      })
+                    }
+                    value={slot.key}
+                  />
+                </Field>
+                <Field label={t("web.slider.magnet.halfA")}>
+                  <select
+                    aria-label={t("web.slider.magnet.halfA")}
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        slots: configuration.slots.map((current, position) =>
+                          position === index
+                            ? {
+                                ...current,
+                                half: event.target.value as "half-a" | "half-b",
+                              }
+                            : current,
+                        ),
+                      })
+                    }
+                    value={slot.half}
+                  >
+                    <option value="half-a">
+                      {t("web.slider.magnet.halfA")}
+                    </option>
+                    <option value="half-b">
+                      {t("web.slider.magnet.halfB")}
+                    </option>
+                  </select>
+                </Field>
+                <Field label={t(`web.slider.magnet.state.${slot.state}`)}>
+                  <select
+                    aria-label={t(`web.slider.magnet.state.${slot.state}`)}
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    onChange={(event) => {
+                      const state = event.target.value as
+                        | "occupied"
+                        | "empty"
+                        | "unknown";
+                      replaceConfiguration({
+                        ...configuration,
+                        slots: configuration.slots.map((current, position) =>
+                          position === index
+                            ? {
+                                ...current,
+                                groupKey:
+                                  state === "occupied"
+                                    ? current.groupKey
+                                    : null,
+                                state,
+                              }
+                            : current,
+                        ),
+                      });
+                    }}
+                    value={slot.state}
+                  >
+                    <option value="occupied">
+                      {t("web.slider.magnet.state.occupied")}
+                    </option>
+                    <option value="empty">
+                      {t("web.slider.magnet.state.empty")}
+                    </option>
+                    {allowUnknown ? (
+                      <option value="unknown">
+                        {t("web.slider.magnet.state.unknown")}
+                      </option>
+                    ) : null}
+                  </select>
+                </Field>
+                <Field label={t("web.slider.magnet.group")}>
+                  <select
+                    aria-label={t("web.slider.magnet.group")}
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    disabled={slot.state !== "occupied"}
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        slots: configuration.slots.map((current, position) =>
+                          position === index
+                            ? {
+                                ...current,
+                                groupKey: event.target.value || null,
+                              }
+                            : current,
+                        ),
+                      })
+                    }
+                    value={slot.groupKey ?? ""}
+                  >
+                    <option value="">
+                      {t("web.slider.setup.notRecorded")}
+                    </option>
+                    {configuration.groups.map((group) => (
+                      <option key={group.key} value={group.key}>
+                        {group.label || group.key}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label={t("web.slider.magnet.row")}>
+                  <Input
+                    aria-label={t("web.slider.magnet.row")}
+                    min="1"
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        slots: configuration.slots.map((current, position) =>
+                          position === index
+                            ? {
+                                ...current,
+                                documentedRow: event.target.value
+                                  ? Number(event.target.value)
+                                  : null,
+                              }
+                            : current,
+                        ),
+                      })
+                    }
+                    step="1"
+                    type="number"
+                    value={slot.documentedRow ?? ""}
+                  />
+                </Field>
+                <Field label={t("web.slider.magnet.column")}>
+                  <Input
+                    aria-label={t("web.slider.magnet.column")}
+                    min="1"
+                    onChange={(event) =>
+                      replaceConfiguration({
+                        ...configuration,
+                        slots: configuration.slots.map((current, position) =>
+                          position === index
+                            ? {
+                                ...current,
+                                documentedColumn: event.target.value
+                                  ? Number(event.target.value)
+                                  : null,
+                              }
+                            : current,
+                        ),
+                      })
+                    }
+                    step="1"
+                    type="number"
+                    value={slot.documentedColumn ?? ""}
+                  />
+                </Field>
+                <Button
+                  className="w-fit self-end"
+                  onClick={() =>
+                    replaceConfiguration({
+                      ...configuration,
+                      slots: configuration.slots.filter(
+                        (_, position) => position !== index,
+                      ),
+                    })
+                  }
+                  type="button"
+                  variant="outline"
+                >
+                  {t("web.action.removeSelection", { name: slot.key })}
+                </Button>
+              </section>
+            ))}
+            <Button
+              className="w-fit"
+              onClick={() =>
+                replaceConfiguration({
+                  ...configuration,
+                  slots: [
+                    ...configuration.slots,
+                    {
+                      documentedColumn: null,
+                      documentedRow: null,
+                      groupKey: null,
+                      half: "half-a",
+                      key: `A${configuration.slots.length + 1}`,
+                      state: "empty",
+                    },
+                  ],
+                })
+              }
+              type="button"
+              variant="outline"
+            >
+              {t("web.action.confirmAdd")} {t("web.slider.magnet.slot")}
+            </Button>
+          </fieldset>
+          <Button
+            className="w-fit"
+            onClick={() => replaceConfiguration(null)}
+            type="button"
+            variant="outline"
+          >
+            {t("web.action.removeSelection", {
+              name: t("web.slider.magnet.configuration"),
+            })}
+          </Button>
+        </section>
+      ) : (
+        <Button
+          className="w-fit"
+          onClick={() =>
+            replaceConfiguration({
+              groups: [],
+              label: "",
+              slots: [],
+              sourceLabel: null,
+              sourceNotes: null,
+            })
+          }
+          type="button"
+          variant="outline"
+        >
+          {t("web.action.confirmAdd")} {t("web.slider.magnet.configuration")}
+        </Button>
+      )}
+    </fieldset>
+  );
+}
+
+/**
+ * Edits the durable setup snapshot for one owned slider insert.
+ *
+ * @param props - Exact insert product, setup draft, copy, and replacement callback.
+ * @returns Default, copied-offer, and custom setup controls.
+ */
+function OwnedInsertSetupEditor({
+  onChange,
+  product,
+  t,
+  value,
+}: {
+  /**
+   * Replaces the snapshot draft, or clears it for live catalog defaults.
+   *
+   * @param value - Next owner setup draft, or `null` for live defaults.
+   * @param layoutChanged - Whether a layout edit must clear the click link.
+   * @returns Nothing.
+   */
+  onChange(value: OwnedInsertSetupDraft | null, layoutChanged?: boolean): void;
+  /** Exact insert product owning every selectable option. */
+  product: CatalogProduct;
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+  /** Current durable snapshot draft, or `null` for live defaults. */
+  value: OwnedInsertSetupDraft | null;
+}) {
+  const clickOptions = [...product.insertClickOptions].sort(
+    (left, right) => left.insertionPosition - right.insertionPosition,
+  );
+  const earliestClickOption = clickOptions[0] ?? null;
+  return (
+    <fieldset className="grid gap-4 rounded-lg border border-border p-4">
+      <legend className="px-1 text-sm font-medium">
+        {t("web.slider.setup.title")}
+      </legend>
+      <label className="grid gap-1 rounded-md border border-border p-3 text-sm">
+        <span className="flex items-center gap-2 font-medium">
+          <input
+            checked={value === null}
+            name="owned-insert-setup-mode"
+            onChange={() => onChange(null)}
+            type="radio"
+          />
+          {t("web.slider.setup.default")}
+        </span>
+        <span className="text-muted-foreground">
+          {t("web.slider.setup.defaultDescription")}
+        </span>
+      </label>
+      {product.insertMagnetOffers.length ? (
+        <Field label={t("web.slider.setup.selectOffer")}>
+          <select
+            aria-label={t("web.slider.setup.selectOffer")}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            onChange={(event) => {
+              const offer = product.insertMagnetOffers.find(
+                ({ id }) => id === Number(event.target.value),
+              );
+              if (!offer) return;
+              onChange({
+                clickOptionId:
+                  offer.clickOptionId ?? earliestClickOption?.id ?? null,
+                configuration: offer.configuration,
+                sourceOfferId: offer.id,
+              });
+            }}
+            value={value?.sourceOfferId ?? ""}
+          >
+            <option value="">{t("web.slider.setup.selectOffer")}</option>
+            {product.insertMagnetOffers.map((offer) => (
+              <option key={offer.id} value={offer.id}>
+                {offer.configuration.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      ) : null}
+      <Button
+        className="w-fit"
+        onClick={() =>
+          onChange({
+            clickOptionId: earliestClickOption?.id ?? null,
+            configuration: {
+              groups: [],
+              label: "",
+              slots: [
+                {
+                  documentedColumn: null,
+                  documentedRow: null,
+                  groupKey: null,
+                  half: "half-a",
+                  key: "A1",
+                  state: "unknown",
+                },
+              ],
+              sourceLabel: null,
+              sourceNotes: null,
+            },
+            sourceOfferId: null,
+          })
+        }
+        type="button"
+        variant="outline"
+      >
+        {t("web.slider.setup.fromScratch")}
+      </Button>
+      {value ? (
+        <>
+          <Field label={t("web.slider.setup.clickCount")}>
+            <select
+              aria-label={t("web.slider.setup.clickCount")}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  clickOptionId: event.target.value
+                    ? Number(event.target.value)
+                    : null,
+                })
+              }
+              value={value.clickOptionId ?? ""}
+            >
+              <option value="">{t("web.slider.setup.notRecorded")}</option>
+              {clickOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.clickCount}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <BodyHostedMagnetSetupEditor
+            allowUnknown
+            legend={t("web.slider.setup.custom")}
+            onChange={(setup) =>
+              onChange(
+                ownedInsertSetupAfterLayoutChange(value, setup.configuration),
+                true,
+              )
+            }
+            showClickCount={false}
+            showSourceNote={false}
+            t={t}
+            value={{
+              clickCount: null,
+              configuration: value.configuration,
+              sourceNote: null,
+            }}
+          />
+        </>
+      ) : null}
+    </fieldset>
+  );
+}
+
 /** Editable finish option value used by product and collection forms. */
 type FinishOptionFormValue = ProductFormInput["finishOptions"][number];
 
@@ -701,10 +2213,11 @@ const emptyFinishOption = (): FinishOptionFormValue => ({
   colorEffectSlug: null,
   colorIds: [],
   finishIds: [],
+  patternId: null,
 });
 
 /**
- * Renders editable finish options for a catalog product.
+ * Renders editable appearance options for catalog products and collection items.
  *
  * @param root0 - Finish option editor properties.
  * @returns The finish option fields.
@@ -769,7 +2282,7 @@ export function FinishOptionsEditor({
   return (
     <fieldset className="grid gap-4 rounded-lg border border-border p-4">
       <legend className="px-1 text-sm font-medium">
-        {t("web.catalog.field.finishOptions")}
+        {t("web.slider.appearance.label")}
       </legend>
       {value.map((option, index) => {
         const effectOptions = options.colorEffects.map((effect) => ({
@@ -789,10 +2302,13 @@ export function FinishOptionsEditor({
         );
         const selectedEffect =
           effectOptions.find(({ id }) => id === option.colorEffectId) ?? null;
+        const selectedPattern =
+          options.patterns.find(({ id }) => id === option.patternId) ?? null;
         const preview = finishOptionLabel({
           colorEffect: selectedEffect,
           colors: selectedColors,
           finishes: selectedFinishes,
+          pattern: selectedPattern,
         });
 
         return (
@@ -889,6 +2405,34 @@ export function FinishOptionsEditor({
                 />
               </Field>
             ) : null}
+            <Field label={t("web.slider.appearance.pattern")}>
+              <CatalogCombobox
+                ariaLabel={t("web.slider.appearance.pattern")}
+                items={options.patterns}
+                onValueChange={(pattern) =>
+                  update(index, {
+                    ...option,
+                    patternId: pattern ? Number(pattern.id) : null,
+                  })
+                }
+                placeholder={t("web.slider.appearance.selectPattern")}
+                removeLabel={t("web.action.close")}
+                value={selectedPattern}
+              />
+              <LookupDialog
+                kind="pattern"
+                onCreated={(pattern) => {
+                  onOptionsChange((current) => ({
+                    ...current,
+                    patterns: [...current.patterns, pattern].sort((a, b) =>
+                      a.name.localeCompare(b.name),
+                    ),
+                  }));
+                  update(index, { ...option, patternId: pattern.id });
+                }}
+                t={t}
+              />
+            </Field>
             {preview ? (
               <p className="text-sm text-muted-foreground">
                 {t("web.catalog.finishPreview", { finish: preview })}
@@ -964,7 +2508,33 @@ type LookupDialogProps = (
     }
   | {
       /** Lookup kind created by this dialog. */
-      kind: "finish" | "material";
+      kind: "compatibilityFamily";
+      /** Maker that defines the compatibility family. */
+      makerId: number;
+      /**
+       * Receives a newly created compatibility family.
+       *
+       * @param value - Created compatibility-family value.
+       */
+      onCreated: (value: CatalogCompatibilityFamily) => void;
+    }
+  | {
+      /** Product type named by the alias. */
+      canonicalKey: CatalogProductType;
+      /** Lookup kind created by this dialog. */
+      kind: "terminologyAlias";
+      /** Maker that owns the terminology alias. */
+      makerId: number;
+      /**
+       * Receives the created terminology alias.
+       *
+       * @param value - Created catalog terminology alias.
+       */
+      onCreated: (value: CatalogTerminologyAlias) => void;
+    }
+  | {
+      /** Lookup kind created by this dialog. */
+      kind: "finish" | "material" | "pattern";
       /**
        * Receives a newly created finish or material.
        *
@@ -991,15 +2561,19 @@ function LookupDialog(props: LookupDialogProps) {
   const [name, setName] = React.useState("");
   const [hex, setHex] = React.useState("#808080");
   const [rootUrl, setRootUrl] = React.useState("");
+  const [isPreferred, setIsPreferred] = React.useState(false);
   const [fieldErrors, setFieldErrors] = React.useState<
     Record<string, string[] | undefined>
   >({});
   const [error, setError] = React.useState<string | null>(null);
   const action = {
     color: "web.action.addColor",
+    compatibilityFamily: "web.action.addCompatibilityFamily",
     finish: "web.action.addFinish",
     maker: "web.action.addMaker",
     material: "web.action.addMaterial",
+    pattern: "web.slider.appearance.pattern",
+    terminologyAlias: "web.slider.alias.add",
   }[kind] as TranslationKey;
 
   /**
@@ -1016,6 +2590,32 @@ function LookupDialog(props: LookupDialogProps) {
         return;
       }
       props.onCreated(result.maker);
+    } else if (props.kind === "compatibilityFamily") {
+      const result = await createCatalogCompatibilityFamily({
+        data: { makerId: props.makerId, name },
+      });
+      if (!result.ok) {
+        setFieldErrors(result.fieldErrors);
+        setError(result.formError);
+        return;
+      }
+      props.onCreated(result.compatibilityFamily);
+    } else if (props.kind === "terminologyAlias") {
+      const result = await createCatalogTerminologyAlias({
+        data: {
+          canonicalKey: props.canonicalKey,
+          canonicalNamespace: "product-type",
+          isPreferred,
+          label: name,
+          makerId: props.makerId,
+        },
+      });
+      if (!result.ok) {
+        setFieldErrors(result.fieldErrors);
+        setError(result.formError);
+        return;
+      }
+      props.onCreated(result.terminologyAlias);
     } else if (props.kind === "material") {
       const result = await createCatalogMaterial({ data: { name } });
       if (!result.ok) {
@@ -1032,6 +2632,14 @@ function LookupDialog(props: LookupDialogProps) {
         return;
       }
       props.onCreated(result.finish);
+    } else if (props.kind === "pattern") {
+      const result = await createCatalogPattern({ data: { name } });
+      if (!result.ok) {
+        setFieldErrors(result.fieldErrors);
+        setError(result.formError);
+        return;
+      }
+      props.onCreated(result.pattern);
     } else {
       const result = await createCatalogColor({ data: { hex, name } });
       if (!result.ok) {
@@ -1044,6 +2652,7 @@ function LookupDialog(props: LookupDialogProps) {
     setName("");
     setHex("#808080");
     setRootUrl("");
+    setIsPreferred(false);
     setFieldErrors({});
     setError(null);
     ref.current?.close();
@@ -1093,7 +2702,7 @@ function LookupDialog(props: LookupDialogProps) {
               />
               <FieldError error={fieldErrors.rootUrl?.[0]} t={t} />
             </Field>
-          ) : (
+          ) : kind === "terminologyAlias" ? null : (
             <Field label={t("web.catalog.field.slug")}>
               <Input
                 aria-label={t("web.catalog.field.slug")}
@@ -1102,6 +2711,16 @@ function LookupDialog(props: LookupDialogProps) {
               />
             </Field>
           )}
+          {kind === "terminologyAlias" ? (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                checked={isPreferred}
+                onChange={(event) => setIsPreferred(event.target.checked)}
+                type="checkbox"
+              />
+              {t("web.slider.alias.preferred")}
+            </label>
+          ) : null}
           {kind === "color" ? (
             <Field label={t("web.catalog.field.colors")}>
               <Input
@@ -1872,13 +3491,11 @@ export function CollectionAddPage({
       !displayName.trim() ||
       selectedCollectionId === null ||
       !material ||
-      !finish ||
-      (finish.id === "custom" && !customFinishIsValid) ||
-      !productTypeIsSupported(product.productTypeSlug) ||
+      (finish?.id === "custom" && !customFinishIsValid) ||
+      !collectionProductTypeIsSupported(product.productTypeSlug) ||
       (selectedButton &&
         (!buttonMaterial ||
-          !buttonFinish ||
-          (buttonFinish.id === "custom" && !buttonCustomFinishIsValid)))
+          (buttonFinish?.id === "custom" && !buttonCustomFinishIsValid)))
     ) {
       return;
     }
@@ -1941,10 +3558,11 @@ export function CollectionAddPage({
         buttonProductId: selectedButton?.id ?? null,
         collectionId: selectedCollectionId === -1 ? null : selectedCollectionId,
         confirmed,
-        customFinish: finish.id === "custom" ? customFinish : null,
+        customFinish: finish?.id === "custom" ? customFinish : null,
         displayName,
         description: currentDescription,
-        finishOptionId: finish.id === "custom" ? null : Number(finish.id),
+        finishOptionId:
+          finish?.id === "custom" ? null : finish ? Number(finish.id) : null,
         materialId: material.id,
         newCollection:
           selectedCollectionId === -1 && newCollection
@@ -2266,6 +3884,17 @@ export function CollectionAddPage({
             t={t}
           />
         ) : null}
+        {product?.productTypeSlug === "slider" &&
+        product.includedComponents.length ? (
+          <Notice>
+            <p>{t("web.slider.relationship.inclusionHelp")}</p>
+            <ul className="mt-2 grid list-disc gap-1 pl-5">
+              {product.includedComponents.map((component) => (
+                <li key={component.id}>{component.name}</li>
+              ))}
+            </ul>
+          </Notice>
+        ) : null}
         {product && collectionIsPrivate ? (
           <Notice>{t("web.collections.visibility.privateCallout")}</Notice>
         ) : null}
@@ -2545,26 +4174,56 @@ function localizedFinishLabel(
   });
 }
 
+/** Editable owned-insert setup sent to the collection service. */
+type OwnedInsertSetupDraft = {
+  /** Current exact-product click option selected by the owner. */
+  clickOptionId: number | null;
+  /** Owner-recorded layout snapshot. */
+  configuration: OwnedMagnetConfiguration | null;
+  /** Current exact-product offer copied as the authoring source. */
+  sourceOfferId: number | null;
+};
+
+/**
+ * Applies an owned layout edit and clears the linked click selection.
+ *
+ * @param current - Existing setup draft.
+ * @param configuration - Replacement owner-recorded layout.
+ * @returns Updated setup draft with no selected click option.
+ */
+export function ownedInsertSetupAfterLayoutChange(
+  current: OwnedInsertSetupDraft,
+  configuration: OwnedMagnetConfiguration | null,
+): OwnedInsertSetupDraft {
+  return { ...current, clickOptionId: null, configuration };
+}
+
 /**
  * Renders the collection-item edit page.
  *
  * @param root0 - Existing item, product, and lookup values.
+ * @param root0.assemblyMoveItemCount - Connected assembly members moved with this item.
  * @param root0.buttonProducts - Catalog products for owned spinner buttons.
  * @param root0.collections - Collections available as destinations.
  * @param root0.item - Collection item being edited.
  * @param root0.options - Catalog lookup options.
  * @param root0.ownedButtons - Owned spinner buttons available to install.
+ * @param root0.ownedSliderComponents - Owned slider plates and inserts available to install.
  * @param root0.product - Source catalog product.
  * @returns The collection-item edit page.
  */
 export function CollectionEditPage({
+  assemblyMoveItemCount = 1,
   buttonProducts,
   collections,
   item,
   options: initialOptions,
   ownedButtons,
+  ownedSliderComponents = [],
   product,
 }: {
+  /** Connected assembly members moved with this item. */
+  assemblyMoveItemCount?: number;
   /** Catalog products for owned spinner buttons. */
   buttonProducts: CatalogProduct[];
   /** Collections available as destinations. */
@@ -2575,6 +4234,8 @@ export function CollectionEditPage({
   options: CatalogOptions;
   /** Owned spinner buttons available to install. */
   ownedButtons: UserCollectionItem[];
+  /** Owned slider components available to install. */
+  ownedSliderComponents?: UserCollectionItem[];
   /** Source catalog product. */
   product: CatalogProduct;
 }) {
@@ -2605,6 +4266,26 @@ export function CollectionEditPage({
       : null,
   );
   const [customFinish, setCustomFinish] = React.useState(emptyFinishOption);
+  const [insertSetup, setInsertSetup] =
+    React.useState<OwnedInsertSetupDraft | null>(() => {
+      if (!item.ownedInsertSetup) return null;
+      return {
+        clickOptionId:
+          product.insertClickOptions.find(
+            ({ clickCount }) =>
+              clickCount === item.ownedInsertSetup?.clickCount,
+          )?.id ?? null,
+        configuration: item.ownedInsertSetup.configuration,
+        sourceOfferId: product.insertMagnetOffers.some(
+          ({ id }) => id === item.ownedInsertSetup?.sourceOfferId,
+        )
+          ? item.ownedInsertSetup.sourceOfferId
+          : null,
+      };
+    });
+  const [insertSetupDirty, setInsertSetupDirty] = React.useState(false);
+  const [insertSetupClickCleared, setInsertSetupClickCleared] =
+    React.useState(false);
   const initialButton = ownedButtons.find(
     ({ collectionItemId }) => collectionItemId === item.installedButtonId,
   );
@@ -2632,27 +4313,51 @@ export function CollectionEditPage({
   const selectedButtonProduct = buttonProducts.find(
     ({ id }) => id === selectedButton?.productId,
   );
+  const initialPlate = ownedSliderComponents.find(
+    ({ collectionItemId }) => collectionItemId === item.installedPlateId,
+  );
+  const initialInsert = ownedSliderComponents.find(
+    ({ collectionItemId }) => collectionItemId === item.installedInsertId,
+  );
+  const [plate, setPlate] = React.useState<ComboboxOption | null>(() =>
+    initialPlate
+      ? { id: initialPlate.collectionItemId, name: initialPlate.displayName }
+      : { id: "default", name: t("web.slider.component.noPlate") },
+  );
+  const [insert, setInsert] = React.useState<ComboboxOption | null>(() =>
+    initialInsert
+      ? { id: initialInsert.collectionItemId, name: initialInsert.displayName }
+      : { id: "default", name: t("web.slider.component.noInsert") },
+  );
+  const selectedPlate = ownedSliderComponents.find(
+    ({ collectionItemId }) => collectionItemId === plate?.id,
+  );
+  const selectedInsert = ownedSliderComponents.find(
+    ({ collectionItemId }) => collectionItemId === insert?.id,
+  );
+  const sliderComponentSelectionIsValid =
+    item.productTypeSlug !== "slider" ||
+    ((plate?.id === "default" || Boolean(selectedPlate)) &&
+      (product.magnetSystem !== "insert-driven" ||
+        insert?.id === "default" ||
+        Boolean(selectedInsert)));
   const buttonSelectionIsValid =
     item.productTypeSlug !== "spinner" ||
     button?.id === "default" ||
-    Boolean(
-      selectedButton && selectedButtonProduct && buttonMaterial && buttonFinish,
-    );
+    Boolean(selectedButton && selectedButtonProduct && buttonMaterial);
   const finishSelectionIsValid =
-    Boolean(finish) &&
-    (finish?.id !== "custom" ||
-      finishOptionSchema.safeParse(customFinish).success);
+    finish?.id !== "custom" ||
+    finishOptionSchema.safeParse(customFinish).success;
   const buttonFinishSelectionIsValid =
-    Boolean(buttonFinish) &&
-    (buttonFinish?.id !== "custom" ||
-      finishOptionSchema.safeParse(buttonCustomFinish).success);
+    buttonFinish?.id !== "custom" ||
+    finishOptionSchema.safeParse(buttonCustomFinish).success;
   const detailsAreValid = Boolean(
     displayName.trim() &&
       description.length <= 5000 &&
       material &&
-      finish &&
       finishSelectionIsValid &&
       buttonSelectionIsValid &&
+      sliderComponentSelectionIsValid &&
       (!selectedButton || buttonFinishSelectionIsValid),
   );
   const submissionMode = collectionEditSubmissionMode(
@@ -2671,6 +4376,7 @@ export function CollectionEditPage({
         <div className="grid min-w-0 content-start gap-5">
           <Field label={displayNameLabel}>
             <Input
+              aria-label={displayNameLabel}
               onChange={(event) => setDisplayName(event.target.value)}
               required
               value={displayName}
@@ -2718,6 +4424,27 @@ export function CollectionEditPage({
             product={product}
             t={t}
           />
+          {item.productTypeSlug === "slider-insert" ? (
+            <>
+              <OwnedInsertSetupEditor
+                onChange={(next, layoutChanged = false) => {
+                  if (layoutChanged && insertSetup?.clickOptionId !== null) {
+                    setInsertSetupClickCleared(true);
+                  } else if (!layoutChanged) {
+                    setInsertSetupClickCleared(false);
+                  }
+                  setInsertSetup(next);
+                  setInsertSetupDirty(true);
+                }}
+                product={product}
+                t={t}
+                value={insertSetup}
+              />
+              {insertSetupClickCleared ? (
+                <Notice>{t("web.slider.setup.clickCountCleared")}</Notice>
+              ) : null}
+            </>
+          ) : null}
           {item.productTypeSlug === "spinner" ? (
             <Field label={t("web.catalog.field.button")}>
               <CatalogCombobox
@@ -2757,6 +4484,104 @@ export function CollectionEditPage({
                 value={button}
               />
             </Field>
+          ) : null}
+          {item.productTypeSlug === "slider" ? (
+            <>
+              <Field label={t("web.slider.component.installedPlate")}>
+                <CatalogCombobox
+                  ariaLabel={t("web.slider.component.installedPlate")}
+                  items={[
+                    {
+                      id: "default",
+                      name: t("web.slider.component.noPlate"),
+                    },
+                    ...ownedSliderComponents
+                      .filter(
+                        (candidate) =>
+                          candidate.productTypeSlug === "slider-plate" &&
+                          (candidate.installedOnSliderId === null ||
+                            candidate.installedOnSliderId ===
+                              item.collectionItemId),
+                      )
+                      .map(({ collectionItemId, displayName }) => ({
+                        id: collectionItemId,
+                        name: displayName,
+                      })),
+                  ]}
+                  onValueChange={setPlate}
+                  placeholder={t("web.slider.component.noPlate")}
+                  removeLabel={t("web.action.close")}
+                  showSelectedPill
+                  value={plate}
+                />
+              </Field>
+              {product.magnetSystem === "insert-driven" ? (
+                <Field label={t("web.slider.component.installedInsert")}>
+                  <CatalogCombobox
+                    ariaLabel={t("web.slider.component.installedInsert")}
+                    items={[
+                      {
+                        id: "default",
+                        name: t("web.slider.component.noInsert"),
+                      },
+                      ...ownedSliderComponents
+                        .filter(
+                          (candidate) =>
+                            candidate.productTypeSlug === "slider-insert" &&
+                            (candidate.installedOnSliderId === null ||
+                              candidate.installedOnSliderId ===
+                                item.collectionItemId),
+                        )
+                        .map(({ collectionItemId, displayName }) => ({
+                          id: collectionItemId,
+                          name: displayName,
+                        })),
+                    ]}
+                    onValueChange={setInsert}
+                    placeholder={t("web.slider.component.noInsert")}
+                    removeLabel={t("web.action.close")}
+                    showSelectedPill
+                    value={insert}
+                  />
+                </Field>
+              ) : null}
+              {collectionId !== item.collectionId ||
+              selectedPlate?.collectionId !== collectionId ||
+              selectedInsert?.collectionId !== collectionId ? (
+                <Notice>
+                  {t("web.slider.component.moveAssemblySummary", {
+                    count:
+                      1 +
+                      Number(Boolean(selectedPlate)) +
+                      Number(Boolean(selectedInsert)),
+                  })}
+                </Notice>
+              ) : null}
+              <Notice>
+                <ul className="grid gap-1">
+                  <li>
+                    {t("web.slider.component.installedPlate")}:{" "}
+                    {selectedPlate?.displayName ??
+                      t("web.slider.component.noPlate")}
+                  </li>
+                  {product.magnetSystem === "insert-driven" ? (
+                    <li>
+                      {t("web.slider.component.installedInsert")}:{" "}
+                      {selectedInsert?.displayName ??
+                        t("web.slider.component.noInsert")}
+                    </li>
+                  ) : null}
+                </ul>
+              </Notice>
+            </>
+          ) : null}
+          {item.installedOnSliderId !== null &&
+          collectionId !== item.collectionId ? (
+            <Notice>
+              {t("web.slider.component.moveAssemblySummary", {
+                count: assemblyMoveItemCount,
+              })}
+            </Notice>
           ) : null}
           {selectedButton && selectedButtonProduct ? (
             <CollectionProductFields
@@ -2970,6 +4795,23 @@ export function CollectionEditPage({
                   };
                 }
               }
+              const installedPlate =
+                item.productTypeSlug === "slider"
+                  ? plate?.id === "default"
+                    ? null
+                    : selectedPlate
+                      ? { collectionItemId: selectedPlate.collectionItemId }
+                      : undefined
+                  : undefined;
+              const installedInsert =
+                item.productTypeSlug === "slider" &&
+                product.magnetSystem === "insert-driven"
+                  ? insert?.id === "default"
+                    ? null
+                    : selectedInsert
+                      ? { collectionItemId: selectedInsert.collectionItemId }
+                      : undefined
+                  : undefined;
               const result = await updateCollectionItem({
                 data: {
                   bearing,
@@ -2984,6 +4826,13 @@ export function CollectionEditPage({
                       : Number(finish.id),
                   ...(item.productTypeSlug === "spinner"
                     ? { installedButton }
+                    : {}),
+                  ...(item.productTypeSlug === "slider"
+                    ? { installedInsert, installedPlate }
+                    : {}),
+                  ...(item.productTypeSlug === "slider-insert" &&
+                  insertSetupDirty
+                    ? { insertSetup }
                     : {}),
                   materialId: material.id,
                   reason,

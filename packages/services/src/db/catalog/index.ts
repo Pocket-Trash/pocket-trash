@@ -17,6 +17,7 @@ import {
 import { alias } from "drizzle-orm/pg-core";
 import { type Actor, hasPermission } from "../../authorization.js";
 import { nextAvailableSlug } from "../../catalog-slug.js";
+import { normalizeCatalogSearch } from "../../catalog-terminology.js";
 import { hashLogIdentifier, loggedMutation } from "../../logging.js";
 import {
   attachImages as attachStoredImages,
@@ -55,6 +56,15 @@ export class CollectionButtonAlreadyInstalledError extends Error {
   }
 }
 
+/** Error raised when a slider component is already installed elsewhere. */
+export class CollectionSliderComponentAlreadyInstalledError extends Error {
+  /** Creates the error reported when a plate or insert is assigned elsewhere. */
+  constructor() {
+    super("Collection component is already installed on another slider.");
+    this.name = "CollectionSliderComponentAlreadyInstalledError";
+  }
+}
+
 /**
  * Returns the violated PostgreSQL unique-constraint name.
  *
@@ -87,6 +97,13 @@ const catalogNameConflictMessages: Record<string, string> = {
   makers_root_url_unique: "Maker root URL already exists.",
   makers_slug_unique: "Maker slug already exists.",
   materials_name_case_insensitive_unique: "Material name already exists.",
+  pattern_name_case_insensitive_unique: "Pattern name already exists.",
+  compatibility_family_maker_name_unique:
+    "Compatibility family name already exists for this maker.",
+  catalog_terminology_alias_maker_concept_value_unique:
+    "Alias already exists for this maker and concept.",
+  catalog_terminology_alias_preferred_unique:
+    "A preferred alias already exists for this maker and concept.",
 };
 
 /**
@@ -105,7 +122,63 @@ function mapCatalogNameConflict(error: unknown): never {
 /**
  * Product category supported by the spinner catalog.
  */
-export type CatalogProductType = "spinner" | "spinner-button";
+export type CatalogProductType =
+  | "slider"
+  | "slider-insert"
+  | "slider-plate"
+  | "spinner"
+  | "spinner-button";
+
+/** Registered canonical namespace supported by catalog terminology. */
+export type CatalogTerminologyNamespace = "product-type";
+
+/** Maker-scoped catalog terminology alias exposed to clients. */
+export type CatalogTerminologyAlias = {
+  /** Registered canonical key named by the alias. */
+  canonicalKey: CatalogProductType;
+  /** Registered namespace containing the canonical key. */
+  canonicalNamespace: CatalogTerminologyNamespace;
+  /** Creation timestamp. */
+  createdAt: Date;
+  /** Database identifier. */
+  id: number;
+  /** Whether this is the maker's display term for the concept. */
+  isPreferred: boolean;
+  /** User-visible, non-localized catalog name. */
+  label: string;
+  /** Maker identifier scoping the alias. */
+  makerId: number;
+  /** Maker display name. */
+  makerName: string;
+  /** Stable comparison value. */
+  normalizedValue: string;
+  /** Last-updated timestamp. */
+  updatedAt: Date;
+};
+
+/**
+ * Narrows a persisted product-type slug to the supported exhaustive union.
+ *
+ * @param value - Product-type slug loaded from the database.
+ * @returns The supported product type.
+ * @throws When the catalog contains an unsupported product type.
+ */
+function catalogProductType(value: string): CatalogProductType {
+  switch (value) {
+    case "slider":
+    case "slider-insert":
+    case "slider-plate":
+    case "spinner":
+    case "spinner-button":
+      return value;
+    default:
+      throw new Error(`Unsupported catalog product type: ${value}`);
+  }
+}
+/** Explicit physical host for a slider product's magnet system. */
+export type SliderMagnetSystem = "body-hosted" | "insert-driven";
+/** Meaning of a slider body's recorded weight. */
+export type SliderWeightBasis = "body-only" | "complete-build";
 /** Durable review state for a catalog product or collection item. */
 export type CatalogApprovalStatus = "approved" | "pending" | "rejected";
 /** Administrative transition accepted by a catalog approval workflow. */
@@ -165,6 +238,34 @@ export type PublicMakerDetail = CatalogMaker & {
   products: CatalogProduct[];
 };
 
+/** Maker-scoped reviewed compatibility family. */
+export type CatalogCompatibilityFamily = CatalogLookup & {
+  /** Maker that defines the family. */
+  makerId: number;
+  /** Maker display name. */
+  makerName: string;
+};
+
+/** Reviewed warning that remains distinct from enforced family compatibility. */
+export type CatalogCompatibilityAdvisory = {
+  /** Advisory database identifier. */
+  id: number;
+  /** Exact related product identifier. */
+  relatedProductId: number;
+  /** Exact related product display name. */
+  relatedProductName: string;
+  /** Review timestamp. */
+  reviewedAt: Date;
+  /** Non-blocking reviewed warning text. */
+  text: string;
+};
+
+/** Exact product relationship describing a component sold with a parent. */
+export type CatalogIncludedComponent = CatalogLookup & {
+  /** Canonical component product type. */
+  productTypeSlug: "slider-insert" | "slider-plate";
+};
+
 /**
  * Catalog color lookup with its hexadecimal display value.
  */
@@ -176,7 +277,7 @@ export type CatalogColor = CatalogLookup & {
 };
 
 /**
- * Finish option with its effect, colors, and finish layers.
+ * Appearance option with its optional pattern, effect, colors, and finish layers.
  */
 export type CatalogFinishOption = {
   /**
@@ -195,6 +296,10 @@ export type CatalogFinishOption = {
    * Finish-option database identifier.
    */
   id: number;
+  /**
+   * Reusable surface pattern, or `null` for none.
+   */
+  pattern: CatalogLookup | null;
 };
 
 /**
@@ -335,6 +440,227 @@ export type ProductWriteFinishOption = {
    * Finish identifiers.
    */
   finishIds: number[];
+  /**
+   * Pattern identifier.
+   */
+  patternId?: number | null;
+};
+
+/** Exact magnet group within one catalog configuration. */
+export type CatalogMagnetGroup = {
+  /** Positive diameter in millimetres, retained at database precision. */
+  diameterMm: string;
+  /** Normalized uppercase grade text. */
+  grade: string;
+  /** Stable key scoped to the configuration. */
+  key: string;
+  /** Global vocabulary label. */
+  label: string;
+  /** Positive thickness in millimetres, retained at database precision. */
+  thicknessMm: string;
+};
+
+/** Exact source-relative position in one complete catalog configuration. */
+export type CatalogMagnetSlot = {
+  /** Source-documented column, when present. */
+  documentedColumn: number | null;
+  /** Source-documented row, when present. */
+  documentedRow: number | null;
+  /** Group key for an occupied slot; `null` for an empty slot. */
+  groupKey: string | null;
+  /** Physical slider half named by the source-relative contract. */
+  half: "half-a" | "half-b";
+  /** Stable source-relative slot key. */
+  key: string;
+  /** Complete catalog state; unknown is intentionally unsupported. */
+  state: "occupied" | "empty";
+};
+
+/** Complete structured layout for one body-hosted catalog slider. */
+export type CatalogMagnetConfiguration = {
+  /** Ordered magnet groups. */
+  groups: CatalogMagnetGroup[];
+  /** Global configuration vocabulary label. */
+  label: string;
+  /** Optional source-relative layout label. */
+  sourceLabel: string | null;
+  /** Optional notes accompanying a complete source layout. */
+  sourceNotes: string | null;
+  /** Ordered exact slots across Half A and Half B. */
+  slots: CatalogMagnetSlot[];
+};
+
+/** Inherent, immutable-at-collection-time setup of a body-hosted slider. */
+export type CatalogBodyHostedMagnetSetup = {
+  /** Positive inherent click count, or `null` when undocumented. */
+  clickCount: number | null;
+  /** Complete structured configuration, or `null` when undocumented. */
+  configuration: CatalogMagnetConfiguration | null;
+  /** Sourced note retained instead of inferring an incomplete layout. */
+  sourceNote: string | null;
+};
+
+/** One positive insert click count in immutable insertion order. */
+export type CatalogInsertClickOption = {
+  /** Positive click count. */
+  clickCount: number;
+  /** Database identifier. */
+  id: number;
+  /** Immutable system-assigned insertion position. */
+  insertionPosition: number;
+};
+
+/** One complete, exact magnet configuration offered by an insert product. */
+export type CatalogInsertMagnetOffer = {
+  /** Referenced insert click-option identifier, when linked. */
+  clickOptionId: number | null;
+  /** Linked positive click count, when present. */
+  clickCount: number | null;
+  /** Complete exact offer snapshot. */
+  configuration: CatalogMagnetConfiguration;
+  /** Authoring template provenance, when copied from a template. */
+  copiedFromTemplateId: number | null;
+  /** Database identifier. */
+  id: number;
+  /** Exact host insert product identifier. */
+  insertProductId: number;
+  /** Whether this is the insert product's advertised default. */
+  isAdvertisedDefault: boolean;
+};
+
+/** An exact insert offer explicitly merchandised for an insert-driven slider. */
+export type CatalogSliderInsertOffer = CatalogInsertMagnetOffer & {
+  /** Exact host insert product name. */
+  insertProductName: string;
+  /** Whether this is the slider's advertised default association. */
+  isSliderAdvertisedDefault: boolean;
+};
+
+/** Source-relative position in an owner-recorded insert setup. */
+export type OwnedMagnetSlot = Omit<CatalogMagnetSlot, "state"> & {
+  /** Owner-recorded state, including an explicitly unknown position. */
+  state: CatalogMagnetSlot["state"] | "unknown";
+};
+
+/** Owner-recorded magnet layout snapshot. */
+export type OwnedMagnetConfiguration = Omit<
+  CatalogMagnetConfiguration,
+  "slots"
+> & {
+  /** Ordered owner-recorded positions. */
+  slots: OwnedMagnetSlot[];
+};
+
+/** Durable setup snapshot belonging to one owned insert. */
+export type OwnedSliderInsertSetup = {
+  /** Selected positive click-count snapshot, or `null` when not recorded. */
+  clickCount: number | null;
+  /** Owner-recorded layout snapshot, or `null` when not recorded. */
+  configuration: OwnedMagnetConfiguration | null;
+  /** Catalog offer copied as an authoring source, when present. */
+  sourceOfferId: number | null;
+};
+
+/** Effective setup displayed for an owned slider. */
+export type EffectiveSliderSetup = {
+  /** Effective click count, or `null` when not recorded. */
+  clickCount: number | null;
+  /** Effective layout, or `null` when not recorded. */
+  configuration: OwnedMagnetConfiguration | null;
+  /** Whether the values are resolved live from current catalog metadata. */
+  isLiveCatalog: boolean;
+  /** Physical or catalog source selected by the fallback rules. */
+  source:
+    | "body-hosted"
+    | "owned-insert"
+    | "slider-default"
+    | "insert-default"
+    | "not-recorded";
+};
+
+/**
+ * Resolves an owned slider's effective setup without blending partial snapshots.
+ *
+ * @param input - Physical host, installed insert, owned snapshot, and live catalog offers.
+ * @returns The effective setup and its provenance.
+ */
+export function resolveEffectiveSliderSetup(input: {
+  /** Inherent body-hosted setup, when the body is the physical host. */
+  bodyHostedSetup: CatalogBodyHostedMagnetSetup | null;
+  /** Live offers belonging to the installed insert product. */
+  installedInsertOffers: CatalogInsertMagnetOffer[];
+  /** Exact installed insert product identifier, when installed. */
+  installedInsertProductId: number | null;
+  /** Durable owner snapshot on the installed insert, when recorded. */
+  ownedInsertSetup: OwnedSliderInsertSetup | null;
+  /** Offers explicitly associated with the slider product. */
+  sliderAdvertisedOffers: CatalogSliderInsertOffer[];
+}): EffectiveSliderSetup {
+  if (input.bodyHostedSetup) {
+    return {
+      clickCount: input.bodyHostedSetup.clickCount,
+      configuration: input.bodyHostedSetup.configuration,
+      isLiveCatalog: true,
+      source: "body-hosted",
+    };
+  }
+  if (input.installedInsertProductId !== null && input.ownedInsertSetup) {
+    return {
+      clickCount: input.ownedInsertSetup.clickCount,
+      configuration: input.ownedInsertSetup.configuration,
+      isLiveCatalog: false,
+      source: "owned-insert",
+    };
+  }
+  const sliderDefault = input.sliderAdvertisedOffers.find(
+    (offer) =>
+      offer.isSliderAdvertisedDefault &&
+      (input.installedInsertProductId === null ||
+        offer.insertProductId === input.installedInsertProductId),
+  );
+  if (sliderDefault) {
+    return {
+      clickCount: sliderDefault.clickCount,
+      configuration: sliderDefault.configuration,
+      isLiveCatalog: true,
+      source: "slider-default",
+    };
+  }
+  const insertDefault = input.installedInsertOffers.find(
+    (offer) =>
+      offer.isAdvertisedDefault &&
+      offer.insertProductId === input.installedInsertProductId,
+  );
+  if (insertDefault) {
+    return {
+      clickCount: insertDefault.clickCount,
+      configuration: insertDefault.configuration,
+      isLiveCatalog: true,
+      source: "insert-default",
+    };
+  }
+  return {
+    clickCount: null,
+    configuration: null,
+    isLiveCatalog: false,
+    source: "not-recorded",
+  };
+}
+
+/** Catalog-manager-only reusable authoring source. */
+export type CatalogMagnetConfigurationTemplate = {
+  /** Family scope target, when family-scoped. */
+  compatibilityFamilyId: number | null;
+  /** Complete exact authoring configuration. */
+  configuration: CatalogMagnetConfiguration;
+  /** Database identifier. */
+  id: number;
+  /** Maker scope target, when maker-scoped. */
+  makerId: number | null;
+  /** Manager-facing template name. */
+  name: string;
+  /** Authoring visibility scope. */
+  scope: "global" | "maker" | "family";
 };
 
 /**
@@ -345,10 +671,18 @@ export type CatalogProduct = {
    * Durable product review state.
    */
   approvalStatus: CatalogApprovalStatus;
+  /** Reviewed non-blocking compatibility warnings. */
+  compatibilityAdvisories: CatalogCompatibilityAdvisory[];
+  /** Reviewed compatibility-family memberships. */
+  compatibilityFamilies: CatalogCompatibilityFamily[];
   /**
    * Bearing model or designation, or `null` when unspecified.
    */
   bearing: string | null;
+  /** Live inherent setup for a body-hosted slider. */
+  bodyHostedMagnetSetup: CatalogBodyHostedMagnetSetup | null;
+  /** Exact insert offers explicitly merchandised for this slider. */
+  advertisedInsertOffers: CatalogSliderInsertOffer[];
   /**
    * Button diameter in millimetres.
    */
@@ -393,6 +727,12 @@ export type CatalogProduct = {
    * Images ordered for display.
    */
   images: CatalogImage[];
+  /** Exact products sold as components with this product. */
+  includedComponents: CatalogIncludedComponent[];
+  /** Positive click counts owned by this exact insert product. */
+  insertClickOptions: CatalogInsertClickOption[];
+  /** Complete configuration offers owned by this exact insert product. */
+  insertMagnetOffers: CatalogInsertMagnetOffer[];
   /**
    * Database identifier.
    */
@@ -423,6 +763,8 @@ export type CatalogProduct = {
    * Maker URL.
    */
   makerUrl: string | null;
+  /** Explicit magnet host for sliders, or `null` for other product types. */
+  magnetSystem: SliderMagnetSystem | null;
   /**
    * Materials assigned to the product.
    */
@@ -471,7 +813,7 @@ export type CatalogProduct = {
   /**
    * Product type slug.
    */
-  productTypeSlug: string;
+  productTypeSlug: CatalogProductType;
   /**
    * URL-safe identifier.
    */
@@ -496,6 +838,8 @@ export type CatalogProduct = {
    * Weight in grams.
    */
   weightG: string | null;
+  /** Meaning of a slider's weight, or `null` when no slider weight is recorded. */
+  weightBasis: SliderWeightBasis | null;
   /**
    * Width in millimetres.
    */
@@ -510,6 +854,17 @@ export type ProductWriteInput = {
    * Authenticated actor.
    */
   actor: Actor;
+  /** Complete inherent setup or sourced incomplete-layout note. */
+  bodyHostedMagnetSetup?: CatalogBodyHostedMagnetSetup | null;
+  /** Reviewed non-blocking compatibility warnings. */
+  compatibilityAdvisories?: Array<{
+    /** Exact related product identifier. */
+    relatedProductId: number;
+    /** Reviewed warning text. */
+    text: string;
+  }>;
+  /** Reviewed compatibility-family identifiers. */
+  compatibilityFamilyIds?: number[];
   /**
    * Optional description.
    */
@@ -530,6 +885,33 @@ export type ProductWriteInput = {
    * Material identifiers.
    */
   materialIds: number[];
+  /** Exact component products sold with this product. */
+  includedComponentIds?: number[];
+  /** Exact offers merchandised by an insert-driven slider. */
+  advertisedInsertOffers?: Array<{
+    /** Whether this association is the slider's Default setup. */
+    isAdvertisedDefault: boolean;
+    /** Exact host-bound insert offer identifier. */
+    offerId: number;
+  }>;
+  /** Insert-owned click counts and complete exact configuration offers. */
+  insertHostedMagnetOptions?: {
+    /** Positive click counts in system-managed insertion order. */
+    clickCounts: number[];
+    /** Complete exact offers hosted by this insert product. */
+    offers: Array<{
+      /** Linked click count belonging to the same insert. */
+      clickCount: number | null;
+      /** Complete exact configuration snapshot. */
+      configuration: CatalogMagnetConfiguration;
+      /** Optional manager template provenance. */
+      copiedFromTemplateId?: number | null;
+      /** Existing offer identifier retained across updates. */
+      id?: number;
+      /** Whether this is the insert product's advertised default. */
+      isAdvertisedDefault: boolean;
+    }>;
+  } | null;
   /**
    * Display name.
    */
@@ -570,6 +952,8 @@ export type ProductWriteInput = {
      * Length in millimetres.
      */
     lengthMm?: string | null;
+    /** Explicit physical magnet host for a slider product. */
+    magnetSystem?: SliderMagnetSystem | null;
     /**
      * Spin diameter in millimetres.
      */
@@ -586,6 +970,8 @@ export type ProductWriteInput = {
      * Weight in grams.
      */
     weightG?: string | null;
+    /** Meaning of a slider body's recorded weight. */
+    weightBasis?: SliderWeightBasis | null;
     /**
      * Width in millimetres.
      */
@@ -597,6 +983,64 @@ export type ProductWriteInput = {
  * Catalog reads and audited mutations exposed to application callers.
  */
 export type CatalogService = {
+  /**
+   * Creates an audited maker-scoped alias for a registered catalog concept.
+   *
+   * @param input - Alias label, maker, canonical concept, preference, and actor.
+   * @returns The created alias.
+   */
+  createTerminologyAlias(input: {
+    /** Authenticated catalog manager. */
+    actor: Actor;
+    /** Registered product-type key. */
+    canonicalKey: CatalogProductType;
+    /** Registered canonical namespace. */
+    canonicalNamespace: CatalogTerminologyNamespace;
+    /** Whether the alias is the maker's preferred display term. */
+    isPreferred: boolean;
+    /** Non-localized display label. */
+    label: string;
+    /** Maker identifier scoping the alias. */
+    makerId: number;
+  }): Promise<CatalogTerminologyAlias>;
+  /**
+   * Creates a reviewed maker-scoped compatibility family.
+   *
+   * @param input - Family maker, name, slug, and authenticated catalog manager.
+   * @returns Created compatibility family.
+   * @rejects When authorization, validation, persistence, auditing, or logging fails.
+   */
+  createCompatibilityFamily(input: {
+    /** Authenticated catalog manager. */
+    actor: Actor;
+    /** Maker identifier that scopes the family. */
+    makerId: number;
+    /** Display name. */
+    name: string;
+    /** URL-safe identifier. */
+    slug: string;
+  }): Promise<CatalogCompatibilityFamily>;
+  /**
+   * Creates a catalog-manager-only exact configuration authoring template.
+   *
+   * @param input - Template scope, name, configuration, and authenticated actor.
+   * @returns Created reusable authoring template.
+   * @rejects When authorization, validation, persistence, auditing, or logging fails.
+   */
+  createMagnetConfigurationTemplate(input: {
+    /** Authenticated catalog manager. */
+    actor: Actor;
+    /** Family scope target, required only for family scope. */
+    compatibilityFamilyId: number | null;
+    /** Complete exact configuration copied by future offers. */
+    configuration: CatalogMagnetConfiguration;
+    /** Maker scope target, required only for maker scope. */
+    makerId: number | null;
+    /** Manager-facing template name. */
+    name: string;
+    /** Visibility scope used by catalog authoring. */
+    scope: "global" | "maker" | "family";
+  }): Promise<CatalogMagnetConfigurationTemplate>;
   /**
    * Attaches images.
    *
@@ -735,6 +1179,21 @@ export type CatalogService = {
      */
     name: string;
   }): Promise<AdminMaterial>;
+  /**
+   * Creates pattern.
+   *
+   * @param input - Pattern name, slug, and authenticated actor.
+   * @returns Created pattern.
+   * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+   */
+  createPattern(input: {
+    /** Authenticated actor. */
+    actor: Actor;
+    /** Display name. */
+    name: string;
+    /** URL-safe identifier. */
+    slug: string;
+  }): Promise<CatalogLookup>;
   /**
    * Creates product.
    *
@@ -929,6 +1388,36 @@ export type CatalogService = {
     /** Replacement display name. */
     name: string;
   }): Promise<AdminMaterial>;
+  /**
+   * Lists patterns.
+   *
+   * @returns Matching patterns.
+   * @rejects When the database query or operation logging fails.
+   */
+  listPatterns(): Promise<CatalogLookup[]>;
+  /**
+   * Lists reviewed compatibility families.
+   *
+   * @returns Compatibility families ordered by maker and name.
+   * @rejects When the database query or operation logging fails.
+   */
+  listCompatibilityFamilies(): Promise<CatalogCompatibilityFamily[]>;
+  /**
+   * Lists authoring templates only for catalog managers.
+   *
+   * @param viewer - Viewer whose catalog permissions control access.
+   * @returns Reusable exact configuration templates or an empty list.
+   * @rejects When the database query or operation logging fails.
+   */
+  listMagnetConfigurationTemplates(
+    viewer?: CatalogViewer,
+  ): Promise<CatalogMagnetConfigurationTemplate[]>;
+  /**
+   * Lists maker-scoped terminology aliases ordered by label.
+   *
+   * @returns Registered terminology aliases.
+   */
+  listTerminologyAliases(): Promise<CatalogTerminologyAlias[]>;
   /**
    * Lists products.
    *
@@ -1146,6 +1635,12 @@ export type UserCollectionItem = {
    * Whether the viewer may edit the record.
    */
   canEdit: boolean;
+  /** Live reviewed compatibility families on the source product. */
+  compatibilityFamilies: CatalogCompatibilityFamily[];
+  /** Exact spinner-button product included with the source spinner. */
+  compatibleButtonId: number | null;
+  /** Display name of the included spinner button, when present. */
+  compatibleButtonName: string | null;
   /**
    * Collection is private.
    */
@@ -1186,6 +1681,8 @@ export type UserCollectionItem = {
    * Images ordered for display.
    */
   images: CatalogImage[];
+  /** Live exact components sold with the source product. */
+  includedComponents: CatalogIncludedComponent[];
   /**
    * Whether the record is private.
    */
@@ -1202,6 +1699,18 @@ export type UserCollectionItem = {
    * Installed button identifier.
    */
   installedButtonId: number | null;
+  /** Whether any uninterrupted slider-component installation no longer matches current compatibility metadata. */
+  hasGrandfatheredInstallation: boolean;
+  /** Effective physical or catalog-derived setup for an owned slider. */
+  effectiveSliderSetup: EffectiveSliderSetup | null;
+  /** Installed slider insert collection-item identifier. */
+  installedInsertId: number | null;
+  /** Slider collection-item identifier that currently hosts this component. */
+  installedOnSliderId: number | null;
+  /** Installed slider plate collection-item identifier. */
+  installedPlateId: number | null;
+  /** Durable setup recorded on an owned insert, or `null` for live defaults. */
+  ownedInsertSetup: OwnedSliderInsertSetup | null;
   /**
    * Maker identifier.
    */
@@ -1517,6 +2026,35 @@ export type CollectionsService = {
      * New collection.
      */
     newCollection?: CollectionWriteInput | null;
+  }): Promise<number>;
+  /**
+   * Adds one standalone slider, plate set, or insert set to a collection.
+   *
+   * @param input - Collection, exact catalog product, appearance snapshot, and actor.
+   * @returns Identifier of the created collection item.
+   * @rejects When the product type, material, authorization, persistence, auditing, or logging fails.
+   */
+  addSliderProduct(input: {
+    /** Authenticated actor. */
+    actor: Actor;
+    /** Collection identifier. */
+    collectionId?: number | null;
+    /** Optional custom finish snapshot. */
+    customFinish: ProductWriteFinishOption | null;
+    /** Optional description override. */
+    description?: string | null;
+    /** Display name override. */
+    displayName: string;
+    /** Optional catalog finish option to snapshot. */
+    finishOptionId: number | null;
+    /** Required selected material. */
+    materialId: number;
+    /** Optional collection created with the item. */
+    newCollection?: CollectionWriteInput | null;
+    /** Exact catalog product identifier. */
+    productId: number;
+    /** Exact standalone slider product subtype. */
+    productTypeSlug: "slider" | "slider-insert" | "slider-plate";
   }): Promise<number>;
   /**
    * Creates collection.
@@ -1846,6 +2384,25 @@ export type CollectionsService = {
        */
       materialId: number;
     } | null;
+    /** Slider insert to install, or `null` to detach the current insert. */
+    installedInsert?: {
+      /** Owned slider insert collection-item identifier. */
+      collectionItemId: number;
+    } | null;
+    /** Slider plate to install, or `null` to detach the current plate. */
+    installedPlate?: {
+      /** Owned slider plate collection-item identifier. */
+      collectionItemId: number;
+    } | null;
+    /** Owned insert setup snapshot, or `null` to return to live defaults. */
+    insertSetup?: {
+      /** Current exact-product click option selected by the owner. */
+      clickOptionId: number | null;
+      /** Owner-recorded configuration, including explicit unknown positions. */
+      configuration: OwnedMagnetConfiguration | null;
+      /** Current exact-product offer copied as the authoring source. */
+      sourceOfferId: number | null;
+    } | null;
     /**
      * Material identifier.
      */
@@ -1893,6 +2450,81 @@ export function createCatalogService(
 ): CatalogService {
   return {
     /**
+     * Creates an audited maker-scoped catalog terminology alias.
+     *
+     * @param input - Alias concept, label, maker, preference, and actor.
+     * @returns Created terminology alias.
+     * @rejects When authorization, validation, persistence, auditing, or logging fails.
+     */
+    async createTerminologyAlias(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      if (input.canonicalNamespace !== "product-type")
+        throw new Error("Catalog terminology namespace is not registered.");
+      const canonicalKey = catalogProductType(input.canonicalKey);
+      const label = input.label.trim();
+      const normalizedValue = normalizeCatalogSearch(label);
+      if (!label || label.length > 80 || !normalizedValue)
+        throw new Error("Alias must be between 1 and 80 characters.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await loggedMutation(
+        logger,
+        loggerMessages.database.catalog.createTerminologyAlias,
+        () =>
+          db.transaction(async (tx) => {
+            const [makerRow] = await tx
+              .select({ id: schema.maker.id, name: schema.maker.name })
+              .from(schema.maker)
+              .where(eq(schema.maker.id, input.makerId))
+              .limit(1);
+            if (!makerRow) throw new Error("Maker does not exist.");
+            const [row] = await tx
+              .insert(schema.catalogTerminologyAlias)
+              .values({
+                canonicalKey,
+                canonicalNamespace: input.canonicalNamespace,
+                isPreferred: input.isPreferred,
+                label,
+                makerId: input.makerId,
+                normalizedValue,
+              })
+              .returning()
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create terminology alias.");
+            const result: CatalogTerminologyAlias = {
+              ...row,
+              canonicalKey,
+              canonicalNamespace: "product-type",
+              makerName: makerRow.name,
+            };
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: {
+                  canonicalKey,
+                  canonicalNamespace: "product-type",
+                  isPreferred: row.isPreferred,
+                  label: row.label,
+                  makerId: row.makerId,
+                  normalizedValue: row.normalizedValue,
+                },
+                definition: productAudit.terminologyAliasCreated,
+                targetId: row.id,
+              });
+            }
+            return result;
+          }),
+        actorAttributes(input.actor.clerkId, {
+          canonicalKey,
+          makerId: input.makerId,
+        }),
+      );
+    },
+    /**
      * Attaches images.
      *
      * @param input - Target, uploaded files, and authenticated actor.
@@ -1934,6 +2566,8 @@ export function createCatalogService(
             );
             const before = await collectionImageState(tx, input.target);
             await attachStoredImages(tx, input);
+            if (input.target.type === "product" && input.files.length)
+              await touchProductUpdatedAt(tx, input.target.id);
             if (collectionContext) {
               const after = await collectionImageState(tx, input.target);
               if (!collectionDependencies || !actorUser)
@@ -2027,6 +2661,139 @@ export function createCatalogService(
               reason: input.reason,
               targetId: input.collectionId,
             });
+          }),
+        actorAttributes(input.actor.clerkId),
+      );
+    },
+    /**
+     * Creates a reviewed maker-scoped compatibility family.
+     *
+     * @param input - Family maker, name, slug, and authenticated catalog manager.
+     * @returns Created compatibility family.
+     * @rejects When authorization, validation, persistence, auditing, or logging fails.
+     */
+    async createCompatibilityFamily(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await logger.operation(
+        loggerMessages.database.catalog.createCompatibilityFamily,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [makerRow] = await tx
+              .select({ id: schema.maker.id, name: schema.maker.name })
+              .from(schema.maker)
+              .where(eq(schema.maker.id, input.makerId))
+              .limit(1);
+            if (!makerRow) throw new Error("Maker does not exist.");
+            const [row] = await tx
+              .insert(schema.compatibilityFamily)
+              .values({
+                makerId: input.makerId,
+                name: input.name,
+                slug: input.slug,
+              })
+              .returning({
+                id: schema.compatibilityFamily.id,
+                makerId: schema.compatibilityFamily.makerId,
+                name: schema.compatibilityFamily.name,
+                slug: schema.compatibilityFamily.slug,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create compatibility family.");
+            const result = { ...row, makerName: makerRow.name };
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: result,
+                definition: productAudit.compatibilityFamilyCreated,
+                targetId: row.id,
+              });
+            }
+            return result;
+          }),
+        actorAttributes(input.actor.clerkId, { slug: input.slug }),
+      );
+    },
+    /**
+     * Creates an audited catalog-manager configuration template.
+     *
+     * @param input - Template scope, exact configuration, and actor.
+     * @returns Created reusable authoring template.
+     * @rejects When authorization, validation, persistence, auditing, or logging fails.
+     */
+    async createMagnetConfigurationTemplate(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const name = normalizeRequiredVocabulary(input.name);
+      const normalizedName = normalizeCatalogSearch(name);
+      const configuration = normalizeCatalogMagnetConfiguration(
+        input.configuration,
+      );
+      if (
+        (input.scope === "global" &&
+          (input.makerId !== null || input.compatibilityFamilyId !== null)) ||
+        (input.scope === "maker" &&
+          (input.makerId === null || input.compatibilityFamilyId !== null)) ||
+        (input.scope === "family" &&
+          (input.makerId !== null || input.compatibilityFamilyId === null))
+      ) {
+        throw new Error("Magnet configuration template scope is invalid.");
+      }
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await logger.operation(
+        loggerMessages.database.catalog.createMagnetConfigurationTemplate,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [row] = await tx
+              .insert(schema.magnetConfigurationTemplate)
+              .values({
+                compatibilityFamilyId: input.compatibilityFamilyId,
+                configuration,
+                makerId: input.makerId,
+                name,
+                normalizedName,
+                scope: input.scope,
+              })
+              .returning()
+              .catch(mapCatalogNameConflict);
+            if (!row)
+              throw new Error(
+                "Failed to create magnet configuration template.",
+              );
+            const result: CatalogMagnetConfigurationTemplate = {
+              compatibilityFamilyId: row.compatibilityFamilyId,
+              configuration: normalizeCatalogMagnetConfiguration(
+                row.configuration,
+              ),
+              id: row.id,
+              makerId: row.makerId,
+              name: row.name,
+              scope: row.scope,
+            };
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: {
+                  compatibilityFamilyId: result.compatibilityFamilyId,
+                  configuration: result.configuration,
+                  makerId: result.makerId,
+                  name: result.name,
+                  scope: result.scope,
+                },
+                definition: productAudit.magnetConfigurationTemplateCreated,
+                targetId: row.id,
+              });
+            }
+            return result;
           }),
         actorAttributes(input.actor.clerkId),
       );
@@ -2261,6 +3028,60 @@ export function createCatalogService(
       );
     },
     /**
+     * Creates pattern.
+     *
+     * @param input - Pattern name, slug, and authenticated actor.
+     * @returns Created pattern.
+     * @rejects When validation, authorization, persistence, auditing, or operation logging fails.
+     */
+    async createPattern(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await logger.operation(
+        loggerMessages.database.catalog.createPattern,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [duplicate] = await tx
+              .select({ id: schema.pattern.id })
+              .from(schema.pattern)
+              .where(
+                eq(
+                  sql`lower(${schema.pattern.name})`,
+                  input.name.toLowerCase(),
+                ),
+              )
+              .limit(1);
+            if (duplicate) throw new Error("Pattern name already exists.");
+
+            const [row] = await tx
+              .insert(schema.pattern)
+              .values({ name: input.name, slug: input.slug })
+              .returning({
+                id: schema.pattern.id,
+                name: schema.pattern.name,
+                slug: schema.pattern.slug,
+              })
+              .catch(mapCatalogNameConflict);
+            if (!row) throw new Error("Failed to create pattern.");
+            if (dependencies && actorUser) {
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: row,
+                definition: productAudit.patternCreated,
+                targetId: row.id,
+              });
+            }
+            return row;
+          }),
+        actorAttributes(input.actor.clerkId, { slug: input.slug }),
+      );
+    },
+    /**
      * Creates product.
      *
      * @param input - Product fields, finish options, and authenticated actor.
@@ -2281,6 +3102,8 @@ export function createCatalogService(
             .where(eq(schema.productType.slug, input.productTypeSlug))
             .limit(1);
           if (!type) throw new Error("Product type does not exist.");
+          if (!input.materialIds.length)
+            throw new Error("At least one material is required.");
           await validateFinishOptions(db, input.finishOptions);
 
           const productId = await db.transaction(async (tx) => {
@@ -2322,17 +3145,16 @@ export function createCatalogService(
 
             await replaceProductFinishOptions(tx, row.id, input.finishOptions);
 
-            if (input.productTypeSlug === "spinner") {
-              await tx.insert(schema.productSpinner).values({
-                id: row.id,
-                ...spinnerSpecs(input.specs),
-              });
-            } else {
-              await tx.insert(schema.productSpinnerButton).values({
-                id: row.id,
-                ...buttonSpecs(input.specs),
-              });
-            }
+            await insertProductSubtype(
+              tx,
+              row.id,
+              input.productTypeSlug,
+              input.specs,
+            );
+            await replaceBodyHostedMagnetSetup(tx, row.id, input, true);
+            await replaceInsertHostedMagnetOptions(tx, row.id, input, true);
+            await replaceSliderInsertOffers(tx, row.id, input, true);
+            await replaceProductRelationships(tx, row.id, input);
             if (dependencies && actorUser) {
               const [created] = await queryProducts(
                 tx as unknown as Database,
@@ -2441,7 +3263,6 @@ export function createCatalogService(
                 approvalDecidedAt: occurredAt,
                 approvalDecisionReason: reason,
                 approvalStatus,
-                updatedAt: occurredAt,
               })
               .where(eq(schema.product.id, input.productId));
             await writeProductAdminAudit(audit, tx, {
@@ -2533,6 +3354,17 @@ export function createCatalogService(
               .from(schema.productSpinnerButton)
               .where(eq(schema.productSpinnerButton.id, row.id))
               .for("update");
+            for (const subtype of [
+              schema.productSlider,
+              schema.productSliderPlate,
+              schema.productSliderInsert,
+            ]) {
+              await tx
+                .select({ id: subtype.id })
+                .from(subtype)
+                .where(eq(subtype.id, row.id))
+                .for("update");
+            }
             const finishes = await tx
               .select({ id: schema.finishOption.id })
               .from(schema.finishOption)
@@ -2543,6 +3375,8 @@ export function createCatalogService(
             select 1 from collection_spinner where product_spinner_id = ${row.id}
             union all select 1 from collection_spinner_button where product_spinner_button_id = ${row.id}
             union all select 1 from product_spinner where compatible_button_id = ${row.id}
+            union all select 1 from product_included_component where component_product_id = ${row.id}
+            union all select 1 from product_compatibility_advisory where related_product_id = ${row.id}
             union all select 1 from finish_option selected join finish_option source on source.id = selected.source_product_finish_option_id where source.product_id = ${row.id}
             limit 1`);
             if (references.rows.length) return false;
@@ -2814,6 +3648,105 @@ export function createCatalogService(
       );
     },
     /**
+     * Lists reviewed compatibility families.
+     *
+     * @returns Compatibility families ordered by maker and name.
+     * @rejects When the database query or operation logging fails.
+     */
+    async listCompatibilityFamilies() {
+      return await logger.operation(
+        loggerMessages.database.catalog.listCompatibilityFamilies,
+        async () =>
+          await db
+            .select({
+              id: schema.compatibilityFamily.id,
+              makerId: schema.compatibilityFamily.makerId,
+              makerName: schema.maker.name,
+              name: schema.compatibilityFamily.name,
+              slug: schema.compatibilityFamily.slug,
+            })
+            .from(schema.compatibilityFamily)
+            .innerJoin(
+              schema.maker,
+              eq(schema.compatibilityFamily.makerId, schema.maker.id),
+            )
+            .orderBy(
+              asc(schema.maker.name),
+              asc(schema.compatibilityFamily.name),
+            ),
+      );
+    },
+    /**
+     * Lists exact configuration templates only to catalog managers.
+     *
+     * @param viewer - Viewer whose manager permission controls access.
+     * @returns Visible authoring templates.
+     */
+    async listMagnetConfigurationTemplates(viewer) {
+      if (!hasPermission(viewer, "products.manage")) return [];
+      return await logger.operation(
+        loggerMessages.database.catalog.listMagnetConfigurationTemplates,
+        async () => {
+          const rows = await db
+            .select()
+            .from(schema.magnetConfigurationTemplate)
+            .orderBy(asc(schema.magnetConfigurationTemplate.name));
+          return rows.map(
+            (row): CatalogMagnetConfigurationTemplate => ({
+              compatibilityFamilyId: row.compatibilityFamilyId,
+              configuration: normalizeCatalogMagnetConfiguration(
+                row.configuration,
+              ),
+              id: row.id,
+              makerId: row.makerId,
+              name: row.name,
+              scope: row.scope,
+            }),
+          );
+        },
+      );
+    },
+    /**
+     * Lists maker-scoped terminology aliases ordered by label.
+     *
+     * @returns Registered terminology aliases.
+     */
+    async listTerminologyAliases() {
+      return await logger.operation(
+        loggerMessages.database.catalog.listTerminologyAliases,
+        async () => {
+          const rows = await db
+            .select({
+              canonicalKey: schema.catalogTerminologyAlias.canonicalKey,
+              canonicalNamespace:
+                schema.catalogTerminologyAlias.canonicalNamespace,
+              createdAt: schema.catalogTerminologyAlias.createdAt,
+              id: schema.catalogTerminologyAlias.id,
+              isPreferred: schema.catalogTerminologyAlias.isPreferred,
+              label: schema.catalogTerminologyAlias.label,
+              makerId: schema.catalogTerminologyAlias.makerId,
+              makerName: schema.maker.name,
+              normalizedValue: schema.catalogTerminologyAlias.normalizedValue,
+              updatedAt: schema.catalogTerminologyAlias.updatedAt,
+            })
+            .from(schema.catalogTerminologyAlias)
+            .innerJoin(
+              schema.maker,
+              eq(schema.catalogTerminologyAlias.makerId, schema.maker.id),
+            )
+            .orderBy(
+              asc(schema.catalogTerminologyAlias.label),
+              asc(schema.maker.name),
+            );
+          return rows.map((row) => ({
+            ...row,
+            canonicalKey: catalogProductType(row.canonicalKey),
+            canonicalNamespace: "product-type" as const,
+          }));
+        },
+      );
+    },
+    /**
      * Lists colors.
      *
      * @returns Matching colors.
@@ -2957,6 +3890,26 @@ export function createCatalogService(
             : null;
         },
         actorAttributes(actor.clerkId, { materialId }),
+      );
+    },
+    /**
+     * Lists patterns.
+     *
+     * @returns Matching patterns.
+     * @rejects When the database query or operation logging fails.
+     */
+    async listPatterns() {
+      return await logger.operation(
+        loggerMessages.database.catalog.listPatterns,
+        async () =>
+          await db
+            .select({
+              id: schema.pattern.id,
+              name: schema.pattern.name,
+              slug: schema.pattern.slug,
+            })
+            .from(schema.pattern)
+            .orderBy(asc(schema.pattern.name)),
       );
     },
     /**
@@ -3181,6 +4134,7 @@ export function createCatalogService(
               actorIsModerating,
               isPrivate: input.isPrivate,
               reason: input.reason,
+              touchUpdatedAt: false,
             }),
           )
           .where(eq(schema.product.id, input.productId));
@@ -3303,7 +4257,10 @@ export function createCatalogService(
             }
             await tx
               .update(schema.product)
-              .set({ makerProductUrlValid: input.makerProductUrlValid })
+              .set({
+                makerProductUrlValid: input.makerProductUrlValid,
+                updatedAt: new Date(),
+              })
               .where(eq(schema.product.id, input.productId));
             if (dependencies && actorUser) {
               await writeProductAdminAudit(dependencies.audit, tx, {
@@ -3524,6 +4481,8 @@ export function createCatalogService(
       return await logger.operation(
         loggerMessages.database.catalog.updateProduct,
         async () => {
+          if (!input.materialIds.length)
+            throw new Error("At least one material is required.");
           await validateFinishOptions(db, input.finishOptions);
           await db.transaction(async (tx) => {
             const [existing] = await tx
@@ -3599,6 +4558,7 @@ export function createCatalogService(
                   : {}),
                 name: input.name,
                 slug: input.slug,
+                updatedAt: new Date(),
               })
               .where(eq(schema.product.id, input.productId));
             await tx
@@ -3616,17 +4576,26 @@ export function createCatalogService(
               input.finishOptions,
             );
 
-            if (input.productTypeSlug === "spinner") {
-              await tx
-                .update(schema.productSpinner)
-                .set({ ...spinnerSpecs(input.specs), updatedAt: new Date() })
-                .where(eq(schema.productSpinner.id, input.productId));
-            } else {
-              await tx
-                .update(schema.productSpinnerButton)
-                .set({ ...buttonSpecs(input.specs), updatedAt: new Date() })
-                .where(eq(schema.productSpinnerButton.id, input.productId));
-            }
+            await updateProductSubtype(
+              tx,
+              input.productId,
+              input.productTypeSlug,
+              input.specs,
+            );
+            await replaceBodyHostedMagnetSetup(
+              tx,
+              input.productId,
+              input,
+              false,
+            );
+            await replaceInsertHostedMagnetOptions(
+              tx,
+              input.productId,
+              input,
+              false,
+            );
+            await replaceSliderInsertOffers(tx, input.productId, input, false);
+            await replaceProductRelationships(tx, input.productId, input);
             if (dependencies && actorUser) {
               const [updated] = await queryProducts(
                 tx as unknown as Database,
@@ -3849,10 +4818,10 @@ export function createCollectionsService(
             if (input.buttonProductId !== null) {
               if (
                 input.buttonMaterialId === null ||
-                (input.buttonFinishOptionId === null) ===
-                  (input.buttonCustomFinish === null)
+                (input.buttonFinishOptionId !== null &&
+                  input.buttonCustomFinish !== null)
               ) {
-                throw new Error("Button material and finish are required.");
+                throw new Error("Button material is required.");
               }
               await assertProductMaterial(
                 tx,
@@ -4037,6 +5006,113 @@ export function createCollectionsService(
       );
     },
     /**
+     * Adds one standalone slider product without creating related component items.
+     *
+     * @param input - Exact product, collection, appearance snapshot, and actor.
+     * @returns Identifier of the created collection item.
+     * @rejects When validation, authorization, persistence, auditing, or logging fails.
+     */
+    async addSliderProduct(input) {
+      return await logger.operation(
+        loggerMessages.database.collections.addSliderProduct,
+        async () => {
+          const owner = await users.ensure({ clerkId: input.actor.clerkId });
+          return await db.transaction(async (tx) => {
+            const resolvedCollection = await resolveCollectionForWrite(tx, {
+              collectionId: input.collectionId ?? null,
+              newCollection: input.newCollection ?? null,
+              ownerId: owner.id,
+            });
+            if (resolvedCollection.created) {
+              await writeCollectionAudit(audit, tx, {
+                actor: input.actor,
+                actorUser: owner,
+                after: {
+                  id: resolvedCollection.id,
+                  isPrivate: resolvedCollection.created.isPrivate,
+                  ...validatedCollectionValues(resolvedCollection.created),
+                },
+                definition: collectionAudit.collectionCreated,
+                ownerUserId: owner.id,
+                targetId: resolvedCollection.id,
+              });
+            }
+            await assertProductMaterial(tx, input.productId, input.materialId);
+            const [product] = await tx
+              .select({ slug: schema.productType.slug })
+              .from(schema.product)
+              .innerJoin(
+                schema.productType,
+                eq(schema.product.productTypeId, schema.productType.id),
+              )
+              .where(eq(schema.product.id, input.productId))
+              .limit(1);
+            if (product?.slug !== input.productTypeSlug) {
+              throw new Error("Collection product type does not match.");
+            }
+            const [item] = await tx
+              .insert(schema.collectionItem)
+              .values({
+                collectionId: resolvedCollection.id,
+                ...(input.description !== undefined
+                  ? {
+                      description: normalizeOptionalDescription(
+                        input.description,
+                      ),
+                    }
+                  : {}),
+                displayName: input.displayName,
+                materialId: input.materialId,
+                ownerId: owner.id,
+              })
+              .returning({ id: schema.collectionItem.id });
+            if (!item) throw new Error("Failed to create collection item.");
+            if (input.productTypeSlug === "slider") {
+              await tx.insert(schema.collectionSlider).values({
+                id: item.id,
+                productSliderId: input.productId,
+              });
+            } else if (input.productTypeSlug === "slider-plate") {
+              await tx.insert(schema.collectionSliderPlate).values({
+                id: item.id,
+                productSliderPlateId: input.productId,
+              });
+            } else {
+              await tx.insert(schema.collectionSliderInsert).values({
+                id: item.id,
+                productSliderInsertId: input.productId,
+              });
+            }
+            await createCollectionFinishOption(tx, {
+              collectionItemId: item.id,
+              customFinish: input.customFinish,
+              productFinishOptionId: input.finishOptionId,
+              productId: input.productId,
+            });
+            await touchCollection(tx, resolvedCollection.id);
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser: owner,
+              after: {
+                collectionId: resolvedCollection.id,
+                description: normalizeOptionalDescription(input.description),
+                displayName: input.displayName,
+                id: item.id,
+                materialId: input.materialId,
+                productId: input.productId,
+                productTypeSlug: input.productTypeSlug,
+              },
+              definition: collectionAudit.itemCreated,
+              ownerUserId: owner.id,
+              targetId: item.id,
+            });
+            return item.id;
+          });
+        },
+        actorAttributes(input.actor.clerkId, { productId: input.productId }),
+      );
+    },
+    /**
      * Counts owned products.
      *
      * @param input - Actor and product identifiers to count.
@@ -4053,6 +5129,9 @@ export function createCollectionsService(
           count: count(schema.collectionItem.id),
           spinnerId: schema.collectionSpinner.productSpinnerId,
           buttonId: schema.collectionSpinnerButton.productSpinnerButtonId,
+          sliderId: schema.collectionSlider.productSliderId,
+          sliderInsertId: schema.collectionSliderInsert.productSliderInsertId,
+          sliderPlateId: schema.collectionSliderPlate.productSliderPlateId,
         })
         .from(schema.collectionItem)
         .leftJoin(
@@ -4063,6 +5142,18 @@ export function createCollectionsService(
           schema.collectionSpinnerButton,
           eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
         )
+        .leftJoin(
+          schema.collectionSlider,
+          eq(schema.collectionItem.id, schema.collectionSlider.id),
+        )
+        .leftJoin(
+          schema.collectionSliderPlate,
+          eq(schema.collectionItem.id, schema.collectionSliderPlate.id),
+        )
+        .leftJoin(
+          schema.collectionSliderInsert,
+          eq(schema.collectionItem.id, schema.collectionSliderInsert.id),
+        )
         .where(
           and(
             eq(schema.collectionItem.ownerId, owner.id),
@@ -4072,10 +5163,18 @@ export function createCollectionsService(
         .groupBy(
           schema.collectionSpinner.productSpinnerId,
           schema.collectionSpinnerButton.productSpinnerButtonId,
+          schema.collectionSlider.productSliderId,
+          schema.collectionSliderPlate.productSliderPlateId,
+          schema.collectionSliderInsert.productSliderInsertId,
         );
       const result: Record<number, number> = {};
       for (const row of rows) {
-        const productId = row.spinnerId ?? row.buttonId;
+        const productId =
+          row.spinnerId ??
+          row.buttonId ??
+          row.sliderId ??
+          row.sliderPlateId ??
+          row.sliderInsertId;
         if (productId !== null && productIds.includes(productId)) {
           result[productId] = Number(row.count);
         }
@@ -4348,6 +5447,16 @@ export function createCollectionsService(
               .from(schema.collectionSpinnerButton)
               .where(eq(schema.collectionSpinnerButton.id, item.id))
               .for("update");
+            await tx
+              .select({ id: schema.collectionSliderPlate.id })
+              .from(schema.collectionSliderPlate)
+              .where(eq(schema.collectionSliderPlate.id, item.id))
+              .for("update");
+            await tx
+              .select({ id: schema.collectionSliderInsert.id })
+              .from(schema.collectionSliderInsert)
+              .where(eq(schema.collectionSliderInsert.id, item.id))
+              .for("update");
             const detachedSpinners = await tx
               .select({
                 id: schema.collectionSpinner.id,
@@ -4356,6 +5465,21 @@ export function createCollectionsService(
               .from(schema.collectionSpinner)
               .where(eq(schema.collectionSpinner.installedButtonId, item.id))
               .orderBy(asc(schema.collectionSpinner.id))
+              .for("update");
+            const detachedSliders = await tx
+              .select({
+                id: schema.collectionSlider.id,
+                installedInsertId: schema.collectionSlider.installedInsertId,
+                installedPlateId: schema.collectionSlider.installedPlateId,
+              })
+              .from(schema.collectionSlider)
+              .where(
+                or(
+                  eq(schema.collectionSlider.installedPlateId, item.id),
+                  eq(schema.collectionSlider.installedInsertId, item.id),
+                ),
+              )
+              .orderBy(asc(schema.collectionSlider.id))
               .for("update");
             const [before] = await collectionItemDeletionState(tx, [item.id]);
             if (!before) throw new Error("Collection item does not exist.");
@@ -4378,12 +5502,15 @@ export function createCollectionsService(
               reason,
               targetId: item.id,
               definition: collectionAudit.itemDeleted,
-              before: { ...before, detachedSpinners },
+              before: { ...before, detachedSliders, detachedSpinners },
               after: {
                 deleted: true,
                 collectionId: item.collectionId,
+                detachedSliderIds: detachedSliders.map(({ id }) => id),
                 detachedSpinnerIds: detachedSpinners.map(({ id }) => id),
                 retainedButtonId: before.installedButtonId ?? null,
+                retainedInsertId: before.installedInsertId ?? null,
+                retainedPlateId: before.installedPlateId ?? null,
                 queuedImageCount: new Set(
                   images.map(({ objectPath }) => objectPath),
                 ).size,
@@ -4913,9 +6040,18 @@ export function createCollectionsService(
                 description: schema.collectionItem.description,
                 displayName: schema.collectionItem.displayName,
                 installedButtonId: schema.collectionSpinner.installedButtonId,
+                installedInsertId: schema.collectionSlider.installedInsertId,
+                installedPlateId: schema.collectionSlider.installedPlateId,
+                insertSetup: schema.collectionSliderInsert.setup,
                 isPrivate: schema.collectionItem.isPrivate,
                 materialId: schema.collectionItem.materialId,
+                magnetSystem: schema.productSlider.magnetSystem,
                 ownerId: schema.collectionItem.ownerId,
+                sliderProductId: schema.collectionSlider.productSliderId,
+                sliderInsertProductId:
+                  schema.collectionSliderInsert.productSliderInsertId,
+                sliderPlateProductId:
+                  schema.collectionSliderPlate.productSliderPlateId,
                 spinnerProductId: schema.collectionSpinner.productSpinnerId,
               })
               .from(schema.collectionItem)
@@ -4926,6 +6062,25 @@ export function createCollectionsService(
               .leftJoin(
                 schema.collectionSpinnerButton,
                 eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
+              )
+              .leftJoin(
+                schema.collectionSlider,
+                eq(schema.collectionItem.id, schema.collectionSlider.id),
+              )
+              .leftJoin(
+                schema.productSlider,
+                eq(
+                  schema.collectionSlider.productSliderId,
+                  schema.productSlider.id,
+                ),
+              )
+              .leftJoin(
+                schema.collectionSliderPlate,
+                eq(schema.collectionItem.id, schema.collectionSliderPlate.id),
+              )
+              .leftJoin(
+                schema.collectionSliderInsert,
+                eq(schema.collectionItem.id, schema.collectionSliderInsert.id),
               )
               .where(
                 and(
@@ -4940,7 +6095,12 @@ export function createCollectionsService(
               )
               .limit(1);
             const productId =
-              item?.spinnerProductId ?? item?.buttonProductId ?? null;
+              item?.spinnerProductId ??
+              item?.buttonProductId ??
+              item?.sliderProductId ??
+              item?.sliderPlateProductId ??
+              item?.sliderInsertProductId ??
+              null;
             if (!item || productId === null) {
               throw new Error("Collection item does not exist.");
             }
@@ -4950,6 +6110,9 @@ export function createCollectionsService(
               displayName: item.displayName,
               id: input.collectionItemId,
               installedButtonId: item.installedButtonId,
+              installedInsertId: item.installedInsertId,
+              installedPlateId: item.installedPlateId,
+              insertSetup: item.insertSetup,
               isPrivate: item.isPrivate,
               materialId: item.materialId,
             };
@@ -4969,9 +6132,15 @@ export function createCollectionsService(
               throw new Error("Collection does not exist.");
 
             if (item.collectionId !== targetCollectionId) {
-              const linkedItemIds = [input.collectionItemId];
+              const linkedItemIds = new Set([input.collectionItemId]);
               if (item.installedButtonId !== null) {
-                linkedItemIds.push(item.installedButtonId);
+                linkedItemIds.add(item.installedButtonId);
+              }
+              if (item.installedPlateId !== null) {
+                linkedItemIds.add(item.installedPlateId);
+              }
+              if (item.installedInsertId !== null) {
+                linkedItemIds.add(item.installedInsertId);
               }
               const linkedSpinners = await tx
                 .select({ id: schema.collectionSpinner.id })
@@ -4982,14 +6151,40 @@ export function createCollectionsService(
                     input.collectionItemId,
                   ),
                 );
-              linkedItemIds.push(...linkedSpinners.map(({ id }) => id));
+              for (const { id } of linkedSpinners) linkedItemIds.add(id);
+              const linkedSliders = await tx
+                .select({
+                  id: schema.collectionSlider.id,
+                  installedInsertId: schema.collectionSlider.installedInsertId,
+                  installedPlateId: schema.collectionSlider.installedPlateId,
+                })
+                .from(schema.collectionSlider)
+                .where(
+                  or(
+                    eq(
+                      schema.collectionSlider.installedPlateId,
+                      input.collectionItemId,
+                    ),
+                    eq(
+                      schema.collectionSlider.installedInsertId,
+                      input.collectionItemId,
+                    ),
+                  ),
+                );
+              for (const slider of linkedSliders) {
+                linkedItemIds.add(slider.id);
+                if (slider.installedPlateId !== null)
+                  linkedItemIds.add(slider.installedPlateId);
+                if (slider.installedInsertId !== null)
+                  linkedItemIds.add(slider.installedInsertId);
+              }
               await tx
                 .update(schema.collectionItem)
                 .set({
                   collectionId: targetCollectionId,
                   updatedAt: new Date(),
                 })
-                .where(inArray(schema.collectionItem.id, linkedItemIds));
+                .where(inArray(schema.collectionItem.id, [...linkedItemIds]));
               await Promise.all([
                 touchCollection(tx, item.collectionId),
                 touchCollection(tx, targetCollectionId),
@@ -5093,6 +6288,161 @@ export function createCollectionsService(
                 throw error;
               }
             }
+            if (
+              input.installedPlate !== undefined ||
+              input.installedInsert !== undefined
+            ) {
+              if (item.sliderProductId === null) {
+                throw new Error("Collection item is not a slider.");
+              }
+              if (
+                input.installedInsert !== undefined &&
+                input.installedInsert !== null &&
+                item.magnetSystem !== "insert-driven"
+              ) {
+                throw new Error("Body-hosted sliders cannot install inserts.");
+              }
+              const installedPlateId =
+                input.installedPlate === undefined
+                  ? item.installedPlateId
+                  : (input.installedPlate?.collectionItemId ?? null);
+              const installedInsertId =
+                input.installedInsert === undefined
+                  ? item.installedInsertId
+                  : (input.installedInsert?.collectionItemId ?? null);
+              for (const candidate of [
+                input.installedPlate !== undefined &&
+                input.installedPlate !== null &&
+                input.installedPlate.collectionItemId !== item.installedPlateId
+                  ? {
+                      collectionItemId: input.installedPlate.collectionItemId,
+                      componentType: "plate" as const,
+                    }
+                  : null,
+                input.installedInsert !== undefined &&
+                input.installedInsert !== null &&
+                input.installedInsert.collectionItemId !==
+                  item.installedInsertId
+                  ? {
+                      collectionItemId: input.installedInsert.collectionItemId,
+                      componentType: "insert" as const,
+                    }
+                  : null,
+              ]) {
+                if (!candidate) continue;
+                const component = await validateSliderComponentInstallation(
+                  tx,
+                  {
+                    ...candidate,
+                    ownerId: item.ownerId,
+                    sliderCollectionItemId: input.collectionItemId,
+                    sliderProductId: item.sliderProductId,
+                  },
+                );
+                await tx
+                  .update(schema.collectionItem)
+                  .set({
+                    collectionId: targetCollectionId,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(schema.collectionItem.id, component.id));
+              }
+              try {
+                await tx
+                  .update(schema.collectionSlider)
+                  .set({ installedInsertId, installedPlateId })
+                  .where(
+                    eq(schema.collectionSlider.id, input.collectionItemId),
+                  );
+              } catch (error) {
+                const constraint = uniqueConstraint(error);
+                if (
+                  constraint === "collection_slider_installed_plate_unique" ||
+                  constraint === "collection_slider_installed_insert_unique"
+                ) {
+                  throw new CollectionSliderComponentAlreadyInstalledError();
+                }
+                throw error;
+              }
+            }
+            let normalizedInsertSetup = item.insertSetup;
+            if (input.insertSetup !== undefined) {
+              if (item.sliderInsertProductId === null) {
+                throw new Error("Collection item is not a slider insert.");
+              }
+              let setup: OwnedSliderInsertSetup | null = null;
+              if (input.insertSetup !== null) {
+                const [clickOption, sourceOffer] = await Promise.all([
+                  input.insertSetup.clickOptionId === null
+                    ? null
+                    : tx
+                        .select({
+                          clickCount:
+                            schema.productInsertClickOption.clickCount,
+                        })
+                        .from(schema.productInsertClickOption)
+                        .where(
+                          and(
+                            eq(
+                              schema.productInsertClickOption.id,
+                              input.insertSetup.clickOptionId,
+                            ),
+                            eq(
+                              schema.productInsertClickOption.insertProductId,
+                              item.sliderInsertProductId,
+                            ),
+                          ),
+                        )
+                        .limit(1)
+                        .then(([row]) => row ?? null),
+                  input.insertSetup.sourceOfferId === null
+                    ? null
+                    : tx
+                        .select({ id: schema.productInsertMagnetOffer.id })
+                        .from(schema.productInsertMagnetOffer)
+                        .where(
+                          and(
+                            eq(
+                              schema.productInsertMagnetOffer.id,
+                              input.insertSetup.sourceOfferId,
+                            ),
+                            eq(
+                              schema.productInsertMagnetOffer.insertProductId,
+                              item.sliderInsertProductId,
+                            ),
+                          ),
+                        )
+                        .limit(1)
+                        .then(([row]) => row ?? null),
+                ]);
+                if (input.insertSetup.clickOptionId !== null && !clickOption) {
+                  throw new Error(
+                    "Insert click option does not belong to this product.",
+                  );
+                }
+                if (input.insertSetup.sourceOfferId !== null && !sourceOffer) {
+                  throw new Error(
+                    "Insert setup offer does not belong to this product.",
+                  );
+                }
+                setup = {
+                  clickCount: clickOption?.clickCount ?? null,
+                  configuration: input.insertSetup.configuration
+                    ? normalizeOwnedMagnetConfiguration(
+                        input.insertSetup.configuration,
+                      )
+                    : null,
+                  sourceOfferId: sourceOffer?.id ?? null,
+                };
+              }
+              normalizedInsertSetup = setup;
+              await tx
+                .update(schema.collectionSliderInsert)
+                .set({ setup })
+                .where(
+                  eq(schema.collectionSliderInsert.id, input.collectionItemId),
+                );
+            }
             await touchCollection(tx, targetCollectionId);
             const after = {
               ...before,
@@ -5106,6 +6456,18 @@ export function createCollectionsService(
                 input.installedButton === undefined
                   ? item.installedButtonId
                   : (input.installedButton?.collectionItemId ?? null),
+              installedInsertId:
+                input.installedInsert === undefined
+                  ? item.installedInsertId
+                  : (input.installedInsert?.collectionItemId ?? null),
+              installedPlateId:
+                input.installedPlate === undefined
+                  ? item.installedPlateId
+                  : (input.installedPlate?.collectionItemId ?? null),
+              insertSetup:
+                input.insertSetup === undefined
+                  ? item.insertSetup
+                  : normalizedInsertSetup,
               materialId: input.materialId,
             };
             await writeCollectionAudit(audit, tx, {
@@ -5135,6 +6497,12 @@ export function createCollectionsService(
         actorAttributes(input.actor.clerkId, {
           collectionItemId: input.collectionItemId,
           installedButtonId: input.installedButton?.collectionItemId,
+          installedInsertId: input.installedInsert?.collectionItemId,
+          installedPlateId: input.installedPlate?.collectionItemId,
+          insertSetupRecorded:
+            input.insertSetup === undefined
+              ? undefined
+              : input.insertSetup !== null,
           materialId: input.materialId,
         }),
       );
@@ -5418,9 +6786,21 @@ function requireProductAudit(
  */
 function productAuditState(product: CatalogProduct): AuditJsonObject {
   return {
+    advertisedInsertOffers: product.advertisedInsertOffers.map(
+      ({ id, insertProductId, isSliderAdvertisedDefault }) => ({
+        id,
+        insertProductId,
+        isSliderAdvertisedDefault,
+      }),
+    ),
     bearing: product.bearing,
+    bodyHostedMagnetSetup: product.bodyHostedMagnetSetup ?? null,
     buttonDiameterMm: product.buttonDiameterMm,
     compatibleButtonId: product.compatibleButtonId,
+    compatibilityAdvisories: product.compatibilityAdvisories.map(
+      ({ id, relatedProductId }) => ({ id, relatedProductId }),
+    ),
+    compatibilityFamilyIds: product.compatibilityFamilies.map(({ id }) => id),
     description: product.description,
     diameterMm: product.diameterMm,
     finishOptions: product.finishOptions.map((option) => ({
@@ -5428,14 +6808,19 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
       colorIds: option.colors.map(({ id }) => id),
       finishIds: option.finishes.map(({ id }) => id),
       id: option.id,
+      patternId: option.pattern?.id ?? null,
     })),
     id: product.id,
     imageIds: product.images.map(({ id }) => id),
+    includedComponentIds: product.includedComponents.map(({ id }) => id),
+    insertClickOptions: product.insertClickOptions,
+    insertMagnetOffers: product.insertMagnetOffers,
     isPrivate: product.isPrivate,
     lengthMm: product.lengthMm,
     makerId: product.makerId,
     makerProductUrl: product.makerProductUrl,
     makerProductUrlValid: product.makerProductUrlValid,
+    magnetSystem: product.magnetSystem,
     materialIds: product.materials.map(({ id }) => id),
     name: product.name,
     productTypeId: product.productTypeId,
@@ -5445,6 +6830,7 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     thicknessMm: product.thicknessMm,
     thicknessWithButtonMm: product.thicknessWithButtonMm,
     weightG: product.weightG,
+    weightBasis: product.weightBasis,
     widthMm: product.widthMm,
   };
 }
@@ -5842,25 +7228,17 @@ async function updateCollectionItemSnapshot(
     .set({ materialId: input.materialId })
     .where(eq(schema.collectionItem.id, input.collectionItemId));
 
+  await tx
+    .delete(schema.finishOption)
+    .where(eq(schema.finishOption.collectionItemId, input.collectionItemId));
   if (input.customFinish !== null || input.finishOptionId !== null) {
-    await tx
-      .delete(schema.finishOption)
-      .where(eq(schema.finishOption.collectionItemId, input.collectionItemId));
     await createCollectionFinishOption(tx, {
       collectionItemId: input.collectionItemId,
       customFinish: input.customFinish,
       productFinishOptionId: input.finishOptionId,
       productId: input.productId,
     });
-    return;
   }
-
-  const [finish] = await tx
-    .select({ id: schema.finishOption.id })
-    .from(schema.finishOption)
-    .where(eq(schema.finishOption.collectionItemId, input.collectionItemId))
-    .limit(1);
-  if (!finish) throw new Error("A finish is required.");
 }
 
 /**
@@ -5932,19 +7310,24 @@ async function queryProducts(
       buttonDiameterMm: schema.productSpinner.buttonDiameterMm,
       compatibleButtonId: schema.productSpinner.compatibleButtonId,
       compatibleButtonName: compatibleButtonProduct.name,
-      createdAt: sql<Date>`coalesce(${schema.productSpinner.createdAt}, ${schema.productSpinnerButton.createdAt})`,
+      createdAt: sql<Date>`coalesce(${schema.productSpinner.createdAt}, ${schema.productSpinnerButton.createdAt}, ${schema.productSlider.createdAt}, ${schema.productSliderPlate.createdAt}, ${schema.productSliderInsert.createdAt})`,
       description: schema.product.description,
       diameterMm: schema.productSpinnerButton.diameterMm,
+      inherentClickCount: schema.productSlider.inherentClickCount,
       id: schema.product.id,
       isPrivate: schema.product.isPrivate,
       privatedByClerkId: schema.product.privatedByClerkId,
-      lengthMm: schema.productSpinner.lengthMm,
+      lengthMm: sql<
+        string | null
+      >`coalesce(${schema.productSpinner.lengthMm}, ${schema.productSlider.lengthMm}, ${schema.productSliderPlate.lengthMm}, ${schema.productSliderInsert.lengthMm})`,
       makerId: schema.maker.id,
       makerName: schema.maker.name,
       makerSlug: schema.maker.slug,
       makerProductUrl: schema.product.makerProductUrl,
       makerProductUrlValid: schema.product.makerProductUrlValid,
       makerUrl: schema.maker.rootUrl,
+      magnetSystem: schema.productSlider.magnetSystem,
+      magnetSetupSourceNote: schema.productSlider.magnetSetupSourceNote,
       materialId: schema.material.id,
       materialName: schema.material.name,
       materialSlug: schema.material.slug,
@@ -5957,13 +7340,16 @@ async function queryProducts(
       spinDiameterMm: schema.productSpinner.spinDiameterMm,
       thicknessMm: sql<
         string | null
-      >`coalesce(${schema.productSpinner.thicknessMm}, ${schema.productSpinnerButton.thicknessMm})`,
+      >`coalesce(${schema.productSpinner.thicknessMm}, ${schema.productSpinnerButton.thicknessMm}, ${schema.productSlider.thicknessMm}, ${schema.productSliderPlate.thicknessMm}, ${schema.productSliderInsert.thicknessMm})`,
       thicknessWithButtonMm: schema.productSpinner.thicknessWithButtonMm,
-      updatedAt: sql<Date>`coalesce(${schema.productSpinner.updatedAt}, ${schema.productSpinnerButton.updatedAt})`,
+      updatedAt: schema.product.updatedAt,
       weightG: sql<
         string | null
-      >`coalesce(${schema.productSpinner.weightG}, ${schema.productSpinnerButton.weightG})`,
-      widthMm: schema.productSpinner.widthMm,
+      >`coalesce(${schema.productSpinner.weightG}, ${schema.productSpinnerButton.weightG}, ${schema.productSlider.weightG}, ${schema.productSliderPlate.weightG}, ${schema.productSliderInsert.weightG})`,
+      weightBasis: schema.productSlider.weightBasis,
+      widthMm: sql<
+        string | null
+      >`coalesce(${schema.productSpinner.widthMm}, ${schema.productSlider.widthMm}, ${schema.productSliderPlate.widthMm}, ${schema.productSliderInsert.widthMm})`,
     })
     .from(schema.product)
     .innerJoin(schema.maker, eq(schema.product.makerId, schema.maker.id))
@@ -5988,11 +7374,28 @@ async function queryProducts(
       eq(schema.product.id, schema.productSpinnerButton.id),
     )
     .leftJoin(
+      schema.productSlider,
+      eq(schema.product.id, schema.productSlider.id),
+    )
+    .leftJoin(
+      schema.productSliderPlate,
+      eq(schema.product.id, schema.productSliderPlate.id),
+    )
+    .leftJoin(
+      schema.productSliderInsert,
+      eq(schema.product.id, schema.productSliderInsert.id),
+    )
+    .leftJoin(
       compatibleButtonProduct,
       eq(schema.productSpinner.compatibleButtonId, compatibleButtonProduct.id),
     )
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(asc(schema.product.name), asc(schema.material.name));
+    .orderBy(
+      desc(schema.product.updatedAt),
+      asc(schema.product.name),
+      asc(schema.product.id),
+      asc(schema.material.name),
+    );
 
   const products = new Map<number, CatalogProduct>();
   for (const row of rows) {
@@ -6009,7 +7412,16 @@ async function queryProducts(
     }
     products.set(row.id, {
       approvalStatus: row.approvalStatus,
+      advertisedInsertOffers: [],
       bearing: row.bearing,
+      bodyHostedMagnetSetup:
+        row.magnetSystem === "body-hosted"
+          ? {
+              clickCount: row.inherentClickCount,
+              configuration: null,
+              sourceNote: row.magnetSetupSourceNote,
+            }
+          : null,
       buttonDiameterMm: row.buttonDiameterMm,
       compatibleButtonId: row.compatibleButtonId,
       compatibleButtonName: row.compatibleButtonName,
@@ -6018,12 +7430,17 @@ async function queryProducts(
         viewer?.clerkId === row.ownerClerkId ||
           hasPermission(viewer, "products.manage"),
       ),
+      compatibilityAdvisories: [],
+      compatibilityFamilies: [],
       createdAt: row.createdAt,
       description: row.description,
       diameterMm: row.diameterMm,
       finishOptions: [],
       imageCount: 0,
       images: [],
+      includedComponents: [],
+      insertClickOptions: [],
+      insertMagnetOffers: [],
       id: row.id,
       lengthMm: row.lengthMm,
       makerId: row.makerId,
@@ -6032,6 +7449,7 @@ async function queryProducts(
       makerProductUrl: row.makerProductUrl,
       makerProductUrlValid: row.makerProductUrlValid,
       makerUrl: row.makerUrl,
+      magnetSystem: row.magnetSystem,
       materials:
         row.materialId && row.materialName && row.materialSlug
           ? [
@@ -6052,13 +7470,14 @@ async function queryProducts(
       isOwner: viewer?.clerkId === row.ownerClerkId,
       productTypeId: row.productTypeId,
       productTypeName: row.productTypeName,
-      productTypeSlug: row.productTypeSlug,
+      productTypeSlug: catalogProductType(row.productTypeSlug),
       slug: row.slug,
       spinDiameterMm: row.spinDiameterMm,
       thicknessMm: row.thicknessMm,
       thicknessWithButtonMm: row.thicknessWithButtonMm,
       updatedAt: row.updatedAt,
       weightG: row.weightG,
+      weightBasis: row.weightBasis,
       widthMm: row.widthMm,
     });
   }
@@ -6066,8 +7485,497 @@ async function queryProducts(
   await Promise.all([
     loadFinishOptions(db, result),
     loadProductImages(db, result, viewer),
+    loadProductRelationships(db, result, viewer),
+    loadProductMagnetConfigurations(db, result),
+    loadInsertHostedMagnetOptions(db, result, viewer),
   ]);
   return result;
+}
+
+/**
+ * Hydrates complete body-hosted magnet configurations without inferring gaps.
+ *
+ * @param db - Database used for exact configuration reads.
+ * @param products - Products receiving their live catalog setup.
+ * @rejects When exact configuration rows cannot be queried.
+ */
+async function loadProductMagnetConfigurations(
+  db: Pick<Database, "select">,
+  products: CatalogProduct[],
+) {
+  const bodyHosted = products.filter(
+    (product) => product.bodyHostedMagnetSetup,
+  );
+  if (!bodyHosted.length) return;
+  const productIds = bodyHosted.map(({ id }) => id);
+  const configurations = await db
+    .select({
+      label: schema.magnetConfigurationLabel.name,
+      productId: schema.productMagnetConfiguration.productId,
+      sourceLabel: schema.productMagnetConfiguration.sourceLabel,
+      sourceNotes: schema.productMagnetConfiguration.sourceNotes,
+    })
+    .from(schema.productMagnetConfiguration)
+    .innerJoin(
+      schema.magnetConfigurationLabel,
+      eq(
+        schema.productMagnetConfiguration.configurationLabelId,
+        schema.magnetConfigurationLabel.id,
+      ),
+    )
+    .where(inArray(schema.productMagnetConfiguration.productId, productIds));
+  if (!configurations.length) return;
+  const configurationIds = configurations.map(({ productId }) => productId);
+  const [groups, slots] = await Promise.all([
+    db
+      .select({
+        configurationProductId:
+          schema.productMagnetGroup.configurationProductId,
+        diameterMm: schema.productMagnetGroup.diameterMm,
+        grade: schema.productMagnetGroup.grade,
+        key: schema.productMagnetGroup.groupKey,
+        label: schema.magnetGroupLabel.name,
+        thicknessMm: schema.productMagnetGroup.thicknessMm,
+      })
+      .from(schema.productMagnetGroup)
+      .innerJoin(
+        schema.magnetGroupLabel,
+        eq(schema.productMagnetGroup.groupLabelId, schema.magnetGroupLabel.id),
+      )
+      .where(
+        inArray(
+          schema.productMagnetGroup.configurationProductId,
+          configurationIds,
+        ),
+      )
+      .orderBy(asc(schema.productMagnetGroup.displayOrder)),
+    db
+      .select({
+        configurationProductId: schema.productMagnetSlot.configurationProductId,
+        documentedColumn: schema.productMagnetSlot.documentedColumn,
+        documentedRow: schema.productMagnetSlot.documentedRow,
+        groupKey: schema.productMagnetGroup.groupKey,
+        half: schema.productMagnetSlot.half,
+        key: schema.productMagnetSlot.slotKey,
+        state: schema.productMagnetSlot.state,
+      })
+      .from(schema.productMagnetSlot)
+      .leftJoin(
+        schema.productMagnetGroup,
+        and(
+          eq(schema.productMagnetSlot.groupId, schema.productMagnetGroup.id),
+          eq(
+            schema.productMagnetSlot.configurationProductId,
+            schema.productMagnetGroup.configurationProductId,
+          ),
+        ),
+      )
+      .where(
+        inArray(
+          schema.productMagnetSlot.configurationProductId,
+          configurationIds,
+        ),
+      )
+      .orderBy(asc(schema.productMagnetSlot.displayOrder)),
+  ]);
+  const byProductId = new Map(
+    bodyHosted.map((product) => [product.id, product]),
+  );
+  for (const configuration of configurations) {
+    const setup = byProductId.get(
+      configuration.productId,
+    )?.bodyHostedMagnetSetup;
+    if (!setup) continue;
+    setup.configuration = {
+      groups: groups
+        .filter(
+          ({ configurationProductId }) =>
+            configurationProductId === configuration.productId,
+        )
+        .map((group) => ({
+          diameterMm: group.diameterMm,
+          grade: group.grade,
+          key: group.key,
+          label: group.label,
+          thicknessMm: group.thicknessMm,
+        })),
+      label: configuration.label,
+      slots: slots
+        .filter(
+          ({ configurationProductId }) =>
+            configurationProductId === configuration.productId,
+        )
+        .map((slot) => ({
+          documentedColumn: slot.documentedColumn,
+          documentedRow: slot.documentedRow,
+          groupKey: slot.groupKey,
+          half: slot.half,
+          key: slot.key,
+          state: slot.state,
+        })),
+      sourceLabel: configuration.sourceLabel,
+      sourceNotes: configuration.sourceNotes,
+    };
+  }
+}
+
+/**
+ * Hydrates insert-owned options and slider-specific advertised offers.
+ *
+ * @param db - Database used for option and offer reads.
+ * @param products - Products receiving hydrated insert-hosted data.
+ * @param viewer - Viewer controlling associated insert-product visibility.
+ * @rejects When insert option or offer data cannot be queried.
+ */
+async function loadInsertHostedMagnetOptions(
+  db: Pick<Database, "select">,
+  products: CatalogProduct[],
+  viewer?: CatalogViewer,
+) {
+  const inserts = products.filter(
+    ({ productTypeSlug }) => productTypeSlug === "slider-insert",
+  );
+  const sliders = products.filter(
+    ({ productTypeSlug }) => productTypeSlug === "slider",
+  );
+  const byProductId = new Map(products.map((product) => [product.id, product]));
+
+  if (inserts.length) {
+    const insertIds = inserts.map(({ id }) => id);
+    const clickOptions = await db
+      .select({
+        clickCount: schema.productInsertClickOption.clickCount,
+        id: schema.productInsertClickOption.id,
+        insertionPosition: schema.productInsertClickOption.insertionPosition,
+        insertProductId: schema.productInsertClickOption.insertProductId,
+      })
+      .from(schema.productInsertClickOption)
+      .where(
+        inArray(schema.productInsertClickOption.insertProductId, insertIds),
+      )
+      .orderBy(asc(schema.productInsertClickOption.insertionPosition));
+    for (const option of clickOptions) {
+      byProductId.get(option.insertProductId)?.insertClickOptions.push({
+        clickCount: option.clickCount,
+        id: option.id,
+        insertionPosition: option.insertionPosition,
+      });
+    }
+  }
+
+  const associationRows = sliders.length
+    ? await db
+        .select({
+          insertOfferId: schema.productSliderInsertOffer.insertOfferId,
+          isSliderAdvertisedDefault:
+            schema.productSliderInsertOffer.isAdvertisedDefault,
+          sliderProductId: schema.productSliderInsertOffer.sliderProductId,
+        })
+        .from(schema.productSliderInsertOffer)
+        .where(
+          inArray(
+            schema.productSliderInsertOffer.sliderProductId,
+            sliders.map(({ id }) => id),
+          ),
+        )
+    : [];
+  const insertIds = inserts.map(({ id }) => id);
+  const associatedOfferIds = associationRows.map(
+    ({ insertOfferId }) => insertOfferId,
+  );
+  if (!insertIds.length && !associatedOfferIds.length) return;
+  const offerCondition = and(
+    insertIds.length
+      ? inArray(schema.productInsertMagnetOffer.insertProductId, insertIds)
+      : undefined,
+  );
+  const offerVisibility = hasPermission(viewer, "products.manage")
+    ? undefined
+    : viewer?.clerkId
+      ? sql`((${schema.product.approvalStatus} = 'approved' and ${schema.product.isPrivate} = false) or ${schema.product.ownerClerkId} = ${viewer.clerkId})`
+      : and(
+          eq(schema.product.approvalStatus, "approved"),
+          eq(schema.product.isPrivate, false),
+        );
+  const offers = await db
+    .select({
+      clickCount: schema.productInsertClickOption.clickCount,
+      clickOptionId: schema.productInsertMagnetOffer.clickOptionId,
+      copiedFromTemplateId:
+        schema.productInsertMagnetOffer.copiedFromTemplateId,
+      id: schema.productInsertMagnetOffer.id,
+      insertProductId: schema.productInsertMagnetOffer.insertProductId,
+      insertProductName: schema.product.name,
+      isAdvertisedDefault: schema.productInsertMagnetOffer.isAdvertisedDefault,
+      label: schema.magnetConfigurationLabel.name,
+      sourceLabel: schema.productInsertMagnetOffer.sourceLabel,
+      sourceNotes: schema.productInsertMagnetOffer.sourceNotes,
+    })
+    .from(schema.productInsertMagnetOffer)
+    .innerJoin(
+      schema.product,
+      eq(schema.productInsertMagnetOffer.insertProductId, schema.product.id),
+    )
+    .innerJoin(
+      schema.magnetConfigurationLabel,
+      eq(
+        schema.productInsertMagnetOffer.configurationLabelId,
+        schema.magnetConfigurationLabel.id,
+      ),
+    )
+    .leftJoin(
+      schema.productInsertClickOption,
+      eq(
+        schema.productInsertMagnetOffer.clickOptionId,
+        schema.productInsertClickOption.id,
+      ),
+    )
+    .where(
+      and(
+        insertIds.length && associatedOfferIds.length
+          ? or(
+              offerCondition,
+              inArray(schema.productInsertMagnetOffer.id, associatedOfferIds),
+            )
+          : insertIds.length
+            ? offerCondition
+            : inArray(schema.productInsertMagnetOffer.id, associatedOfferIds),
+        offerVisibility,
+      ),
+    );
+  if (!offers.length) return;
+  const offerIds = offers.map(({ id }) => id);
+  const [groups, slots] = await Promise.all([
+    db
+      .select({
+        diameterMm: schema.productInsertMagnetGroup.diameterMm,
+        grade: schema.productInsertMagnetGroup.grade,
+        key: schema.productInsertMagnetGroup.groupKey,
+        label: schema.magnetGroupLabel.name,
+        offerId: schema.productInsertMagnetGroup.offerId,
+        thicknessMm: schema.productInsertMagnetGroup.thicknessMm,
+      })
+      .from(schema.productInsertMagnetGroup)
+      .innerJoin(
+        schema.magnetGroupLabel,
+        eq(
+          schema.productInsertMagnetGroup.groupLabelId,
+          schema.magnetGroupLabel.id,
+        ),
+      )
+      .where(inArray(schema.productInsertMagnetGroup.offerId, offerIds))
+      .orderBy(asc(schema.productInsertMagnetGroup.displayOrder)),
+    db
+      .select({
+        documentedColumn: schema.productInsertMagnetSlot.documentedColumn,
+        documentedRow: schema.productInsertMagnetSlot.documentedRow,
+        groupKey: schema.productInsertMagnetGroup.groupKey,
+        half: schema.productInsertMagnetSlot.half,
+        key: schema.productInsertMagnetSlot.slotKey,
+        offerId: schema.productInsertMagnetSlot.offerId,
+        state: schema.productInsertMagnetSlot.state,
+      })
+      .from(schema.productInsertMagnetSlot)
+      .leftJoin(
+        schema.productInsertMagnetGroup,
+        and(
+          eq(
+            schema.productInsertMagnetSlot.groupId,
+            schema.productInsertMagnetGroup.id,
+          ),
+          eq(
+            schema.productInsertMagnetSlot.offerId,
+            schema.productInsertMagnetGroup.offerId,
+          ),
+        ),
+      )
+      .where(inArray(schema.productInsertMagnetSlot.offerId, offerIds))
+      .orderBy(asc(schema.productInsertMagnetSlot.displayOrder)),
+  ]);
+  const hydrated = new Map<number, CatalogInsertMagnetOffer>();
+  for (const offer of offers) {
+    const value: CatalogInsertMagnetOffer = {
+      clickCount: offer.clickCount,
+      clickOptionId: offer.clickOptionId,
+      configuration: {
+        groups: groups
+          .filter(({ offerId }) => offerId === offer.id)
+          .map((group) => ({
+            diameterMm: group.diameterMm,
+            grade: group.grade,
+            key: group.key,
+            label: group.label,
+            thicknessMm: group.thicknessMm,
+          })),
+        label: offer.label,
+        slots: slots
+          .filter(({ offerId }) => offerId === offer.id)
+          .map((slot) => ({
+            documentedColumn: slot.documentedColumn,
+            documentedRow: slot.documentedRow,
+            groupKey: slot.groupKey,
+            half: slot.half,
+            key: slot.key,
+            state: slot.state,
+          })),
+        sourceLabel: offer.sourceLabel,
+        sourceNotes: offer.sourceNotes,
+      },
+      copiedFromTemplateId: offer.copiedFromTemplateId,
+      id: offer.id,
+      insertProductId: offer.insertProductId,
+      isAdvertisedDefault: offer.isAdvertisedDefault,
+    };
+    hydrated.set(offer.id, value);
+    byProductId.get(offer.insertProductId)?.insertMagnetOffers.push(value);
+  }
+  for (const association of associationRows) {
+    const offer = hydrated.get(association.insertOfferId);
+    const slider = byProductId.get(association.sliderProductId);
+    const insertName = offers.find(
+      ({ id }) => id === association.insertOfferId,
+    )?.insertProductName;
+    if (!offer || !slider || !insertName) continue;
+    slider.advertisedInsertOffers.push({
+      ...offer,
+      insertProductName: insertName,
+      isSliderAdvertisedDefault: association.isSliderAdvertisedDefault,
+    });
+  }
+}
+
+/**
+ * Loads reviewed compatibility and visible exact inclusion relationships.
+ *
+ * @param db - Database used for relationship queries.
+ * @param products - Hydrated products receiving relationship data.
+ * @param viewer - Optional viewer controlling related-product visibility.
+ * @rejects When a relationship query fails.
+ */
+async function loadProductRelationships(
+  db: Pick<Database, "select">,
+  products: CatalogProduct[],
+  viewer?: CatalogViewer,
+) {
+  if (!products.length) return;
+  const productIds = products.map(({ id }) => id);
+  const relatedProduct = alias(schema.product, "relationship_related_product");
+  const relatedType = alias(schema.productType, "relationship_related_type");
+  const relatedVisibility = hasPermission(viewer, "products.manage")
+    ? undefined
+    : viewer?.clerkId
+      ? sql`((${relatedProduct.approvalStatus} = 'approved' and ${relatedProduct.isPrivate} = false) or ${relatedProduct.ownerClerkId} = ${viewer.clerkId})`
+      : and(
+          eq(relatedProduct.approvalStatus, "approved"),
+          eq(relatedProduct.isPrivate, false),
+        );
+  const [families, advisories, components] = await Promise.all([
+    db
+      .select({
+        id: schema.compatibilityFamily.id,
+        makerId: schema.compatibilityFamily.makerId,
+        makerName: schema.maker.name,
+        name: schema.compatibilityFamily.name,
+        productId: schema.productCompatibilityFamily.productId,
+        slug: schema.compatibilityFamily.slug,
+      })
+      .from(schema.productCompatibilityFamily)
+      .innerJoin(
+        schema.compatibilityFamily,
+        eq(
+          schema.productCompatibilityFamily.compatibilityFamilyId,
+          schema.compatibilityFamily.id,
+        ),
+      )
+      .innerJoin(
+        schema.maker,
+        eq(schema.compatibilityFamily.makerId, schema.maker.id),
+      )
+      .where(inArray(schema.productCompatibilityFamily.productId, productIds))
+      .orderBy(asc(schema.maker.name), asc(schema.compatibilityFamily.name)),
+    db
+      .select({
+        id: schema.productCompatibilityAdvisory.id,
+        productId: schema.productCompatibilityAdvisory.productId,
+        relatedProductId: schema.productCompatibilityAdvisory.relatedProductId,
+        relatedProductName: relatedProduct.name,
+        reviewedAt: schema.productCompatibilityAdvisory.reviewedAt,
+        text: schema.productCompatibilityAdvisory.text,
+      })
+      .from(schema.productCompatibilityAdvisory)
+      .innerJoin(
+        relatedProduct,
+        eq(
+          schema.productCompatibilityAdvisory.relatedProductId,
+          relatedProduct.id,
+        ),
+      )
+      .where(
+        and(
+          inArray(schema.productCompatibilityAdvisory.productId, productIds),
+          relatedVisibility,
+        ),
+      )
+      .orderBy(asc(schema.productCompatibilityAdvisory.id)),
+    db
+      .select({
+        id: relatedProduct.id,
+        name: relatedProduct.name,
+        productId: schema.productIncludedComponent.productId,
+        productTypeSlug: relatedType.slug,
+        slug: relatedProduct.slug,
+      })
+      .from(schema.productIncludedComponent)
+      .innerJoin(
+        relatedProduct,
+        eq(
+          schema.productIncludedComponent.componentProductId,
+          relatedProduct.id,
+        ),
+      )
+      .innerJoin(relatedType, eq(relatedProduct.productTypeId, relatedType.id))
+      .where(
+        and(
+          inArray(schema.productIncludedComponent.productId, productIds),
+          relatedVisibility,
+        ),
+      )
+      .orderBy(asc(relatedProduct.name)),
+  ]);
+  const productsById = new Map(
+    products.map((product) => [product.id, product]),
+  );
+  for (const family of families) {
+    productsById.get(family.productId)?.compatibilityFamilies.push({
+      id: family.id,
+      makerId: family.makerId,
+      makerName: family.makerName,
+      name: family.name,
+      slug: family.slug,
+    });
+  }
+  for (const advisory of advisories) {
+    productsById.get(advisory.productId)?.compatibilityAdvisories.push({
+      id: advisory.id,
+      relatedProductId: advisory.relatedProductId,
+      relatedProductName: advisory.relatedProductName,
+      reviewedAt: advisory.reviewedAt,
+      text: advisory.text,
+    });
+  }
+  for (const component of components) {
+    if (
+      component.productTypeSlug !== "slider-insert" &&
+      component.productTypeSlug !== "slider-plate"
+    )
+      continue;
+    productsById.get(component.productId)?.includedComponents.push({
+      id: component.id,
+      name: component.name,
+      productTypeSlug: component.productTypeSlug,
+      slug: component.slug,
+    });
+  }
 }
 
 /**
@@ -6147,12 +8055,19 @@ async function loadFinishOptions(
       colorEffectName: schema.colorEffect.name,
       colorEffectSlug: schema.colorEffect.slug,
       id: schema.finishOption.id,
+      patternId: schema.pattern.id,
+      patternName: schema.pattern.name,
+      patternSlug: schema.pattern.slug,
       productId: schema.finishOption.productId,
     })
     .from(schema.finishOption)
     .leftJoin(
       schema.colorEffect,
       eq(schema.finishOption.colorEffectId, schema.colorEffect.id),
+    )
+    .leftJoin(
+      schema.pattern,
+      eq(schema.finishOption.patternId, schema.pattern.id),
     )
     .where(
       inArray(
@@ -6204,6 +8119,12 @@ async function loadFinishOptionComponents(
      * Database identifier.
      */
     id: number;
+    /** Pattern identifier. */
+    patternId: number | null;
+    /** Pattern name. */
+    patternName: string | null;
+    /** Pattern slug. */
+    patternSlug: string | null;
   }>,
 ): Promise<Map<number, CatalogFinishOption>> {
   if (!options.length) return new Map();
@@ -6258,6 +8179,14 @@ async function loadFinishOptionComponents(
         .filter(({ finishOptionId }) => finishOptionId === option.id)
         .map(({ id, name, slug }) => ({ id, name, slug })),
       id: option.id,
+      pattern:
+        option.patternId && option.patternName && option.patternSlug
+          ? {
+              id: option.patternId,
+              name: option.patternName,
+              slug: option.patternSlug,
+            }
+          : null,
     });
   }
   return result;
@@ -6367,7 +8296,51 @@ async function queryOwnedItems(
       colorEffectName: schema.colorEffect.name,
       colorEffectSlug: schema.colorEffect.slug,
       finishOptionId: schema.finishOption.id,
+      hasGrandfatheredInstallation: sql<boolean>`case
+        when ${schema.collectionSlider.id} is null then false
+        when ${schema.collectionSlider.installedPlateId} is not null and not exists (
+          select 1
+          from product_compatibility_family slider_family
+          inner join product_compatibility_family component_family
+            on component_family.compatibility_family_id = slider_family.compatibility_family_id
+          where slider_family.product_id = ${schema.collectionSlider.productSliderId}
+            and component_family.product_id = (
+              select product_slider_plate_id
+              from collection_slider_plate
+              where id = ${schema.collectionSlider.installedPlateId}
+            )
+        ) then true
+        when ${schema.collectionSlider.installedInsertId} is not null and not exists (
+          select 1
+          from product_compatibility_family slider_family
+          inner join product_compatibility_family component_family
+            on component_family.compatibility_family_id = slider_family.compatibility_family_id
+          where slider_family.product_id = ${schema.collectionSlider.productSliderId}
+            and component_family.product_id = (
+              select product_slider_insert_id
+              from collection_slider_insert
+              where id = ${schema.collectionSlider.installedInsertId}
+            )
+        ) then true
+        else false
+      end`,
       installedButtonId: schema.collectionSpinner.installedButtonId,
+      installedInsertId: schema.collectionSlider.installedInsertId,
+      installedOnSliderId: sql<number | null>`coalesce(
+        (select id from collection_slider where installed_plate_id = ${schema.collectionItem.id}),
+        (select id from collection_slider where installed_insert_id = ${schema.collectionItem.id})
+      )`,
+      installedPlateId: schema.collectionSlider.installedPlateId,
+      installedInsertProductId: sql<number | null>`(
+        select product_slider_insert_id
+        from collection_slider_insert
+        where id = ${schema.collectionSlider.installedInsertId}
+      )`,
+      installedInsertSetup: sql<OwnedSliderInsertSetup | null>`(
+        select setup
+        from collection_slider_insert
+        where id = ${schema.collectionSlider.installedInsertId}
+      )`,
       isPrivate: schema.collectionItem.isPrivate,
       privatedByClerkId: schema.collectionItem.privatedByClerkId,
       makerId: schema.maker.id,
@@ -6384,10 +8357,18 @@ async function queryOwnedItems(
       productId: schema.product.id,
       productSlug: schema.product.slug,
       productTypeName: schema.productType.name,
+      patternId: schema.pattern.id,
+      patternName: schema.pattern.name,
+      patternSlug: schema.pattern.slug,
       sourceProductFinishOptionId:
         schema.finishOption.sourceProductFinishOptionId,
       spinnerId: schema.collectionSpinner.id,
       buttonId: schema.collectionSpinnerButton.id,
+      sliderId: schema.collectionSlider.id,
+      sliderInsertId: schema.collectionSliderInsert.id,
+      ownedInsertSetup: schema.collectionSliderInsert.setup,
+      sliderPlateId: schema.collectionSliderPlate.id,
+      productTypeSlug: schema.productType.slug,
       updatedAt: schema.collectionItem.updatedAt,
     })
     .from(schema.collectionItem)
@@ -6409,6 +8390,10 @@ async function queryOwnedItems(
       eq(schema.finishOption.colorEffectId, schema.colorEffect.id),
     )
     .leftJoin(
+      schema.pattern,
+      eq(schema.finishOption.patternId, schema.pattern.id),
+    )
+    .leftJoin(
       schema.collectionSpinner,
       eq(schema.collectionItem.id, schema.collectionSpinner.id),
     )
@@ -6416,11 +8401,23 @@ async function queryOwnedItems(
       schema.collectionSpinnerButton,
       eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
     )
+    .leftJoin(
+      schema.collectionSlider,
+      eq(schema.collectionItem.id, schema.collectionSlider.id),
+    )
+    .leftJoin(
+      schema.collectionSliderPlate,
+      eq(schema.collectionItem.id, schema.collectionSliderPlate.id),
+    )
+    .leftJoin(
+      schema.collectionSliderInsert,
+      eq(schema.collectionItem.id, schema.collectionSliderInsert.id),
+    )
     .innerJoin(
       schema.product,
       eq(
         schema.product.id,
-        sql`coalesce(${schema.collectionSpinner.productSpinnerId}, ${schema.collectionSpinnerButton.productSpinnerButtonId})`,
+        sql`coalesce(${schema.collectionSpinner.productSpinnerId}, ${schema.collectionSpinnerButton.productSpinnerButtonId}, ${schema.collectionSlider.productSliderId}, ${schema.collectionSliderPlate.productSliderPlateId}, ${schema.collectionSliderInsert.productSliderInsertId})`,
       ),
     )
     .innerJoin(schema.maker, eq(schema.product.makerId, schema.maker.id))
@@ -6451,6 +8448,9 @@ async function queryOwnedItems(
               colorEffectName: row.colorEffectName,
               colorEffectSlug: row.colorEffectSlug,
               id: row.finishOptionId,
+              patternId: row.patternId,
+              patternName: row.patternName,
+              patternSlug: row.patternSlug,
             },
           ]
         : [],
@@ -6464,6 +8464,9 @@ async function queryOwnedItems(
     canEdit: Boolean(
       options.viewerCanManage || options.viewerClerkId === row.ownerClerkId,
     ),
+    compatibilityFamilies: [],
+    compatibleButtonId: null,
+    compatibleButtonName: null,
     collectionIsPrivate: row.collectionIsPrivate,
     collectionId: row.collectionId,
     collectionItemId: row.collectionItemId,
@@ -6474,14 +8477,21 @@ async function queryOwnedItems(
     finishOption: row.finishOptionId
       ? (finishOptions.get(row.finishOptionId) ?? null)
       : null,
+    effectiveSliderSetup: null,
     imageCount: 0,
     images: [],
+    includedComponents: [],
     isPrivate: row.isPrivate,
     isAdminPrivate:
       row.isPrivate &&
       row.privatedByClerkId !== null &&
       row.privatedByClerkId !== row.ownerClerkId,
+    hasGrandfatheredInstallation: row.hasGrandfatheredInstallation,
     installedButtonId: row.installedButtonId,
+    installedInsertId: row.installedInsertId,
+    installedOnSliderId: row.installedOnSliderId,
+    installedPlateId: row.installedPlateId,
+    ownedInsertSetup: row.ownedInsertSetup,
     isOwner: options.viewerClerkId === row.ownerClerkId,
     makerId: row.makerId,
     makerName: row.makerName,
@@ -6502,7 +8512,11 @@ async function queryOwnedItems(
     productId: row.productId,
     productSlug: row.productSlug,
     productTypeName: row.productTypeName,
-    productTypeSlug: row.spinnerId ? "spinner" : "spinner-button",
+    productTypeSlug: row.productTypeSlug
+      ? catalogProductType(row.productTypeSlug)
+      : row.spinnerId
+        ? "spinner"
+        : "spinner-button",
     productImages: [],
     sourceProductFinishOptionId: row.sourceProductFinishOptionId,
   }));
@@ -6512,6 +8526,42 @@ async function queryOwnedItems(
     options.viewerClerkId,
     options.includePrivate,
   );
+  if (items.length) {
+    const viewer = options.viewerClerkId
+      ? {
+          clerkId: options.viewerClerkId,
+          role: options.viewerCanManage
+            ? ("admin" as const)
+            : ("user" as const),
+        }
+      : undefined;
+    const products = await queryProducts(db, undefined, undefined, viewer);
+    const productsById = new Map(
+      products.map((product) => [product.id, product]),
+    );
+    const rowsById = new Map(
+      visibleRows.map((row) => [row.collectionItemId, row]),
+    );
+    for (const item of items) {
+      const row = rowsById.get(item.collectionItemId);
+      const product = productsById.get(item.productId);
+      item.compatibilityFamilies = product?.compatibilityFamilies ?? [];
+      item.compatibleButtonId = product?.compatibleButtonId ?? null;
+      item.compatibleButtonName = product?.compatibleButtonName ?? null;
+      item.includedComponents = product?.includedComponents ?? [];
+      if (item.productTypeSlug !== "slider") continue;
+      const insertProduct = row?.installedInsertProductId
+        ? productsById.get(row.installedInsertProductId)
+        : null;
+      item.effectiveSliderSetup = resolveEffectiveSliderSetup({
+        bodyHostedSetup: product?.bodyHostedMagnetSetup ?? null,
+        installedInsertOffers: insertProduct?.insertMagnetOffers ?? [],
+        installedInsertProductId: row?.installedInsertProductId ?? null,
+        ownedInsertSetup: row?.installedInsertSetup ?? null,
+        sliderAdvertisedOffers: product?.advertisedInsertOffers ?? [],
+      });
+    }
+  }
   return items;
 }
 
@@ -6993,6 +9043,8 @@ function privacyUpdate(input: {
    * Administrative reason for the operation.
    */
   reason?: string;
+  /** Whether this visibility change also represents a meaningful content update. */
+  touchUpdatedAt?: boolean;
 }) {
   return input.isPrivate
     ? {
@@ -7000,14 +9052,14 @@ function privacyUpdate(input: {
         privateReason: input.actorIsModerating ? input.reason?.trim() : "",
         privatedAt: new Date(),
         privatedByClerkId: input.actorClerkId,
-        updatedAt: new Date(),
+        ...(input.touchUpdatedAt === false ? {} : { updatedAt: new Date() }),
       }
     : {
         isPrivate: false,
         privateReason: null,
         privatedAt: null,
         privatedByClerkId: null,
-        updatedAt: new Date(),
+        ...(input.touchUpdatedAt === false ? {} : { updatedAt: new Date() }),
       };
 }
 
@@ -7083,6 +9135,7 @@ async function softDeleteCatalogImage(
       .select({
         deletedAt: schema.productImage.deletedAt,
         ownerClerkId: schema.product.ownerClerkId,
+        productId: schema.product.id,
       })
       .from(schema.productImage)
       .innerJoin(
@@ -7104,6 +9157,10 @@ async function softDeleteCatalogImage(
         deletedByRole: actorIsModerating ? "admin" : "owner",
       })
       .where(eq(schema.productImage.id, input.imageId));
+    await db
+      .update(schema.product)
+      .set({ updatedAt: deletedAt })
+      .where(eq(schema.product.id, image.productId));
     return true;
   }
   const [image] = await db
@@ -7208,6 +9265,7 @@ async function restoreCatalogImage(
         deletedByClerkId: schema.productImage.deletedByClerkId,
         deletedByRole: schema.productImage.deletedByRole,
         ownerClerkId: schema.product.ownerClerkId,
+        productId: schema.product.id,
       })
       .from(schema.productImage)
       .innerJoin(
@@ -7221,11 +9279,16 @@ async function restoreCatalogImage(
         ),
       )
       .limit(1);
+    if (!image) throw new Error("Image does not exist.");
     assertCanRestoreImage(image, input.actor, "products.manage");
     await db
       .update(schema.productImage)
       .set({ deletedAt: null, deletedByClerkId: null, deletedByRole: null })
       .where(eq(schema.productImage.id, input.imageId));
+    await db
+      .update(schema.product)
+      .set({ updatedAt: new Date() })
+      .where(eq(schema.product.id, image.productId));
     return;
   }
   const [image] = await db
@@ -7477,6 +9540,1050 @@ async function listCatalogImageTrash(
 type CatalogTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 /**
+ * Validates a new slider-component installation against current ownership and catalog metadata.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param input - Slider, owner, component, and expected component type.
+ * @returns The validated component item and product identifiers.
+ * @rejects When the component is unavailable, installed elsewhere, unreviewed, or incompatible.
+ */
+async function validateSliderComponentInstallation(
+  tx: CatalogTransaction,
+  input: {
+    /** Owned component collection-item identifier. */
+    collectionItemId: number;
+    /** Expected component subtype. */
+    componentType: "insert" | "plate";
+    /** Owner shared by every assembly member. */
+    ownerId: number;
+    /** Parent slider collection-item identifier. */
+    sliderCollectionItemId: number;
+    /** Parent slider catalog product identifier. */
+    sliderProductId: number;
+  },
+) {
+  const componentProductColumn =
+    input.componentType === "plate"
+      ? schema.collectionSliderPlate.productSliderPlateId
+      : schema.collectionSliderInsert.productSliderInsertId;
+  const componentTable =
+    input.componentType === "plate"
+      ? schema.collectionSliderPlate
+      : schema.collectionSliderInsert;
+  const [component] = await tx
+    .select({
+      approvalStatus: schema.collectionItem.approvalStatus,
+      collectionId: schema.collectionItem.collectionId,
+      id: schema.collectionItem.id,
+      productApprovalStatus: schema.product.approvalStatus,
+      productId: componentProductColumn,
+    })
+    .from(componentTable)
+    .innerJoin(
+      schema.collectionItem,
+      eq(componentTable.id, schema.collectionItem.id),
+    )
+    .innerJoin(schema.product, eq(componentProductColumn, schema.product.id))
+    .where(
+      and(
+        eq(componentTable.id, input.collectionItemId),
+        eq(schema.collectionItem.ownerId, input.ownerId),
+        eq(schema.collectionItem.owned, true),
+      ),
+    )
+    .limit(1);
+  if (
+    !component ||
+    component.approvalStatus === "rejected" ||
+    component.productApprovalStatus !== "approved"
+  ) {
+    throw new Error(`Installed slider ${input.componentType} does not exist.`);
+  }
+
+  const [existingInstallation] = await tx
+    .select({ id: schema.collectionSlider.id })
+    .from(schema.collectionSlider)
+    .where(
+      and(
+        input.componentType === "plate"
+          ? eq(schema.collectionSlider.installedPlateId, input.collectionItemId)
+          : eq(
+              schema.collectionSlider.installedInsertId,
+              input.collectionItemId,
+            ),
+        sql`${schema.collectionSlider.id} <> ${input.sliderCollectionItemId}`,
+      ),
+    )
+    .limit(1);
+  if (existingInstallation) {
+    throw new CollectionSliderComponentAlreadyInstalledError();
+  }
+
+  const [sharedFamily] = await tx
+    .select({ id: schema.productCompatibilityFamily.compatibilityFamilyId })
+    .from(schema.productCompatibilityFamily)
+    .innerJoin(
+      alias(schema.productCompatibilityFamily, "component_family"),
+      sql`component_family.compatibility_family_id = ${schema.productCompatibilityFamily.compatibilityFamilyId}
+        and component_family.product_id = ${component.productId}`,
+    )
+    .where(
+      eq(schema.productCompatibilityFamily.productId, input.sliderProductId),
+    )
+    .limit(1);
+  if (!sharedFamily) {
+    throw new Error(
+      `Installed slider ${input.componentType} does not share a compatibility family.`,
+    );
+  }
+  return component;
+}
+
+/**
+ * Marks a catalog product as meaningfully updated inside its caller transaction.
+ *
+ * @param tx - Caller-owned catalog transaction.
+ * @param productId - Product whose public content changed.
+ * @rejects When the canonical product timestamp cannot be updated.
+ */
+async function touchProductUpdatedAt(
+  tx: CatalogTransaction,
+  productId: number,
+) {
+  await tx
+    .update(schema.product)
+    .set({ updatedAt: new Date() })
+    .where(eq(schema.product.id, productId));
+}
+
+/** Normalized exact setup ready for atomic replacement. */
+type NormalizedBodyHostedMagnetSetup = CatalogBodyHostedMagnetSetup;
+
+/**
+ * Replaces the inherent body-hosted setup while preserving undocumented facts as nulls.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - Slider product identifier.
+ * @param input - Product write carrying the candidate setup.
+ * @param creating - Whether this is the initial product write.
+ * @rejects When setup facts are invalid for the product or cannot be persisted.
+ */
+async function replaceBodyHostedMagnetSetup(
+  tx: CatalogTransaction,
+  productId: number,
+  input: ProductWriteInput,
+  creating: boolean,
+) {
+  if (input.bodyHostedMagnetSetup === undefined && !creating) return;
+  if (
+    input.bodyHostedMagnetSetup !== null &&
+    input.bodyHostedMagnetSetup !== undefined &&
+    (input.productTypeSlug !== "slider" ||
+      input.specs.magnetSystem !== "body-hosted")
+  ) {
+    throw new Error("Only body-hosted sliders may define an inherent setup.");
+  }
+  if (input.productTypeSlug !== "slider") return;
+  const normalized = normalizeBodyHostedMagnetSetup(
+    input.specs.magnetSystem === "body-hosted"
+      ? (input.bodyHostedMagnetSetup ?? null)
+      : null,
+  );
+  await tx
+    .update(schema.productSlider)
+    .set({
+      inherentClickCount: normalized?.clickCount ?? null,
+      magnetSetupSourceNote: normalized?.sourceNote ?? null,
+    })
+    .where(eq(schema.productSlider.id, productId));
+  await tx
+    .delete(schema.productMagnetConfiguration)
+    .where(eq(schema.productMagnetConfiguration.productId, productId));
+  const configuration = normalized?.configuration;
+  if (!configuration) return;
+
+  const configurationLabelId = await getOrCreateMagnetConfigurationLabel(
+    tx,
+    configuration.label,
+  );
+  await tx.insert(schema.productMagnetConfiguration).values({
+    configurationLabelId,
+    productId,
+    sourceLabel: configuration.sourceLabel,
+    sourceNotes: configuration.sourceNotes,
+  });
+  const groupsByKey = new Map<string, number>();
+  for (const [displayOrder, group] of configuration.groups.entries()) {
+    const groupLabelId = await getOrCreateMagnetGroupLabel(tx, group.label);
+    const [created] = await tx
+      .insert(schema.productMagnetGroup)
+      .values({
+        configurationProductId: productId,
+        diameterMm: group.diameterMm,
+        displayOrder,
+        grade: group.grade,
+        groupKey: group.key,
+        groupLabelId,
+        thicknessMm: group.thicknessMm,
+      })
+      .returning({ id: schema.productMagnetGroup.id });
+    if (!created) throw new Error("Failed to create magnet group.");
+    groupsByKey.set(group.key, created.id);
+  }
+  await tx.insert(schema.productMagnetSlot).values(
+    configuration.slots.map((slot, displayOrder) => ({
+      configurationProductId: productId,
+      displayOrder,
+      documentedColumn: slot.documentedColumn,
+      documentedRow: slot.documentedRow,
+      groupId: slot.groupKey ? (groupsByKey.get(slot.groupKey) ?? null) : null,
+      half: slot.half,
+      slotKey: slot.key,
+      state: slot.state,
+    })),
+  );
+}
+
+/**
+ * Replaces insert-owned click counts and exact offers while retaining stable IDs.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - Exact insert host product identifier.
+ * @param input - Product write containing insert-hosted options.
+ * @param creating - Whether this is the initial product write.
+ * @rejects When authorization, validation, or persistence fails.
+ */
+async function replaceInsertHostedMagnetOptions(
+  tx: CatalogTransaction,
+  productId: number,
+  input: ProductWriteInput,
+  creating: boolean,
+) {
+  if (input.insertHostedMagnetOptions === undefined && !creating) return;
+  const candidate = input.insertHostedMagnetOptions ?? {
+    clickCounts: [],
+    offers: [],
+  };
+  if (
+    input.productTypeSlug !== "slider-insert" &&
+    (candidate.clickCounts.length || candidate.offers.length)
+  ) {
+    throw new Error("Only slider inserts may define insert-hosted options.");
+  }
+  if (input.productTypeSlug !== "slider-insert") return;
+
+  const clickCounts = candidate.clickCounts.map((clickCount) => {
+    if (!Number.isSafeInteger(clickCount) || clickCount <= 0)
+      throw new Error("Click count must be a positive integer.");
+    return clickCount;
+  });
+  if (new Set(clickCounts).size !== clickCounts.length)
+    throw new Error("Insert click counts must be unique.");
+  if (
+    candidate.offers.filter(({ isAdvertisedDefault }) => isAdvertisedDefault)
+      .length > 1
+  )
+    throw new Error("An insert may have at most one advertised default.");
+
+  const currentOptions = await tx
+    .select({
+      clickCount: schema.productInsertClickOption.clickCount,
+      id: schema.productInsertClickOption.id,
+      insertionPosition: schema.productInsertClickOption.insertionPosition,
+    })
+    .from(schema.productInsertClickOption)
+    .where(eq(schema.productInsertClickOption.insertProductId, productId));
+  const optionByCount = new Map(
+    currentOptions.map((option) => [option.clickCount, option]),
+  );
+  let nextPosition =
+    Math.max(
+      -1,
+      ...currentOptions.map(({ insertionPosition }) => insertionPosition),
+    ) + 1;
+  for (const clickCount of clickCounts) {
+    if (optionByCount.has(clickCount)) continue;
+    const [created] = await tx
+      .insert(schema.productInsertClickOption)
+      .values({
+        clickCount,
+        insertionPosition: nextPosition,
+        insertProductId: productId,
+      })
+      .returning({
+        clickCount: schema.productInsertClickOption.clickCount,
+        id: schema.productInsertClickOption.id,
+        insertionPosition: schema.productInsertClickOption.insertionPosition,
+      });
+    if (!created) throw new Error("Failed to create insert click option.");
+    optionByCount.set(clickCount, created);
+    nextPosition += 1;
+  }
+
+  const currentOffers = await tx
+    .select({ id: schema.productInsertMagnetOffer.id })
+    .from(schema.productInsertMagnetOffer)
+    .where(eq(schema.productInsertMagnetOffer.insertProductId, productId));
+  const currentOfferIds = new Set(currentOffers.map(({ id }) => id));
+  const submittedIds = candidate.offers.flatMap(({ id }) =>
+    id === undefined ? [] : [id],
+  );
+  if (
+    new Set(submittedIds).size !== submittedIds.length ||
+    submittedIds.some((id) => !currentOfferIds.has(id))
+  ) {
+    throw new Error("Insert offer does not belong to this product.");
+  }
+  const removedOfferIds = [...currentOfferIds].filter(
+    (id) => !submittedIds.includes(id),
+  );
+  if (removedOfferIds.length) {
+    await tx
+      .delete(schema.productInsertMagnetOffer)
+      .where(inArray(schema.productInsertMagnetOffer.id, removedOfferIds));
+  }
+  if (currentOfferIds.size) {
+    await tx
+      .update(schema.productInsertMagnetOffer)
+      .set({ isAdvertisedDefault: false })
+      .where(eq(schema.productInsertMagnetOffer.insertProductId, productId));
+  }
+
+  for (const offer of candidate.offers) {
+    if (offer.clickCount !== null && !clickCounts.includes(offer.clickCount))
+      throw new Error("Offer click count must belong to the same insert.");
+    const configuration = normalizeCatalogMagnetConfiguration(
+      offer.configuration,
+    );
+    const copiedFromTemplateId = offer.copiedFromTemplateId ?? null;
+    if (copiedFromTemplateId !== null) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const [template] = await tx
+        .select({
+          compatibilityFamilyId:
+            schema.magnetConfigurationTemplate.compatibilityFamilyId,
+          id: schema.magnetConfigurationTemplate.id,
+          makerId: schema.magnetConfigurationTemplate.makerId,
+          scope: schema.magnetConfigurationTemplate.scope,
+        })
+        .from(schema.magnetConfigurationTemplate)
+        .where(eq(schema.magnetConfigurationTemplate.id, copiedFromTemplateId))
+        .limit(1);
+      if (!template)
+        throw new Error("Magnet configuration template does not exist.");
+      if (
+        (template.scope === "maker" && template.makerId !== input.makerId) ||
+        (template.scope === "family" &&
+          !input.compatibilityFamilyIds?.includes(
+            template.compatibilityFamilyId ?? 0,
+          ))
+      ) {
+        throw new Error(
+          "Magnet configuration template is outside this product scope.",
+        );
+      }
+    }
+    const configurationLabelId = await getOrCreateMagnetConfigurationLabel(
+      tx,
+      configuration.label,
+    );
+    const clickOptionId =
+      offer.clickCount === null
+        ? null
+        : (optionByCount.get(offer.clickCount)?.id ?? null);
+    let offerId = offer.id;
+    if (offerId === undefined) {
+      const [created] = await tx
+        .insert(schema.productInsertMagnetOffer)
+        .values({
+          clickOptionId,
+          configurationLabelId,
+          copiedFromTemplateId,
+          insertProductId: productId,
+          isAdvertisedDefault: offer.isAdvertisedDefault,
+          sourceLabel: configuration.sourceLabel,
+          sourceNotes: configuration.sourceNotes,
+        })
+        .returning({ id: schema.productInsertMagnetOffer.id });
+      if (!created) throw new Error("Failed to create insert offer.");
+      offerId = created.id;
+    } else {
+      await tx
+        .update(schema.productInsertMagnetOffer)
+        .set({
+          clickOptionId,
+          configurationLabelId,
+          copiedFromTemplateId,
+          isAdvertisedDefault: offer.isAdvertisedDefault,
+          sourceLabel: configuration.sourceLabel,
+          sourceNotes: configuration.sourceNotes,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.productInsertMagnetOffer.id, offerId));
+      await tx
+        .delete(schema.productInsertMagnetSlot)
+        .where(eq(schema.productInsertMagnetSlot.offerId, offerId));
+      await tx
+        .delete(schema.productInsertMagnetGroup)
+        .where(eq(schema.productInsertMagnetGroup.offerId, offerId));
+    }
+    const groupsByKey = new Map<string, number>();
+    for (const [displayOrder, group] of configuration.groups.entries()) {
+      const groupLabelId = await getOrCreateMagnetGroupLabel(tx, group.label);
+      const [created] = await tx
+        .insert(schema.productInsertMagnetGroup)
+        .values({
+          diameterMm: group.diameterMm,
+          displayOrder,
+          grade: group.grade,
+          groupKey: group.key,
+          groupLabelId,
+          offerId,
+          thicknessMm: group.thicknessMm,
+        })
+        .returning({ id: schema.productInsertMagnetGroup.id });
+      if (!created) throw new Error("Failed to create insert magnet group.");
+      groupsByKey.set(group.key, created.id);
+    }
+    await tx.insert(schema.productInsertMagnetSlot).values(
+      configuration.slots.map((slot, displayOrder) => ({
+        displayOrder,
+        documentedColumn: slot.documentedColumn,
+        documentedRow: slot.documentedRow,
+        groupId: slot.groupKey
+          ? (groupsByKey.get(slot.groupKey) ?? null)
+          : null,
+        half: slot.half,
+        offerId,
+        slotKey: slot.key,
+        state: slot.state,
+      })),
+    );
+  }
+  const removedOptionIds = currentOptions
+    .filter(({ clickCount }) => !clickCounts.includes(clickCount))
+    .map(({ id }) => id);
+  if (removedOptionIds.length) {
+    await tx
+      .delete(schema.productInsertClickOption)
+      .where(inArray(schema.productInsertClickOption.id, removedOptionIds));
+  }
+}
+
+/**
+ * Replaces exact insert-offer merchandising for one insert-driven slider.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - Insert-driven slider product identifier.
+ * @param input - Product write containing exact offer associations.
+ * @param creating - Whether this is the initial product write.
+ * @rejects When associations are invalid or cannot be persisted.
+ */
+async function replaceSliderInsertOffers(
+  tx: CatalogTransaction,
+  productId: number,
+  input: ProductWriteInput,
+  creating: boolean,
+) {
+  if (input.advertisedInsertOffers === undefined && !creating) {
+    if (
+      input.productTypeSlug !== "slider" ||
+      input.specs.magnetSystem === "insert-driven"
+    ) {
+      return;
+    }
+    await tx
+      .delete(schema.productSliderInsertOffer)
+      .where(eq(schema.productSliderInsertOffer.sliderProductId, productId));
+    return;
+  }
+  const associations = input.advertisedInsertOffers ?? [];
+  if (
+    associations.length &&
+    (input.productTypeSlug !== "slider" ||
+      input.specs.magnetSystem !== "insert-driven")
+  ) {
+    throw new Error("Only insert-driven sliders may advertise insert offers.");
+  }
+  if (input.productTypeSlug !== "slider") return;
+  if (
+    new Set(associations.map(({ offerId }) => offerId)).size !==
+    associations.length
+  )
+    throw new Error("Duplicate slider insert offers are not allowed.");
+  if (
+    associations.length &&
+    associations.filter(({ isAdvertisedDefault }) => isAdvertisedDefault)
+      .length !== 1
+  ) {
+    throw new Error(
+      "A slider with insert offers requires exactly one advertised default.",
+    );
+  }
+  const offers = associations.length
+    ? await tx
+        .select({
+          id: schema.productInsertMagnetOffer.id,
+          insertProductId: schema.productInsertMagnetOffer.insertProductId,
+        })
+        .from(schema.productInsertMagnetOffer)
+        .where(
+          inArray(
+            schema.productInsertMagnetOffer.id,
+            associations.map(({ offerId }) => offerId),
+          ),
+        )
+    : [];
+  if (offers.length !== associations.length)
+    throw new Error("Insert offer does not exist.");
+  await tx
+    .delete(schema.productSliderInsertOffer)
+    .where(eq(schema.productSliderInsertOffer.sliderProductId, productId));
+  if (associations.length) {
+    const byId = new Map(offers.map((offer) => [offer.id, offer]));
+    await tx.insert(schema.productSliderInsertOffer).values(
+      associations.map((association) => ({
+        insertOfferId: association.offerId,
+        insertProductId: byId.get(association.offerId)?.insertProductId ?? 0,
+        isAdvertisedDefault: association.isAdvertisedDefault,
+        sliderProductId: productId,
+      })),
+    );
+  }
+}
+
+/**
+ * Validates and normalizes one body-hosted setup without inventing missing facts.
+ *
+ * @param setup - Candidate setup or undocumented state.
+ * @returns Normalized setup suitable for persistence.
+ * @throws When a catalog configuration is incomplete or internally inconsistent.
+ */
+function normalizeBodyHostedMagnetSetup(
+  setup: CatalogBodyHostedMagnetSetup | null,
+): NormalizedBodyHostedMagnetSetup | null {
+  if (!setup) return null;
+  const clickCount = setup.clickCount;
+  if (
+    clickCount !== null &&
+    (!Number.isSafeInteger(clickCount) || clickCount <= 0)
+  ) {
+    throw new Error("Click count must be a positive integer.");
+  }
+  const sourceNote = normalizeBoundedText(setup.sourceNote, 5000);
+  if (!setup.configuration) {
+    return { clickCount, configuration: null, sourceNote };
+  }
+  return {
+    clickCount,
+    configuration: normalizeCatalogMagnetConfiguration(setup.configuration),
+    sourceNote,
+  };
+}
+
+/**
+ * Validates one complete exact catalog magnet layout.
+ *
+ * @param configuration - Candidate exact configuration.
+ * @returns Normalized complete catalog configuration.
+ * @throws When the configuration is incomplete or internally inconsistent.
+ */
+function normalizeCatalogMagnetConfiguration(
+  configuration: CatalogMagnetConfiguration,
+): CatalogMagnetConfiguration {
+  const label = normalizeRequiredVocabulary(configuration.label);
+  const sourceLabel = normalizeBoundedText(configuration.sourceLabel, 200);
+  const sourceNotes = normalizeBoundedText(configuration.sourceNotes, 5000);
+  if (!configuration.slots.length)
+    throw new Error("A structured magnet configuration requires slots.");
+
+  const groupKeys = new Set<string>();
+  const referencedGroupKeys = new Set<string>();
+  const groups = configuration.groups.map((candidate) => {
+    const key = normalizeStableKey(candidate.key);
+    if (groupKeys.has(key))
+      throw new Error("Magnet group keys must be unique.");
+    groupKeys.add(key);
+    return {
+      diameterMm: normalizePositiveDecimal(candidate.diameterMm),
+      grade: normalizeMagnetGrade(candidate.grade),
+      key,
+      label: normalizeRequiredVocabulary(candidate.label),
+      thicknessMm: normalizePositiveDecimal(candidate.thicknessMm),
+    };
+  });
+  const slotKeys = new Set<string>();
+  const slots = configuration.slots.map((candidate) => {
+    const key = normalizeStableKey(candidate.key);
+    if (slotKeys.has(key)) throw new Error("Magnet slot keys must be unique.");
+    slotKeys.add(key);
+    if (candidate.half !== "half-a" && candidate.half !== "half-b")
+      throw new Error("A magnet slot requires Half A or Half B.");
+    if (candidate.state !== "occupied" && candidate.state !== "empty")
+      throw new Error("Catalog magnet slots cannot be unknown.");
+    const groupKey = candidate.groupKey
+      ? normalizeStableKey(candidate.groupKey)
+      : null;
+    if (candidate.state === "occupied" && !groupKey)
+      throw new Error("An occupied magnet slot requires a group.");
+    if (candidate.state === "empty" && groupKey)
+      throw new Error("An empty magnet slot cannot belong to a group.");
+    if (groupKey && !groupKeys.has(groupKey))
+      throw new Error("Magnet group does not belong to this configuration.");
+    if (groupKey) referencedGroupKeys.add(groupKey);
+    return {
+      documentedColumn: normalizeDocumentedPosition(candidate.documentedColumn),
+      documentedRow: normalizeDocumentedPosition(candidate.documentedRow),
+      groupKey,
+      half: candidate.half,
+      key,
+      state: candidate.state,
+    };
+  });
+  if (groups.some(({ key }) => !referencedGroupKeys.has(key)))
+    throw new Error("Every magnet group must contain an occupied slot.");
+  return { groups, label, slots, sourceLabel, sourceNotes };
+}
+
+/**
+ * Validates an owner-recorded layout while preserving explicit unknown positions.
+ *
+ * @param configuration - Candidate owner snapshot.
+ * @returns Normalized durable owner snapshot.
+ * @throws When keys, dimensions, groups, or slot states are inconsistent.
+ */
+function normalizeOwnedMagnetConfiguration(
+  configuration: OwnedMagnetConfiguration,
+): OwnedMagnetConfiguration {
+  const label = normalizeRequiredVocabulary(configuration.label);
+  const sourceLabel = normalizeBoundedText(configuration.sourceLabel, 200);
+  const sourceNotes = normalizeBoundedText(configuration.sourceNotes, 5000);
+  if (!configuration.slots.length)
+    throw new Error("An owned magnet configuration requires positions.");
+
+  const groupKeys = new Set<string>();
+  const referencedGroupKeys = new Set<string>();
+  const groups = configuration.groups.map((candidate) => {
+    const key = normalizeStableKey(candidate.key);
+    if (groupKeys.has(key))
+      throw new Error("Magnet group keys must be unique.");
+    groupKeys.add(key);
+    return {
+      diameterMm: normalizePositiveDecimal(candidate.diameterMm),
+      grade: normalizeMagnetGrade(candidate.grade),
+      key,
+      label: normalizeRequiredVocabulary(candidate.label),
+      thicknessMm: normalizePositiveDecimal(candidate.thicknessMm),
+    };
+  });
+  const slotKeys = new Set<string>();
+  const slots = configuration.slots.map((candidate) => {
+    const key = normalizeStableKey(candidate.key);
+    if (slotKeys.has(key)) throw new Error("Magnet slot keys must be unique.");
+    slotKeys.add(key);
+    if (candidate.half !== "half-a" && candidate.half !== "half-b")
+      throw new Error("A magnet slot requires Half A or Half B.");
+    if (
+      candidate.state !== "occupied" &&
+      candidate.state !== "empty" &&
+      candidate.state !== "unknown"
+    ) {
+      throw new Error("Owned magnet slot state is invalid.");
+    }
+    const groupKey = candidate.groupKey
+      ? normalizeStableKey(candidate.groupKey)
+      : null;
+    if (candidate.state === "occupied" && !groupKey)
+      throw new Error("An occupied magnet slot requires a group.");
+    if (candidate.state !== "occupied" && groupKey)
+      throw new Error("Only an occupied magnet slot may belong to a group.");
+    if (groupKey && !groupKeys.has(groupKey))
+      throw new Error("Magnet group does not belong to this configuration.");
+    if (groupKey) referencedGroupKeys.add(groupKey);
+    return {
+      documentedColumn: normalizeDocumentedPosition(candidate.documentedColumn),
+      documentedRow: normalizeDocumentedPosition(candidate.documentedRow),
+      groupKey,
+      half: candidate.half,
+      key,
+      state: candidate.state,
+    };
+  });
+  if (groups.some(({ key }) => !referencedGroupKeys.has(key)))
+    throw new Error("Every magnet group must contain an occupied slot.");
+  return { groups, label, slots, sourceLabel, sourceNotes };
+}
+
+/**
+ * Returns a trimmed optional string while enforcing its storage bound.
+ *
+ * @param value - Candidate optional text.
+ * @param maximum - Maximum stored character count.
+ * @returns Trimmed text or `null`.
+ * @throws When nonblank text exceeds the storage bound.
+ */
+function normalizeBoundedText(value: string | null, maximum: number) {
+  const normalized = value?.trim() || null;
+  if (normalized && normalized.length > maximum)
+    throw new Error("Magnet setup text is too long.");
+  return normalized;
+}
+
+/**
+ * Returns one nonblank stable source key.
+ *
+ * @param value - Candidate key.
+ * @returns Trimmed stable key.
+ * @throws When the key is blank or too long.
+ */
+function normalizeStableKey(value: string) {
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 100)
+    throw new Error("Magnet setup key is invalid.");
+  return normalized;
+}
+
+/**
+ * Returns one normalized global vocabulary name.
+ *
+ * @param value - Candidate vocabulary label.
+ * @returns Unicode-normalized, whitespace-collapsed label.
+ * @throws When the label is blank or too long.
+ */
+function normalizeRequiredVocabulary(value: string) {
+  const normalized = value.normalize("NFKC").trim().replace(/\s+/g, " ");
+  if (!normalized || normalized.length > 100)
+    throw new Error("Magnet vocabulary label is invalid.");
+  return normalized;
+}
+
+/**
+ * Returns a positive arbitrary-precision decimal string.
+ *
+ * @param value - Candidate metric dimension.
+ * @returns Validated decimal text without reducing precision.
+ * @throws When the dimension is not a positive plain decimal.
+ */
+function normalizePositiveDecimal(value: string) {
+  const normalized = value.trim();
+  if (
+    normalized.length > 50 ||
+    !/^\d+(?:\.\d+)?$/.test(normalized) ||
+    !Number.isFinite(Number(normalized)) ||
+    Number(normalized) <= 0
+  ) {
+    throw new Error("Magnet dimensions must be positive decimals.");
+  }
+  return normalized;
+}
+
+/**
+ * Returns normalized conservative magnet grade text.
+ *
+ * @param value - Candidate magnet grade.
+ * @returns Trimmed uppercase grade.
+ * @throws When the grade contains unsupported characters or length.
+ */
+function normalizeMagnetGrade(value: string) {
+  const normalized = value.trim().toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9+_-]{0,19}$/.test(normalized))
+    throw new Error("Magnet grade is invalid.");
+  return normalized;
+}
+
+/**
+ * Returns a positive source-documented row or column.
+ *
+ * @param value - Candidate documented position.
+ * @returns Positive integer or `null` when undocumented.
+ * @throws When a documented position is not a positive safe integer.
+ */
+function normalizeDocumentedPosition(value: number | null) {
+  if (value === null) return null;
+  if (!Number.isSafeInteger(value) || value <= 0)
+    throw new Error("Documented magnet positions must be positive integers.");
+  return value;
+}
+
+/**
+ * Creates or reuses one global configuration vocabulary row.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param name - Normalized display label.
+ * @returns Global configuration-label identifier.
+ * @rejects When the vocabulary row cannot be written or loaded.
+ */
+async function getOrCreateMagnetConfigurationLabel(
+  tx: CatalogTransaction,
+  name: string,
+) {
+  const normalizedName = name.toLocaleLowerCase("en-US");
+  const [created] = await tx
+    .insert(schema.magnetConfigurationLabel)
+    .values({ name, normalizedName })
+    .onConflictDoNothing({
+      target: schema.magnetConfigurationLabel.normalizedName,
+    })
+    .returning({ id: schema.magnetConfigurationLabel.id });
+  if (created) return created.id;
+  const [existing] = await tx
+    .select({ id: schema.magnetConfigurationLabel.id })
+    .from(schema.magnetConfigurationLabel)
+    .where(eq(schema.magnetConfigurationLabel.normalizedName, normalizedName))
+    .limit(1);
+  if (!existing) throw new Error("Failed to load magnet configuration label.");
+  return existing.id;
+}
+
+/**
+ * Creates or reuses one global group vocabulary row.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param name - Normalized display label.
+ * @returns Global group-label identifier.
+ * @rejects When the vocabulary row cannot be written or loaded.
+ */
+async function getOrCreateMagnetGroupLabel(
+  tx: CatalogTransaction,
+  name: string,
+) {
+  const normalizedName = name.toLocaleLowerCase("en-US");
+  const [created] = await tx
+    .insert(schema.magnetGroupLabel)
+    .values({ name, normalizedName })
+    .onConflictDoNothing({ target: schema.magnetGroupLabel.normalizedName })
+    .returning({ id: schema.magnetGroupLabel.id });
+  if (created) return created.id;
+  const [existing] = await tx
+    .select({ id: schema.magnetGroupLabel.id })
+    .from(schema.magnetGroupLabel)
+    .where(eq(schema.magnetGroupLabel.normalizedName, normalizedName))
+    .limit(1);
+  if (!existing) throw new Error("Failed to load magnet group label.");
+  return existing.id;
+}
+
+/**
+ * Inserts the subtype row required by one canonical product type.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - New product identifier.
+ * @param productTypeSlug - Canonical product type.
+ * @param specs - Type-specific product facts.
+ * @rejects When required facts are missing, forbidden facts are present, or persistence fails.
+ */
+async function insertProductSubtype(
+  tx: CatalogTransaction,
+  productId: number,
+  productTypeSlug: CatalogProductType,
+  specs: ProductWriteInput["specs"],
+) {
+  switch (productTypeSlug) {
+    case "spinner":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .insert(schema.productSpinner)
+        .values({ id: productId, ...spinnerSpecs(specs) });
+      return;
+    case "spinner-button":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .insert(schema.productSpinnerButton)
+        .values({ id: productId, ...buttonSpecs(specs) });
+      return;
+    case "slider":
+      await tx
+        .insert(schema.productSlider)
+        .values({ id: productId, ...sliderSpecs(specs) });
+      return;
+    case "slider-plate":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .insert(schema.productSliderPlate)
+        .values({ id: productId, ...sliderComponentSpecs(specs) });
+      return;
+    case "slider-insert":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .insert(schema.productSliderInsert)
+        .values({ id: productId, ...sliderComponentSpecs(specs) });
+  }
+}
+
+/**
+ * Updates exactly the subtype row belonging to one product.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - Product identifier.
+ * @param productTypeSlug - Canonical product type.
+ * @param specs - Type-specific product facts.
+ * @rejects When required facts are missing, forbidden facts are present, or persistence fails.
+ */
+async function updateProductSubtype(
+  tx: CatalogTransaction,
+  productId: number,
+  productTypeSlug: CatalogProductType,
+  specs: ProductWriteInput["specs"],
+) {
+  const updatedAt = new Date();
+  switch (productTypeSlug) {
+    case "spinner":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .update(schema.productSpinner)
+        .set({ ...spinnerSpecs(specs), updatedAt })
+        .where(eq(schema.productSpinner.id, productId));
+      return;
+    case "spinner-button":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .update(schema.productSpinnerButton)
+        .set({ ...buttonSpecs(specs), updatedAt })
+        .where(eq(schema.productSpinnerButton.id, productId));
+      return;
+    case "slider":
+      await tx
+        .update(schema.productSlider)
+        .set({ ...sliderSpecs(specs), updatedAt })
+        .where(eq(schema.productSlider.id, productId));
+      return;
+    case "slider-plate":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .update(schema.productSliderPlate)
+        .set({ ...sliderComponentSpecs(specs), updatedAt })
+        .where(eq(schema.productSliderPlate.id, productId));
+      return;
+    case "slider-insert":
+      assertNoSliderOnlySpecs(specs);
+      await tx
+        .update(schema.productSliderInsert)
+        .set({ ...sliderComponentSpecs(specs), updatedAt })
+        .where(eq(schema.productSliderInsert.id, productId));
+  }
+}
+
+/**
+ * Replaces reviewed compatibility, advisory, and exact-inclusion relationships.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - Product identifier.
+ * @param input - Product write containing replacement relationships.
+ * @rejects When authorization, relationship validation, or persistence fails.
+ */
+async function replaceProductRelationships(
+  tx: CatalogTransaction,
+  productId: number,
+  input: ProductWriteInput,
+) {
+  const familyIds = input.compatibilityFamilyIds ?? [];
+  const componentIds = input.includedComponentIds ?? [];
+  const advisories = input.compatibilityAdvisories ?? [];
+  if (
+    (familyIds.length || componentIds.length || advisories.length) &&
+    !hasPermission(input.actor, "products.manage")
+  ) {
+    throw new Error("Product does not exist.");
+  }
+  if (new Set(familyIds).size !== familyIds.length)
+    throw new Error("Duplicate compatibility families are not allowed.");
+  if (new Set(componentIds).size !== componentIds.length)
+    throw new Error("Duplicate included components are not allowed.");
+  if (componentIds.length && input.productTypeSlug !== "slider")
+    throw new Error("Only sliders may declare included slider components.");
+
+  if (familyIds.length) {
+    const families = await tx
+      .select({ id: schema.compatibilityFamily.id })
+      .from(schema.compatibilityFamily)
+      .where(inArray(schema.compatibilityFamily.id, familyIds));
+    if (families.length !== familyIds.length)
+      throw new Error("Compatibility family does not exist.");
+  }
+  if (componentIds.length) {
+    const components = await tx
+      .select({ id: schema.product.id, type: schema.productType.slug })
+      .from(schema.product)
+      .innerJoin(
+        schema.productType,
+        eq(schema.product.productTypeId, schema.productType.id),
+      )
+      .where(inArray(schema.product.id, componentIds));
+    if (
+      components.length !== componentIds.length ||
+      components.some(
+        ({ type }) => type !== "slider-plate" && type !== "slider-insert",
+      )
+    ) {
+      throw new Error("Included product must be a slider plate or insert.");
+    }
+  }
+
+  const advisoryKeys = new Set<string>();
+  for (const advisory of advisories) {
+    const text = advisory.text.trim();
+    if (!text || text.length > 1000)
+      throw new Error("Compatibility advisory text is invalid.");
+    if (advisory.relatedProductId === productId)
+      throw new Error("A product cannot advise against itself.");
+    const key = `${advisory.relatedProductId}:${text.toLocaleLowerCase()}`;
+    if (advisoryKeys.has(key))
+      throw new Error("Duplicate compatibility advisories are not allowed.");
+    advisoryKeys.add(key);
+  }
+  if (advisories.length) {
+    const relatedIds = [
+      ...new Set(advisories.map(({ relatedProductId }) => relatedProductId)),
+    ];
+    const relatedProducts = await tx
+      .select({ id: schema.product.id })
+      .from(schema.product)
+      .where(inArray(schema.product.id, relatedIds));
+    if (relatedProducts.length !== relatedIds.length)
+      throw new Error("Advisory product does not exist.");
+  }
+
+  await tx
+    .delete(schema.productCompatibilityFamily)
+    .where(eq(schema.productCompatibilityFamily.productId, productId));
+  await tx
+    .delete(schema.productCompatibilityAdvisory)
+    .where(eq(schema.productCompatibilityAdvisory.productId, productId));
+  await tx
+    .delete(schema.productIncludedComponent)
+    .where(eq(schema.productIncludedComponent.productId, productId));
+
+  if (familyIds.length) {
+    await tx.insert(schema.productCompatibilityFamily).values(
+      familyIds.map((compatibilityFamilyId) => ({
+        compatibilityFamilyId,
+        productId,
+        reviewedByClerkId: input.actor.clerkId,
+      })),
+    );
+  }
+  if (componentIds.length) {
+    await tx.insert(schema.productIncludedComponent).values(
+      componentIds.map((componentProductId) => ({
+        componentProductId,
+        productId,
+      })),
+    );
+  }
+  if (advisories.length) {
+    await tx.insert(schema.productCompatibilityAdvisory).values(
+      advisories.map(({ relatedProductId, text }) => ({
+        productId,
+        relatedProductId,
+        reviewedByClerkId: input.actor.clerkId,
+        text: text.trim(),
+      })),
+    );
+  }
+}
+
+/**
  * Validates product material.
  *
  * @param tx - Caller-owned database transaction.
@@ -7518,7 +10625,10 @@ async function copyProductFinishOption(
   collectionItemId: number,
 ) {
   const [source] = await tx
-    .select({ colorEffectId: schema.finishOption.colorEffectId })
+    .select({
+      colorEffectId: schema.finishOption.colorEffectId,
+      patternId: schema.finishOption.patternId,
+    })
     .from(schema.finishOption)
     .where(
       and(
@@ -7546,26 +10656,27 @@ async function copyProductFinishOption(
     .from(schema.finishOptionColor)
     .where(eq(schema.finishOptionColor.finishOptionId, sourceFinishOptionId))
     .orderBy(asc(schema.finishOptionColor.position));
-  if (!finishes.length) throw new Error("Finish option has no finishes.");
-
   const [snapshot] = await tx
     .insert(schema.finishOption)
     .values({
       collectionItemId,
       colorEffectId: source.colorEffectId,
+      patternId: source.patternId,
       position: 0,
       sourceProductFinishOptionId: sourceFinishOptionId,
     })
     .returning({ id: schema.finishOption.id });
   if (!snapshot) throw new Error("Failed to create finish snapshot.");
 
-  await tx.insert(schema.finishOptionFinish).values(
-    finishes.map(({ finishId, position }) => ({
-      finishId,
-      finishOptionId: snapshot.id,
-      position,
-    })),
-  );
+  if (finishes.length) {
+    await tx.insert(schema.finishOptionFinish).values(
+      finishes.map(({ finishId, position }) => ({
+        finishId,
+        finishOptionId: snapshot.id,
+        position,
+      })),
+    );
+  }
   if (colors.length) {
     await tx.insert(schema.finishOptionColor).values(
       colors.map(({ colorId, position }) => ({
@@ -7605,12 +10716,11 @@ async function createCollectionFinishOption(
     productId: number;
   },
 ) {
-  if (
-    (input.productFinishOptionId === null) ===
-    (input.customFinish === null)
-  ) {
-    throw new Error("Select one finish option.");
+  if (input.productFinishOptionId !== null && input.customFinish !== null) {
+    throw new Error("Select at most one appearance option.");
   }
+  if (input.productFinishOptionId === null && input.customFinish === null)
+    return;
   if (input.productFinishOptionId !== null) {
     await copyProductFinishOption(
       tx,
@@ -7622,25 +10732,28 @@ async function createCollectionFinishOption(
   }
 
   const customFinish = input.customFinish;
-  if (!customFinish) throw new Error("A finish is required.");
+  if (!customFinish) return;
   await validateFinishOptions(tx, [customFinish]);
   const [option] = await tx
     .insert(schema.finishOption)
     .values({
       collectionItemId: input.collectionItemId,
       colorEffectId: customFinish.colorEffectId,
+      patternId: customFinish.patternId ?? null,
       position: 0,
     })
     .returning({ id: schema.finishOption.id });
   if (!option) throw new Error("Failed to create finish snapshot.");
 
-  await tx.insert(schema.finishOptionFinish).values(
-    customFinish.finishIds.map((finishId, position) => ({
-      finishId,
-      finishOptionId: option.id,
-      position,
-    })),
-  );
+  if (customFinish.finishIds.length) {
+    await tx.insert(schema.finishOptionFinish).values(
+      customFinish.finishIds.map((finishId, position) => ({
+        finishId,
+        finishOptionId: option.id,
+        position,
+      })),
+    );
+  }
   if (customFinish.colorIds.length) {
     await tx.insert(schema.finishOptionColor).values(
       customFinish.colorIds.map((colorId, position) => ({
@@ -7674,19 +10787,22 @@ async function replaceProductFinishOptions(
       .insert(schema.finishOption)
       .values({
         colorEffectId: option.colorEffectId,
+        patternId: option.patternId ?? null,
         position,
         productId,
       })
       .returning({ id: schema.finishOption.id });
     if (!row) throw new Error("Failed to create finish option.");
 
-    await tx.insert(schema.finishOptionFinish).values(
-      option.finishIds.map((finishId, componentPosition) => ({
-        finishId,
-        finishOptionId: row.id,
-        position: componentPosition,
-      })),
-    );
+    if (option.finishIds.length) {
+      await tx.insert(schema.finishOptionFinish).values(
+        option.finishIds.map((finishId, componentPosition) => ({
+          finishId,
+          finishOptionId: row.id,
+          position: componentPosition,
+        })),
+      );
+    }
     if (option.colorIds.length) {
       await tx.insert(schema.finishOptionColor).values(
         option.colorIds.map((colorId, componentPosition) => ({
@@ -7710,9 +10826,6 @@ async function validateFinishOptions(
   db: Pick<Database, "select">,
   options: ProductWriteFinishOption[],
 ) {
-  if (!options.length)
-    throw new Error("At least one finish option is required.");
-
   const effectIds = [
     ...new Set(
       options.flatMap(({ colorEffectId }) =>
@@ -7740,14 +10853,17 @@ export function assertValidFinishOptions(
   options: ProductWriteFinishOption[],
   effects: Array<Pick<CatalogLookup, "id" | "slug">>,
 ) {
-  if (!options.length)
-    throw new Error("At least one finish option is required.");
-
   const effectsById = new Map(effects.map((effect) => [effect.id, effect]));
   const signatures = new Set<string>();
 
   for (const option of options) {
-    if (!option.finishIds.length) throw new Error("A finish is required.");
+    if (
+      !option.finishIds.length &&
+      !option.colorIds.length &&
+      option.patternId == null
+    ) {
+      throw new Error("An appearance option requires a visible component.");
+    }
     if (new Set(option.finishIds).size !== option.finishIds.length) {
       throw new Error("Duplicate finishes are not allowed.");
     }
@@ -7774,12 +10890,64 @@ export function assertValidFinishOptions(
       throw new Error("A solid finish requires exactly one color.");
     }
 
-    const signature = `${option.finishIds.join(",")}|${option.colorEffectId ?? ""}|${option.colorIds.join(",")}`;
+    const signature = `${option.finishIds.join(",")}|${option.colorEffectId ?? ""}|${option.colorIds.join(",")}|${option.patternId ?? ""}`;
     if (signatures.has(signature)) {
       throw new Error("Duplicate finish options are not allowed.");
     }
     signatures.add(signature);
   }
+}
+
+/**
+ * Rejects slider-only facts on all other catalog product types.
+ *
+ * @param specs - Candidate type-specific facts.
+ * @throws When magnet capability or slider weight basis is present.
+ */
+function assertNoSliderOnlySpecs(specs: ProductWriteInput["specs"]) {
+  if (specs.magnetSystem != null || specs.weightBasis != null)
+    throw new Error("Slider-only specifications are not allowed.");
+}
+
+/**
+ * Selects slider body facts and enforces explicit magnet and weight semantics.
+ *
+ * @param specs - Slider product specifications.
+ * @returns Slider subtype columns.
+ * @throws When the magnet host is absent or weight and its basis are incomplete.
+ */
+function sliderSpecs(specs: ProductWriteInput["specs"]) {
+  if (!specs.magnetSystem)
+    throw new Error("A slider magnet system is required.");
+  const weightG = specs.weightG ?? null;
+  const weightBasis = specs.weightBasis ?? null;
+  if ((weightG === null) !== (weightBasis === null))
+    throw new Error(
+      "Slider weight and weight basis must be recorded together.",
+    );
+  return {
+    lengthMm: specs.lengthMm ?? null,
+    magnetSystem: specs.magnetSystem,
+    thicknessMm: specs.thicknessMm ?? null,
+    weightBasis,
+    weightG,
+    widthMm: specs.widthMm ?? null,
+  };
+}
+
+/**
+ * Selects set-level facts shared by slider plate and insert products.
+ *
+ * @param specs - Component product specifications.
+ * @returns Component subtype columns.
+ */
+function sliderComponentSpecs(specs: ProductWriteInput["specs"]) {
+  return {
+    lengthMm: specs.lengthMm ?? null,
+    thicknessMm: specs.thicknessMm ?? null,
+    weightG: specs.weightG ?? null,
+    widthMm: specs.widthMm ?? null,
+  };
 }
 
 /**

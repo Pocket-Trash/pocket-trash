@@ -5,11 +5,85 @@ import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
 describe("catalog product persistence", () => {
+  it("normalizes, constrains, lists, and audits maker-scoped terminology aliases", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      const migrationsFolder = fileURLToPath(
+        new URL("../../../../database/drizzle", import.meta.url),
+      );
+      for (const file of readdirSync(migrationsFolder)
+        .filter((name) => name.endsWith(".sql"))
+        .sort()) {
+        await client.exec(
+          readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
+            "--> statement-breakpoint",
+            "",
+          ),
+        );
+      }
+      const [maker] = await db
+        .insert(schema.maker)
+        .values({ name: "Alias Maker", slug: "alias-maker" })
+        .returning({ id: schema.maker.id });
+      await db
+        .insert(schema.productType)
+        .values({ name: "Slider Insert", slug: "slider-insert" });
+      await db.insert(schema.user).values({ clerkId: "admin-alias" });
+      if (!maker) throw new Error("Alias fixtures were not created.");
+
+      const service = createDbServices(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      ).catalog;
+      const input = {
+        actor: { clerkId: "admin-alias", role: "admin" as const },
+        canonicalKey: "slider-insert" as const,
+        canonicalNamespace: "product-type" as const,
+        isPreferred: true,
+        label: "  CASSÉTTE  ",
+        makerId: maker.id,
+      };
+
+      await expect(service.createTerminologyAlias(input)).resolves.toEqual(
+        expect.objectContaining({
+          canonicalKey: "slider-insert",
+          label: "CASSÉTTE",
+          normalizedValue: "cassette",
+        }),
+      );
+      await expect(
+        service.createTerminologyAlias({
+          ...input,
+          isPreferred: false,
+          label: "cassette",
+        }),
+      ).rejects.toThrow("Alias already exists");
+      await expect(service.listTerminologyAliases()).resolves.toEqual([
+        expect.objectContaining({ makerName: "Alias Maker" }),
+      ]);
+
+      const events = await db.select().from(schema.auditEvent);
+      expect(events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: "products.terminology_alias.created",
+            permission: "products.manage",
+          }),
+        ]),
+      );
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("round-trips source details and enforces approval transitions", async () => {
     const client = new PGlite();
     const db = drizzle(client, { schema });
@@ -44,7 +118,11 @@ describe("catalog product persistence", () => {
         .insert(schema.material)
         .values({ name: "Titanium", slug: "titanium" })
         .returning({ id: schema.material.id });
-      if (!maker || !productType || !finish || !material) {
+      const [pattern] = await db
+        .insert(schema.pattern)
+        .values({ name: "Honeycomb", slug: "honeycomb" })
+        .returning({ id: schema.pattern.id });
+      if (!maker || !productType || !finish || !material || !pattern) {
         throw new Error("Catalog fixtures were not created.");
       }
 
@@ -63,6 +141,7 @@ describe("catalog product persistence", () => {
             colorEffectId: null,
             colorIds: [],
             finishIds: [finish.id],
+            patternId: pattern.id,
           },
         ],
         makerId: maker.id,
@@ -84,6 +163,11 @@ describe("catalog product persistence", () => {
           spinDiameterMm: "52",
         }),
       );
+      expect(created.finishOptions[0]?.pattern).toEqual({
+        id: pattern.id,
+        name: "Honeycomb",
+        slug: "honeycomb",
+      });
       await expect(
         service.getProduct("spinner", "spinner"),
       ).resolves.toBeNull();
@@ -182,6 +266,7 @@ describe("catalog product persistence", () => {
             colorEffectId: null,
             colorIds: [],
             finishIds: [finish.id],
+            patternId: pattern.id,
           },
         ],
         makerId: maker.id,
@@ -296,6 +381,678 @@ describe("catalog product persistence", () => {
         expect.arrayContaining([
           expect.objectContaining({ id: carbon.id, slug: "carbon-fiber" }),
         ]),
+      );
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("round-trips slider subtypes and keeps reviewed relationships distinct", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      const migrationsFolder = fileURLToPath(
+        new URL("../../../../database/drizzle", import.meta.url),
+      );
+      for (const file of readdirSync(migrationsFolder)
+        .filter((name) => name.endsWith(".sql"))
+        .sort()) {
+        await client.exec(
+          readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
+            "--> statement-breakpoint",
+            "",
+          ),
+        );
+      }
+      const [maker] = await db
+        .insert(schema.maker)
+        .values({ name: "Slider Maker", slug: "slider-maker" })
+        .returning({ id: schema.maker.id });
+      const productTypes = await db
+        .insert(schema.productType)
+        .values([
+          { name: "Slider", slug: "slider" },
+          { name: "Slider Plate", slug: "slider-plate" },
+          { name: "Slider Insert", slug: "slider-insert" },
+        ])
+        .returning({ id: schema.productType.id });
+      const [material] = await db
+        .insert(schema.material)
+        .values({ name: "Titanium", slug: "titanium" })
+        .returning({ id: schema.material.id });
+      if (!maker || productTypes.length !== 3 || !material) {
+        throw new Error("Slider fixtures were not created.");
+      }
+
+      await db
+        .insert(schema.user)
+        .values([{ clerkId: "user-test" }, { clerkId: "admin-test" }]);
+      const service = createDbServices(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      ).catalog;
+      const admin = { clerkId: "admin-test", role: "admin" as const };
+      const user = { clerkId: "user-test", role: "user" as const };
+      const family = await service.createCompatibilityFamily({
+        actor: admin,
+        makerId: maker.id,
+        name: "Rail 50",
+        slug: "rail-50",
+      });
+      const plate = await service.createProduct({
+        actor: admin,
+        finishOptions: [],
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: "Matched Plates",
+        productTypeSlug: "slider-plate",
+        slug: "matched-plates",
+        specs: {
+          lengthMm: "50",
+          thicknessMm: "4",
+          weightG: "28",
+          widthMm: "20",
+        },
+      });
+      const insert = await service.createProduct({
+        actor: admin,
+        finishOptions: [],
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: "Cassette Insert",
+        productTypeSlug: "slider-insert",
+        slug: "cassette-insert",
+        specs: {
+          lengthMm: "42",
+          thicknessMm: "3",
+          weightG: "18",
+          widthMm: "16",
+        },
+      });
+      const slider = await service.createProduct({
+        actor: admin,
+        compatibilityAdvisories: [
+          {
+            relatedProductId: insert.id,
+            text: "Requires the revised spring pack.",
+          },
+        ],
+        compatibilityFamilyIds: [family.id],
+        finishOptions: [],
+        includedComponentIds: [plate.id, insert.id],
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: "Rail Slider",
+        productTypeSlug: "slider",
+        slug: "rail-slider",
+        bodyHostedMagnetSetup: {
+          clickCount: 4,
+          configuration: {
+            label: "Medium",
+            sourceLabel: "4-click layout",
+            sourceNotes: null,
+            groups: [
+              {
+                diameterMm: "6.35",
+                grade: "n52",
+                key: "corners",
+                label: "Corners",
+                thicknessMm: "3.175",
+              },
+            ],
+            slots: [
+              {
+                documentedColumn: 1,
+                documentedRow: 1,
+                groupKey: "corners",
+                half: "half-a",
+                key: "A1",
+                state: "occupied",
+              },
+              {
+                documentedColumn: 1,
+                documentedRow: 1,
+                groupKey: null,
+                half: "half-b",
+                key: "B1",
+                state: "empty",
+              },
+            ],
+          },
+          sourceNote: null,
+        },
+        specs: {
+          lengthMm: "52",
+          magnetSystem: "body-hosted",
+          thicknessMm: "12",
+          weightBasis: "complete-build",
+          weightG: "96",
+          widthMm: "24",
+        },
+      });
+
+      expect(slider).toEqual(
+        expect.objectContaining({
+          bodyHostedMagnetSetup: {
+            clickCount: 4,
+            configuration: {
+              label: "Medium",
+              sourceLabel: "4-click layout",
+              sourceNotes: null,
+              groups: [
+                expect.objectContaining({
+                  diameterMm: "6.35",
+                  grade: "N52",
+                  key: "corners",
+                  label: "Corners",
+                  thicknessMm: "3.175",
+                }),
+              ],
+              slots: [
+                expect.objectContaining({
+                  groupKey: "corners",
+                  half: "half-a",
+                  key: "A1",
+                  state: "occupied",
+                }),
+                expect.objectContaining({
+                  groupKey: null,
+                  half: "half-b",
+                  key: "B1",
+                  state: "empty",
+                }),
+              ],
+            },
+            sourceNote: null,
+          },
+          magnetSystem: "body-hosted",
+          weightBasis: "complete-build",
+          weightG: "96",
+        }),
+      );
+      expect(slider.compatibilityFamilies).toEqual([
+        expect.objectContaining({ id: family.id, makerId: maker.id }),
+      ]);
+      expect(slider.includedComponents).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: plate.id,
+            productTypeSlug: "slider-plate",
+          }),
+          expect.objectContaining({
+            id: insert.id,
+            productTypeSlug: "slider-insert",
+          }),
+        ]),
+      );
+      expect(slider.compatibilityAdvisories).toEqual([
+        expect.objectContaining({
+          relatedProductId: insert.id,
+          text: "Requires the revised spring pack.",
+        }),
+      ]);
+      expect(plate).toEqual(
+        expect.objectContaining({
+          lengthMm: "50",
+          magnetSystem: null,
+          weightBasis: null,
+          weightG: "28",
+        }),
+      );
+      await expect(
+        service.createProduct({
+          actor: admin,
+          bodyHostedMagnetSetup: {
+            clickCount: 0,
+            configuration: null,
+            sourceNote: "The maker documents an incomplete layout.",
+          },
+          finishOptions: [],
+          makerId: maker.id,
+          materialIds: [material.id],
+          name: "Invalid body setup",
+          productTypeSlug: "slider",
+          slug: "invalid-body-setup",
+          specs: { magnetSystem: "body-hosted" },
+        }),
+      ).rejects.toThrow("Click count must be a positive integer");
+      await expect(
+        service.createProduct({
+          actor: admin,
+          bodyHostedMagnetSetup: {
+            clickCount: 2,
+            configuration: {
+              label: "Small",
+              sourceLabel: null,
+              sourceNotes: null,
+              groups: [
+                {
+                  diameterMm: "6",
+                  grade: "N42",
+                  key: "center",
+                  label: "Center",
+                  thicknessMm: "3",
+                },
+              ],
+              slots: [
+                {
+                  documentedColumn: null,
+                  documentedRow: null,
+                  groupKey: "missing",
+                  half: "half-a",
+                  key: "A1",
+                  state: "occupied",
+                },
+              ],
+            },
+            sourceNote: null,
+          },
+          finishOptions: [],
+          makerId: maker.id,
+          materialIds: [material.id],
+          name: "Cross configuration reference",
+          productTypeSlug: "slider",
+          slug: "cross-configuration-reference",
+          specs: { magnetSystem: "body-hosted" },
+        }),
+      ).rejects.toThrow("Magnet group does not belong to this configuration");
+      await expect(
+        service.createProduct({
+          actor: user,
+          compatibilityFamilyIds: [family.id],
+          finishOptions: [],
+          makerId: maker.id,
+          materialIds: [material.id],
+          name: "Unreviewed Slider",
+          productTypeSlug: "slider",
+          slug: "unreviewed-slider",
+          specs: { magnetSystem: "insert-driven" },
+        }),
+      ).rejects.toThrow("Product does not exist.");
+      await expect(
+        service.deleteProduct({
+          actor: admin,
+          confirmed: true,
+          productId: plate.id,
+          reason: "Remove referenced component",
+        }),
+      ).resolves.toBe(false);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("round-trips insert offers with stable click order and exact slider defaults", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      const migrationsFolder = fileURLToPath(
+        new URL("../../../../database/drizzle", import.meta.url),
+      );
+      for (const file of readdirSync(migrationsFolder)
+        .filter((name) => name.endsWith(".sql"))
+        .sort()) {
+        await client.exec(
+          readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
+            "--> statement-breakpoint",
+            "",
+          ),
+        );
+      }
+      const [maker] = await db
+        .insert(schema.maker)
+        .values({ name: "Insert Maker", slug: "insert-maker" })
+        .returning({ id: schema.maker.id });
+      await db.insert(schema.productType).values([
+        { name: "Slider", slug: "slider" },
+        { name: "Slider Insert", slug: "slider-insert" },
+      ]);
+      const [material] = await db
+        .insert(schema.material)
+        .values({ name: "Steel", slug: "steel" })
+        .returning({ id: schema.material.id });
+      await db.insert(schema.user).values({ clerkId: "admin-insert" });
+      if (!maker || !material) throw new Error("Insert fixtures failed.");
+      const service = createDbServices(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      ).catalog;
+      const actor = { clerkId: "admin-insert", role: "admin" as const };
+      const configuration = {
+        groups: [
+          {
+            diameterMm: "6.35",
+            grade: "n52",
+            key: "corners",
+            label: "Corners",
+            thicknessMm: "3.175",
+          },
+        ],
+        label: "Medium",
+        slots: [
+          {
+            documentedColumn: null,
+            documentedRow: null,
+            groupKey: "corners",
+            half: "half-a" as const,
+            key: "A1",
+            state: "occupied" as const,
+          },
+        ],
+        sourceLabel: "Maker medium",
+        sourceNotes: null,
+      };
+      const template = await service.createMagnetConfigurationTemplate({
+        actor,
+        compatibilityFamilyId: null,
+        configuration,
+        makerId: null,
+        name: "Standard medium",
+        scope: "global",
+      });
+      await expect(
+        service.listMagnetConfigurationTemplates({
+          clerkId: "collection-owner",
+          role: "user",
+        }),
+      ).resolves.toEqual([]);
+      await expect(
+        service.listMagnetConfigurationTemplates(actor),
+      ).resolves.toEqual([expect.objectContaining({ id: template.id })]);
+      const insert = await service.createProduct({
+        actor,
+        finishOptions: [],
+        insertHostedMagnetOptions: {
+          clickCounts: [3, 5],
+          offers: [
+            {
+              clickCount: 3,
+              configuration,
+              copiedFromTemplateId: template.id,
+              isAdvertisedDefault: true,
+            },
+            {
+              clickCount: 5,
+              configuration: { ...configuration, label: "Strong" },
+              isAdvertisedDefault: false,
+            },
+          ],
+        },
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: "Exact Insert",
+        productTypeSlug: "slider-insert",
+        slug: "exact-insert",
+        specs: {},
+      });
+      expect(
+        insert.insertClickOptions.map(({ clickCount }) => clickCount),
+      ).toEqual([3, 5]);
+      expect(insert.insertMagnetOffers).toEqual([
+        expect.objectContaining({
+          clickCount: 3,
+          copiedFromTemplateId: template.id,
+          isAdvertisedDefault: true,
+          configuration: expect.objectContaining({ label: "Medium" }),
+        }),
+        expect.objectContaining({
+          clickCount: 5,
+          isAdvertisedDefault: false,
+          configuration: expect.objectContaining({ label: "Strong" }),
+        }),
+      ]);
+      const advertisedOffer = insert.insertMagnetOffers[1];
+      if (!advertisedOffer) throw new Error("Offer fixture failed.");
+      const slider = await service.createProduct({
+        actor,
+        advertisedInsertOffers: [
+          { isAdvertisedDefault: true, offerId: advertisedOffer.id },
+        ],
+        finishOptions: [],
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: "Insert Slider",
+        productTypeSlug: "slider",
+        slug: "insert-slider",
+        specs: { magnetSystem: "insert-driven" },
+      });
+      expect(slider.advertisedInsertOffers).toEqual([
+        expect.objectContaining({
+          id: advertisedOffer.id,
+          insertProductId: insert.id,
+          insertProductName: "Exact Insert",
+          isSliderAdvertisedDefault: true,
+        }),
+      ]);
+      const updated = await service.updateProduct({
+        actor,
+        finishOptions: [],
+        insertHostedMagnetOptions: {
+          clickCounts: [5, 7, 3],
+          offers: insert.insertMagnetOffers.map((offer) => ({
+            clickCount: offer.clickCount,
+            configuration: offer.configuration,
+            id: offer.id,
+            isAdvertisedDefault: offer.isAdvertisedDefault,
+          })),
+        },
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: insert.name,
+        productId: insert.id,
+        productTypeSlug: "slider-insert",
+        slug: insert.slug,
+        specs: {},
+      });
+      expect(
+        updated.insertClickOptions.map(({ clickCount, insertionPosition }) => ({
+          clickCount,
+          insertionPosition,
+        })),
+      ).toEqual([
+        { clickCount: 3, insertionPosition: 0 },
+        { clickCount: 5, insertionPosition: 1 },
+        { clickCount: 7, insertionPosition: 2 },
+      ]);
+      await expect(
+        service.createProduct({
+          actor,
+          advertisedInsertOffers: [
+            { isAdvertisedDefault: false, offerId: advertisedOffer.id },
+          ],
+          finishOptions: [],
+          makerId: maker.id,
+          materialIds: [material.id],
+          name: "No default",
+          productTypeSlug: "slider",
+          slug: "no-default",
+          specs: { magnetSystem: "insert-driven" },
+        }),
+      ).rejects.toThrow("requires exactly one advertised default");
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("orders canonical meaningful updates without approval or privacy churn", async () => {
+    const client = new PGlite();
+    const db = drizzle(client, { schema });
+
+    try {
+      const migrationsFolder = fileURLToPath(
+        new URL("../../../../database/drizzle", import.meta.url),
+      );
+      for (const file of readdirSync(migrationsFolder)
+        .filter((name) => name.endsWith(".sql"))
+        .sort()) {
+        await client.exec(
+          readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
+            "--> statement-breakpoint",
+            "",
+          ),
+        );
+      }
+      const [maker] = await db
+        .insert(schema.maker)
+        .values({ name: "Recent Maker", slug: "recent-maker" })
+        .returning({ id: schema.maker.id });
+      await db
+        .insert(schema.productType)
+        .values({ name: "Spinner", slug: "spinner" });
+      const [material] = await db
+        .insert(schema.material)
+        .values({ name: "Titanium", slug: "titanium" })
+        .returning({ id: schema.material.id });
+      await db.insert(schema.user).values({ clerkId: "admin-recent" });
+      if (!maker || !material)
+        throw new Error("Recent-product fixtures were not created.");
+
+      const service = createDbServices(
+        db as unknown as Database,
+        createLogger({ app: "api", environment: "test" }),
+      ).catalog;
+      const actor = { clerkId: "admin-recent", role: "admin" as const };
+      const created = [];
+      for (const [name, slug] of [
+        ["Beta", "beta"],
+        ["Alpha", "alpha-one"],
+        ["Alpha", "alpha-two"],
+      ] as const) {
+        created.push(
+          await service.createProduct({
+            actor,
+            finishOptions: [],
+            makerId: maker.id,
+            materialIds: [material.id],
+            name,
+            productTypeSlug: "spinner",
+            slug,
+            specs: { bearing: "R188" },
+          }),
+        );
+      }
+      const [beta, alphaOne, alphaTwo] = created;
+      if (!beta || !alphaOne || !alphaTwo)
+        throw new Error("Recent products were not created.");
+      const baseline = new Date("2026-01-01T00:00:00.000Z");
+      const misleadingSubtypeDate = new Date("2030-01-01T00:00:00.000Z");
+      await db.update(schema.product).set({ updatedAt: baseline });
+      await db
+        .update(schema.productSpinner)
+        .set({ updatedAt: misleadingSubtypeDate })
+        .where(eq(schema.productSpinner.id, beta.id));
+
+      await expect(service.listProducts(undefined, actor)).resolves.toEqual([
+        expect.objectContaining({ id: alphaOne.id, updatedAt: baseline }),
+        expect.objectContaining({ id: alphaTwo.id, updatedAt: baseline }),
+        expect.objectContaining({ id: beta.id, updatedAt: baseline }),
+      ]);
+
+      await service.decideProductApproval({
+        action: "approve",
+        actor,
+        productId: beta.id,
+        reason: "Ready",
+      });
+      await service.setVisibility({
+        actor,
+        isPrivate: true,
+        productId: beta.id,
+      });
+      await service.setVisibility({
+        actor,
+        isPrivate: false,
+        productId: beta.id,
+      });
+      const [moderated] = await db
+        .select({ updatedAt: schema.product.updatedAt })
+        .from(schema.product)
+        .where(eq(schema.product.id, beta.id));
+      expect(moderated?.updatedAt).toEqual(baseline);
+
+      const updated = await service.updateProduct({
+        actor,
+        finishOptions: [],
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: beta.name,
+        productId: beta.id,
+        productTypeSlug: "spinner",
+        slug: beta.slug,
+        specs: { bearing: "One Drop" },
+      });
+      expect(updated.updatedAt.getTime()).toBeGreaterThan(baseline.getTime());
+      expect((await service.listProducts(undefined, actor))[0]?.id).toBe(
+        beta.id,
+      );
+
+      await db
+        .update(schema.product)
+        .set({ updatedAt: baseline })
+        .where(eq(schema.product.id, beta.id));
+      await service.attachImages({
+        actor,
+        files: [
+          {
+            contentType: "image/jpeg",
+            fileName: "beta.jpg",
+            kind: "image",
+            objectPath: "images/test/products/beta.jpg",
+            position: 0,
+            sha256: "a".repeat(64),
+            size: 12,
+            url: "https://cdn.example/beta.jpg",
+          },
+        ],
+        target: { id: beta.id, type: "product" },
+      });
+      const [image] = await db
+        .select({ id: schema.productImage.id })
+        .from(schema.productImage)
+        .where(eq(schema.productImage.productId, beta.id));
+      const [afterImage] = await db
+        .select({ updatedAt: schema.product.updatedAt })
+        .from(schema.product)
+        .where(eq(schema.product.id, beta.id));
+      expect(afterImage?.updatedAt.getTime()).toBeGreaterThan(
+        baseline.getTime(),
+      );
+      if (!image) throw new Error("Product image was not created.");
+
+      await db
+        .update(schema.product)
+        .set({ updatedAt: baseline })
+        .where(eq(schema.product.id, beta.id));
+      await service.softDeleteImage({
+        actor,
+        imageId: image.id,
+        targetType: "product",
+      });
+      const [afterDeletion] = await db
+        .select({ updatedAt: schema.product.updatedAt })
+        .from(schema.product)
+        .where(eq(schema.product.id, beta.id));
+      expect(afterDeletion?.updatedAt.getTime()).toBeGreaterThan(
+        baseline.getTime(),
+      );
+
+      await db
+        .update(schema.product)
+        .set({ updatedAt: baseline })
+        .where(eq(schema.product.id, beta.id));
+      await service.restoreImage({
+        actor,
+        imageId: image.id,
+        targetType: "product",
+      });
+      const [afterRestore] = await db
+        .select({ updatedAt: schema.product.updatedAt })
+        .from(schema.product)
+        .where(eq(schema.product.id, beta.id));
+      expect(afterRestore?.updatedAt.getTime()).toBeGreaterThan(
+        baseline.getTime(),
       );
     } finally {
       await client.close();

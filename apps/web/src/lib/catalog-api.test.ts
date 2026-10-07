@@ -3,11 +3,24 @@ import {
   collectionDeletionSchema,
   collectionItemApprovalSchema,
   collectionItemDeletionSchema,
+  collectionProductTypeIsSupported,
   collectionWriteSchema,
   productApprovalSchema,
   productDeletionSchema,
   productFormSchema,
 } from "./catalog-api";
+
+describe("collection product types", () => {
+  it.each([
+    "spinner",
+    "spinner-button",
+    "slider",
+    "slider-plate",
+    "slider-insert",
+  ])("supports standalone %s items", (productType) => {
+    expect(collectionProductTypeIsSupported(productType)).toBe(true);
+  });
+});
 
 /**
  * Baseline product-form fields combined with finish options by schema tests.
@@ -18,6 +31,7 @@ const base = {
   compatibleButtonId: null,
   description: "",
   diameterMm: null,
+  finishOptions: [],
   lengthMm: null,
   makerId: 1000,
   makerProductUrl: "",
@@ -30,6 +44,11 @@ const base = {
   thicknessWithButtonMm: null,
   weightG: null,
   widthMm: null,
+  compatibilityAdvisories: [],
+  compatibilityFamilyIds: [],
+  includedComponentIds: [],
+  magnetSystem: null,
+  weightBasis: null,
 };
 
 /**
@@ -41,6 +60,7 @@ const validFinishOptions = [
     colorEffectSlug: null,
     colorIds: [],
     finishIds: [1000],
+    patternId: null,
   },
 ];
 
@@ -99,11 +119,11 @@ describe("product deletion", () => {
   });
 });
 
-describe("product finish options", () => {
-  it("requires one option with at least one finish", () => {
+describe("product appearance options", () => {
+  it("accepts no options and pattern-only options but rejects an empty option", () => {
     expect(
       productFormSchema.safeParse({ ...base, finishOptions: [] }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       productFormSchema.safeParse({
         ...base,
@@ -113,6 +133,21 @@ describe("product finish options", () => {
             colorEffectSlug: null,
             colorIds: [],
             finishIds: [],
+            patternId: 1000,
+          },
+        ],
+      }).success,
+    ).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        finishOptions: [
+          {
+            colorEffectId: null,
+            colorEffectSlug: null,
+            colorIds: [],
+            finishIds: [],
+            patternId: null,
           },
         ],
       }).success,
@@ -129,6 +164,7 @@ describe("product finish options", () => {
             colorEffectSlug: "fade",
             colorIds: [],
             finishIds: [1000],
+            patternId: null,
           },
         ],
       }).success,
@@ -142,6 +178,7 @@ describe("product finish options", () => {
             colorEffectSlug: "fade",
             colorIds: [1000],
             finishIds: [1000],
+            patternId: null,
           },
         ],
       }).success,
@@ -155,6 +192,7 @@ describe("product finish options", () => {
             colorEffectSlug: "solid",
             colorIds: [1000, 1001],
             finishIds: [1000],
+            patternId: null,
           },
         ],
       }).success,
@@ -171,6 +209,7 @@ describe("product finish options", () => {
             colorEffectSlug: null,
             colorIds: [],
             finishIds: [1000, 1000],
+            patternId: null,
           },
         ],
       }).success,
@@ -184,12 +223,14 @@ describe("product finish options", () => {
             colorEffectSlug: null,
             colorIds: [],
             finishIds: [1000],
+            patternId: null,
           },
           {
             colorEffectId: null,
             colorEffectSlug: null,
             colorIds: [],
             finishIds: [1000],
+            patternId: null,
           },
         ],
       }).success,
@@ -270,6 +311,192 @@ describe("product source details", () => {
         finishOptions: validFinishOptions,
         productTypeSlug: "spinner-button",
         spinDiameterMm: "22",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("slider catalog product validation", () => {
+  it.each([
+    "slider",
+    "slider-plate",
+    "slider-insert",
+  ] as const)("accepts the %s product type", (productTypeSlug) => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        magnetSystem: productTypeSlug === "slider" ? "body-hosted" : null,
+        productTypeSlug,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires an explicit slider magnet host and paired slider weight basis", () => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        productTypeSlug: "slider",
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        magnetSystem: "insert-driven",
+        productTypeSlug: "slider",
+        weightG: "120",
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        magnetSystem: "insert-driven",
+        productTypeSlug: "slider",
+        weightBasis: "complete-build",
+        weightG: "120",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("keeps exact inclusion separate from compatibility and reviewed advisories", () => {
+    const parsed = productFormSchema.parse({
+      ...base,
+      compatibilityAdvisories: [
+        { relatedProductId: 2001, text: "May require thin tape." },
+      ],
+      compatibilityFamilyIds: [3001, 3002],
+      includedComponentIds: [2000],
+      magnetSystem: "body-hosted",
+      productTypeSlug: "slider",
+    });
+
+    expect(parsed.compatibilityFamilyIds).toEqual([3001, 3002]);
+    expect(parsed.includedComponentIds).toEqual([2000]);
+    expect(parsed.compatibilityAdvisories).toEqual([
+      { relatedProductId: 2001, text: "May require thin tape." },
+    ]);
+  });
+
+  it("accepts complete exact body-hosted layouts and rejects incomplete slots", () => {
+    const bodyHostedMagnetSetup = {
+      clickCount: 4,
+      configuration: {
+        groups: [
+          {
+            diameterMm: "6.35",
+            grade: "N52",
+            key: "corners",
+            label: "Corners",
+            thicknessMm: "3.175",
+          },
+        ],
+        label: "Medium",
+        slots: [
+          {
+            documentedColumn: 1,
+            documentedRow: 1,
+            groupKey: "corners",
+            half: "half-a" as const,
+            key: "A1",
+            state: "occupied" as const,
+          },
+        ],
+        sourceLabel: null,
+        sourceNotes: null,
+      },
+      sourceNote: null,
+    };
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        bodyHostedMagnetSetup,
+        magnetSystem: "body-hosted",
+        productTypeSlug: "slider",
+      }).success,
+    ).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        bodyHostedMagnetSetup: {
+          ...bodyHostedMagnetSetup,
+          configuration: {
+            ...bodyHostedMagnetSetup.configuration,
+            slots: [
+              {
+                ...bodyHostedMagnetSetup.configuration.slots[0],
+                groupKey: null,
+              },
+            ],
+          },
+        },
+        magnetSystem: "body-hosted",
+        productTypeSlug: "slider",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("validates insert-owned offers and exactly one slider advertised default", () => {
+    const configuration = {
+      groups: [
+        {
+          diameterMm: "6.35",
+          grade: "N52",
+          key: "corners",
+          label: "Corners",
+          thicknessMm: "3.175",
+        },
+      ],
+      label: "Medium",
+      slots: [
+        {
+          documentedColumn: null,
+          documentedRow: null,
+          groupKey: "corners",
+          half: "half-a" as const,
+          key: "A1",
+          state: "occupied" as const,
+        },
+      ],
+      sourceLabel: null,
+      sourceNotes: null,
+    };
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        insertHostedMagnetOptions: {
+          clickCounts: [3, 5],
+          offers: [
+            {
+              clickCount: 3,
+              configuration,
+              isAdvertisedDefault: true,
+            },
+          ],
+        },
+        productTypeSlug: "slider-insert",
+      }).success,
+    ).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        insertHostedMagnetOptions: {
+          clickCounts: [3],
+          offers: [
+            {
+              clickCount: 5,
+              configuration,
+              isAdvertisedDefault: false,
+            },
+          ],
+        },
+        productTypeSlug: "slider-insert",
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        advertisedInsertOffers: [{ isAdvertisedDefault: false, offerId: 4000 }],
+        magnetSystem: "insert-driven",
+        productTypeSlug: "slider",
       }).success,
     ).toBe(false);
   });

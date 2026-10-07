@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
+  catalogSeedTimestamp,
   loadKapedcSeedData,
   materialSlugForTerm,
   seedCatalog,
@@ -15,6 +16,8 @@ import {
   seedUserSettings,
   seedUsers,
   seedUsersAndSettings,
+  sliderFixtureCatalog,
+  sliderFixtureOwnerClerkId,
 } from "../scripts/seed.js";
 import type { createDb } from "../src/client.js";
 import {
@@ -567,6 +570,9 @@ describe("catalog seed", () => {
     await seedCatalog(state.db);
 
     expect(state.productTypes.size).toBe(seedProductTypes.length);
+    expect([...state.productTypes.keys()]).toEqual(
+      expect.arrayContaining(["slider", "slider-plate", "slider-insert"]),
+    );
     expect(state.makers.size).toBe(seedMakers.length);
     expect(state.materials.size).toBe(seedMaterials.length);
     expect(state.finishes.size).toBe(seedFinishes.length);
@@ -611,6 +617,78 @@ describe("catalog seed", () => {
         .flatMap(({ materialTerms }) => materialTerms)
         .every((term) => materialSlugForTerm(term).length > 0),
     ).toBe(true);
+    expect(catalogSeedTimestamp(snapshot.importedAt).toISOString()).toBe(
+      snapshot.importedAt,
+    );
+  });
+
+  it("defines a deterministic slider fixture that exercises every discovery path", () => {
+    const byType = Object.groupBy(
+      sliderFixtureCatalog.products,
+      ({ type }) => type,
+    );
+    expect(byType.slider).toHaveLength(21);
+    expect(byType["slider-plate"]?.length).toBeGreaterThan(0);
+    expect(byType["slider-plate"]?.length).toBeLessThanOrEqual(21);
+    expect(byType["slider-insert"]?.length).toBeGreaterThan(0);
+    expect(byType["slider-insert"]?.length).toBeLessThanOrEqual(21);
+    expect(sliderFixtureOwnerClerkId).toBe("user_3JRUuhMIDwBBiLyc4smN8pAtGS9");
+    expect(
+      new Set(sliderFixtureCatalog.products.map(({ maker }) => maker)),
+    ).toEqual(new Set(["Magnus Fidgets", "Novel Carry", "FidgetBoy"]));
+
+    for (const type of ["slider", "slider-plate", "slider-insert"] as const) {
+      const products = [...(byType[type] ?? [])].sort(
+        (left, right) =>
+          new Date(right.updatedAt).getTime() -
+          new Date(left.updatedAt).getTime(),
+      );
+      expect(products[0]?.images.length).toBeGreaterThan(1);
+      expect(products.slice(1).every(({ images }) => images.length === 1)).toBe(
+        true,
+      );
+    }
+
+    const sliders = byType.slider ?? [];
+    expect(
+      sliders.some(
+        ({ magnetSystem, magnetConfiguration }) =>
+          magnetSystem === "body-hosted" && magnetConfiguration !== null,
+      ),
+    ).toBe(true);
+    expect(
+      sliders.some(
+        ({ magnetSystem, magnetSetupSourceNote }) =>
+          magnetSystem === "body-hosted" && magnetSetupSourceNote !== null,
+      ),
+    ).toBe(true);
+    expect(
+      sliders.some(
+        ({ defaultInsertSlug, magnetSystem }) =>
+          magnetSystem === "insert-driven" && defaultInsertSlug !== null,
+      ),
+    ).toBe(true);
+    expect(
+      sliders.every(({ compatibilityFamily }) => compatibilityFamily),
+    ).toBe(true);
+    expect(sliders.every(({ includedPlateSlug }) => includedPlateSlug)).toBe(
+      true,
+    );
+    expect(sliderFixtureCatalog.products.some(({ pattern }) => pattern)).toBe(
+      true,
+    );
+    expect(
+      new Set(
+        sliderFixtureCatalog.products.flatMap(({ images }) =>
+          images.map(({ key }) => key),
+        ),
+      ).size,
+    ).toBe(
+      sliderFixtureCatalog.products.reduce(
+        (count, { images }) => count + images.length,
+        0,
+      ),
+    );
   });
 });
 

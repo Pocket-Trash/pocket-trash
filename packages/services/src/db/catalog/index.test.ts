@@ -8,6 +8,7 @@ import {
   createCatalogService,
   createCollectionsService,
   normalizeCollectionName,
+  resolveEffectiveSliderSetup,
 } from "./index.js";
 
 /**
@@ -32,7 +33,7 @@ const actor = (
  */
 function createLookup(
   service: ReturnType<typeof createCatalogService>,
-  kind: "color" | "finish" | "maker" | "material",
+  kind: "color" | "finish" | "maker" | "material" | "pattern",
 ) {
   switch (kind) {
     case "color":
@@ -59,6 +60,12 @@ function createLookup(
         actor: actor("user-secret", "admin"),
         name: "bronze",
       });
+    case "pattern":
+      return service.createPattern({
+        actor: actor("user-secret", "admin"),
+        name: "bronze",
+        slug: "bronze-2",
+      });
   }
 }
 
@@ -70,6 +77,103 @@ describe("collection name normalization", () => {
       "roys",
     ]);
     expect(normalizeCollectionName(" --- ")).toBe("");
+  });
+});
+
+describe("effective owned slider setup", () => {
+  const configuration = {
+    groups: [],
+    label: "Catalog layout",
+    slots: [
+      {
+        documentedColumn: null,
+        documentedRow: null,
+        groupKey: null,
+        half: "half-a" as const,
+        key: "A1",
+        state: "empty" as const,
+      },
+    ],
+    sourceLabel: null,
+    sourceNotes: null,
+  };
+  const matchingDefault = {
+    clickCount: 5,
+    clickOptionId: 1000,
+    configuration,
+    copiedFromTemplateId: null,
+    id: 2000,
+    insertProductId: 3000,
+    insertProductName: "Matching insert",
+    isAdvertisedDefault: true,
+    isSliderAdvertisedDefault: true,
+  };
+  const otherInsertDefault = {
+    ...matchingDefault,
+    id: 2001,
+    insertProductId: 3001,
+    insertProductName: "Other insert",
+  };
+
+  it("uses only a matching installed insert for live catalog fallback", () => {
+    expect(
+      resolveEffectiveSliderSetup({
+        bodyHostedSetup: null,
+        installedInsertOffers: [],
+        installedInsertProductId: 3000,
+        ownedInsertSetup: null,
+        sliderAdvertisedOffers: [otherInsertDefault, matchingDefault],
+      }),
+    ).toMatchObject({
+      clickCount: 5,
+      source: "slider-default",
+    });
+    expect(
+      resolveEffectiveSliderSetup({
+        bodyHostedSetup: null,
+        installedInsertOffers: [],
+        installedInsertProductId: 3000,
+        ownedInsertSetup: null,
+        sliderAdvertisedOffers: [otherInsertDefault],
+      }),
+    ).toMatchObject({ clickCount: null, source: "not-recorded" });
+  });
+
+  it("lets a partial owned snapshot win without filling catalog gaps", () => {
+    expect(
+      resolveEffectiveSliderSetup({
+        bodyHostedSetup: null,
+        installedInsertOffers: [matchingDefault],
+        installedInsertProductId: 3000,
+        ownedInsertSetup: {
+          clickCount: null,
+          configuration: null,
+          sourceOfferId: null,
+        },
+        sliderAdvertisedOffers: [matchingDefault],
+      }),
+    ).toEqual({
+      clickCount: null,
+      configuration: null,
+      isLiveCatalog: false,
+      source: "owned-insert",
+    });
+  });
+
+  it("resolves an uninstalled slider default without creating an insert", () => {
+    expect(
+      resolveEffectiveSliderSetup({
+        bodyHostedSetup: null,
+        installedInsertOffers: [],
+        installedInsertProductId: null,
+        ownedInsertSetup: null,
+        sliderAdvertisedOffers: [matchingDefault],
+      }),
+    ).toMatchObject({
+      configuration,
+      isLiveCatalog: true,
+      source: "slider-default",
+    });
   });
 });
 
@@ -459,11 +563,11 @@ describe("collection catalog writes", () => {
       [
         [{ id: 900 }],
         [{ materialId: 1201 }],
-        [{ colorEffectId: null }],
+        [{ colorEffectId: null, patternId: 1203 }],
         [{ finishId: 1202, position: 0 }],
         [],
         [{ materialId: 1101 }],
-        [{ colorEffectId: null }],
+        [{ colorEffectId: null, patternId: 1103 }],
         [{ finishId: 1102, position: 0 }],
         [],
       ],
@@ -501,6 +605,7 @@ describe("collection catalog writes", () => {
           value: {
             collectionItemId: 2000,
             colorEffectId: null,
+            patternId: 1203,
             position: 0,
             sourceProductFinishOptionId: 1202,
           },
@@ -532,7 +637,7 @@ describe("collection catalog writes", () => {
       [
         [{ id: 900 }],
         [{ materialId: 1101 }],
-        [{ colorEffectId: null }],
+        [{ colorEffectId: null, patternId: 1103 }],
         [{ finishId: 1102, position: 0 }],
         [],
       ],
@@ -577,6 +682,7 @@ describe("collection catalog writes", () => {
         value: {
           collectionItemId: 2001,
           colorEffectId: null,
+          patternId: 1103,
           position: 0,
           sourceProductFinishOptionId: 1102,
         },
@@ -586,6 +692,33 @@ describe("collection catalog writes", () => {
         value: [{ finishId: 1102, finishOptionId: 3001, position: 0 }],
       },
     ]);
+  });
+
+  it("stores a collection item without an appearance snapshot", async () => {
+    const { service, writes } = setup(
+      [[{ id: 2001 }]],
+      [[{ id: 900 }], [{ materialId: 1101 }]],
+    );
+
+    await expect(
+      service.addSpinner({
+        actor: actor("user-secret"),
+        buttonCustomFinish: null,
+        buttonFinishOptionId: null,
+        buttonMaterialId: null,
+        buttonProductId: null,
+        collectionId: 900,
+        displayName: "My spinner",
+        spinnerCustomFinish: null,
+        spinnerFinishOptionId: null,
+        spinnerMaterialId: 1101,
+        spinnerProductId: 1100,
+      }),
+    ).resolves.toEqual({ buttonItemId: null, spinnerItemId: 2001 });
+
+    expect(writes.some(({ table }) => table === schema.finishOption)).toBe(
+      false,
+    );
   });
 
   it("stores a private custom finish with ordered fade colors", async () => {
@@ -601,6 +734,7 @@ describe("collection catalog writes", () => {
           colorEffectId: 10,
           colorIds: [22, 21],
           finishIds: [31, 32],
+          patternId: 33,
         },
         finishOptionId: null,
         collectionId: 900,
@@ -617,6 +751,7 @@ describe("collection catalog writes", () => {
           value: {
             collectionItemId: 2000,
             colorEffectId: 10,
+            patternId: 33,
             position: 0,
           },
         },
@@ -1046,7 +1181,7 @@ describe("catalog lookup writes", () => {
     }
   });
 
-  it("updates maker product URL validity without rewriting the product", async () => {
+  it("marks maker product URL validity as a meaningful update", async () => {
     const { db, updates } = setup(
       [],
       [[{ makerProductUrlValid: true, ownerUserId: 1000 }]],
@@ -1065,7 +1200,10 @@ describe("catalog lookup writes", () => {
 
     expect(updates).toContainEqual({
       table: schema.product,
-      value: { makerProductUrlValid: false },
+      value: {
+        makerProductUrlValid: false,
+        updatedAt: expect.any(Date),
+      },
     });
   });
 
@@ -1166,6 +1304,7 @@ describe("catalog lookup writes", () => {
     "finish",
     "maker",
     "material",
+    "pattern",
   ] as const)("rejects a case-insensitive duplicate %s name", async (kind) => {
     const insert = vi.fn();
     const db = {
@@ -1198,6 +1337,7 @@ describe("catalog lookup writes", () => {
     ["finish", "finish_name_case_insensitive_unique", "Finish"],
     ["maker", "makers_name_case_insensitive_unique", "Maker"],
     ["material", "materials_name_case_insensitive_unique", "Material"],
+    ["pattern", "pattern_name_case_insensitive_unique", "Pattern"],
   ] as const)("maps a concurrent duplicate %s name to the existing domain error", async (kind, constraint, label) => {
     const databaseError = new Error("Query failed", {
       cause: { code: "23505", constraint },
@@ -1249,6 +1389,24 @@ describe("catalog finish validation", () => {
             colorEffectId: 1001,
             colorIds: [1000, 1001],
             finishIds: [1000, 1001],
+            patternId: null,
+          },
+        ],
+        effects,
+      ),
+    ).not.toThrow();
+  });
+
+  it("accepts no appearance options and a pattern-only option", () => {
+    expect(() => assertValidFinishOptions([], effects)).not.toThrow();
+    expect(() =>
+      assertValidFinishOptions(
+        [
+          {
+            colorEffectId: null,
+            colorIds: [],
+            finishIds: [],
+            patternId: 1002,
           },
         ],
         effects,
@@ -1261,21 +1419,25 @@ describe("catalog finish validation", () => {
       colorEffectId: null,
       colorIds: [],
       finishIds: [],
+      patternId: null,
     },
     {
       colorEffectId: 1001,
       colorIds: [1000],
       finishIds: [1000],
+      patternId: null,
     },
     {
       colorEffectId: 1000,
       colorIds: [1000, 1001],
       finishIds: [1000],
+      patternId: null,
     },
     {
       colorEffectId: null,
       colorIds: [],
       finishIds: [1000, 1000],
+      patternId: null,
     },
   ])("rejects an invalid option", (option) => {
     expect(() => assertValidFinishOptions([option], effects)).toThrow();
@@ -1286,6 +1448,7 @@ describe("catalog finish validation", () => {
       colorEffectId: null,
       colorIds: [] as number[],
       finishIds: [1000],
+      patternId: null,
     };
     expect(() => assertValidFinishOptions([option, option], effects)).toThrow(
       /duplicate/i,

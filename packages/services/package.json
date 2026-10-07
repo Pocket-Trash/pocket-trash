@@ -21,6 +21,10 @@
     "./catalog-slug": {
       "types": "./dist/catalog-slug.d.ts",
       "default": "./dist/catalog-slug.js"
+    },
+    "./catalog-terminology": {
+      "types": "./dist/catalog-terminology.d.ts",
+      "default": "./dist/catalog-terminology.js"
     }
   },
   "scripts": {

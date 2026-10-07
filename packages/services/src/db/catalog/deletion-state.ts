@@ -16,7 +16,13 @@ export async function collectionItemDeletionState(
 ): Promise<AuditJsonObject[]> {
   if (!ids.length) return [];
   // Freeze child keys and rows so FK writers cannot change the allowlisted pre-state.
-  for (const table of ["collection_spinner_button", "collection_spinner"]) {
+  for (const table of [
+    "collection_spinner_button",
+    "collection_spinner",
+    "collection_slider",
+    "collection_slider_plate",
+    "collection_slider_insert",
+  ]) {
     await tx.execute(sql`select id from ${sql.identifier(table)}
       where id in (${sql.join(
         ids.map((id) => sql`${id}`),
@@ -51,6 +57,11 @@ export async function collectionItemDeletionState(
       'productSpinnerId', spinner.product_spinner_id,
       'installedButtonId', spinner.installed_button_id, 'bearing', spinner.bearing,
       'productSpinnerButtonId', button.product_spinner_button_id,
+      'productSliderId', slider.product_slider_id,
+      'installedPlateId', slider.installed_plate_id,
+      'installedInsertId', slider.installed_insert_id,
+      'productSliderPlateId', slider_plate.product_slider_plate_id,
+      'productSliderInsertId', slider_insert.product_slider_insert_id,
       'finishOptions', coalesce((
         select jsonb_agg(jsonb_build_object(
           'id', option.id, 'position', option.position,
@@ -77,6 +88,9 @@ export async function collectionItemDeletionState(
     from collection_item item
     left join collection_spinner spinner on spinner.id = item.id
     left join collection_spinner_button button on button.id = item.id
+    left join collection_slider slider on slider.id = item.id
+    left join collection_slider_plate slider_plate on slider_plate.id = item.id
+    left join collection_slider_insert slider_insert on slider_insert.id = item.id
     where item.id in (${sql.join(
       ids.map((id) => sql`${id}`),
       sql`, `,

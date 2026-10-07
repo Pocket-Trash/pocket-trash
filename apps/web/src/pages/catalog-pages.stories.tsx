@@ -38,12 +38,18 @@ const collectionImage = image(
 /** Catalog product shared by the stories. */
 const product: CatalogProduct = {
   approvalStatus: "approved",
+  advertisedInsertOffers: [],
   bearing: "R188 hybrid ceramic",
+  bodyHostedMagnetSetup: null,
+  insertClickOptions: [],
+  insertMagnetOffers: [],
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: false,
   compatibleButtonId: null,
   compatibleButtonName: null,
+  compatibilityAdvisories: [],
+  compatibilityFamilies: [],
   createdAt: new Date("2026-01-01"),
   description: "A **compact** spinner.",
   diameterMm: "50.8",
@@ -53,11 +59,13 @@ const product: CatalogProduct = {
       colors: [{ hex: "#2563eb", id: 1000, name: "Blue", slug: "blue" }],
       finishes: [{ id: 1000, name: "Anodized", slug: "anodized" }],
       id: 1000,
+      pattern: null,
     },
   ],
   id: 1000,
   imageCount: 1,
   images: [productImage],
+  includedComponents: [],
   isAdminPrivate: false,
   isPrivate: false,
   lengthMm: null,
@@ -67,6 +75,7 @@ const product: CatalogProduct = {
   makerProductUrl: "https://www.kapedc.com/products/katla",
   makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
+  magnetSystem: null,
   materials: [{ id: 1000, name: "Titanium", slug: "titanium" }],
   name: "Katla",
   ownerClerkId: "user_storybook",
@@ -79,7 +88,91 @@ const product: CatalogProduct = {
   thicknessWithButtonMm: null,
   updatedAt: new Date("2026-01-02"),
   weightG: "90",
+  weightBasis: null,
   widthMm: null,
+};
+
+/** Slider catalog fixture covering capability and reviewed relationships. */
+const slider: CatalogProduct = {
+  ...product,
+  bearing: null,
+  bodyHostedMagnetSetup: {
+    clickCount: 4,
+    configuration: {
+      groups: [
+        {
+          diameterMm: "6.35",
+          grade: "N52",
+          key: "corners",
+          label: "Corners",
+          thicknessMm: "3.175",
+        },
+      ],
+      label: "Medium",
+      slots: [
+        {
+          documentedColumn: 1,
+          documentedRow: 1,
+          groupKey: "corners",
+          half: "half-a",
+          key: "A1",
+          state: "occupied",
+        },
+        {
+          documentedColumn: 1,
+          documentedRow: 1,
+          groupKey: null,
+          half: "half-b",
+          key: "B1",
+          state: "empty",
+        },
+      ],
+      sourceLabel: "4-click layout",
+      sourceNotes: null,
+    },
+    sourceNote: null,
+  },
+  buttonDiameterMm: null,
+  compatibilityAdvisories: [
+    {
+      id: 2100,
+      relatedProductId: 2200,
+      relatedProductName: "Cassette insert",
+      reviewedAt: new Date("2026-01-02"),
+      text: "Requires the revised spring pack.",
+    },
+  ],
+  compatibilityFamilies: [
+    {
+      id: 2000,
+      makerId: product.makerId,
+      makerName: product.makerName,
+      name: "Rail 50",
+      slug: "rail-50",
+    },
+  ],
+  diameterMm: null,
+  id: 2000,
+  includedComponents: [
+    {
+      id: 2200,
+      name: "Matched plates",
+      productTypeSlug: "slider-plate",
+      slug: "matched-plates",
+    },
+  ],
+  lengthMm: "52",
+  magnetSystem: "body-hosted",
+  name: "Rail Slider",
+  productTypeId: 2000,
+  productTypeName: "Slider",
+  productTypeSlug: "slider",
+  slug: "rail-slider",
+  spinDiameterMm: null,
+  thicknessMm: "12",
+  weightBasis: "complete-build",
+  weightG: "96",
+  widthMm: "24",
 };
 
 /** User collection shared by the stories. */
@@ -108,13 +201,22 @@ const item: UserCollectionItem = {
   collectionIsPrivate: false,
   collectionItemId: 1000,
   collectionName: collection.name,
+  compatibilityFamilies: [],
+  compatibleButtonId: null,
+  compatibleButtonName: null,
   displayName: "My Katla",
   description: "My **daily carry** spinner.",
   descriptionOverride: "My **daily carry** spinner.",
   finishOption: product.finishOptions[0] ?? null,
+  effectiveSliderSetup: null,
+  hasGrandfatheredInstallation: false,
   imageCount: 1,
   images: [collectionImage],
   installedButtonId: 1001,
+  installedInsertId: null,
+  installedOnSliderId: null,
+  installedPlateId: null,
+  includedComponents: [],
   isAdminPrivate: false,
   isPrivate: false,
   makerId: product.makerId,
@@ -126,6 +228,7 @@ const item: UserCollectionItem = {
   ownerClerkId: "user_storybook",
   ownerUsername: "royanger",
   ownerUserId: collection.ownerUserId,
+  ownedInsertSetup: null,
   productId: product.id,
   productSlug: product.slug,
   productImages: product.images,
@@ -235,6 +338,31 @@ export const CollectionItem: Story = {
   ),
 };
 
+/** Standalone body-hosted slider item with live read-only catalog setup. */
+export const StandaloneSliderCollectionItem: Story = {
+  /**
+   * Renders the standalone slider collection-item story.
+   * @returns A slider item and its live catalog facts.
+   */
+  render: () => (
+    <CollectionItemDetailPage
+      item={{
+        ...item,
+        bearing: null,
+        bearingOverride: null,
+        displayName: "My Rail Slider",
+        installedButtonId: null,
+        name: slider.name,
+        productId: slider.id,
+        productSlug: slider.slug,
+        productTypeName: slider.productTypeName,
+        productTypeSlug: "slider",
+      }}
+      product={slider}
+    />
+  ),
+};
+
 /** Home page story. */
 export const Home: Story = {
   /**
@@ -288,6 +416,15 @@ export const ProductDetail: Story = {
   render: () => (
     <ProductDetailPage collectionItems={[item]} product={product} />
   ),
+};
+
+/** Slider product detail with explicit capability and reviewed relationships. */
+export const SliderProductDetail: Story = {
+  /**
+   * Renders the slider detail story.
+   * @returns A slider catalog detail fixture.
+   */
+  render: () => <ProductDetailPage product={slider} />,
 };
 
 /** Approval-decision spy returning the approved state for story interactions. */

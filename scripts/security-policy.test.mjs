@@ -8,6 +8,8 @@ import test from "node:test";
 
 /** Repository pnpm workspace policy under test. */
 const workspacePolicy = await readFile("pnpm-workspace.yaml", "utf8");
+/** Committed dependency resolutions under test. */
+const workspaceLockfile = await readFile("pnpm-lock.yaml", "utf8");
 /** Workspace policy without repository-only package patch metadata. */
 const fixturePolicy = workspacePolicy.replace(
   /patchedDependencies:\n(?: {2}.+\n)+/,
@@ -43,6 +45,15 @@ test("gates artifacts, releases, and deployments on the audit", () => {
     /^pnpm --dir \.\.\/\.\. security:audit/,
   );
   assert.match(railwayConfig.build.buildCommand, /^pnpm security:audit/);
+});
+
+test("pins patched shell-quote and Sharp releases across transitive paths", () => {
+  assert.match(workspacePolicy, /"shell-quote@1": "1\.11\.0"/);
+  assert.match(workspacePolicy, /"sharp@0\.35": "0\.35\.5"/);
+  assert.match(workspaceLockfile, /shell-quote@1\.11\.0/);
+  assert.match(workspaceLockfile, /sharp@0\.35\.5/);
+  assert.doesNotMatch(workspaceLockfile, /shell-quote@1\.9\.0/);
+  assert.doesNotMatch(workspaceLockfile, /sharp@0\.35\.4/);
 });
 
 test("provides the locked deployment executables", async () => {

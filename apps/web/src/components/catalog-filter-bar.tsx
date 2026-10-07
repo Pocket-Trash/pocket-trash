@@ -12,6 +12,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -65,6 +66,8 @@ export type CatalogFilterCopy = {
    * Color facet label.
    */
   colors: string;
+  /** Compatibility-family facet label. */
+  compatibilityFamily: string;
   /**
    * Description of the advanced filter sheet.
    */
@@ -96,6 +99,10 @@ export type CatalogFilterCopy = {
    * Material facet label.
    */
   materials: string;
+  /** Appearance-pattern facet label. */
+  pattern: string;
+  /** Exact slider-plate facet label. */
+  plate: string;
   /**
    * Short label for opening overflow facet options.
    */
@@ -120,6 +127,13 @@ export type CatalogFilterCopy = {
    */
   productTypeAll: string;
   /**
+   * Builds the polite result-count announcement.
+   *
+   * @param count - Current matching result count.
+   * @returns Localized result-count announcement.
+   */
+  resultsAnnouncement: (count: number) => string;
+  /**
    * Placeholder for the maker combobox.
    */
   selectMaker: string;
@@ -127,6 +141,12 @@ export type CatalogFilterCopy = {
    * Placeholder for the product-type combobox.
    */
   selectProductType: string;
+  /** Exact spinner-button facet label. */
+  spinnerButton: string;
+  /** Accessible label for shared catalog search. */
+  searchLabel: string;
+  /** Placeholder for shared catalog search. */
+  searchPlaceholder: string;
 };
 
 /**
@@ -141,6 +161,7 @@ export type CatalogFilterCopy = {
  * @param props.facets - Available catalog facet values and counts.
  * @param props.filters - Current controlled filter state.
  * @param props.onChange - Callback receiving the complete next filter state.
+ * @param props.resultCount - Current matching result count announced politely.
  * @returns The responsive catalog filter controls.
  */
 export function CatalogFilterBar({
@@ -149,6 +170,7 @@ export function CatalogFilterBar({
   facets,
   filters,
   onChange,
+  resultCount,
 }: {
   /**
    * Optional trailing action beside the filter controls.
@@ -172,6 +194,8 @@ export function CatalogFilterBar({
    * @param filters - Complete next filter state.
    */
   onChange: (filters: CatalogFilters) => void;
+  /** Current matching result count announced after filter changes. */
+  resultCount: number;
 }) {
   const [desktopAdvancedOpen, setDesktopAdvancedOpen] = React.useState(false);
   const [mobileAdvancedOpen, setMobileAdvancedOpen] = React.useState(false);
@@ -181,8 +205,12 @@ export function CatalogFilterBar({
     colors: facets.colors.map(({ id }) => id),
     fades: facets.fades.map(({ key }) => key),
     finishes: facets.finishes.map(({ id }) => id),
+    compatibilityFamilies: facets.compatibilityFamilies.map(({ id }) => id),
     makers: facets.makers.map(({ id }) => id),
     materials: facets.materials.map(({ id }) => id),
+    patterns: facets.patterns.map(({ id }) => id),
+    plates: facets.plates.map(({ id }) => id),
+    spinnerButtons: facets.spinnerButtons.map(({ id }) => id),
   });
   React.useEffect(() => {
     const next = pruneCatalogFilters(filters, facets);
@@ -249,7 +277,22 @@ export function CatalogFilterBar({
       className="relative grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-end gap-1.5"
       ref={desktopRootRef}
     >
+      <output aria-live="polite" className="sr-only">
+        {copy.resultsAnnouncement(resultCount)}
+      </output>
       <div className="flex min-w-0 flex-wrap items-end gap-1.5">
+        <div className="grid min-w-52 flex-1 gap-1 text-xs font-semibold text-foreground">
+          <label htmlFor={advancedId + "-search"}>{copy.searchLabel}</label>
+          <Input
+            id={advancedId + "-search"}
+            onChange={(event) =>
+              onChange({ ...filters, query: event.target.value })
+            }
+            placeholder={copy.searchPlaceholder}
+            type="search"
+            value={filters.query}
+          />
+        </div>
         <div className="grid min-w-40 gap-1 text-xs font-semibold text-foreground">
           <span>{copy.productType}</span>
           <CatalogCombobox
@@ -258,10 +301,11 @@ export function CatalogFilterBar({
             onValueChange={(value) =>
               onChange({
                 ...filters,
-                productType:
-                  value?.id === "spinner" || value?.id === "spinner-button"
-                    ? value.id
-                    : null,
+                productType: facets.productTypes.some(
+                  ({ slug }) => slug === value?.id,
+                )
+                  ? (value?.id as CatalogFilters["productType"])
+                  : null,
               })
             }
             placeholder={copy.selectProductType}
@@ -689,6 +733,38 @@ function AdvancedFilters({
 }) {
   return (
     <>
+      <CheckboxFacet
+        copy={copy}
+        label={copy.pattern}
+        onChange={(patternIds) => onChange({ ...filters, patternIds })}
+        options={facets.patterns}
+        selected={filters.patternIds}
+      />
+      <CheckboxFacet
+        copy={copy}
+        label={copy.compatibilityFamily}
+        onChange={(compatibilityFamilyIds) =>
+          onChange({ ...filters, compatibilityFamilyIds })
+        }
+        options={facets.compatibilityFamilies}
+        selected={filters.compatibilityFamilyIds}
+      />
+      <CheckboxFacet
+        copy={copy}
+        label={copy.plate}
+        onChange={(plateIds) => onChange({ ...filters, plateIds })}
+        options={facets.plates}
+        selected={filters.plateIds}
+      />
+      <CheckboxFacet
+        copy={copy}
+        label={copy.spinnerButton}
+        onChange={(spinnerButtonIds) =>
+          onChange({ ...filters, spinnerButtonIds })
+        }
+        options={facets.spinnerButtons}
+        selected={filters.spinnerButtonIds}
+      />
       <div className="grid gap-1 text-xs font-semibold">
         <span>{copy.maker}</span>
         <CatalogMultiCombobox

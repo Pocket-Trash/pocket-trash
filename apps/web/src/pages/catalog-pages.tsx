@@ -1,8 +1,13 @@
 import type {
   CatalogApprovalAction,
   CatalogApprovalStatus,
+  CatalogBodyHostedMagnetSetup,
   CatalogFinishOption,
   CatalogProduct,
+  CatalogProductType,
+  CatalogTerminologyAlias,
+  EffectiveSliderSetup,
+  OwnedSliderInsertSetup,
   PublicCollectionOwner,
   UserCollectionItem,
   UserCollectionSummary,
@@ -46,6 +51,11 @@ import {
   matchesCatalogFilters,
   productFilterItem,
 } from "@/lib/catalog-filters";
+import {
+  type CatalogSearchMatch,
+  catalogTypeDisplayLabel,
+  matchCatalogSearch,
+} from "@/lib/catalog-search";
 import { cn } from "@/lib/utils";
 
 export {
@@ -69,6 +79,7 @@ function catalogFilterCopy(
     clear: t("web.action.clearAllFilters"),
     close: t("web.action.close"),
     colors: t("web.catalog.field.colors"),
+    compatibilityFamily: t("web.slider.filter.compatibilityFamily"),
     description: t("web.catalog.filter.description"),
     /**
      * Formats a fade option name.
@@ -91,11 +102,83 @@ function catalogFilterCopy(
      * @returns The localized additional-options label.
      */
     moreOptions: (label) => t("web.catalog.filter.moreOptions", { label }),
+    pattern: t("web.slider.filter.pattern"),
+    plate: t("web.slider.filter.plate"),
     productType: t("web.catalog.field.productType"),
     productTypeAll: t("web.catalog.filter.productTypeAll"),
+    /**
+     * Formats the polite matching-result announcement.
+     *
+     * @param count - Current matching result count.
+     * @returns Localized matching-result announcement.
+     */
+    resultsAnnouncement: (count) =>
+      t("web.slider.filter.resultsAnnouncement", { count }),
+    searchLabel: t("web.slider.search.label"),
+    searchPlaceholder: t("web.slider.search.placeholder"),
     selectMaker: t("web.catalog.selectMaker"),
     selectProductType: t("web.catalog.selectProductType"),
+    spinnerButton: t("web.slider.filter.spinnerButton"),
   };
+}
+
+/** English canonical product-type labels retained as locale fallback search terms. */
+const englishProductTypeLabels: Record<CatalogProductType, string> = {
+  slider: "Slider",
+  "slider-insert": "Slider insert",
+  "slider-plate": "Slider plate",
+  spinner: "Spinner",
+  "spinner-button": "Spinner button",
+};
+
+/**
+ * Returns the active-locale canonical product-type label.
+ *
+ * @param t - Active-locale catalog formatter.
+ * @param productType - Canonical product-type key.
+ * @param fallback - Persisted label used until a localization ships.
+ * @returns Active-locale label or the persisted fallback.
+ */
+function localizedProductTypeLabel(
+  t: ReturnType<typeof useCatalogCopy>,
+  productType: CatalogProductType,
+  fallback: string,
+) {
+  const key = {
+    slider: "web.slider.productType.slider",
+    "slider-insert": "web.slider.productType.insert",
+    "slider-plate": "web.slider.productType.plate",
+    spinner: "web.slider.productType.spinner",
+    "spinner-button": "web.slider.productType.spinnerButton",
+  }[productType];
+  const label = t(key);
+  return label === key ? fallback : label;
+}
+
+/**
+ * Formats a concise explanation for a non-name search match.
+ *
+ * @param t - Active-locale catalog formatter.
+ * @param match - Search context to explain.
+ * @returns Localized context, or `undefined` for direct name and maker matches.
+ */
+function searchMatchContext(
+  t: ReturnType<typeof useCatalogCopy>,
+  match: CatalogSearchMatch | undefined,
+) {
+  if (match?.matchedAlias)
+    return t("web.slider.search.matchedAliasContext", {
+      alias: match.matchedAlias,
+    });
+  if (match?.matchedType)
+    return t("web.slider.search.matchedTypeContext", {
+      type: match.matchedType,
+    });
+  if (match?.matchedOwner)
+    return t("web.slider.search.ownerMatchContext", {
+      owner: match.matchedOwner,
+    });
+  return undefined;
 }
 
 /**
@@ -188,10 +271,13 @@ export function ResourcesPage() {
  * @returns The product index page.
  */
 export function ProductsPage({
+  aliases = [],
   filters = emptyCatalogFilters(),
   onFiltersChange,
   products,
 }: {
+  /** Registered terminology aliases available to search and display. */
+  aliases?: CatalogTerminologyAlias[];
   /** Active catalog filters. */
   filters?: CatalogFilters;
   /** Optional filter state updater. */
@@ -200,9 +286,31 @@ export function ProductsPage({
   products: CatalogProduct[];
 }) {
   const t = useCatalogCopy();
-  const filtered = products.filter((product) =>
-    matchesCatalogFilters(productFilterItem(product), filters),
-  );
+  const searchMatches = new Map<number, CatalogSearchMatch>();
+  const filtered = products.filter((product) => {
+    if (!matchesCatalogFilters(productFilterItem(product), filters))
+      return false;
+    const activeTypeLabel = localizedProductTypeLabel(
+      t,
+      product.productTypeSlug,
+      product.productTypeName,
+    );
+    const match = matchCatalogSearch(
+      {
+        activeTypeLabel,
+        englishTypeLabel: englishProductTypeLabels[product.productTypeSlug],
+        makerId: product.makerId,
+        makerName: product.makerName,
+        name: product.name,
+        ownerDisplayName: null,
+        productTypeSlug: product.productTypeSlug,
+      },
+      filters.query,
+      aliases,
+    );
+    if (match) searchMatches.set(product.id, match);
+    return match !== null;
+  });
   const facets = buildCatalogFacets(
     products.map(productFilterItem),
     filters.productType,
@@ -224,12 +332,17 @@ export function ProductsPage({
             facets={facets}
             filters={filters}
             onChange={onFiltersChange}
+            resultCount={filtered.length}
           />
         ) : undefined
       }
       title={t("web.navigation.products")}
     >
-      <ProductGrid products={filtered} />
+      <ProductGrid
+        aliases={aliases}
+        products={filtered}
+        searchMatches={searchMatches}
+      />
     </AppShell>
   );
 }
@@ -253,43 +366,41 @@ export function ProductDetailPage({
 }) {
   const t = useCatalogCopy();
   const navigate = useNavigate();
-  if (
-    product.productTypeSlug !== "spinner" &&
-    product.productTypeSlug !== "spinner-button"
-  ) {
-    return (
-      <AppShell
-        breadcrumbItems={[
-          { label: t("web.navigation.products"), to: "/products" },
-        ]}
-        title={product.name}
-      >
-        <main className="mx-auto max-w-3xl p-6">
-          <EmptyState>{t("web.catalog.notImplemented")}</EmptyState>
-        </main>
-      </AppShell>
-    );
+  let specs: Array<[TranslationKey, string | null, string]>;
+  switch (product.productTypeSlug) {
+    case "spinner":
+      specs = [
+        ["web.archive.spec.weight", product.weightG, "g"],
+        ["web.archive.spec.length", product.lengthMm, "mm"],
+        ["web.catalog.field.width", product.widthMm, "mm"],
+        ["web.catalog.field.thickness", product.thicknessMm, "mm"],
+        [
+          "web.catalog.field.thicknessWithButton",
+          product.thicknessWithButtonMm,
+          "mm",
+        ],
+        ["web.catalog.field.buttonDiameter", product.buttonDiameterMm, "mm"],
+        ["web.catalog.field.spinDiameter", product.spinDiameterMm, "mm"],
+      ];
+      break;
+    case "spinner-button":
+      specs = [
+        ["web.archive.spec.weight", product.weightG, "g"],
+        ["web.archive.spec.diameter", product.diameterMm, "mm"],
+        ["web.catalog.field.thickness", product.thicknessMm, "mm"],
+      ];
+      break;
+    case "slider":
+    case "slider-insert":
+    case "slider-plate":
+      specs = [
+        ["web.archive.spec.weight", product.weightG, "g"],
+        ["web.archive.spec.length", product.lengthMm, "mm"],
+        ["web.catalog.field.width", product.widthMm, "mm"],
+        ["web.catalog.field.thickness", product.thicknessMm, "mm"],
+      ];
+      break;
   }
-  const specs: Array<[TranslationKey, string | null, string]> =
-    product.productTypeSlug === "spinner"
-      ? [
-          ["web.archive.spec.weight", product.weightG, "g"],
-          ["web.archive.spec.length", product.lengthMm, "mm"],
-          ["web.catalog.field.width", product.widthMm, "mm"],
-          ["web.catalog.field.thickness", product.thicknessMm, "mm"],
-          [
-            "web.catalog.field.thicknessWithButton",
-            product.thicknessWithButtonMm,
-            "mm",
-          ],
-          ["web.catalog.field.buttonDiameter", product.buttonDiameterMm, "mm"],
-          ["web.catalog.field.spinDiameter", product.spinDiameterMm, "mm"],
-        ]
-      : [
-          ["web.archive.spec.weight", product.weightG, "g"],
-          ["web.archive.spec.diameter", product.diameterMm, "mm"],
-          ["web.catalog.field.thickness", product.thicknessMm, "mm"],
-        ];
 
   return (
     <AppShell
@@ -298,13 +409,16 @@ export function ProductDetailPage({
       ]}
       headerActions={
         <div className="flex items-center gap-2">
-          <Link
-            className={buttonVariants({ variant: "outline" })}
-            search={{ product: product.id }}
-            to="/collections/add"
-          >
-            {t("web.action.addToCollection")}
-          </Link>
+          {product.productTypeSlug === "spinner" ||
+          product.productTypeSlug === "spinner-button" ? (
+            <Link
+              className={buttonVariants({ variant: "outline" })}
+              search={{ product: product.id }}
+              to="/collections/add"
+            >
+              {t("web.action.addToCollection")}
+            </Link>
+          ) : null}
           {product.canEdit ? (
             <>
               <Link
@@ -428,6 +542,90 @@ export function ProductDetailPage({
               {product.bearing}
             </Detail>
           ) : null}
+          {product.productTypeSlug === "slider" && product.magnetSystem ? (
+            <Detail label={t("web.slider.capability.label")}>
+              {t(
+                product.magnetSystem === "body-hosted"
+                  ? "web.slider.capability.bodyHosted"
+                  : "web.slider.capability.insertDriven",
+              )}
+            </Detail>
+          ) : null}
+          {product.productTypeSlug === "slider" && product.weightBasis ? (
+            <Detail label={t("web.slider.measurement.weightBasis")}>
+              {t(
+                product.weightBasis === "body-only"
+                  ? "web.slider.measurement.bodyOnly"
+                  : "web.slider.measurement.completeBuild",
+              )}
+            </Detail>
+          ) : null}
+          {product.bodyHostedMagnetSetup ? (
+            <Detail label={t("web.slider.setup.title")}>
+              <BodyHostedMagnetSetupDetails
+                setup={product.bodyHostedMagnetSetup}
+                t={t}
+              />
+            </Detail>
+          ) : null}
+          {product.insertClickOptions.length ? (
+            <Detail label={t("web.slider.setup.clickCount")}>
+              {product.insertClickOptions
+                .map(({ clickCount }) =>
+                  t("web.slider.setup.clicks", { count: clickCount }),
+                )
+                .join(", ")}
+            </Detail>
+          ) : null}
+          {product.insertMagnetOffers.length ? (
+            <Detail label={t("web.slider.setup.availableOffers")}>
+              <ul className="grid gap-3">
+                {product.insertMagnetOffers.map((offer) => (
+                  <li
+                    className="grid gap-2 rounded-md border border-border p-3"
+                    key={offer.id}
+                  >
+                    <span className="font-medium">
+                      {offer.configuration.label}
+                      {offer.isAdvertisedDefault
+                        ? ` · ${t("web.slider.setup.advertisedDefault")}`
+                        : ""}
+                    </span>
+                    <BodyHostedMagnetSetupDetails
+                      setup={{
+                        clickCount: offer.clickCount,
+                        configuration: offer.configuration,
+                        sourceNote: null,
+                      }}
+                      t={t}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </Detail>
+          ) : null}
+          {product.advertisedInsertOffers.length ? (
+            <Detail label={t("web.slider.setup.availableOffers")}>
+              <ul className="grid gap-3">
+                {product.advertisedInsertOffers.map((offer) => (
+                  <li key={offer.id}>
+                    <span className="font-medium">
+                      {offer.insertProductName}: {offer.configuration.label}
+                    </span>
+                    {offer.isSliderAdvertisedDefault
+                      ? ` · ${t("web.slider.setup.default")}`
+                      : ""}
+                  </li>
+                ))}
+              </ul>
+            </Detail>
+          ) : null}
+          {product.productTypeSlug === "slider-plate" ||
+          product.productTypeSlug === "slider-insert" ? (
+            <Detail label={t("web.slider.measurement.basis")}>
+              {t("web.slider.measurement.setLevel")}
+            </Detail>
+          ) : null}
           {specs.map(([key, value, unit]) =>
             value ? (
               <Detail key={key} label={t(key)}>
@@ -435,6 +633,36 @@ export function ProductDetailPage({
               </Detail>
             ) : null,
           )}
+          {product.compatibilityFamilies.length ? (
+            <Detail label={t("web.slider.relationship.compatibilityFamilies")}>
+              {product.compatibilityFamilies
+                .map(({ makerName, name }) => `${makerName}: ${name}`)
+                .join(", ")}
+            </Detail>
+          ) : null}
+          {product.includedComponents.length ? (
+            <Detail label={t("web.slider.relationship.includedComponents")}>
+              <ul className="grid gap-1">
+                {product.includedComponents.map((component) => (
+                  <li key={component.id}>{component.name}</li>
+                ))}
+              </ul>
+            </Detail>
+          ) : null}
+          {product.compatibilityAdvisories.length ? (
+            <Detail label={t("web.slider.relationship.reviewedAdvisory")}>
+              <ul className="grid gap-1">
+                {product.compatibilityAdvisories.map((advisory) => (
+                  <li key={advisory.id}>
+                    <span className="font-medium">
+                      {advisory.relatedProductName}:
+                    </span>{" "}
+                    {advisory.text}
+                  </li>
+                ))}
+              </ul>
+            </Detail>
+          ) : null}
         </dl>
         <section className="grid gap-4">
           <h2 className="text-lg font-semibold">
@@ -511,10 +739,13 @@ export function ProductDetailPage({
  * @returns The public collection directory.
  */
 export function PublicCollectionsPage({
+  aliases = [],
   filters = emptyCatalogFilters(),
   onFiltersChange,
   owners,
 }: {
+  /** Registered terminology aliases available to search. */
+  aliases?: CatalogTerminologyAlias[];
   /** Active catalog filters. */
   filters?: CatalogFilters;
   /** Optional filter state updater. */
@@ -529,11 +760,39 @@ export function PublicCollectionsPage({
         approvalStatus === "approved" && !(collectionIsPrivate || isPrivate),
     ),
   );
+  const ownerNames = new Map(
+    owners.map((owner) => [owner.userId, owner.username]),
+  );
   const matchingCollectionIds = new Set(
     publicItems
-      .filter((item) =>
-        matchesCatalogFilters(collectionFilterItem(item), filters),
-      )
+      .filter((item) => {
+        if (
+          !matchesCatalogFilters(
+            collectionFilterItem(item, publicItems),
+            filters,
+          )
+        )
+          return false;
+        return Boolean(
+          matchCatalogSearch(
+            {
+              activeTypeLabel: localizedProductTypeLabel(
+                t,
+                item.productTypeSlug,
+                item.productTypeName,
+              ),
+              englishTypeLabel: englishProductTypeLabels[item.productTypeSlug],
+              makerId: item.makerId,
+              makerName: item.makerName,
+              name: item.displayName,
+              ownerDisplayName: ownerNames.get(item.ownerUserId) ?? null,
+              productTypeSlug: item.productTypeSlug,
+            },
+            filters.query,
+            aliases,
+          ),
+        );
+      })
       .map(({ collectionId }) => collectionId),
   );
   const collections = owners
@@ -552,7 +811,7 @@ export function PublicCollectionsPage({
         left.collection.updatedAt.getTime(),
     );
   const facets = buildCatalogFacets(
-    publicItems.map(collectionFilterItem),
+    publicItems.map((item) => collectionFilterItem(item, publicItems)),
     filters.productType,
   );
   return (
@@ -564,6 +823,7 @@ export function PublicCollectionsPage({
             facets={facets}
             filters={filters}
             onChange={onFiltersChange}
+            resultCount={collections.length}
           />
         ) : undefined
       }
@@ -680,11 +940,14 @@ export function PublicCollectionPage({
  * @returns The user collection directory.
  */
 export function UserCollectionsPage({
+  aliases = [],
   collections,
   filters = emptyCatalogFilters(),
   items,
   onFiltersChange,
 }: {
+  /** Registered terminology aliases available to search. */
+  aliases?: CatalogTerminologyAlias[];
   /** User collections to display. */
   collections: UserCollectionSummary[];
   /** Active catalog filters. */
@@ -697,16 +960,36 @@ export function UserCollectionsPage({
   const t = useCatalogCopy();
   const matchingIds = new Set(
     items
-      .filter((item) =>
-        matchesCatalogFilters(collectionFilterItem(item), filters),
-      )
+      .filter((item) => {
+        if (!matchesCatalogFilters(collectionFilterItem(item, items), filters))
+          return false;
+        return Boolean(
+          matchCatalogSearch(
+            {
+              activeTypeLabel: localizedProductTypeLabel(
+                t,
+                item.productTypeSlug,
+                item.productTypeName,
+              ),
+              englishTypeLabel: englishProductTypeLabels[item.productTypeSlug],
+              makerId: item.makerId,
+              makerName: item.makerName,
+              name: item.displayName,
+              ownerDisplayName: item.ownerUsername,
+              productTypeSlug: item.productTypeSlug,
+            },
+            filters.query,
+            aliases,
+          ),
+        );
+      })
       .map(({ collectionId }) => collectionId),
   );
   const filtered = hasCatalogFilters(filters)
     ? collections.filter(({ id }) => matchingIds.has(id))
     : collections;
   const facets = buildCatalogFacets(
-    items.map(collectionFilterItem),
+    items.map((item) => collectionFilterItem(item, items)),
     filters.productType,
   );
   const addCollection = (
@@ -731,6 +1014,7 @@ export function UserCollectionsPage({
             facets={facets}
             filters={filters}
             onChange={onFiltersChange}
+            resultCount={filtered.length}
           />
         ) : (
           <div className="flex justify-end">{addCollection}</div>
@@ -788,6 +1072,7 @@ export function UserCollectionsPage({
  * @returns The collection page.
  */
 export function CollectionPage({
+  aliases = [],
   collection,
   filters = emptyCatalogFilters(),
   items,
@@ -795,6 +1080,8 @@ export function CollectionPage({
   ownerUsername,
   userArea = false,
 }: {
+  /** Registered terminology aliases available to search and display. */
+  aliases?: CatalogTerminologyAlias[];
   /** Collection to display. */
   collection: UserCollectionSummary;
   /** Active catalog filters. */
@@ -809,11 +1096,32 @@ export function CollectionPage({
   userArea?: boolean;
 }) {
   const t = useCatalogCopy();
-  const filtered = items.filter((item) =>
-    matchesCatalogFilters(collectionFilterItem(item), filters),
-  );
+  const searchMatches = new Map<number, CatalogSearchMatch>();
+  const filtered = items.filter((item) => {
+    if (!matchesCatalogFilters(collectionFilterItem(item, items), filters))
+      return false;
+    const match = matchCatalogSearch(
+      {
+        activeTypeLabel: localizedProductTypeLabel(
+          t,
+          item.productTypeSlug,
+          item.productTypeName,
+        ),
+        englishTypeLabel: englishProductTypeLabels[item.productTypeSlug],
+        makerId: item.makerId,
+        makerName: item.makerName,
+        name: item.displayName,
+        ownerDisplayName: item.ownerUsername ?? ownerUsername ?? null,
+        productTypeSlug: item.productTypeSlug,
+      },
+      filters.query,
+      aliases,
+    );
+    if (match) searchMatches.set(item.collectionItemId, match);
+    return match !== null;
+  });
   const facets = buildCatalogFacets(
-    items.map(collectionFilterItem),
+    items.map((item) => collectionFilterItem(item, items)),
     filters.productType,
   );
   const filterBar = onFiltersChange ? (
@@ -822,6 +1130,7 @@ export function CollectionPage({
       facets={facets}
       filters={filters}
       onChange={onFiltersChange}
+      resultCount={filtered.length}
     />
   ) : null;
   const headerActions = (
@@ -933,13 +1242,36 @@ export function CollectionPage({
                   </Badge>
                 ) : null}
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {item.productTypeName} ·{" "}
+                  {catalogTypeDisplayLabel(
+                    {
+                      activeTypeLabel: localizedProductTypeLabel(
+                        t,
+                        item.productTypeSlug,
+                        item.productTypeName,
+                      ),
+                      makerId: item.makerId,
+                      productTypeSlug: item.productTypeSlug,
+                    },
+                    aliases,
+                  )}{" "}
+                  ·{" "}
                   <MakerLink
                     className="relative z-20"
                     name={item.makerName}
                     slug={item.makerSlug}
                   />
                 </p>
+                {searchMatchContext(
+                  t,
+                  searchMatches.get(item.collectionItemId),
+                ) ? (
+                  <p className="mt-1 text-xs text-primary">
+                    {searchMatchContext(
+                      t,
+                      searchMatches.get(item.collectionItemId),
+                    )}
+                  </p>
+                ) : null}
                 {item.material ? (
                   <p className="mt-3 text-xs text-muted-foreground">
                     {item.material.name}
@@ -1017,10 +1349,16 @@ export function CollectionPage({
  * @returns The product grid or its empty state.
  */
 export function ProductGrid({
+  aliases = [],
   products,
+  searchMatches = new Map(),
 }: {
+  /** Registered terminology aliases available for preferred display labels. */
+  aliases?: CatalogTerminologyAlias[];
   /** Catalog products to display. */
   products: CatalogProduct[];
+  /** Per-product context explaining a search match. */
+  searchMatches?: ReadonlyMap<number, CatalogSearchMatch>;
 }) {
   const t = useCatalogCopy();
   if (!products.length) {
@@ -1067,6 +1405,22 @@ export function ProductGrid({
                 })}
                 privateLabel={t("web.resources.moderation.privateBadge")}
                 product={product}
+                productTypeLabel={catalogTypeDisplayLabel(
+                  {
+                    activeTypeLabel: localizedProductTypeLabel(
+                      t,
+                      product.productTypeSlug,
+                      product.productTypeName,
+                    ),
+                    makerId: product.makerId,
+                    productTypeSlug: product.productTypeSlug,
+                  },
+                  aliases,
+                )}
+                searchContext={searchMatchContext(
+                  t,
+                  searchMatches.get(product.id),
+                )}
               />
             </div>
           ))}
@@ -1218,25 +1572,65 @@ function approvalStatusLabel(
 /**
  * Renders one collection item with its effective product details.
  *
- * @param props - Collection item data and its installed button, when present.
+ * @param props - Collection item data, live catalog product, and installed components, when present.
  * @param props.installedButton - Installed spinner button, when present.
+ * @param props.installedInsert - Installed slider insert, when present.
+ * @param props.installedPlate - Installed slider plate, when present.
  * @param props.item - Collection item to display.
+ * @param props.product - Live catalog facts for the exact owned product.
  * @returns The collection item detail page.
  */
 export function CollectionItemDetailPage({
   installedButton = null,
+  installedInsert = null,
+  installedPlate = null,
   item,
+  product = null,
 }: {
   /** Installed spinner button, when present. */
   installedButton?: UserCollectionItem | null;
+  /** Installed slider insert, when present. */
+  installedInsert?: UserCollectionItem | null;
+  /** Installed slider plate, when present. */
+  installedPlate?: UserCollectionItem | null;
   /** Collection item to display. */
   item: UserCollectionItem;
+  /** Live catalog facts for the exact owned product. */
+  product?: CatalogProduct | null;
 }) {
   const t = useCatalogCopy();
   const ownImages = item.images.filter(({ deletedAt }) => !deletedAt);
   const productImages = item.productImages.filter(
     ({ deletedAt }) => !deletedAt,
   );
+  const insertAdvertisedDefault = product?.insertMagnetOffers.find(
+    ({ isAdvertisedDefault }) => isAdvertisedDefault,
+  );
+  const displayedSliderSetup:
+    | CatalogBodyHostedMagnetSetup
+    | EffectiveSliderSetup
+    | OwnedSliderInsertSetup
+    | null =
+    item.productTypeSlug === "slider"
+      ? (item.effectiveSliderSetup ?? product?.bodyHostedMagnetSetup ?? null)
+      : item.productTypeSlug === "slider-insert"
+        ? (item.ownedInsertSetup ??
+          (insertAdvertisedDefault
+            ? {
+                clickCount: insertAdvertisedDefault.clickCount,
+                configuration: insertAdvertisedDefault.configuration,
+                sourceOfferId: insertAdvertisedDefault.id,
+              }
+            : null))
+        : null;
+  const usesLiveInsertDefault =
+    (item.productTypeSlug === "slider-insert" &&
+      item.ownedInsertSetup === null &&
+      insertAdvertisedDefault !== undefined) ||
+    (item.productTypeSlug === "slider" &&
+      item.effectiveSliderSetup?.isLiveCatalog === true &&
+      (item.effectiveSliderSetup.source === "slider-default" ||
+        item.effectiveSliderSetup.source === "insert-default"));
   return (
     <AppShell
       breadcrumbItems={[
@@ -1311,6 +1705,14 @@ export function CollectionItemDetailPage({
             {t("web.resources.moderation.privateBadge")}
           </Badge>
         ) : null}
+        {item.hasGrandfatheredInstallation ? (
+          <p
+            className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground"
+            role="status"
+          >
+            {t("web.slider.component.grandfatheredWarning")}
+          </p>
+        ) : null}
         {[...ownImages, ...productImages][0] ? (
           <img
             alt={t("web.resources.detail.imageAlt", {
@@ -1359,9 +1761,54 @@ export function CollectionItemDetailPage({
               )}
             </Detail>
           ) : null}
+          {item.productTypeSlug === "slider" ? (
+            <Detail label={t("web.slider.component.installedPlate")}>
+              {installedPlate?.displayName ?? t("web.slider.component.noPlate")}
+            </Detail>
+          ) : null}
+          {item.productTypeSlug === "slider" &&
+          product?.magnetSystem === "insert-driven" ? (
+            <Detail label={t("web.slider.component.installedInsert")}>
+              {installedInsert?.displayName ??
+                t("web.slider.component.noInsert")}
+            </Detail>
+          ) : null}
           {item.productTypeSlug === "spinner" && item.bearing ? (
             <Detail label={t("web.catalog.field.bearing")}>
               {item.bearing}
+            </Detail>
+          ) : null}
+          {product?.productTypeSlug === "slider" && product.magnetSystem ? (
+            <Detail label={t("web.slider.capability.label")}>
+              {t(
+                product.magnetSystem === "body-hosted"
+                  ? "web.slider.capability.bodyHosted"
+                  : "web.slider.capability.insertDriven",
+              )}
+            </Detail>
+          ) : null}
+          {displayedSliderSetup ? (
+            <Detail label={t("web.slider.setup.title")}>
+              {usesLiveInsertDefault ? (
+                <p className="mb-2 text-sm text-muted-foreground">
+                  {t("web.slider.setup.defaultDescription")}
+                </p>
+              ) : null}
+              <BodyHostedMagnetSetupDetails
+                missingConfigurationLabel={t("web.slider.setup.notRecorded")}
+                setup={displayedSliderSetup}
+                t={t}
+              />
+            </Detail>
+          ) : null}
+          {product?.widthMm ? (
+            <Detail label={t("web.catalog.field.width")}>
+              {product.widthMm} mm
+            </Detail>
+          ) : null}
+          {product?.thicknessMm ? (
+            <Detail label={t("web.catalog.field.thickness")}>
+              {product.thicknessMm} mm
             </Detail>
           ) : null}
         </dl>
@@ -1513,6 +1960,105 @@ function Detail({
         {label}
       </dt>
       <dd className="mt-1">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * Renders the live catalog setup of a body-hosted slider as read-only facts.
+ *
+ * @param props - Setup and localized formatter.
+ * @returns Read-only exact setup details without install or custom controls.
+ */
+function BodyHostedMagnetSetupDetails({
+  missingConfigurationLabel,
+  setup,
+  t,
+}: {
+  /** Optional copy used when an owner snapshot omitted its layout. */
+  missingConfigurationLabel?: string;
+  /** Live inherent catalog setup. */
+  setup:
+    | CatalogBodyHostedMagnetSetup
+    | EffectiveSliderSetup
+    | OwnedSliderInsertSetup;
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+}) {
+  const configuration = setup.configuration;
+  const sourceNote = "sourceNote" in setup ? setup.sourceNote : null;
+  return (
+    <div className="grid gap-3 rounded-md border border-border p-3">
+      <p className="m-0 text-sm">
+        <span className="font-medium">{t("web.slider.setup.clickCount")}:</span>{" "}
+        {setup.clickCount === null
+          ? t("web.slider.setup.notRecorded")
+          : t("web.slider.setup.clicks", { count: setup.clickCount })}
+      </p>
+      {sourceNote ? (
+        <div>
+          <p className="m-0 text-sm font-medium">
+            {t("web.slider.setup.sourceNote")}
+          </p>
+          <p className="m-0 whitespace-pre-wrap text-sm text-muted-foreground">
+            {sourceNote}
+          </p>
+        </div>
+      ) : null}
+      {configuration ? (
+        <div className="grid gap-3">
+          <p className="m-0 text-sm font-medium">
+            {t("web.slider.magnet.configuration")}: {configuration.label}
+            {configuration.sourceLabel ? ` — ${configuration.sourceLabel}` : ""}
+          </p>
+          {configuration.sourceNotes ? (
+            <p className="m-0 whitespace-pre-wrap text-sm text-muted-foreground">
+              {configuration.sourceNotes}
+            </p>
+          ) : null}
+          <ul className="m-0 grid list-none gap-2 p-0">
+            {configuration.groups.map((group) => (
+              <li
+                className="rounded border border-border p-2 text-sm"
+                key={group.key}
+              >
+                <span className="font-medium">{group.label}</span>:{" "}
+                {group.diameterMm}×{group.thicknessMm} mm, {group.grade}
+              </li>
+            ))}
+          </ul>
+          <ul className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2">
+            {configuration.slots.map((slot) => (
+              <li
+                className="rounded border border-border p-2 text-sm"
+                key={`${slot.half}-${slot.key}`}
+              >
+                <span className="font-medium">
+                  {t(
+                    slot.half === "half-a"
+                      ? "web.slider.magnet.halfA"
+                      : "web.slider.magnet.halfB",
+                  )}{" "}
+                  {slot.key}
+                </span>
+                : {t(`web.slider.magnet.state.${slot.state}`)}
+                {slot.groupKey ? ` — ${slot.groupKey}` : ""}
+                {slot.documentedRow !== null
+                  ? ` · ${t("web.slider.magnet.row")} ${slot.documentedRow}`
+                  : ""}
+                {slot.documentedColumn !== null
+                  ? ` · ${t("web.slider.magnet.column")} ${slot.documentedColumn}`
+                  : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="m-0 text-sm text-muted-foreground">
+          {missingConfigurationLabel ??
+            t("web.slider.setup.incompleteSourceNote")}
+        </p>
+      )}
     </div>
   );
 }

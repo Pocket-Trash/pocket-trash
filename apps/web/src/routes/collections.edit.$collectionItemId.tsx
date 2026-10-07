@@ -55,10 +55,12 @@ export const Route = createFileRoute("/collections/edit/$collectionItemId")({
     ]);
     if (!data.item || !data.product) throw notFound();
     return {
+      assemblyMoveItemCount: data.assemblyMoveItemCount,
       buttonProducts: data.buttonProducts,
       collections: data.collections,
       item: data.item,
       ownedButtons: data.ownedButtons,
+      ownedSliderComponents: data.ownedSliderComponents,
       options,
       product: data.product,
     };

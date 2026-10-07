@@ -7,12 +7,18 @@ import { ProductCard } from "./product-card";
  */
 const product: CatalogProduct = {
   approvalStatus: "approved",
+  advertisedInsertOffers: [],
   bearing: null,
+  bodyHostedMagnetSetup: null,
+  insertClickOptions: [],
+  insertMagnetOffers: [],
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: true,
   compatibleButtonId: null,
   compatibleButtonName: null,
+  compatibilityAdvisories: [],
+  compatibilityFamilies: [],
   createdAt: new Date("2026-01-01"),
   description: null,
   diameterMm: "50.8",
@@ -24,11 +30,13 @@ const product: CatalogProduct = {
         { id: 1000, name: "Machine finished", slug: "machine-finished" },
       ],
       id: 1000,
+      pattern: null,
     },
   ],
   id: 1000,
   imageCount: 0,
   images: [],
+  includedComponents: [],
   isAdminPrivate: false,
   isPrivate: false,
   lengthMm: null,
@@ -38,6 +46,7 @@ const product: CatalogProduct = {
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
+  magnetSystem: null,
   materials: [
     { id: 1000, name: "Bronze", slug: "bronze" },
     { id: 1001, name: "Titanium", slug: "titanium" },
@@ -53,6 +62,7 @@ const product: CatalogProduct = {
   thicknessWithButtonMm: null,
   updatedAt: new Date("2026-01-02"),
   weightG: "90",
+  weightBasis: null,
   widthMm: null,
 };
 

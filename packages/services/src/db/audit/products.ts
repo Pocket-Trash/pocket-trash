@@ -63,6 +63,18 @@ function definition(action: string, targetType: string) {
 
 /** Audit event definitions for product mutations. */
 export const productAudit = {
+  compatibilityFamilyCreated: definition(
+    "products.compatibility_family.created",
+    "products.compatibility_family",
+  ),
+  magnetConfigurationTemplateCreated: definition(
+    "products.magnet_configuration_template.created",
+    "products.magnet_configuration_template",
+  ),
+  terminologyAliasCreated: definition(
+    "products.terminology_alias.created",
+    "products.terminology_alias",
+  ),
   productApproved: definition("products.product.approved", "products.product"),
   productRejected: definition("products.product.rejected", "products.product"),
   productApprovalReversed: definition(
@@ -103,6 +115,7 @@ export const productAudit = {
     "products.material",
   ),
   materialUpdated: definition("products.material.updated", "products.material"),
+  patternCreated: definition("products.pattern.created", "products.pattern"),
   productCreated: definition("products.product.created", "products.product"),
   productDeleted: definition("products.product.deleted", "products.product"),
   productUpdated: definition("products.product.updated", "products.product"),

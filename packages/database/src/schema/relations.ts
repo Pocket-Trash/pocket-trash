@@ -1,21 +1,33 @@
 import { relations } from "drizzle-orm";
 import {
+  catalogTerminologyAlias,
   collectionImage,
   collectionItem,
   collectionItemImage,
+  collectionSlider,
+  collectionSliderInsert,
+  collectionSliderPlate,
   collectionSpinner,
   collectionSpinnerButton,
   color,
   colorEffect,
+  compatibilityFamily,
   finish,
   finishOption,
   finishOptionColor,
   finishOptionFinish,
   makerImage,
   materialImage,
+  pattern,
   product,
+  productCompatibilityAdvisory,
+  productCompatibilityFamily,
   productImage,
+  productIncludedComponent,
   productMaterial,
+  productSlider,
+  productSliderInsert,
+  productSliderPlate,
   productSpinner,
   productSpinnerButton,
   userCollection,
@@ -206,6 +218,8 @@ export const featureFlagUserOverridesRelations = relations(
 /** Connects a maker to catalog products and staged Autmog, Grimsmo pen, and Grimsmo knife records. */
 export const makersRelations = relations(maker, ({ many }) => ({
   autmogPens: many(tmpAutmogPens),
+  catalogTerminologyAliases: many(catalogTerminologyAlias),
+  compatibilityFamilies: many(compatibilityFamily),
   grimsmoKnives: many(tmpGrimsmoKnives),
   grimsmoPens: many(tmpGrimsmoPens),
   images: many(makerImage),
@@ -219,6 +233,21 @@ export const makerImageRelations = relations(makerImage, ({ one }) => ({
     references: [maker.id],
   }),
 }));
+
+/** Connects a terminology alias to the maker and canonical product type it names. */
+export const catalogTerminologyAliasRelations = relations(
+  catalogTerminologyAlias,
+  ({ one }) => ({
+    maker: one(maker, {
+      fields: [catalogTerminologyAlias.makerId],
+      references: [maker.id],
+    }),
+    productType: one(productType, {
+      fields: [catalogTerminologyAlias.canonicalKey],
+      references: [productType.slug],
+    }),
+  }),
+);
 
 /** Connects a material to catalog products, collection items, and staged Autmog pens. */
 export const materialsRelations = relations(material, ({ many }) => ({
@@ -243,6 +272,7 @@ export const mechanismsRelations = relations(mechanism, ({ many }) => ({
 
 /** Connects a product type to catalog products and staged product assignments. */
 export const productTypesRelations = relations(productType, ({ many }) => ({
+  catalogTerminologyAliases: many(catalogTerminologyAlias),
   catalogProducts: many(product),
   products: many(tmpProductProductTypes),
 }));
@@ -284,6 +314,18 @@ export const collectionItemRelations = relations(
       fields: [collectionItem.id],
       references: [collectionSpinnerButton.id],
     }),
+    slider: one(collectionSlider, {
+      fields: [collectionItem.id],
+      references: [collectionSlider.id],
+    }),
+    sliderInsert: one(collectionSliderInsert, {
+      fields: [collectionItem.id],
+      references: [collectionSliderInsert.id],
+    }),
+    sliderPlate: one(collectionSliderPlate, {
+      fields: [collectionItem.id],
+      references: [collectionSliderPlate.id],
+    }),
   }),
 );
 
@@ -300,6 +342,10 @@ export const collectionItemImageRelations = relations(
 
 /** Connects a catalog product to its maker, type, finishes, images, materials, and spinner data. */
 export const productRelations = relations(product, ({ many, one }) => ({
+  compatibilityAdvisories: many(productCompatibilityAdvisory, {
+    relationName: "compatibilityAdvisoryProduct",
+  }),
+  compatibilityFamilies: many(productCompatibilityFamily),
   finishOptions: many(finishOption),
   images: many(productImage),
   maker: one(maker, {
@@ -307,6 +353,15 @@ export const productRelations = relations(product, ({ many, one }) => ({
     references: [maker.id],
   }),
   materials: many(productMaterial),
+  includedComponents: many(productIncludedComponent, {
+    relationName: "includedComponentParent",
+  }),
+  includedWithProducts: many(productIncludedComponent, {
+    relationName: "includedComponentChild",
+  }),
+  relatedCompatibilityAdvisories: many(productCompatibilityAdvisory, {
+    relationName: "compatibilityAdvisoryRelatedProduct",
+  }),
   productType: one(productType, {
     fields: [product.productTypeId],
     references: [productType.id],
@@ -319,7 +374,80 @@ export const productRelations = relations(product, ({ many, one }) => ({
     fields: [product.id],
     references: [productSpinnerButton.id],
   }),
+  slider: one(productSlider, {
+    fields: [product.id],
+    references: [productSlider.id],
+  }),
+  sliderInsert: one(productSliderInsert, {
+    fields: [product.id],
+    references: [productSliderInsert.id],
+  }),
+  sliderPlate: one(productSliderPlate, {
+    fields: [product.id],
+    references: [productSliderPlate.id],
+  }),
 }));
+
+/** Connects a compatibility family to its maker and reviewed products. */
+export const compatibilityFamilyRelations = relations(
+  compatibilityFamily,
+  ({ many, one }) => ({
+    maker: one(maker, {
+      fields: [compatibilityFamily.makerId],
+      references: [maker.id],
+    }),
+    products: many(productCompatibilityFamily),
+  }),
+);
+
+/** Connects each reviewed family membership to its product and family. */
+export const productCompatibilityFamilyRelations = relations(
+  productCompatibilityFamily,
+  ({ one }) => ({
+    family: one(compatibilityFamily, {
+      fields: [productCompatibilityFamily.compatibilityFamilyId],
+      references: [compatibilityFamily.id],
+    }),
+    product: one(product, {
+      fields: [productCompatibilityFamily.productId],
+      references: [product.id],
+    }),
+  }),
+);
+
+/** Connects a reviewed compatibility advisory to both exact products. */
+export const productCompatibilityAdvisoryRelations = relations(
+  productCompatibilityAdvisory,
+  ({ one }) => ({
+    product: one(product, {
+      fields: [productCompatibilityAdvisory.productId],
+      references: [product.id],
+      relationName: "compatibilityAdvisoryProduct",
+    }),
+    relatedProduct: one(product, {
+      fields: [productCompatibilityAdvisory.relatedProductId],
+      references: [product.id],
+      relationName: "compatibilityAdvisoryRelatedProduct",
+    }),
+  }),
+);
+
+/** Connects exact included-component relationships to parent and component products. */
+export const productIncludedComponentRelations = relations(
+  productIncludedComponent,
+  ({ one }) => ({
+    component: one(product, {
+      fields: [productIncludedComponent.componentProductId],
+      references: [product.id],
+      relationName: "includedComponentChild",
+    }),
+    product: one(product, {
+      fields: [productIncludedComponent.productId],
+      references: [product.id],
+      relationName: "includedComponentParent",
+    }),
+  }),
+);
 
 /** Connects a product image to its catalog product. */
 export const productImageRelations = relations(productImage, ({ one }) => ({
@@ -359,6 +487,11 @@ export const colorEffectsRelations = relations(colorEffect, ({ many }) => ({
   options: many(finishOption),
 }));
 
+/** Connects a pattern to finish options that use it. */
+export const patternsRelations = relations(pattern, ({ many }) => ({
+  options: many(finishOption),
+}));
+
 /** Connects a finish option to its product or item, source and derived options, color effect, colors, and finishes. */
 export const finishOptionRelations = relations(
   finishOption,
@@ -382,6 +515,10 @@ export const finishOptionRelations = relations(
     colorEffect: one(colorEffect, {
       fields: [finishOption.colorEffectId],
       references: [colorEffect.id],
+    }),
+    pattern: one(pattern, {
+      fields: [finishOption.patternId],
+      references: [pattern.id],
     }),
     colors: many(finishOptionColor),
     finishes: many(finishOptionFinish),
@@ -432,6 +569,36 @@ export const productSpinnerButtonRelations = relations(
   ({ one }) => ({
     product: one(product, {
       fields: [productSpinnerButton.id],
+      references: [product.id],
+    }),
+  }),
+);
+
+/** Connects a slider body subtype to its catalog product. */
+export const productSliderRelations = relations(productSlider, ({ one }) => ({
+  product: one(product, {
+    fields: [productSlider.id],
+    references: [product.id],
+  }),
+}));
+
+/** Connects a slider plate-set subtype to its catalog product. */
+export const productSliderPlateRelations = relations(
+  productSliderPlate,
+  ({ one }) => ({
+    product: one(product, {
+      fields: [productSliderPlate.id],
+      references: [product.id],
+    }),
+  }),
+);
+
+/** Connects a slider insert-set subtype to its catalog product. */
+export const productSliderInsertRelations = relations(
+  productSliderInsert,
+  ({ one }) => ({
+    product: one(product, {
+      fields: [productSliderInsert.id],
       references: [product.id],
     }),
   }),
