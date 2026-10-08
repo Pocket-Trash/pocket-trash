@@ -399,7 +399,9 @@ export function classifyChanges(
   }
 
   const labelEvent =
-    eventName === "pull_request" && ["labeled", "unlabeled"].includes(action);
+    eventName === "pull_request" &&
+    ["labeled", "unlabeled"].includes(action) &&
+    !(action === "labeled" && eventLabel === "preview:webhooks");
   const domains = everyDomain(false);
   const mutationDomains = new Set();
   const noCodePaths = [];

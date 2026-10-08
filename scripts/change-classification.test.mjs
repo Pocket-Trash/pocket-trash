@@ -609,3 +609,20 @@ packages: {}
     /Unresolved workspace importer/,
   );
 });
+
+test("webhook preview label retains schema and runtime mutation isolation", () => {
+  for (const file of [
+    "packages/database/src/schema/products.ts",
+    "apps/api/src/index.ts",
+    "apps/web/src/components/collection-form.tsx",
+  ]) {
+    const regular = classifyChanges([file]);
+    const webhook = classifyChanges([file], {
+      action: "labeled",
+      eventLabel: "preview:webhooks",
+      labels: ["preview:webhooks"],
+    });
+    assert.equal(webhook.domains.mutation_e2e, true, file);
+    assert.deepEqual(webhook, regular);
+  }
+});
