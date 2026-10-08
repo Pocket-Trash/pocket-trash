@@ -121,7 +121,7 @@ test("schema-changing main deploys refresh preview after development", () => {
   assert.equal(refresh.needs, "development-api");
   assert.match(
     refresh.if,
-    /needs\.development-api\.outputs\.database_changed == 'true'/,
+    /needs\.development-api\.outputs\.database_content_changed == 'true'/,
   );
   assert.equal(refresh.uses, "./.github/workflows/preview-refresh.yml");
   assert.ok(Object.hasOwn(refreshWorkflow.on, "workflow_call"));
