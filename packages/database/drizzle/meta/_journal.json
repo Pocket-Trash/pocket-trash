@@ -512,6 +512,13 @@
       "when": 1791432864881,
       "tag": "0072_normalize_medium_hybrid_preset",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1791433448738,
+      "tag": "0073_slim_wonder_man",
+      "breakpoints": true
     }
   ]
 }

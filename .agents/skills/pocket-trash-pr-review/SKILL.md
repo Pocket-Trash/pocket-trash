@@ -46,6 +46,20 @@ For checkout mode:
    it.
 4. Run `pnpm install` to sync dependencies for the branch.
 
+## Resolve the Changeset policy
+
+Read the target repository's `AGENTS.md`, Changeset documentation when present,
+and the Changeset validation command used by its required checks. Treat that
+documented and enforced policy as authoritative; do not infer exceptions from
+the diff category or PR body.
+
+If the repository requires a Changeset for every PR, that includes docs-only,
+test-only, tooling-only, chore, and explicitly unreleased PRs. Verify that the
+branch adds or updates a `.changeset/*.md` file whose frontmatter gives an
+affected package a valid `major`, `minor`, or `patch` release marker. A deleted
+Changeset does not satisfy the requirement. Only apply an exception that the
+target repository explicitly documents.
+
 ## Human steps
 
 Read the PR body and inspect the text between:
@@ -99,11 +113,8 @@ pnpm exec biome check --linter-enabled=false .   # format check without rewritin
    test-procedure gap, not a PR bug — say so.
 5. If the PR ships a schema change, confirm a migration was generated;
    `drizzle-kit check` alone does not catch a missing migration.
-6. If the PR changes app behavior, package behavior, public APIs, dependencies,
-   or user-visible output, confirm a changeset exists under `.changeset/`. Treat
-   a missing changeset as blocking unless the PR is test-only, docs-only,
-   tooling-only with no released package impact, or the PR body explicitly says
-   the change should not be released.
+6. Apply the resolved repository Changeset policy. Classify a missing or invalid
+   repository-required Changeset as blocking.
 7. Classify findings before commenting:
    - Blocking: correctness, security, data loss, broken tests, migration risk,
      missing required changeset.
@@ -165,8 +176,9 @@ check.
   the body with a section titled
   `Issues that can't be covered via a comment and suggestion` and list those
   findings there. Omit that section when there are no such findings. Then
-  include checks run or skipped, changeset status, blocking finding count,
-  nonblocking finding count, and the recommended final review action.
+  include checks run or skipped, the resolved Changeset policy and result,
+  blocking finding count, nonblocking finding count, and the recommended final
+  review action.
 - Add a collapsed section titled `AI prompt for all issues` to the draft review
   body. Say it can be used in lieu of the individual AI prompts, then include
   one copyable `text` code block:

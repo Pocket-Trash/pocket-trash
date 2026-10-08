@@ -59,7 +59,6 @@ const product: CatalogProduct = {
   thicknessWithButtonMm: null,
   updatedAt: new Date("2026-01-02"),
   weightG: "90",
-  weightBasis: null,
   widthMm: null,
 };
 

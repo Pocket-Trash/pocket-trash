@@ -155,7 +155,6 @@ describe("catalog schema", () => {
         "id",
         "uses_inserts",
         "weight_g",
-        "weight_basis",
         "length_mm",
         "width_mm",
         "thickness_mm",
@@ -165,15 +164,20 @@ describe("catalog schema", () => {
         "included_insert_product_id",
       ]),
     );
+    expect(slider.columns.map(({ name }) => name)).not.toContain(
+      "weight_basis",
+    );
     expect(slider.checks.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
         "product_slider_insert_choice_consistent",
         "product_slider_magnet_layout_consistent",
         "product_slider_magnet_layout_valid",
         "product_slider_included_insert_distinct",
-        "product_slider_weight_basis_consistent",
         "product_slider_measurements_positive",
       ]),
+    );
+    expect(slider.checks.map(({ name }) => name)).not.toContain(
+      "product_slider_weight_basis_consistent",
     );
     expect(plate.columns.map(({ name }) => name)).toEqual([
       "id",

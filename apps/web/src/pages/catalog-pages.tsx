@@ -588,15 +588,6 @@ export function ProductDetailPage({
               )}
             </Detail>
           ) : null}
-          {product.productTypeSlug === "slider" && product.weightBasis ? (
-            <Detail label={t("web.slider.measurement.weightBasis")}>
-              {t(
-                product.weightBasis === "body-only"
-                  ? "web.slider.measurement.bodyOnly"
-                  : "web.slider.measurement.completeBuild",
-              )}
-            </Detail>
-          ) : null}
           {product.magnetLayout ? (
             <Detail label={t("web.slider.layout.label")}>
               <SliderMagnetLayoutValue layout={product.magnetLayout} t={t} />

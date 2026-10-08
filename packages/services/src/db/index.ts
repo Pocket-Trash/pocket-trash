@@ -135,7 +135,6 @@ export type {
   SliderMagnetConfiguration,
   SliderMagnetLayout,
   SliderMagnetPreset,
-  SliderWeightBasis,
   UserCollectionItem,
   UserCollectionSummary,
 } from "./catalog/index.js";
