@@ -92,7 +92,38 @@ describe("Clerk webhooks", () => {
     expect(syncFromClerk).toHaveBeenCalledWith({
       clerkId: "user_secret",
       clerkUpdatedAt: new Date(1_795_000_000_000),
+      imageUrl: null,
       username: "roy",
+    });
+  });
+
+  it.each([
+    [true, "https://img.clerk.com/original"],
+    [true, "https://img.clerk.com/replacement"],
+    [false, null],
+  ])("mirrors selected pictures and clears generated avatars (%s, %s)", async (hasImage, imageUrl) => {
+    const syncFromClerk = vi.fn().mockResolvedValue("updated");
+    const response = await createClerkWebhookHandler({
+      logger: createNoopLogger(),
+      signingSecret,
+      users: { syncFromClerk },
+      verify: vi.fn().mockResolvedValue({
+        type: "user.updated",
+        data: {
+          id: "user_secret",
+          updated_at: 1,
+          username: "roy",
+          has_image: hasImage,
+          image_url: imageUrl ?? "https://img.clerk.com/generated",
+        },
+      }) as never,
+    })(signedRequest(), "production");
+    expect(response.status).toBe(204);
+    expect(syncFromClerk).toHaveBeenCalledWith({
+      clerkId: "user_secret",
+      clerkUpdatedAt: new Date(1),
+      username: "roy",
+      imageUrl,
     });
   });
 

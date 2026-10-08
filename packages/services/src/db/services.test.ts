@@ -151,6 +151,7 @@ describe("database service logging", () => {
     const user: User = {
       clerkId,
       clerkUpdatedAt: null,
+      imageUrl: null,
       id: 1000,
       username: null,
     };
@@ -191,6 +192,7 @@ describe("database service logging", () => {
       users.syncFromClerk({
         clerkId: "user_123",
         clerkUpdatedAt: new Date("2026-09-22T12:00:00.000Z"),
+        imageUrl: null,
         username: "roy",
       }),
     ).resolves.toBe(expected);
@@ -261,6 +263,7 @@ describe("database service logging", () => {
     const user: User = {
       clerkId,
       clerkUpdatedAt: null,
+      imageUrl: null,
       id: 1000,
       username: null,
     };
@@ -313,6 +316,7 @@ describe("database service logging", () => {
     const user: User = {
       clerkId,
       clerkUpdatedAt: null,
+      imageUrl: null,
       id: 1000,
       username: null,
     };
@@ -357,6 +361,7 @@ describe("database service logging", () => {
     const user: User = {
       clerkId,
       clerkUpdatedAt: null,
+      imageUrl: null,
       id: 1000,
       username: null,
     };
@@ -404,6 +409,7 @@ describe("database service logging", () => {
     const user: User = {
       clerkId,
       clerkUpdatedAt: null,
+      imageUrl: null,
       id: 1000,
       username: null,
     };
@@ -455,6 +461,7 @@ describe("database service logging", () => {
     const user: User = {
       clerkId,
       clerkUpdatedAt: null,
+      imageUrl: null,
       id: existingSettings.userId,
       username: null,
     };

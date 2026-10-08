@@ -11,6 +11,10 @@ import { createServices, type UsersService } from "@package/services";
 type ClerkUser = {
   /** Clerk user identifier. */
   id: string;
+  /** Whether Clerk hosts a user-selected picture. */
+  hasImage: boolean;
+  /** Current Clerk-hosted picture or generated avatar URL. */
+  imageUrl: string;
   /** Clerk update timestamp in Unix milliseconds. */
   updatedAt: number;
   /** Public username, or `null` when unset. */
@@ -85,6 +89,7 @@ export async function reconcileClerkUsers(
         const result = await users.syncFromClerk({
           clerkId: user.id,
           clerkUpdatedAt: new Date(user.updatedAt),
+          imageUrl: user.hasImage ? user.imageUrl : null,
           username: user.username,
         });
         counts[result] += 1;

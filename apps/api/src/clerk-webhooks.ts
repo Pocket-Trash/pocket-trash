@@ -81,6 +81,7 @@ export function createClerkWebhookHandler(options: ClerkWebhookHandlerOptions) {
         await options.users.syncFromClerk({
           clerkId: event.data.id,
           clerkUpdatedAt: new Date(event.data.updated_at),
+          imageUrl: event.data.has_image ? event.data.image_url : null,
           username: event.data.username ?? "",
         });
       } else if (event.type === "user.deleted") {

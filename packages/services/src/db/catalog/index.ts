@@ -1578,6 +1578,8 @@ export type UserCollectionItem = {
    * Owner username.
    */
   ownerUsername: string | null;
+  /** Selected Clerk picture URL; null when the owner has no public picture. */
+  ownerImageUrl: string | null;
   /**
    * Owner database user identifier.
    */
@@ -1612,6 +1614,8 @@ export type UserCollectionItem = {
  * Public owner identity and aggregate collection counts.
  */
 export type PublicCollectionOwner = {
+  /** Selected Clerk picture URL; null when the owner has no public picture. */
+  imageUrl: string | null;
   /**
    * Visible collections owned by the user.
    */
@@ -5646,6 +5650,7 @@ export function createCollectionsService(
       const owners = await db
         .select({
           clerkId: schema.user.clerkId,
+          imageUrl: schema.user.imageUrl,
           userId: schema.user.id,
           username: schema.user.username,
         })
@@ -5662,6 +5667,7 @@ export function createCollectionsService(
             ),
             itemCount: ownerItems.length,
             items: ownerItems,
+            imageUrl: owner.imageUrl,
             userId: owner.userId,
             username: owner.username ?? owner.clerkId,
           };
@@ -8133,6 +8139,7 @@ async function queryOwnedItems(
       materialSlug: schema.material.slug,
       name: schema.product.name,
       ownerClerkId: schema.user.clerkId,
+      ownerImageUrl: schema.user.imageUrl,
       ownerUsername: schema.user.username,
       ownerUserId: schema.user.id,
       productId: schema.product.id,
@@ -8315,6 +8322,7 @@ async function queryOwnedItems(
           : null,
       name: row.name,
       ownerClerkId: row.ownerClerkId,
+      ownerImageUrl: row.ownerImageUrl,
       ownerUsername: row.ownerUsername,
       ownerUserId: row.ownerUserId,
       productId: row.productId,

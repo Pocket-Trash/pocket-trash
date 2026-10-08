@@ -122,6 +122,8 @@ export type SyncUserFromClerkInput = {
   clerkId: string;
   /** Provider update time used to ignore stale synchronization events. */
   clerkUpdatedAt: Date;
+  /** Selected Clerk picture URL; null for generated avatars or removal. */
+  imageUrl: string | null;
   /** Current provider username persisted for newer events. */
   username: string;
 };
@@ -435,6 +437,7 @@ export function createUsersService(
               .update(schema.user)
               .set({
                 clerkUpdatedAt: normalized.clerkUpdatedAt,
+                imageUrl: normalized.imageUrl,
                 username: normalized.username,
               })
               .where(
@@ -443,6 +446,11 @@ export function createUsersService(
                   or(
                     isNull(schema.user.clerkUpdatedAt),
                     lt(schema.user.clerkUpdatedAt, normalized.clerkUpdatedAt),
+                    // Reconciliation backfills the new field without a provider timestamp change.
+                    and(
+                      eq(schema.user.clerkUpdatedAt, normalized.clerkUpdatedAt),
+                      sql`${schema.user.imageUrl} is distinct from ${normalized.imageUrl}`,
+                    ),
                   ),
                 ),
               )

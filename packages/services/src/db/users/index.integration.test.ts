@@ -10,9 +10,80 @@ import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it, vi } from "vitest";
 import { type AuditService, createAuditService } from "../audit/index.js";
 import { userBanAudit, userBanAuditEvents } from "../audit/users.js";
+import { createDbServices } from "../index.js";
 import { createUsersService, UserBanStateError } from "./index.js";
 
 describe("user ban management", () => {
+  it("mirrors pictures, backfills equal timestamps, and ignores stale changes", async () => {
+    const client = new PGlite();
+    await migrate(client);
+    const db = drizzle(client, { schema }) as unknown as Database;
+    const services = createDbServices(
+      db,
+      createLogger({ app: "test", environment: "test", transports: [] }),
+    );
+    const input = {
+      clerkId: "user_picture",
+      username: "collector",
+      clerkUpdatedAt: new Date("2026-10-01"),
+      imageUrl: "https://img.clerk.com/selected",
+    };
+    try {
+      await expect(services.users.syncFromClerk(input)).resolves.toBe(
+        "inserted",
+      );
+      const owner = await services.users.getByClerkId(input.clerkId);
+      expect(owner?.imageUrl).toBe(input.imageUrl);
+      if (!owner) throw new Error("Missing picture owner.");
+      await db.insert(schema.userCollection).values({
+        name: "Public",
+        normalizedName: "public",
+        ownerId: owner.id,
+        isPrivate: false,
+      });
+      expect(await services.collections.listOwners()).toEqual([
+        expect.objectContaining({ imageUrl: input.imageUrl }),
+      ]);
+      await expect(services.users.syncFromClerk(input)).resolves.toBe(
+        "unchanged",
+      );
+      const changed = {
+        ...input,
+        imageUrl: "https://img.clerk.com/replaced",
+        clerkUpdatedAt: new Date("2026-10-02"),
+      };
+      await expect(services.users.syncFromClerk(changed)).resolves.toBe(
+        "updated",
+      );
+      await expect(services.users.syncFromClerk(input)).resolves.toBe(
+        "unchanged",
+      );
+      expect((await services.users.getByClerkId(input.clerkId))?.imageUrl).toBe(
+        changed.imageUrl,
+      );
+      await expect(
+        services.users.syncFromClerk({
+          ...changed,
+          clerkUpdatedAt: new Date("2026-10-03"),
+          imageUrl: null,
+        }),
+      ).resolves.toBe("updated");
+      expect((await services.collections.listOwners())[0]?.imageUrl).toBeNull();
+      // Existing mirrored users retain their provider timestamp when the column is added.
+      await expect(
+        services.users.syncFromClerk({
+          ...changed,
+          clerkUpdatedAt: new Date("2026-10-03"),
+        }),
+      ).resolves.toBe("updated");
+      expect((await services.collections.listOwners())[0]?.imageUrl).toBe(
+        changed.imageUrl,
+      );
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("authorizes transitions, preserves pending work, and edits ban reasons", async () => {
     const client = new PGlite();
     await migrate(client);
