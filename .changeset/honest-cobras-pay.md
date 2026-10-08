@@ -2,4 +2,4 @@
 "@package/database": patch
 ---
 
-Add a reproducible pen and refill schema diagram.
+Add an interactive diagram generated from the checked-out Drizzle schema.
