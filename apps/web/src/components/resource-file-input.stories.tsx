@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useState } from "react";
 import { expect, fn } from "storybook/test";
-import { ResourceFileInput } from "./resource-file-input";
+import { FileDropInput, ResourceFileInput } from "./resource-file-input";
 
 /**
  * Configures Storybook coverage for the resource file input examples.
@@ -120,3 +120,58 @@ function FileInputExample({
   );
   return <ResourceFileInput {...args} files={files} onFilesChange={setFiles} />;
 }
+
+/** Verifies hidden image-picker sizing and keyboard access in constrained layouts. */
+export const ImagePicker: Story = {
+  /**
+   * Renders the shared picker with the product image restrictions.
+   * @param args - Existing picker labels and state.
+   * @returns The image picker example.
+   */
+  render: (args) => (
+    <FileDropInput
+      {...args}
+      accept=".avif,.jpeg,.jpg,.png,.webp"
+      multiple
+      onRemove={fn()}
+    />
+  ),
+  /**
+   * Checks visually hidden geometry and keyboard focus without suppressing overflow.
+   * @param context - Browser story context.
+   * @param context.canvas - Queries scoped to the picker.
+   * @param context.canvasElement - Layout container in the browser.
+   * @param context.userEvent - Keyboard interaction driver.
+   * @returns Completion of the browser assertions.
+   */
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const input = canvas.getByLabelText(/Upload resource files/);
+    for (const width of [256, 512]) {
+      canvasElement.style.width = `${width}px`;
+      canvasElement.style.maxWidth = "100%";
+      const style = getComputedStyle(input);
+      await expect(style.width).toBe("1px");
+      await expect(style.height).toBe("1px");
+      await expect(style.padding).toBe("0px");
+      await expect(style.borderWidth).toBe("0px");
+      await expect(canvasElement.scrollWidth).toBeLessThanOrEqual(
+        canvasElement.clientWidth,
+      );
+      const root = canvasElement.ownerDocument.documentElement;
+      await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+    }
+    await expect(input).toHaveAttribute(
+      "accept",
+      ".avif,.jpeg,.jpg,.png,.webp",
+    );
+    await expect(input).toHaveAttribute("multiple");
+    await expect(input).toHaveAccessibleDescription(
+      "Drag files here or choose them from your device.",
+    );
+    await userEvent.tab();
+    await expect(input).toHaveFocus();
+    const label = canvas.getByText("Browse files").closest("label");
+    await expect(label).toHaveAttribute("for", input.id);
+    await expect(getComputedStyle(label!).boxShadow).not.toBe("none");
+  },
+};
