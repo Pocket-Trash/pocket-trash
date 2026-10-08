@@ -351,6 +351,9 @@ export const productRelations = relations(product, ({ many, one }) => ({
   includedWithProducts: many(productIncludedComponent, {
     relationName: "includedComponentChild",
   }),
+  includedAsSliderPlate: many(productSlider, {
+    relationName: "includedSliderPlate",
+  }),
   productType: one(productType, {
     fields: [product.productTypeId],
     references: [productType.id],
@@ -521,6 +524,11 @@ export const productSpinnerButtonRelations = relations(
 
 /** Connects a slider body subtype to its catalog product. */
 export const productSliderRelations = relations(productSlider, ({ one }) => ({
+  includedPlate: one(product, {
+    fields: [productSlider.includedPlateProductId],
+    references: [product.id],
+    relationName: "includedSliderPlate",
+  }),
   product: one(product, {
     fields: [productSlider.id],
     references: [product.id],

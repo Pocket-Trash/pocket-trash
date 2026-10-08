@@ -822,6 +822,10 @@ export const productSlider = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .references(() => product.id, { onDelete: "cascade" }),
+    /** Exact catalog plate supplied with the slider; null means unnamed included plates. */
+    includedPlateProductId: bigint("included_plate_product_id", {
+      mode: "number",
+    }).references(() => product.id, { onDelete: "restrict" }),
     magnetSystem: text("magnet_system", {
       enum: ["body-hosted", "insert-driven"],
     }).notNull(),
@@ -867,6 +871,11 @@ export const productSlider = pgTable(
       "product_slider_setup_source_note_valid",
       sql`${table.magnetSetupSourceNote} is null or char_length(trim(${table.magnetSetupSourceNote})) between 1 and 5000`,
     ),
+    check(
+      "product_slider_included_plate_distinct",
+      sql`${table.includedPlateProductId} is null or ${table.includedPlateProductId} <> ${table.id}`,
+    ),
+    index("product_slider_included_plate_idx").on(table.includedPlateProductId),
   ],
 );
 
@@ -1078,31 +1087,18 @@ export const productMagnetSlot = pgTable(
   ],
 );
 
-/** Optional set-level measurements for one matched slider plate pair or set. */
-export const productSliderPlate = pgTable(
-  "product_slider_plate",
-  {
-    id: bigint("id", { mode: "number" })
-      .primaryKey()
-      .references(() => product.id, { onDelete: "cascade" }),
-    weightG: decimal("weight_g"),
-    lengthMm: decimal("length_mm"),
-    widthMm: decimal("width_mm"),
-    thicknessMm: decimal("thickness_mm"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    check(
-      "product_slider_plate_measurements_positive",
-      sql`${table.weightG} > 0 and ${table.lengthMm} > 0 and ${table.widthMm} > 0 and ${table.thicknessMm} > 0`,
-    ),
-  ],
-);
+/** Catalog subtype marker for one matched slider plate pair or set. */
+export const productSliderPlate = pgTable("product_slider_plate", {
+  id: bigint("id", { mode: "number" })
+    .primaryKey()
+    .references(() => product.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
 
 /** Optional set-level measurements for one slider insert or cassette set. */
 export const productSliderInsert = pgTable(

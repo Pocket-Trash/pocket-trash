@@ -168,6 +168,7 @@ describe("catalog schema", () => {
         "thickness_mm",
         "inherent_click_count",
         "magnet_setup_source_note",
+        "included_plate_product_id",
       ]),
     );
     expect(slider.checks.map(({ name }) => name)).toEqual(
@@ -177,17 +178,20 @@ describe("catalog schema", () => {
         "product_slider_measurements_positive",
       ]),
     );
-    for (const subtype of [plate, insert]) {
-      expect(subtype.columns.map(({ name }) => name)).toEqual(
-        expect.arrayContaining([
-          "id",
-          "weight_g",
-          "length_mm",
-          "width_mm",
-          "thickness_mm",
-        ]),
-      );
-    }
+    expect(plate.columns.map(({ name }) => name)).toEqual([
+      "id",
+      "created_at",
+      "updated_at",
+    ]);
+    expect(insert.columns.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "id",
+        "weight_g",
+        "length_mm",
+        "width_mm",
+        "thickness_mm",
+      ]),
+    );
     expect(inclusion.primaryKeys).toHaveLength(1);
     expect(configuration.columns.map(({ name }) => name)).toEqual(
       expect.arrayContaining([

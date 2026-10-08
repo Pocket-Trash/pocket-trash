@@ -734,6 +734,8 @@ export type CatalogProduct = {
   images: CatalogImage[];
   /** Exact products sold as components with this product. */
   includedComponents: CatalogIncludedComponent[];
+  /** Exact catalog plate supplied with a slider; null means unnamed included plates. */
+  includedPlate: CatalogIncludedComponent | null;
   /** Positive click counts owned by this exact insert product. */
   insertClickOptions: CatalogInsertClickOption[];
   /** Complete configuration offers owned by this exact insert product. */
@@ -883,6 +885,8 @@ export type ProductWriteInput = {
   materialIds: number[];
   /** Exact component products sold with this product. */
   includedComponentIds?: number[];
+  /** Exact catalog plate supplied with a slider; null means unnamed included plates. */
+  includedPlateProductId?: number | null;
   /** Exact offers merchandised by an insert-driven slider. */
   advertisedInsertOffers?: Array<{
     /** Whether this association is the slider's Default setup. */
@@ -1620,6 +1624,8 @@ export type UserCollectionItem = {
   images: CatalogImage[];
   /** Live exact components sold with the source product. */
   includedComponents: CatalogIncludedComponent[];
+  /** Live exact plate supplied with the source slider. */
+  includedPlate: CatalogIncludedComponent | null;
   /**
    * Whether the record is private.
    */
@@ -3188,6 +3194,7 @@ export function createCatalogService(
             union all select 1 from collection_spinner_button where product_spinner_button_id = ${row.id}
             union all select 1 from product_spinner where compatible_button_id = ${row.id}
             union all select 1 from product_included_component where component_product_id = ${row.id}
+            union all select 1 from product_slider where included_plate_product_id = ${row.id}
             union all select 1 from finish_option selected join finish_option source on source.id = selected.source_product_finish_option_id where source.product_id = ${row.id}
             limit 1`);
             if (references.rows.length) return false;
@@ -6840,6 +6847,7 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     id: product.id,
     imageIds: product.images.map(({ id }) => id),
     includedComponentIds: product.includedComponents.map(({ id }) => id),
+    includedPlateProductId: product.includedPlate?.id ?? null,
     insertClickOptions: product.insertClickOptions,
     insertMagnetOffers: product.insertMagnetOffers,
     isPrivate: product.isPrivate,
@@ -7382,7 +7390,7 @@ async function queryProducts(
       privatedByClerkId: schema.product.privatedByClerkId,
       lengthMm: sql<
         string | null
-      >`coalesce(${schema.productSpinner.lengthMm}, ${schema.productSlider.lengthMm}, ${schema.productSliderPlate.lengthMm}, ${schema.productSliderInsert.lengthMm})`,
+      >`coalesce(${schema.productSpinner.lengthMm}, ${schema.productSlider.lengthMm}, ${schema.productSliderInsert.lengthMm})`,
       makerId: schema.maker.id,
       makerName: schema.maker.name,
       makerSlug: schema.maker.slug,
@@ -7403,16 +7411,16 @@ async function queryProducts(
       spinDiameterMm: schema.productSpinner.spinDiameterMm,
       thicknessMm: sql<
         string | null
-      >`coalesce(${schema.productSpinner.thicknessMm}, ${schema.productSpinnerButton.thicknessMm}, ${schema.productSlider.thicknessMm}, ${schema.productSliderPlate.thicknessMm}, ${schema.productSliderInsert.thicknessMm})`,
+      >`coalesce(${schema.productSpinner.thicknessMm}, ${schema.productSpinnerButton.thicknessMm}, ${schema.productSlider.thicknessMm}, ${schema.productSliderInsert.thicknessMm})`,
       thicknessWithButtonMm: schema.productSpinner.thicknessWithButtonMm,
       updatedAt: schema.product.updatedAt,
       weightG: sql<
         string | null
-      >`coalesce(${schema.productSpinner.weightG}, ${schema.productSpinnerButton.weightG}, ${schema.productSlider.weightG}, ${schema.productSliderPlate.weightG}, ${schema.productSliderInsert.weightG})`,
+      >`coalesce(${schema.productSpinner.weightG}, ${schema.productSpinnerButton.weightG}, ${schema.productSlider.weightG}, ${schema.productSliderInsert.weightG})`,
       weightBasis: schema.productSlider.weightBasis,
       widthMm: sql<
         string | null
-      >`coalesce(${schema.productSpinner.widthMm}, ${schema.productSlider.widthMm}, ${schema.productSliderPlate.widthMm}, ${schema.productSliderInsert.widthMm})`,
+      >`coalesce(${schema.productSpinner.widthMm}, ${schema.productSlider.widthMm}, ${schema.productSliderInsert.widthMm})`,
     })
     .from(schema.product)
     .innerJoin(schema.maker, eq(schema.product.makerId, schema.maker.id))
@@ -7500,6 +7508,7 @@ async function queryProducts(
       imageCount: 0,
       images: [],
       includedComponents: [],
+      includedPlate: null,
       insertClickOptions: [],
       insertMagnetOffers: [],
       id: row.id,
@@ -7927,42 +7936,71 @@ async function loadProductRelationships(
           eq(relatedProduct.approvalStatus, "approved"),
           eq(relatedProduct.isPrivate, false),
         );
-  const components = await db
-    .select({
-      id: relatedProduct.id,
-      name: relatedProduct.name,
-      productId: schema.productIncludedComponent.productId,
-      productTypeSlug: relatedType.slug,
-      slug: relatedProduct.slug,
-    })
-    .from(schema.productIncludedComponent)
-    .innerJoin(
-      relatedProduct,
-      eq(schema.productIncludedComponent.componentProductId, relatedProduct.id),
-    )
-    .innerJoin(relatedType, eq(relatedProduct.productTypeId, relatedType.id))
-    .where(
-      and(
-        inArray(schema.productIncludedComponent.productId, productIds),
-        relatedVisibility,
+  const [components, plates] = await Promise.all([
+    db
+      .select({
+        id: relatedProduct.id,
+        name: relatedProduct.name,
+        productId: schema.productIncludedComponent.productId,
+        productTypeSlug: relatedType.slug,
+        slug: relatedProduct.slug,
+      })
+      .from(schema.productIncludedComponent)
+      .innerJoin(
+        relatedProduct,
+        eq(
+          schema.productIncludedComponent.componentProductId,
+          relatedProduct.id,
+        ),
+      )
+      .innerJoin(relatedType, eq(relatedProduct.productTypeId, relatedType.id))
+      .where(
+        and(
+          inArray(schema.productIncludedComponent.productId, productIds),
+          relatedVisibility,
+        ),
+      )
+      .orderBy(asc(relatedProduct.name)),
+    db
+      .select({
+        id: relatedProduct.id,
+        name: relatedProduct.name,
+        productId: schema.productSlider.id,
+        productTypeSlug: relatedType.slug,
+        slug: relatedProduct.slug,
+      })
+      .from(schema.productSlider)
+      .innerJoin(
+        relatedProduct,
+        eq(schema.productSlider.includedPlateProductId, relatedProduct.id),
+      )
+      .innerJoin(relatedType, eq(relatedProduct.productTypeId, relatedType.id))
+      .where(
+        and(inArray(schema.productSlider.id, productIds), relatedVisibility),
       ),
-    )
-    .orderBy(asc(relatedProduct.name));
+  ]);
   const productsById = new Map(
     products.map((product) => [product.id, product]),
   );
   for (const component of components) {
-    if (
-      component.productTypeSlug !== "slider-insert" &&
-      component.productTypeSlug !== "slider-plate"
-    )
-      continue;
+    if (component.productTypeSlug !== "slider-insert") continue;
     productsById.get(component.productId)?.includedComponents.push({
       id: component.id,
       name: component.name,
       productTypeSlug: component.productTypeSlug,
       slug: component.slug,
     });
+  }
+  for (const plate of plates) {
+    if (plate.productTypeSlug !== "slider-plate") continue;
+    const slider = productsById.get(plate.productId);
+    if (!slider) continue;
+    slider.includedPlate = {
+      id: plate.id,
+      name: plate.name,
+      productTypeSlug: plate.productTypeSlug,
+      slug: plate.slug,
+    };
   }
 }
 
@@ -8524,6 +8562,7 @@ async function queryOwnedItems(
       imageCount: 0,
       images: [],
       includedComponents: [],
+      includedPlate: null,
       isPrivate: row.isPrivate,
       savedIsPrivate: row.savedIsPrivate,
       isAdminPrivate:
@@ -8600,6 +8639,7 @@ async function queryOwnedItems(
       item.compatibleButtonId = product?.compatibleButtonId ?? null;
       item.compatibleButtonName = product?.compatibleButtonName ?? null;
       item.includedComponents = product?.includedComponents ?? [];
+      item.includedPlate = product?.includedPlate ?? null;
       if (item.productTypeSlug !== "slider") continue;
       const insertProduct = row?.installedInsertProductId
         ? productsById.get(row.installedInsertProductId)
@@ -10557,9 +10597,8 @@ async function insertProductSubtype(
       return;
     case "slider-plate":
       assertNoSliderOnlySpecs(specs);
-      await tx
-        .insert(schema.productSliderPlate)
-        .values({ id: productId, ...sliderComponentSpecs(specs) });
+      assertNoSliderPlateMeasurements(specs);
+      await tx.insert(schema.productSliderPlate).values({ id: productId });
       return;
     case "slider-insert":
       assertNoSliderOnlySpecs(specs);
@@ -10608,9 +10647,10 @@ async function updateProductSubtype(
       return;
     case "slider-plate":
       assertNoSliderOnlySpecs(specs);
+      assertNoSliderPlateMeasurements(specs);
       await tx
         .update(schema.productSliderPlate)
-        .set({ ...sliderComponentSpecs(specs), updatedAt })
+        .set({ updatedAt })
         .where(eq(schema.productSliderPlate.id, productId));
       return;
     case "slider-insert":
@@ -10636,6 +10676,7 @@ async function replaceProductRelationships(
   input: ProductWriteInput,
 ) {
   const componentIds = input.includedComponentIds ?? [];
+  const includedPlateProductId = input.includedPlateProductId ?? null;
   if (componentIds.length && !hasPermission(input.actor, "products.manage")) {
     throw new Error("Product does not exist.");
   }
@@ -10643,6 +10684,36 @@ async function replaceProductRelationships(
     throw new Error("Duplicate included components are not allowed.");
   if (componentIds.length && input.productTypeSlug !== "slider")
     throw new Error("Only sliders may declare included slider components.");
+  if (includedPlateProductId !== null && input.productTypeSlug !== "slider")
+    throw new Error("Only sliders may declare included plates.");
+
+  if (input.productTypeSlug === "slider" && includedPlateProductId !== null) {
+    if (includedPlateProductId === productId)
+      throw new Error("A slider cannot include itself as its plate.");
+    const [plate] = await tx
+      .select({
+        approvalStatus: schema.product.approvalStatus,
+        isPrivate: schema.product.isPrivate,
+        ownerClerkId: schema.product.ownerClerkId,
+        type: schema.productType.slug,
+      })
+      .from(schema.product)
+      .innerJoin(
+        schema.productType,
+        eq(schema.product.productTypeId, schema.productType.id),
+      )
+      .where(eq(schema.product.id, includedPlateProductId))
+      .limit(1);
+    if (
+      !plate ||
+      plate.type !== "slider-plate" ||
+      (!hasPermission(input.actor, "products.manage") &&
+        plate.ownerClerkId !== input.actor.clerkId &&
+        (plate.approvalStatus !== "approved" || plate.isPrivate))
+    ) {
+      throw new Error("Included plate must be a slider plate.");
+    }
+  }
 
   if (componentIds.length) {
     const components = await tx
@@ -10655,12 +10726,17 @@ async function replaceProductRelationships(
       .where(inArray(schema.product.id, componentIds));
     if (
       components.length !== componentIds.length ||
-      components.some(
-        ({ type }) => type !== "slider-plate" && type !== "slider-insert",
-      )
+      components.some(({ type }) => type !== "slider-insert")
     ) {
-      throw new Error("Included product must be a slider plate or insert.");
+      throw new Error("Included product must be a slider insert.");
     }
+  }
+
+  if (input.productTypeSlug === "slider") {
+    await tx
+      .update(schema.productSlider)
+      .set({ includedPlateProductId })
+      .where(eq(schema.productSlider.id, productId));
   }
 
   await tx
@@ -11001,6 +11077,23 @@ export function assertValidFinishOptions(
 function assertNoSliderOnlySpecs(specs: ProductWriteInput["specs"]) {
   if (specs.magnetSystem != null || specs.weightBasis != null)
     throw new Error("Slider-only specifications are not allowed.");
+}
+
+/**
+ * Rejects obsolete measurement fields on slider plates.
+ *
+ * @param specs - Candidate plate facts.
+ * @throws When a plate measurement is present.
+ */
+function assertNoSliderPlateMeasurements(specs: ProductWriteInput["specs"]) {
+  if (
+    specs.weightG != null ||
+    specs.lengthMm != null ||
+    specs.widthMm != null ||
+    specs.thicknessMm != null
+  ) {
+    throw new Error("Slider plates do not store measurements.");
+  }
 }
 
 /**
