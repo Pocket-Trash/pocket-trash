@@ -9,13 +9,13 @@ describe("public profile pictures", () => {
   it.each([
     ["sm", "45"],
     ["lg", "75"],
-  ] as const)("requests a square 2x crop for %s avatars", (size, pixels) => {
+  ] as const)("requests square 2x dimensions without overriding Clerk fit for %s avatars", (size, pixels) => {
     const url = publicProfileImageUrl(
-      "https://img.clerk.com/picture?quality=90&width=999",
+      "https://img.clerk.com/picture?quality=90&width=999&fit=crop",
       size,
     );
     expect(url).toBe(
-      `https://img.clerk.com/picture?quality=90&width=${pixels}&height=${pixels}&fit=crop`,
+      `https://img.clerk.com/picture?quality=90&width=${pixels}&height=${pixels}`,
     );
   });
   it("preserves a decorative fallback when the picture is absent or invalid", () => {

@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 /**
- * Requests a square Clerk crop at twice the avatar's CSS dimensions.
+ * Requests square Clerk image dimensions at twice the avatar's CSS dimensions.
  *
  * @param imageUrl - Selected Clerk picture, or null when absent.
  * @param size - Primitive size: 22.5 or 37.5 CSS pixels at the 15px root font.
@@ -18,7 +18,7 @@ export function publicProfileImageUrl(
     const pixels = size === "sm" ? "45" : "75";
     url.searchParams.set("width", pixels);
     url.searchParams.set("height", pixels);
-    url.searchParams.set("fit", "crop");
+    url.searchParams.delete("fit");
     return url.toString();
   } catch {
     return undefined;

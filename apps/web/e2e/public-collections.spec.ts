@@ -242,7 +242,7 @@ test("@mutation public profile pictures appear, change, and disappear on every o
           const size = path === `/collections/${fixture.ownerId}` ? "75" : "45";
           await expect(image).toHaveAttribute(
             "src",
-            `${imageUrl}?width=${size}&height=${size}&fit=crop`,
+            `${imageUrl}?width=${size}&height=${size}`,
           );
           await expect(avatar).toHaveCSS(
             "width",

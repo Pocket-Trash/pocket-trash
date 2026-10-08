@@ -23,11 +23,11 @@ export const Absent: Story = {};
 export const ProfilePicture: Story = {
   args: { imageUrl: picture, size: "lg" },
   /**
-   * Verifies the profile crop matches twice its rendered dimensions.
+   * Verifies the profile image request matches twice its rendered dimensions.
    *
    * @param context - Story canvas.
    * @param context.canvasElement - Rendered story container.
-   * @returns Completion after crop assertions.
+   * @returns Completion after image size assertions.
    * @rejects When the profile avatar is missing.
    */
   play: async ({ canvasElement }) => {
@@ -38,7 +38,7 @@ export const ProfilePicture: Story = {
     if (!avatar) throw new Error("Profile avatar missing");
     const pixels = 2 * parseFloat(getComputedStyle(avatar).width);
     expect(canvasElement.querySelector("img")?.getAttribute("src")).toContain(
-      `width=${pixels}&height=${pixels}&fit=crop`,
+      `width=${pixels}&height=${pixels}`,
     );
   },
 };
@@ -89,7 +89,7 @@ export const ChangedAndRemoved: Story = {
     const pixels = 2 * parseFloat(getComputedStyle(avatar).width);
     expect(canvasElement.querySelector("img")).toHaveAttribute("alt", "");
     expect(canvasElement.querySelector("img")?.getAttribute("src")).toContain(
-      `width=${pixels}&height=${pixels}&fit=crop`,
+      `width=${pixels}&height=${pixels}`,
     );
     await userEvent.click(canvas.getByRole("button", { name: "Replace" }));
     await waitFor(() =>
