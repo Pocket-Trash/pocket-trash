@@ -20,7 +20,6 @@ import {
   pattern,
   product,
   productImage,
-  productIncludedComponent,
   productMaterial,
   productSlider,
   productSliderInsert,
@@ -345,14 +344,11 @@ export const productRelations = relations(product, ({ many, one }) => ({
     references: [maker.id],
   }),
   materials: many(productMaterial),
-  includedComponents: many(productIncludedComponent, {
-    relationName: "includedComponentParent",
-  }),
-  includedWithProducts: many(productIncludedComponent, {
-    relationName: "includedComponentChild",
-  }),
   includedAsSliderPlate: many(productSlider, {
     relationName: "includedSliderPlate",
+  }),
+  includedAsSliderInsert: many(productSlider, {
+    relationName: "includedSliderInsert",
   }),
   productType: one(productType, {
     fields: [product.productTypeId],
@@ -379,23 +375,6 @@ export const productRelations = relations(product, ({ many, one }) => ({
     references: [productSliderPlate.id],
   }),
 }));
-
-/** Connects exact included-component relationships to parent and component products. */
-export const productIncludedComponentRelations = relations(
-  productIncludedComponent,
-  ({ one }) => ({
-    component: one(product, {
-      fields: [productIncludedComponent.componentProductId],
-      references: [product.id],
-      relationName: "includedComponentChild",
-    }),
-    product: one(product, {
-      fields: [productIncludedComponent.productId],
-      references: [product.id],
-      relationName: "includedComponentParent",
-    }),
-  }),
-);
 
 /** Connects a product image to its catalog product. */
 export const productImageRelations = relations(productImage, ({ one }) => ({
@@ -524,6 +503,11 @@ export const productSpinnerButtonRelations = relations(
 
 /** Connects a slider body subtype to its catalog product. */
 export const productSliderRelations = relations(productSlider, ({ one }) => ({
+  includedInsert: one(product, {
+    fields: [productSlider.includedInsertProductId],
+    references: [product.id],
+    relationName: "includedSliderInsert",
+  }),
   includedPlate: one(product, {
     fields: [productSlider.includedPlateProductId],
     references: [product.id],

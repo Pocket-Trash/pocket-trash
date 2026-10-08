@@ -88,7 +88,7 @@ const manifest: CatalogImportManifest = {
       entity: "product-slider",
       expected: { state: "absent" },
       key: "slider:slider",
-      payload: { magnetSystem: "body-hosted" },
+      payload: { usesInserts: false },
       references: { product: "product:slider" },
     },
   ],

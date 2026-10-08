@@ -14,7 +14,6 @@ export const catalogImportEntityTypes = [
   "finish-option",
   "finish-option-finish",
   "finish-option-color",
-  "product-included-component",
   "product-spinner",
   "product-spinner-button",
   "product-slider",
@@ -25,11 +24,6 @@ export const catalogImportEntityTypes = [
   "product-magnet-configuration",
   "product-magnet-group",
   "product-magnet-slot",
-  "product-insert-click-option",
-  "product-insert-magnet-offer",
-  "product-insert-magnet-group",
-  "product-insert-magnet-slot",
-  "product-slider-insert-offer",
   "catalog-terminology-alias",
 ] as const;
 

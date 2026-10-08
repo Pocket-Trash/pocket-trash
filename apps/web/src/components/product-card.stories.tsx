@@ -7,11 +7,8 @@ import { ProductCard } from "./product-card";
  */
 const product: CatalogProduct = {
   approvalStatus: "approved",
-  advertisedInsertOffers: [],
   bearing: null,
   bodyHostedMagnetSetup: null,
-  insertClickOptions: [],
-  insertMagnetOffers: [],
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: true,
@@ -34,7 +31,7 @@ const product: CatalogProduct = {
   id: 1000,
   imageCount: 0,
   images: [],
-  includedComponents: [],
+  includedInsert: null,
   includedPlate: null,
   isAdminPrivate: false,
   isPrivate: false,
@@ -45,7 +42,7 @@ const product: CatalogProduct = {
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
-  magnetSystem: null,
+  usesInserts: null,
   materials: [
     { id: 1000, name: "Bronze", slug: "bronze" },
     { id: 1001, name: "Titanium", slug: "titanium" },

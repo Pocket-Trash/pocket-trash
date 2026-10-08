@@ -20,11 +20,9 @@ import {
   pattern,
   product,
   productImage,
-  productInsertMagnetOffer,
   productMagnetConfiguration,
   productSlider,
   productSliderInsert,
-  productSliderInsertOffer,
   productSliderPlate,
   productType,
 } from "../src/schema/index.js";
@@ -161,7 +159,7 @@ describe("deterministic slider fixture seed", () => {
    * @returns Completion after every relationship assertion passes.
    */
   async function expectDiscoveryRelationships(productIds: number[]) {
-    const [bodyConfigurations, incompleteSources, defaultOffers] =
+    const [bodyConfigurations, incompleteSources, includedInserts] =
       await Promise.all([
         db
           .select({ productId: productMagnetConfiguration.productId })
@@ -180,26 +178,18 @@ describe("deterministic slider fixture seed", () => {
             ),
           ),
         db
-          .select({ sliderProductId: productSliderInsertOffer.sliderProductId })
-          .from(productSliderInsertOffer)
-          .innerJoin(
-            productInsertMagnetOffer,
-            eq(
-              productInsertMagnetOffer.id,
-              productSliderInsertOffer.insertOfferId,
-            ),
-          )
+          .select({ sliderProductId: productSlider.id })
+          .from(productSlider)
           .where(
             and(
-              inArray(productSliderInsertOffer.sliderProductId, productIds),
-              eq(productSliderInsertOffer.isAdvertisedDefault, true),
-              eq(productInsertMagnetOffer.sourceLabel, "Default setup"),
+              inArray(productSlider.id, productIds),
+              isNotNull(productSlider.includedInsertProductId),
             ),
           ),
       ]);
     expect(bodyConfigurations).toHaveLength(1);
     expect(incompleteSources).toHaveLength(1);
-    expect(defaultOffers.length).toBeGreaterThan(0);
+    expect(includedInserts.length).toBeGreaterThan(0);
 
     const [includedPlates, patternedProducts] = await Promise.all([
       db

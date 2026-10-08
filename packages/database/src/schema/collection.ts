@@ -579,29 +579,6 @@ export const catalogTerminologyAlias = pgTable(
   ],
 );
 
-/** Exact component products sold with a parent catalog product. */
-export const productIncludedComponent = pgTable(
-  "product_included_component",
-  {
-    productId: bigint("product_id", { mode: "number" })
-      .notNull()
-      .references(() => product.id, { onDelete: "cascade" }),
-    componentProductId: bigint("component_product_id", { mode: "number" })
-      .notNull()
-      .references(() => product.id, { onDelete: "restrict" }),
-  },
-  (table) => [
-    primaryKey({ columns: [table.productId, table.componentProductId] }),
-    index("product_included_component_component_idx").on(
-      table.componentProductId,
-    ),
-    check(
-      "product_included_component_distinct_products",
-      sql`${table.productId} <> ${table.componentProductId}`,
-    ),
-  ],
-);
-
 /**
  * Builds shared identity and timestamp columns for catalog lookup tables.
  *
@@ -815,7 +792,7 @@ export const productSpinnerButton = pgTable(
   ],
 );
 
-/** Slider body measurements and explicit physical magnet-host capability. */
+/** Slider body measurements and catalog component choices. */
 export const productSlider = pgTable(
   "product_slider",
   {
@@ -826,9 +803,12 @@ export const productSlider = pgTable(
     includedPlateProductId: bigint("included_plate_product_id", {
       mode: "number",
     }).references(() => product.id, { onDelete: "restrict" }),
-    magnetSystem: text("magnet_system", {
-      enum: ["body-hosted", "insert-driven"],
-    }).notNull(),
+    /** Whether this slider uses an insert to configure and hold magnets. */
+    usesInserts: boolean("uses_inserts").notNull(),
+    /** Exact catalog insert supplied with the slider; null means an unnamed included insert when inserts are used. */
+    includedInsertProductId: bigint("included_insert_product_id", {
+      mode: "number",
+    }).references(() => product.id, { onDelete: "restrict" }),
     inherentClickCount: integer("inherent_click_count"),
     /** Source text retained when a complete layout is not documented. */
     magnetSetupSourceNote: text("magnet_setup_source_note"),
@@ -848,8 +828,8 @@ export const productSlider = pgTable(
   },
   (table) => [
     check(
-      "product_slider_magnet_system_valid",
-      sql`${table.magnetSystem} in ('body-hosted', 'insert-driven')`,
+      "product_slider_insert_choice_consistent",
+      sql`${table.usesInserts} or ${table.includedInsertProductId} is null`,
     ),
     check(
       "product_slider_weight_basis_consistent",
@@ -874,6 +854,13 @@ export const productSlider = pgTable(
     check(
       "product_slider_included_plate_distinct",
       sql`${table.includedPlateProductId} is null or ${table.includedPlateProductId} <> ${table.id}`,
+    ),
+    check(
+      "product_slider_included_insert_distinct",
+      sql`${table.includedInsertProductId} is null or ${table.includedInsertProductId} <> ${table.id}`,
+    ),
+    index("product_slider_included_insert_idx").on(
+      table.includedInsertProductId,
     ),
     index("product_slider_included_plate_idx").on(table.includedPlateProductId),
   ],
@@ -1100,72 +1087,18 @@ export const productSliderPlate = pgTable("product_slider_plate", {
     .notNull(),
 });
 
-/** Optional set-level measurements for one slider insert or cassette set. */
-export const productSliderInsert = pgTable(
-  "product_slider_insert",
-  {
-    id: bigint("id", { mode: "number" })
-      .primaryKey()
-      .references(() => product.id, { onDelete: "cascade" }),
-    weightG: decimal("weight_g"),
-    lengthMm: decimal("length_mm"),
-    widthMm: decimal("width_mm"),
-    thicknessMm: decimal("thickness_mm"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    check(
-      "product_slider_insert_measurements_positive",
-      sql`${table.weightG} > 0 and ${table.lengthMm} > 0 and ${table.widthMm} > 0 and ${table.thicknessMm} > 0`,
-    ),
-  ],
-);
-
-/** Immutable insertion-ordered click counts offered by one exact insert product. */
-export const productInsertClickOption = pgTable(
-  "product_insert_click_option",
-  {
-    id: bigint("id", { mode: "number" })
-      .primaryKey()
-      .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    insertProductId: bigint("insert_product_id", { mode: "number" })
-      .notNull()
-      .references(() => productSliderInsert.id, { onDelete: "cascade" }),
-    clickCount: integer("click_count").notNull(),
-    /** Assigned by the service and never exposed as catalog-managed sorting. */
-    insertionPosition: integer("insertion_position").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    unique("product_insert_click_option_id_product_unique").on(
-      table.id,
-      table.insertProductId,
-    ),
-    unique("product_insert_click_option_product_count_unique").on(
-      table.insertProductId,
-      table.clickCount,
-    ),
-    unique("product_insert_click_option_product_position_unique").on(
-      table.insertProductId,
-      table.insertionPosition,
-    ),
-    check(
-      "product_insert_click_option_click_count_positive",
-      sql`${table.clickCount} > 0`,
-    ),
-    check(
-      "product_insert_click_option_position_nonnegative",
-      sql`${table.insertionPosition} >= 0`,
-    ),
-  ],
-);
+/** Catalog subtype marker for one slider insert or cassette set. */
+export const productSliderInsert = pgTable("product_slider_insert", {
+  id: bigint("id", { mode: "number" })
+    .primaryKey()
+    .references(() => product.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
 
 /** Exact configuration JSON stored by a catalog-authoring template. */
 export type MagnetConfigurationValue = {
@@ -1224,208 +1157,6 @@ export type OwnedSliderInsertSetupValue = {
   /** Catalog offer copied as the authoring source, when present. */
   sourceOfferId: number | null;
 };
-
-/** Complete magnet-layout offer belonging to one exact insert product. */
-export const productInsertMagnetOffer = pgTable(
-  "product_insert_magnet_offer",
-  {
-    id: bigint("id", { mode: "number" })
-      .primaryKey()
-      .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    insertProductId: bigint("insert_product_id", { mode: "number" })
-      .notNull()
-      .references(() => productSliderInsert.id, { onDelete: "cascade" }),
-    configurationLabelId: bigint("configuration_label_id", {
-      mode: "number",
-    })
-      .notNull()
-      .references(() => magnetConfigurationLabel.id, {
-        onDelete: "restrict",
-      }),
-    clickOptionId: bigint("click_option_id", { mode: "number" }),
-    isAdvertisedDefault: boolean("is_advertised_default")
-      .default(false)
-      .notNull(),
-    sourceLabel: text("source_label"),
-    sourceNotes: text("source_notes"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    foreignKey({
-      columns: [table.clickOptionId, table.insertProductId],
-      foreignColumns: [
-        productInsertClickOption.id,
-        productInsertClickOption.insertProductId,
-      ],
-      name: "product_insert_magnet_offer_click_option_product_fk",
-    }).onDelete("restrict"),
-    unique("product_insert_magnet_offer_id_product_unique").on(
-      table.id,
-      table.insertProductId,
-    ),
-    uniqueIndex("product_insert_magnet_offer_advertised_default_unique")
-      .on(table.insertProductId)
-      .where(sql`${table.isAdvertisedDefault}`),
-    check(
-      "product_insert_magnet_offer_source_label_valid",
-      sql`${table.sourceLabel} is null or char_length(trim(${table.sourceLabel})) between 1 and 200`,
-    ),
-    check(
-      "product_insert_magnet_offer_source_notes_valid",
-      sql`${table.sourceNotes} is null or char_length(trim(${table.sourceNotes})) between 1 and 5000`,
-    ),
-  ],
-);
-
-/** Exact magnet dimensions and grade within one insert offer snapshot. */
-export const productInsertMagnetGroup = pgTable(
-  "product_insert_magnet_group",
-  {
-    id: bigint("id", { mode: "number" })
-      .primaryKey()
-      .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    offerId: bigint("offer_id", { mode: "number" })
-      .notNull()
-      .references(() => productInsertMagnetOffer.id, { onDelete: "cascade" }),
-    groupKey: text("group_key").notNull(),
-    groupLabelId: bigint("group_label_id", { mode: "number" })
-      .notNull()
-      .references(() => magnetGroupLabel.id, { onDelete: "restrict" }),
-    diameterMm: decimal("diameter_mm").notNull(),
-    thicknessMm: decimal("thickness_mm").notNull(),
-    grade: text("grade").notNull(),
-    displayOrder: integer("display_order").notNull(),
-  },
-  (table) => [
-    unique("product_insert_magnet_group_id_offer_unique").on(
-      table.id,
-      table.offerId,
-    ),
-    unique("product_insert_magnet_group_offer_key_unique").on(
-      table.offerId,
-      table.groupKey,
-    ),
-    unique("product_insert_magnet_group_offer_order_unique").on(
-      table.offerId,
-      table.displayOrder,
-    ),
-    check(
-      "product_insert_magnet_group_key_valid",
-      sql`char_length(trim(${table.groupKey})) between 1 and 100`,
-    ),
-    check(
-      "product_insert_magnet_group_dimensions_positive",
-      sql`${table.diameterMm} > 0 and ${table.thicknessMm} > 0`,
-    ),
-    check(
-      "product_insert_magnet_group_grade_normalized",
-      sql`${table.grade} ~ '^[A-Z0-9][A-Z0-9+_-]{0,19}$'`,
-    ),
-    check(
-      "product_insert_magnet_group_display_order_nonnegative",
-      sql`${table.displayOrder} >= 0`,
-    ),
-  ],
-);
-
-/** One exact, source-relative position within an insert offer snapshot. */
-export const productInsertMagnetSlot = pgTable(
-  "product_insert_magnet_slot",
-  {
-    id: bigint("id", { mode: "number" })
-      .primaryKey()
-      .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    offerId: bigint("offer_id", { mode: "number" })
-      .notNull()
-      .references(() => productInsertMagnetOffer.id, { onDelete: "cascade" }),
-    slotKey: text("slot_key").notNull(),
-    half: text("half", { enum: ["half-a", "half-b"] }).notNull(),
-    state: text("state", { enum: ["occupied", "empty"] }).notNull(),
-    groupId: bigint("group_id", { mode: "number" }),
-    documentedRow: integer("documented_row"),
-    documentedColumn: integer("documented_column"),
-    displayOrder: integer("display_order").notNull(),
-  },
-  (table) => [
-    foreignKey({
-      columns: [table.groupId, table.offerId],
-      foreignColumns: [
-        productInsertMagnetGroup.id,
-        productInsertMagnetGroup.offerId,
-      ],
-      name: "product_insert_magnet_slot_group_offer_fk",
-    }).onDelete("restrict"),
-    unique("product_insert_magnet_slot_offer_key_unique").on(
-      table.offerId,
-      table.slotKey,
-    ),
-    unique("product_insert_magnet_slot_offer_order_unique").on(
-      table.offerId,
-      table.displayOrder,
-    ),
-    check(
-      "product_insert_magnet_slot_key_valid",
-      sql`char_length(trim(${table.slotKey})) between 1 and 100`,
-    ),
-    check(
-      "product_insert_magnet_slot_half_valid",
-      sql`${table.half} in ('half-a', 'half-b')`,
-    ),
-    check(
-      "product_insert_magnet_slot_state_valid",
-      sql`${table.state} in ('occupied', 'empty')`,
-    ),
-    check(
-      "product_insert_magnet_slot_state_group_consistent",
-      sql`(${table.state} = 'occupied' and ${table.groupId} is not null) or (${table.state} = 'empty' and ${table.groupId} is null)`,
-    ),
-    check(
-      "product_insert_magnet_slot_documented_position_positive",
-      sql`(${table.documentedRow} is null or ${table.documentedRow} > 0) and (${table.documentedColumn} is null or ${table.documentedColumn} > 0)`,
-    ),
-    check(
-      "product_insert_magnet_slot_display_order_nonnegative",
-      sql`${table.displayOrder} >= 0`,
-    ),
-  ],
-);
-
-/** Explicit merchandising association between an insert-driven slider and an exact offer. */
-export const productSliderInsertOffer = pgTable(
-  "product_slider_insert_offer",
-  {
-    sliderProductId: bigint("slider_product_id", { mode: "number" })
-      .notNull()
-      .references(() => productSlider.id, { onDelete: "cascade" }),
-    insertOfferId: bigint("insert_offer_id", { mode: "number" }).notNull(),
-    insertProductId: bigint("insert_product_id", { mode: "number" }).notNull(),
-    isAdvertisedDefault: boolean("is_advertised_default")
-      .default(false)
-      .notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.sliderProductId, table.insertOfferId] }),
-    foreignKey({
-      columns: [table.insertOfferId, table.insertProductId],
-      foreignColumns: [
-        productInsertMagnetOffer.id,
-        productInsertMagnetOffer.insertProductId,
-      ],
-      name: "product_slider_insert_offer_exact_offer_fk",
-    }).onDelete("cascade"),
-    uniqueIndex("product_slider_insert_offer_advertised_default_unique")
-      .on(table.sliderProductId)
-      .where(sql`${table.isAdvertisedDefault}`),
-  ],
-);
 
 /** Catalog spinner-button mappings selected for collection items. */
 export const collectionSpinnerButton = pgTable("collection_spinner_button", {
@@ -1552,12 +1283,6 @@ export type CatalogTerminologyAlias =
 /** Values accepted when creating a catalog terminology alias. */
 export type NewCatalogTerminologyAlias =
   typeof catalogTerminologyAlias.$inferInsert;
-/** Stored exact included-component relationship. */
-export type ProductIncludedComponent =
-  typeof productIncludedComponent.$inferSelect;
-/** Values accepted for an exact included-component relationship. */
-export type NewProductIncludedComponent =
-  typeof productIncludedComponent.$inferInsert;
 /** Stored finish row. */
 export type Finish = typeof finish.$inferSelect;
 /** Values accepted when creating a finish row. */
@@ -1626,36 +1351,6 @@ export type NewProductSliderPlate = typeof productSliderPlate.$inferInsert;
 export type ProductSliderInsert = typeof productSliderInsert.$inferSelect;
 /** Values accepted when creating a slider insert-set row. */
 export type NewProductSliderInsert = typeof productSliderInsert.$inferInsert;
-/** Stored insertion-ordered click-count option for an insert product. */
-export type ProductInsertClickOption =
-  typeof productInsertClickOption.$inferSelect;
-/** Values accepted for an insert click-count option. */
-export type NewProductInsertClickOption =
-  typeof productInsertClickOption.$inferInsert;
-/** Stored exact insert-hosted magnet offer. */
-export type ProductInsertMagnetOffer =
-  typeof productInsertMagnetOffer.$inferSelect;
-/** Values accepted for an exact insert-hosted magnet offer. */
-export type NewProductInsertMagnetOffer =
-  typeof productInsertMagnetOffer.$inferInsert;
-/** Stored magnet group within an insert-hosted offer. */
-export type ProductInsertMagnetGroup =
-  typeof productInsertMagnetGroup.$inferSelect;
-/** Values accepted for an insert-hosted offer magnet group. */
-export type NewProductInsertMagnetGroup =
-  typeof productInsertMagnetGroup.$inferInsert;
-/** Stored exact magnet slot within an insert-hosted offer. */
-export type ProductInsertMagnetSlot =
-  typeof productInsertMagnetSlot.$inferSelect;
-/** Values accepted for an insert-hosted offer magnet slot. */
-export type NewProductInsertMagnetSlot =
-  typeof productInsertMagnetSlot.$inferInsert;
-/** Stored slider-to-insert-offer merchandising association. */
-export type ProductSliderInsertOffer =
-  typeof productSliderInsertOffer.$inferSelect;
-/** Values accepted for a slider-to-insert-offer association. */
-export type NewProductSliderInsertOffer =
-  typeof productSliderInsertOffer.$inferInsert;
 /** Stored collection spinner row. */
 export type CollectionSpinner = typeof collectionSpinner.$inferSelect;
 /** Values accepted when creating a collection spinner row. */

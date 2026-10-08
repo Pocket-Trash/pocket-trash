@@ -302,56 +302,6 @@ const bodyHostedMagnetSetupSchema = z.object({
   sourceNote: optionalMagnetTextSchema(5000),
 });
 
-/** Insert-owned click counts and complete exact configuration offers. */
-const insertHostedMagnetOptionsSchema = z
-  .object({
-    clickCounts: z.array(z.number().int().positive()),
-    offers: z.array(
-      z.object({
-        clickCount: z.number().int().positive().nullable(),
-        configuration: magnetConfigurationSchema,
-        id: idSchema.nullable().default(null),
-        isAdvertisedDefault: z.boolean(),
-      }),
-    ),
-  })
-  .superRefine(({ clickCounts, offers }, context) => {
-    if (new Set(clickCounts).size !== clickCounts.length) {
-      context.addIssue({
-        code: "custom",
-        message: "web.catalog.error.form",
-        path: ["clickCounts"],
-      });
-    }
-    if (
-      offers.filter(({ isAdvertisedDefault }) => isAdvertisedDefault).length > 1
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "web.catalog.error.form",
-        path: ["offers"],
-      });
-    }
-    for (const [index, offer] of offers.entries()) {
-      if (
-        offer.clickCount !== null &&
-        !clickCounts.includes(offer.clickCount)
-      ) {
-        context.addIssue({
-          code: "custom",
-          message: "web.catalog.error.form",
-          path: ["offers", index, "clickCount"],
-        });
-      }
-    }
-  });
-
-/** Exact insert offers merchandised by an insert-driven slider. */
-const advertisedInsertOfferSchema = z.object({
-  isAdvertisedDefault: z.boolean(),
-  offerId: idSchema,
-});
-
 /**
  * Checks whether an optional URL uses HTTP or HTTPS.
  *
@@ -445,7 +395,6 @@ export const finishOptionSchema = z
  */
 export const productFormSchema = z
   .object({
-    advertisedInsertOffers: z.array(advertisedInsertOfferSchema).default([]),
     bearing: optionalBearingSchema,
     bodyHostedMagnetSetup: bodyHostedMagnetSetupSchema.nullable().default(null),
     buttonDiameterMm: numericSpecSchema,
@@ -453,15 +402,11 @@ export const productFormSchema = z
     description: optionalDescriptionSchema,
     diameterMm: numericSpecSchema,
     finishOptions: z.array(finishOptionSchema),
-    includedComponentIds: z.array(idSchema),
+    includedInsertProductId: idSchema.nullable(),
     includedPlateProductId: idSchema.nullable(),
-    insertHostedMagnetOptions: insertHostedMagnetOptionsSchema
-      .nullable()
-      .default(null),
     lengthMm: numericSpecSchema,
     makerId: idSchema,
     makerProductUrl: optionalUrlSchema,
-    magnetSystem: z.enum(["body-hosted", "insert-driven"]).nullable(),
     materialIds: z.array(idSchema).min(1, requiredMessage),
     name: slugNameSchema,
     productId: idSchema.nullable(),
@@ -473,25 +418,25 @@ export const productFormSchema = z
     weightG: numericSpecSchema,
     weightBasis: z.enum(["body-only", "complete-build"]).nullable(),
     widthMm: numericSpecSchema,
+    usesInserts: z.boolean().nullable(),
   })
   .superRefine(
     (
       {
         bearing,
         bodyHostedMagnetSetup,
-        advertisedInsertOffers,
         finishOptions,
-        includedComponentIds,
+        includedInsertProductId,
         includedPlateProductId,
-        insertHostedMagnetOptions,
         lengthMm,
-        magnetSystem,
+        materialIds,
         productTypeSlug,
         spinDiameterMm,
         thicknessMm,
         weightBasis,
         weightG,
         widthMm,
+        usesInserts,
       },
       context,
     ) => {
@@ -505,55 +450,23 @@ export const productFormSchema = z
           path: [bearing !== null ? "bearing" : "spinDiameterMm"],
         });
       }
-      if (
-        insertHostedMagnetOptions !== null &&
-        productTypeSlug !== "slider-insert"
-      ) {
-        context.addIssue({
-          code: "custom",
-          message: "web.slider.validation.bodyHostedInsert",
-          path: ["insertHostedMagnetOptions"],
-        });
-      }
-      if (
-        advertisedInsertOffers.length &&
-        (productTypeSlug !== "slider" || magnetSystem !== "insert-driven")
-      ) {
-        context.addIssue({
-          code: "custom",
-          message: "web.catalog.error.form",
-          path: ["advertisedInsertOffers"],
-        });
-      }
-      if (
-        advertisedInsertOffers.length &&
-        advertisedInsertOffers.filter(({ isAdvertisedDefault }) =>
-          Boolean(isAdvertisedDefault),
-        ).length !== 1
-      ) {
-        context.addIssue({
-          code: "custom",
-          message: "web.catalog.error.form",
-          path: ["advertisedInsertOffers"],
-        });
-      }
-      if (productTypeSlug === "slider" && magnetSystem === null) {
+      if (productTypeSlug === "slider" && usesInserts === null) {
         context.addIssue({
           code: "custom",
           message: "web.slider.validation.capabilityRequired",
-          path: ["magnetSystem"],
+          path: ["usesInserts"],
         });
       }
-      if (productTypeSlug !== "slider" && magnetSystem !== null) {
+      if (productTypeSlug !== "slider" && usesInserts !== null) {
         context.addIssue({
           code: "custom",
           message: "web.catalog.error.form",
-          path: ["magnetSystem"],
+          path: ["usesInserts"],
         });
       }
       if (
         bodyHostedMagnetSetup !== null &&
-        (productTypeSlug !== "slider" || magnetSystem !== "body-hosted")
+        (productTypeSlug !== "slider" || usesInserts !== false)
       ) {
         context.addIssue({
           code: "custom",
@@ -578,11 +491,18 @@ export const productFormSchema = z
           path: ["weightBasis"],
         });
       }
-      if (productTypeSlug !== "slider" && includedComponentIds.length) {
+      if (productTypeSlug !== "slider" && includedInsertProductId !== null) {
         context.addIssue({
           code: "custom",
           message: "web.catalog.error.form",
-          path: ["includedComponentIds"],
+          path: ["includedInsertProductId"],
+        });
+      }
+      if (usesInserts !== true && includedInsertProductId !== null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["includedInsertProductId"],
         });
       }
       if (productTypeSlug !== "slider" && includedPlateProductId !== null) {
@@ -593,7 +513,8 @@ export const productFormSchema = z
         });
       }
       if (
-        productTypeSlug === "slider-plate" &&
+        (productTypeSlug === "slider-plate" ||
+          productTypeSlug === "slider-insert") &&
         [weightG, lengthMm, widthMm, thicknessMm].some(
           (measurement) => measurement !== null,
         )
@@ -604,11 +525,18 @@ export const productFormSchema = z
           path: ["weightG"],
         });
       }
-      if (new Set(includedComponentIds).size !== includedComponentIds.length) {
+      if (productTypeSlug === "slider-insert" && materialIds.length !== 1) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.insertMaterial",
+          path: ["materialIds"],
+        });
+      }
+      if (productTypeSlug === "slider-insert" && finishOptions.length) {
         context.addIssue({
           code: "custom",
           message: "web.catalog.error.form",
-          path: ["includedComponentIds"],
+          path: ["finishOptions"],
         });
       }
       const signatures = finishOptions.map(
@@ -1537,7 +1465,6 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     const slug = nextAvailableSlug(parsed.data.name, slugs);
     const input: ProductWriteInput = {
       actor,
-      advertisedInsertOffers: parsed.data.advertisedInsertOffers,
       bodyHostedMagnetSetup: parsed.data.bodyHostedMagnetSetup,
       description: parsed.data.description,
       finishOptions: parsed.data.finishOptions.map(
@@ -1551,19 +1478,8 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       makerId: parsed.data.makerId,
       makerProductUrl: parsed.data.makerProductUrl,
       materialIds: parsed.data.materialIds,
-      includedComponentIds: parsed.data.includedComponentIds,
+      includedInsertProductId: parsed.data.includedInsertProductId,
       includedPlateProductId: parsed.data.includedPlateProductId,
-      insertHostedMagnetOptions: parsed.data.insertHostedMagnetOptions
-        ? {
-            ...parsed.data.insertHostedMagnetOptions,
-            offers: parsed.data.insertHostedMagnetOptions.offers.map(
-              ({ id, ...offer }) => ({
-                ...offer,
-                ...(id === null ? {} : { id }),
-              }),
-            ),
-          }
-        : null,
       name: parsed.data.name,
       productTypeSlug: parsed.data.productTypeSlug,
       reason: parsed.data.reason,
@@ -1574,13 +1490,13 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
         compatibleButtonId: parsed.data.compatibleButtonId,
         diameterMm: parsed.data.diameterMm,
         lengthMm: parsed.data.lengthMm,
-        magnetSystem: parsed.data.magnetSystem,
         spinDiameterMm: parsed.data.spinDiameterMm,
         thicknessMm: parsed.data.thicknessMm,
         thicknessWithButtonMm: parsed.data.thicknessWithButtonMm,
         weightG: parsed.data.weightG,
         weightBasis: parsed.data.weightBasis,
         widthMm: parsed.data.widthMm,
+        usesInserts: parsed.data.usesInserts,
       },
     };
 

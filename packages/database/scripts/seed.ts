@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import {
   createUploadStorage,
   type UploadStorage,
@@ -25,17 +25,12 @@ import {
   pattern,
   product,
   productImage,
-  productInsertClickOption,
-  productInsertMagnetGroup,
-  productInsertMagnetOffer,
-  productInsertMagnetSlot,
   productMagnetConfiguration,
   productMagnetGroup,
   productMagnetSlot,
   productMaterial,
   productSlider,
   productSliderInsert,
-  productSliderInsertOffer,
   productSliderPlate,
   productSpinner,
   productSpinnerButton,
@@ -247,14 +242,14 @@ export type SliderFixtureMagnetConfiguration = {
 
 /** One catalog product in the deterministic development slider fixture. */
 export type SliderFixtureProduct = {
-  /** Insert product selected as the advertised default, when applicable. */
-  defaultInsertSlug: string | null;
+  /** Exact included insert product slug for a slider. */
+  includedInsertSlug: string | null;
   /** Deterministic generated gallery images. */
   images: SliderFixtureImage[];
   /** Exact included plate product slug for a slider. */
   includedPlateSlug: string | null;
-  /** Product magnet-host system for sliders. */
-  magnetSystem: "body-hosted" | "insert-driven" | null;
+  /** Whether a slider uses inserts. */
+  usesInserts: boolean | null;
   /** Complete body-hosted configuration, when the source is complete. */
   magnetConfiguration: SliderFixtureMagnetConfiguration | null;
   /** Retained note when a complete body-hosted layout is unavailable. */
@@ -279,14 +274,6 @@ export type SliderFixtureCatalog = {
   products: SliderFixtureProduct[];
 };
 
-/** Persisted default offer used to connect insert-driven slider fixtures. */
-type SliderFixtureInsertOffer = {
-  /** Persisted insert magnet-offer identifier. */
-  id: number;
-  /** Persisted slider-insert product identifier. */
-  productId: number;
-};
-
 /** Maker definitions used to generate the compact slider fixture. */
 const sliderFixtureMakers = [
   { name: "Magnus Fidgets" as const, slug: "magnus" },
@@ -305,7 +292,7 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
         const hasCompleteConfiguration = makerIndex === 0 && productIndex === 0;
         const hasIncompleteSource = makerIndex === 1 && productIndex === 2;
         return {
-          defaultInsertSlug: bodyHosted
+          includedInsertSlug: bodyHosted
             ? null
             : `${fixtureMaker.slug}-demo-insert`,
           images: [
@@ -320,7 +307,7 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
           magnetSetupSourceNote: hasIncompleteSource
             ? "The maker documents the click count but not every magnet position."
             : null,
-          magnetSystem: bodyHosted ? "body-hosted" : "insert-driven",
+          usesInserts: !bodyHosted,
           maker: fixtureMaker.name,
           name: `${fixtureMaker.name} Demo Slider ${String(productIndex + 1).padStart(2, "0")}`,
           pattern:
@@ -338,7 +325,7 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
     ...sliderFixtureMakers.map((fixtureMaker, index): SliderFixtureProduct => {
       const slug = `${fixtureMaker.slug}-demo-plate`;
       return {
-        defaultInsertSlug: null,
+        includedInsertSlug: null,
         images: [
           { key: `${slug}-primary` },
           ...(index === sliderFixtureMakers.length - 1
@@ -348,7 +335,7 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
         includedPlateSlug: null,
         magnetConfiguration: null,
         magnetSetupSourceNote: null,
-        magnetSystem: null,
+        usesInserts: null,
         maker: fixtureMaker.name,
         name: `${fixtureMaker.name} Demo Plate`,
         pattern: index === 0 ? "machined-grid" : null,
@@ -360,7 +347,7 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
     ...sliderFixtureMakers.map((fixtureMaker, index): SliderFixtureProduct => {
       const slug = `${fixtureMaker.slug}-demo-insert`;
       return {
-        defaultInsertSlug: null,
+        includedInsertSlug: null,
         images: [
           { key: `${slug}-primary` },
           ...(index === sliderFixtureMakers.length - 1
@@ -370,10 +357,10 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
         includedPlateSlug: null,
         magnetConfiguration: null,
         magnetSetupSourceNote: null,
-        magnetSystem: null,
+        usesInserts: null,
         maker: fixtureMaker.name,
         name: `${fixtureMaker.name} Demo Insert`,
-        pattern: index === 1 ? "ripple" : null,
+        pattern: null,
         slug,
         type: "slider-insert" as const,
         updatedAt: new Date(Date.UTC(2026, 9, 1 + index, 12)).toISOString(),
@@ -1098,29 +1085,27 @@ export async function seedSliderFixtures(
         .insert(productSlider)
         .values({
           id: seededProduct.id,
-          inherentClickCount:
-            fixtureProduct.magnetSystem === "body-hosted" ? 4 : null,
+          inherentClickCount: fixtureProduct.usesInserts === false ? 4 : null,
           lengthMm: "52",
           magnetSetupSourceNote: fixtureProduct.magnetSetupSourceNote,
-          magnetSystem: fixtureProduct.magnetSystem ?? "body-hosted",
           thicknessMm: "12",
           updatedAt,
           weightBasis: "complete-build",
           weightG: "96",
           widthMm: "24",
+          usesInserts: fixtureProduct.usesInserts ?? false,
         })
         .onConflictDoUpdate({
           set: {
-            inherentClickCount:
-              fixtureProduct.magnetSystem === "body-hosted" ? 4 : null,
+            inherentClickCount: fixtureProduct.usesInserts === false ? 4 : null,
             lengthMm: "52",
             magnetSetupSourceNote: fixtureProduct.magnetSetupSourceNote,
-            magnetSystem: fixtureProduct.magnetSystem ?? "body-hosted",
             thicknessMm: "12",
             updatedAt,
             weightBasis: "complete-build",
             weightG: "96",
             widthMm: "24",
+            usesInserts: fixtureProduct.usesInserts ?? false,
           },
           target: productSlider.id,
         });
@@ -1140,20 +1125,10 @@ export async function seedSliderFixtures(
         .insert(productSliderInsert)
         .values({
           id: seededProduct.id,
-          lengthMm: "48",
-          thicknessMm: "4",
           updatedAt,
-          weightG: "24",
-          widthMm: "20",
         })
         .onConflictDoUpdate({
-          set: {
-            lengthMm: "48",
-            thicknessMm: "4",
-            updatedAt,
-            weightG: "24",
-            widthMm: "20",
-          },
+          set: { updatedAt },
           target: productSliderInsert.id,
         });
     }
@@ -1162,6 +1137,7 @@ export async function seedSliderFixtures(
       .insert(productMaterial)
       .values({ materialId: titanium.id, productId: seededProduct.id })
       .onConflictDoNothing();
+    if (fixtureProduct.type === "slider-insert") continue;
     const patternId = fixtureProduct.pattern
       ? patternsBySlug.get(fixtureProduct.pattern)
       : null;
@@ -1221,112 +1197,6 @@ export async function seedSliderFixtures(
   if (!configurationLabel || !groupLabel)
     throw new Error("Slider fixture magnet vocabulary could not be seeded.");
 
-  const insertOffers = new Map<string, SliderFixtureInsertOffer>();
-  for (const fixtureInsert of sliderFixtureCatalog.products.filter(
-    ({ type }) => type === "slider-insert",
-  )) {
-    const insertProductId = productIds.get(fixtureInsert.slug);
-    if (!insertProductId)
-      throw new Error(`Fixture insert ${fixtureInsert.slug} is missing.`);
-    const [clickOption] = await db
-      .insert(productInsertClickOption)
-      .values({ clickCount: 3, insertProductId, insertionPosition: 0 })
-      .onConflictDoUpdate({
-        set: { insertionPosition: 0 },
-        target: [
-          productInsertClickOption.insertProductId,
-          productInsertClickOption.clickCount,
-        ],
-      })
-      .returning({ id: productInsertClickOption.id });
-    if (!clickOption)
-      throw new Error(`Fixture click option ${fixtureInsert.slug} is missing.`);
-    const [existingOffer] = await db
-      .select({ id: productInsertMagnetOffer.id })
-      .from(productInsertMagnetOffer)
-      .where(
-        and(
-          eq(productInsertMagnetOffer.insertProductId, insertProductId),
-          eq(productInsertMagnetOffer.isAdvertisedDefault, true),
-        ),
-      )
-      .limit(1);
-    const offerValues = {
-      clickOptionId: clickOption.id,
-      configurationLabelId: configurationLabel.id,
-      isAdvertisedDefault: true,
-      sourceLabel: "Default setup",
-      sourceNotes: null,
-    };
-    let offerId = existingOffer?.id;
-    if (offerId) {
-      await db
-        .update(productInsertMagnetOffer)
-        .set(offerValues)
-        .where(eq(productInsertMagnetOffer.id, offerId));
-    } else {
-      const [offer] = await db
-        .insert(productInsertMagnetOffer)
-        .values({ ...offerValues, insertProductId })
-        .returning({ id: productInsertMagnetOffer.id });
-      offerId = offer?.id;
-    }
-    if (!offerId)
-      throw new Error(`Fixture offer ${fixtureInsert.slug} is missing.`);
-    const [group] = await db
-      .insert(productInsertMagnetGroup)
-      .values({
-        diameterMm: "6.35",
-        displayOrder: 0,
-        grade: "N52",
-        groupKey: "corners",
-        groupLabelId: groupLabel.id,
-        offerId,
-        thicknessMm: "3.175",
-      })
-      .onConflictDoUpdate({
-        set: {
-          diameterMm: "6.35",
-          displayOrder: 0,
-          grade: "N52",
-          groupLabelId: groupLabel.id,
-          thicknessMm: "3.175",
-        },
-        target: [
-          productInsertMagnetGroup.offerId,
-          productInsertMagnetGroup.groupKey,
-        ],
-      })
-      .returning({ id: productInsertMagnetGroup.id });
-    if (!group)
-      throw new Error(`Fixture magnet group ${fixtureInsert.slug} is missing.`);
-    for (const [displayOrder, half] of ["half-a", "half-b"].entries()) {
-      await db
-        .insert(productInsertMagnetSlot)
-        .values({
-          displayOrder,
-          documentedColumn: 1,
-          documentedRow: 1,
-          groupId: group.id,
-          half: half as "half-a" | "half-b",
-          offerId,
-          slotKey: half === "half-a" ? "A1" : "B1",
-          state: "occupied",
-        })
-        .onConflictDoUpdate({
-          set: { displayOrder, groupId: group.id, state: "occupied" },
-          target: [
-            productInsertMagnetSlot.offerId,
-            productInsertMagnetSlot.slotKey,
-          ],
-        });
-    }
-    insertOffers.set(fixtureInsert.slug, {
-      id: offerId,
-      productId: insertProductId,
-    });
-  }
-
   for (const fixtureSlider of sliderFixtureCatalog.products.filter(
     ({ type }) => type === "slider",
   )) {
@@ -1334,11 +1204,17 @@ export async function seedSliderFixtures(
     const plateProductId = fixtureSlider.includedPlateSlug
       ? productIds.get(fixtureSlider.includedPlateSlug)
       : null;
+    const insertProductId = fixtureSlider.includedInsertSlug
+      ? productIds.get(fixtureSlider.includedInsertSlug)
+      : null;
     if (!sliderProductId)
       throw new Error(`Fixture assembly ${fixtureSlider.slug} is incomplete.`);
     await db
       .update(productSlider)
-      .set({ includedPlateProductId: plateProductId })
+      .set({
+        includedInsertProductId: insertProductId,
+        includedPlateProductId: plateProductId,
+      })
       .where(eq(productSlider.id, sliderProductId));
 
     if (fixtureSlider.magnetConfiguration) {
@@ -1406,29 +1282,6 @@ export async function seedSliderFixtures(
             ],
           });
       }
-    }
-
-    if (fixtureSlider.defaultInsertSlug) {
-      const insertOffer = insertOffers.get(fixtureSlider.defaultInsertSlug);
-      if (!insertOffer)
-        throw new Error(
-          `Fixture default ${fixtureSlider.defaultInsertSlug} is missing.`,
-        );
-      await db
-        .insert(productSliderInsertOffer)
-        .values({
-          insertOfferId: insertOffer.id,
-          insertProductId: insertOffer.productId,
-          isAdvertisedDefault: true,
-          sliderProductId,
-        })
-        .onConflictDoUpdate({
-          set: { isAdvertisedDefault: true },
-          target: [
-            productSliderInsertOffer.sliderProductId,
-            productSliderInsertOffer.insertOfferId,
-          ],
-        });
     }
   }
 

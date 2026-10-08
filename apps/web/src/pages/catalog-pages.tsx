@@ -576,12 +576,12 @@ export function ProductDetailPage({
               {product.bearing}
             </Detail>
           ) : null}
-          {product.productTypeSlug === "slider" && product.magnetSystem ? (
+          {product.productTypeSlug === "slider" ? (
             <Detail label={t("web.slider.capability.label")}>
               {t(
-                product.magnetSystem === "body-hosted"
-                  ? "web.slider.capability.bodyHosted"
-                  : "web.slider.capability.insertDriven",
+                product.usesInserts
+                  ? "web.slider.capability.usesInserts"
+                  : "web.slider.capability.sliderBodyHoldsMagnets",
               )}
             </Detail>
           ) : null}
@@ -602,63 +602,6 @@ export function ProductDetailPage({
               />
             </Detail>
           ) : null}
-          {product.insertClickOptions.length ? (
-            <Detail label={t("web.slider.setup.clickCount")}>
-              {product.insertClickOptions
-                .map(({ clickCount }) =>
-                  t("web.slider.setup.clicks", { count: clickCount }),
-                )
-                .join(", ")}
-            </Detail>
-          ) : null}
-          {product.insertMagnetOffers.length ? (
-            <Detail label={t("web.slider.setup.availableOffers")}>
-              <ul className="grid gap-3">
-                {product.insertMagnetOffers.map((offer) => (
-                  <li
-                    className="grid gap-2 rounded-md border border-border p-3"
-                    key={offer.id}
-                  >
-                    <span className="font-medium">
-                      {offer.configuration.label}
-                      {offer.isAdvertisedDefault
-                        ? ` · ${t("web.slider.setup.advertisedDefault")}`
-                        : ""}
-                    </span>
-                    <BodyHostedMagnetSetupDetails
-                      setup={{
-                        clickCount: offer.clickCount,
-                        configuration: offer.configuration,
-                        sourceNote: null,
-                      }}
-                      t={t}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </Detail>
-          ) : null}
-          {product.advertisedInsertOffers.length ? (
-            <Detail label={t("web.slider.setup.availableOffers")}>
-              <ul className="grid gap-3">
-                {product.advertisedInsertOffers.map((offer) => (
-                  <li key={offer.id}>
-                    <span className="font-medium">
-                      {offer.insertProductName}: {offer.configuration.label}
-                    </span>
-                    {offer.isSliderAdvertisedDefault
-                      ? ` · ${t("web.slider.setup.default")}`
-                      : ""}
-                  </li>
-                ))}
-              </ul>
-            </Detail>
-          ) : null}
-          {product.productTypeSlug === "slider-insert" ? (
-            <Detail label={t("web.slider.measurement.basis")}>
-              {t("web.slider.measurement.setLevel")}
-            </Detail>
-          ) : null}
           {product.productTypeSlug === "slider" ? (
             <Detail label={t("web.slider.relationship.plates")}>
               {product.includedPlate ? (
@@ -677,6 +620,24 @@ export function ProductDetailPage({
               )}
             </Detail>
           ) : null}
+          {product.productTypeSlug === "slider" && product.usesInserts ? (
+            <Detail label={t("web.slider.relationship.inserts")}>
+              {product.includedInsert ? (
+                <Link
+                  className="text-primary underline-offset-4 hover:underline"
+                  params={{
+                    productSlug: product.includedInsert.slug,
+                    productTypeSlug: product.includedInsert.productTypeSlug,
+                  }}
+                  to="/products/$productTypeSlug/$productSlug"
+                >
+                  {product.includedInsert.name}
+                </Link>
+              ) : (
+                t("web.slider.relationship.includedInsert")
+              )}
+            </Detail>
+          ) : null}
           {specs.map(([key, value, unit]) =>
             value ? (
               <Detail key={key} label={t(key)}>
@@ -684,15 +645,6 @@ export function ProductDetailPage({
               </Detail>
             ) : null,
           )}
-          {product.includedComponents.length ? (
-            <Detail label={t("web.slider.relationship.includedComponents")}>
-              <ul className="grid gap-1">
-                {product.includedComponents.map((component) => (
-                  <li key={component.id}>{component.name}</li>
-                ))}
-              </ul>
-            </Detail>
-          ) : null}
         </dl>
         <section className="grid gap-4">
           <h2 className="text-lg font-semibold">
@@ -1633,9 +1585,6 @@ export function CollectionItemDetailPage({
   const productImages = item.productImages.filter(
     ({ deletedAt }) => !deletedAt,
   );
-  const insertAdvertisedDefault = product?.insertMagnetOffers.find(
-    ({ isAdvertisedDefault }) => isAdvertisedDefault,
-  );
   const displayedSliderSetup:
     | CatalogBodyHostedMagnetSetup
     | EffectiveSliderSetup
@@ -1644,23 +1593,8 @@ export function CollectionItemDetailPage({
     item.productTypeSlug === "slider"
       ? (item.effectiveSliderSetup ?? product?.bodyHostedMagnetSetup ?? null)
       : item.productTypeSlug === "slider-insert"
-        ? (item.ownedInsertSetup ??
-          (insertAdvertisedDefault
-            ? {
-                clickCount: insertAdvertisedDefault.clickCount,
-                configuration: insertAdvertisedDefault.configuration,
-                sourceOfferId: insertAdvertisedDefault.id,
-              }
-            : null))
+        ? item.ownedInsertSetup
         : null;
-  const usesLiveInsertDefault =
-    (item.productTypeSlug === "slider-insert" &&
-      item.ownedInsertSetup === null &&
-      insertAdvertisedDefault !== undefined) ||
-    (item.productTypeSlug === "slider" &&
-      item.effectiveSliderSetup?.isLiveCatalog === true &&
-      (item.effectiveSliderSetup.source === "slider-default" ||
-        item.effectiveSliderSetup.source === "insert-default"));
   return (
     <AppShell
       breadcrumbItems={[
@@ -1807,6 +1741,24 @@ export function CollectionItemDetailPage({
               )}
             </Detail>
           ) : null}
+          {item.productTypeSlug === "slider" && product?.usesInserts ? (
+            <Detail label={t("web.slider.relationship.inserts")}>
+              {product.includedInsert ? (
+                <Link
+                  className="text-primary underline-offset-4 hover:underline"
+                  params={{
+                    productSlug: product.includedInsert.slug,
+                    productTypeSlug: product.includedInsert.productTypeSlug,
+                  }}
+                  to="/products/$productTypeSlug/$productSlug"
+                >
+                  {product.includedInsert.name}
+                </Link>
+              ) : (
+                t("web.slider.relationship.includedInsert")
+              )}
+            </Detail>
+          ) : null}
           {item.productTypeSlug === "slider" ? (
             <Detail label={t("web.slider.component.installedPlate")}>
               {installedPlate?.displayName ??
@@ -1817,8 +1769,7 @@ export function CollectionItemDetailPage({
                 )}
             </Detail>
           ) : null}
-          {item.productTypeSlug === "slider" &&
-          product?.magnetSystem === "insert-driven" ? (
+          {item.productTypeSlug === "slider" && product?.usesInserts ? (
             <Detail label={t("web.slider.component.installedInsert")}>
               {installedInsert?.displayName ??
                 t(
@@ -1833,22 +1784,17 @@ export function CollectionItemDetailPage({
               {item.bearing}
             </Detail>
           ) : null}
-          {product?.productTypeSlug === "slider" && product.magnetSystem ? (
+          {product?.productTypeSlug === "slider" ? (
             <Detail label={t("web.slider.capability.label")}>
               {t(
-                product.magnetSystem === "body-hosted"
-                  ? "web.slider.capability.bodyHosted"
-                  : "web.slider.capability.insertDriven",
+                product.usesInserts
+                  ? "web.slider.capability.usesInserts"
+                  : "web.slider.capability.sliderBodyHoldsMagnets",
               )}
             </Detail>
           ) : null}
           {displayedSliderSetup ? (
             <Detail label={t("web.slider.setup.title")}>
-              {usesLiveInsertDefault ? (
-                <p className="mb-2 text-sm text-muted-foreground">
-                  {t("web.slider.setup.defaultDescription")}
-                </p>
-              ) : null}
               <BodyHostedMagnetSetupDetails
                 missingConfigurationLabel={t("web.slider.setup.notRecorded")}
                 setup={displayedSliderSetup}

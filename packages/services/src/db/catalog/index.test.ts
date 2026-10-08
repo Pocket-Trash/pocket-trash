@@ -97,59 +97,33 @@ describe("effective owned slider setup", () => {
     sourceLabel: null,
     sourceNotes: null,
   };
-  const matchingDefault = {
-    clickCount: 5,
-    clickOptionId: 1000,
-    configuration,
-    id: 2000,
-    insertProductId: 3000,
-    insertProductName: "Matching insert",
-    isAdvertisedDefault: true,
-    isSliderAdvertisedDefault: true,
-  };
-  const otherInsertDefault = {
-    ...matchingDefault,
-    id: 2001,
-    insertProductId: 3001,
-    insertProductName: "Other insert",
-  };
-
-  it("uses only a matching installed insert for live catalog fallback", () => {
+  it("uses the slider body setup when present", () => {
     expect(
       resolveEffectiveSliderSetup({
-        bodyHostedSetup: null,
-        installedInsertOffers: [],
-        installedInsertProductId: 3000,
+        bodyHostedSetup: {
+          clickCount: 5,
+          configuration,
+          sourceNote: null,
+        },
+        installedInsertProductId: null,
         ownedInsertSetup: null,
-        sliderAdvertisedOffers: [otherInsertDefault, matchingDefault],
       }),
     ).toMatchObject({
       clickCount: 5,
-      source: "slider-default",
+      source: "body-hosted",
     });
-    expect(
-      resolveEffectiveSliderSetup({
-        bodyHostedSetup: null,
-        installedInsertOffers: [],
-        installedInsertProductId: 3000,
-        ownedInsertSetup: null,
-        sliderAdvertisedOffers: [otherInsertDefault],
-      }),
-    ).toMatchObject({ clickCount: null, source: "not-recorded" });
   });
 
   it("lets a partial owned snapshot win without filling catalog gaps", () => {
     expect(
       resolveEffectiveSliderSetup({
         bodyHostedSetup: null,
-        installedInsertOffers: [matchingDefault],
         installedInsertProductId: 3000,
         ownedInsertSetup: {
           clickCount: null,
           configuration: null,
           sourceOfferId: null,
         },
-        sliderAdvertisedOffers: [matchingDefault],
       }),
     ).toEqual({
       clickCount: null,
@@ -159,20 +133,14 @@ describe("effective owned slider setup", () => {
     });
   });
 
-  it("resolves an uninstalled slider default without creating an insert", () => {
+  it("does not invent an insert setup", () => {
     expect(
       resolveEffectiveSliderSetup({
         bodyHostedSetup: null,
-        installedInsertOffers: [],
         installedInsertProductId: null,
         ownedInsertSetup: null,
-        sliderAdvertisedOffers: [matchingDefault],
       }),
-    ).toMatchObject({
-      configuration,
-      isLiveCatalog: true,
-      source: "slider-default",
-    });
+    ).toMatchObject({ isLiveCatalog: false, source: "not-recorded" });
   });
 });
 

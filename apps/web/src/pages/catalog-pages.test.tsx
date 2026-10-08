@@ -228,7 +228,7 @@ const owners = [
         installedInsertId: null,
         installedOnSliderId: null,
         installedPlateId: null,
-        includedComponents: [],
+        includedInsert: null,
         includedPlate: null,
         isAdminPrivate: false,
         isPrivate: false,
@@ -258,11 +258,8 @@ const owners = [
 /** Catalog product fixture used by page tests. */
 const product: CatalogProduct = {
   approvalStatus: "approved",
-  advertisedInsertOffers: [],
   bearing: null,
   bodyHostedMagnetSetup: null,
-  insertClickOptions: [],
-  insertMagnetOffers: [],
   buttonDiameterMm: null,
   canAdminister: false,
   canEdit: false,
@@ -275,7 +272,7 @@ const product: CatalogProduct = {
   id: 1,
   imageCount: 0,
   images: [],
-  includedComponents: [],
+  includedInsert: null,
   includedPlate: null,
   isAdminPrivate: false,
   isPrivate: false,
@@ -286,7 +283,7 @@ const product: CatalogProduct = {
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
-  magnetSystem: null,
+  usesInserts: null,
   materials: [],
   name: "Catla",
   ownerClerkId: "user_1002",
@@ -882,7 +879,7 @@ describe("ProductDetailPage", () => {
             },
             sourceNote: null,
           },
-          magnetSystem: "body-hosted",
+          usesInserts: false,
           productTypeName: "Slider",
           productTypeSlug: "slider",
         }}
@@ -897,50 +894,28 @@ describe("ProductDetailPage", () => {
     expect(html).not.toContain("Custom setup");
   });
 
-  it("distinguishes insert offers and slider advertised defaults", () => {
-    const configuration = {
-      groups: [],
-      label: "Medium",
-      slots: [
-        {
-          documentedColumn: null,
-          documentedRow: null,
-          groupKey: null,
-          half: "half-a" as const,
-          key: "A1",
-          state: "empty" as const,
-        },
-      ],
-      sourceLabel: null,
-      sourceNotes: null,
-    };
+  it("shows the exact included insert", () => {
     const html = renderToStaticMarkup(
       <ProductDetailPage
         collectionItems={[]}
         product={{
           ...product,
-          advertisedInsertOffers: [
-            {
-              clickCount: 3,
-              clickOptionId: 3000,
-              configuration,
-              id: 4000,
-              insertProductId: 2000,
-              insertProductName: "Maker Insert",
-              isAdvertisedDefault: true,
-              isSliderAdvertisedDefault: true,
-            },
-          ],
-          magnetSystem: "insert-driven",
+          includedInsert: {
+            id: 2000,
+            name: "Maker Insert",
+            productTypeSlug: "slider-insert",
+            slug: "maker-insert",
+          },
           productTypeName: "Slider",
           productTypeSlug: "slider",
+          usesInserts: true,
         }}
       />,
     );
 
-    expect(html).toContain("Available insert setups");
-    expect(html).toContain("Maker Insert: Medium");
-    expect(html).toContain("Default setup");
+    expect(html).toContain("Maker Insert");
+    expect(html).toContain("/products/slider-insert/maker-insert");
+    expect(html).not.toContain("Available insert setups");
   });
 
   it("limits deletion controls to owners and authorized staff", () => {
@@ -1019,7 +994,7 @@ describe("CollectionItemDetailPage", () => {
         configuration: null,
         sourceNote: "Documented by the maker.",
       },
-      magnetSystem: "body-hosted" as const,
+      usesInserts: false,
       productTypeName: "Slider",
       productTypeSlug: "slider" as const,
       thicknessMm: "12",
@@ -1036,7 +1011,9 @@ describe("CollectionItemDetailPage", () => {
       />,
     );
 
-    expect(html).toContain("Body-hosted");
+    expect(html).toMatch(
+      /Slider body holds magnets|web\.slider\.capability\.sliderBodyHoldsMagnets/,
+    );
     expect(html).toContain("Magnet setup");
     expect(html).toContain("Documented by the maker.");
     expect(html).toContain("40 mm");
@@ -1049,7 +1026,7 @@ describe("CollectionItemDetailPage", () => {
     if (!item) throw new Error("Collection item fixture is required.");
     const slider = {
       ...product,
-      magnetSystem: "insert-driven" as const,
+      usesInserts: true,
       productTypeName: "Slider",
       productTypeSlug: "slider" as const,
     };
@@ -1084,7 +1061,7 @@ describe("CollectionItemDetailPage", () => {
         }}
         product={{
           ...product,
-          magnetSystem: "insert-driven",
+          usesInserts: true,
           productTypeName: "Slider",
           productTypeSlug: "slider",
         }}
@@ -1151,7 +1128,7 @@ describe("CollectionItemDetailPage", () => {
         }}
         product={{
           ...product,
-          magnetSystem: "insert-driven",
+          usesInserts: true,
           productTypeName: "Slider",
           productTypeSlug: "slider",
         }}
@@ -1163,16 +1140,9 @@ describe("CollectionItemDetailPage", () => {
     expect(html).toContain("Unknown");
   });
 
-  it("uses an insert's live advertised default until its owner records a setup", () => {
+  it("does not invent a live setup for an insert", () => {
     const item = owners[0]?.items[0];
     if (!item) throw new Error("Collection item fixture is required.");
-    const configuration = {
-      groups: [],
-      label: "Advertised layout",
-      slots: [],
-      sourceLabel: null,
-      sourceNotes: null,
-    };
     const html = renderToStaticMarkup(
       <CollectionItemDetailPage
         item={{
@@ -1183,27 +1153,14 @@ describe("CollectionItemDetailPage", () => {
         }}
         product={{
           ...product,
-          insertMagnetOffers: [
-            {
-              clickCount: 5,
-              clickOptionId: 3000,
-              configuration,
-              id: 4000,
-              insertProductId: product.id,
-              isAdvertisedDefault: true,
-            },
-          ],
           productTypeName: "Slider insert",
           productTypeSlug: "slider-insert",
         }}
       />,
     );
 
-    expect(html).toContain(
-      "The live setup advertised by the catalog. It does not create a saved custom setup.",
-    );
-    expect(html).toContain("Advertised layout");
-    expect(html).toContain("5");
+    expect(html).not.toContain("Magnet setup");
+    expect(html).not.toContain("Advertised layout");
   });
 
   it("shows approval actions only to administrators while owners retain review status and editing", () => {
