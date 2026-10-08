@@ -96,8 +96,18 @@ export function SliderMagnetConfigurationEditor({
   );
   const [selectedGrade, setSelectedGrade] =
     React.useState<SliderMagnetGrade | null>("N52");
+  const [selectedPosition, setSelectedPosition] = React.useState<{
+    /** Zero-based row-major position. */
+    index: number;
+    /** Layout in which the position was selected. */
+    layout: SliderMagnetLayout;
+    /** Physical side containing the position. */
+    side: "sideA" | "sideB";
+  } | null>(null);
   const details = sliderMagnetLayoutDetails[layout];
   const configuration = value ?? uniformMagnetConfiguration(layout, "N52");
+  const activePosition =
+    selectedPosition?.layout === layout ? selectedPosition : null;
   const matchingPresets = presets.filter(
     (preset) => preset.magnetLayout === layout,
   );
@@ -111,14 +121,19 @@ export function SliderMagnetConfigurationEditor({
    *
    * @param side - Snapshot side to edit.
    * @param index - Zero-based slot position.
+   * @param grade - Replacement magnet grade, or an intentionally empty slot.
    */
-  const setSlot = (side: "sideA" | "sideB", index: number) => {
+  const setSlot = (
+    side: "sideA" | "sideB",
+    index: number,
+    grade: SliderMagnetGrade | null,
+  ) => {
     const current =
       side === "sideA"
         ? configuration.sideA
         : (configuration.sideB ?? configuration.sideA);
     const next = [...current];
-    next[index] = selectedGrade;
+    next[index] = grade;
     onChange({
       ...configuration,
       [side]: next,
@@ -152,18 +167,26 @@ export function SliderMagnetConfigurationEditor({
               id: `${side}-${index + 1}`,
               index,
             }))
-            .map(({ grade, id, index }) => (
-              <button
-                aria-label={slotLabel(index, side === "sideA" ? "A" : "B", t)}
-                className="flex size-11 items-center justify-center rounded-full border border-input bg-background text-xs font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                key={id}
-                onClick={() => setSlot(side, index)}
-                title={grade ?? t("web.slider.magnet.state.empty")}
-                type="button"
-              >
-                {grade ?? "—"}
-              </button>
-            ))}
+            .map(({ grade, id, index }) => {
+              const selected =
+                activePosition?.side === side && activePosition.index === index;
+              return (
+                <button
+                  aria-label={slotLabel(index, side === "sideA" ? "A" : "B", t)}
+                  aria-pressed={selected}
+                  className={`flex size-11 items-center justify-center rounded-full border bg-background text-xs font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-ring ring-2 ring-ring" : "border-input"}`}
+                  key={id}
+                  onClick={() => {
+                    setSelectedPosition({ index, layout, side });
+                    setSelectedGrade(grade);
+                  }}
+                  title={grade ?? t("web.slider.magnet.state.empty")}
+                  type="button"
+                >
+                  {grade ?? "—"}
+                </button>
+              );
+            })}
         </div>
       </fieldset>
     );
@@ -184,13 +207,15 @@ export function SliderMagnetConfigurationEditor({
               const preset = matchingPresets.find(
                 ({ id }) => id === Number(event.target.value),
               );
-              if (preset)
+              if (preset) {
+                setSelectedPosition(null);
                 onChange({
                   sideA: [...preset.configuration.sideA],
                   sideB: preset.configuration.sideB
                     ? [...preset.configuration.sideB]
                     : null,
                 });
+              }
             }}
           >
             <option value="">
@@ -210,6 +235,7 @@ export function SliderMagnetConfigurationEditor({
           onChange={(event) => {
             const next = event.target.checked;
             setAdvanced(next);
+            setSelectedPosition(null);
             if (value === null || (!next && !isUniform))
               onChange(uniformMagnetConfiguration(layout, selectedGrade));
           }}
@@ -217,54 +243,60 @@ export function SliderMagnetConfigurationEditor({
         />
         {t("web.slider.magnet.advanced" as TranslationKey)}
       </label>
-      <label className="grid gap-1 text-sm font-medium">
-        {t("web.slider.magnet.grade")}
-        <select
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          onChange={(event) => {
-            if (event.target.value === "not-recorded") {
-              onChange(null);
-              return;
+      {!advanced || activePosition ? (
+        <label className="grid gap-1 text-sm font-medium">
+          {t("web.slider.magnet.grade")}
+          <select
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            onChange={(event) => {
+              if (event.target.value === "not-recorded") {
+                onChange(null);
+                return;
+              }
+              const grade =
+                sliderMagnetGrades.find(
+                  (candidate) => candidate === event.target.value,
+                ) ?? null;
+              setSelectedGrade(grade);
+              if (advanced && activePosition)
+                setSlot(activePosition.side, activePosition.index, grade);
+              else if (!advanced)
+                onChange(uniformMagnetConfiguration(layout, grade));
+            }}
+            value={
+              advanced
+                ? (selectedGrade ?? "empty")
+                : value === null || !isUniform
+                  ? "not-recorded"
+                  : (uniformGrade ?? "empty")
             }
-            const grade =
-              sliderMagnetGrades.find(
-                (candidate) => candidate === event.target.value,
-              ) ?? null;
-            setSelectedGrade(grade);
-            if (!advanced) onChange(uniformMagnetConfiguration(layout, grade));
-          }}
-          value={
-            advanced
-              ? (selectedGrade ?? "empty")
-              : value === null || !isUniform
-                ? "not-recorded"
-                : (uniformGrade ?? "empty")
-          }
-        >
-          {!advanced ? (
-            <option value="not-recorded">
-              {t("web.slider.setup.notRecorded")}
-            </option>
-          ) : null}
-          <option value="empty">{t("web.slider.magnet.state.empty")}</option>
-          {sliderMagnetGrades.map((grade) => (
-            <option key={grade} value={grade}>
-              {grade}
-            </option>
-          ))}
-        </select>
-      </label>
+          >
+            {!advanced ? (
+              <option value="not-recorded">
+                {t("web.slider.setup.notRecorded")}
+              </option>
+            ) : null}
+            <option value="empty">{t("web.slider.magnet.state.empty")}</option>
+            {sliderMagnetGrades.map((grade) => (
+              <option key={grade} value={grade}>
+                {grade}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       {advanced ? (
         <>
           <label className="flex items-center gap-2 text-sm font-medium">
             <input
               checked={configuration.sideB !== null}
-              onChange={(event) =>
+              onChange={(event) => {
+                setSelectedPosition(null);
                 onChange({
                   ...configuration,
                   sideB: event.target.checked ? [...configuration.sideA] : null,
-                })
-              }
+                });
+              }}
               type="checkbox"
             />
             {t("web.slider.magnet.differentSides" as TranslationKey)}
@@ -279,7 +311,10 @@ export function SliderMagnetConfigurationEditor({
       ) : null}
       <Button
         className="w-fit"
-        onClick={() => onChange(null)}
+        onClick={() => {
+          setSelectedPosition(null);
+          onChange(null);
+        }}
         type="button"
         variant="outline"
       >
