@@ -5,8 +5,10 @@ import { SliderMagnetConfigurationEditor } from "./slider-magnet-configuration-e
 
 /** Minimal English copy used by the isolated editor story. */
 const labels: Partial<Record<TranslationKey, string>> = {
+  ["web.slider.magnet.advanced" as TranslationKey]:
+    "Set custom magnet configuration or strengths",
   "web.slider.magnet.configuration": "Magnet configuration",
-  "web.slider.magnet.grade": "Magnet grade",
+  "web.slider.magnet.grade": "Choose magnet strength for all magnets",
   "web.slider.magnet.halfA": "Side A",
   "web.slider.magnet.halfB": "Side B",
   "web.slider.magnet.state.empty": "Empty",

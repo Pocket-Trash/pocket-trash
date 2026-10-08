@@ -41,6 +41,71 @@ describe("slider magnet configuration editor", () => {
     expect(uniformMagnetConfiguration("2x4", "N35").sideA).toHaveLength(8);
   });
 
+  it("keeps custom configuration controls behind an explicit opt-in", async () => {
+    /**
+     * Renders the empty controlled editor matching the default form state.
+     *
+     * @returns Controlled editor fixture.
+     */
+    function EditorFixture() {
+      const [value, setValue] =
+        React.useState<SliderMagnetConfiguration | null>(null);
+
+      return (
+        <SliderMagnetConfigurationEditor
+          layout="2x2"
+          onChange={setValue}
+          presets={[
+            {
+              configuration: uniformMagnetConfiguration("2x2", "N52"),
+              id: 1,
+              magnetLayout: "2x2",
+              name: "Hybrid",
+            },
+          ]}
+          t={(key) => key}
+          value={value}
+        />
+      );
+    }
+
+    await act(() => root.render(<EditorFixture />));
+
+    expect(container.textContent).toContain("web.slider.magnet.grade");
+    expect(container.textContent).not.toContain("web.slider.magnet.preset");
+    expect(
+      container.querySelector(
+        'button[aria-label="web.slider.magnet.position"]',
+      ),
+    ).toBeNull();
+
+    const custom = container.querySelector<HTMLInputElement>(
+      'input[type="checkbox"]',
+    );
+    expect(custom?.disabled).toBe(true);
+
+    const grade = container.querySelector<HTMLSelectElement>("select");
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLSelectElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(grade, "N42");
+      grade?.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(custom?.disabled).toBe(false);
+
+    act(() => custom?.click());
+    expect(container.textContent).toContain("web.slider.magnet.preset");
+    const positions = container.querySelectorAll<HTMLButtonElement>(
+      'button[aria-label="web.slider.magnet.position"]',
+    );
+    expect(positions).toHaveLength(4);
+    expect(
+      [...positions].every(({ textContent }) => textContent === "N42"),
+    ).toBe(true);
+  });
+
   it("edits the selected position when its grade changes", async () => {
     /**
      * Renders the controlled editor matching the user-facing interaction.

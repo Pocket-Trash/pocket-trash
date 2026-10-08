@@ -10,7 +10,6 @@ import {
 } from "@package/services/constants";
 import type { TranslationKey } from "@pocket-trash/localizations";
 import * as React from "react";
-import { Button } from "@/components/ui/button";
 
 /**
  * Formats localized editor copy.
@@ -116,6 +115,50 @@ export function SliderMagnetConfigurationEditor({
   );
   const uniformGrade = isUniform ? (configuration.sideA[0] ?? null) : null;
 
+  const gradeSelector = (
+    <label className="grid gap-1 text-sm font-medium">
+      {t("web.slider.magnet.grade")}
+      <select
+        className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+        onChange={(event) => {
+          if (event.target.value === "not-recorded") {
+            onChange(null);
+            return;
+          }
+          const grade =
+            sliderMagnetGrades.find(
+              (candidate) => candidate === event.target.value,
+            ) ?? null;
+          setSelectedGrade(grade);
+          if (advanced && activePosition)
+            setSlot(activePosition.side, activePosition.index, grade);
+          else if (!advanced)
+            onChange(uniformMagnetConfiguration(layout, grade));
+        }}
+        value={
+          advanced
+            ? (selectedGrade ?? "empty")
+            : value === null || !isUniform
+              ? "not-recorded"
+              : (uniformGrade ?? "empty")
+        }
+      >
+        {!advanced ? (
+          <option value="not-recorded">
+            {t("web.slider.setup.notRecorded")}
+          </option>
+        ) : (
+          <option value="empty">{t("web.slider.magnet.state.empty")}</option>
+        )}
+        {sliderMagnetGrades.map((grade) => (
+          <option key={grade} value={grade}>
+            {grade}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
   /**
    * Replaces one slot with the active grade.
    *
@@ -197,96 +240,57 @@ export function SliderMagnetConfigurationEditor({
       <legend className="px-1 text-sm font-medium">
         {t("web.slider.magnet.configuration")}
       </legend>
-      {matchingPresets.length ? (
-        <label className="grid gap-1 text-sm font-medium">
-          {t("web.slider.magnet.preset" as TranslationKey)}
-          <select
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            defaultValue=""
-            onChange={(event) => {
-              const preset = matchingPresets.find(
-                ({ id }) => id === Number(event.target.value),
-              );
-              if (preset) {
-                setSelectedPosition(null);
-                onChange({
-                  sideA: [...preset.configuration.sideA],
-                  sideB: preset.configuration.sideB
-                    ? [...preset.configuration.sideB]
-                    : null,
-                });
-              }
-            }}
-          >
-            <option value="">
-              {t("web.slider.magnet.selectPreset" as TranslationKey)}
-            </option>
-            {matchingPresets.map((preset) => (
-              <option key={preset.id} value={preset.id}>
-                {preset.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
+      {!advanced ? gradeSelector : null}
       <label className="flex items-center gap-2 text-sm font-medium">
         <input
           checked={advanced}
+          disabled={value === null}
           onChange={(event) => {
             const next = event.target.checked;
             setAdvanced(next);
             setSelectedPosition(null);
-            if (value === null || (!next && !isUniform))
+            if (!next && !isUniform)
               onChange(uniformMagnetConfiguration(layout, selectedGrade));
           }}
           type="checkbox"
         />
         {t("web.slider.magnet.advanced" as TranslationKey)}
       </label>
-      {!advanced || activePosition ? (
-        <label className="grid gap-1 text-sm font-medium">
-          {t("web.slider.magnet.grade")}
-          <select
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            onChange={(event) => {
-              if (event.target.value === "not-recorded") {
-                onChange(null);
-                return;
-              }
-              const grade =
-                sliderMagnetGrades.find(
-                  (candidate) => candidate === event.target.value,
-                ) ?? null;
-              setSelectedGrade(grade);
-              if (advanced && activePosition)
-                setSlot(activePosition.side, activePosition.index, grade);
-              else if (!advanced)
-                onChange(uniformMagnetConfiguration(layout, grade));
-            }}
-            value={
-              advanced
-                ? (selectedGrade ?? "empty")
-                : value === null || !isUniform
-                  ? "not-recorded"
-                  : (uniformGrade ?? "empty")
-            }
-          >
-            {!advanced ? (
-              <option value="not-recorded">
-                {t("web.slider.setup.notRecorded")}
-              </option>
-            ) : null}
-            <option value="empty">{t("web.slider.magnet.state.empty")}</option>
-            {sliderMagnetGrades.map((grade) => (
-              <option key={grade} value={grade}>
-                {grade}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
       {advanced ? (
         <>
+          {matchingPresets.length ? (
+            <label className="grid gap-1 text-sm font-medium">
+              {t("web.slider.magnet.preset" as TranslationKey)}
+              <select
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                defaultValue=""
+                onChange={(event) => {
+                  const preset = matchingPresets.find(
+                    ({ id }) => id === Number(event.target.value),
+                  );
+                  if (preset) {
+                    setSelectedPosition(null);
+                    onChange({
+                      sideA: [...preset.configuration.sideA],
+                      sideB: preset.configuration.sideB
+                        ? [...preset.configuration.sideB]
+                        : null,
+                    });
+                  }
+                }}
+              >
+                <option value="">
+                  {t("web.slider.magnet.selectPreset" as TranslationKey)}
+                </option>
+                {matchingPresets.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {activePosition ? gradeSelector : null}
           <label className="flex items-center gap-2 text-sm font-medium">
             <input
               checked={configuration.sideB !== null}
@@ -309,17 +313,6 @@ export function SliderMagnetConfigurationEditor({
           </div>
         </>
       ) : null}
-      <Button
-        className="w-fit"
-        onClick={() => {
-          setSelectedPosition(null);
-          onChange(null);
-        }}
-        type="button"
-        variant="outline"
-      >
-        {t("web.slider.magnet.clear" as TranslationKey)}
-      </Button>
     </fieldset>
   );
 }
