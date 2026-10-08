@@ -14,7 +14,6 @@ import {
   CollectionProductFields,
   collectionEditSubmissionMode,
   FinishOptionsEditor,
-  ownedInsertSetupAfterLayoutChange,
   ProductEditor,
 } from "./catalog-form-pages";
 
@@ -398,53 +397,6 @@ describe("finish option editor", () => {
     expect(html).toContain("Plate");
     expect(html).not.toContain("Busy plate");
   });
-
-  it("offers default and custom owned insert setups", () => {
-    const insert = productFixture(3100, "Setup insert", "slider-insert");
-    const html = renderToStaticMarkup(
-      createElement(CollectionEditPage, {
-        buttonProducts: [],
-        collections: [],
-        item: {
-          ...collectionFixture(41, insert, 3101),
-          ownedInsertSetup: {
-            clickCount: null,
-            configuration: null,
-            sourceOfferId: null,
-          },
-        },
-        options: emptyCatalogOptions,
-        ownedButtons: [],
-        product: insert,
-      }),
-    );
-
-    expect(html).toContain("Default setup");
-    expect(html).toContain("Build from scratch");
-    expect(html).not.toContain("Select a setup offer");
-  });
-
-  it("clears a linked click option after any layout edit", () => {
-    expect(
-      ownedInsertSetupAfterLayoutChange(
-        {
-          clickOptionId: 4101,
-          configuration: null,
-          sourceOfferId: 4200,
-        },
-        {
-          groups: [],
-          label: "Observed",
-          slots: [],
-          sourceLabel: null,
-          sourceNotes: null,
-        },
-      ),
-    ).toMatchObject({
-      clickOptionId: null,
-      sourceOfferId: null,
-    });
-  });
 });
 
 describe("collection edit submission", () => {
@@ -614,7 +566,7 @@ describe("product form conditional fields", () => {
       expect(html).toContain('aria-label="web.slider.layout.label"');
       expect(html).toContain('aria-label="Weight basis"');
       expect(html).not.toContain('aria-label="Click count"');
-      expect(html).not.toContain("Magnet configuration");
+      expect(html).toContain("Magnet configuration");
       expect(html).toContain("web.slider.relationship.includedPlates");
       expect(html).toContain("web.slider.relationship.addPlates");
       expect(html).not.toContain("Included components");
@@ -985,7 +937,6 @@ function collectionFixture(
     makerUrl: product.makerUrl,
     material: product.materials[0] ?? null,
     name: product.name,
-    ownedInsertSetup: null,
     ownerClerkId: "user_test",
     ownerUsername: "tester",
     ownerUserId: 1,

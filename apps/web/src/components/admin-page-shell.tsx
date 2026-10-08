@@ -11,6 +11,7 @@ import {
   Flag,
   MessageSquare,
   ScrollText,
+  SlidersHorizontal,
   Trash2,
   UsersRound,
 } from "lucide-react";
@@ -29,6 +30,7 @@ type AdminSection =
   | "feedback"
   | "materials"
   | "makers"
+  | "magnet-presets"
   | "notifications"
   | "trash"
   | "users";
@@ -143,6 +145,12 @@ function AdminSidebar({
             active: section === "materials",
             label: t("web.admin.hub.materials"),
             to: "/admin/materials" as const,
+          },
+          {
+            icon: SlidersHorizontal,
+            active: section === "magnet-presets",
+            label: t("web.slider.magnet.presets" as TranslationKey),
+            to: "/admin/slider-magnet-presets" as const,
           },
         ]
       : []),

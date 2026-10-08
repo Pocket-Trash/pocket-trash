@@ -24,6 +24,7 @@ import { Route as UserRouteImport } from './routes/user'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAccountErasureRouteImport } from './routes/admin.account-erasure'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
+import { Route as AdminSliderMagnetPresetsRouteImport } from './routes/admin.slider-magnet-presets'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AutmogPenIdRouteImport } from './routes/autmog.$penId'
 import { Route as ChangelogIndexRouteImport } from './routes/changelog.index'
@@ -160,6 +161,12 @@ const AdminAuditRoute = AdminAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSliderMagnetPresetsRoute =
+  AdminSliderMagnetPresetsRouteImport.update({
+    id: '/slider-magnet-presets',
+    path: '/slider-magnet-presets',
+    getParentRoute: () => AdminRoute,
+  } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -489,6 +496,7 @@ export interface FileRoutesByFullPath {
   '/user': typeof UserRouteWithChildren
   '/admin/account-erasure': typeof AdminAccountErasureRoute
   '/admin/audit': typeof AdminAuditRouteWithChildren
+  '/admin/slider-magnet-presets': typeof AdminSliderMagnetPresetsRoute
   '/admin/users': typeof AdminUsersRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/changelog/$slug': typeof ChangelogSlugRoute
@@ -562,6 +570,7 @@ export interface FileRoutesByTo {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/account-erasure': typeof AdminAccountErasureRoute
   '/admin/audit': typeof AdminAuditRouteWithChildren
+  '/admin/slider-magnet-presets': typeof AdminSliderMagnetPresetsRoute
   '/admin/users': typeof AdminUsersRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/changelog/$slug': typeof ChangelogSlugRoute
@@ -640,6 +649,7 @@ export interface FileRoutesById {
   '/user': typeof UserRouteWithChildren
   '/admin/account-erasure': typeof AdminAccountErasureRoute
   '/admin/audit': typeof AdminAuditRouteWithChildren
+  '/admin/slider-magnet-presets': typeof AdminSliderMagnetPresetsRoute
   '/admin/users': typeof AdminUsersRoute
   '/autmog/$penId': typeof AutmogPenIdRoute
   '/changelog/$slug': typeof ChangelogSlugRoute
@@ -719,6 +729,7 @@ export interface FileRouteTypes {
     | '/user'
     | '/admin/account-erasure'
     | '/admin/audit'
+    | '/admin/slider-magnet-presets'
     | '/admin/users'
     | '/autmog/$penId'
     | '/changelog/$slug'
@@ -792,6 +803,7 @@ export interface FileRouteTypes {
     | '/terms-of-service'
     | '/admin/account-erasure'
     | '/admin/audit'
+    | '/admin/slider-magnet-presets'
     | '/admin/users'
     | '/autmog/$penId'
     | '/changelog/$slug'
@@ -869,6 +881,7 @@ export interface FileRouteTypes {
     | '/user'
     | '/admin/account-erasure'
     | '/admin/audit'
+    | '/admin/slider-magnet-presets'
     | '/admin/users'
     | '/autmog/$penId'
     | '/changelog/$slug'
@@ -1073,6 +1086,13 @@ declare module '@tanstack/react-router' {
       path: '/audit'
       fullPath: '/admin/audit'
       preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/slider-magnet-presets': {
+      id: '/admin/slider-magnet-presets'
+      path: '/slider-magnet-presets'
+      fullPath: '/admin/slider-magnet-presets'
+      preLoaderRoute: typeof AdminSliderMagnetPresetsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/users': {
@@ -1513,6 +1533,7 @@ const AdminAuditRouteWithChildren = AdminAuditRoute._addFileChildren(
 interface AdminRouteChildren {
   AdminAccountErasureRoute: typeof AdminAccountErasureRoute
   AdminAuditRoute: typeof AdminAuditRouteWithChildren
+  AdminSliderMagnetPresetsRoute: typeof AdminSliderMagnetPresetsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminFeedbackArchiveRoute: typeof AdminFeedbackArchiveRoute
@@ -1537,6 +1558,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAccountErasureRoute: AdminAccountErasureRoute,
   AdminAuditRoute: AdminAuditRouteWithChildren,
+  AdminSliderMagnetPresetsRoute: AdminSliderMagnetPresetsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminFeedbackArchiveRoute: AdminFeedbackArchiveRoute,

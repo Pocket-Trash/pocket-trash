@@ -241,7 +241,6 @@ const owners = [
         ownerClerkId: "user_1002",
         ownerUsername: "royanger",
         ownerUserId: 1002,
-        ownedInsertSetup: null,
         productId: 1,
         productSlug: "catla",
         productImages: [],
@@ -984,7 +983,7 @@ describe("CollectionItemDetailPage", () => {
     expect(html).toMatch(
       /Slider body holds magnets|web\.slider\.capability\.sliderBodyHoldsMagnets/,
     );
-    expect(html).toMatch(/Magnet layout|web\.slider\.layout\.label/);
+    expect(html).toMatch(/Magnet setup|web\.slider\.setup\.title/);
     expect(html).toMatch(/2×4 — 3-click|web\.slider\.layout\.option/);
     expect(html).toContain("40 mm");
     expect(html).toContain("12 mm");
@@ -1065,7 +1064,7 @@ describe("CollectionItemDetailPage", () => {
     expect(html).toContain("disabled");
   });
 
-  it("shows an owned slider's effective setup without filling snapshot gaps", () => {
+  it("shows an owned slider's effective magnet snapshot", () => {
     const item = owners[0]?.items[0];
     if (!item) throw new Error("Collection item fixture is required.");
     const html = renderToStaticMarkup(
@@ -1075,24 +1074,11 @@ describe("CollectionItemDetailPage", () => {
           effectiveSliderSetup: {
             clickCount: null,
             configuration: {
-              groups: [],
-              label: "Owner layout",
-              slots: [
-                {
-                  documentedColumn: null,
-                  documentedRow: null,
-                  groupKey: null,
-                  half: "half-a",
-                  key: "A1",
-                  state: "unknown",
-                },
-              ],
-              sourceLabel: null,
-              sourceNotes: null,
+              sideA: ["N52", "N48", null, "N42"],
+              sideB: null,
             },
-            isLiveCatalog: false,
-            magnetLayout: null,
-            source: "owned-insert",
+            magnetLayout: "2x2",
+            source: "installed-insert",
           },
           productTypeName: "Slider",
           productTypeSlug: "slider",
@@ -1106,9 +1092,9 @@ describe("CollectionItemDetailPage", () => {
       />,
     );
 
-    expect(html).toContain("Not recorded");
-    expect(html).toContain("Owner layout");
-    expect(html).toContain("Unknown");
+    expect(html).toContain("web.slider.layout.option");
+    expect(html).toContain("N52");
+    expect(html).toContain("Empty");
   });
 
   it("does not invent a live setup for an insert", () => {
@@ -1118,7 +1104,6 @@ describe("CollectionItemDetailPage", () => {
       <CollectionItemDetailPage
         item={{
           ...item,
-          ownedInsertSetup: null,
           productTypeName: "Slider insert",
           productTypeSlug: "slider-insert",
         }}

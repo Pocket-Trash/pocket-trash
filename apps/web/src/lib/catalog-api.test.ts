@@ -325,7 +325,10 @@ describe("slider catalog product validation", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
-        magnetLayout: productTypeSlug === "slider" ? "2x4" : null,
+        magnetLayout:
+          productTypeSlug === "slider" || productTypeSlug === "slider-insert"
+            ? "2x4"
+            : null,
         usesInserts: productTypeSlug === "slider" ? false : null,
         productTypeSlug,
       }).success,
@@ -441,12 +444,14 @@ describe("slider catalog product validation", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
+        magnetLayout: "2x4",
         productTypeSlug: "slider-insert",
       }).success,
     ).toBe(true);
     expect(
       productFormSchema.safeParse({
         ...base,
+        magnetLayout: "2x4",
         materialIds: [1000, 2000],
         productTypeSlug: "slider-insert",
       }).success,
@@ -455,6 +460,7 @@ describe("slider catalog product validation", () => {
       productFormSchema.safeParse({
         ...base,
         finishOptions: validFinishOptions,
+        magnetLayout: "2x4",
         productTypeSlug: "slider-insert",
       }).success,
     ).toBe(false);
