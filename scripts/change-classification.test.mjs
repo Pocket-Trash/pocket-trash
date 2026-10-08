@@ -779,6 +779,7 @@ test("local scraper tooling gets scraper checks without a mutation preview", () 
     "scripts/scraper-command.mjs",
     "scripts/scraper-redis.mjs",
     "scripts/check-railway-context.mjs",
+    "scripts/check-railway-context.test.mjs",
     "scripts/workspace-packages.mjs",
   ]) {
     assert.deepEqual(

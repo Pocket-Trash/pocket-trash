@@ -9,8 +9,15 @@
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
 !railway.json
+!security-audit-exceptions.json
 !tsconfig.json
 !turbo.json
+
+!patches/
+!patches/**
+
+!scripts/
+!scripts/security-audit.mjs
 
 !apps/
 !apps/scraper/
@@ -19,8 +26,8 @@
 !packages/
 !packages/database/
 !packages/database/**
-!packages/eslint/
-!packages/eslint/**
+!packages/lint/
+!packages/lint/**
 !packages/feature-flags/
 !packages/feature-flags/**
 !packages/storage/

@@ -1476,6 +1476,9 @@ jobs:
             --service "$RAILWAY_SCRAPER_PRODUCTION_SERVICE_NAME" \
             --environment production
 
+      - name: Validate Railway upload context
+        run: node scripts/check-railway-context.mjs
+
       - name: Deploy Railway production scraper
         shell: bash
         env:

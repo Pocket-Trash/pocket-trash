@@ -1,11 +1,17 @@
 import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
 
 import { getWorkspacePackages } from "./workspace-packages.mjs";
 
 /** Absolute repository root used for Git and manifest discovery. */
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+/** Workspace configuration supplying pnpm patch inputs. */
+const workspace = parse(
+  readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8"),
+);
 /** Workspace package metadata loaded from the repository. */
 const workspacePackages = getWorkspacePackages(repoRoot);
 /** Workspace package metadata indexed by package name. */
@@ -15,10 +21,17 @@ const packagesByName = new Map(
     workspacePackage,
   ]),
 );
-/** Directories required by the scraper and its workspace dependencies. */
+/** Root manifest whose workspace tooling must be available during installation. */
+const rootManifest = JSON.parse(
+  readFileSync(join(repoRoot, "package.json"), "utf8"),
+);
+/** Directories required by the root manifest, scraper, and workspace dependencies. */
 const requiredPackageDirectories = new Set();
 /** Workspace package names pending dependency traversal. */
-const pendingPackageNames = ["@app/scraper"];
+const pendingPackageNames = [
+  "@app/scraper",
+  ...getWorkspaceDependencyNames(rootManifest),
+];
 
 while (pendingPackageNames.length > 0) {
   const packageName = pendingPackageNames.pop();
@@ -34,28 +47,26 @@ while (pendingPackageNames.length > 0) {
 
   requiredPackageDirectories.add(workspacePackage.directory);
 
-  for (const dependencies of [
-    workspacePackage.manifest.dependencies,
-    workspacePackage.manifest.devDependencies,
-    workspacePackage.manifest.optionalDependencies,
-  ]) {
-    for (const dependencyName of Object.keys(dependencies ?? {})) {
-      if (packagesByName.has(dependencyName)) {
-        pendingPackageNames.push(dependencyName);
-      }
-    }
-  }
+  pendingPackageNames.push(
+    ...getWorkspaceDependencyNames(workspacePackage.manifest),
+  );
 }
 
-/** Root configuration files required by Railway builds. */
-const requiredRootFiles = [
+/** Install and build entry points required in the tracked upload context. */
+const requiredBuildFiles = [
   ".railwayignore",
   "package.json",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
   "railway.json",
+  "scripts/security-audit.mjs",
+  "security-audit-exceptions.json",
   "tsconfig.json",
   "turbo.json",
+  ...Object.values(workspace.patchedDependencies ?? {}),
+  ...[...requiredPackageDirectories].map(
+    (directory) => `${directory}/package.json`,
+  ),
 ];
 /** Tracked files required to build the scraper service. */
 const requiredFiles = execFileSync(
@@ -63,7 +74,7 @@ const requiredFiles = execFileSync(
   [
     "ls-files",
     "--",
-    ...requiredRootFiles,
+    ...requiredBuildFiles,
     ...[...requiredPackageDirectories].sort(),
   ],
   { cwd: repoRoot, encoding: "utf8" },
@@ -71,6 +82,21 @@ const requiredFiles = execFileSync(
   .trim()
   .split("\n")
   .filter(Boolean);
+/** Tracked inputs used to detect silently omitted required files. */
+const trackedFiles = new Set(requiredFiles);
+/** Missing or untracked inputs that cannot reach the source upload. */
+const missingFiles = [
+  ...new Set([...requiredBuildFiles, ...requiredFiles]),
+].filter(
+  (file) => !trackedFiles.has(file) || !existsSync(join(repoRoot, file)),
+);
+
+if (missingFiles.length > 0) {
+  throw new Error(
+    `Railway requires existing tracked build files:\n${missingFiles.join("\n")}`,
+  );
+}
+
 /** Result of checking required files against `.railwayignore`. */
 const ignored = spawnSync(
   "git",
@@ -102,3 +128,22 @@ if (ignored.status === 0) {
 console.log(
   `Railway includes ${requiredFiles.length} tracked files across ${requiredPackageDirectories.size} workspace packages.`,
 );
+
+/**
+ * Finds workspace dependencies, including references to missing local packages.
+ *
+ * @param manifest - Package manifest whose install dependencies are required.
+ * @returns Workspace package names to traverse.
+ */
+function getWorkspaceDependencyNames(manifest) {
+  return Object.entries({
+    ...manifest.dependencies,
+    ...manifest.devDependencies,
+    ...manifest.optionalDependencies,
+  })
+    .filter(
+      ([name, version]) =>
+        packagesByName.has(name) || version.startsWith("workspace:"),
+    )
+    .map(([name]) => name);
+}

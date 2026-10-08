@@ -9,7 +9,11 @@
       "package.json",
       "pnpm-lock.yaml",
       "pnpm-workspace.yaml",
+      "patches/**",
       "railway.json",
+      ".railwayignore",
+      "scripts/security-audit.mjs",
+      "security-audit-exceptions.json",
       "turbo.json"
     ]
   },
