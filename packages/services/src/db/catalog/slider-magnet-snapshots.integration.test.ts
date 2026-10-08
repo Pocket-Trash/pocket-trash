@@ -9,8 +9,8 @@ import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
-describe("owned slider insert setups", () => {
-  it("keeps an owned setup without overriding a body-hosted layout", async () => {
+describe("owned slider magnet snapshots", () => {
+  it("keeps an owned snapshot while the installed insert supplies the layout", async () => {
     const client = new PGlite();
     const db = drizzle(client, { schema }) as unknown as Database;
     const folder = fileURLToPath(
@@ -139,48 +139,28 @@ describe("owned slider insert setups", () => {
         materialId: material.id,
       });
       const configuration = {
-        groups: [],
-        label: "Observed layout",
-        slots: [
-          {
-            documentedColumn: null,
-            documentedRow: null,
-            groupKey: null,
-            half: "half-a" as const,
-            key: "A1",
-            state: "unknown" as const,
-          },
-        ],
-        sourceLabel: null,
-        sourceNotes: null,
+        sideA: Array.from({ length: 8 }, () => "N52" as const),
+        sideB: null,
       };
       await service.updateItem({
         actor,
-        collectionItemId: insertId,
+        collectionItemId: sliderId,
         customFinish: null,
-        displayName: "Insert",
+        displayName: "Slider",
         finishOptionId: null,
-        insertSetup: {
-          clickOptionId: null,
-          configuration,
-          sourceOfferId: null,
-        },
+        magnetConfiguration: configuration,
         materialId: material.id,
       });
       expect(
-        (await service.getOwnedItem(actor, insertId))?.ownedInsertSetup,
-      ).toEqual({
-        clickCount: null,
-        configuration,
-        sourceOfferId: null,
-      });
+        (await service.getOwnedItem(actor, sliderId))?.magnetConfiguration,
+      ).toEqual(configuration);
       expect(
         (await service.getOwnedItem(actor, sliderId))?.effectiveSliderSetup,
       ).toMatchObject({
         clickCount: 3,
-        configuration: null,
+        configuration,
         magnetLayout: "2x4",
-        source: "body-hosted",
+        source: "installed-insert",
       });
     } finally {
       await client.close();

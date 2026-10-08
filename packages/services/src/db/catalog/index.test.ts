@@ -94,8 +94,9 @@ describe("effective owned slider setup", () => {
     expect(
       resolveEffectiveSliderSetup({
         bodyMagnetLayout: "2x4",
-        installedInsertProductId: null,
-        ownedInsertSetup: null,
+        includedInsertMagnetLayout: null,
+        installedInsertMagnetLayout: null,
+        magnetConfiguration: null,
       }),
     ).toMatchObject({
       clickCount: 3,
@@ -104,23 +105,25 @@ describe("effective owned slider setup", () => {
     });
   });
 
-  it("lets a partial owned snapshot win without filling catalog gaps", () => {
+  it("lets the installed insert layout override the supplied insert", () => {
     expect(
       resolveEffectiveSliderSetup({
         bodyMagnetLayout: null,
-        installedInsertProductId: 3000,
-        ownedInsertSetup: {
-          clickCount: null,
-          configuration: null,
-          sourceOfferId: null,
+        includedInsertMagnetLayout: "2x4",
+        installedInsertMagnetLayout: "2x2",
+        magnetConfiguration: {
+          sideA: ["N52", "N52", "N35", "N35"],
+          sideB: null,
         },
       }),
     ).toEqual({
-      clickCount: null,
-      configuration: null,
-      isLiveCatalog: false,
-      magnetLayout: null,
-      source: "owned-insert",
+      clickCount: 1,
+      configuration: {
+        sideA: ["N52", "N52", "N35", "N35"],
+        sideB: null,
+      },
+      magnetLayout: "2x2",
+      source: "installed-insert",
     });
   });
 
@@ -128,10 +131,11 @@ describe("effective owned slider setup", () => {
     expect(
       resolveEffectiveSliderSetup({
         bodyMagnetLayout: null,
-        installedInsertProductId: null,
-        ownedInsertSetup: null,
+        includedInsertMagnetLayout: null,
+        installedInsertMagnetLayout: null,
+        magnetConfiguration: null,
       }),
-    ).toMatchObject({ isLiveCatalog: false, source: "not-recorded" });
+    ).toMatchObject({ source: "not-recorded" });
   });
 });
 

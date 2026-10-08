@@ -13,6 +13,7 @@ import type {
   PublicMakerSummary,
   PublicMaterial,
   PublicMaterialSummary,
+  SliderMagnetPreset,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
@@ -22,7 +23,10 @@ import {
 } from "@package/services";
 import { hasPermission } from "@package/services/authorization";
 import {
+  type SliderMagnetConfiguration,
   type SliderMagnetLayout,
+  sliderMagnetGrades,
+  sliderMagnetLayoutDetails,
   sliderMagnetLayouts,
 } from "@package/services/constants";
 import { createServerFn } from "@tanstack/react-start";
@@ -41,6 +45,12 @@ import { getResourceViewer } from "./resources";
  * Localization key used for missing required catalog input.
  */
 const requiredMessage = "web.catalog.error.required";
+
+/** Compact row-major slider magnet snapshot accepted by forms. */
+export const sliderMagnetConfigurationSchema = z.object({
+  sideA: z.array(z.enum(sliderMagnetGrades).nullable()),
+  sideB: z.array(z.enum(sliderMagnetGrades).nullable()).nullable(),
+});
 
 /**
  * Reports whether the current actor may manage products or collections.
@@ -89,6 +99,28 @@ const idSchema = z
   .number(requiredMessage)
   .int(requiredMessage)
   .positive(requiredMessage);
+
+/** Validated reusable slider magnet preset write. */
+const sliderMagnetPresetSchema = z
+  .object({
+    configuration: sliderMagnetConfigurationSchema,
+    magnetLayout: z.enum(sliderMagnetLayouts),
+    name: z.string().trim().min(1, requiredMessage).max(100),
+    presetId: idSchema.optional(),
+  })
+  .superRefine(({ configuration, magnetLayout }, context) => {
+    const slots = sliderMagnetLayoutDetails[magnetLayout].slotsPerSide;
+    if (
+      configuration.sideA.length !== slots ||
+      (configuration.sideB !== null && configuration.sideB.length !== slots)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "web.slider.validation.completeConfiguration",
+        path: ["configuration"],
+      });
+    }
+  });
 /**
  * Schema for optional positive numeric specifications.
  */
@@ -136,106 +168,6 @@ const optionalUrlSchema = z
   .trim()
   .refine((value) => isWebUrl(normalizeOptionalUrl(value)), urlMessage)
   .transform((value) => normalizeOptionalUrl(value) || null);
-
-/**
- * Creates an optional sourced setup text schema without inferring missing facts.
- *
- * @param maximum - Maximum accepted character count.
- * @returns Schema that trims text and maps blank input to `null`.
- */
-const optionalMagnetTextSchema = (maximum: number) =>
-  z
-    .union([z.string().max(maximum, "web.catalog.error.form"), z.null()])
-    .transform((value) => value?.trim() || null);
-
-/** One complete exact magnet group in a catalog layout. */
-const magnetGroupSchema = z.object({
-  diameterMm: positiveDecimalSchema.pipe(
-    z.string({ error: "web.slider.validation.positiveDimension" }),
-  ),
-  grade: z.string().trim().min(1, requiredMessage).max(20),
-  key: z.string().trim().min(1, requiredMessage).max(100),
-  label: z.string().trim().min(1, requiredMessage).max(100),
-  thicknessMm: positiveDecimalSchema.pipe(
-    z.string({ error: "web.slider.validation.positiveDimension" }),
-  ),
-});
-
-/** One exact Half A or Half B slot in a complete catalog layout. */
-const magnetSlotSchema = z.object({
-  documentedColumn: z.number().int().positive().nullable(),
-  documentedRow: z.number().int().positive().nullable(),
-  groupKey: z.string().trim().min(1).max(100).nullable(),
-  half: z.enum(["half-a", "half-b"]),
-  key: z.string().trim().min(1, requiredMessage).max(100),
-  state: z.enum(["occupied", "empty"]),
-});
-
-/** Owner-recorded layout contract that additionally permits unknown positions. */
-const ownedMagnetConfigurationSchema = z
-  .object({
-    groups: z.array(magnetGroupSchema),
-    label: z.string().trim().min(1, requiredMessage).max(100),
-    slots: z
-      .array(
-        magnetSlotSchema.extend({
-          state: z.enum(["occupied", "empty", "unknown"]),
-        }),
-      )
-      .min(1, "web.slider.validation.completeConfiguration"),
-    sourceLabel: optionalMagnetTextSchema(200),
-    sourceNotes: optionalMagnetTextSchema(5000),
-  })
-  .superRefine((configuration, context) => {
-    const groupKeys = configuration.groups.map(({ key }) => key);
-    const slotKeys = configuration.slots.map(({ key }) => key);
-    if (new Set(groupKeys).size !== groupKeys.length) {
-      context.addIssue({
-        code: "custom",
-        message: "web.catalog.error.form",
-        path: ["configuration", "groups"],
-      });
-    }
-    if (new Set(slotKeys).size !== slotKeys.length) {
-      context.addIssue({
-        code: "custom",
-        message: "web.catalog.error.form",
-        path: ["configuration", "slots"],
-      });
-    }
-    const referenced = new Set<string>();
-    for (const [index, slot] of configuration.slots.entries()) {
-      if (slot.state === "occupied" && !slot.groupKey) {
-        context.addIssue({
-          code: "custom",
-          message: "web.slider.validation.incompleteSlot",
-          path: ["configuration", "slots", index, "groupKey"],
-        });
-      }
-      if (slot.state !== "occupied" && slot.groupKey) {
-        context.addIssue({
-          code: "custom",
-          message: "web.slider.validation.overlappingGroup",
-          path: ["configuration", "slots", index, "groupKey"],
-        });
-      }
-      if (slot.groupKey && !groupKeys.includes(slot.groupKey)) {
-        context.addIssue({
-          code: "custom",
-          message: "web.slider.validation.crossConfiguration",
-          path: ["configuration", "slots", index, "groupKey"],
-        });
-      }
-      if (slot.groupKey) referenced.add(slot.groupKey);
-    }
-    if (groupKeys.some((key) => !referenced.has(key))) {
-      context.addIssue({
-        code: "custom",
-        message: "web.slider.validation.completeConfiguration",
-        path: ["configuration", "groups"],
-      });
-    }
-  });
 
 /**
  * Checks whether an optional URL uses HTTP or HTTPS.
@@ -341,6 +273,9 @@ export const productFormSchema = z
     lengthMm: numericSpecSchema,
     makerId: idSchema,
     makerProductUrl: optionalUrlSchema,
+    magnetConfiguration: sliderMagnetConfigurationSchema
+      .nullable()
+      .default(null),
     magnetLayout: z.enum(sliderMagnetLayouts).nullable(),
     materialIds: z.array(idSchema).min(1, requiredMessage),
     name: slugNameSchema,
@@ -364,6 +299,7 @@ export const productFormSchema = z
         includedPlateProductId,
         lengthMm,
         materialIds,
+        magnetConfiguration,
         magnetLayout,
         productTypeSlug,
         spinDiameterMm,
@@ -399,12 +335,44 @@ export const productFormSchema = z
           path: ["usesInserts"],
         });
       }
-      if (productTypeSlug !== "slider" && magnetLayout !== null) {
+      if (
+        productTypeSlug !== "slider" &&
+        productTypeSlug !== "slider-insert" &&
+        magnetLayout !== null
+      ) {
         context.addIssue({
           code: "custom",
           message: "web.catalog.error.form",
           path: ["magnetLayout"],
         });
+      }
+      if (productTypeSlug === "slider-insert" && magnetLayout === null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.layoutRequired",
+          path: ["magnetLayout"],
+        });
+      }
+      if (productTypeSlug !== "slider" && magnetConfiguration !== null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["magnetConfiguration"],
+        });
+      }
+      if (magnetConfiguration && magnetLayout) {
+        const slots = sliderMagnetLayoutDetails[magnetLayout].slotsPerSide;
+        if (
+          magnetConfiguration.sideA.length !== slots ||
+          (magnetConfiguration.sideB !== null &&
+            magnetConfiguration.sideB.length !== slots)
+        ) {
+          context.addIssue({
+            code: "custom",
+            message: "web.slider.validation.completeConfiguration",
+            path: ["magnetConfiguration"],
+          });
+        }
       }
       if (
         productTypeSlug === "slider" &&
@@ -722,14 +690,7 @@ const collectionEditSchema = z
       .object({ collectionItemId: idSchema })
       .nullable()
       .optional(),
-    insertSetup: z
-      .object({
-        clickOptionId: idSchema.nullable(),
-        configuration: ownedMagnetConfigurationSchema.nullable(),
-        sourceOfferId: idSchema.nullable(),
-      })
-      .nullable()
-      .optional(),
+    magnetConfiguration: sliderMagnetConfigurationSchema.nullable().optional(),
     materialId: idSchema,
     reason: z.string().trim().max(1000).optional(),
   })
@@ -788,6 +749,8 @@ export type CatalogOptions = {
    * Available materials.
    */
   materials: Awaited<ReturnType<typeof listMaterials>>;
+  /** Reusable slider magnet presets. */
+  magnetPresets?: SliderMagnetPreset[];
   /**
    * Available patterns.
    */
@@ -819,6 +782,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       colors,
       finishes,
       makers,
+      magnetPresets,
       materials,
       patterns,
       productTypes,
@@ -830,6 +794,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       listColors(),
       listFinishes(),
       listMakers(),
+      s.db.catalog.listSliderMagnetPresets(),
       listMaterials(),
       listPatterns(),
       listProductTypes(),
@@ -842,6 +807,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       colors,
       finishes,
       makers,
+      magnetPresets,
       materials,
       patterns,
       productTypes,
@@ -851,6 +817,79 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
     };
   },
 );
+
+/** Lists reusable slider magnet presets for product managers. */
+export const listSliderMagnetPresets = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<SliderMagnetPreset[]> => {
+  await requirePermission("products.manage");
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listSliderMagnetPresets();
+});
+
+/** Creates a reusable slider magnet preset. */
+export const createSliderMagnetPreset = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("products.manage");
+    const parsed = sliderMagnetPresetSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+    const { s } = await import("@/lib/services");
+    try {
+      const preset = await s.db.catalog.createSliderMagnetPreset({
+        actor,
+        configuration: parsed.data.configuration,
+        magnetLayout: parsed.data.magnetLayout,
+        name: parsed.data.name,
+      });
+      return { ok: true as const, preset };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
+
+/** Updates a reusable slider magnet preset. */
+export const updateSliderMagnetPreset = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("products.manage");
+    const parsed = sliderMagnetPresetSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+    if (parsed.data.presetId === undefined)
+      return {
+        fieldErrors: { presetId: [requiredMessage] },
+        formError: "web.catalog.error.form",
+        ok: false as const,
+        requiresConfirmation: false as const,
+      };
+    const { s } = await import("@/lib/services");
+    try {
+      const preset = await s.db.catalog.updateSliderMagnetPreset({
+        actor,
+        configuration: parsed.data.configuration,
+        magnetLayout: parsed.data.magnetLayout,
+        name: parsed.data.name,
+        presetId: parsed.data.presetId,
+      });
+      return { ok: true as const, preset };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
+
+/** Deletes a reusable slider magnet preset. */
+export const deleteSliderMagnetPreset = createServerFn({ method: "POST" })
+  .validator((input: unknown) => z.object({ presetId: idSchema }).parse(input))
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("products.manage");
+    const { s } = await import("@/lib/services");
+    try {
+      await s.db.catalog.deleteSliderMagnetPreset({ actor, ...data });
+      return { ok: true as const };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
 
 /** Lists registered catalog terminology aliases for shared client-side search. */
 export const listCatalogTerminologyAliases = createServerFn({
@@ -1418,6 +1457,8 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       ),
       makerId: parsed.data.makerId,
       makerProductUrl: parsed.data.makerProductUrl,
+      magnetConfiguration: parsed.data
+        .magnetConfiguration as SliderMagnetConfiguration | null,
       magnetLayout: parsed.data.magnetLayout as SliderMagnetLayout | null,
       materialIds: parsed.data.materialIds,
       includedInsertProductId: parsed.data.includedInsertProductId,

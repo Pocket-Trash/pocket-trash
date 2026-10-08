@@ -31,6 +31,7 @@ type SidebarPath =
   | "/admin/feedback/requests"
   | "/admin/materials"
   | "/admin/makers"
+  | "/admin/slider-magnet-presets"
   | "/admin/notifications/feedback"
   | "/admin/notifications/resources"
   | "/admin/settings/feature-flags"

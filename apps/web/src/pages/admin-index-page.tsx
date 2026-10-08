@@ -1,3 +1,5 @@
+import { useAuth } from "@clerk/tanstack-react-start";
+import { hasPermission, normalizeActor } from "@package/services/authorization";
 import {
   formatTranslation,
   type TranslationKey,
@@ -10,6 +12,7 @@ import {
   MessageSquare,
   ScrollText,
   ShieldCheck,
+  SlidersHorizontal,
   UsersRound,
 } from "lucide-react";
 import { AdminPageShell } from "@/components/admin-page-shell";
@@ -60,8 +63,14 @@ export function AdminIndexPage() {
     label: t("web.admin.makers.title"),
     to: "/admin/makers" as const,
   };
+  const magnetPresetsLink = {
+    icon: SlidersHorizontal,
+    label: t("web.slider.magnet.presets" as TranslationKey),
+    to: "/admin/slider-magnet-presets" as const,
+  };
   const primaryLinks = [
     ...(hasPermission(actor, "products.manage") ? [makersLink] : []),
+    ...(hasPermission(actor, "products.manage") ? [magnetPresetsLink] : []),
     ...(hasPermission(actor, "users.manage") ? [usersLink] : []),
     ...(hasPermission(actor, "audit.read") ? [auditLink] : []),
     ...(hasPermission(actor, "products.manage") ? [materialsLink] : []),
@@ -100,6 +109,3 @@ export function AdminIndexPage() {
     </AdminPageShell>
   );
 }
-
-import { useAuth } from "@clerk/tanstack-react-start";
-import { hasPermission, normalizeActor } from "@package/services/authorization";

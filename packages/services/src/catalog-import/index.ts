@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { sliderMagnetLayouts } from "../constants.js";
+import {
+  sliderMagnetConfigurationIsValid,
+  sliderMagnetLayouts,
+} from "../constants.js";
 
 /** Catalog tables that an import manifest may own. Collection data is excluded. */
 export const catalogImportEntityTypes = [
@@ -20,11 +23,7 @@ export const catalogImportEntityTypes = [
   "product-slider",
   "product-slider-plate",
   "product-slider-insert",
-  "magnet-configuration-label",
-  "magnet-group-label",
-  "product-magnet-configuration",
-  "product-magnet-group",
-  "product-magnet-slot",
+  "slider-magnet-preset",
   "catalog-terminology-alias",
 ] as const;
 
@@ -219,6 +218,9 @@ const manifestSchema = z
           }
         }
         const layout = record.payload.magnetLayout;
+        const supportedLayout = sliderMagnetLayouts.find(
+          (candidate) => candidate === layout,
+        );
         if (
           layout !== undefined &&
           layout !== null &&
@@ -228,6 +230,51 @@ const manifestSchema = z
             code: "custom",
             message: "Slider import magnet layout is invalid.",
             path: ["records", index, "payload", "magnetLayout"],
+          });
+        }
+        if (
+          layout !== undefined &&
+          layout !== null &&
+          record.payload.magnetConfiguration !== undefined &&
+          record.payload.magnetConfiguration !== null &&
+          supportedLayout &&
+          !sliderMagnetConfigurationIsValid(
+            record.payload.magnetConfiguration,
+            supportedLayout,
+          )
+        ) {
+          context.addIssue({
+            code: "custom",
+            message: "Slider import magnet configuration is invalid.",
+            path: ["records", index, "payload", "magnetConfiguration"],
+          });
+        }
+      }
+      if (
+        record.entity === "product-slider-insert" ||
+        record.entity === "slider-magnet-preset"
+      ) {
+        const layout = record.payload.magnetLayout;
+        const supportedLayout = sliderMagnetLayouts.find(
+          (candidate) => candidate === layout,
+        );
+        if (!supportedLayout) {
+          context.addIssue({
+            code: "custom",
+            message: "Slider insert or preset magnet layout is invalid.",
+            path: ["records", index, "payload", "magnetLayout"],
+          });
+        } else if (
+          record.entity === "slider-magnet-preset" &&
+          !sliderMagnetConfigurationIsValid(
+            record.payload.configuration,
+            supportedLayout,
+          )
+        ) {
+          context.addIssue({
+            code: "custom",
+            message: "Slider preset configuration is invalid.",
+            path: ["records", index, "payload", "configuration"],
           });
         }
       }

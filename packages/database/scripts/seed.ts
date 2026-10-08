@@ -30,6 +30,8 @@ import {
   productSpinner,
   productSpinnerButton,
   productType,
+  type SliderMagnetConfigurationValue,
+  sliderMagnetPreset,
   user,
   userSettings,
 } from "../src/schema/index.js";
@@ -264,6 +266,57 @@ const sliderFixtureMakers = [
   { name: "Magnus Fidgets" as const, slug: "magnus" },
   { name: "Novel Carry" as const, slug: "novel-carry" },
   { name: "FidgetBoy" as const, slug: "fidgetboy" },
+];
+
+/** Canonical reusable 2×4 magnet configurations. */
+export const seedSliderMagnetPresets: Array<{
+  /** Complete 2×4 configuration snapshot. */
+  configuration: SliderMagnetConfigurationValue;
+  /** Preset display name. */
+  name: string;
+  /** Case-insensitive uniqueness key. */
+  normalizedName: string;
+}> = [
+  {
+    configuration: {
+      sideA: ["N48", "N52", "N52", "N48", "N48", "N52", "N52", "N48"],
+      sideB: null,
+    },
+    name: "Hybrid",
+    normalizedName: "hybrid",
+  },
+  {
+    configuration: {
+      sideA: Array.from({ length: 8 }, () => "N52" as const),
+      sideB: null,
+    },
+    name: "Strong",
+    normalizedName: "strong",
+  },
+  {
+    configuration: {
+      sideA: ["N52", "N35", "N35", "N52", "N52", "N35", "N35", "N52"],
+      sideB: null,
+    },
+    name: "Medium Hybrid",
+    normalizedName: "mediumhybrid",
+  },
+  {
+    configuration: {
+      sideA: ["N52", "N35", "N35", "N52", "N52", "N35", "N35", "N52"],
+      sideB: ["N42", "N35", "N35", "N42", "N42", "N35", "N35", "N42"],
+    },
+    name: "Weak",
+    normalizedName: "weak",
+  },
+  {
+    configuration: {
+      sideA: ["N42", "N35", "N35", "N42", "N42", "N35", "N35", "N42"],
+      sideB: null,
+    },
+    name: "Weakest",
+    normalizedName: "weakest",
+  },
 ];
 
 /** Deterministic product records used in development and preview databases. */
@@ -966,6 +1019,28 @@ async function seedSliderFixtureImages(
 }
 
 /**
+ * Seeds the canonical reusable slider magnet configurations.
+ *
+ * @param db - Database client receiving idempotent preset writes.
+ */
+async function seedMagnetPresets(db: ReturnType<typeof createDb>) {
+  for (const preset of seedSliderMagnetPresets) {
+    await db
+      .insert(sliderMagnetPreset)
+      .values({ ...preset, magnetLayout: "2x4" })
+      .onConflictDoUpdate({
+        set: {
+          configuration: preset.configuration,
+          magnetLayout: "2x4",
+          name: preset.name,
+          updatedAt: new Date(),
+        },
+        target: sliderMagnetPreset.normalizedName,
+      });
+  }
+}
+
+/**
  * Seeds the compact deterministic slider catalog used by development and
  * preview deployments.
  *
@@ -1108,10 +1183,11 @@ export async function seedSliderFixtures(
         .insert(productSliderInsert)
         .values({
           id: seededProduct.id,
+          magnetLayout: "2x4",
           updatedAt,
         })
         .onConflictDoUpdate({
-          set: { updatedAt },
+          set: { magnetLayout: "2x4", updatedAt },
           target: productSliderInsert.id,
         });
     }
@@ -1273,6 +1349,7 @@ export async function seedDatabase(
 ): Promise<void> {
   await seedUsersAndSettings(db);
   await seedCatalog(db);
+  await seedMagnetPresets(db);
   const snapshot = await loadKapedcSeedData();
   const products = await seedKapedcProducts(db, snapshot);
   await seedKapedcImages(db, bunnyConfig, products);

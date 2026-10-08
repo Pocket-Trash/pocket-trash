@@ -171,7 +171,6 @@ const item: UserCollectionItem = {
   ownerClerkId: "user_storybook",
   ownerUsername: "royanger",
   ownerUserId: collection.ownerUserId,
-  ownedInsertSetup: null,
   productId: product.id,
   productSlug: product.slug,
   productImages: product.images,

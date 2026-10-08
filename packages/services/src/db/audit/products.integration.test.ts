@@ -133,6 +133,64 @@ describe("product audit adoption", () => {
       await client.close();
     }
   }, 30_000);
+
+  it("audits reusable slider magnet preset CRUD", async () => {
+    const client = new PGlite();
+    await migrate(client);
+    const db = drizzle(client, { schema }) as unknown as Database;
+    const services = createDbServices(
+      db,
+      createNoopLogger({ app: "test", environment: "test" }),
+    );
+    try {
+      const [admin] = await db
+        .insert(schema.user)
+        .values({ clerkId: "preset_admin", username: "Preset admin" })
+        .returning();
+      if (!admin) throw new Error("Preset administrator fixture is required.");
+      const actor = { clerkId: admin.clerkId, role: "admin" as const };
+      const created = await services.catalog.createSliderMagnetPreset({
+        actor,
+        configuration: {
+          sideA: ["N52", "N52", "N52", "N52"],
+          sideB: null,
+        },
+        magnetLayout: "2x2",
+        name: "Compact strong",
+      });
+      const updated = await services.catalog.updateSliderMagnetPreset({
+        actor,
+        configuration: {
+          sideA: ["N48", "N48", "N48", "N48"],
+          sideB: null,
+        },
+        magnetLayout: "2x2",
+        name: "Compact medium",
+        presetId: created.id,
+      });
+      expect(updated.name).toBe("Compact medium");
+      expect(await services.catalog.listSliderMagnetPresets()).toContainEqual(
+        updated,
+      );
+      await services.catalog.deleteSliderMagnetPreset({
+        actor,
+        presetId: created.id,
+      });
+      expect(
+        await db
+          .select({ action: schema.auditEvent.action })
+          .from(schema.auditEvent)
+          .where(eq(schema.auditEvent.actorUserId, admin.id))
+          .orderBy(schema.auditEvent.id),
+      ).toEqual([
+        { action: "products.slider_magnet_preset.created" },
+        { action: "products.slider_magnet_preset.updated" },
+        { action: "products.slider_magnet_preset.deleted" },
+      ]);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
 });
 
 /**

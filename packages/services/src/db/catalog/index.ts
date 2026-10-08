@@ -19,8 +19,10 @@ import { type Actor, hasPermission } from "../../authorization.js";
 import { nextAvailableSlug } from "../../catalog-slug.js";
 import { normalizeCatalogSearch } from "../../catalog-terminology.js";
 import {
+  type SliderMagnetConfiguration,
   type SliderMagnetLayout,
   sliderClickCount,
+  sliderMagnetConfigurationIsValid,
   sliderMagnetLayoutDetails,
   sliderMagnetLayouts,
 } from "../../constants.js";
@@ -232,8 +234,10 @@ function catalogProductType(value: string): CatalogProductType {
 }
 
 export {
+  type SliderMagnetConfiguration,
   type SliderMagnetLayout,
   sliderClickCount,
+  sliderMagnetConfigurationIsValid,
   sliderMagnetLayoutDetails,
   sliderMagnetLayouts,
 };
@@ -485,73 +489,16 @@ export type ProductWriteFinishOption = {
   patternId?: number | null;
 };
 
-/** Exact magnet group within one catalog configuration. */
-export type CatalogMagnetGroup = {
-  /** Positive diameter in millimetres, retained at database precision. */
-  diameterMm: string;
-  /** Normalized uppercase grade text. */
-  grade: string;
-  /** Stable key scoped to the configuration. */
-  key: string;
-  /** Global vocabulary label. */
-  label: string;
-  /** Positive thickness in millimetres, retained at database precision. */
-  thicknessMm: string;
-};
-
-/** Exact source-relative position in one complete catalog configuration. */
-export type CatalogMagnetSlot = {
-  /** Source-documented column, when present. */
-  documentedColumn: number | null;
-  /** Source-documented row, when present. */
-  documentedRow: number | null;
-  /** Group key for an occupied slot; `null` for an empty slot. */
-  groupKey: string | null;
-  /** Physical slider half named by the source-relative contract. */
-  half: "half-a" | "half-b";
-  /** Stable source-relative slot key. */
-  key: string;
-  /** Complete catalog state; unknown is intentionally unsupported. */
-  state: "occupied" | "empty";
-};
-
-/** Complete structured layout for one body-hosted catalog slider. */
-export type CatalogMagnetConfiguration = {
-  /** Ordered magnet groups. */
-  groups: CatalogMagnetGroup[];
-  /** Global configuration vocabulary label. */
-  label: string;
-  /** Optional source-relative layout label. */
-  sourceLabel: string | null;
-  /** Optional notes accompanying a complete source layout. */
-  sourceNotes: string | null;
-  /** Ordered exact slots across Half A and Half B. */
-  slots: CatalogMagnetSlot[];
-};
-
-/** Source-relative position in an owner-recorded insert setup. */
-export type OwnedMagnetSlot = Omit<CatalogMagnetSlot, "state"> & {
-  /** Owner-recorded state, including an explicitly unknown position. */
-  state: CatalogMagnetSlot["state"] | "unknown";
-};
-
-/** Owner-recorded magnet layout snapshot. */
-export type OwnedMagnetConfiguration = Omit<
-  CatalogMagnetConfiguration,
-  "slots"
-> & {
-  /** Ordered owner-recorded positions. */
-  slots: OwnedMagnetSlot[];
-};
-
 /** Durable setup snapshot belonging to one owned insert. */
-export type OwnedSliderInsertSetup = {
-  /** Selected positive click-count snapshot, or `null` when not recorded. */
-  clickCount: number | null;
-  /** Owner-recorded layout snapshot, or `null` when not recorded. */
-  configuration: OwnedMagnetConfiguration | null;
-  /** Catalog offer copied as an authoring source, when present. */
-  sourceOfferId: number | null;
+export type SliderMagnetPreset = {
+  /** Preset identifier. */
+  id: number;
+  /** Preset display name. */
+  name: string;
+  /** Physical layout required by the configuration. */
+  magnetLayout: SliderMagnetLayout;
+  /** Snapshot copied when the preset is applied. */
+  configuration: SliderMagnetConfiguration;
 };
 
 /** Effective setup displayed for an owned slider. */
@@ -559,51 +506,56 @@ export type EffectiveSliderSetup = {
   /** Effective click count, or `null` when not recorded. */
   clickCount: number | null;
   /** Effective layout, or `null` when not recorded. */
-  configuration: OwnedMagnetConfiguration | null;
-  /** Whether the values are resolved live from current catalog metadata. */
-  isLiveCatalog: boolean;
+  configuration: SliderMagnetConfiguration | null;
   /** Effective immutable physical layout, when known. */
   magnetLayout: SliderMagnetLayout | null;
   /** Physical or catalog source selected by the fallback rules. */
-  source: "body-hosted" | "owned-insert" | "not-recorded";
+  source:
+    | "body-hosted"
+    | "included-insert"
+    | "installed-insert"
+    | "not-recorded";
 };
 
 /**
  * Resolves an owned slider's effective setup without blending partial snapshots.
  *
- * @param input - Physical host, installed insert, and owned snapshot.
+ * @param input - Physical hosts and the owned snapshot.
  * @returns The effective setup and its provenance.
  */
 export function resolveEffectiveSliderSetup(input: {
   /** Slider-owned layout, when the slider or generic insert is the physical host. */
   bodyMagnetLayout: SliderMagnetLayout | null;
-  /** Exact installed insert product identifier, when installed. */
-  installedInsertProductId: number | null;
-  /** Durable owner snapshot on the installed insert, when recorded. */
-  ownedInsertSetup: OwnedSliderInsertSetup | null;
+  /** Exact catalog-supplied insert layout, when present. */
+  includedInsertMagnetLayout: SliderMagnetLayout | null;
+  /** Current installed insert layout, when present. */
+  installedInsertMagnetLayout: SliderMagnetLayout | null;
+  /** Durable owned configuration snapshot. */
+  magnetConfiguration?: SliderMagnetConfiguration | null;
 }): EffectiveSliderSetup {
-  if (input.bodyMagnetLayout) {
+  const magnetLayout =
+    input.installedInsertMagnetLayout ??
+    input.includedInsertMagnetLayout ??
+    input.bodyMagnetLayout;
+  if (magnetLayout)
     return {
-      clickCount: sliderClickCount(input.bodyMagnetLayout),
-      configuration: null,
-      isLiveCatalog: true,
-      magnetLayout: input.bodyMagnetLayout,
-      source: "body-hosted",
+      clickCount: sliderClickCount(magnetLayout),
+      configuration: sliderMagnetConfigurationIsValid(
+        input.magnetConfiguration,
+        magnetLayout,
+      )
+        ? input.magnetConfiguration
+        : null,
+      magnetLayout,
+      source: input.installedInsertMagnetLayout
+        ? "installed-insert"
+        : input.includedInsertMagnetLayout
+          ? "included-insert"
+          : "body-hosted",
     };
-  }
-  if (input.installedInsertProductId !== null && input.ownedInsertSetup) {
-    return {
-      clickCount: input.ownedInsertSetup.clickCount,
-      configuration: input.ownedInsertSetup.configuration,
-      isLiveCatalog: false,
-      magnetLayout: null,
-      source: "owned-insert",
-    };
-  }
   return {
     clickCount: null,
     configuration: null,
-    isLiveCatalog: false,
     magnetLayout: null,
     source: "not-recorded",
   };
@@ -703,6 +655,8 @@ export type CatalogProduct = {
   makerUrl: string | null;
   /** Slider-owned immutable layout, or null when an exact insert owns it. */
   magnetLayout: SliderMagnetLayout | null;
+  /** Optional catalog-default magnet configuration. */
+  magnetConfiguration?: SliderMagnetConfiguration | null;
   /** Whether the slider uses an insert, or `null` for other product types. */
   usesInserts: boolean | null;
   /**
@@ -816,6 +770,8 @@ export type ProductWriteInput = {
   materialIds: number[];
   /** Slider-owned immutable layout, or null when an exact insert owns it. */
   magnetLayout?: SliderMagnetLayout | null;
+  /** Optional catalog-default magnet configuration. */
+  magnetConfiguration?: SliderMagnetConfiguration | null;
   /** Exact catalog insert supplied with a slider; null means unnamed included insert when inserts are used. */
   includedInsertProductId?: number | null;
   /** Exact catalog plate supplied with a slider; null means unnamed included plates. */
@@ -1073,6 +1029,22 @@ export type CatalogService = {
    */
   createProduct(input: ProductWriteInput): Promise<CatalogProduct>;
   /**
+   * Creates a reusable slider magnet preset.
+   *
+   * @param input - Authorized name, layout, and configuration.
+   * @returns Created preset.
+   */
+  createSliderMagnetPreset(input: {
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** Snapshot copied when applied. */
+    configuration: SliderMagnetConfiguration;
+    /** Required physical layout. */
+    magnetLayout: SliderMagnetLayout;
+    /** Preset display name. */
+    name: string;
+  }): Promise<SliderMagnetPreset>;
+  /**
    * Permanently deletes an unreferenced product with transactional audit and storage cleanup.
    *
    * @param input - Confirmed owner or staff deletion with a reason for staff intervention.
@@ -1089,6 +1061,18 @@ export type CatalogService = {
     /** Required nonblank reason for cross-owner deletion. */
     reason?: string;
   }): Promise<boolean>;
+  /**
+   * Deletes a reusable slider magnet preset.
+   *
+   * @param input - Authorized preset identifier.
+   * @returns Completion after deletion.
+   */
+  deleteSliderMagnetPreset(input: {
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** Preset identifier. */
+    presetId: number;
+  }): Promise<void>;
   /**
    * Applies one authorized product approval transition.
    *
@@ -1259,6 +1243,24 @@ export type CatalogService = {
     name: string;
   }): Promise<AdminMaterial>;
   /**
+   * Updates a reusable slider magnet preset.
+   *
+   * @param input - Authorized replacement preset fields.
+   * @returns Updated preset.
+   */
+  updateSliderMagnetPreset(input: {
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** Replacement snapshot. */
+    configuration: SliderMagnetConfiguration;
+    /** Replacement physical layout. */
+    magnetLayout: SliderMagnetLayout;
+    /** Replacement display name. */
+    name: string;
+    /** Preset identifier. */
+    presetId: number;
+  }): Promise<SliderMagnetPreset>;
+  /**
    * Lists patterns.
    *
    * @returns Matching patterns.
@@ -1283,6 +1285,12 @@ export type CatalogService = {
     productTypeSlug?: string,
     viewer?: CatalogViewer,
   ): Promise<CatalogProduct[]>;
+  /**
+   * Lists reusable slider magnet presets by name.
+   *
+   * @returns Ordered reusable presets.
+   */
+  listSliderMagnetPresets(): Promise<SliderMagnetPreset[]>;
   /**
    * Lists product types.
    *
@@ -1570,8 +1578,8 @@ export type UserCollectionItem = {
   installedPlateId: number | null;
   /** Whether an installed plate exists but is unavailable to this viewer. */
   installedPlateUnavailable?: boolean;
-  /** Durable setup recorded on an owned insert, or `null` for live defaults. */
-  ownedInsertSetup: OwnedSliderInsertSetup | null;
+  /** Durable magnet snapshot recorded on an owned slider. */
+  magnetConfiguration?: SliderMagnetConfiguration | null;
   /**
    * Maker identifier.
    */
@@ -2255,15 +2263,8 @@ export type CollectionsService = {
       /** Owned slider plate collection-item identifier. */
       collectionItemId: number;
     } | null;
-    /** Owned insert setup snapshot, or `null` to return to live defaults. */
-    insertSetup?: {
-      /** Current exact-product click option selected by the owner. */
-      clickOptionId: number | null;
-      /** Owner-recorded configuration, including explicit unknown positions. */
-      configuration: OwnedMagnetConfiguration | null;
-      /** Current exact-product offer copied as the authoring source. */
-      sourceOfferId: number | null;
-    } | null;
+    /** Owned slider magnet snapshot, or `null` to clear it. */
+    magnetConfiguration?: SliderMagnetConfiguration | null;
     /**
      * Material identifier.
      */
@@ -2810,6 +2811,49 @@ export function createCatalogService(
       );
     },
     /**
+     * Creates a reusable slider magnet preset.
+     *
+     * @param input - Authorized preset fields.
+     * @returns Created preset.
+     * @rejects When authorization, validation, persistence, auditing, or logging fails.
+     */
+    async createSliderMagnetPreset(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Slider magnet preset does not exist.");
+      const values = sliderMagnetPresetValues(input);
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await logger.operation(
+        loggerMessages.database.catalog.createSliderMagnetPreset,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [preset] = await tx
+              .insert(schema.sliderMagnetPreset)
+              .values(values)
+              .returning({
+                configuration: schema.sliderMagnetPreset.configuration,
+                id: schema.sliderMagnetPreset.id,
+                magnetLayout: schema.sliderMagnetPreset.magnetLayout,
+                name: schema.sliderMagnetPreset.name,
+              });
+            if (!preset)
+              throw new Error("Failed to create slider magnet preset.");
+            if (dependencies && actorUser)
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: preset,
+                definition: productAudit.sliderMagnetPresetCreated,
+                targetId: preset.id,
+              });
+            return preset;
+          }),
+        actorAttributes(input.actor.clerkId),
+      );
+    },
+    /**
      * Creates product.
      *
      * @param input - Product fields, finish options, and authenticated actor.
@@ -2925,6 +2969,47 @@ export function createCatalogService(
         viewer,
       );
       return products[0] ?? null;
+    },
+    /**
+     * Deletes a reusable slider magnet preset.
+     *
+     * @param input - Authorized preset identifier.
+     * @returns Completion after deletion.
+     * @rejects When authorization, lookup, persistence, auditing, or logging fails.
+     */
+    async deleteSliderMagnetPreset(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Slider magnet preset does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      await logger.operation(
+        loggerMessages.database.catalog.deleteSliderMagnetPreset,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [before] = await tx
+              .delete(schema.sliderMagnetPreset)
+              .where(eq(schema.sliderMagnetPreset.id, input.presetId))
+              .returning({
+                configuration: schema.sliderMagnetPreset.configuration,
+                id: schema.sliderMagnetPreset.id,
+                magnetLayout: schema.sliderMagnetPreset.magnetLayout,
+                name: schema.sliderMagnetPreset.name,
+              });
+            if (!before)
+              throw new Error("Slider magnet preset does not exist.");
+            if (dependencies && actorUser)
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                before,
+                definition: productAudit.sliderMagnetPresetDeleted,
+                targetId: before.id,
+              });
+          }),
+        actorAttributes(input.actor.clerkId, { presetId: input.presetId }),
+      );
     },
     /**
      * Applies one serialized product approval transition.
@@ -3584,6 +3669,26 @@ export function createCatalogService(
       return await queryProducts(db, productTypeSlug, undefined, viewer);
     },
     /**
+     * Lists reusable slider magnet presets by name.
+     *
+     * @returns Ordered reusable presets.
+     */
+    async listSliderMagnetPresets() {
+      return await logger.operation(
+        loggerMessages.database.catalog.listSliderMagnetPresets,
+        async () =>
+          await db
+            .select({
+              configuration: schema.sliderMagnetPreset.configuration,
+              id: schema.sliderMagnetPreset.id,
+              magnetLayout: schema.sliderMagnetPreset.magnetLayout,
+              name: schema.sliderMagnetPreset.name,
+            })
+            .from(schema.sliderMagnetPreset)
+            .orderBy(asc(schema.sliderMagnetPreset.name)),
+      );
+    },
+    /**
      * Lists product types.
      *
      * @returns Matching product types.
@@ -4051,6 +4156,62 @@ export function createCatalogService(
           targetId: context.collectionItemId,
         });
       });
+    },
+    /**
+     * Updates a reusable slider magnet preset.
+     *
+     * @param input - Authorized replacement preset fields.
+     * @returns Updated preset.
+     * @rejects When authorization, lookup, validation, persistence, auditing, or logging fails.
+     */
+    async updateSliderMagnetPreset(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Slider magnet preset does not exist.");
+      const values = sliderMagnetPresetValues(input);
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await logger.operation(
+        loggerMessages.database.catalog.updateSliderMagnetPreset,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [before] = await tx
+              .select({
+                configuration: schema.sliderMagnetPreset.configuration,
+                id: schema.sliderMagnetPreset.id,
+                magnetLayout: schema.sliderMagnetPreset.magnetLayout,
+                name: schema.sliderMagnetPreset.name,
+              })
+              .from(schema.sliderMagnetPreset)
+              .where(eq(schema.sliderMagnetPreset.id, input.presetId))
+              .limit(1);
+            if (!before)
+              throw new Error("Slider magnet preset does not exist.");
+            const [after] = await tx
+              .update(schema.sliderMagnetPreset)
+              .set({ ...values, updatedAt: new Date() })
+              .where(eq(schema.sliderMagnetPreset.id, input.presetId))
+              .returning({
+                configuration: schema.sliderMagnetPreset.configuration,
+                id: schema.sliderMagnetPreset.id,
+                magnetLayout: schema.sliderMagnetPreset.magnetLayout,
+                name: schema.sliderMagnetPreset.name,
+              });
+            if (!after) throw new Error("Slider magnet preset does not exist.");
+            if (dependencies && actorUser)
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after,
+                before,
+                definition: productAudit.sliderMagnetPresetUpdated,
+                targetId: after.id,
+              });
+            return after;
+          }),
+        actorAttributes(input.actor.clerkId, { presetId: input.presetId }),
+      );
     },
     /**
      * Updates editable material content while preserving its stable slug.
@@ -4680,11 +4841,28 @@ export function createCollectionsService(
             }
             await assertProductMaterial(tx, input.productId, input.materialId);
             const [product] = await tx
-              .select({ slug: schema.productType.slug })
+              .select({
+                bodyMagnetLayout: schema.productSlider.magnetLayout,
+                includedInsertMagnetLayout:
+                  schema.productSliderInsert.magnetLayout,
+                magnetConfiguration: schema.productSlider.magnetConfiguration,
+                slug: schema.productType.slug,
+              })
               .from(schema.product)
               .innerJoin(
                 schema.productType,
                 eq(schema.product.productTypeId, schema.productType.id),
+              )
+              .leftJoin(
+                schema.productSlider,
+                eq(schema.product.id, schema.productSlider.id),
+              )
+              .leftJoin(
+                schema.productSliderInsert,
+                eq(
+                  schema.productSlider.includedInsertProductId,
+                  schema.productSliderInsert.id,
+                ),
               )
               .where(eq(schema.product.id, input.productId))
               .limit(1);
@@ -4709,8 +4887,18 @@ export function createCollectionsService(
               .returning({ id: schema.collectionItem.id });
             if (!item) throw new Error("Failed to create collection item.");
             if (input.productTypeSlug === "slider") {
+              const magnetLayout =
+                product.includedInsertMagnetLayout ?? product.bodyMagnetLayout;
               await tx.insert(schema.collectionSlider).values({
                 id: item.id,
+                magnetConfiguration:
+                  magnetLayout &&
+                  sliderMagnetConfigurationIsValid(
+                    product.magnetConfiguration,
+                    magnetLayout,
+                  )
+                    ? product.magnetConfiguration
+                    : null,
                 productSliderId: input.productId,
               });
             } else if (input.productTypeSlug === "slider-plate") {
@@ -5851,6 +6039,7 @@ export function createCollectionsService(
             const [item] = await tx
               .select({
                 approvalStatus: schema.collectionItem.approvalStatus,
+                bodyMagnetLayout: schema.productSlider.magnetLayout,
                 buttonProductId:
                   schema.collectionSpinnerButton.productSpinnerButtonId,
                 collectionId: schema.collectionItem.collectionId,
@@ -5859,9 +6048,12 @@ export function createCollectionsService(
                 installedButtonId: schema.collectionSpinner.installedButtonId,
                 installedInsertId: schema.collectionSlider.installedInsertId,
                 installedPlateId: schema.collectionSlider.installedPlateId,
-                insertSetup: schema.collectionSliderInsert.setup,
+                includedInsertProductId:
+                  schema.productSlider.includedInsertProductId,
                 isPrivate: schema.collectionItem.isPrivate,
                 materialId: schema.collectionItem.materialId,
+                magnetConfiguration:
+                  schema.collectionSlider.magnetConfiguration,
                 usesInserts: schema.productSlider.usesInserts,
                 ownerId: schema.collectionItem.ownerId,
                 sliderProductId: schema.collectionSlider.productSliderId,
@@ -5929,7 +6121,7 @@ export function createCollectionsService(
               installedButtonId: item.installedButtonId,
               installedInsertId: item.installedInsertId,
               installedPlateId: item.installedPlateId,
-              insertSetup: item.insertSetup,
+              magnetConfiguration: item.magnetConfiguration,
               isPrivate: item.isPrivate,
               materialId: item.materialId,
             };
@@ -6116,9 +6308,11 @@ export function createCollectionsService(
                 throw error;
               }
             }
+            let normalizedMagnetConfiguration = item.magnetConfiguration;
             if (
               input.installedPlate !== undefined ||
-              input.installedInsert !== undefined
+              input.installedInsert !== undefined ||
+              input.magnetConfiguration !== undefined
             ) {
               if (item.sliderProductId === null) {
                 throw new Error("Collection item is not a slider.");
@@ -6178,10 +6372,42 @@ export function createCollectionsService(
                   })
                   .where(eq(schema.collectionItem.id, component.id));
               }
+              const currentLayout = await sliderMagnetLayoutForAssembly(tx, {
+                bodyMagnetLayout: item.bodyMagnetLayout,
+                includedInsertProductId: item.includedInsertProductId,
+                installedInsertId: item.installedInsertId,
+              });
+              const nextLayout = await sliderMagnetLayoutForAssembly(tx, {
+                bodyMagnetLayout: item.bodyMagnetLayout,
+                includedInsertProductId: item.includedInsertProductId,
+                installedInsertId,
+              });
+              normalizedMagnetConfiguration =
+                input.magnetConfiguration !== undefined
+                  ? input.magnetConfiguration
+                  : currentLayout === nextLayout
+                    ? item.magnetConfiguration
+                    : null;
+              if (
+                normalizedMagnetConfiguration &&
+                (!nextLayout ||
+                  !sliderMagnetConfigurationIsValid(
+                    normalizedMagnetConfiguration,
+                    nextLayout,
+                  ))
+              ) {
+                throw new Error(
+                  "Slider magnet configuration does not match its layout.",
+                );
+              }
               try {
                 await tx
                   .update(schema.collectionSlider)
-                  .set({ installedInsertId, installedPlateId })
+                  .set({
+                    installedInsertId,
+                    installedPlateId,
+                    magnetConfiguration: normalizedMagnetConfiguration,
+                  })
                   .where(
                     eq(schema.collectionSlider.id, input.collectionItemId),
                   );
@@ -6195,38 +6421,6 @@ export function createCollectionsService(
                 }
                 throw error;
               }
-            }
-            let normalizedInsertSetup = item.insertSetup;
-            if (input.insertSetup !== undefined) {
-              if (item.sliderInsertProductId === null) {
-                throw new Error("Collection item is not a slider insert.");
-              }
-              let setup: OwnedSliderInsertSetup | null = null;
-              if (input.insertSetup !== null) {
-                if (
-                  input.insertSetup.clickOptionId !== null ||
-                  input.insertSetup.sourceOfferId !== null
-                )
-                  throw new Error(
-                    "Catalog insert setup options no longer exist.",
-                  );
-                setup = {
-                  clickCount: null,
-                  configuration: input.insertSetup.configuration
-                    ? normalizeOwnedMagnetConfiguration(
-                        input.insertSetup.configuration,
-                      )
-                    : null,
-                  sourceOfferId: null,
-                };
-              }
-              normalizedInsertSetup = setup;
-              await tx
-                .update(schema.collectionSliderInsert)
-                .set({ setup })
-                .where(
-                  eq(schema.collectionSliderInsert.id, input.collectionItemId),
-                );
             }
             const membershipChanges = [
               input.installedButton === undefined
@@ -6338,10 +6532,7 @@ export function createCollectionsService(
                 input.installedPlate === undefined
                   ? item.installedPlateId
                   : (input.installedPlate?.collectionItemId ?? null),
-              insertSetup:
-                input.insertSetup === undefined
-                  ? item.insertSetup
-                  : normalizedInsertSetup,
+              magnetConfiguration: normalizedMagnetConfiguration,
               materialId: input.materialId,
             };
             await writeCollectionAudit(audit, tx, {
@@ -6373,10 +6564,10 @@ export function createCollectionsService(
           installedButtonId: input.installedButton?.collectionItemId,
           installedInsertId: input.installedInsert?.collectionItemId,
           installedPlateId: input.installedPlate?.collectionItemId,
-          insertSetupRecorded:
-            input.insertSetup === undefined
+          magnetConfigurationRecorded:
+            input.magnetConfiguration === undefined
               ? undefined
-              : input.insertSetup !== null,
+              : input.magnetConfiguration !== null,
           materialId: input.materialId,
         }),
       );
@@ -6681,6 +6872,7 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     makerId: product.makerId,
     makerProductUrl: product.makerProductUrl,
     makerProductUrlValid: product.makerProductUrlValid,
+    magnetConfiguration: product.magnetConfiguration ?? null,
     magnetLayout: product.magnetLayout,
     materialIds: product.materials.map(({ id }) => id),
     name: product.name,
@@ -6722,6 +6914,36 @@ export function normalizeCollectionName(name: string) {
     .replace(/\p{M}/gu, "")
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+/**
+ * Validates and normalizes one reusable slider magnet preset write.
+ *
+ * @param input - Candidate name, layout, and configuration.
+ * @returns Values safe to persist.
+ * @throws When the name or configuration is invalid for the layout.
+ */
+function sliderMagnetPresetValues(input: {
+  /** Candidate snapshot. */
+  configuration: SliderMagnetConfiguration;
+  /** Candidate layout. */
+  magnetLayout: SliderMagnetLayout;
+  /** Candidate display name. */
+  name: string;
+}) {
+  const name = input.name.normalize("NFKC").trim().replace(/\s+/g, " ");
+  if (!name || name.length > 100)
+    throw new Error("Slider magnet preset name is invalid.");
+  if (
+    !sliderMagnetConfigurationIsValid(input.configuration, input.magnetLayout)
+  )
+    throw new Error("Slider magnet configuration does not match its layout.");
+  return {
+    configuration: input.configuration,
+    magnetLayout: input.magnetLayout,
+    name,
+    normalizedName: normalizeCatalogSearch(name),
+  };
 }
 
 /**
@@ -7223,7 +7445,8 @@ async function queryProducts(
       makerProductUrl: schema.product.makerProductUrl,
       makerProductUrlValid: schema.product.makerProductUrlValid,
       makerUrl: schema.maker.rootUrl,
-      magnetLayout: schema.productSlider.magnetLayout,
+      magnetConfiguration: schema.productSlider.magnetConfiguration,
+      magnetLayout: sql<SliderMagnetLayout | null>`coalesce(${schema.productSlider.magnetLayout}, ${schema.productSliderInsert.magnetLayout})`,
       materialId: schema.material.id,
       materialName: schema.material.name,
       materialSlug: schema.material.slug,
@@ -7336,6 +7559,7 @@ async function queryProducts(
       makerProductUrlValid: row.makerProductUrlValid,
       makerUrl: row.makerUrl,
       magnetLayout: row.magnetLayout,
+      magnetConfiguration: row.magnetConfiguration,
       materials:
         row.materialId && row.materialName && row.materialSlug
           ? [
@@ -7374,6 +7598,11 @@ async function queryProducts(
     loadProductImages(db, result, viewer),
     loadProductRelationships(db, result, viewer),
   ]);
+  for (const product of result) {
+    product.clickCount = product.magnetLayout
+      ? sliderClickCount(product.magnetLayout)
+      : null;
+  }
   return result;
 }
 
@@ -7406,6 +7635,7 @@ async function loadProductRelationships(
     db
       .select({
         id: relatedProduct.id,
+        magnetLayout: schema.productSliderInsert.magnetLayout,
         name: relatedProduct.name,
         productId: schema.productSlider.id,
         productTypeSlug: relatedType.slug,
@@ -7417,6 +7647,10 @@ async function loadProductRelationships(
         eq(schema.productSlider.includedInsertProductId, relatedProduct.id),
       )
       .innerJoin(relatedType, eq(relatedProduct.productTypeId, relatedType.id))
+      .innerJoin(
+        schema.productSliderInsert,
+        eq(relatedProduct.id, schema.productSliderInsert.id),
+      )
       .where(
         and(inArray(schema.productSlider.id, productIds), relatedVisibility),
       )
@@ -7452,6 +7686,7 @@ async function loadProductRelationships(
       productTypeSlug: insert.productTypeSlug,
       slug: insert.slug,
     };
+    slider.magnetLayout = insert.magnetLayout;
   }
   for (const plate of plates) {
     if (plate.productTypeSlug !== "slider-plate") continue;
@@ -7859,11 +8094,6 @@ async function queryOwnedItems(
         from collection_slider_insert
         where id = ${schema.collectionSlider.installedInsertId}
       )`,
-      installedInsertSetup: sql<OwnedSliderInsertSetup | null>`(
-        select setup
-        from collection_slider_insert
-        where id = ${schema.collectionSlider.installedInsertId}
-      )`,
       isPrivate: effectiveItemIsPrivate,
       privacyInheritedFromItemId,
       savedIsPrivate: schema.collectionItem.isPrivate,
@@ -7891,7 +8121,7 @@ async function queryOwnedItems(
       buttonId: schema.collectionSpinnerButton.id,
       sliderId: schema.collectionSlider.id,
       sliderInsertId: schema.collectionSliderInsert.id,
-      ownedInsertSetup: schema.collectionSliderInsert.setup,
+      magnetConfiguration: schema.collectionSlider.magnetConfiguration,
       sliderPlateId: schema.collectionSliderPlate.id,
       productTypeSlug: schema.productType.slug,
       updatedAt: schema.collectionItem.updatedAt,
@@ -8043,7 +8273,7 @@ async function queryOwnedItems(
       installedPlateId: installedPlateUnavailable ? null : row.installedPlateId,
       installedPlateUnavailable,
       privacyInheritedFromItemId: row.privacyInheritedFromItemId,
-      ownedInsertSetup: row.ownedInsertSetup,
+      magnetConfiguration: row.magnetConfiguration,
       isOwner: options.viewerClerkId === row.ownerClerkId,
       makerId: row.makerId,
       makerName: row.makerName,
@@ -8103,10 +8333,18 @@ async function queryOwnedItems(
       item.includedInsert = product?.includedInsert ?? null;
       item.includedPlate = product?.includedPlate ?? null;
       if (item.productTypeSlug !== "slider") continue;
+      const installedInsert = row?.installedInsertProductId
+        ? productsById.get(row.installedInsertProductId)
+        : null;
       item.effectiveSliderSetup = resolveEffectiveSliderSetup({
-        bodyMagnetLayout: product?.magnetLayout ?? null,
-        installedInsertProductId: row?.installedInsertProductId ?? null,
-        ownedInsertSetup: row?.installedInsertSetup ?? null,
+        bodyMagnetLayout: product?.includedInsert
+          ? null
+          : (product?.magnetLayout ?? null),
+        includedInsertMagnetLayout: product?.includedInsert
+          ? (product.magnetLayout ?? null)
+          : null,
+        installedInsertMagnetLayout: installedInsert?.magnetLayout ?? null,
+        magnetConfiguration: item.magnetConfiguration,
       });
     }
   }
@@ -9326,6 +9564,45 @@ async function validateSliderComponentInstallation(
 }
 
 /**
+ * Resolves the physical magnet layout for an owned slider assembly.
+ *
+ * @param tx - Caller-owned database transaction.
+ * @param input - Slider body, supplied insert, and current installed insert.
+ * @returns The installed, supplied, or body-hosted layout in precedence order.
+ */
+async function sliderMagnetLayoutForAssembly(
+  tx: CatalogTransaction,
+  input: {
+    /** Body-hosted layout, when present. */
+    bodyMagnetLayout: SliderMagnetLayout | null;
+    /** Exact catalog-supplied insert product, when present. */
+    includedInsertProductId: number | null;
+    /** Current owned insert collection item, when present. */
+    installedInsertId: number | null;
+  },
+) {
+  const productId = input.installedInsertId
+    ? (
+        await tx
+          .select({
+            productId: schema.collectionSliderInsert.productSliderInsertId,
+          })
+          .from(schema.collectionSliderInsert)
+          .where(eq(schema.collectionSliderInsert.id, input.installedInsertId))
+          .limit(1)
+      )[0]?.productId
+    : input.includedInsertProductId;
+  if (!productId) return input.bodyMagnetLayout;
+  return (
+    await tx
+      .select({ magnetLayout: schema.productSliderInsert.magnetLayout })
+      .from(schema.productSliderInsert)
+      .where(eq(schema.productSliderInsert.id, productId))
+      .limit(1)
+  )[0]?.magnetLayout;
+}
+
+/**
  * Marks a catalog product as meaningfully updated inside its caller transaction.
  *
  * @param tx - Caller-owned catalog transaction.
@@ -9340,166 +9617,6 @@ async function touchProductUpdatedAt(
     .update(schema.product)
     .set({ updatedAt: new Date() })
     .where(eq(schema.product.id, productId));
-}
-
-/**
- * Validates an owner-recorded layout while preserving explicit unknown positions.
- *
- * @param configuration - Candidate owner snapshot.
- * @returns Normalized durable owner snapshot.
- * @throws When keys, dimensions, groups, or slot states are inconsistent.
- */
-function normalizeOwnedMagnetConfiguration(
-  configuration: OwnedMagnetConfiguration,
-): OwnedMagnetConfiguration {
-  const label = normalizeRequiredVocabulary(configuration.label);
-  const sourceLabel = normalizeBoundedText(configuration.sourceLabel, 200);
-  const sourceNotes = normalizeBoundedText(configuration.sourceNotes, 5000);
-  if (!configuration.slots.length)
-    throw new Error("An owned magnet configuration requires positions.");
-
-  const groupKeys = new Set<string>();
-  const referencedGroupKeys = new Set<string>();
-  const groups = configuration.groups.map((candidate) => {
-    const key = normalizeStableKey(candidate.key);
-    if (groupKeys.has(key))
-      throw new Error("Magnet group keys must be unique.");
-    groupKeys.add(key);
-    return {
-      diameterMm: normalizePositiveDecimal(candidate.diameterMm),
-      grade: normalizeMagnetGrade(candidate.grade),
-      key,
-      label: normalizeRequiredVocabulary(candidate.label),
-      thicknessMm: normalizePositiveDecimal(candidate.thicknessMm),
-    };
-  });
-  const slotKeys = new Set<string>();
-  const slots = configuration.slots.map((candidate) => {
-    const key = normalizeStableKey(candidate.key);
-    if (slotKeys.has(key)) throw new Error("Magnet slot keys must be unique.");
-    slotKeys.add(key);
-    if (candidate.half !== "half-a" && candidate.half !== "half-b")
-      throw new Error("A magnet slot requires Half A or Half B.");
-    if (
-      candidate.state !== "occupied" &&
-      candidate.state !== "empty" &&
-      candidate.state !== "unknown"
-    ) {
-      throw new Error("Owned magnet slot state is invalid.");
-    }
-    const groupKey = candidate.groupKey
-      ? normalizeStableKey(candidate.groupKey)
-      : null;
-    if (candidate.state === "occupied" && !groupKey)
-      throw new Error("An occupied magnet slot requires a group.");
-    if (candidate.state !== "occupied" && groupKey)
-      throw new Error("Only an occupied magnet slot may belong to a group.");
-    if (groupKey && !groupKeys.has(groupKey))
-      throw new Error("Magnet group does not belong to this configuration.");
-    if (groupKey) referencedGroupKeys.add(groupKey);
-    return {
-      documentedColumn: normalizeDocumentedPosition(candidate.documentedColumn),
-      documentedRow: normalizeDocumentedPosition(candidate.documentedRow),
-      groupKey,
-      half: candidate.half,
-      key,
-      state: candidate.state,
-    };
-  });
-  if (groups.some(({ key }) => !referencedGroupKeys.has(key)))
-    throw new Error("Every magnet group must contain an occupied slot.");
-  return { groups, label, slots, sourceLabel, sourceNotes };
-}
-
-/**
- * Returns a trimmed optional string while enforcing its storage bound.
- *
- * @param value - Candidate optional text.
- * @param maximum - Maximum stored character count.
- * @returns Trimmed text or `null`.
- * @throws When nonblank text exceeds the storage bound.
- */
-function normalizeBoundedText(value: string | null, maximum: number) {
-  const normalized = value?.trim() || null;
-  if (normalized && normalized.length > maximum)
-    throw new Error("Magnet setup text is too long.");
-  return normalized;
-}
-
-/**
- * Returns one nonblank stable source key.
- *
- * @param value - Candidate key.
- * @returns Trimmed stable key.
- * @throws When the key is blank or too long.
- */
-function normalizeStableKey(value: string) {
-  const normalized = value.trim();
-  if (!normalized || normalized.length > 100)
-    throw new Error("Magnet setup key is invalid.");
-  return normalized;
-}
-
-/**
- * Returns one normalized global vocabulary name.
- *
- * @param value - Candidate vocabulary label.
- * @returns Unicode-normalized, whitespace-collapsed label.
- * @throws When the label is blank or too long.
- */
-function normalizeRequiredVocabulary(value: string) {
-  const normalized = value.normalize("NFKC").trim().replace(/\s+/g, " ");
-  if (!normalized || normalized.length > 100)
-    throw new Error("Magnet vocabulary label is invalid.");
-  return normalized;
-}
-
-/**
- * Returns a positive arbitrary-precision decimal string.
- *
- * @param value - Candidate metric dimension.
- * @returns Validated decimal text without reducing precision.
- * @throws When the dimension is not a positive plain decimal.
- */
-function normalizePositiveDecimal(value: string) {
-  const normalized = value.trim();
-  if (
-    normalized.length > 50 ||
-    !/^\d+(?:\.\d+)?$/.test(normalized) ||
-    !Number.isFinite(Number(normalized)) ||
-    Number(normalized) <= 0
-  ) {
-    throw new Error("Magnet dimensions must be positive decimals.");
-  }
-  return normalized;
-}
-
-/**
- * Returns normalized conservative magnet grade text.
- *
- * @param value - Candidate magnet grade.
- * @returns Trimmed uppercase grade.
- * @throws When the grade contains unsupported characters or length.
- */
-function normalizeMagnetGrade(value: string) {
-  const normalized = value.trim().toUpperCase();
-  if (!/^[A-Z0-9][A-Z0-9+_-]{0,19}$/.test(normalized))
-    throw new Error("Magnet grade is invalid.");
-  return normalized;
-}
-
-/**
- * Returns a positive source-documented row or column.
- *
- * @param value - Candidate documented position.
- * @returns Positive integer or `null` when undocumented.
- * @throws When a documented position is not a positive safe integer.
- */
-function normalizeDocumentedPosition(value: number | null) {
-  if (value === null) return null;
-  if (!Number.isSafeInteger(value) || value <= 0)
-    throw new Error("Documented magnet positions must be positive integers.");
-  return value;
 }
 
 /**
@@ -9540,9 +9657,11 @@ async function insertProductSubtype(
       await tx.insert(schema.productSliderPlate).values({ id: productId });
       return;
     case "slider-insert":
-      assertNoSliderOnlySpecs(input);
+      assertNoSliderInsertBodySpecs(input);
       assertNoSliderComponentMeasurements(specs);
-      await tx.insert(schema.productSliderInsert).values({ id: productId });
+      await tx
+        .insert(schema.productSliderInsert)
+        .values({ id: productId, magnetLayout: input.magnetLayout ?? "2x4" });
   }
 }
 
@@ -9591,11 +9710,11 @@ async function updateProductSubtype(
         .where(eq(schema.productSliderPlate.id, productId));
       return;
     case "slider-insert":
-      assertNoSliderOnlySpecs(input);
+      assertNoSliderInsertBodySpecs(input);
       assertNoSliderComponentMeasurements(specs);
       await tx
         .update(schema.productSliderInsert)
-        .set({ updatedAt })
+        .set({ magnetLayout: input.magnetLayout ?? "2x4", updatedAt })
         .where(eq(schema.productSliderInsert.id, productId));
   }
 }
@@ -9646,6 +9765,7 @@ async function assertProductRelationships(
       .select({
         approvalStatus: schema.product.approvalStatus,
         isPrivate: schema.product.isPrivate,
+        magnetLayout: schema.productSliderInsert.magnetLayout,
         ownerClerkId: schema.product.ownerClerkId,
         type: schema.productType.slug,
       })
@@ -9653,6 +9773,10 @@ async function assertProductRelationships(
       .innerJoin(
         schema.productType,
         eq(schema.product.productTypeId, schema.productType.id),
+      )
+      .leftJoin(
+        schema.productSliderInsert,
+        eq(schema.product.id, schema.productSliderInsert.id),
       )
       .where(eq(schema.product.id, relationship.id))
       .limit(1);
@@ -9666,6 +9790,17 @@ async function assertProductRelationships(
       throw new Error(
         `Included ${relationship.label} must be a ${relationship.type.replace("-", " ")}.`,
       );
+    }
+    if (
+      relationship.type === "slider-insert" &&
+      input.magnetConfiguration &&
+      component.magnetLayout &&
+      !sliderMagnetConfigurationIsValid(
+        input.magnetConfiguration,
+        component.magnetLayout,
+      )
+    ) {
+      throw new Error("Slider magnet configuration does not match its layout.");
     }
   }
 }
@@ -9995,9 +10130,27 @@ function assertNoSliderOnlySpecs(input: ProductWriteInput) {
   if (
     input.specs.usesInserts != null ||
     input.specs.weightBasis != null ||
-    input.magnetLayout != null
+    input.magnetLayout != null ||
+    input.magnetConfiguration != null
   )
     throw new Error("Slider-only specifications are not allowed.");
+}
+
+/**
+ * Rejects slider-body-only facts while requiring an insert layout.
+ *
+ * @param input - Candidate slider insert write.
+ * @throws When body facts are present or the insert layout is absent.
+ */
+function assertNoSliderInsertBodySpecs(input: ProductWriteInput) {
+  if (
+    input.specs.usesInserts != null ||
+    input.specs.weightBasis != null ||
+    input.magnetConfiguration != null
+  )
+    throw new Error("Slider-body specifications are not allowed on inserts.");
+  if (!input.magnetLayout)
+    throw new Error("A slider insert magnet layout is required.");
 }
 
 /**
@@ -10056,6 +10209,13 @@ function sliderSpecs(input: ProductWriteInput) {
   if (includedInsertProductId !== null && magnetLayout !== null) {
     throw new Error("An exact included insert owns the magnet layout.");
   }
+  if (
+    input.magnetConfiguration &&
+    magnetLayout &&
+    !sliderMagnetConfigurationIsValid(input.magnetConfiguration, magnetLayout)
+  ) {
+    throw new Error("Slider magnet configuration does not match its layout.");
+  }
   const weightG = specs.weightG ?? null;
   const weightBasis = specs.weightBasis ?? null;
   if ((weightG === null) !== (weightBasis === null))
@@ -10067,6 +10227,7 @@ function sliderSpecs(input: ProductWriteInput) {
     includedPlateProductId,
     lengthMm: specs.lengthMm ?? null,
     magnetLayout,
+    magnetConfiguration: input.magnetConfiguration ?? null,
     thicknessMm: specs.thicknessMm ?? null,
     weightBasis,
     weightG,

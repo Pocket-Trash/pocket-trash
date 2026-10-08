@@ -6,8 +6,8 @@ import type {
   CatalogProductType,
   CatalogTerminologyAlias,
   EffectiveSliderSetup,
-  OwnedSliderInsertSetup,
   PublicCollectionOwner,
+  SliderMagnetConfiguration,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
@@ -600,6 +600,14 @@ export function ProductDetailPage({
           {product.magnetLayout ? (
             <Detail label={t("web.slider.layout.label")}>
               <SliderMagnetLayoutValue layout={product.magnetLayout} t={t} />
+            </Detail>
+          ) : null}
+          {product.magnetConfiguration ? (
+            <Detail label={t("web.slider.magnet.configuration")}>
+              <MagnetConfigurationValue
+                configuration={product.magnetConfiguration}
+                t={t}
+              />
             </Detail>
           ) : null}
           {product.productTypeSlug === "slider" ? (
@@ -1585,24 +1593,18 @@ export function CollectionItemDetailPage({
   const productImages = item.productImages.filter(
     ({ deletedAt }) => !deletedAt,
   );
-  const displayedSliderSetup:
-    | EffectiveSliderSetup
-    | OwnedSliderInsertSetup
-    | null =
+  const displayedSliderSetup: EffectiveSliderSetup | null =
     item.productTypeSlug === "slider"
       ? (item.effectiveSliderSetup ??
         (product?.magnetLayout
           ? {
               clickCount: product.clickCount,
-              configuration: null,
-              isLiveCatalog: true,
+              configuration: product.magnetConfiguration ?? null,
               magnetLayout: product.magnetLayout,
               source: "body-hosted" as const,
             }
           : null))
-      : item.productTypeSlug === "slider-insert"
-        ? item.ownedInsertSetup
-        : null;
+      : null;
   return (
     <AppShell
       breadcrumbItems={[
@@ -1802,19 +1804,8 @@ export function CollectionItemDetailPage({
             </Detail>
           ) : null}
           {displayedSliderSetup ? (
-            <Detail
-              label={t(
-                "magnetLayout" in displayedSliderSetup &&
-                  displayedSliderSetup.magnetLayout
-                  ? "web.slider.layout.label"
-                  : "web.slider.setup.title",
-              )}
-            >
-              <MagnetSetupDetails
-                missingConfigurationLabel={t("web.slider.setup.notRecorded")}
-                setup={displayedSliderSetup}
-                t={t}
-              />
+            <Detail label={t("web.slider.setup.title")}>
+              <MagnetSetupDetails setup={displayedSliderSetup} t={t} />
             </Detail>
           ) : null}
           {product?.widthMm ? (
@@ -2090,82 +2081,67 @@ function Detail({
  * @returns Read-only exact setup details without install or custom controls.
  */
 function MagnetSetupDetails({
-  missingConfigurationLabel,
   setup,
   t,
 }: {
-  /** Optional copy used when an owner snapshot omitted its layout. */
-  missingConfigurationLabel?: string;
-  /** Effective or owner-recorded setup. */
-  setup: EffectiveSliderSetup | OwnedSliderInsertSetup;
+  /** Effective slider setup. */
+  setup: EffectiveSliderSetup;
   /** Localized catalog message formatter. */
   t: ReturnType<typeof useCatalogCopy>;
 }) {
-  const magnetLayout = "magnetLayout" in setup ? setup.magnetLayout : null;
-  if (magnetLayout)
-    return <SliderMagnetLayoutValue layout={magnetLayout} t={t} />;
-  const configuration = setup.configuration;
   return (
     <div className="grid gap-3 rounded-md border border-border p-3">
-      <p className="m-0 text-sm">
-        <span className="font-medium">{t("web.slider.setup.clickCount")}:</span>{" "}
-        {setup.clickCount === null
-          ? t("web.slider.setup.notRecorded")
-          : t("web.slider.setup.clicks", { count: setup.clickCount })}
-      </p>
-      {configuration ? (
-        <div className="grid gap-3">
-          <p className="m-0 text-sm font-medium">
-            {t("web.slider.magnet.configuration")}: {configuration.label}
-            {configuration.sourceLabel ? ` — ${configuration.sourceLabel}` : ""}
-          </p>
-          {configuration.sourceNotes ? (
-            <p className="m-0 whitespace-pre-wrap text-sm text-muted-foreground">
-              {configuration.sourceNotes}
-            </p>
-          ) : null}
-          <ul className="m-0 grid list-none gap-2 p-0">
-            {configuration.groups.map((group) => (
-              <li
-                className="rounded border border-border p-2 text-sm"
-                key={group.key}
-              >
-                <span className="font-medium">{group.label}</span>:{" "}
-                {group.diameterMm}×{group.thicknessMm} mm, {group.grade}
-              </li>
-            ))}
-          </ul>
-          <ul className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2">
-            {configuration.slots.map((slot) => (
-              <li
-                className="rounded border border-border p-2 text-sm"
-                key={`${slot.half}-${slot.key}`}
-              >
-                <span className="font-medium">
-                  {t(
-                    slot.half === "half-a"
-                      ? "web.slider.magnet.halfA"
-                      : "web.slider.magnet.halfB",
-                  )}{" "}
-                  {slot.key}
-                </span>
-                : {t(`web.slider.magnet.state.${slot.state}`)}
-                {slot.groupKey ? ` — ${slot.groupKey}` : ""}
-                {slot.documentedRow !== null
-                  ? ` · ${t("web.slider.magnet.row")} ${slot.documentedRow}`
-                  : ""}
-                {slot.documentedColumn !== null
-                  ? ` · ${t("web.slider.magnet.column")} ${slot.documentedColumn}`
-                  : ""}
-              </li>
-            ))}
-          </ul>
-        </div>
+      {setup.magnetLayout ? (
+        <SliderMagnetLayoutValue layout={setup.magnetLayout} t={t} />
+      ) : null}
+      {setup.configuration ? (
+        <MagnetConfigurationValue configuration={setup.configuration} t={t} />
       ) : (
         <p className="m-0 text-sm text-muted-foreground">
-          {missingConfigurationLabel ?? t("web.slider.setup.notRecorded")}
+          {t("web.slider.setup.notRecorded")}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Renders a compact row-major magnet snapshot.
+ *
+ * @param root0 - Snapshot and translation formatter.
+ * @returns Read-only magnet grades grouped by side.
+ */
+function MagnetConfigurationValue({
+  configuration,
+  t,
+}: {
+  /** Snapshot to render. */
+  configuration: SliderMagnetConfiguration;
+  /** Localized catalog message formatter. */
+  t: ReturnType<typeof useCatalogCopy>;
+}) {
+  /**
+   * Formats one side as ordered grades.
+   *
+   * @param values - Row-major grade values.
+   * @returns Compact human-readable grades.
+   */
+  const side = (values: SliderMagnetConfiguration["sideA"]) =>
+    values
+      .map((grade) => grade ?? t("web.slider.magnet.state.empty"))
+      .join(" · ");
+  return (
+    <div className="grid gap-1 text-sm">
+      <p className="m-0">
+        <span className="font-medium">{t("web.slider.magnet.halfA")}:</span>{" "}
+        {side(configuration.sideA)}
+      </p>
+      {configuration.sideB ? (
+        <p className="m-0">
+          <span className="font-medium">{t("web.slider.magnet.halfB")}:</span>{" "}
+          {side(configuration.sideB)}
+        </p>
+      ) : null}
     </div>
   );
 }

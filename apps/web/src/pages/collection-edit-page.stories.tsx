@@ -82,7 +82,6 @@ const plate = product(2001, "Assembly plate", "slider-plate");
 /** Insert catalog product used by the edit page. */
 const insert = product(2002, "Assembly insert", "slider-insert");
 /** Insert catalog product used by the setup editor story. */
-const setupInsert = insert;
 
 /**
  * Creates one owned assembly item.
@@ -134,7 +133,6 @@ function item(
     ownerClerkId: "user_storybook",
     ownerUserId: 1000,
     ownerUsername: "collector",
-    ownedInsertSetup: null,
     productId: catalogProduct.id,
     productImages: [],
     productSlug: catalogProduct.slug,
@@ -253,34 +251,5 @@ export const InstalledSliderAssembly: Story = {
     ).not.toBeInTheDocument();
     await userEvent.click(page.getByRole("option", { name: "Spare plate" }));
     await expect(plateSelector).toHaveValue("Spare plate");
-  },
-};
-
-/** Owned insert setup editor with default and custom paths. */
-export const OwnedInsertSetup: Story = {
-  args: {
-    item: item(4010, setupInsert, "Setup insert"),
-    ownedSliderComponents: [],
-    product: setupInsert,
-  },
-  /**
-   * Verifies custom setup initialization.
-   *
-   * @param context - Story interaction context.
-   * @param context.canvas - Rendered story queries.
-   * @param context.userEvent - Browser interaction driver.
-   * @returns A promise resolving after the setup assertions pass.
-   */
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(
-      canvas.getByRole("button", {
-        name: /build from scratch|web\.slider\.setup\.fromScratch/iu,
-      }),
-    );
-    const label = canvas.getByRole("textbox", {
-      name: /configuration label|web\.slider\.magnet\.vocabularyLabel/iu,
-    });
-    await userEvent.type(label, "Owner layout");
-    await expect(label).toHaveValue("Owner layout");
   },
 };
