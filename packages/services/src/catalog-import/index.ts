@@ -208,6 +208,7 @@ const manifestSchema = z
         for (const retiredField of [
           "inherentClickCount",
           "magnetSetupSourceNote",
+          "weightBasis",
         ]) {
           if (retiredField in record.payload) {
             context.addIssue({

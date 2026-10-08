@@ -242,8 +242,6 @@ export {
   sliderMagnetLayouts,
 };
 
-/** Meaning of a slider body's recorded weight. */
-export type SliderWeightBasis = "body-only" | "complete-build";
 /** Durable review state for a catalog product or collection item. */
 export type CatalogApprovalStatus = "approved" | "pending" | "rejected";
 /** Administrative transition accepted by a catalog approval workflow. */
@@ -732,8 +730,6 @@ export type CatalogProduct = {
    * Weight in grams.
    */
   weightG: string | null;
-  /** Meaning of a slider's weight, or `null` when no slider weight is recorded. */
-  weightBasis: SliderWeightBasis | null;
   /**
    * Width in millimetres.
    */
@@ -834,8 +830,6 @@ export type ProductWriteInput = {
      * Weight in grams.
      */
     weightG?: string | null;
-    /** Meaning of a slider body's recorded weight. */
-    weightBasis?: SliderWeightBasis | null;
     /**
      * Width in millimetres.
      */
@@ -6883,7 +6877,6 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     thicknessMm: product.thicknessMm,
     thicknessWithButtonMm: product.thicknessWithButtonMm,
     weightG: product.weightG,
-    weightBasis: product.weightBasis,
     widthMm: product.widthMm,
     usesInserts: product.usesInserts,
   };
@@ -7466,7 +7459,6 @@ async function queryProducts(
       weightG: sql<
         string | null
       >`coalesce(${schema.productSpinner.weightG}, ${schema.productSpinnerButton.weightG}, ${schema.productSlider.weightG})`,
-      weightBasis: schema.productSlider.weightBasis,
       widthMm: sql<
         string | null
       >`coalesce(${schema.productSpinner.widthMm}, ${schema.productSlider.widthMm})`,
@@ -7587,7 +7579,6 @@ async function queryProducts(
       thicknessWithButtonMm: row.thicknessWithButtonMm,
       updatedAt: row.updatedAt,
       weightG: row.weightG,
-      weightBasis: row.weightBasis,
       widthMm: row.widthMm,
       usesInserts: row.usesInserts,
     });
@@ -10124,12 +10115,11 @@ export function assertValidFinishOptions(
  * Rejects slider-only facts on all other catalog product types.
  *
  * @param input - Candidate product write.
- * @throws When magnet capability or slider weight basis is present.
+ * @throws When magnet capability is present.
  */
 function assertNoSliderOnlySpecs(input: ProductWriteInput) {
   if (
     input.specs.usesInserts != null ||
-    input.specs.weightBasis != null ||
     input.magnetLayout != null ||
     input.magnetConfiguration != null
   )
@@ -10143,11 +10133,7 @@ function assertNoSliderOnlySpecs(input: ProductWriteInput) {
  * @throws When body facts are present or the insert layout is absent.
  */
 function assertNoSliderInsertBodySpecs(input: ProductWriteInput) {
-  if (
-    input.specs.usesInserts != null ||
-    input.specs.weightBasis != null ||
-    input.magnetConfiguration != null
-  )
+  if (input.specs.usesInserts != null || input.magnetConfiguration != null)
     throw new Error("Slider-body specifications are not allowed on inserts.");
   if (!input.magnetLayout)
     throw new Error("A slider insert magnet layout is required.");
@@ -10189,11 +10175,11 @@ function assertNoSliderComponentMeasurements(
 }
 
 /**
- * Selects slider body facts and enforces explicit insert and weight semantics.
+ * Selects slider body facts and enforces explicit insert semantics.
  *
  * @param input - Slider product write.
  * @returns Slider subtype columns.
- * @throws When insert use is absent or weight and its basis are incomplete.
+ * @throws When insert use is absent or the magnet configuration is invalid.
  */
 function sliderSpecs(input: ProductWriteInput) {
   const { specs } = input;
@@ -10216,12 +10202,6 @@ function sliderSpecs(input: ProductWriteInput) {
   ) {
     throw new Error("Slider magnet configuration does not match its layout.");
   }
-  const weightG = specs.weightG ?? null;
-  const weightBasis = specs.weightBasis ?? null;
-  if ((weightG === null) !== (weightBasis === null))
-    throw new Error(
-      "Slider weight and weight basis must be recorded together.",
-    );
   return {
     includedInsertProductId,
     includedPlateProductId,
@@ -10229,8 +10209,7 @@ function sliderSpecs(input: ProductWriteInput) {
     magnetLayout,
     magnetConfiguration: input.magnetConfiguration ?? null,
     thicknessMm: specs.thicknessMm ?? null,
-    weightBasis,
-    weightG,
+    weightG: specs.weightG ?? null,
     widthMm: specs.widthMm ?? null,
     usesInserts: specs.usesInserts,
   };

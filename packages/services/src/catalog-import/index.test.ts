@@ -251,7 +251,11 @@ describe("catalog import manifest", () => {
     ).toThrow(/approved and public/i);
   });
 
-  it("rejects retired slider click and source-note fields", () => {
+  it.each([
+    "inherentClickCount",
+    "magnetSetupSourceNote",
+    "weightBasis",
+  ])("rejects retired slider field %s", (retiredField) => {
     expect(() =>
       parseCatalogImportManifest({
         ...manifest,
@@ -259,7 +263,7 @@ describe("catalog import manifest", () => {
           record.entity === "product-slider"
             ? {
                 ...record,
-                payload: { ...record.payload, inherentClickCount: 4 },
+                payload: { ...record.payload, [retiredField]: "legacy" },
               }
             : record,
         ),

@@ -826,9 +826,6 @@ export const productSlider = pgTable(
       "magnet_configuration",
     ).$type<SliderMagnetConfigurationValue>(),
     weightG: decimal("weight_g"),
-    weightBasis: text("weight_basis", {
-      enum: ["body-only", "complete-build"],
-    }),
     lengthMm: decimal("length_mm"),
     widthMm: decimal("width_mm"),
     thicknessMm: decimal("thickness_mm"),
@@ -851,14 +848,6 @@ export const productSlider = pgTable(
     check(
       "product_slider_magnet_layout_valid",
       sql`${table.magnetLayout} is null or ${table.magnetLayout} in ('2x2', '2x3', '2x4')`,
-    ),
-    check(
-      "product_slider_weight_basis_consistent",
-      sql`num_nonnulls(${table.weightG}, ${table.weightBasis}) in (0, 2)`,
-    ),
-    check(
-      "product_slider_weight_basis_valid",
-      sql`${table.weightBasis} is null or ${table.weightBasis} in ('body-only', 'complete-build')`,
     ),
     check(
       "product_slider_measurements_positive",

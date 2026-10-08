@@ -468,7 +468,6 @@ describe("catalog product persistence", () => {
           lengthMm: "52",
           thicknessMm: "12",
           usesInserts: true,
-          weightBasis: "complete-build",
           weightG: "96",
           widthMm: "24",
         },
@@ -479,7 +478,6 @@ describe("catalog product persistence", () => {
           clickCount: 3,
           magnetLayout: "2x4",
           usesInserts: true,
-          weightBasis: "complete-build",
           weightG: "96",
         }),
       );
@@ -499,7 +497,6 @@ describe("catalog product persistence", () => {
         expect.objectContaining({
           lengthMm: null,
           usesInserts: null,
-          weightBasis: null,
           weightG: null,
         }),
       );
