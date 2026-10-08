@@ -160,9 +160,11 @@ export async function createMutationFixture({
     );
     if (!spinner || !button) throw new Error("Failed to seed E2E products.");
 
-    await transaction.insert(schema.productSpinner).values({ id: spinner.id });
     await transaction
-      .insert(schema.productSpinnerButton)
+      .insert(schema.productDetailSpinner)
+      .values({ id: spinner.id });
+    await transaction
+      .insert(schema.productDetailSpinnerButton)
       .values({ id: button.id });
     await transaction.insert(schema.productMaterial).values([
       { materialId: material.id, productId: spinner.id },

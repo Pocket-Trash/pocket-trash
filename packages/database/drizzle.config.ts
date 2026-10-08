@@ -8,7 +8,7 @@ const env = createDatabaseEnv({
 
 export default defineConfig({
   dialect: "postgresql",
-  out: process.env.MIGRATION_REPAIR_FOLDER ?? "./drizzle",
+  out: "./drizzle",
   schema: "./src/schema/index.ts",
   ...(env.DATABASE_URL
     ? {

@@ -314,7 +314,7 @@ async function createCollectionLifecycleFixture(
     if (items.length !== collectionScenarios.length) {
       throw new Error("Failed to seed collection lifecycle items.");
     }
-    await transaction.insert(schema.collectionSpinner).values(
+    await transaction.insert(schema.collectionDetailSpinner).values(
       items.map(({ id }) => ({
         id,
         productSpinnerId: productId,

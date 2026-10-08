@@ -145,7 +145,7 @@ async function createMakerPaginationFixture() {
       )
       .returning({ id: schema.product.id });
     await transaction
-      .insert(schema.productSpinner)
+      .insert(schema.productDetailSpinner)
       .values(products.map(({ id }) => ({ id })));
     return maker;
   });

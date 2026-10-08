@@ -103,9 +103,9 @@ describe("catalog schema", () => {
     expect(productType.columns.map(({ name }) => name)).toEqual(
       expect.arrayContaining(["image_url", "image_alt"]),
     );
-    const spinnerColumns = getTableConfig(schema.productSpinner).columns.map(
-      ({ name }) => name,
-    );
+    const spinnerColumns = getTableConfig(
+      schema.productDetailSpinner,
+    ).columns.map(({ name }) => name);
     expect(spinnerColumns).toEqual(
       expect.arrayContaining([
         "bearing",
@@ -140,15 +140,19 @@ describe("catalog schema", () => {
       ]),
     );
     expect(
-      getTableConfig(schema.collectionSpinner).columns.map(({ name }) => name),
+      getTableConfig(schema.collectionDetailSpinner).columns.map(
+        ({ name }) => name,
+      ),
     ).toEqual(expect.arrayContaining(["bearing"]));
   });
 
   it("models slider subtypes and exact inclusion without compatibility metadata", () => {
-    const slider = getTableConfig(schema.productSlider);
-    const plate = getTableConfig(schema.productSliderPlate);
-    const insert = getTableConfig(schema.productSliderInsert);
-    const collectionSlider = getTableConfig(schema.collectionSlider);
+    const slider = getTableConfig(schema.productDetailSlider);
+    const plate = getTableConfig(schema.productDetailSliderPlate);
+    const insert = getTableConfig(schema.productDetailSliderInsert);
+    const collectionDetailSlider = getTableConfig(
+      schema.collectionDetailSlider,
+    );
     const preset = getTableConfig(schema.sliderMagnetPreset);
 
     expect(slider.columns.map(({ name }) => name)).toEqual(
@@ -174,14 +178,14 @@ describe("catalog schema", () => {
     );
     expect(slider.checks.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
-        "product_slider_insert_choice_consistent",
-        "product_slider_magnet_layout_consistent",
-        "product_slider_magnet_layout_valid",
-        "product_slider_included_insert_distinct",
-        "product_slider_length_consistent",
-        "product_slider_thickness_consistent",
-        "product_slider_weight_consistent",
-        "product_slider_width_consistent",
+        "product_detail_slider_insert_choice_consistent",
+        "product_detail_slider_magnet_layout_consistent",
+        "product_detail_slider_magnet_layout_valid",
+        "product_detail_slider_included_insert_distinct",
+        "product_detail_slider_length_consistent",
+        "product_detail_slider_thickness_consistent",
+        "product_detail_slider_weight_consistent",
+        "product_detail_slider_width_consistent",
       ]),
     );
     expect(slider.checks.map(({ name }) => name)).not.toContain(
@@ -198,7 +202,7 @@ describe("catalog schema", () => {
       "created_at",
       "updated_at",
     ]);
-    expect(collectionSlider.columns.map(({ name }) => name)).toContain(
+    expect(collectionDetailSlider.columns.map(({ name }) => name)).toContain(
       "magnet_configuration",
     );
     expect(preset.columns.map(({ name }) => name)).toEqual([
@@ -217,18 +221,18 @@ describe("catalog schema", () => {
 
   it("models standalone slider items and unique installed assemblies", () => {
     for (const table of [
-      schema.collectionSliderPlate,
-      schema.collectionSliderInsert,
+      schema.collectionDetailSliderPlate,
+      schema.collectionDetailSliderInsert,
     ]) {
       const config = getTableConfig(table);
       expect(config.columns.map(({ name }) => name)).toEqual(
-        table === schema.collectionSliderInsert
+        table === schema.collectionDetailSliderInsert
           ? ["id", "product_slider_insert_id"]
           : ["id", "product_slider_plate_id"],
       );
       expect(config.foreignKeys).toHaveLength(2);
     }
-    const slider = getTableConfig(schema.collectionSlider);
+    const slider = getTableConfig(schema.collectionDetailSlider);
     expect(slider.columns.map(({ name }) => name)).toEqual([
       "id",
       "product_slider_id",
@@ -238,8 +242,8 @@ describe("catalog schema", () => {
     ]);
     expect(slider.foreignKeys).toHaveLength(4);
     expect(slider.indexes.map(({ config }) => config.name)).toEqual([
-      "collection_slider_installed_plate_unique",
-      "collection_slider_installed_insert_unique",
+      "collection_detail_slider_installed_plate_unique",
+      "collection_detail_slider_installed_insert_unique",
     ]);
   });
 });

@@ -17,11 +17,11 @@ export async function collectionItemDeletionState(
   if (!ids.length) return [];
   // Freeze child keys and rows so FK writers cannot change the allowlisted pre-state.
   for (const table of [
-    "collection_spinner_button",
-    "collection_spinner",
-    "collection_slider",
-    "collection_slider_plate",
-    "collection_slider_insert",
+    "collection_detail_spinner_button",
+    "collection_detail_spinner",
+    "collection_detail_slider",
+    "collection_detail_slider_plate",
+    "collection_detail_slider_insert",
   ]) {
     await tx.execute(sql`select id from ${sql.identifier(table)}
       where id in (${sql.join(
@@ -86,11 +86,11 @@ export async function collectionItemDeletionState(
         from collection_item_image image where image.collection_item_id = item.id), '[]')
     ) as state
     from collection_item item
-    left join collection_spinner spinner on spinner.id = item.id
-    left join collection_spinner_button button on button.id = item.id
-    left join collection_slider slider on slider.id = item.id
-    left join collection_slider_plate slider_plate on slider_plate.id = item.id
-    left join collection_slider_insert slider_insert on slider_insert.id = item.id
+    left join collection_detail_spinner spinner on spinner.id = item.id
+    left join collection_detail_spinner_button button on button.id = item.id
+    left join collection_detail_slider slider on slider.id = item.id
+    left join collection_detail_slider_plate slider_plate on slider_plate.id = item.id
+    left join collection_detail_slider_insert slider_insert on slider_insert.id = item.id
     where item.id in (${sql.join(
       ids.map((id) => sql`${id}`),
       sql`, `,

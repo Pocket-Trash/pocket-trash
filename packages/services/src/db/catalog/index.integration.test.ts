@@ -606,9 +606,9 @@ describe("catalog product persistence", () => {
       const misleadingSubtypeDate = new Date("2030-01-01T00:00:00.000Z");
       await db.update(schema.product).set({ updatedAt: baseline });
       await db
-        .update(schema.productSpinner)
+        .update(schema.productDetailSpinner)
         .set({ updatedAt: misleadingSubtypeDate })
-        .where(eq(schema.productSpinner.id, beta.id));
+        .where(eq(schema.productDetailSpinner.id, beta.id));
 
       await expect(service.listProducts(undefined, actor)).resolves.toEqual([
         expect.objectContaining({ id: alphaOne.id, updatedAt: baseline }),

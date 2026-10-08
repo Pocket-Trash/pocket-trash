@@ -3121,19 +3121,19 @@ export function createCatalogService(
               : [];
             // FK writers lock these child keys, not necessarily the parent product.
             await tx
-              .select({ id: schema.productSpinner.id })
-              .from(schema.productSpinner)
-              .where(eq(schema.productSpinner.id, row.id))
+              .select({ id: schema.productDetailSpinner.id })
+              .from(schema.productDetailSpinner)
+              .where(eq(schema.productDetailSpinner.id, row.id))
               .for("update");
             await tx
-              .select({ id: schema.productSpinnerButton.id })
-              .from(schema.productSpinnerButton)
-              .where(eq(schema.productSpinnerButton.id, row.id))
+              .select({ id: schema.productDetailSpinnerButton.id })
+              .from(schema.productDetailSpinnerButton)
+              .where(eq(schema.productDetailSpinnerButton.id, row.id))
               .for("update");
             for (const subtype of [
-              schema.productSlider,
-              schema.productSliderPlate,
-              schema.productSliderInsert,
+              schema.productDetailSlider,
+              schema.productDetailSliderPlate,
+              schema.productDetailSliderInsert,
             ]) {
               await tx
                 .select({ id: subtype.id })
@@ -3148,11 +3148,11 @@ export function createCatalogService(
               .orderBy(asc(schema.finishOption.id))
               .for("update");
             const references = await tx.execute(sql`
-            select 1 from collection_spinner where product_spinner_id = ${row.id}
-            union all select 1 from collection_spinner_button where product_spinner_button_id = ${row.id}
-            union all select 1 from product_spinner where compatible_button_id = ${row.id}
-            union all select 1 from product_slider where included_plate_product_id = ${row.id}
-            union all select 1 from product_slider where included_insert_product_id = ${row.id}
+            select 1 from collection_detail_spinner where product_spinner_id = ${row.id}
+            union all select 1 from collection_detail_spinner_button where product_spinner_button_id = ${row.id}
+            union all select 1 from product_detail_spinner where compatible_button_id = ${row.id}
+            union all select 1 from product_detail_slider where included_plate_product_id = ${row.id}
+            union all select 1 from product_detail_slider where included_insert_product_id = ${row.id}
             union all select 1 from finish_option selected join finish_option source on source.id = selected.source_product_finish_option_id where source.product_id = ${row.id}
             limit 1`);
             if (references.rows.length) return false;
@@ -3305,14 +3305,14 @@ export function createCatalogService(
           from collection_item
           join user_collection
             on user_collection.id = collection_item.collection_id
-          left join collection_spinner
-            on collection_spinner.id = collection_item.id
-          left join collection_spinner_button
-            on collection_spinner_button.id = collection_item.id
+          left join collection_detail_spinner
+            on collection_detail_spinner.id = collection_item.id
+          left join collection_detail_spinner_button
+            on collection_detail_spinner_button.id = collection_item.id
           join public_products
             on public_products.id = coalesce(
-              collection_spinner.product_spinner_id,
-              collection_spinner_button.product_spinner_button_id
+              collection_detail_spinner.product_spinner_id,
+              collection_detail_spinner_button.product_spinner_button_id
             )
           where collection_item.owned
             and collection_item.sold_at is null
@@ -4611,7 +4611,7 @@ export function createCollectionsService(
                 })
                 .returning({ id: schema.collectionItem.id });
               if (!buttonItem) throw new Error("Failed to create button item.");
-              await tx.insert(schema.collectionSpinnerButton).values({
+              await tx.insert(schema.collectionDetailSpinnerButton).values({
                 id: buttonItem.id,
                 productSpinnerButtonId: input.buttonProductId,
               });
@@ -4658,7 +4658,7 @@ export function createCollectionsService(
               })
               .returning({ id: schema.collectionItem.id });
             if (!spinnerItem) throw new Error("Failed to create spinner item.");
-            await tx.insert(schema.collectionSpinner).values({
+            await tx.insert(schema.collectionDetailSpinner).values({
               ...(input.bearing !== undefined
                 ? { bearing: normalizeOptionalText(input.bearing) }
                 : {}),
@@ -4748,7 +4748,7 @@ export function createCollectionsService(
               })
               .returning({ id: schema.collectionItem.id });
             if (!item) throw new Error("Failed to create collection item.");
-            await tx.insert(schema.collectionSpinnerButton).values({
+            await tx.insert(schema.collectionDetailSpinnerButton).values({
               id: item.id,
               productSpinnerButtonId: input.productId,
             });
@@ -4814,10 +4814,11 @@ export function createCollectionsService(
             await assertProductMaterial(tx, input.productId, input.materialId);
             const [product] = await tx
               .select({
-                bodyMagnetLayout: schema.productSlider.magnetLayout,
+                bodyMagnetLayout: schema.productDetailSlider.magnetLayout,
                 includedInsertMagnetLayout:
-                  schema.productSliderInsert.magnetLayout,
-                magnetConfiguration: schema.productSlider.magnetConfiguration,
+                  schema.productDetailSliderInsert.magnetLayout,
+                magnetConfiguration:
+                  schema.productDetailSlider.magnetConfiguration,
                 slug: schema.productType.slug,
               })
               .from(schema.product)
@@ -4826,14 +4827,14 @@ export function createCollectionsService(
                 eq(schema.product.productTypeId, schema.productType.id),
               )
               .leftJoin(
-                schema.productSlider,
-                eq(schema.product.id, schema.productSlider.id),
+                schema.productDetailSlider,
+                eq(schema.product.id, schema.productDetailSlider.id),
               )
               .leftJoin(
-                schema.productSliderInsert,
+                schema.productDetailSliderInsert,
                 eq(
-                  schema.productSlider.includedInsertProductId,
-                  schema.productSliderInsert.id,
+                  schema.productDetailSlider.includedInsertProductId,
+                  schema.productDetailSliderInsert.id,
                 ),
               )
               .where(eq(schema.product.id, input.productId))
@@ -4861,7 +4862,7 @@ export function createCollectionsService(
             if (input.productTypeSlug === "slider") {
               const magnetLayout =
                 product.includedInsertMagnetLayout ?? product.bodyMagnetLayout;
-              await tx.insert(schema.collectionSlider).values({
+              await tx.insert(schema.collectionDetailSlider).values({
                 id: item.id,
                 magnetConfiguration:
                   magnetLayout &&
@@ -4874,12 +4875,12 @@ export function createCollectionsService(
                 productSliderId: input.productId,
               });
             } else if (input.productTypeSlug === "slider-plate") {
-              await tx.insert(schema.collectionSliderPlate).values({
+              await tx.insert(schema.collectionDetailSliderPlate).values({
                 id: item.id,
                 productSliderPlateId: input.productId,
               });
             } else {
-              await tx.insert(schema.collectionSliderInsert).values({
+              await tx.insert(schema.collectionDetailSliderInsert).values({
                 id: item.id,
                 productSliderInsertId: input.productId,
               });
@@ -4928,32 +4929,34 @@ export function createCollectionsService(
       const rows = await db
         .select({
           count: count(schema.collectionItem.id),
-          spinnerId: schema.collectionSpinner.productSpinnerId,
-          buttonId: schema.collectionSpinnerButton.productSpinnerButtonId,
-          sliderId: schema.collectionSlider.productSliderId,
-          sliderInsertId: schema.collectionSliderInsert.productSliderInsertId,
-          sliderPlateId: schema.collectionSliderPlate.productSliderPlateId,
+          spinnerId: schema.collectionDetailSpinner.productSpinnerId,
+          buttonId: schema.collectionDetailSpinnerButton.productSpinnerButtonId,
+          sliderId: schema.collectionDetailSlider.productSliderId,
+          sliderInsertId:
+            schema.collectionDetailSliderInsert.productSliderInsertId,
+          sliderPlateId:
+            schema.collectionDetailSliderPlate.productSliderPlateId,
         })
         .from(schema.collectionItem)
         .leftJoin(
-          schema.collectionSpinner,
-          eq(schema.collectionItem.id, schema.collectionSpinner.id),
+          schema.collectionDetailSpinner,
+          eq(schema.collectionItem.id, schema.collectionDetailSpinner.id),
         )
         .leftJoin(
-          schema.collectionSpinnerButton,
-          eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
+          schema.collectionDetailSpinnerButton,
+          eq(schema.collectionItem.id, schema.collectionDetailSpinnerButton.id),
         )
         .leftJoin(
-          schema.collectionSlider,
-          eq(schema.collectionItem.id, schema.collectionSlider.id),
+          schema.collectionDetailSlider,
+          eq(schema.collectionItem.id, schema.collectionDetailSlider.id),
         )
         .leftJoin(
-          schema.collectionSliderPlate,
-          eq(schema.collectionItem.id, schema.collectionSliderPlate.id),
+          schema.collectionDetailSliderPlate,
+          eq(schema.collectionItem.id, schema.collectionDetailSliderPlate.id),
         )
         .leftJoin(
-          schema.collectionSliderInsert,
-          eq(schema.collectionItem.id, schema.collectionSliderInsert.id),
+          schema.collectionDetailSliderInsert,
+          eq(schema.collectionItem.id, schema.collectionDetailSliderInsert.id),
         )
         .where(
           and(
@@ -4962,11 +4965,11 @@ export function createCollectionsService(
           ),
         )
         .groupBy(
-          schema.collectionSpinner.productSpinnerId,
-          schema.collectionSpinnerButton.productSpinnerButtonId,
-          schema.collectionSlider.productSliderId,
-          schema.collectionSliderPlate.productSliderPlateId,
-          schema.collectionSliderInsert.productSliderInsertId,
+          schema.collectionDetailSpinner.productSpinnerId,
+          schema.collectionDetailSpinnerButton.productSpinnerButtonId,
+          schema.collectionDetailSlider.productSliderId,
+          schema.collectionDetailSliderPlate.productSliderPlateId,
+          schema.collectionDetailSliderInsert.productSliderInsertId,
         );
       const result: Record<number, number> = {};
       for (const row of rows) {
@@ -5086,21 +5089,21 @@ export function createCollectionsService(
               !destination && itemIds.length
                 ? await tx
                     .select({
-                      id: schema.collectionSpinner.id,
+                      id: schema.collectionDetailSpinner.id,
                       installedButtonId:
-                        schema.collectionSpinner.installedButtonId,
+                        schema.collectionDetailSpinner.installedButtonId,
                     })
-                    .from(schema.collectionSpinner)
+                    .from(schema.collectionDetailSpinner)
                     .where(
                       and(
                         inArray(
-                          schema.collectionSpinner.installedButtonId,
+                          schema.collectionDetailSpinner.installedButtonId,
                           itemIds,
                         ),
-                        notInArray(schema.collectionSpinner.id, itemIds),
+                        notInArray(schema.collectionDetailSpinner.id, itemIds),
                       ),
                     )
-                    .orderBy(asc(schema.collectionSpinner.id))
+                    .orderBy(asc(schema.collectionDetailSpinner.id))
                     .for("update")
                 : [];
 
@@ -5244,59 +5247,67 @@ export function createCollectionsService(
               throw new Error("A moderation reason is required.");
             // FK link writers lock the button key, not the parent item.
             await tx
-              .select({ id: schema.collectionSpinnerButton.id })
-              .from(schema.collectionSpinnerButton)
-              .where(eq(schema.collectionSpinnerButton.id, item.id))
+              .select({ id: schema.collectionDetailSpinnerButton.id })
+              .from(schema.collectionDetailSpinnerButton)
+              .where(eq(schema.collectionDetailSpinnerButton.id, item.id))
               .for("update");
             await tx
-              .select({ id: schema.collectionSliderPlate.id })
-              .from(schema.collectionSliderPlate)
-              .where(eq(schema.collectionSliderPlate.id, item.id))
+              .select({ id: schema.collectionDetailSliderPlate.id })
+              .from(schema.collectionDetailSliderPlate)
+              .where(eq(schema.collectionDetailSliderPlate.id, item.id))
               .for("update");
             await tx
-              .select({ id: schema.collectionSliderInsert.id })
-              .from(schema.collectionSliderInsert)
-              .where(eq(schema.collectionSliderInsert.id, item.id))
+              .select({ id: schema.collectionDetailSliderInsert.id })
+              .from(schema.collectionDetailSliderInsert)
+              .where(eq(schema.collectionDetailSliderInsert.id, item.id))
               .for("update");
             const detachedSpinners = await tx
               .select({
-                id: schema.collectionSpinner.id,
-                installedButtonId: schema.collectionSpinner.installedButtonId,
+                id: schema.collectionDetailSpinner.id,
+                installedButtonId:
+                  schema.collectionDetailSpinner.installedButtonId,
               })
-              .from(schema.collectionSpinner)
-              .where(eq(schema.collectionSpinner.installedButtonId, item.id))
-              .orderBy(asc(schema.collectionSpinner.id))
+              .from(schema.collectionDetailSpinner)
+              .where(
+                eq(schema.collectionDetailSpinner.installedButtonId, item.id),
+              )
+              .orderBy(asc(schema.collectionDetailSpinner.id))
               .for("update");
             const detachedSliders = await tx
               .select({
-                id: schema.collectionSlider.id,
-                installedInsertId: schema.collectionSlider.installedInsertId,
-                installedPlateId: schema.collectionSlider.installedPlateId,
+                id: schema.collectionDetailSlider.id,
+                installedInsertId:
+                  schema.collectionDetailSlider.installedInsertId,
+                installedPlateId:
+                  schema.collectionDetailSlider.installedPlateId,
               })
-              .from(schema.collectionSlider)
+              .from(schema.collectionDetailSlider)
               .where(
                 or(
-                  eq(schema.collectionSlider.installedPlateId, item.id),
-                  eq(schema.collectionSlider.installedInsertId, item.id),
+                  eq(schema.collectionDetailSlider.installedPlateId, item.id),
+                  eq(schema.collectionDetailSlider.installedInsertId, item.id),
                 ),
               )
-              .orderBy(asc(schema.collectionSlider.id))
+              .orderBy(asc(schema.collectionDetailSlider.id))
               .for("update");
             const [deletedAssembly] = await tx
               .select({
-                installedButtonId: schema.collectionSpinner.installedButtonId,
-                installedInsertId: schema.collectionSlider.installedInsertId,
-                installedPlateId: schema.collectionSlider.installedPlateId,
+                installedButtonId:
+                  schema.collectionDetailSpinner.installedButtonId,
+                installedInsertId:
+                  schema.collectionDetailSlider.installedInsertId,
+                installedPlateId:
+                  schema.collectionDetailSlider.installedPlateId,
                 isPrivate: schema.collectionItem.isPrivate,
               })
               .from(schema.collectionItem)
               .leftJoin(
-                schema.collectionSpinner,
-                eq(schema.collectionItem.id, schema.collectionSpinner.id),
+                schema.collectionDetailSpinner,
+                eq(schema.collectionItem.id, schema.collectionDetailSpinner.id),
               )
               .leftJoin(
-                schema.collectionSlider,
-                eq(schema.collectionItem.id, schema.collectionSlider.id),
+                schema.collectionDetailSlider,
+                eq(schema.collectionItem.id, schema.collectionDetailSlider.id),
               )
               .where(eq(schema.collectionItem.id, item.id))
               .limit(1);
@@ -5874,13 +5885,13 @@ export function createCollectionsService(
         const [item] = await tx
           .select({
             collectionIsPrivate: schema.userCollection.isPrivate,
-            installedButtonId: schema.collectionSpinner.installedButtonId,
-            installedInsertId: schema.collectionSlider.installedInsertId,
-            installedPlateId: schema.collectionSlider.installedPlateId,
+            installedButtonId: schema.collectionDetailSpinner.installedButtonId,
+            installedInsertId: schema.collectionDetailSlider.installedInsertId,
+            installedPlateId: schema.collectionDetailSlider.installedPlateId,
             installedParentId: sql<number | null>`coalesce(
-              (select id from collection_spinner where installed_button_id = ${schema.collectionItem.id}),
-              (select id from collection_slider where installed_plate_id = ${schema.collectionItem.id}),
-              (select id from collection_slider where installed_insert_id = ${schema.collectionItem.id})
+              (select id from collection_detail_spinner where installed_button_id = ${schema.collectionItem.id}),
+              (select id from collection_detail_slider where installed_plate_id = ${schema.collectionItem.id}),
+              (select id from collection_detail_slider where installed_insert_id = ${schema.collectionItem.id})
             )`,
             isPrivate: schema.collectionItem.isPrivate,
             ownerId: schema.collectionItem.ownerId,
@@ -5892,12 +5903,12 @@ export function createCollectionsService(
             eq(schema.collectionItem.collectionId, schema.userCollection.id),
           )
           .leftJoin(
-            schema.collectionSpinner,
-            eq(schema.collectionItem.id, schema.collectionSpinner.id),
+            schema.collectionDetailSpinner,
+            eq(schema.collectionItem.id, schema.collectionDetailSpinner.id),
           )
           .leftJoin(
-            schema.collectionSlider,
-            eq(schema.collectionItem.id, schema.collectionSlider.id),
+            schema.collectionDetailSlider,
+            eq(schema.collectionItem.id, schema.collectionDetailSlider.id),
           )
           .where(eq(schema.collectionItem.id, input.collectionItemId))
           .limit(1);
@@ -6013,57 +6024,70 @@ export function createCollectionsService(
             const [item] = await tx
               .select({
                 approvalStatus: schema.collectionItem.approvalStatus,
-                bodyMagnetLayout: schema.productSlider.magnetLayout,
+                bodyMagnetLayout: schema.productDetailSlider.magnetLayout,
                 buttonProductId:
-                  schema.collectionSpinnerButton.productSpinnerButtonId,
+                  schema.collectionDetailSpinnerButton.productSpinnerButtonId,
                 collectionId: schema.collectionItem.collectionId,
                 description: schema.collectionItem.description,
                 displayName: schema.collectionItem.displayName,
-                installedButtonId: schema.collectionSpinner.installedButtonId,
-                installedInsertId: schema.collectionSlider.installedInsertId,
-                installedPlateId: schema.collectionSlider.installedPlateId,
+                installedButtonId:
+                  schema.collectionDetailSpinner.installedButtonId,
+                installedInsertId:
+                  schema.collectionDetailSlider.installedInsertId,
+                installedPlateId:
+                  schema.collectionDetailSlider.installedPlateId,
                 includedInsertProductId:
-                  schema.productSlider.includedInsertProductId,
+                  schema.productDetailSlider.includedInsertProductId,
                 isPrivate: schema.collectionItem.isPrivate,
                 materialId: schema.collectionItem.materialId,
                 magnetConfiguration:
-                  schema.collectionSlider.magnetConfiguration,
-                usesInserts: schema.productSlider.usesInserts,
+                  schema.collectionDetailSlider.magnetConfiguration,
+                usesInserts: schema.productDetailSlider.usesInserts,
                 ownerId: schema.collectionItem.ownerId,
-                sliderProductId: schema.collectionSlider.productSliderId,
+                sliderProductId: schema.collectionDetailSlider.productSliderId,
                 sliderInsertProductId:
-                  schema.collectionSliderInsert.productSliderInsertId,
+                  schema.collectionDetailSliderInsert.productSliderInsertId,
                 sliderPlateProductId:
-                  schema.collectionSliderPlate.productSliderPlateId,
-                spinnerProductId: schema.collectionSpinner.productSpinnerId,
+                  schema.collectionDetailSliderPlate.productSliderPlateId,
+                spinnerProductId:
+                  schema.collectionDetailSpinner.productSpinnerId,
               })
               .from(schema.collectionItem)
               .leftJoin(
-                schema.collectionSpinner,
-                eq(schema.collectionItem.id, schema.collectionSpinner.id),
+                schema.collectionDetailSpinner,
+                eq(schema.collectionItem.id, schema.collectionDetailSpinner.id),
               )
               .leftJoin(
-                schema.collectionSpinnerButton,
-                eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
-              )
-              .leftJoin(
-                schema.collectionSlider,
-                eq(schema.collectionItem.id, schema.collectionSlider.id),
-              )
-              .leftJoin(
-                schema.productSlider,
+                schema.collectionDetailSpinnerButton,
                 eq(
-                  schema.collectionSlider.productSliderId,
-                  schema.productSlider.id,
+                  schema.collectionItem.id,
+                  schema.collectionDetailSpinnerButton.id,
                 ),
               )
               .leftJoin(
-                schema.collectionSliderPlate,
-                eq(schema.collectionItem.id, schema.collectionSliderPlate.id),
+                schema.collectionDetailSlider,
+                eq(schema.collectionItem.id, schema.collectionDetailSlider.id),
               )
               .leftJoin(
-                schema.collectionSliderInsert,
-                eq(schema.collectionItem.id, schema.collectionSliderInsert.id),
+                schema.productDetailSlider,
+                eq(
+                  schema.collectionDetailSlider.productSliderId,
+                  schema.productDetailSlider.id,
+                ),
+              )
+              .leftJoin(
+                schema.collectionDetailSliderPlate,
+                eq(
+                  schema.collectionItem.id,
+                  schema.collectionDetailSliderPlate.id,
+                ),
+              )
+              .leftJoin(
+                schema.collectionDetailSliderInsert,
+                eq(
+                  schema.collectionItem.id,
+                  schema.collectionDetailSliderInsert.id,
+                ),
               )
               .where(
                 and(
@@ -6129,30 +6153,32 @@ export function createCollectionsService(
                 linkedItemIds.add(item.installedInsertId);
               }
               const linkedSpinners = await tx
-                .select({ id: schema.collectionSpinner.id })
-                .from(schema.collectionSpinner)
+                .select({ id: schema.collectionDetailSpinner.id })
+                .from(schema.collectionDetailSpinner)
                 .where(
                   eq(
-                    schema.collectionSpinner.installedButtonId,
+                    schema.collectionDetailSpinner.installedButtonId,
                     input.collectionItemId,
                   ),
                 );
               for (const { id } of linkedSpinners) linkedItemIds.add(id);
               const linkedSliders = await tx
                 .select({
-                  id: schema.collectionSlider.id,
-                  installedInsertId: schema.collectionSlider.installedInsertId,
-                  installedPlateId: schema.collectionSlider.installedPlateId,
+                  id: schema.collectionDetailSlider.id,
+                  installedInsertId:
+                    schema.collectionDetailSlider.installedInsertId,
+                  installedPlateId:
+                    schema.collectionDetailSlider.installedPlateId,
                 })
-                .from(schema.collectionSlider)
+                .from(schema.collectionDetailSlider)
                 .where(
                   or(
                     eq(
-                      schema.collectionSlider.installedPlateId,
+                      schema.collectionDetailSlider.installedPlateId,
                       input.collectionItemId,
                     ),
                     eq(
-                      schema.collectionSlider.installedInsertId,
+                      schema.collectionDetailSlider.installedInsertId,
                       input.collectionItemId,
                     ),
                   ),
@@ -6200,9 +6226,11 @@ export function createCollectionsService(
 
             if (item.spinnerProductId !== null && input.bearing !== undefined) {
               await tx
-                .update(schema.collectionSpinner)
+                .update(schema.collectionDetailSpinner)
                 .set({ bearing: normalizeOptionalText(input.bearing) })
-                .where(eq(schema.collectionSpinner.id, input.collectionItemId));
+                .where(
+                  eq(schema.collectionDetailSpinner.id, input.collectionItemId),
+                );
             }
 
             if (input.installedButton !== undefined) {
@@ -6213,23 +6241,24 @@ export function createCollectionsService(
                 const [button] = await tx
                   .select({
                     approvalStatus: schema.collectionItem.approvalStatus,
-                    id: schema.collectionSpinnerButton.id,
+                    id: schema.collectionDetailSpinnerButton.id,
                     ownerId: schema.collectionItem.ownerId,
                     productId:
-                      schema.collectionSpinnerButton.productSpinnerButtonId,
+                      schema.collectionDetailSpinnerButton
+                        .productSpinnerButtonId,
                   })
-                  .from(schema.collectionSpinnerButton)
+                  .from(schema.collectionDetailSpinnerButton)
                   .innerJoin(
                     schema.collectionItem,
                     eq(
-                      schema.collectionSpinnerButton.id,
+                      schema.collectionDetailSpinnerButton.id,
                       schema.collectionItem.id,
                     ),
                   )
                   .where(
                     and(
                       eq(
-                        schema.collectionSpinnerButton.id,
+                        schema.collectionDetailSpinnerButton.id,
                         input.installedButton.collectionItemId,
                       ),
                       eq(schema.collectionItem.ownerId, item.ownerId),
@@ -6264,18 +6293,21 @@ export function createCollectionsService(
               }
               try {
                 await tx
-                  .update(schema.collectionSpinner)
+                  .update(schema.collectionDetailSpinner)
                   .set({
                     installedButtonId:
                       input.installedButton?.collectionItemId ?? null,
                   })
                   .where(
-                    eq(schema.collectionSpinner.id, input.collectionItemId),
+                    eq(
+                      schema.collectionDetailSpinner.id,
+                      input.collectionItemId,
+                    ),
                   );
               } catch (error) {
                 if (
                   uniqueConstraint(error) ===
-                  "collection_spinner_installed_button_unique"
+                  "collection_detail_spinner_installed_button_unique"
                 ) {
                   throw new CollectionButtonAlreadyInstalledError();
                 }
@@ -6376,20 +6408,25 @@ export function createCollectionsService(
               }
               try {
                 await tx
-                  .update(schema.collectionSlider)
+                  .update(schema.collectionDetailSlider)
                   .set({
                     installedInsertId,
                     installedPlateId,
                     magnetConfiguration: normalizedMagnetConfiguration,
                   })
                   .where(
-                    eq(schema.collectionSlider.id, input.collectionItemId),
+                    eq(
+                      schema.collectionDetailSlider.id,
+                      input.collectionItemId,
+                    ),
                   );
               } catch (error) {
                 const constraint = uniqueConstraint(error);
                 if (
-                  constraint === "collection_slider_installed_plate_unique" ||
-                  constraint === "collection_slider_installed_insert_unique"
+                  constraint ===
+                    "collection_detail_slider_installed_plate_unique" ||
+                  constraint ===
+                    "collection_detail_slider_installed_insert_unique"
                 ) {
                   throw new CollectionSliderComponentAlreadyInstalledError();
                 }
@@ -7082,15 +7119,15 @@ function effectiveCollectionItemIsPrivate() {
       then true
     else coalesce(
       (select parent.is_private
-         from collection_spinner assembly
+         from collection_detail_spinner assembly
          inner join collection_item parent on parent.id = assembly.id
         where assembly.installed_button_id = ${schema.collectionItem.id}),
       (select parent.is_private
-         from collection_slider assembly
+         from collection_detail_slider assembly
          inner join collection_item parent on parent.id = assembly.id
         where assembly.installed_plate_id = ${schema.collectionItem.id}),
       (select parent.is_private
-         from collection_slider assembly
+         from collection_detail_slider assembly
          inner join collection_item parent on parent.id = assembly.id
         where assembly.installed_insert_id = ${schema.collectionItem.id}),
       ${schema.collectionItem.isPrivate}
@@ -7443,30 +7480,30 @@ async function queryProducts(
   const rows = await db
     .select({
       approvalStatus: schema.product.approvalStatus,
-      bearing: schema.productSpinner.bearing,
-      buttonDiameter: schema.productSpinner.buttonDiameter,
-      buttonDiameterUnit: schema.productSpinner.buttonDiameterUnit,
-      compatibleButtonId: schema.productSpinner.compatibleButtonId,
+      bearing: schema.productDetailSpinner.bearing,
+      buttonDiameter: schema.productDetailSpinner.buttonDiameter,
+      buttonDiameterUnit: schema.productDetailSpinner.buttonDiameterUnit,
+      compatibleButtonId: schema.productDetailSpinner.compatibleButtonId,
       compatibleButtonName: compatibleButtonProduct.name,
-      createdAt: sql<Date>`coalesce(${schema.productSpinner.createdAt}, ${schema.productSpinnerButton.createdAt}, ${schema.productSlider.createdAt}, ${schema.productSliderPlate.createdAt}, ${schema.productSliderInsert.createdAt})`,
+      createdAt: sql<Date>`coalesce(${schema.productDetailSpinner.createdAt}, ${schema.productDetailSpinnerButton.createdAt}, ${schema.productDetailSlider.createdAt}, ${schema.productDetailSliderPlate.createdAt}, ${schema.productDetailSliderInsert.createdAt})`,
       description: schema.product.description,
-      diameter: schema.productSpinnerButton.diameter,
-      diameterUnit: schema.productSpinnerButton.diameterUnit,
+      diameter: schema.productDetailSpinnerButton.diameter,
+      diameterUnit: schema.productDetailSpinnerButton.diameterUnit,
       id: schema.product.id,
       isPrivate: schema.product.isPrivate,
       privatedByClerkId: schema.product.privatedByClerkId,
       length: sql<
         string | null
-      >`coalesce(${schema.productSpinner.length}, ${schema.productSlider.length})`,
-      lengthUnit: sql<DimensionUnit | null>`coalesce(${schema.productSpinner.lengthUnit}, ${schema.productSlider.lengthUnit})`,
+      >`coalesce(${schema.productDetailSpinner.length}, ${schema.productDetailSlider.length})`,
+      lengthUnit: sql<DimensionUnit | null>`coalesce(${schema.productDetailSpinner.lengthUnit}, ${schema.productDetailSlider.lengthUnit})`,
       makerId: schema.maker.id,
       makerName: schema.maker.name,
       makerSlug: schema.maker.slug,
       makerProductUrl: schema.product.makerProductUrl,
       makerProductUrlValid: schema.product.makerProductUrlValid,
       makerUrl: schema.maker.rootUrl,
-      magnetConfiguration: schema.productSlider.magnetConfiguration,
-      magnetLayout: sql<SliderMagnetLayout | null>`coalesce(${schema.productSlider.magnetLayout}, ${schema.productSliderInsert.magnetLayout})`,
+      magnetConfiguration: schema.productDetailSlider.magnetConfiguration,
+      magnetLayout: sql<SliderMagnetLayout | null>`coalesce(${schema.productDetailSlider.magnetLayout}, ${schema.productDetailSliderInsert.magnetLayout})`,
       materialId: schema.material.id,
       materialName: schema.material.name,
       materialSlug: schema.material.slug,
@@ -7476,24 +7513,25 @@ async function queryProducts(
       productTypeName: schema.productType.name,
       productTypeSlug: schema.productType.slug,
       slug: schema.product.slug,
-      spinDiameter: schema.productSpinner.spinDiameter,
-      spinDiameterUnit: schema.productSpinner.spinDiameterUnit,
+      spinDiameter: schema.productDetailSpinner.spinDiameter,
+      spinDiameterUnit: schema.productDetailSpinner.spinDiameterUnit,
       thickness: sql<
         string | null
-      >`coalesce(${schema.productSpinner.thickness}, ${schema.productSpinnerButton.thickness}, ${schema.productSlider.thickness})`,
-      thicknessUnit: sql<DimensionUnit | null>`coalesce(${schema.productSpinner.thicknessUnit}, ${schema.productSpinnerButton.thicknessUnit}, ${schema.productSlider.thicknessUnit})`,
-      thicknessWithButton: schema.productSpinner.thicknessWithButton,
-      thicknessWithButtonUnit: schema.productSpinner.thicknessWithButtonUnit,
+      >`coalesce(${schema.productDetailSpinner.thickness}, ${schema.productDetailSpinnerButton.thickness}, ${schema.productDetailSlider.thickness})`,
+      thicknessUnit: sql<DimensionUnit | null>`coalesce(${schema.productDetailSpinner.thicknessUnit}, ${schema.productDetailSpinnerButton.thicknessUnit}, ${schema.productDetailSlider.thicknessUnit})`,
+      thicknessWithButton: schema.productDetailSpinner.thicknessWithButton,
+      thicknessWithButtonUnit:
+        schema.productDetailSpinner.thicknessWithButtonUnit,
       updatedAt: schema.product.updatedAt,
-      usesInserts: schema.productSlider.usesInserts,
+      usesInserts: schema.productDetailSlider.usesInserts,
       weight: sql<
         string | null
-      >`coalesce(${schema.productSpinner.weight}, ${schema.productSpinnerButton.weight}, ${schema.productSlider.weight})`,
-      weightUnit: sql<WeightUnit | null>`coalesce(${schema.productSpinner.weightUnit}, ${schema.productSpinnerButton.weightUnit}, ${schema.productSlider.weightUnit})`,
+      >`coalesce(${schema.productDetailSpinner.weight}, ${schema.productDetailSpinnerButton.weight}, ${schema.productDetailSlider.weight})`,
+      weightUnit: sql<WeightUnit | null>`coalesce(${schema.productDetailSpinner.weightUnit}, ${schema.productDetailSpinnerButton.weightUnit}, ${schema.productDetailSlider.weightUnit})`,
       width: sql<
         string | null
-      >`coalesce(${schema.productSpinner.width}, ${schema.productSlider.width})`,
-      widthUnit: sql<DimensionUnit | null>`coalesce(${schema.productSpinner.widthUnit}, ${schema.productSlider.widthUnit})`,
+      >`coalesce(${schema.productDetailSpinner.width}, ${schema.productDetailSlider.width})`,
+      widthUnit: sql<DimensionUnit | null>`coalesce(${schema.productDetailSpinner.widthUnit}, ${schema.productDetailSlider.widthUnit})`,
     })
     .from(schema.product)
     .innerJoin(schema.maker, eq(schema.product.makerId, schema.maker.id))
@@ -7510,28 +7548,31 @@ async function queryProducts(
       eq(schema.productMaterial.materialId, schema.material.id),
     )
     .leftJoin(
-      schema.productSpinner,
-      eq(schema.product.id, schema.productSpinner.id),
+      schema.productDetailSpinner,
+      eq(schema.product.id, schema.productDetailSpinner.id),
     )
     .leftJoin(
-      schema.productSpinnerButton,
-      eq(schema.product.id, schema.productSpinnerButton.id),
+      schema.productDetailSpinnerButton,
+      eq(schema.product.id, schema.productDetailSpinnerButton.id),
     )
     .leftJoin(
-      schema.productSlider,
-      eq(schema.product.id, schema.productSlider.id),
+      schema.productDetailSlider,
+      eq(schema.product.id, schema.productDetailSlider.id),
     )
     .leftJoin(
-      schema.productSliderPlate,
-      eq(schema.product.id, schema.productSliderPlate.id),
+      schema.productDetailSliderPlate,
+      eq(schema.product.id, schema.productDetailSliderPlate.id),
     )
     .leftJoin(
-      schema.productSliderInsert,
-      eq(schema.product.id, schema.productSliderInsert.id),
+      schema.productDetailSliderInsert,
+      eq(schema.product.id, schema.productDetailSliderInsert.id),
     )
     .leftJoin(
       compatibleButtonProduct,
-      eq(schema.productSpinner.compatibleButtonId, compatibleButtonProduct.id),
+      eq(
+        schema.productDetailSpinner.compatibleButtonId,
+        compatibleButtonProduct.id,
+      ),
     )
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(
@@ -7667,42 +7708,54 @@ async function loadProductRelationships(
     db
       .select({
         id: relatedProduct.id,
-        magnetLayout: schema.productSliderInsert.magnetLayout,
+        magnetLayout: schema.productDetailSliderInsert.magnetLayout,
         name: relatedProduct.name,
-        productId: schema.productSlider.id,
+        productId: schema.productDetailSlider.id,
         productTypeSlug: relatedType.slug,
         slug: relatedProduct.slug,
       })
-      .from(schema.productSlider)
+      .from(schema.productDetailSlider)
       .innerJoin(
         relatedProduct,
-        eq(schema.productSlider.includedInsertProductId, relatedProduct.id),
+        eq(
+          schema.productDetailSlider.includedInsertProductId,
+          relatedProduct.id,
+        ),
       )
       .innerJoin(relatedType, eq(relatedProduct.productTypeId, relatedType.id))
       .innerJoin(
-        schema.productSliderInsert,
-        eq(relatedProduct.id, schema.productSliderInsert.id),
+        schema.productDetailSliderInsert,
+        eq(relatedProduct.id, schema.productDetailSliderInsert.id),
       )
       .where(
-        and(inArray(schema.productSlider.id, productIds), relatedVisibility),
+        and(
+          inArray(schema.productDetailSlider.id, productIds),
+          relatedVisibility,
+        ),
       )
       .orderBy(asc(relatedProduct.name)),
     db
       .select({
         id: relatedProduct.id,
         name: relatedProduct.name,
-        productId: schema.productSlider.id,
+        productId: schema.productDetailSlider.id,
         productTypeSlug: relatedType.slug,
         slug: relatedProduct.slug,
       })
-      .from(schema.productSlider)
+      .from(schema.productDetailSlider)
       .innerJoin(
         relatedProduct,
-        eq(schema.productSlider.includedPlateProductId, relatedProduct.id),
+        eq(
+          schema.productDetailSlider.includedPlateProductId,
+          relatedProduct.id,
+        ),
       )
       .innerJoin(relatedType, eq(relatedProduct.productTypeId, relatedType.id))
       .where(
-        and(inArray(schema.productSlider.id, productIds), relatedVisibility),
+        and(
+          inArray(schema.productDetailSlider.id, productIds),
+          relatedVisibility,
+        ),
       ),
   ]);
   const productsById = new Map(
@@ -7999,9 +8052,9 @@ async function queryOwnedItems(
   } = {},
 ): Promise<UserCollectionItem[]> {
   const privacyInheritedFromItemId = sql<number | null>`coalesce(
-    (select id from collection_spinner where installed_button_id = ${schema.collectionItem.id}),
-    (select id from collection_slider where installed_plate_id = ${schema.collectionItem.id}),
-    (select id from collection_slider where installed_insert_id = ${schema.collectionItem.id})
+    (select id from collection_detail_spinner where installed_button_id = ${schema.collectionItem.id}),
+    (select id from collection_detail_slider where installed_plate_id = ${schema.collectionItem.id}),
+    (select id from collection_detail_slider where installed_insert_id = ${schema.collectionItem.id})
   )`;
   const effectiveItemIsPrivate = effectiveCollectionItemIsPrivate();
   const conditions = [
@@ -8044,8 +8097,8 @@ async function queryOwnedItems(
   const rows = await db
     .select({
       approvalStatus: schema.collectionItem.approvalStatus,
-      bearingOverride: schema.collectionSpinner.bearing,
-      productBearing: schema.productSpinner.bearing,
+      bearingOverride: schema.collectionDetailSpinner.bearing,
+      productBearing: schema.productDetailSpinner.bearing,
       collectionId: schema.userCollection.id,
       collectionItemId: schema.collectionItem.id,
       collectionIsPrivate: schema.userCollection.isPrivate,
@@ -8057,16 +8110,16 @@ async function queryOwnedItems(
       colorEffectName: schema.colorEffect.name,
       colorEffectSlug: schema.colorEffect.slug,
       finishOptionId: schema.finishOption.id,
-      installedButtonId: schema.collectionSpinner.installedButtonId,
+      installedButtonId: schema.collectionDetailSpinner.installedButtonId,
       installedButtonPubliclyAvailable: sql<boolean>`case
-        when ${schema.collectionSpinner.installedButtonId} is null then true
+        when ${schema.collectionDetailSpinner.installedButtonId} is null then true
         else exists (
           select 1
           from collection_item component
           inner join users component_owner on component_owner.id = component.owner_id
-          inner join collection_spinner_button button on button.id = component.id
+          inner join collection_detail_spinner_button button on button.id = component.id
           inner join product component_product on component_product.id = button.product_spinner_button_id
-          where component.id = ${schema.collectionSpinner.installedButtonId}
+          where component.id = ${schema.collectionDetailSpinner.installedButtonId}
             and component.approval_status = 'approved'
             and component_product.approval_status = 'approved'
             and component_product.is_private = false
@@ -8077,16 +8130,16 @@ async function queryOwnedItems(
             )
         )
       end`,
-      installedInsertId: schema.collectionSlider.installedInsertId,
+      installedInsertId: schema.collectionDetailSlider.installedInsertId,
       installedInsertPubliclyAvailable: sql<boolean>`case
-        when ${schema.collectionSlider.installedInsertId} is null then true
+        when ${schema.collectionDetailSlider.installedInsertId} is null then true
         else exists (
           select 1
           from collection_item component
           inner join users component_owner on component_owner.id = component.owner_id
-          inner join collection_slider_insert slider_insert on slider_insert.id = component.id
+          inner join collection_detail_slider_insert slider_insert on slider_insert.id = component.id
           inner join product component_product on component_product.id = slider_insert.product_slider_insert_id
-          where component.id = ${schema.collectionSlider.installedInsertId}
+          where component.id = ${schema.collectionDetailSlider.installedInsertId}
             and component.approval_status = 'approved'
             and component_product.approval_status = 'approved'
             and component_product.is_private = false
@@ -8098,19 +8151,19 @@ async function queryOwnedItems(
         )
       end`,
       installedOnSliderId: sql<number | null>`coalesce(
-        (select id from collection_slider where installed_plate_id = ${schema.collectionItem.id}),
-        (select id from collection_slider where installed_insert_id = ${schema.collectionItem.id})
+        (select id from collection_detail_slider where installed_plate_id = ${schema.collectionItem.id}),
+        (select id from collection_detail_slider where installed_insert_id = ${schema.collectionItem.id})
       )`,
-      installedPlateId: schema.collectionSlider.installedPlateId,
+      installedPlateId: schema.collectionDetailSlider.installedPlateId,
       installedPlatePubliclyAvailable: sql<boolean>`case
-        when ${schema.collectionSlider.installedPlateId} is null then true
+        when ${schema.collectionDetailSlider.installedPlateId} is null then true
         else exists (
           select 1
           from collection_item component
           inner join users component_owner on component_owner.id = component.owner_id
-          inner join collection_slider_plate slider_plate on slider_plate.id = component.id
+          inner join collection_detail_slider_plate slider_plate on slider_plate.id = component.id
           inner join product component_product on component_product.id = slider_plate.product_slider_plate_id
-          where component.id = ${schema.collectionSlider.installedPlateId}
+          where component.id = ${schema.collectionDetailSlider.installedPlateId}
             and component.approval_status = 'approved'
             and component_product.approval_status = 'approved'
             and component_product.is_private = false
@@ -8123,8 +8176,8 @@ async function queryOwnedItems(
       end`,
       installedInsertProductId: sql<number | null>`(
         select product_slider_insert_id
-        from collection_slider_insert
-        where id = ${schema.collectionSlider.installedInsertId}
+        from collection_detail_slider_insert
+        where id = ${schema.collectionDetailSlider.installedInsertId}
       )`,
       isPrivate: effectiveItemIsPrivate,
       privacyInheritedFromItemId,
@@ -8150,12 +8203,12 @@ async function queryOwnedItems(
       patternSlug: schema.pattern.slug,
       sourceProductFinishOptionId:
         schema.finishOption.sourceProductFinishOptionId,
-      spinnerId: schema.collectionSpinner.id,
-      buttonId: schema.collectionSpinnerButton.id,
-      sliderId: schema.collectionSlider.id,
-      sliderInsertId: schema.collectionSliderInsert.id,
-      magnetConfiguration: schema.collectionSlider.magnetConfiguration,
-      sliderPlateId: schema.collectionSliderPlate.id,
+      spinnerId: schema.collectionDetailSpinner.id,
+      buttonId: schema.collectionDetailSpinnerButton.id,
+      sliderId: schema.collectionDetailSlider.id,
+      sliderInsertId: schema.collectionDetailSliderInsert.id,
+      magnetConfiguration: schema.collectionDetailSlider.magnetConfiguration,
+      sliderPlateId: schema.collectionDetailSliderPlate.id,
       productTypeSlug: schema.productType.slug,
       updatedAt: schema.collectionItem.updatedAt,
     })
@@ -8182,36 +8235,36 @@ async function queryOwnedItems(
       eq(schema.finishOption.patternId, schema.pattern.id),
     )
     .leftJoin(
-      schema.collectionSpinner,
-      eq(schema.collectionItem.id, schema.collectionSpinner.id),
+      schema.collectionDetailSpinner,
+      eq(schema.collectionItem.id, schema.collectionDetailSpinner.id),
     )
     .leftJoin(
-      schema.collectionSpinnerButton,
-      eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
+      schema.collectionDetailSpinnerButton,
+      eq(schema.collectionItem.id, schema.collectionDetailSpinnerButton.id),
     )
     .leftJoin(
-      schema.collectionSlider,
-      eq(schema.collectionItem.id, schema.collectionSlider.id),
+      schema.collectionDetailSlider,
+      eq(schema.collectionItem.id, schema.collectionDetailSlider.id),
     )
     .leftJoin(
-      schema.collectionSliderPlate,
-      eq(schema.collectionItem.id, schema.collectionSliderPlate.id),
+      schema.collectionDetailSliderPlate,
+      eq(schema.collectionItem.id, schema.collectionDetailSliderPlate.id),
     )
     .leftJoin(
-      schema.collectionSliderInsert,
-      eq(schema.collectionItem.id, schema.collectionSliderInsert.id),
+      schema.collectionDetailSliderInsert,
+      eq(schema.collectionItem.id, schema.collectionDetailSliderInsert.id),
     )
     .innerJoin(
       schema.product,
       eq(
         schema.product.id,
-        sql`coalesce(${schema.collectionSpinner.productSpinnerId}, ${schema.collectionSpinnerButton.productSpinnerButtonId}, ${schema.collectionSlider.productSliderId}, ${schema.collectionSliderPlate.productSliderPlateId}, ${schema.collectionSliderInsert.productSliderInsertId})`,
+        sql`coalesce(${schema.collectionDetailSpinner.productSpinnerId}, ${schema.collectionDetailSpinnerButton.productSpinnerButtonId}, ${schema.collectionDetailSlider.productSliderId}, ${schema.collectionDetailSliderPlate.productSliderPlateId}, ${schema.collectionDetailSliderInsert.productSliderInsertId})`,
       ),
     )
     .innerJoin(schema.maker, eq(schema.product.makerId, schema.maker.id))
     .leftJoin(
-      schema.productSpinner,
-      eq(schema.product.id, schema.productSpinner.id),
+      schema.productDetailSpinner,
+      eq(schema.product.id, schema.productDetailSpinner.id),
     )
     .innerJoin(
       schema.productType,
@@ -8788,18 +8841,18 @@ async function queryPublicMaterialSummaries(
         eq(schema.collectionItem.collectionId, schema.userCollection.id),
       )
       .leftJoin(
-        schema.collectionSpinner,
-        eq(schema.collectionItem.id, schema.collectionSpinner.id),
+        schema.collectionDetailSpinner,
+        eq(schema.collectionItem.id, schema.collectionDetailSpinner.id),
       )
       .leftJoin(
-        schema.collectionSpinnerButton,
-        eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
+        schema.collectionDetailSpinnerButton,
+        eq(schema.collectionItem.id, schema.collectionDetailSpinnerButton.id),
       )
       .innerJoin(
         schema.product,
         eq(
           schema.product.id,
-          sql`coalesce(${schema.collectionSpinner.productSpinnerId}, ${schema.collectionSpinnerButton.productSpinnerButtonId})`,
+          sql`coalesce(${schema.collectionDetailSpinner.productSpinnerId}, ${schema.collectionDetailSpinnerButton.productSpinnerButtonId})`,
         ),
       )
       .where(
@@ -9311,18 +9364,18 @@ async function listCatalogImageTrash(
       )
       .innerJoin(schema.user, eq(schema.collectionItem.ownerId, schema.user.id))
       .leftJoin(
-        schema.collectionSpinner,
-        eq(schema.collectionItem.id, schema.collectionSpinner.id),
+        schema.collectionDetailSpinner,
+        eq(schema.collectionItem.id, schema.collectionDetailSpinner.id),
       )
       .leftJoin(
-        schema.collectionSpinnerButton,
-        eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
+        schema.collectionDetailSpinnerButton,
+        eq(schema.collectionItem.id, schema.collectionDetailSpinnerButton.id),
       )
       .innerJoin(
         schema.product,
         eq(
           schema.product.id,
-          sql`coalesce(${schema.collectionSpinner.productSpinnerId}, ${schema.collectionSpinnerButton.productSpinnerButtonId})`,
+          sql`coalesce(${schema.collectionDetailSpinner.productSpinnerId}, ${schema.collectionDetailSpinnerButton.productSpinnerButtonId})`,
         ),
       )
       .where(
@@ -9397,22 +9450,22 @@ async function assertAssemblyComponentsMayBePublic(
     .from(schema.collectionItem)
     .innerJoin(schema.user, eq(schema.collectionItem.ownerId, schema.user.id))
     .leftJoin(
-      schema.collectionSpinnerButton,
-      eq(schema.collectionItem.id, schema.collectionSpinnerButton.id),
+      schema.collectionDetailSpinnerButton,
+      eq(schema.collectionItem.id, schema.collectionDetailSpinnerButton.id),
     )
     .leftJoin(
-      schema.collectionSliderPlate,
-      eq(schema.collectionItem.id, schema.collectionSliderPlate.id),
+      schema.collectionDetailSliderPlate,
+      eq(schema.collectionItem.id, schema.collectionDetailSliderPlate.id),
     )
     .leftJoin(
-      schema.collectionSliderInsert,
-      eq(schema.collectionItem.id, schema.collectionSliderInsert.id),
+      schema.collectionDetailSliderInsert,
+      eq(schema.collectionItem.id, schema.collectionDetailSliderInsert.id),
     )
     .innerJoin(
       schema.product,
       eq(
         schema.product.id,
-        sql`coalesce(${schema.collectionSpinnerButton.productSpinnerButtonId}, ${schema.collectionSliderPlate.productSliderPlateId}, ${schema.collectionSliderInsert.productSliderInsertId})`,
+        sql`coalesce(${schema.collectionDetailSpinnerButton.productSpinnerButtonId}, ${schema.collectionDetailSliderPlate.productSliderPlateId}, ${schema.collectionDetailSliderInsert.productSliderInsertId})`,
       ),
     )
     .innerJoin(
@@ -9466,28 +9519,28 @@ async function assertCollectionAssembliesMayBePublic(
 ) {
   const [spinners, sliders] = await Promise.all([
     tx
-      .select({ componentId: schema.collectionSpinner.installedButtonId })
-      .from(schema.collectionSpinner)
+      .select({ componentId: schema.collectionDetailSpinner.installedButtonId })
+      .from(schema.collectionDetailSpinner)
       .innerJoin(
         schema.collectionItem,
-        eq(schema.collectionSpinner.id, schema.collectionItem.id),
+        eq(schema.collectionDetailSpinner.id, schema.collectionItem.id),
       )
       .where(
         and(
           eq(schema.collectionItem.collectionId, collectionId),
           eq(schema.collectionItem.isPrivate, false),
-          isNotNull(schema.collectionSpinner.installedButtonId),
+          isNotNull(schema.collectionDetailSpinner.installedButtonId),
         ),
       ),
     tx
       .select({
-        installedInsertId: schema.collectionSlider.installedInsertId,
-        installedPlateId: schema.collectionSlider.installedPlateId,
+        installedInsertId: schema.collectionDetailSlider.installedInsertId,
+        installedPlateId: schema.collectionDetailSlider.installedPlateId,
       })
-      .from(schema.collectionSlider)
+      .from(schema.collectionDetailSlider)
       .innerJoin(
         schema.collectionItem,
-        eq(schema.collectionSlider.id, schema.collectionItem.id),
+        eq(schema.collectionDetailSlider.id, schema.collectionItem.id),
       )
       .where(
         and(
@@ -9533,12 +9586,12 @@ async function validateSliderComponentInstallation(
 ) {
   const componentProductColumn =
     input.componentType === "plate"
-      ? schema.collectionSliderPlate.productSliderPlateId
-      : schema.collectionSliderInsert.productSliderInsertId;
+      ? schema.collectionDetailSliderPlate.productSliderPlateId
+      : schema.collectionDetailSliderInsert.productSliderInsertId;
   const componentTable =
     input.componentType === "plate"
-      ? schema.collectionSliderPlate
-      : schema.collectionSliderInsert;
+      ? schema.collectionDetailSliderPlate
+      : schema.collectionDetailSliderInsert;
   const [component] = await tx
     .select({
       approvalStatus: schema.collectionItem.approvalStatus,
@@ -9576,17 +9629,20 @@ async function validateSliderComponentInstallation(
   }
 
   const [existingInstallation] = await tx
-    .select({ id: schema.collectionSlider.id })
-    .from(schema.collectionSlider)
+    .select({ id: schema.collectionDetailSlider.id })
+    .from(schema.collectionDetailSlider)
     .where(
       and(
         input.componentType === "plate"
-          ? eq(schema.collectionSlider.installedPlateId, input.collectionItemId)
+          ? eq(
+              schema.collectionDetailSlider.installedPlateId,
+              input.collectionItemId,
+            )
           : eq(
-              schema.collectionSlider.installedInsertId,
+              schema.collectionDetailSlider.installedInsertId,
               input.collectionItemId,
             ),
-        sql`${schema.collectionSlider.id} <> ${input.sliderCollectionItemId}`,
+        sql`${schema.collectionDetailSlider.id} <> ${input.sliderCollectionItemId}`,
       ),
     )
     .limit(1);
@@ -9619,19 +9675,22 @@ async function sliderMagnetLayoutForAssembly(
     ? (
         await tx
           .select({
-            productId: schema.collectionSliderInsert.productSliderInsertId,
+            productId:
+              schema.collectionDetailSliderInsert.productSliderInsertId,
           })
-          .from(schema.collectionSliderInsert)
-          .where(eq(schema.collectionSliderInsert.id, input.installedInsertId))
+          .from(schema.collectionDetailSliderInsert)
+          .where(
+            eq(schema.collectionDetailSliderInsert.id, input.installedInsertId),
+          )
           .limit(1)
       )[0]?.productId
     : input.includedInsertProductId;
   if (!productId) return input.bodyMagnetLayout;
   return (
     await tx
-      .select({ magnetLayout: schema.productSliderInsert.magnetLayout })
-      .from(schema.productSliderInsert)
-      .where(eq(schema.productSliderInsert.id, productId))
+      .select({ magnetLayout: schema.productDetailSliderInsert.magnetLayout })
+      .from(schema.productDetailSliderInsert)
+      .where(eq(schema.productDetailSliderInsert.id, productId))
       .limit(1)
   )[0]?.magnetLayout;
 }
@@ -9671,30 +9730,32 @@ async function insertProductSubtype(
     case "spinner":
       assertNoSliderOnlySpecs(input);
       await tx
-        .insert(schema.productSpinner)
+        .insert(schema.productDetailSpinner)
         .values({ id: productId, ...spinnerSpecs(specs) });
       return;
     case "spinner-button":
       assertNoSliderOnlySpecs(input);
       await tx
-        .insert(schema.productSpinnerButton)
+        .insert(schema.productDetailSpinnerButton)
         .values({ id: productId, ...buttonSpecs(specs) });
       return;
     case "slider":
       await tx
-        .insert(schema.productSlider)
+        .insert(schema.productDetailSlider)
         .values({ id: productId, ...sliderSpecs(input) });
       return;
     case "slider-plate":
       assertNoSliderOnlySpecs(input);
       assertNoSliderComponentMeasurements(specs);
-      await tx.insert(schema.productSliderPlate).values({ id: productId });
+      await tx
+        .insert(schema.productDetailSliderPlate)
+        .values({ id: productId });
       return;
     case "slider-insert":
       assertNoSliderInsertBodySpecs(input);
       assertNoSliderComponentMeasurements(specs);
       await tx
-        .insert(schema.productSliderInsert)
+        .insert(schema.productDetailSliderInsert)
         .values({ id: productId, magnetLayout: input.magnetLayout ?? "2x4" });
   }
 }
@@ -9718,38 +9779,38 @@ async function updateProductSubtype(
     case "spinner":
       assertNoSliderOnlySpecs(input);
       await tx
-        .update(schema.productSpinner)
+        .update(schema.productDetailSpinner)
         .set({ ...spinnerSpecs(specs), updatedAt })
-        .where(eq(schema.productSpinner.id, productId));
+        .where(eq(schema.productDetailSpinner.id, productId));
       return;
     case "spinner-button":
       assertNoSliderOnlySpecs(input);
       await tx
-        .update(schema.productSpinnerButton)
+        .update(schema.productDetailSpinnerButton)
         .set({ ...buttonSpecs(specs), updatedAt })
-        .where(eq(schema.productSpinnerButton.id, productId));
+        .where(eq(schema.productDetailSpinnerButton.id, productId));
       return;
     case "slider":
       await tx
-        .update(schema.productSlider)
+        .update(schema.productDetailSlider)
         .set({ ...sliderSpecs(input), updatedAt })
-        .where(eq(schema.productSlider.id, productId));
+        .where(eq(schema.productDetailSlider.id, productId));
       return;
     case "slider-plate":
       assertNoSliderOnlySpecs(input);
       assertNoSliderComponentMeasurements(specs);
       await tx
-        .update(schema.productSliderPlate)
+        .update(schema.productDetailSliderPlate)
         .set({ updatedAt })
-        .where(eq(schema.productSliderPlate.id, productId));
+        .where(eq(schema.productDetailSliderPlate.id, productId));
       return;
     case "slider-insert":
       assertNoSliderInsertBodySpecs(input);
       assertNoSliderComponentMeasurements(specs);
       await tx
-        .update(schema.productSliderInsert)
+        .update(schema.productDetailSliderInsert)
         .set({ magnetLayout: input.magnetLayout ?? "2x4", updatedAt })
-        .where(eq(schema.productSliderInsert.id, productId));
+        .where(eq(schema.productDetailSliderInsert.id, productId));
   }
 }
 
@@ -9799,7 +9860,7 @@ async function assertProductRelationships(
       .select({
         approvalStatus: schema.product.approvalStatus,
         isPrivate: schema.product.isPrivate,
-        magnetLayout: schema.productSliderInsert.magnetLayout,
+        magnetLayout: schema.productDetailSliderInsert.magnetLayout,
         ownerClerkId: schema.product.ownerClerkId,
         type: schema.productType.slug,
       })
@@ -9809,8 +9870,8 @@ async function assertProductRelationships(
         eq(schema.product.productTypeId, schema.productType.id),
       )
       .leftJoin(
-        schema.productSliderInsert,
-        eq(schema.product.id, schema.productSliderInsert.id),
+        schema.productDetailSliderInsert,
+        eq(schema.product.id, schema.productDetailSliderInsert.id),
       )
       .where(eq(schema.product.id, relationship.id))
       .limit(1);

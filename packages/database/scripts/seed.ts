@@ -22,13 +22,13 @@ import {
   material,
   pattern,
   product,
+  productDetailSlider,
+  productDetailSliderInsert,
+  productDetailSliderPlate,
+  productDetailSpinner,
+  productDetailSpinnerButton,
   productImage,
   productMaterial,
-  productSlider,
-  productSliderInsert,
-  productSliderPlate,
-  productSpinner,
-  productSpinnerButton,
   productType,
   type SliderMagnetConfigurationValue,
   sliderMagnetPreset,
@@ -751,7 +751,9 @@ export async function seedKapedcProducts(
       throw new Error(`Failed to seed KAP product ${value.name}.`);
 
     const subtype =
-      value.type === "spinner" ? productSpinner : productSpinnerButton;
+      value.type === "spinner"
+        ? productDetailSpinner
+        : productDetailSpinnerButton;
     await db
       .insert(subtype)
       .values({ id: seededProduct.id })
@@ -1139,7 +1141,7 @@ export async function seedSliderFixtures(
 
     if (fixtureProduct.type === "slider") {
       await db
-        .insert(productSlider)
+        .insert(productDetailSlider)
         .values({
           id: seededProduct.id,
           includedInsertProductId: null,
@@ -1170,22 +1172,22 @@ export async function seedSliderFixtures(
             widthUnit: "mm",
             usesInserts: fixtureProduct.usesInserts ?? false,
           },
-          target: productSlider.id,
+          target: productDetailSlider.id,
         });
     } else if (fixtureProduct.type === "slider-plate") {
       await db
-        .insert(productSliderPlate)
+        .insert(productDetailSliderPlate)
         .values({
           id: seededProduct.id,
           updatedAt,
         })
         .onConflictDoUpdate({
           set: { updatedAt },
-          target: productSliderPlate.id,
+          target: productDetailSliderPlate.id,
         });
     } else {
       await db
-        .insert(productSliderInsert)
+        .insert(productDetailSliderInsert)
         .values({
           id: seededProduct.id,
           magnetLayout: "2x4",
@@ -1193,7 +1195,7 @@ export async function seedSliderFixtures(
         })
         .onConflictDoUpdate({
           set: { magnetLayout: "2x4", updatedAt },
-          target: productSliderInsert.id,
+          target: productDetailSliderInsert.id,
         });
     }
 
@@ -1255,13 +1257,13 @@ export async function seedSliderFixtures(
     if (!sliderProductId)
       throw new Error(`Fixture assembly ${fixtureSlider.slug} is incomplete.`);
     await db
-      .update(productSlider)
+      .update(productDetailSlider)
       .set({
         includedInsertProductId: insertProductId,
         includedPlateProductId: plateProductId,
         magnetLayout: insertProductId ? null : fixtureSlider.magnetLayout,
       })
-      .where(eq(productSlider.id, sliderProductId));
+      .where(eq(productDetailSlider.id, sliderProductId));
   }
 
   for (const fixtureProduct of sliderFixtureCatalog.products) {

@@ -223,7 +223,7 @@ function setup(
       return {
         where: vi.fn(async () => {
           if (
-            table === schema.collectionSpinner &&
+            table === schema.collectionDetailSpinner &&
             spinnerUpdateError &&
             "installedButtonId" in (value as object)
           ) {
@@ -570,7 +570,7 @@ describe("collection catalog writes", () => {
           value: { collectionId: 900, materialId: 1201, ownerId: 1000 },
         },
         {
-          table: schema.collectionSpinnerButton,
+          table: schema.collectionDetailSpinnerButton,
           value: { id: 2000, productSpinnerButtonId: 1200 },
         },
         {
@@ -593,7 +593,7 @@ describe("collection catalog writes", () => {
           },
         },
         {
-          table: schema.collectionSpinner,
+          table: schema.collectionDetailSpinner,
           value: {
             id: 2001,
             installedButtonId: 2000,
@@ -643,7 +643,7 @@ describe("collection catalog writes", () => {
         },
       },
       {
-        table: schema.collectionSpinner,
+        table: schema.collectionDetailSpinner,
         value: {
           id: 2001,
           installedButtonId: null,
@@ -814,7 +814,7 @@ describe("collection catalog writes", () => {
         { table: schema.collectionItem, value: { materialId: 1101 } },
         { table: schema.collectionItem, value: { materialId: 1201 } },
         {
-          table: schema.collectionSpinner,
+          table: schema.collectionDetailSpinner,
           value: { installedButtonId: 2000 },
         },
       ]),
@@ -844,7 +844,7 @@ describe("collection catalog writes", () => {
       new Error("Query failed", {
         cause: {
           code: "23505",
-          constraint: "collection_spinner_installed_button_unique",
+          constraint: "collection_detail_spinner_installed_button_unique",
         },
       }),
     );
@@ -1016,7 +1016,7 @@ describe("catalog lookup writes", () => {
           }),
         },
         {
-          table: schema.productSpinner,
+          table: schema.productDetailSpinner,
           value: expect.objectContaining({
             bearing: "R188",
             spinDiameter: "52",
@@ -1146,7 +1146,7 @@ describe("catalog lookup writes", () => {
       expect.objectContaining({ description: "Updated **description**" }),
     );
     expect(
-      updates.find(({ table }) => table === schema.productSpinner)?.value,
+      updates.find(({ table }) => table === schema.productDetailSpinner)?.value,
     ).toEqual(
       expect.objectContaining({
         bearing: "One Drop",

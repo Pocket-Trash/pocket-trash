@@ -500,14 +500,14 @@ async function createPublicPrivacyFixture(
     const privateButton = item(" private button");
     const privateCollectionItem = item(" private collection item");
 
-    await transaction.insert(schema.collectionSpinnerButton).values([
+    await transaction.insert(schema.collectionDetailSpinnerButton).values([
       { id: publicButton.id, productSpinnerButtonId: mutation.buttonProductId },
       {
         id: privateButton.id,
         productSpinnerButtonId: mutation.buttonProductId,
       },
     ]);
-    await transaction.insert(schema.collectionSpinner).values([
+    await transaction.insert(schema.collectionDetailSpinner).values([
       {
         id: publicSpinner.id,
         installedButtonId: privateButton.id,

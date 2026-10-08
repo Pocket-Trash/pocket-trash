@@ -79,7 +79,7 @@ describe("collection-item approval", () => {
         })
         .returning();
       if (!product) throw new Error("Product missing.");
-      await db.insert(schema.productSpinner).values({ id: product.id });
+      await db.insert(schema.productDetailSpinner).values({ id: product.id });
       const [material] = await db
         .insert(schema.material)
         .values({ name: "Titanium", slug: "titanium" })
@@ -99,7 +99,7 @@ describe("collection-item approval", () => {
       await db
         .insert(schema.finishOption)
         .values({ collectionItemId: item.id, position: 0 });
-      await db.insert(schema.collectionSpinner).values([
+      await db.insert(schema.collectionDetailSpinner).values([
         { id: item.id, productSpinnerId: product.id },
         { id: legacy.id, productSpinnerId: product.id },
       ]);

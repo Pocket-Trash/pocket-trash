@@ -80,13 +80,13 @@ describe("owned slider magnet snapshots", () => {
       )?.id;
       if (!sliderProductId || !insertProductId)
         throw new Error("Products missing.");
-      await db.insert(schema.productSlider).values({
+      await db.insert(schema.productDetailSlider).values({
         id: sliderProductId,
         magnetLayout: "2x4",
         usesInserts: true,
       });
       await db
-        .insert(schema.productSliderInsert)
+        .insert(schema.productDetailSliderInsert)
         .values({ id: insertProductId });
       await db.insert(schema.productMaterial).values(
         products.map((product) => ({

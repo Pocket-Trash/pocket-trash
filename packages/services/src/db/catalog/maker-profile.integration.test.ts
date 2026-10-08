@@ -205,7 +205,7 @@ describe("maker profile persistence", () => {
           ((select id from product_types where slug = 'spinner'), (select id from makers where slug = 'directory-maker'), 'Public product', 'public-product', 'approved', false),
           ((select id from product_types where slug = 'spinner'), (select id from makers where slug = 'directory-maker'), 'Pending product', 'pending-product', 'pending', false),
           ((select id from product_types where slug = 'spinner'), (select id from makers where slug = 'directory-maker'), 'Private product', 'private-product', 'approved', true);
-        insert into product_spinner (id)
+        insert into product_detail_spinner (id)
           select id from product where slug in ('public-product', 'pending-product', 'private-product');
         insert into user_collection (owner_id, name, normalized_name, is_private)
         values
@@ -231,7 +231,7 @@ describe("maker profile persistence", () => {
         ) fixture(display_name, owned, sold_at, approval_status, is_private, collection_name)
         join users on users.clerk_id = 'directory-owner'
         join user_collection on user_collection.name = fixture.collection_name;
-        insert into collection_spinner (id, product_spinner_id)
+        insert into collection_detail_spinner (id, product_spinner_id)
         select collection_item.id,
           product.id
         from collection_item

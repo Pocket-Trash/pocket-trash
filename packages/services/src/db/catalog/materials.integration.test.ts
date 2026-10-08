@@ -96,7 +96,7 @@ describe("public material directory", () => {
         ])
         .returning();
       await db
-        .insert(schema.productSpinner)
+        .insert(schema.productDetailSpinner)
         .values(products.map(({ id }) => ({ id })));
       await db.insert(schema.productMaterial).values(
         products.map(({ id }) => ({
@@ -177,7 +177,7 @@ describe("public material directory", () => {
           },
         ])
         .returning();
-      await db.insert(schema.collectionSpinner).values(
+      await db.insert(schema.collectionDetailSpinner).values(
         items.map(({ id }, index) => ({
           id,
           productSpinnerId:
