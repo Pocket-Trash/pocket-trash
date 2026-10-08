@@ -224,7 +224,6 @@ const changeClassificationRules = [
     paths: ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"],
     prefixes: ["patches/"],
     domains: ["validation"],
-    dependencyGraph: true,
   },
   {
     category: "lint-policy",
@@ -257,6 +256,52 @@ const changeClassificationRules = [
     domains: ["scraper", "preview", "validation"],
   },
   {
+    category: "local-scraper-tooling",
+    paths: [
+      "scripts/dev-scraper.mjs",
+      "scripts/scraper-command.mjs",
+      "scripts/scraper-redis.mjs",
+      "scripts/check-railway-context.mjs",
+      "scripts/workspace-packages.mjs",
+    ],
+    domains: ["scraper", "validation"],
+  },
+  {
+    category: "local-webhook-tooling",
+    paths: ["scripts/dev-webhooks.mjs"],
+    domains: ["api", "preview", "safe_e2e", "validation"],
+    mutationDomains: allMutationDomains,
+  },
+  {
+    category: "standalone-validation-scripts",
+    paths: [
+      "scripts/audit-bunny-services.mjs",
+      "scripts/change-classification.test.mjs",
+      "scripts/check-changelog-reminder.mjs",
+      "scripts/check-changelog-reminder.test.mjs",
+      "scripts/check-jsdoc.mjs",
+      "scripts/check-jsdoc.test.mjs",
+      "scripts/check-pr-changeset.mjs",
+      "scripts/check-pr-changeset.test.mjs",
+      "scripts/classify-changes.mjs",
+      "scripts/database-change-detection.test.mjs",
+      "scripts/dependency-changes.mjs",
+      "scripts/developer-commands.test.mjs",
+      "scripts/drizzle-view.mjs",
+      "scripts/e2e-local-contract.test.mjs",
+      "scripts/generate-infrastructure-diagram.mjs",
+      "scripts/release.mjs",
+      "scripts/release.test.mjs",
+      "scripts/security-audit.mjs",
+      "scripts/security-policy.test.mjs",
+      "scripts/validate-pr.mjs",
+      "scripts/validate-pr.test.mjs",
+      "scripts/generate-database-schema-diagram.mjs",
+      "scripts/database-schema-diagram.template.html",
+    ],
+    domains: ["validation"],
+  },
+  {
     category: "repository-validation",
     paths: [
       ".gitignore",
@@ -286,6 +331,20 @@ const changeClassificationRules = [
     mutationDomains: allMutationDomains,
   },
 ];
+
+/**
+ * Identifies manifests and dependency policies requiring committed graph comparison.
+ * @param {string} file - Repository-relative changed path.
+ * @returns {boolean} Whether dependency consumers must be compared.
+ */
+export function requiresDependencyComparison(file) {
+  return (
+    file === "package.json" ||
+    file.endsWith("/package.json") ||
+    ["pnpm-lock.yaml", "pnpm-workspace.yaml"].includes(file) ||
+    file.startsWith("patches/")
+  );
+}
 
 /**
  * Creates a result with every validation domain set to the same value.
@@ -417,13 +476,17 @@ export function classifyChanges(
 
     if (rule.domains.length === 0) noCodePaths.push(file);
     else if (!labelEvent) {
-      enable(domains, ...rule.domains);
-      if (rule.dependencyGraph && dependencyChanges === undefined) {
-        enable(domains, ...validationDomains);
-        for (const domain of allMutationDomains) mutationDomains.add(domain);
+      if (requiresDependencyComparison(file)) {
+        enable(domains, "validation");
+        if (dependencyChanges === undefined) {
+          enable(domains, ...validationDomains);
+          for (const domain of allMutationDomains) mutationDomains.add(domain);
+        }
+      } else {
+        enable(domains, ...rule.domains);
+        for (const domain of rule.mutationDomains ?? [])
+          mutationDomains.add(domain);
       }
-      for (const domain of rule.mutationDomains ?? [])
-        mutationDomains.add(domain);
     }
   }
 
@@ -523,7 +586,7 @@ async function main() {
     };
     const files = getChangedFiles(options);
     let dependencyChanges;
-    if (files.some((file) => findRule(file)?.dependencyGraph)) {
+    if (files.some(requiresDependencyComparison)) {
       try {
         const { getDependencyChanges } = await import(
           "./dependency-changes.mjs"

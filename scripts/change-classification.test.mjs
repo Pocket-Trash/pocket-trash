@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
@@ -625,4 +633,175 @@ test("webhook preview label retains schema and runtime mutation isolation", () =
     assert.equal(webhook.domains.mutation_e2e, true, file);
     assert.deepEqual(webhook, regular);
   }
+});
+
+test("workspace manifest changes use dependency consumers before enabling mutations", () => {
+  for (const file of [
+    "package.json",
+    "apps/web/package.json",
+    "apps/api/package.json",
+    "packages/database/package.json",
+  ]) {
+    assert.deepEqual(
+      classifyChanges([file], { dependencyChanges: [] }),
+      expected(["validation"]),
+      file,
+    );
+    assert.equal(
+      classifyChanges([file], {
+        dependencyChanges: [{ path: file, runtime: false }],
+      }).domains.mutation_e2e,
+      false,
+      file,
+    );
+    assert.equal(
+      classifyChanges([file], {
+        dependencyChanges: [{ path: file, runtime: true }],
+      }).domains.mutation_e2e,
+      true,
+      file,
+    );
+  }
+});
+
+test("committed workspace scripts select build checks without mutation isolation", async (context) => {
+  const { getDependencyChanges } = await import("./dependency-changes.mjs");
+  const cwd = mkdtempSync(join(tmpdir(), "manifest-classification-"));
+  context.after(() => rmSync(cwd, { recursive: true, force: true }));
+  /**
+   * Runs Git within the isolated manifest fixture.
+   * @param {string[]} args - Git arguments.
+   * @returns {string} Trimmed command output.
+   * @throws When Git cannot complete the command.
+   */
+  const git = (args) =>
+    execFileSync("git", args, {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+  git(["init"]);
+  git(["config", "user.name", "Fixture"]);
+  git(["config", "user.email", "fixture@example.com"]);
+  mkdirSync(join(cwd, "apps/api"), { recursive: true });
+  writeFileSync(
+    join(cwd, "package.json"),
+    JSON.stringify({ name: "fixture", version: "1.0.0" }),
+  );
+  writeFileSync(
+    join(cwd, "apps/api/package.json"),
+    JSON.stringify({ name: "@app/api", scripts: { build: "old" } }),
+  );
+  writeFileSync(join(cwd, "pnpm-workspace.yaml"), "packages: [apps/*]\n");
+  writeFileSync(
+    join(cwd, "pnpm-lock.yaml"),
+    "lockfileVersion: '9.0'\nimporters:\n  .: {}\n  apps/api: {}\npackages: {}\nsnapshots: {}\n",
+  );
+  git(["add", "."]);
+  git(["commit", "-m", "base"]);
+  const baseSha = git(["rev-parse", "HEAD"]);
+  writeFileSync(
+    join(cwd, "apps/api/package.json"),
+    JSON.stringify({ name: "@app/api", scripts: { build: "new" } }),
+  );
+  git(["add", "apps/api/package.json"]);
+  git(["commit", "-m", "script"]);
+  const changes = getDependencyChanges({ baseSha, headSha: "HEAD", cwd });
+  assert.deepEqual(changes, [
+    { path: "apps/api/package.json", runtime: false },
+  ]);
+  const result = classifyChanges(["apps/api/package.json"], {
+    dependencyChanges: changes,
+  });
+  assert.equal(result.domains.api, true);
+  assert.equal(result.domains.mutation_e2e, false);
+  const scriptSha = git(["rev-parse", "HEAD"]);
+  writeFileSync(
+    join(cwd, "package.json"),
+    JSON.stringify({ name: "fixture", version: "2.0.0" }),
+  );
+  git(["add", "package.json"]);
+  git(["commit", "-m", "version"]);
+  assert.deepEqual(
+    getDependencyChanges({ baseSha: scriptSha, headSha: "HEAD", cwd }),
+    [],
+  );
+  const versionSha = git(["rev-parse", "HEAD"]);
+  writeFileSync(
+    join(cwd, "package.json"),
+    JSON.stringify({
+      name: "fixture",
+      version: "2.0.0",
+      scripts: { diagram: "node diagram.mjs" },
+    }),
+  );
+  git(["add", "package.json"]);
+  git(["commit", "-m", "root script"]);
+  assert.deepEqual(
+    getDependencyChanges({ baseSha: versionSha, headSha: "HEAD", cwd }),
+    [{ path: "package.json", runtime: false }],
+  );
+});
+
+test("audited standalone scripts require validation without preview isolation", () => {
+  for (const file of [
+    "scripts/audit-bunny-services.mjs",
+    "scripts/change-classification.test.mjs",
+    "scripts/check-changelog-reminder.mjs",
+    "scripts/check-changelog-reminder.test.mjs",
+    "scripts/check-jsdoc.mjs",
+    "scripts/check-jsdoc.test.mjs",
+    "scripts/check-pr-changeset.mjs",
+    "scripts/check-pr-changeset.test.mjs",
+    "scripts/classify-changes.mjs",
+    "scripts/database-change-detection.test.mjs",
+    "scripts/dependency-changes.mjs",
+    "scripts/developer-commands.test.mjs",
+    "scripts/drizzle-view.mjs",
+    "scripts/e2e-local-contract.test.mjs",
+    "scripts/generate-infrastructure-diagram.mjs",
+    "scripts/release.mjs",
+    "scripts/release.test.mjs",
+    "scripts/security-audit.mjs",
+    "scripts/security-policy.test.mjs",
+    "scripts/validate-pr.mjs",
+    "scripts/validate-pr.test.mjs",
+    "scripts/generate-database-schema-diagram.mjs",
+    "scripts/database-schema-diagram.template.html",
+  ]) {
+    assert.deepEqual(classifyChanges([file]), expected(["validation"]), file);
+  }
+});
+
+test("local scraper tooling gets scraper checks without a mutation preview", () => {
+  for (const file of [
+    "scripts/dev-scraper.mjs",
+    "scripts/scraper-command.mjs",
+    "scripts/scraper-redis.mjs",
+    "scripts/check-railway-context.mjs",
+    "scripts/workspace-packages.mjs",
+  ]) {
+    assert.deepEqual(
+      classifyChanges([file]),
+      expected(["scraper", "validation"]),
+      file,
+    );
+  }
+});
+
+test("webhook tooling and unreviewed scripts retain mutation coverage", () => {
+  assert.equal(
+    classifyChanges(["scripts/dev-webhooks.mjs"]).domains.mutation_e2e,
+    true,
+  );
+  assert.deepEqual(
+    classifyChanges(["scripts/new-unreviewed-tool.mjs"]),
+    expected(validationDomains),
+  );
+  assert.equal(
+    classifyChanges(["scripts/generate-database-schema-diagram.mjs"], {
+      labels: ["test:e2e"],
+    }).domains.mutation_e2e,
+    true,
+  );
 });

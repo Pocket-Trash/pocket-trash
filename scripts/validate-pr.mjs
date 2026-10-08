@@ -2,7 +2,11 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { classifyChanges, getChangedFiles } from "./classify-changes.mjs";
+import {
+  classifyChanges,
+  getChangedFiles,
+  requiresDependencyComparison,
+} from "./classify-changes.mjs";
 
 /** Absolute repository root used by pull-request validation. */
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -310,14 +314,7 @@ async function main() {
 
   const context = getValidationContext({ baseRef });
   let dependencyChanges;
-  if (
-    context.files.some(
-      (file) =>
-        ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"].includes(
-          file,
-        ) || file.startsWith("patches/"),
-    )
-  ) {
+  if (context.files.some(requiresDependencyComparison)) {
     try {
       const { getDependencyChanges } = await import("./dependency-changes.mjs");
       dependencyChanges = getDependencyChanges({

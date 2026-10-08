@@ -204,16 +204,32 @@ export function getDependencyChanges({ baseSha, headSha, cwd }) {
   if (JSON.stringify(beforePolicy) !== JSON.stringify(afterPolicy)) {
     changes.push({ path: "package.json", runtime: true });
   }
-  const beforeRoot = JSON.parse(read(mergeBase, "package.json"));
-  const afterRoot = JSON.parse(read(headSha, "package.json"));
-  for (const root of [beforeRoot, afterRoot]) {
-    delete root.dependencies;
-    delete root.devDependencies;
-    delete root.name;
-    delete root.version;
-  }
-  if (JSON.stringify(beforeRoot) !== JSON.stringify(afterRoot)) {
-    changes.push({ path: "package.json", runtime: false });
+  const manifests = execFileSync(
+    "git",
+    ["diff", "--name-only", `${mergeBase}...${headSha}`],
+    { cwd, encoding: "utf8" },
+  )
+    .trim()
+    .split("\n")
+    .filter(
+      (path) => path === "package.json" || path.endsWith("/package.json"),
+    );
+  for (const path of manifests) {
+    const beforeManifest = JSON.parse(read(mergeBase, path));
+    const afterManifest = JSON.parse(read(headSha, path));
+    for (const manifest of [beforeManifest, afterManifest]) {
+      for (const field of [
+        "dependencies",
+        "devDependencies",
+        "optionalDependencies",
+        "peerDependencies",
+        "name",
+        "version",
+      ])
+        delete manifest[field];
+    }
+    if (JSON.stringify(beforeManifest) !== JSON.stringify(afterManifest))
+      changes.push({ path, runtime: false });
   }
   return changes;
 }
