@@ -149,3 +149,31 @@ The command prints instructions for Codex to use the shared
 `$pocket-trash db-migration-conflicts` workflow. That workflow preserves
 schema intent and hand-written SQL, regenerates migration artifacts, and runs
 the Drizzle consistency check.
+
+## Preview classification contract
+
+Three outputs answer different questions:
+
+- `database_validation` selects database checks for changes to the database or
+  shared foundation. It does not indicate schema changes or require a PR branch.
+- `database_content_changed` detects schema, migrations, Drizzle configuration,
+  and seed scripts/data. It alone controls the `db-change` label and development
+  database refresh. Dependency-only changes do not receive that label.
+- `mutation_e2e` selects mutation fixtures and requires an isolated Neon PR
+  branch. Schema/seed changes and the explicit `test:e2e` label require isolation;
+  other runtime changes may also require it without changing database content.
+
+For dependency policy or lockfile changes, the classifier compares both committed
+pnpm lockfiles and traverses resolved dependencies, optional dependencies,
+workspace links, and package integrity metadata. Known build entrypoints (Vite,
+TypeScript, Tailwind's Vite plugin, and TanStack build plugins) stay in the build
+graph even when declared as runtime dependencies. Runtime consumers retain their
+normal mutation domains; build-only consumers receive build/preview/safe E2E
+checks without mutation isolation. Unchanged graphs select validation only.
+Unreadable or unsupported graphs retain conservative full checks and isolation.
+Release-age policy changes alone select validation only. Other workspace policy
+changes retain conservative isolation; root script/engine changes select build
+and smoke checks. Lint policy and skill lockfiles select validation only; Railway configuration
+selects scraper checks and a preview. Unknown paths and workflows remain
+conservative. Deployment summaries show content changes and mutation isolation
+separately; removing isolation also removes stale PR branches and overrides.

@@ -104,7 +104,7 @@ test("database detection includes schema and seed changes", (context) => {
     });
     assert.equal(
       readFileSync(output, "utf8"),
-      `database=${expected}\nchanged_files<<EOF\n${path}\nEOF\n`,
+      `database_content_changed=${expected}\nchanged_files<<EOF\n${path}\nEOF\n`,
       path,
     );
   }
@@ -115,8 +115,8 @@ test("schema-changing main deploys refresh preview after development", () => {
   const refresh = deployWorkflow.jobs["refresh-preview"];
 
   assert.equal(
-    development.outputs.database_changed,
-    "${{ steps.db_changes.outputs.database }}",
+    development.outputs.database_content_changed,
+    "${{ steps.db_changes.outputs.database_content_changed }}",
   );
   assert.equal(refresh.needs, "development-api");
   assert.match(
@@ -142,7 +142,7 @@ test("PR mutation isolation is independent of migration detection", () => {
   );
   assert.equal(
     readyComment.env.DB_CHANGING,
-    "${{ steps.db_changes.outputs.database }}",
+    "${{ steps.db_changes.outputs.database_content_changed }}",
   );
 });
 
@@ -201,4 +201,26 @@ test("preview lifecycle handles stale state and preflight failures", () => {
     cwd: new URL("..", import.meta.url),
     stdio: ["ignore", "pipe", "pipe"],
   });
+});
+
+test("database content detection alone controls labeling, while mutations control isolation", () => {
+  const steps = deployWorkflow.jobs.preview.steps;
+  const label = steps.find((step) => step.name === "Sync db-change label");
+  assert.equal(
+    label.env.DATABASE_CONTENT_CHANGED,
+    "${{ steps.db_changes.outputs.database_content_changed }}",
+  );
+  assert.match(
+    label.with.script,
+    /process.env.DATABASE_CONTENT_CHANGED === "true"/u,
+  );
+  assert.doesNotMatch(label.with.script, /mutation_e2e/u);
+  const summary = steps.find(
+    (step) => step.name === "Report preview database decisions",
+  );
+  assert.match(
+    summary.env.MUTATION_ISOLATION_REQUIRED,
+    /outputs.mutation_e2e/u,
+  );
+  assert.match(summary.env.MUTATION_ISOLATION_REQUIRED, /test:e2e/u);
 });

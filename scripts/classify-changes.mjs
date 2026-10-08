@@ -8,7 +8,7 @@ export const validationDomains = [
   "api",
   "scraper",
   "web",
-  "database",
+  "database_validation",
   "storybook",
   "preview",
   "safe_e2e",
@@ -220,6 +220,43 @@ const changeClassificationRules = [
     mutationDomains: allMutationDomains,
   },
   {
+    category: "dependency-policy",
+    paths: ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"],
+    prefixes: ["patches/"],
+    domains: ["validation"],
+    dependencyGraph: true,
+  },
+  {
+    category: "lint-policy",
+    paths: [
+      "biome.json",
+      "commitlint.config.cjs",
+      "eslint.config.mjs",
+      "security-audit-exceptions.json",
+      "skills-lock.json",
+    ],
+    prefixes: [".githooks/"],
+    domains: ["validation"],
+  },
+  {
+    category: "root-build",
+    paths: ["tsconfig.json", "turbo.json"],
+    domains: [
+      "api",
+      "scraper",
+      "web",
+      "storybook",
+      "preview",
+      "safe_e2e",
+      "validation",
+    ],
+  },
+  {
+    category: "railway",
+    paths: ["railway.json", ".railwayignore"],
+    domains: ["scraper", "preview", "validation"],
+  },
+  {
     category: "repository-validation",
     paths: [
       ".gitignore",
@@ -326,6 +363,7 @@ function response(
  * @param {unknown[]} files - Changed repository-relative paths.
  * @param {object} options - GitHub event context.
  * @param {string} [options.action] - Pull-request event action.
+ * @param {Array<{path: string, runtime: boolean}>} [options.dependencyChanges] - Lockfile consumers affected by dependency graph changes; absent means unknown.
  * @param {boolean} [options.diffFailed] - Whether Git could not produce a diff.
  * @param {string} [options.eventLabel] - Label changed by this event.
  * @param {string} [options.eventName] - GitHub event name.
@@ -337,6 +375,7 @@ export function classifyChanges(
   {
     action = "synchronize",
     diffFailed = false,
+    dependencyChanges,
     eventLabel,
     eventName = "pull_request",
     labels = [],
@@ -377,8 +416,42 @@ export function classifyChanges(
     if (rule.domains.length === 0) noCodePaths.push(file);
     else if (!labelEvent) {
       enable(domains, ...rule.domains);
+      if (rule.dependencyGraph && dependencyChanges === undefined) {
+        enable(domains, ...validationDomains);
+        for (const domain of allMutationDomains) mutationDomains.add(domain);
+      }
       for (const domain of rule.mutationDomains ?? [])
         mutationDomains.add(domain);
+    }
+  }
+
+  if (!labelEvent && dependencyChanges) {
+    for (const { path, runtime } of dependencyChanges) {
+      const rule = findRule(path);
+      if (!rule || path === "package.json") {
+        enable(
+          domains,
+          ...validationDomains.filter(
+            (domain) =>
+              runtime ||
+              !["database_validation", "mutation_e2e"].includes(domain),
+          ),
+        );
+        if (runtime)
+          for (const domain of allMutationDomains) mutationDomains.add(domain);
+      } else {
+        enable(
+          domains,
+          ...rule.domains.filter(
+            (domain) =>
+              runtime ||
+              !["database_validation", "mutation_e2e"].includes(domain),
+          ),
+        );
+        if (runtime)
+          for (const domain of rule.mutationDomains ?? [])
+            mutationDomains.add(domain);
+      }
     }
   }
 
@@ -437,22 +510,34 @@ export function getChangedFiles({ baseSha, headSha, cwd = repoRoot }) {
 }
 
 /** Writes classifier outputs for GitHub Actions, failing open on diff errors. */
-function main() {
+async function main() {
   let classification;
 
   try {
-    classification = classifyChanges(
-      getChangedFiles({
-        baseSha: process.env.BASE_SHA,
-        headSha: process.env.HEAD_SHA,
-      }),
-      {
-        action: process.env.EVENT_ACTION,
-        eventLabel: process.env.EVENT_LABEL,
-        eventName: process.env.EVENT_NAME,
-        labels: JSON.parse(process.env.PR_LABELS || "[]") ?? [],
-      },
-    );
+    const options = {
+      baseSha: process.env.BASE_SHA,
+      headSha: process.env.HEAD_SHA,
+      cwd: repoRoot,
+    };
+    const files = getChangedFiles(options);
+    let dependencyChanges;
+    if (files.some((file) => findRule(file)?.dependencyGraph)) {
+      try {
+        const { getDependencyChanges } = await import(
+          "./dependency-changes.mjs"
+        );
+        dependencyChanges = getDependencyChanges(options);
+      } catch {
+        /* Unknown dependency graphs retain full validation and isolation. */
+      }
+    }
+    classification = classifyChanges(files, {
+      dependencyChanges,
+      action: process.env.EVENT_ACTION,
+      eventLabel: process.env.EVENT_LABEL,
+      eventName: process.env.EVENT_NAME,
+      labels: JSON.parse(process.env.PR_LABELS || "[]") ?? [],
+    });
   } catch {
     classification = response(everyDomain(true), {
       error: "diff-failed",
@@ -478,5 +563,5 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  main();
+  await main();
 }

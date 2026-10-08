@@ -21,7 +21,7 @@ jobs:
       api: ${{ steps.classify.outputs.api }}
       scraper: ${{ steps.classify.outputs.scraper }}
       web: ${{ steps.classify.outputs.web }}
-      database: ${{ steps.classify.outputs.database }}
+      database_validation: ${{ steps.classify.outputs.database_validation }}
       storybook: ${{ steps.classify.outputs.storybook }}
       preview: ${{ steps.classify.outputs.preview }}
       safe_e2e: ${{ steps.classify.outputs.safe_e2e }}
@@ -37,6 +37,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install classifier dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
       - name: Classify changes
         id: classify
         env:
@@ -48,7 +54,7 @@ jobs:
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           if ! node scripts/classify-changes.mjs; then
-            for domain in api scraper web database storybook preview safe_e2e mutation_e2e validation; do
+            for domain in api scraper web database_validation storybook preview safe_e2e mutation_e2e validation; do
               echo "$domain=true" >> "$GITHUB_OUTPUT"
             done
             echo 'mutation_e2e_specs=["e2e/collection-covers.spec.ts","e2e/collection-lifecycle.spec.ts","e2e/collection-selection.spec.ts","e2e/public-collections.spec.ts","e2e/mutation.spec.ts","e2e/makers.spec.ts","e2e/authenticated.spec.ts"]' >> "$GITHUB_OUTPUT"
@@ -360,7 +366,7 @@ jobs:
       always() &&
       needs.classify-changes.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
-      needs.classify-changes.outputs.database == 'true'
+      needs.classify-changes.outputs.database_validation == 'true'
     runs-on: ubuntu-latest
 
     steps:

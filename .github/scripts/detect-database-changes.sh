@@ -9,7 +9,7 @@ if grep -Eq '^(packages/database/src/schema/|packages/database/drizzle/|packages
   database=true
 fi
 
-echo "database=$database" >> "$GITHUB_OUTPUT"
+echo "database_content_changed=$database" >> "$GITHUB_OUTPUT"
 {
   echo "changed_files<<EOF"
   printf '%s\n' "$changed_files"
@@ -21,6 +21,6 @@ emit_ci_log info "ci.database.preview.changeDetection.completed" "$(jq -n \
   --argjson database "$database" \
   --arg changed_files "$changed_files" \
   '{
-    databaseChanged: $database,
+    databaseContentChanged: $database,
     changedFiles: ($changed_files | split("\n") | map(select(. != "")))
   }')"
