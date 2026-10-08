@@ -13,7 +13,9 @@ test("regular users can open account and settings", async ({
   await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
 
   await page.goto("/user/settings");
-  await expect(page.getByRole("group", { name: "Dimensions" })).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: "Measurement system options" }),
+  ).toBeVisible();
 });
 
 test("regular users receive not found for admin routes", async ({
