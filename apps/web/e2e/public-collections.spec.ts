@@ -225,12 +225,26 @@ test("@mutation public profile pictures appear, change, and disappear on every o
       for (const path of paths) {
         await page.goto(path);
         await waitForHydration(page);
+        await expect(
+          page.locator('header nav [data-slot="avatar"]'),
+        ).toHaveCount(0);
+        if (path === paths[3]) {
+          continue;
+        }
         const surface =
           path === "/collections"
             ? page
                 .getByRole("article")
                 .filter({ hasText: fixture.publicCollection.name })
-            : page.locator("header");
+            : path === paths[2]
+              ? page
+                  .getByRole("heading", {
+                    name: fixture.publicCollection.name,
+                    exact: true,
+                    level: 2,
+                  })
+                  .locator("..")
+              : page.locator("header");
         const avatar = surface
           .locator('[data-slot="avatar"][aria-hidden="true"]')
           .first();
@@ -239,7 +253,7 @@ test("@mutation public profile pictures appear, change, and disappear on every o
           const image = avatar.locator("img");
           await expect(image).toBeVisible();
           await expect(image).toHaveAttribute("alt", "");
-          const size = path === `/collections/${fixture.ownerId}` ? "75" : "45";
+          const size = path === "/collections" ? "45" : "75";
           await expect(image).toHaveAttribute(
             "src",
             `${imageUrl}?width=${size}&height=${size}`,

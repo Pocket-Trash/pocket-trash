@@ -9,7 +9,6 @@ import { ChevronRight, Home } from "lucide-react";
 import type * as React from "react";
 import { toast } from "sonner";
 import { LanguageSelect } from "@/components/language-select";
-import { PublicProfileAvatar } from "@/components/public-profile-avatar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { updateLocaleSetting } from "@/lib/locale-api";
@@ -44,8 +43,6 @@ export type AppShellProps = {
     | {
         /** Breadcrumb label. */
         label: string;
-        /** Selected public Clerk picture URL, or null when absent. */
-        imageUrl?: string | null;
         /** Parameters for the user collection route. */
         params: {
           /** Numeric collection owner identifier. */
@@ -126,15 +123,11 @@ export function AppShell({
                   />
                   {item.to === "/collections/$userId" ? (
                     <Link
-                      className="flex min-w-0 items-center gap-1 truncate hover:text-foreground"
+                      className="truncate hover:text-foreground"
                       params={item.params}
                       to={item.to}
                     >
-                      <PublicProfileAvatar
-                        imageUrl={item.imageUrl ?? null}
-                        username={item.label}
-                      />
-                      <span className="truncate">{item.label}</span>
+                      {item.label}
                     </Link>
                   ) : item.to ? (
                     <Link

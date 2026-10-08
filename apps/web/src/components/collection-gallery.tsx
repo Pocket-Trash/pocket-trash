@@ -7,7 +7,7 @@ import {
   useTable,
 } from "@tanstack/react-table";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
 import {
   type GalleryImage,
   ImageButton,
@@ -98,11 +98,13 @@ export type CollectionGalleryCopy = {
  * @param props - Collection gallery properties.
  * @param props.collection - Collection summary and cover images to present.
  * @param props.copy - Localized labels and formatted collection metadata.
+ * @param props.ownerAvatar - Decorative owner picture beside the collection title.
  * @returns The collection gallery UI.
  */
 export function CollectionGallery({
   collection,
   copy,
+  ownerAvatar,
 }: {
   /**
    * Collection summary and cover images to present.
@@ -112,6 +114,8 @@ export function CollectionGallery({
    * Localized labels and formatted collection metadata.
    */
   copy: CollectionGalleryCopy;
+  /** Decorative owner picture beside the collection title. */
+  ownerAvatar?: ReactNode;
 }) {
   const nonCoverImages = useMemo(
     () =>
@@ -179,7 +183,10 @@ export function CollectionGallery({
                 onClick={() => select(0)}
               />
             ) : null}
-            <h2 className="text-lg font-semibold">{collection.name}</h2>
+            <div className="flex items-start justify-between gap-4">
+              <h2 className="text-lg font-semibold">{collection.name}</h2>
+              {ownerAvatar}
+            </div>
             {collection.description ? (
               <MarkdownContent markdown={collection.description} />
             ) : null}

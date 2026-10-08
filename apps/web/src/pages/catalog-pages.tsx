@@ -1174,6 +1174,15 @@ export function CollectionPage({
       {userArea ? filterBar : null}
       <CollectionGallery
         collection={collection}
+        ownerAvatar={
+          ownerUsername ? (
+            <PublicProfileAvatar
+              imageUrl={ownerImageUrl}
+              size="lg"
+              username={ownerUsername}
+            />
+          ) : undefined
+        }
         copy={{
           closeImage: t("web.resources.action.closeImage"),
           gallery: t("web.collections.gallery.title"),
@@ -1330,7 +1339,6 @@ export function CollectionPage({
         ...(ownerUsername
           ? [
               {
-                imageUrl: ownerImageUrl,
                 label: ownerUsername,
                 params: { userId: collection.ownerUserId },
                 to: "/collections/$userId" as const,
@@ -1629,7 +1637,6 @@ export function CollectionItemDetailPage({
         ...(item.ownerUsername
           ? [
               {
-                imageUrl: item.ownerImageUrl,
                 label: item.ownerUsername,
                 params: { userId: item.ownerUserId },
                 to: "/collections/$userId" as const,

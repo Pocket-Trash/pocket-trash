@@ -8,7 +8,7 @@ import type {
 } from "@package/services";
 import { formatTranslation } from "@pocket-trash/localizations";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { getHelpDocument } from "@/lib/help-content";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import {
@@ -264,10 +264,34 @@ export const Collection: Story = {
       collection={collection}
       items={[item]}
       onFiltersChange={fn()}
-      ownerImageUrl={owner.imageUrl}
+      ownerImageUrl={
+        new URL("/images/tmp/7887468134587-1.jpg", window.location.origin).href
+      }
       ownerUsername={owner.username}
     />
   ),
+  /**
+   * Verifies the picture is in the details card and breadcrumbs remain text-only.
+   *
+   * @param context - Story canvas.
+   * @param context.canvasElement - Rendered story container.
+   * @returns Completion after avatar placement assertions.
+   */
+  play: async ({ canvasElement }) => {
+    const heading = within(canvasElement).getByRole("heading", {
+      name: collection.name,
+      level: 2,
+    });
+    await waitFor(() =>
+      expect(heading.parentElement?.querySelector("img")).toBeVisible(),
+    );
+    expect(
+      heading.parentElement?.querySelector('[data-slot="avatar"]'),
+    ).toHaveAttribute("data-size", "lg");
+    expect(
+      canvasElement.querySelector('header nav [data-slot="avatar"]'),
+    ).toBeNull();
+  },
 };
 
 /** Collection item page story. */
