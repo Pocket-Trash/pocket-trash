@@ -115,6 +115,18 @@ export const productAudit = {
     "products.product.visibility_changed",
     "products.product",
   ),
+  sliderMagnetPresetCreated: definition(
+    "products.slider_magnet_preset.created",
+    "products.slider_magnet_preset",
+  ),
+  sliderMagnetPresetDeleted: definition(
+    "products.slider_magnet_preset.deleted",
+    "products.slider_magnet_preset",
+  ),
+  sliderMagnetPresetUpdated: definition(
+    "products.slider_magnet_preset.updated",
+    "products.slider_magnet_preset",
+  ),
 } as const;
 
 /** Product audit definitions accepted by the audit service. */

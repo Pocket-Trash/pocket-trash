@@ -446,6 +446,7 @@ describe("catalog product persistence", () => {
       const insert = await service.createProduct({
         actor: admin,
         finishOptions: [],
+        magnetLayout: "2x4",
         makerId: maker.id,
         materialIds: [material.id],
         name: "Cassette Insert",
@@ -475,8 +476,8 @@ describe("catalog product persistence", () => {
 
       expect(slider).toEqual(
         expect.objectContaining({
-          clickCount: null,
-          magnetLayout: null,
+          clickCount: 3,
+          magnetLayout: "2x4",
           usesInserts: true,
           weightBasis: "complete-build",
           weightG: "96",

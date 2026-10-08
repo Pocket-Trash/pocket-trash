@@ -147,9 +147,8 @@ describe("catalog schema", () => {
     const slider = getTableConfig(schema.productSlider);
     const plate = getTableConfig(schema.productSliderPlate);
     const insert = getTableConfig(schema.productSliderInsert);
-    const configuration = getTableConfig(schema.productMagnetConfiguration);
-    const magnetGroup = getTableConfig(schema.productMagnetGroup);
-    const magnetSlot = getTableConfig(schema.productMagnetSlot);
+    const collectionSlider = getTableConfig(schema.collectionSlider);
+    const preset = getTableConfig(schema.sliderMagnetPreset);
 
     expect(slider.columns.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
@@ -161,6 +160,7 @@ describe("catalog schema", () => {
         "width_mm",
         "thickness_mm",
         "magnet_layout",
+        "magnet_configuration",
         "included_plate_product_id",
         "included_insert_product_id",
       ]),
@@ -182,41 +182,24 @@ describe("catalog schema", () => {
     ]);
     expect(insert.columns.map(({ name }) => name)).toEqual([
       "id",
+      "magnet_layout",
       "created_at",
       "updated_at",
     ]);
-    expect(configuration.columns.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        "product_id",
-        "configuration_label_id",
-        "source_label",
-        "source_notes",
-      ]),
+    expect(collectionSlider.columns.map(({ name }) => name)).toContain(
+      "magnet_configuration",
     );
-    expect(magnetGroup.columns.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        "configuration_product_id",
-        "group_key",
-        "diameter_mm",
-        "thickness_mm",
-        "grade",
-        "display_order",
-      ]),
-    );
-    expect(magnetSlot.columns.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        "configuration_product_id",
-        "slot_key",
-        "half",
-        "state",
-        "group_id",
-        "documented_row",
-        "documented_column",
-        "display_order",
-      ]),
-    );
-    expect(magnetSlot.columns.map(({ name }) => name)).not.toEqual(
-      expect.arrayContaining(["polarity", "x", "y", "x_mm", "y_mm"]),
+    expect(preset.columns.map(({ name }) => name)).toEqual([
+      "id",
+      "name",
+      "normalized_name",
+      "magnet_layout",
+      "configuration",
+      "created_at",
+      "updated_at",
+    ]);
+    expect(preset.uniqueConstraints.map(({ name }) => name)).toContain(
+      "slider_magnet_preset_normalized_name_unique",
     );
   });
 
@@ -228,7 +211,7 @@ describe("catalog schema", () => {
       const config = getTableConfig(table);
       expect(config.columns.map(({ name }) => name)).toEqual(
         table === schema.collectionSliderInsert
-          ? ["id", "product_slider_insert_id", "setup"]
+          ? ["id", "product_slider_insert_id"]
           : ["id", "product_slider_plate_id"],
       );
       expect(config.foreignKeys).toHaveLength(2);
@@ -239,6 +222,7 @@ describe("catalog schema", () => {
       "product_slider_id",
       "installed_plate_id",
       "installed_insert_id",
+      "magnet_configuration",
     ]);
     expect(slider.foreignKeys).toHaveLength(4);
     expect(slider.indexes.map(({ config }) => config.name)).toEqual([
