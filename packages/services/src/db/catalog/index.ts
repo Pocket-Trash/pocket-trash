@@ -27,6 +27,12 @@ import {
   sliderMagnetLayouts,
 } from "../../constants.js";
 import { hashLogIdentifier, loggedMutation } from "../../logging.js";
+import type {
+  DimensionMeasurement,
+  DimensionUnit,
+  WeightMeasurement,
+  WeightUnit,
+} from "../../measurements.js";
 import {
   attachImages as attachStoredImages,
   lockTarget,
@@ -573,10 +579,8 @@ export type CatalogProduct = {
   bearing: string | null;
   /** Click count derived from the effective catalog layout. */
   clickCount: number | null;
-  /**
-   * Button diameter in millimetres.
-   */
-  buttonDiameterMm: string | null;
+  /** Stored button diameter and its entered unit. */
+  buttonDiameter: DimensionMeasurement | null;
   /**
    * Compatible button identifier.
    */
@@ -601,10 +605,8 @@ export type CatalogProduct = {
    * Product description, or `null` when absent.
    */
   description: string | null;
-  /**
-   * Diameter in millimetres.
-   */
-  diameterMm: string | null;
+  /** Stored diameter and its entered unit. */
+  diameter: DimensionMeasurement | null;
   /**
    * Configured finish choices with their colors and effects.
    */
@@ -625,10 +627,8 @@ export type CatalogProduct = {
    * Database identifier.
    */
   id: number;
-  /**
-   * Length in millimetres.
-   */
-  lengthMm: string | null;
+  /** Stored length and its entered unit. */
+  length: DimensionMeasurement | null;
   /**
    * Maker identifier.
    */
@@ -710,30 +710,20 @@ export type CatalogProduct = {
    * URL-safe identifier.
    */
   slug: string;
-  /**
-   * Spin diameter in millimetres.
-   */
-  spinDiameterMm: string | null;
-  /**
-   * Thickness in millimetres.
-   */
-  thicknessMm: string | null;
-  /**
-   * Thickness with button in millimetres.
-   */
-  thicknessWithButtonMm: string | null;
+  /** Stored spin diameter and its entered unit. */
+  spinDiameter: DimensionMeasurement | null;
+  /** Stored thickness and its entered unit. */
+  thickness: DimensionMeasurement | null;
+  /** Stored thickness with button and its entered unit. */
+  thicknessWithButton: DimensionMeasurement | null;
   /**
    * Updated timestamp.
    */
   updatedAt: Date;
-  /**
-   * Weight in grams.
-   */
-  weightG: string | null;
-  /**
-   * Width in millimetres.
-   */
-  widthMm: string | null;
+  /** Stored weight and its entered unit. */
+  weight: WeightMeasurement | null;
+  /** Stored width and its entered unit. */
+  width: DimensionMeasurement | null;
 };
 
 /**
@@ -796,44 +786,28 @@ export type ProductWriteInput = {
      * Bearing.
      */
     bearing?: string | null;
-    /**
-     * Button diameter in millimetres.
-     */
-    buttonDiameterMm?: string | null;
+    /** Stored button diameter and its entered unit. */
+    buttonDiameter?: DimensionMeasurement | null;
     /**
      * Compatible button identifier.
      */
     compatibleButtonId?: number | null;
-    /**
-     * Diameter in millimetres.
-     */
-    diameterMm?: string | null;
-    /**
-     * Length in millimetres.
-     */
-    lengthMm?: string | null;
+    /** Stored diameter and its entered unit. */
+    diameter?: DimensionMeasurement | null;
+    /** Stored length and its entered unit. */
+    length?: DimensionMeasurement | null;
     /** Whether a slider uses inserts to configure and hold magnets. */
     usesInserts?: boolean | null;
-    /**
-     * Spin diameter in millimetres.
-     */
-    spinDiameterMm?: string | null;
-    /**
-     * Thickness in millimetres.
-     */
-    thicknessMm?: string | null;
-    /**
-     * Thickness with button in millimetres.
-     */
-    thicknessWithButtonMm?: string | null;
-    /**
-     * Weight in grams.
-     */
-    weightG?: string | null;
-    /**
-     * Width in millimetres.
-     */
-    widthMm?: string | null;
+    /** Stored spin diameter and its entered unit. */
+    spinDiameter?: DimensionMeasurement | null;
+    /** Stored thickness and its entered unit. */
+    thickness?: DimensionMeasurement | null;
+    /** Stored thickness with button and its entered unit. */
+    thicknessWithButton?: DimensionMeasurement | null;
+    /** Stored weight and its entered unit. */
+    weight?: WeightMeasurement | null;
+    /** Stored width and its entered unit. */
+    width?: DimensionMeasurement | null;
   };
 };
 
@@ -6846,10 +6820,10 @@ function requireProductAudit(
 function productAuditState(product: CatalogProduct): AuditJsonObject {
   return {
     bearing: product.bearing,
-    buttonDiameterMm: product.buttonDiameterMm,
+    buttonDiameter: product.buttonDiameter,
     compatibleButtonId: product.compatibleButtonId,
     description: product.description,
-    diameterMm: product.diameterMm,
+    diameter: product.diameter,
     finishOptions: product.finishOptions.map((option) => ({
       colorEffectId: option.colorEffect?.id ?? null,
       colorIds: option.colors.map(({ id }) => id),
@@ -6862,7 +6836,7 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     includedInsertProductId: product.includedInsert?.id ?? null,
     includedPlateProductId: product.includedPlate?.id ?? null,
     isPrivate: product.isPrivate,
-    lengthMm: product.lengthMm,
+    length: product.length,
     makerId: product.makerId,
     makerProductUrl: product.makerProductUrl,
     makerProductUrlValid: product.makerProductUrlValid,
@@ -6873,11 +6847,11 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     productTypeId: product.productTypeId,
     productTypeSlug: product.productTypeSlug,
     slug: product.slug,
-    spinDiameterMm: product.spinDiameterMm,
-    thicknessMm: product.thicknessMm,
-    thicknessWithButtonMm: product.thicknessWithButtonMm,
-    weightG: product.weightG,
-    widthMm: product.widthMm,
+    spinDiameter: product.spinDiameter,
+    thickness: product.thickness,
+    thicknessWithButton: product.thicknessWithButton,
+    weight: product.weight,
+    width: product.width,
     usesInserts: product.usesInserts,
   };
 }
@@ -7377,6 +7351,50 @@ async function queryPublicMaterialProducts(db: Database, materialId: number) {
 }
 
 /**
+ * Reassembles nullable stored dimension columns into one domain value.
+ *
+ * @param value - Stored decimal text.
+ * @param unit - Stored dimension unit.
+ * @returns A complete measurement, or `null` when both columns are absent.
+ */
+function dimensionMeasurement(
+  value: string | null,
+  unit: DimensionUnit | null,
+): DimensionMeasurement | null {
+  if (
+    value === null ||
+    value === undefined ||
+    unit === null ||
+    unit === undefined
+  ) {
+    return null;
+  }
+  return { unit, value };
+}
+
+/**
+ * Reassembles nullable stored weight columns into one domain value.
+ *
+ * @param value - Stored decimal text.
+ * @param unit - Stored weight unit.
+ * @returns A complete measurement, or `null` when both columns are absent.
+ */
+function weightMeasurement(
+  value: string | null,
+  unit: WeightUnit | null,
+): WeightMeasurement | null {
+  if (
+    value === null ||
+    value === undefined ||
+    unit === null ||
+    unit === undefined
+  ) {
+    return null;
+  }
+  return { unit, value };
+}
+
+/**
  * Loads visible catalog products and their related display data.
  *
  * @param db - Database used for the query.
@@ -7420,18 +7438,21 @@ async function queryProducts(
     .select({
       approvalStatus: schema.product.approvalStatus,
       bearing: schema.productSpinner.bearing,
-      buttonDiameterMm: schema.productSpinner.buttonDiameterMm,
+      buttonDiameter: schema.productSpinner.buttonDiameter,
+      buttonDiameterUnit: schema.productSpinner.buttonDiameterUnit,
       compatibleButtonId: schema.productSpinner.compatibleButtonId,
       compatibleButtonName: compatibleButtonProduct.name,
       createdAt: sql<Date>`coalesce(${schema.productSpinner.createdAt}, ${schema.productSpinnerButton.createdAt}, ${schema.productSlider.createdAt}, ${schema.productSliderPlate.createdAt}, ${schema.productSliderInsert.createdAt})`,
       description: schema.product.description,
-      diameterMm: schema.productSpinnerButton.diameterMm,
+      diameter: schema.productSpinnerButton.diameter,
+      diameterUnit: schema.productSpinnerButton.diameterUnit,
       id: schema.product.id,
       isPrivate: schema.product.isPrivate,
       privatedByClerkId: schema.product.privatedByClerkId,
-      lengthMm: sql<
+      length: sql<
         string | null
-      >`coalesce(${schema.productSpinner.lengthMm}, ${schema.productSlider.lengthMm})`,
+      >`coalesce(${schema.productSpinner.length}, ${schema.productSlider.length})`,
+      lengthUnit: sql<DimensionUnit | null>`coalesce(${schema.productSpinner.lengthUnit}, ${schema.productSlider.lengthUnit})`,
       makerId: schema.maker.id,
       makerName: schema.maker.name,
       makerSlug: schema.maker.slug,
@@ -7449,19 +7470,24 @@ async function queryProducts(
       productTypeName: schema.productType.name,
       productTypeSlug: schema.productType.slug,
       slug: schema.product.slug,
-      spinDiameterMm: schema.productSpinner.spinDiameterMm,
-      thicknessMm: sql<
+      spinDiameter: schema.productSpinner.spinDiameter,
+      spinDiameterUnit: schema.productSpinner.spinDiameterUnit,
+      thickness: sql<
         string | null
-      >`coalesce(${schema.productSpinner.thicknessMm}, ${schema.productSpinnerButton.thicknessMm}, ${schema.productSlider.thicknessMm})`,
-      thicknessWithButtonMm: schema.productSpinner.thicknessWithButtonMm,
+      >`coalesce(${schema.productSpinner.thickness}, ${schema.productSpinnerButton.thickness}, ${schema.productSlider.thickness})`,
+      thicknessUnit: sql<DimensionUnit | null>`coalesce(${schema.productSpinner.thicknessUnit}, ${schema.productSpinnerButton.thicknessUnit}, ${schema.productSlider.thicknessUnit})`,
+      thicknessWithButton: schema.productSpinner.thicknessWithButton,
+      thicknessWithButtonUnit: schema.productSpinner.thicknessWithButtonUnit,
       updatedAt: schema.product.updatedAt,
       usesInserts: schema.productSlider.usesInserts,
-      weightG: sql<
+      weight: sql<
         string | null
-      >`coalesce(${schema.productSpinner.weightG}, ${schema.productSpinnerButton.weightG}, ${schema.productSlider.weightG})`,
-      widthMm: sql<
+      >`coalesce(${schema.productSpinner.weight}, ${schema.productSpinnerButton.weight}, ${schema.productSlider.weight})`,
+      weightUnit: sql<WeightUnit | null>`coalesce(${schema.productSpinner.weightUnit}, ${schema.productSpinnerButton.weightUnit}, ${schema.productSlider.weightUnit})`,
+      width: sql<
         string | null
-      >`coalesce(${schema.productSpinner.widthMm}, ${schema.productSlider.widthMm})`,
+      >`coalesce(${schema.productSpinner.width}, ${schema.productSlider.width})`,
+      widthUnit: sql<DimensionUnit | null>`coalesce(${schema.productSpinner.widthUnit}, ${schema.productSlider.widthUnit})`,
     })
     .from(schema.product)
     .innerJoin(schema.maker, eq(schema.product.makerId, schema.maker.id))
@@ -7525,7 +7551,10 @@ async function queryProducts(
     products.set(row.id, {
       approvalStatus: row.approvalStatus,
       bearing: row.bearing,
-      buttonDiameterMm: row.buttonDiameterMm,
+      buttonDiameter: dimensionMeasurement(
+        row.buttonDiameter,
+        row.buttonDiameterUnit,
+      ),
       clickCount: row.magnetLayout ? sliderClickCount(row.magnetLayout) : null,
       compatibleButtonId: row.compatibleButtonId,
       compatibleButtonName: row.compatibleButtonName,
@@ -7536,14 +7565,14 @@ async function queryProducts(
       ),
       createdAt: row.createdAt,
       description: row.description,
-      diameterMm: row.diameterMm,
+      diameter: dimensionMeasurement(row.diameter, row.diameterUnit),
       finishOptions: [],
       imageCount: 0,
       images: [],
       includedInsert: null,
       includedPlate: null,
       id: row.id,
-      lengthMm: row.lengthMm,
+      length: dimensionMeasurement(row.length, row.lengthUnit),
       makerId: row.makerId,
       makerName: row.makerName,
       makerSlug: row.makerSlug,
@@ -7574,12 +7603,18 @@ async function queryProducts(
       productTypeName: row.productTypeName,
       productTypeSlug: catalogProductType(row.productTypeSlug),
       slug: row.slug,
-      spinDiameterMm: row.spinDiameterMm,
-      thicknessMm: row.thicknessMm,
-      thicknessWithButtonMm: row.thicknessWithButtonMm,
+      spinDiameter: dimensionMeasurement(
+        row.spinDiameter,
+        row.spinDiameterUnit,
+      ),
+      thickness: dimensionMeasurement(row.thickness, row.thicknessUnit),
+      thicknessWithButton: dimensionMeasurement(
+        row.thicknessWithButton,
+        row.thicknessWithButtonUnit,
+      ),
       updatedAt: row.updatedAt,
-      weightG: row.weightG,
-      widthMm: row.widthMm,
+      weight: weightMeasurement(row.weight, row.weightUnit),
+      width: dimensionMeasurement(row.width, row.widthUnit),
       usesInserts: row.usesInserts,
     });
   }
@@ -10165,10 +10200,10 @@ function assertNoSliderComponentMeasurements(
   specs: ProductWriteInput["specs"],
 ) {
   if (
-    specs.weightG != null ||
-    specs.lengthMm != null ||
-    specs.widthMm != null ||
-    specs.thicknessMm != null
+    specs.weight != null ||
+    specs.length != null ||
+    specs.width != null ||
+    specs.thickness != null
   ) {
     throw new Error("Slider plates and inserts do not store measurements.");
   }
@@ -10205,12 +10240,16 @@ function sliderSpecs(input: ProductWriteInput) {
   return {
     includedInsertProductId,
     includedPlateProductId,
-    lengthMm: specs.lengthMm ?? null,
+    length: specs.length?.value ?? null,
+    lengthUnit: specs.length?.unit ?? null,
     magnetLayout,
     magnetConfiguration: input.magnetConfiguration ?? null,
-    thicknessMm: specs.thicknessMm ?? null,
-    weightG: specs.weightG ?? null,
-    widthMm: specs.widthMm ?? null,
+    thickness: specs.thickness?.value ?? null,
+    thicknessUnit: specs.thickness?.unit ?? null,
+    weight: specs.weight?.value ?? null,
+    weightUnit: specs.weight?.unit ?? null,
+    width: specs.width?.value ?? null,
+    widthUnit: specs.width?.unit ?? null,
     usesInserts: specs.usesInserts,
   };
 }
@@ -10226,16 +10265,25 @@ function spinnerSpecs(specs: ProductWriteInput["specs"]) {
     ...(specs.bearing !== undefined
       ? { bearing: normalizeOptionalText(specs.bearing) }
       : {}),
-    buttonDiameterMm: specs.buttonDiameterMm ?? null,
+    buttonDiameter: specs.buttonDiameter?.value ?? null,
+    buttonDiameterUnit: specs.buttonDiameter?.unit ?? null,
     compatibleButtonId: specs.compatibleButtonId ?? null,
-    lengthMm: specs.lengthMm ?? null,
-    ...(specs.spinDiameterMm !== undefined
-      ? { spinDiameterMm: specs.spinDiameterMm }
+    length: specs.length?.value ?? null,
+    lengthUnit: specs.length?.unit ?? null,
+    ...(specs.spinDiameter !== undefined
+      ? {
+          spinDiameter: specs.spinDiameter?.value ?? null,
+          spinDiameterUnit: specs.spinDiameter?.unit ?? null,
+        }
       : {}),
-    thicknessMm: specs.thicknessMm ?? null,
-    thicknessWithButtonMm: specs.thicknessWithButtonMm ?? null,
-    weightG: specs.weightG ?? null,
-    widthMm: specs.widthMm ?? null,
+    thickness: specs.thickness?.value ?? null,
+    thicknessUnit: specs.thickness?.unit ?? null,
+    thicknessWithButton: specs.thicknessWithButton?.value ?? null,
+    thicknessWithButtonUnit: specs.thicknessWithButton?.unit ?? null,
+    weight: specs.weight?.value ?? null,
+    weightUnit: specs.weight?.unit ?? null,
+    width: specs.width?.value ?? null,
+    widthUnit: specs.width?.unit ?? null,
   };
 }
 
@@ -10295,9 +10343,12 @@ function nextApprovalStatus(
  */
 function buttonSpecs(specs: ProductWriteInput["specs"]) {
   return {
-    diameterMm: specs.diameterMm ?? null,
-    thicknessMm: specs.thicknessMm ?? null,
-    weightG: specs.weightG ?? null,
+    diameter: specs.diameter?.value ?? null,
+    diameterUnit: specs.diameter?.unit ?? null,
+    thickness: specs.thickness?.value ?? null,
+    thicknessUnit: specs.thickness?.unit ?? null,
+    weight: specs.weight?.value ?? null,
+    weightUnit: specs.weight?.unit ?? null,
   };
 }
 

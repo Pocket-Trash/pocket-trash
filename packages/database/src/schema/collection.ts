@@ -17,6 +17,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { maker, material, productType } from "./scraper.js";
+import { dimensionUnitEnum, weightUnitEnum } from "./user-settings.js";
 import { user } from "./users.js";
 
 /** Roles allowed to soft-delete catalog images. */
@@ -735,13 +736,20 @@ export const productSpinner = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .references(() => product.id, { onDelete: "cascade" }),
-    weightG: decimal("weight_g"),
-    lengthMm: decimal("length_mm"),
-    widthMm: decimal("width_mm"),
-    thicknessMm: decimal("thickness_mm"),
-    thicknessWithButtonMm: decimal("thickness_with_button_mm"),
-    buttonDiameterMm: decimal("button_diameter_mm"),
-    spinDiameterMm: decimal("spin_diameter_mm"),
+    weight: decimal("weight_value"),
+    weightUnit: weightUnitEnum("weight_unit"),
+    length: decimal("length_value"),
+    lengthUnit: dimensionUnitEnum("length_unit"),
+    width: decimal("width_value"),
+    widthUnit: dimensionUnitEnum("width_unit"),
+    thickness: decimal("thickness_value"),
+    thicknessUnit: dimensionUnitEnum("thickness_unit"),
+    thicknessWithButton: decimal("thickness_with_button_value"),
+    thicknessWithButtonUnit: dimensionUnitEnum("thickness_with_button_unit"),
+    buttonDiameter: decimal("button_diameter_value"),
+    buttonDiameterUnit: dimensionUnitEnum("button_diameter_unit"),
+    spinDiameter: decimal("spin_diameter_value"),
+    spinDiameterUnit: dimensionUnitEnum("spin_diameter_unit"),
     bearing: text("bearing"),
     compatibleButtonId: bigint("compatible_button_id", {
       mode: "number",
@@ -757,8 +765,32 @@ export const productSpinner = pgTable(
   },
   (table) => [
     check(
-      "product_spinner_measurements_positive",
-      sql`${table.weightG} > 0 and ${table.lengthMm} > 0 and ${table.widthMm} > 0 and ${table.thicknessMm} > 0 and ${table.thicknessWithButtonMm} > 0 and ${table.buttonDiameterMm} > 0 and ${table.spinDiameterMm} > 0`,
+      "product_spinner_weight_consistent",
+      sql`(${table.weight} is null and ${table.weightUnit} is null) or (${table.weight} > 0 and ${table.weightUnit} is not null)`,
+    ),
+    check(
+      "product_spinner_length_consistent",
+      sql`(${table.length} is null and ${table.lengthUnit} is null) or (${table.length} > 0 and ${table.lengthUnit} is not null)`,
+    ),
+    check(
+      "product_spinner_width_consistent",
+      sql`(${table.width} is null and ${table.widthUnit} is null) or (${table.width} > 0 and ${table.widthUnit} is not null)`,
+    ),
+    check(
+      "product_spinner_thickness_consistent",
+      sql`(${table.thickness} is null and ${table.thicknessUnit} is null) or (${table.thickness} > 0 and ${table.thicknessUnit} is not null)`,
+    ),
+    check(
+      "product_spinner_thickness_with_button_consistent",
+      sql`(${table.thicknessWithButton} is null and ${table.thicknessWithButtonUnit} is null) or (${table.thicknessWithButton} > 0 and ${table.thicknessWithButtonUnit} is not null)`,
+    ),
+    check(
+      "product_spinner_button_diameter_consistent",
+      sql`(${table.buttonDiameter} is null and ${table.buttonDiameterUnit} is null) or (${table.buttonDiameter} > 0 and ${table.buttonDiameterUnit} is not null)`,
+    ),
+    check(
+      "product_spinner_spin_diameter_consistent",
+      sql`(${table.spinDiameter} is null and ${table.spinDiameterUnit} is null) or (${table.spinDiameter} > 0 and ${table.spinDiameterUnit} is not null)`,
     ),
     check(
       "product_spinner_bearing_length_valid",
@@ -774,9 +806,12 @@ export const productSpinnerButton = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .references(() => product.id, { onDelete: "cascade" }),
-    weightG: decimal("weight_g"),
-    diameterMm: decimal("diameter_mm"),
-    thicknessMm: decimal("thickness_mm"),
+    weight: decimal("weight_value"),
+    weightUnit: weightUnitEnum("weight_unit"),
+    diameter: decimal("diameter_value"),
+    diameterUnit: dimensionUnitEnum("diameter_unit"),
+    thickness: decimal("thickness_value"),
+    thicknessUnit: dimensionUnitEnum("thickness_unit"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -786,8 +821,16 @@ export const productSpinnerButton = pgTable(
   },
   (table) => [
     check(
-      "product_spinner_button_measurements_positive",
-      sql`${table.weightG} > 0 and ${table.diameterMm} > 0 and ${table.thicknessMm} > 0`,
+      "product_spinner_button_weight_consistent",
+      sql`(${table.weight} is null and ${table.weightUnit} is null) or (${table.weight} > 0 and ${table.weightUnit} is not null)`,
+    ),
+    check(
+      "product_spinner_button_diameter_consistent",
+      sql`(${table.diameter} is null and ${table.diameterUnit} is null) or (${table.diameter} > 0 and ${table.diameterUnit} is not null)`,
+    ),
+    check(
+      "product_spinner_button_thickness_consistent",
+      sql`(${table.thickness} is null and ${table.thicknessUnit} is null) or (${table.thickness} > 0 and ${table.thicknessUnit} is not null)`,
     ),
   ],
 );
@@ -825,10 +868,14 @@ export const productSlider = pgTable(
     magnetConfiguration: jsonb(
       "magnet_configuration",
     ).$type<SliderMagnetConfigurationValue>(),
-    weightG: decimal("weight_g"),
-    lengthMm: decimal("length_mm"),
-    widthMm: decimal("width_mm"),
-    thicknessMm: decimal("thickness_mm"),
+    weight: decimal("weight_value"),
+    weightUnit: weightUnitEnum("weight_unit"),
+    length: decimal("length_value"),
+    lengthUnit: dimensionUnitEnum("length_unit"),
+    width: decimal("width_value"),
+    widthUnit: dimensionUnitEnum("width_unit"),
+    thickness: decimal("thickness_value"),
+    thicknessUnit: dimensionUnitEnum("thickness_unit"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -850,8 +897,20 @@ export const productSlider = pgTable(
       sql`${table.magnetLayout} is null or ${table.magnetLayout} in ('2x2', '2x3', '2x4')`,
     ),
     check(
-      "product_slider_measurements_positive",
-      sql`${table.weightG} > 0 and ${table.lengthMm} > 0 and ${table.widthMm} > 0 and ${table.thicknessMm} > 0`,
+      "product_slider_weight_consistent",
+      sql`(${table.weight} is null and ${table.weightUnit} is null) or (${table.weight} > 0 and ${table.weightUnit} is not null)`,
+    ),
+    check(
+      "product_slider_length_consistent",
+      sql`(${table.length} is null and ${table.lengthUnit} is null) or (${table.length} > 0 and ${table.lengthUnit} is not null)`,
+    ),
+    check(
+      "product_slider_width_consistent",
+      sql`(${table.width} is null and ${table.widthUnit} is null) or (${table.width} > 0 and ${table.widthUnit} is not null)`,
+    ),
+    check(
+      "product_slider_thickness_consistent",
+      sql`(${table.thickness} is null and ${table.thicknessUnit} is null) or (${table.thickness} > 0 and ${table.thicknessUnit} is not null)`,
     ),
     check(
       "product_slider_included_plate_distinct",

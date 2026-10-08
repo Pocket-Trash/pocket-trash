@@ -31,6 +31,7 @@ export type {
   GrimsmoVariationImageRecord,
   Maker,
   Material,
+  MeasurementSystem,
   Mechanism,
   NewAuditDelivery,
   NewAuditEvent,

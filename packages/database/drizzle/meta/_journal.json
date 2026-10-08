@@ -519,6 +519,13 @@
       "when": 1791433448738,
       "tag": "0073_slim_wonder_man",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1791434152294,
+      "tag": "0074_fine_black_queen",
+      "breakpoints": true
     }
   ]
 }

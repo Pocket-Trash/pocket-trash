@@ -29,6 +29,10 @@
     "./catalog-import": {
       "types": "./dist/catalog-import/index.d.ts",
       "default": "./dist/catalog-import/index.js"
+    },
+    "./measurements": {
+      "types": "./dist/measurements.d.ts",
+      "default": "./dist/measurements.js"
     }
   },
   "scripts": {
