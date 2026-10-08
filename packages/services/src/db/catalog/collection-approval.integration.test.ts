@@ -25,13 +25,17 @@ describe("collection-item approval", () => {
     try {
       for (const file of files.slice(0, approvalMigration))
         await runMigration(client, folder, file);
-      const [owner, editor] = await db
-        .insert(schema.user)
-        .values([
-          { clerkId: "approval-owner", username: "Owner" },
-          { clerkId: "approval-editor", username: "Editor" },
-        ])
-        .returning();
+      const {
+        rows: [owner, editor],
+      } = await client.query<{
+        /** User identifier from the historical users schema. */
+        id: number;
+        /** Clerk identity from the historical users schema. */
+        clerkId: string;
+      }>(
+        'INSERT INTO users (clerk_id, username) VALUES ($1, $2), ($3, $4) RETURNING id::integer AS id, clerk_id AS "clerkId"',
+        ["approval-owner", "Owner", "approval-editor", "Editor"],
+      );
       if (!owner || !editor) throw new Error("Users missing.");
       const {
         rows: [collection],
