@@ -18,10 +18,9 @@ vi.mock("@tanstack/react-start/server", () => ({
 vi.mock("@/lib/user-settings", () => ({
   defaultUserSettings: {
     currencyCode: "USD",
-    dimensionUnit: "in",
+    measurementSystem: "metric",
     locale: null,
     theme: "system",
-    weightUnit: "g",
   },
   getCurrentUserSettingsState: mocks.getSettings,
   patchCurrentUserSettings: vi.fn(),

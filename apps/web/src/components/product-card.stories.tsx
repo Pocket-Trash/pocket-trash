@@ -8,7 +8,7 @@ import { ProductCard } from "./product-card";
 const product: CatalogProduct = {
   approvalStatus: "approved",
   bearing: null,
-  buttonDiameterMm: null,
+  buttonDiameter: null,
   clickCount: null,
   canAdminister: false,
   canEdit: true,
@@ -16,7 +16,7 @@ const product: CatalogProduct = {
   compatibleButtonName: null,
   createdAt: new Date("2026-01-01"),
   description: null,
-  diameterMm: "50.8",
+  diameter: { unit: "mm", value: "50.8" },
   finishOptions: [
     {
       colorEffect: null,
@@ -35,7 +35,7 @@ const product: CatalogProduct = {
   includedPlate: null,
   isAdminPrivate: false,
   isPrivate: false,
-  lengthMm: null,
+  length: null,
   makerId: 1000,
   makerName: "KAP EDC",
   makerSlug: "kap-edc",
@@ -54,12 +54,12 @@ const product: CatalogProduct = {
   productTypeName: "Spinner",
   productTypeSlug: "spinner",
   slug: "katla",
-  spinDiameterMm: null,
-  thicknessMm: "12.7",
-  thicknessWithButtonMm: null,
+  spinDiameter: null,
+  thickness: { unit: "mm", value: "12.7" },
+  thicknessWithButton: null,
   updatedAt: new Date("2026-01-02"),
-  weightG: "90",
-  widthMm: null,
+  weight: { unit: "g", value: "90" },
+  width: null,
 };
 
 /**

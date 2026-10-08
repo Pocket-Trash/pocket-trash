@@ -8,7 +8,7 @@ import { CollectionAddPage } from "./catalog-form-pages";
 const product: CatalogProduct = {
   approvalStatus: "approved",
   bearing: null,
-  buttonDiameterMm: null,
+  buttonDiameter: null,
   clickCount: null,
   canAdminister: false,
   canEdit: true,
@@ -16,7 +16,7 @@ const product: CatalogProduct = {
   compatibleButtonName: null,
   createdAt: new Date(0),
   description: null,
-  diameterMm: null,
+  diameter: null,
   finishOptions: [
     {
       colorEffect: null,
@@ -31,7 +31,7 @@ const product: CatalogProduct = {
   includedInsert: null,
   includedPlate: null,
   id: 1000,
-  lengthMm: null,
+  length: null,
   makerId: 1,
   makerName: "Maker",
   makerSlug: "maker",
@@ -49,12 +49,12 @@ const product: CatalogProduct = {
   productTypeName: "Spinner",
   productTypeSlug: "spinner",
   slug: "product-1",
-  spinDiameterMm: null,
-  thicknessMm: null,
-  thicknessWithButtonMm: null,
+  spinDiameter: null,
+  thickness: null,
+  thicknessWithButton: null,
   updatedAt: new Date(0),
-  weightG: null,
-  widthMm: null,
+  weight: null,
+  width: null,
 };
 
 /** Thirteen products exercise a full first page and a final partial page. */

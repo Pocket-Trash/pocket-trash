@@ -1,13 +1,7 @@
+import type { MeasurementSystem } from "@package/services";
 import type { PenProduct } from "./pen-data";
 
-/**
- * Supported length and diameter display units.
- */
-export type DimensionUnit = "in" | "mm";
-/**
- * Supported weight display units.
- */
-export type WeightUnit = "g" | "oz";
+export type { MeasurementSystem } from "@package/services";
 /**
  * Supported archive display currencies.
  */
@@ -71,11 +65,11 @@ export function formatDate(iso: string) {
  * Formats product diameter in the requested unit, converting inches to millimetres when needed.
  *
  * @param product - Product whose diameter should be displayed.
- * @param unit - Requested display unit.
+ * @param system - Requested display system.
  * @returns The formatted diameter or `null` when unavailable.
  */
-export function formatDiameter(product: PenProduct, unit: DimensionUnit) {
-  if (unit === "mm") {
+export function formatDiameter(product: PenProduct, system: MeasurementSystem) {
+  if (system === "metric") {
     const mm =
       product.diameter_mm ??
       (product.diameter_in == null
@@ -91,11 +85,11 @@ export function formatDiameter(product: PenProduct, unit: DimensionUnit) {
  * Formats product length in the requested unit, converting inches to millimetres when needed.
  *
  * @param product - Product whose length should be displayed.
- * @param unit - Requested display unit.
+ * @param system - Requested display system.
  * @returns The formatted length or `null` when unavailable.
  */
-export function formatLength(product: PenProduct, unit: DimensionUnit) {
-  if (unit === "mm") {
+export function formatLength(product: PenProduct, system: MeasurementSystem) {
+  if (system === "metric") {
     const mm =
       product.length_in == null
         ? null
@@ -110,12 +104,12 @@ export function formatLength(product: PenProduct, unit: DimensionUnit) {
  * Formats product weight in grams or converted ounces.
  *
  * @param product - Product whose weight should be displayed.
- * @param unit - Requested display unit.
+ * @param system - Requested display system.
  * @returns The formatted weight or `null` when unavailable.
  */
-export function formatWeight(product: PenProduct, unit: WeightUnit) {
+export function formatWeight(product: PenProduct, system: MeasurementSystem) {
   if (product.weight_g == null) return null;
-  if (unit === "oz") {
+  if (system === "imperial") {
     return `${Number((product.weight_g / 28.3495).toFixed(2))} oz`;
   }
   return `${product.weight_g} g`;

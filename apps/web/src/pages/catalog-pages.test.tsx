@@ -258,7 +258,7 @@ const owners = [
 const product: CatalogProduct = {
   approvalStatus: "approved",
   bearing: null,
-  buttonDiameterMm: null,
+  buttonDiameter: null,
   clickCount: null,
   canAdminister: false,
   canEdit: false,
@@ -266,7 +266,7 @@ const product: CatalogProduct = {
   compatibleButtonName: null,
   createdAt: new Date(0),
   description: null,
-  diameterMm: null,
+  diameter: null,
   finishOptions: [],
   id: 1,
   imageCount: 0,
@@ -275,7 +275,7 @@ const product: CatalogProduct = {
   includedPlate: null,
   isAdminPrivate: false,
   isPrivate: false,
-  lengthMm: null,
+  length: null,
   makerId: 1,
   makerName: "KAP EDC",
   makerSlug: "kap-edc",
@@ -291,12 +291,12 @@ const product: CatalogProduct = {
   productTypeName: "Spinner",
   productTypeSlug: "spinner",
   slug: "catla",
-  spinDiameterMm: null,
-  thicknessMm: null,
-  thicknessWithButtonMm: null,
+  spinDiameter: null,
+  thickness: null,
+  thicknessWithButton: null,
   updatedAt: new Date(0),
-  weightG: null,
-  widthMm: null,
+  weight: null,
+  width: null,
 };
 
 describe("getCatalogPageSize", () => {
@@ -926,7 +926,7 @@ describe("ProductDetailPage", () => {
       bearing: "R188",
       description: "**Fast** <script>alert('no')</script>",
       makerProductUrl: "https://www.kapedc.com/products/catla",
-      spinDiameterMm: "52",
+      spinDiameter: { unit: "mm" as const, value: "52" },
     };
 
     const html = renderToStaticMarkup(
@@ -965,8 +965,8 @@ describe("CollectionItemDetailPage", () => {
       usesInserts: false,
       productTypeName: "Slider",
       productTypeSlug: "slider" as const,
-      thicknessMm: "12",
-      widthMm: "40",
+      thickness: { unit: "mm" as const, value: "12" },
+      width: { unit: "mm" as const, value: "40" },
     };
     const html = renderToStaticMarkup(
       <CollectionItemDetailPage

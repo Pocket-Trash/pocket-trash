@@ -26,10 +26,9 @@ export const storySettings: UserSettingsState = {
   hasSavedSettings: true,
   settings: {
     currencyCode: "USD",
-    dimensionUnit: "in",
     locale: "en-US",
+    measurementSystem: "metric",
     theme: "light",
-    weightUnit: "g",
   },
 };
 

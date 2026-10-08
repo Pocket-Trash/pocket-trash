@@ -19,10 +19,9 @@ const settings: UserSettingsState = {
   hasSavedSettings: true,
   settings: {
     currencyCode: "USD",
-    dimensionUnit: "in",
+    measurementSystem: "metric",
     locale: "en-US",
     theme: "system",
-    weightUnit: "g",
   },
 };
 

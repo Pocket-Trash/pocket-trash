@@ -26,13 +26,12 @@ import type { PenProduct } from "@/lib/pen-data";
 import {
   type CurrencyCode,
   type CurrencyRates,
-  type DimensionUnit,
   formatDate,
   formatDiameter,
   formatLength,
   formatPrice,
   formatWeight,
-  type WeightUnit,
+  type MeasurementSystem,
 } from "@/lib/pen-formatters";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
@@ -69,14 +68,8 @@ type ProductLightboxProps = {
    * Exchange rates used to convert the product price.
    */
   rates: CurrencyRates;
-  /**
-   * Unit used to display product dimensions.
-   */
-  units: DimensionUnit;
-  /**
-   * Unit used to display product weight.
-   */
-  weight: WeightUnit;
+  /** System used to display product measurements. */
+  measurementSystem: MeasurementSystem;
 };
 
 /**
@@ -93,20 +86,18 @@ type ProductLightboxProps = {
  * @param props.onImageChange - Callback that requests another image.
  * @param props.product - Current product; `null` retains prior content after a selection and closes the mobile drawer.
  * @param props.rates - Exchange rates used for price conversion.
- * @param props.units - Unit used for dimensions.
- * @param props.weight - Unit used for weight.
+ * @param props.measurementSystem - System used for measurements.
  * @returns The responsive product detail view, or no output when no product has ever been provided.
  * @throws {Error} When rendered outside `LocaleProvider`.
  */
 export function ProductLightbox({
   currency,
   imageIndex,
+  measurementSystem,
   onClose,
   onImageChange,
   product,
   rates,
-  units,
-  weight,
 }: ProductLightboxProps) {
   const isMobile = useIsMobile();
   const { locale } = useLocale();
@@ -215,17 +206,17 @@ export function ProductLightbox({
     {
       icon: Scale,
       label: t("web.archive.spec.weight"),
-      value: formatWeight(shown, weight),
+      value: formatWeight(shown, measurementSystem),
     },
     {
       icon: CircleGauge,
       label: t("web.archive.spec.diameter"),
-      value: formatDiameter(shown, units),
+      value: formatDiameter(shown, measurementSystem),
     },
     {
       icon: MoveHorizontal,
       label: t("web.archive.spec.length"),
-      value: formatLength(shown, units),
+      value: formatLength(shown, measurementSystem),
     },
   ];
 

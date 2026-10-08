@@ -211,7 +211,7 @@ describe("finish option editor", () => {
     const product: CatalogProduct = {
       approvalStatus: "approved",
       bearing: null,
-      buttonDiameterMm: null,
+      buttonDiameter: null,
       clickCount: null,
       canAdminister: false,
       canEdit: true,
@@ -219,7 +219,7 @@ describe("finish option editor", () => {
       compatibleButtonName: null,
       createdAt: new Date(0),
       description: null,
-      diameterMm: null,
+      diameter: null,
       finishOptions: [
         {
           colorEffect: null,
@@ -234,7 +234,7 @@ describe("finish option editor", () => {
       includedInsert: null,
       includedPlate: null,
       id: 1000,
-      lengthMm: null,
+      length: null,
       makerId: 1000,
       makerName: "Maker",
       makerSlug: "maker",
@@ -252,12 +252,12 @@ describe("finish option editor", () => {
       productTypeName: "Spinner",
       productTypeSlug: "spinner",
       slug: "spinner",
-      spinDiameterMm: null,
-      thicknessMm: null,
-      thicknessWithButtonMm: null,
+      spinDiameter: null,
+      thickness: null,
+      thicknessWithButton: null,
       updatedAt: new Date(0),
-      weightG: null,
-      widthMm: null,
+      weight: null,
+      width: null,
     };
     const html = renderToStaticMarkup(
       createElement(CollectionProductFields, {
@@ -833,7 +833,7 @@ function productFixture(
   return {
     approvalStatus: "approved",
     bearing: null,
-    buttonDiameterMm: null,
+    buttonDiameter: null,
     clickCount: productTypeSlug === "slider" ? 3 : null,
     canAdminister: false,
     canEdit: true,
@@ -841,7 +841,7 @@ function productFixture(
     compatibleButtonName: null,
     createdAt: new Date(0),
     description: null,
-    diameterMm: null,
+    diameter: null,
     finishOptions: [
       {
         colorEffect: null,
@@ -856,7 +856,7 @@ function productFixture(
     includedInsert: null,
     includedPlate: null,
     id,
-    lengthMm: null,
+    length: null,
     makerId: 1,
     makerName: "Maker",
     makerSlug: "maker",
@@ -880,12 +880,12 @@ function productFixture(
     }[productTypeSlug],
     productTypeSlug,
     slug: name.toLowerCase(),
-    spinDiameterMm: null,
-    thicknessMm: null,
-    thicknessWithButtonMm: null,
+    spinDiameter: null,
+    thickness: null,
+    thicknessWithButton: null,
     updatedAt: new Date(0),
-    weightG: null,
-    widthMm: null,
+    weight: null,
+    width: null,
   };
 }
 
