@@ -25,7 +25,6 @@ import {
   pattern,
   product,
   productImage,
-  productIncludedComponent,
   productInsertClickOption,
   productInsertMagnetGroup,
   productInsertMagnetOffer,
@@ -313,7 +312,8 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
             { key: `${slug}-primary` },
             ...(ordinal === 21 ? [{ key: `${slug}-gallery` }] : []),
           ],
-          includedPlateSlug: `${fixtureMaker.slug}-demo-plate`,
+          includedPlateSlug:
+            ordinal === 21 ? null : `${fixtureMaker.slug}-demo-plate`,
           magnetConfiguration: hasCompleteConfiguration
             ? { label: "Medium", sourceLabel: "Four-corner layout" }
             : null,
@@ -1124,13 +1124,20 @@ export async function seedSliderFixtures(
           },
           target: productSlider.id,
         });
-    } else {
-      const subtype =
-        fixtureProduct.type === "slider-plate"
-          ? productSliderPlate
-          : productSliderInsert;
+    } else if (fixtureProduct.type === "slider-plate") {
       await db
-        .insert(subtype)
+        .insert(productSliderPlate)
+        .values({
+          id: seededProduct.id,
+          updatedAt,
+        })
+        .onConflictDoUpdate({
+          set: { updatedAt },
+          target: productSliderPlate.id,
+        });
+    } else {
+      await db
+        .insert(productSliderInsert)
         .values({
           id: seededProduct.id,
           lengthMm: "48",
@@ -1147,7 +1154,7 @@ export async function seedSliderFixtures(
             weightG: "24",
             widthMm: "20",
           },
-          target: subtype.id,
+          target: productSliderInsert.id,
         });
     }
 
@@ -1327,15 +1334,12 @@ export async function seedSliderFixtures(
     const plateProductId = fixtureSlider.includedPlateSlug
       ? productIds.get(fixtureSlider.includedPlateSlug)
       : null;
-    if (!sliderProductId || !plateProductId)
+    if (!sliderProductId)
       throw new Error(`Fixture assembly ${fixtureSlider.slug} is incomplete.`);
     await db
-      .insert(productIncludedComponent)
-      .values({
-        componentProductId: plateProductId,
-        productId: sliderProductId,
-      })
-      .onConflictDoNothing();
+      .update(productSlider)
+      .set({ includedPlateProductId: plateProductId })
+      .where(eq(productSlider.id, sliderProductId));
 
     if (fixtureSlider.magnetConfiguration) {
       await db

@@ -45,6 +45,7 @@ const base = {
   weightG: null,
   widthMm: null,
   includedComponentIds: [],
+  includedPlateProductId: null,
   magnetSystem: null,
   weightBasis: null,
 };
@@ -364,6 +365,34 @@ describe("slider catalog product validation", () => {
     });
 
     expect(parsed.includedComponentIds).toEqual([2000]);
+  });
+
+  it("accepts one included plate only for sliders", () => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        includedPlateProductId: 2000,
+        magnetSystem: "body-hosted",
+        productTypeSlug: "slider",
+      }).success,
+    ).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        includedPlateProductId: 2000,
+        productTypeSlug: "slider-plate",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects measurements for slider plates", () => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        productTypeSlug: "slider-plate",
+        weightG: "12",
+      }).success,
+    ).toBe(false);
   });
 
   it("accepts complete exact body-hosted layouts and rejects incomplete slots", () => {

@@ -24,6 +24,7 @@ import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 import { RotateCcw, Trash2 } from "lucide-react";
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { z } from "zod";
 import { AppShell } from "@/components/app-shell";
 import { CatalogMarkdownEditor } from "@/components/catalog-markdown-editor";
@@ -166,21 +167,37 @@ type ProductEditorValue = Omit<
  *
  * @param props - Product type, catalog options, and optional existing product.
  * @param props.initialProduct - Existing product being edited.
+ * @param props.onCancel - Optional cancellation callback for embedded creation.
+ * @param props.onCreated - Optional callback receiving an embedded creation result.
  * @param props.options - Catalog lookup options.
  * @param props.productTypeSlug - Product type being edited.
+ * @param props.quickCreate - Whether to hide fields outside the plate quick-create scope.
  * @returns The product editor form.
  */
 export function ProductEditor({
   initialProduct,
+  onCancel,
+  onCreated,
   options: initialOptions,
   productTypeSlug,
+  quickCreate = false,
 }: {
   /** Existing product being edited. */
   initialProduct?: CatalogProduct;
+  /** Cancels embedded product creation. */
+  onCancel?(): void;
+  /**
+   * Receives an embedded product creation result.
+   *
+   * @param product - Newly created catalog product.
+   */
+  onCreated?(product: CatalogProduct): void;
   /** Catalog lookup options. */
   options: CatalogOptions;
   /** Product type being edited. */
   productTypeSlug: CatalogProductType;
+  /** Hides fields outside the plate quick-create scope. */
+  quickCreate?: boolean;
 }) {
   const t = useCatalogCopy();
   const { locale } = useLocale();
@@ -200,6 +217,9 @@ export function ProductEditor({
   >({});
   const [formError, setFormError] = React.useState<string | null>(null);
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
+  const plateDialog = React.useRef<HTMLDialogElement>(null);
+  const plateTrigger = React.useRef<HTMLButtonElement>(null);
+  const plateDialogTitleId = React.useId();
   const [descriptionLoading, setDescriptionLoading] = React.useState(true);
   const defaultValues: ProductEditorValue = {
     advertisedInsertOffers:
@@ -235,6 +255,7 @@ export function ProductEditor({
       : [],
     includedComponentIds:
       initialProduct?.includedComponents.map(({ id }) => id) ?? [],
+    includedPlateProductId: initialProduct?.includedPlate?.id ?? null,
     insertHostedMagnetOptions:
       productTypeSlug === "slider-insert"
         ? {
@@ -312,6 +333,10 @@ export function ProductEditor({
         return;
       }
       setSavedProductId(result.product.id);
+      if (quickCreate) {
+        onCreated?.(result.product);
+        return;
+      }
       if (images.length) {
         try {
           const uploads = await uploadImages({
@@ -387,17 +412,19 @@ export function ProductEditor({
             </Field>
           )}
         </form.Field>
-        <form.Subscribe selector={(state) => state.values.name}>
-          {(name) => (
-            <Field label={t("web.catalog.field.slug")}>
-              <Input
-                aria-label={t("web.catalog.field.slug")}
-                readOnly
-                value={productSlugPreview(name)}
-              />
-            </Field>
-          )}
-        </form.Subscribe>
+        {!quickCreate ? (
+          <form.Subscribe selector={(state) => state.values.name}>
+            {(name) => (
+              <Field label={t("web.catalog.field.slug")}>
+                <Input
+                  aria-label={t("web.catalog.field.slug")}
+                  readOnly
+                  value={productSlugPreview(name)}
+                />
+              </Field>
+            )}
+          </form.Subscribe>
+        ) : null}
         <form.Field name="makerId">
           {(field) => {
             const selected =
@@ -431,65 +458,69 @@ export function ProductEditor({
             );
           }}
         </form.Field>
-        <form.Subscribe selector={(state) => state.values.makerId}>
-          {(makerId) =>
-            makerId > 0 ? (
-              <Field label={t("web.slider.alias.managementLabel")}>
-                {(options.terminologyAliases ?? [])
-                  .filter(
-                    (alias) =>
-                      alias.makerId === makerId &&
-                      alias.canonicalKey === productTypeSlug,
-                  )
-                  .map((alias) => (
-                    <p className="text-sm" key={alias.id}>
-                      {alias.label}
-                      {alias.isPreferred
-                        ? ` · ${t("web.slider.alias.preferred")}`
-                        : ""}
-                    </p>
-                  ))}
-                <LookupDialog
-                  canonicalKey={productTypeSlug}
-                  kind="terminologyAlias"
-                  makerId={makerId}
-                  onCreated={(terminologyAlias) =>
-                    setOptions((current) => ({
-                      ...current,
-                      terminologyAliases: [
-                        ...(current.terminologyAliases ?? []),
-                        terminologyAlias,
-                      ],
-                    }))
-                  }
-                  t={t}
+        {!quickCreate ? (
+          <form.Subscribe selector={(state) => state.values.makerId}>
+            {(makerId) =>
+              makerId > 0 ? (
+                <Field label={t("web.slider.alias.managementLabel")}>
+                  {(options.terminologyAliases ?? [])
+                    .filter(
+                      (alias) =>
+                        alias.makerId === makerId &&
+                        alias.canonicalKey === productTypeSlug,
+                    )
+                    .map((alias) => (
+                      <p className="text-sm" key={alias.id}>
+                        {alias.label}
+                        {alias.isPreferred
+                          ? ` · ${t("web.slider.alias.preferred")}`
+                          : ""}
+                      </p>
+                    ))}
+                  <LookupDialog
+                    canonicalKey={productTypeSlug}
+                    kind="terminologyAlias"
+                    makerId={makerId}
+                    onCreated={(terminologyAlias) =>
+                      setOptions((current) => ({
+                        ...current,
+                        terminologyAliases: [
+                          ...(current.terminologyAliases ?? []),
+                          terminologyAlias,
+                        ],
+                      }))
+                    }
+                    t={t}
+                  />
+                </Field>
+              ) : null
+            }
+          </form.Subscribe>
+        ) : null}
+        {!quickCreate ? (
+          <form.Field name="makerProductUrl">
+            {(field) => (
+              <Field label={t("web.catalog.field.makerProductUrl")}>
+                <Input
+                  aria-label={t("web.catalog.field.makerProductUrl")}
+                  aria-describedby="maker-product-url-help"
+                  name={field.name}
+                  onBlur={field.handleBlur}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  type="url"
+                  value={field.state.value}
                 />
+                <p
+                  className="text-xs text-muted-foreground"
+                  id="maker-product-url-help"
+                >
+                  {t("web.catalog.help.makerProductUrl")}
+                </p>
+                <FieldError error={serverErrors.makerProductUrl?.[0]} t={t} />
               </Field>
-            ) : null
-          }
-        </form.Subscribe>
-        <form.Field name="makerProductUrl">
-          {(field) => (
-            <Field label={t("web.catalog.field.makerProductUrl")}>
-              <Input
-                aria-label={t("web.catalog.field.makerProductUrl")}
-                aria-describedby="maker-product-url-help"
-                name={field.name}
-                onBlur={field.handleBlur}
-                onChange={(event) => field.handleChange(event.target.value)}
-                type="url"
-                value={field.state.value}
-              />
-              <p
-                className="text-xs text-muted-foreground"
-                id="maker-product-url-help"
-              >
-                {t("web.catalog.help.makerProductUrl")}
-              </p>
-              <FieldError error={serverErrors.makerProductUrl?.[0]} t={t} />
-            </Field>
-          )}
-        </form.Field>
+            )}
+          </form.Field>
+        ) : null}
         <form.Field name="materialIds">
           {(field) => {
             const selected = options.materials.filter(({ id }) =>
@@ -551,7 +582,9 @@ export function ProductEditor({
             ] as const)
           : productTypeSlug === "spinner-button"
             ? (["weightG", "diameterMm", "thicknessMm"] as const)
-            : (["weightG", "lengthMm", "widthMm", "thicknessMm"] as const)
+            : productTypeSlug === "slider-plate"
+              ? ([] as const)
+              : (["weightG", "lengthMm", "widthMm", "thicknessMm"] as const)
         ).map((name) => {
           const labels = {
             buttonDiameterMm: "web.catalog.field.buttonDiameter",
@@ -587,6 +620,54 @@ export function ProductEditor({
             </form.Field>
           );
         })}
+        {productTypeSlug === "slider" ? (
+          <form.Field name="includedPlateProductId">
+            {(field) => {
+              const plates = options.relationshipProducts.filter(
+                (candidate) =>
+                  candidate.id !== initialProduct?.id &&
+                  candidate.productTypeSlug === "slider-plate",
+              );
+              const included = {
+                id: "included",
+                name: t("web.slider.relationship.includedPlates"),
+              };
+              return (
+                <Field label={t("web.slider.relationship.plates")}>
+                  <CatalogCombobox
+                    ariaLabel={t("web.slider.relationship.plates")}
+                    items={[included, ...plates]}
+                    onValueChange={(value) =>
+                      field.handleChange(
+                        value && value.id !== "included"
+                          ? Number(value.id)
+                          : null,
+                      )
+                    }
+                    placeholder={t("web.slider.relationship.includedPlates")}
+                    value={
+                      plates.find(({ id }) => id === field.state.value) ??
+                      included
+                    }
+                  />
+                  <Button
+                    aria-haspopup="dialog"
+                    onClick={() => plateDialog.current?.showModal()}
+                    ref={plateTrigger}
+                    type="button"
+                    variant="outline"
+                  >
+                    {t("web.slider.relationship.addPlates")}
+                  </Button>
+                  <FieldError
+                    error={serverErrors.includedPlateProductId?.[0]}
+                    t={t}
+                  />
+                </Field>
+              );
+            }}
+          </form.Field>
+        ) : null}
         {productTypeSlug === "slider" ? (
           <form.Field name="magnetSystem">
             {(field) => {
@@ -735,8 +816,7 @@ export function ProductEditor({
             }
           </form.Subscribe>
         ) : null}
-        {productTypeSlug === "slider-plate" ||
-        productTypeSlug === "slider-insert" ? (
+        {productTypeSlug === "slider-insert" ? (
           <p className="text-xs text-muted-foreground">
             {t("web.slider.measurement.setLevelHelp")}
           </p>
@@ -747,8 +827,7 @@ export function ProductEditor({
               const items = options.relationshipProducts.filter(
                 (candidate) =>
                   candidate.id !== initialProduct?.id &&
-                  (candidate.productTypeSlug === "slider-plate" ||
-                    candidate.productTypeSlug === "slider-insert"),
+                  candidate.productTypeSlug === "slider-insert",
               );
               const selected = items.filter(({ id }) =>
                 field.state.value.includes(id),
@@ -864,33 +943,35 @@ export function ProductEditor({
             />
           )}
         </form.Field>
-        <FileDropInput
-          accept=".avif,.jpeg,.jpg,.png,.webp"
-          aspectRatio={4 / 3}
-          aspectRatioHelpHref="/help/image-size-and-resolution-guide"
-          aspectRatioHelpLabel={imageGuidance.helpLabel}
-          aspectRatioWarning={imageGuidance.warning}
-          browseLabel={t("web.resources.upload.browseFiles")}
-          description={t("web.resources.upload.imagesHelp", {
-            maxFileSize: formatMiB(maxImageBytes, locale),
-            maxImages: maxImageSessionFiles,
-            maxSessionSize: formatMiB(maxImageSessionBytes, locale),
-          })}
-          fileTypes={t("web.resources.upload.imageTypes")}
-          files={images}
-          id="product-images"
-          label={t("web.resources.upload.imagesLabel")}
-          multiple
-          onFilesChange={(additions) =>
-            setImages((current) => [...current, ...additions])
-          }
-          onRemove={(index) =>
-            setImages((current) =>
-              current.filter((_, candidate) => candidate !== index),
-            )
-          }
-          removeFileLabel={t("web.action.close")}
-        />
+        {!quickCreate ? (
+          <FileDropInput
+            accept=".avif,.jpeg,.jpg,.png,.webp"
+            aspectRatio={4 / 3}
+            aspectRatioHelpHref="/help/image-size-and-resolution-guide"
+            aspectRatioHelpLabel={imageGuidance.helpLabel}
+            aspectRatioWarning={imageGuidance.warning}
+            browseLabel={t("web.resources.upload.browseFiles")}
+            description={t("web.resources.upload.imagesHelp", {
+              maxFileSize: formatMiB(maxImageBytes, locale),
+              maxImages: maxImageSessionFiles,
+              maxSessionSize: formatMiB(maxImageSessionBytes, locale),
+            })}
+            fileTypes={t("web.resources.upload.imageTypes")}
+            files={images}
+            id="product-images"
+            label={t("web.resources.upload.imagesLabel")}
+            multiple
+            onFilesChange={(additions) =>
+              setImages((current) => [...current, ...additions])
+            }
+            onRemove={(index) =>
+              setImages((current) =>
+                current.filter((_, candidate) => candidate !== index),
+              )
+            }
+            removeFileLabel={t("web.action.close")}
+          />
+        ) : null}
         {initialProduct ? (
           <CatalogImageEditor
             getReason={
@@ -907,7 +988,7 @@ export function ProductEditor({
             targetType="product"
           />
         ) : null}
-        {!initialProduct ? (
+        {!initialProduct && !quickCreate ? (
           <p className="m-0 text-sm text-muted-foreground">
             {t("web.erasure.productNotice")}
           </p>
@@ -921,6 +1002,10 @@ export function ProductEditor({
       <div className="flex flex-wrap justify-end gap-2 lg:col-span-2">
         <Button
           onClick={() => {
+            if (quickCreate) {
+              onCancel?.();
+              return;
+            }
             if (initialProduct) {
               void navigate({
                 params: {
@@ -955,6 +1040,43 @@ export function ProductEditor({
           )}
         </form.Subscribe>
       </div>
+      {typeof document !== "undefined" && productTypeSlug === "slider"
+        ? createPortal(
+            <dialog
+              aria-labelledby={plateDialogTitleId}
+              className="m-auto w-[min(64rem,calc(100%-2rem))] rounded-xl border border-border bg-card p-0 text-card-foreground backdrop:bg-black/60"
+              ref={plateDialog}
+            >
+              <div className="grid gap-4 p-6">
+                <h2 className="text-lg font-semibold" id={plateDialogTitleId}>
+                  {t("web.slider.relationship.addPlates")}
+                </h2>
+                <ProductEditor
+                  onCancel={() => {
+                    plateDialog.current?.close();
+                    plateTrigger.current?.focus();
+                  }}
+                  onCreated={(plate) => {
+                    setOptions((current) => ({
+                      ...current,
+                      relationshipProducts: [
+                        ...current.relationshipProducts,
+                        plate,
+                      ].sort((a, b) => a.name.localeCompare(b.name)),
+                    }));
+                    form.setFieldValue("includedPlateProductId", plate.id);
+                    plateDialog.current?.close();
+                    plateTrigger.current?.focus();
+                  }}
+                  options={options}
+                  productTypeSlug="slider-plate"
+                  quickCreate
+                />
+              </div>
+            </dialog>,
+            document.body,
+          )
+        : null}
     </form>
   );
 }
@@ -3654,11 +3776,14 @@ export function CollectionAddPage({
             t={t}
           />
         ) : null}
-        {product?.productTypeSlug === "slider" &&
-        product.includedComponents.length ? (
+        {product?.productTypeSlug === "slider" ? (
           <Notice>
             <p>{t("web.slider.relationship.inclusionHelp")}</p>
             <ul className="mt-2 grid list-disc gap-1 pl-5">
+              <li>
+                {product.includedPlate?.name ??
+                  t("web.slider.relationship.includedPlates")}
+              </li>
               {product.includedComponents.map((component) => (
                 <li key={component.id}>{component.name}</li>
               ))}

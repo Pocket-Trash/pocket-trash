@@ -477,6 +477,13 @@
       "when": 1791416104138,
       "tag": "0067_tricky_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1791417125652,
+      "tag": "0068_nasty_black_panther",
+      "breakpoints": true
     }
   ]
 }

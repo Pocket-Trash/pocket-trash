@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createUploadStorage } from "../../storage/src/index.js";
@@ -20,7 +20,6 @@ import {
   pattern,
   product,
   productImage,
-  productIncludedComponent,
   productInsertMagnetOffer,
   productMagnetConfiguration,
   productSlider,
@@ -204,16 +203,14 @@ describe("deterministic slider fixture seed", () => {
 
     const [includedPlates, patternedProducts] = await Promise.all([
       db
-        .select({ productId: productIncludedComponent.productId })
-        .from(productIncludedComponent)
-        .innerJoin(
-          productSliderPlate,
-          eq(
-            productSliderPlate.id,
-            productIncludedComponent.componentProductId,
+        .select({ productId: productSlider.id })
+        .from(productSlider)
+        .where(
+          and(
+            inArray(productSlider.id, productIds),
+            isNotNull(productSlider.includedPlateProductId),
           ),
-        )
-        .where(inArray(productIncludedComponent.productId, productIds)),
+        ),
       db
         .select({ productId: finishOption.productId })
         .from(finishOption)
@@ -221,7 +218,7 @@ describe("deterministic slider fixture seed", () => {
         .where(inArray(finishOption.productId, productIds)),
     ]);
     expect(new Set(includedPlates.map(({ productId }) => productId)).size).toBe(
-      21,
+      20,
     );
     expect(patternedProducts.length).toBeGreaterThan(0);
 

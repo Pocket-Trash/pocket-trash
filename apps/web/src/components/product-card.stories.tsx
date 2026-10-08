@@ -35,6 +35,7 @@ const product: CatalogProduct = {
   imageCount: 0,
   images: [],
   includedComponents: [],
+  includedPlate: null,
   isAdminPrivate: false,
   isPrivate: false,
   lengthMm: null,

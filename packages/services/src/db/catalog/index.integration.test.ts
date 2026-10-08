@@ -441,12 +441,7 @@ describe("catalog product persistence", () => {
         name: "Matched Plates",
         productTypeSlug: "slider-plate",
         slug: "matched-plates",
-        specs: {
-          lengthMm: "50",
-          thicknessMm: "4",
-          weightG: "28",
-          widthMm: "20",
-        },
+        specs: {},
       });
       const insert = await service.createProduct({
         actor: admin,
@@ -466,7 +461,8 @@ describe("catalog product persistence", () => {
       const slider = await service.createProduct({
         actor: admin,
         finishOptions: [],
-        includedComponentIds: [plate.id, insert.id],
+        includedComponentIds: [insert.id],
+        includedPlateProductId: plate.id,
         makerId: maker.id,
         materialIds: [material.id],
         name: "Rail Slider",
@@ -557,24 +553,24 @@ describe("catalog product persistence", () => {
           weightG: "96",
         }),
       );
-      expect(slider.includedComponents).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: plate.id,
-            productTypeSlug: "slider-plate",
-          }),
-          expect.objectContaining({
-            id: insert.id,
-            productTypeSlug: "slider-insert",
-          }),
-        ]),
+      expect(slider.includedPlate).toEqual(
+        expect.objectContaining({
+          id: plate.id,
+          productTypeSlug: "slider-plate",
+        }),
       );
+      expect(slider.includedComponents).toEqual([
+        expect.objectContaining({
+          id: insert.id,
+          productTypeSlug: "slider-insert",
+        }),
+      ]);
       expect(plate).toEqual(
         expect.objectContaining({
-          lengthMm: "50",
+          lengthMm: null,
           magnetSystem: null,
           weightBasis: null,
-          weightG: "28",
+          weightG: null,
         }),
       );
       await expect(
