@@ -13,7 +13,7 @@ permissions:
 jobs:
   assign:
     name: Assign PR opener
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 1
     if: github.event.pull_request.user.login != 'renovate[bot]'
 

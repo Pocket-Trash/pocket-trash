@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@11.27.1",
   "engines": {
-    "node": ">=22.20.0 <23"
+    "node": ">=24.21.0 <25"
   },
   "scripts": {
     "agent-skills:update": "pnpm exec skills add pocket-trash/skills --skill '*' --agent codex claude-code -y",

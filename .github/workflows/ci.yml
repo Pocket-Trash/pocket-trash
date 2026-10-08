@@ -16,7 +16,7 @@ jobs:
   classify-changes:
     name: Classify Changes
     if: github.event_name != 'schedule' && (github.event_name != 'pull_request' || github.event.action != 'edited' || github.event.changes.base != null)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       api: ${{ steps.classify.outputs.api }}
       scraper: ${{ steps.classify.outputs.scraper }}
@@ -33,12 +33,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Install classifier dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -69,7 +69,7 @@ jobs:
       always() &&
       github.event_name != 'schedule' &&
       (github.event_name != 'pull_request' || github.event.action != 'edited' || github.event.changes.base != null)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Require explicit path classification
@@ -91,19 +91,19 @@ jobs:
   metadata:
     name: Metadata
     if: github.event_name == 'pull_request' && github.event.action != 'labeled' && github.event.action != 'unlabeled'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -117,19 +117,19 @@ jobs:
   security:
     name: Security
     if: github.event_name != 'pull_request' || ((github.event.action != 'edited' || github.event.changes.base != null) && github.event.action != 'labeled' && github.event.action != 'unlabeled')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -141,11 +141,11 @@ jobs:
   changeset:
     name: Changeset
     if: github.event_name == 'pull_request' && (github.event.action != 'edited' || github.event.changes.base != null) && github.event.action != 'labeled' && github.event.action != 'unlabeled'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -169,19 +169,19 @@ jobs:
       needs.classify-changes.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.scraper == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -201,19 +201,19 @@ jobs:
       needs.classify-changes.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.api == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -233,19 +233,19 @@ jobs:
       needs.classify-changes.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.web == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -274,19 +274,19 @@ jobs:
       needs.classify-changes.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.validation == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -306,19 +306,19 @@ jobs:
       needs.classify-changes.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.validation == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -335,19 +335,19 @@ jobs:
       needs.classify-changes.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.storybook == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -367,19 +367,19 @@ jobs:
       needs.classify-changes.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       needs.classify-changes.outputs.database_validation == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies

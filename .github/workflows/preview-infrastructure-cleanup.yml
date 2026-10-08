@@ -15,7 +15,7 @@ jobs:
   preview-closed:
     name: Preview Infrastructure Closed
     if: github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     concurrency:
       group: preview-${{ github.event.pull_request.number }}
       cancel-in-progress: true
@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
@@ -47,9 +47,9 @@ jobs:
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies

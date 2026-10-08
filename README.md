@@ -6,7 +6,7 @@ Monorepo for the pocket-trash.app apps and shared packages.
 
 ### Prerequisites
 
-- Node.js 22
+- Node.js 24.21.0 or newer within Node 24
 - Corepack, enabled with `corepack enable`
 - pnpm 10.33.2, provided by the repo `packageManager` setting
 - Infisical CLI access to the `Pocket Trash` project (`pocket-trash` slug)

@@ -33,7 +33,7 @@ jobs:
   classify-changes:
     name: Classify Changes
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       api: ${{ steps.classify.outputs.api }}
       scraper: ${{ steps.classify.outputs.scraper }}
@@ -48,13 +48,13 @@ jobs:
 
     steps:
       - name: Check out pull request head
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Install classifier dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -83,7 +83,7 @@ jobs:
     concurrency:
       group: preview-${{ github.event.pull_request.number }}
       cancel-in-progress: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       can_deploy: ${{ steps.db.outputs.can_deploy }}
       deployment_id: ${{ steps.vercel_preview.outputs.deployment_id }}
@@ -99,7 +99,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -228,9 +228,9 @@ jobs:
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -935,7 +935,7 @@ jobs:
     concurrency:
       group: preview-${{ github.event.pull_request.number }}
       cancel-in-progress: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       id-token: write
@@ -945,7 +945,7 @@ jobs:
 
     steps:
       - name: Check out pull request head
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
@@ -976,9 +976,9 @@ jobs:
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -1036,7 +1036,7 @@ jobs:
 
       - name: Upload failed Playwright report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           if-no-files-found: ignore
           name: playwright-report-${{ github.event.pull_request.number }}
@@ -1046,7 +1046,7 @@ jobs:
   development-api:
     name: Development API
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.target == 'development')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       database_content_changed: ${{ steps.db_changes.outputs.database_content_changed }}
     permissions:
@@ -1054,7 +1054,7 @@ jobs:
       id-token: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -1093,9 +1093,9 @@ jobs:
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -1189,13 +1189,13 @@ jobs:
     concurrency:
       group: preview-${{ github.event.pull_request.number }}
       cancel-in-progress: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       id-token: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Fetch Cloudflare secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
@@ -1212,9 +1212,9 @@ jobs:
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -1239,7 +1239,7 @@ jobs:
   production:
     name: Production
     if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.target == 'production')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       id-token: write
@@ -1248,7 +1248,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
@@ -1276,9 +1276,9 @@ jobs:
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -1389,14 +1389,14 @@ jobs:
     name: Railway Production
     needs: production
     if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       id-token: write
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
@@ -1413,9 +1413,9 @@ jobs:
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -1492,14 +1492,14 @@ jobs:
     name: Web Production
     needs: production
     if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       id-token: write
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Fetch GitHub secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
@@ -1516,9 +1516,9 @@ jobs:
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies
@@ -1607,13 +1607,13 @@ jobs:
     name: GitHub Release
     needs: [production, railway-production, web-production]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Create GitHub Release
         env:
