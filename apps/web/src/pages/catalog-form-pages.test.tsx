@@ -211,7 +211,7 @@ describe("finish option editor", () => {
     const product: CatalogProduct = {
       approvalStatus: "approved",
       bearing: null,
-      buttonDiameterMm: null,
+      buttonDiameter: null,
       clickCount: null,
       canAdminister: false,
       canEdit: true,
@@ -219,7 +219,7 @@ describe("finish option editor", () => {
       compatibleButtonName: null,
       createdAt: new Date(0),
       description: null,
-      diameterMm: null,
+      diameter: null,
       finishOptions: [
         {
           colorEffect: null,
@@ -234,7 +234,7 @@ describe("finish option editor", () => {
       includedInsert: null,
       includedPlate: null,
       id: 1000,
-      lengthMm: null,
+      length: null,
       makerId: 1000,
       makerName: "Maker",
       makerSlug: "maker",
@@ -252,12 +252,12 @@ describe("finish option editor", () => {
       productTypeName: "Spinner",
       productTypeSlug: "spinner",
       slug: "spinner",
-      spinDiameterMm: null,
-      thicknessMm: null,
-      thicknessWithButtonMm: null,
+      spinDiameter: null,
+      thickness: null,
+      thicknessWithButton: null,
       updatedAt: new Date(0),
-      weightG: null,
-      widthMm: null,
+      weight: null,
+      width: null,
     };
     const html = renderToStaticMarkup(
       createElement(CollectionProductFields, {
@@ -561,17 +561,17 @@ describe("product form conditional fields", () => {
     }
     expect(html).not.toContain('aria-label="Diameter"');
     if (productTypeSlug === "slider") {
-      expect(html).toContain("web.slider.capability.usesInserts");
-      expect(html).toContain('aria-label="web.slider.layout.label"');
+      expect(html).toContain("This slider uses inserts");
+      expect(html).toContain('aria-label="Magnet layout"');
       expect(html).not.toContain('aria-label="Weight basis"');
       expect(html).not.toContain('aria-label="Click count"');
       expect(html).toContain("Magnet configuration");
-      expect(html).toContain("web.slider.relationship.includedPlates");
-      expect(html).toContain("web.slider.relationship.addPlates");
-      expect(html).not.toContain("Included components");
+      expect(html).toContain("Included plates");
+      expect(html).toContain("Add plates");
+      expect(html).not.toContain("Included parts");
     } else {
-      expect(html).not.toContain("web.slider.capability.usesInserts");
-      expect(html).not.toContain("Included components");
+      expect(html).not.toContain("This slider uses inserts");
+      expect(html).not.toContain("Included parts");
       if (productTypeSlug === "slider-insert") {
         expect(html).not.toContain("Appearance");
         expect(html).not.toContain("Available insert setups");
@@ -810,7 +810,7 @@ describe("collection add form", () => {
     );
 
     expect(html).toContain(
-      "Included components describe what is sold with this product. They do not create collection items.",
+      "Included parts describe what is sold with this product. They do not create collection items.",
     );
     expect(html).toContain("Suggested plate");
     expect(html).toContain("Suggested insert");
@@ -833,7 +833,7 @@ function productFixture(
   return {
     approvalStatus: "approved",
     bearing: null,
-    buttonDiameterMm: null,
+    buttonDiameter: null,
     clickCount: productTypeSlug === "slider" ? 3 : null,
     canAdminister: false,
     canEdit: true,
@@ -841,7 +841,7 @@ function productFixture(
     compatibleButtonName: null,
     createdAt: new Date(0),
     description: null,
-    diameterMm: null,
+    diameter: null,
     finishOptions: [
       {
         colorEffect: null,
@@ -856,7 +856,7 @@ function productFixture(
     includedInsert: null,
     includedPlate: null,
     id,
-    lengthMm: null,
+    length: null,
     makerId: 1,
     makerName: "Maker",
     makerSlug: "maker",
@@ -880,12 +880,12 @@ function productFixture(
     }[productTypeSlug],
     productTypeSlug,
     slug: name.toLowerCase(),
-    spinDiameterMm: null,
-    thicknessMm: null,
-    thicknessWithButtonMm: null,
+    spinDiameter: null,
+    thickness: null,
+    thicknessWithButton: null,
     updatedAt: new Date(0),
-    weightG: null,
-    widthMm: null,
+    weight: null,
+    width: null,
   };
 }
 

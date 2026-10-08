@@ -39,14 +39,18 @@ describe("catalog helpers", () => {
     ).toEqual(["Aluminum", "Titanium", "Zirconium"]);
 
     const buttons = [
-      { diameterMm: "22.5", id: 2, name: "Large" },
-      { diameterMm: "20.0", id: 1, name: "Small" },
-      { diameterMm: null, id: 3, name: "Unknown" },
-    ];
-    expect(filterButtonsByDiameter(buttons, "20").map(({ id }) => id)).toEqual([
-      1,
-    ]);
-    expect(filterButtonsByDiameter(buttons, null)).toHaveLength(3);
+      { diameter: { unit: "mm", value: "22.5" }, id: 2, name: "Large" },
+      { diameter: { unit: "mm", value: "20.0" }, id: 1, name: "Small" },
+      { diameter: null, id: 3, name: "Unknown" },
+    ] as const;
+    expect(
+      filterButtonsByDiameter(buttons, { unit: "mm", value: "20" }).map(
+        ({ id }) => id,
+      ),
+    ).toEqual([1]);
+    expect(
+      filterButtonsByDiameter(buttons, { unit: "mm", value: "" }),
+    ).toHaveLength(3);
   });
 
   it("formats ordered solid and fade finish labels", () => {

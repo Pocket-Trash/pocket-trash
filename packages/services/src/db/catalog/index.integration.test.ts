@@ -150,7 +150,7 @@ describe("catalog product persistence", () => {
         name: "Spinner",
         productTypeSlug: "spinner",
         slug: "spinner",
-        specs: { bearing: "R188", spinDiameterMm: "52" },
+        specs: { bearing: "R188", spinDiameter: { unit: "mm", value: "52" } },
       });
 
       expect(created).toEqual(
@@ -160,7 +160,7 @@ describe("catalog product persistence", () => {
           description: "Created description",
           makerProductUrl: "https://maker.example/spinner",
           makerProductUrlValid: true,
-          spinDiameterMm: "52",
+          spinDiameter: { unit: "mm", value: "52" },
         }),
       );
       expect(created.finishOptions[0]?.pattern).toEqual({
@@ -276,7 +276,10 @@ describe("catalog product persistence", () => {
         productId: created.id,
         productTypeSlug: "spinner",
         slug: "edited-spinner",
-        specs: { bearing: "One Drop", spinDiameterMm: "54" },
+        specs: {
+          bearing: "One Drop",
+          spinDiameter: { unit: "mm", value: "54" },
+        },
       });
 
       expect(updated).toEqual(
@@ -285,7 +288,7 @@ describe("catalog product persistence", () => {
           description: "Edited description",
           makerProductUrl: "https://maker.example/spinner",
           makerProductUrlValid: false,
-          spinDiameterMm: "54",
+          spinDiameter: { unit: "mm", value: "54" },
         }),
       );
 
@@ -465,11 +468,11 @@ describe("catalog product persistence", () => {
         productTypeSlug: "slider",
         slug: "rail-slider",
         specs: {
-          lengthMm: "52",
-          thicknessMm: "12",
+          length: { unit: "mm", value: "52" },
+          thickness: { unit: "mm", value: "12" },
           usesInserts: true,
-          weightG: "96",
-          widthMm: "24",
+          weight: { unit: "g", value: "96" },
+          width: { unit: "mm", value: "24" },
         },
       });
 
@@ -478,7 +481,7 @@ describe("catalog product persistence", () => {
           clickCount: 3,
           magnetLayout: "2x4",
           usesInserts: true,
-          weightG: "96",
+          weight: { unit: "g", value: "96" },
         }),
       );
       expect(slider.includedPlate).toEqual(
@@ -495,9 +498,9 @@ describe("catalog product persistence", () => {
       );
       expect(plate).toEqual(
         expect.objectContaining({
-          lengthMm: null,
+          length: null,
           usesInserts: null,
-          weightG: null,
+          weight: null,
         }),
       );
       const bodySlider = await service.createProduct({

@@ -17,7 +17,6 @@ export {
   permissions,
 } from "./authorization.js";
 export { nextAvailableSlug, slugify, slugPattern } from "./catalog-slug.js";
-
 export { adminFeedbackArchiveStatuses } from "./db/feedback/index.js";
 export type {
   AdminFeedbackItem,
@@ -122,6 +121,22 @@ export {
   sliderMagnetLayouts,
   UserBanStateError,
 } from "./db/index.js";
+export type {
+  DimensionMeasurement,
+  DimensionUnit,
+  Measurement,
+  MeasurementSystem,
+  WeightMeasurement,
+  WeightUnit,
+} from "./measurements.js";
+export {
+  convertDimension,
+  convertWeight,
+  formatMeasurement,
+  gramsPerOunce,
+  measurementsEqual,
+  millimetersPerInch,
+} from "./measurements.js";
 
 import {
   createFeatureFlagsService,

@@ -27,12 +27,12 @@ describe("collection product types", () => {
  */
 const base = {
   bearing: "",
-  buttonDiameterMm: null,
+  buttonDiameter: null,
   compatibleButtonId: null,
   description: "",
-  diameterMm: null,
+  diameter: null,
   finishOptions: [],
-  lengthMm: null,
+  length: null,
   makerId: 1000,
   makerProductUrl: "",
   magnetLayout: null,
@@ -40,11 +40,11 @@ const base = {
   name: "Spinner",
   productId: null,
   productTypeSlug: "spinner" as const,
-  spinDiameterMm: null,
-  thicknessMm: null,
-  thicknessWithButtonMm: null,
-  weightG: null,
-  widthMm: null,
+  spinDiameter: null,
+  thickness: null,
+  thicknessWithButton: null,
+  weight: null,
+  width: null,
   includedInsertProductId: null,
   includedPlateProductId: null,
   usesInserts: null,
@@ -245,7 +245,7 @@ describe("product source details", () => {
       description: "  **Fast**  ",
       finishOptions: validFinishOptions,
       makerProductUrl: " https://maker.example/products/spinner/ ",
-      spinDiameterMm: "52",
+      spinDiameter: { unit: "mm", value: "52" },
     });
 
     expect(result).toEqual(
@@ -253,9 +253,26 @@ describe("product source details", () => {
         bearing: "R188",
         description: "  **Fast**  ",
         makerProductUrl: "https://maker.example/products/spinner",
-        spinDiameterMm: "52",
+        spinDiameter: { unit: "mm", value: "52" },
       }),
     );
+  });
+
+  it("rejects legacy flat and malformed measurement payloads", () => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        finishOptions: validFinishOptions,
+        spinDiameterMm: "52",
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        finishOptions: validFinishOptions,
+        spinDiameter: { legacyUnit: "mm", unit: "mm", value: "52" },
+      }).success,
+    ).toBe(false);
   });
 
   it("enforces description and bearing limits", () => {
@@ -309,7 +326,7 @@ describe("product source details", () => {
         ...base,
         finishOptions: validFinishOptions,
         productTypeSlug: "spinner-button",
-        spinDiameterMm: "22",
+        spinDiameter: { unit: "mm", value: "22" },
       }).success,
     ).toBe(false);
   });
@@ -347,7 +364,7 @@ describe("slider catalog product validation", () => {
         magnetLayout: "2x4",
         usesInserts: true,
         productTypeSlug: "slider",
-        weightG: "120",
+        weight: { unit: "g", value: "120" },
       }).success,
     ).toBe(true);
     expect(
@@ -357,7 +374,7 @@ describe("slider catalog product validation", () => {
         usesInserts: true,
         productTypeSlug: "slider",
         weightBasis: "complete-build",
-        weightG: "120",
+        weight: { unit: "g", value: "120" },
       }).success,
     ).toBe(false);
   });
@@ -405,7 +422,7 @@ describe("slider catalog product validation", () => {
       productFormSchema.safeParse({
         ...base,
         productTypeSlug: "slider-plate",
-        weightG: "12",
+        weight: { unit: "g", value: "12" },
       }).success,
     ).toBe(false);
   });
@@ -467,7 +484,7 @@ describe("slider catalog product validation", () => {
       productFormSchema.safeParse({
         ...base,
         productTypeSlug: "slider-insert",
-        weightG: "12",
+        weight: { unit: "g", value: "12" },
       }).success,
     ).toBe(false);
   });

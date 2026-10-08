@@ -1,10 +1,9 @@
 import type {
   CurrencyCode,
   Database,
-  DimensionUnit,
+  MeasurementSystem,
   ThemeMode,
   UserSettings,
-  WeightUnit,
 } from "@package/database";
 import { schema } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
@@ -28,10 +27,8 @@ export type UpsertUserSettingsInput = {
    * Currency used to display monetary values.
    */
   currencyCode: CurrencyCode;
-  /**
-   * Unit used to display dimensions.
-   */
-  dimensionUnit: DimensionUnit;
+  /** App-wide system used for secondary measurement displays. */
+  measurementSystem: MeasurementSystem;
   /**
    * Explicit locale, or `null` to use negotiated preferences.
    */
@@ -40,10 +37,6 @@ export type UpsertUserSettingsInput = {
    * Preferred light, dark, or system theme.
    */
   theme: ThemeMode;
-  /**
-   * Unit used to display weights.
-   */
-  weightUnit: WeightUnit;
 };
 
 /**
@@ -118,10 +111,9 @@ export type UserSettingsService = {
  */
 export const defaultUserSettings: UpsertUserSettingsInput = {
   currencyCode: "USD",
-  dimensionUnit: "in",
   locale: null,
+  measurementSystem: "metric",
   theme: "system",
-  weightUnit: "g",
 };
 
 /**
@@ -180,11 +172,10 @@ export function createUserSettingsService(
           const [row] = await db
             .select({
               currencyCode: schema.userSettings.currencyCode,
-              dimensionUnit: schema.userSettings.dimensionUnit,
               locale: schema.userSettings.locale,
+              measurementSystem: schema.userSettings.measurementSystem,
               theme: schema.userSettings.theme,
               userId: schema.userSettings.userId,
-              weightUnit: schema.userSettings.weightUnit,
             })
             .from(schema.userSettings)
             .innerJoin(

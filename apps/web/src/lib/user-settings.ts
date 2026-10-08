@@ -10,8 +10,7 @@ import { activeAuth as auth } from "@/lib/auth";
 import {
   type CurrencyCode,
   currencies,
-  type DimensionUnit,
-  type WeightUnit,
+  type MeasurementSystem,
 } from "@/lib/pen-formatters";
 import { isThemeMode, type ThemeMode } from "@/lib/theme";
 
@@ -19,14 +18,12 @@ import { isThemeMode, type ThemeMode } from "@/lib/theme";
 export type UserSettingsPreferences = UpsertUserSettingsInput & {
   /** Preferred ISO currency code. */
   currencyCode: CurrencyCode;
-  /** Preferred dimension display unit. */
-  dimensionUnit: DimensionUnit;
+  /** App-wide system used for secondary measurement displays. */
+  measurementSystem: MeasurementSystem;
   /** Explicit supported locale, or `null` for automatic selection. */
   locale: SupportedLocale | null;
   /** Preferred light, dark, or system theme. */
   theme: ThemeMode;
-  /** Preferred weight display unit. */
-  weightUnit: WeightUnit;
 };
 
 /** Validated preference fields that may participate in an update. */
@@ -43,10 +40,9 @@ export type UserSettingsState = {
 /** Default preferences for users without saved settings. */
 export const defaultUserSettings: UserSettingsPreferences = {
   currencyCode: "USD",
-  dimensionUnit: "in",
   locale: null,
+  measurementSystem: "metric",
   theme: "system",
-  weightUnit: "g",
 };
 
 /** Browser storage key for local user-setting state. */
@@ -116,11 +112,11 @@ function parseUserSettingsPatch(input: unknown): UserSettingsPatch {
     patch.currencyCode = value.currencyCode as CurrencyCode;
   }
 
-  if ("dimensionUnit" in value) {
-    if (!isDimensionUnit(value.dimensionUnit)) {
-      throw new Error(formatTranslation("web.error.invalidDimensionUnit"));
+  if ("measurementSystem" in value) {
+    if (!isMeasurementSystem(value.measurementSystem)) {
+      throw new Error(formatTranslation("web.error.invalidMeasurementSystem"));
     }
-    patch.dimensionUnit = value.dimensionUnit;
+    patch.measurementSystem = value.measurementSystem;
   }
 
   if ("theme" in value) {
@@ -137,13 +133,6 @@ function parseUserSettingsPatch(input: unknown): UserSettingsPatch {
     patch.locale = value.locale;
   }
 
-  if ("weightUnit" in value) {
-    if (!isWeightUnit(value.weightUnit)) {
-      throw new Error(formatTranslation("web.error.invalidWeightUnit"));
-    }
-    patch.weightUnit = value.weightUnit;
-  }
-
   if (Object.keys(patch).length === 0) {
     throw new Error(formatTranslation("web.error.missingSetting"));
   }
@@ -151,22 +140,13 @@ function parseUserSettingsPatch(input: unknown): UserSettingsPatch {
   return patch;
 }
 
-/** Tests whether a value is a supported dimension unit.
+/** Tests whether a value is a supported measurement system.
  *
  * @param value - Value to inspect.
- * @returns Whether the value is inches or millimetres.
+ * @returns Whether the value selects metric or imperial display.
  */
-function isDimensionUnit(value: unknown): value is DimensionUnit {
-  return value === "in" || value === "mm";
-}
-
-/** Tests whether a value is a supported weight unit.
- *
- * @param value - Value to inspect.
- * @returns Whether the value is grams or ounces.
- */
-function isWeightUnit(value: unknown): value is WeightUnit {
-  return value === "g" || value === "oz";
+function isMeasurementSystem(value: unknown): value is MeasurementSystem {
+  return value === "metric" || value === "imperial";
 }
 
 /** Tests whether a value is already a canonical supported locale.
@@ -186,20 +166,17 @@ function isSupportedLocale(value: unknown): value is SupportedLocale {
 function toUserSettingsPreferences(settings: {
   /** Preferred ISO currency code. */
   currencyCode: CurrencyCode;
-  /** Preferred dimension display unit. */
-  dimensionUnit: DimensionUnit;
+  /** App-wide measurement display system. */
+  measurementSystem: MeasurementSystem;
   /** Stored locale preference, or automatic selection when absent. */
   locale?: LocalePreference | null;
   /** Preferred light, dark, or system theme. */
   theme: ThemeMode;
-  /** Preferred weight display unit. */
-  weightUnit: WeightUnit;
 }) {
   return {
     currencyCode: settings.currencyCode,
-    dimensionUnit: settings.dimensionUnit,
     locale: settings.locale ? resolveLocale(settings.locale) : null,
+    measurementSystem: settings.measurementSystem,
     theme: settings.theme,
-    weightUnit: settings.weightUnit,
   };
 }

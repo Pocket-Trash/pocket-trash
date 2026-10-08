@@ -3,6 +3,10 @@ import {
   slugify,
   slugPattern,
 } from "@package/services/catalog-slug";
+import {
+  type DimensionMeasurement,
+  measurementsEqual,
+} from "@package/services/measurements";
 import { z } from "zod";
 
 export { nextAvailableSlug, slugify, slugPattern };
@@ -54,24 +58,25 @@ export function sortMaterials<
  * Returns name-sorted buttons matching the requested diameter, or all buttons when it is empty.
  *
  * @param buttons - Buttons to filter and sort.
- * @param diameterMm - Requested diameter, or `null` or an empty string to include every diameter.
+ * @param diameter - Requested diameter, or an empty value to include every diameter.
  * @returns A new filtered and name-sorted button array.
  * @template T - Lookup or item shape preserved by the operation.
  */
 export function filterButtonsByDiameter<
   T extends {
-    /** Button diameter in millimetres, or `null` when unspecified. */
-    diameterMm: string | null;
+    /** Stored button diameter, or `null` when unspecified. */
+    diameter: DimensionMeasurement | null;
     /** Human-readable button name. */
     name: string;
   },
->(buttons: readonly T[], diameterMm: string | null): T[] {
-  const diameter = diameterMm ? Number(diameterMm) : null;
+>(buttons: readonly T[], diameter: DimensionMeasurement): T[] {
+  const requested = diameter.value ? diameter : null;
   return [...buttons]
     .filter(
       (button) =>
-        diameter === null ||
-        (button.diameterMm !== null && Number(button.diameterMm) === diameter),
+        requested === null ||
+        (button.diameter !== null &&
+          measurementsEqual(button.diameter, requested)),
     )
     .sort((a, b) => a.name.localeCompare(b.name));
 }

@@ -39,7 +39,7 @@ const collectionImage = image(
 const product: CatalogProduct = {
   approvalStatus: "approved",
   bearing: "R188 hybrid ceramic",
-  buttonDiameterMm: null,
+  buttonDiameter: null,
   clickCount: null,
   canAdminister: false,
   canEdit: false,
@@ -47,7 +47,7 @@ const product: CatalogProduct = {
   compatibleButtonName: null,
   createdAt: new Date("2026-01-01"),
   description: "A **compact** spinner.",
-  diameterMm: "50.8",
+  diameter: { unit: "mm", value: "50.8" },
   finishOptions: [
     {
       colorEffect: null,
@@ -64,7 +64,7 @@ const product: CatalogProduct = {
   includedPlate: null,
   isAdminPrivate: false,
   isPrivate: false,
-  lengthMm: null,
+  length: null,
   makerId: 1000,
   makerName: "KAP EDC",
   makerSlug: "kap-edc",
@@ -80,21 +80,21 @@ const product: CatalogProduct = {
   productTypeName: "Spinner",
   productTypeSlug: "spinner",
   slug: "katla",
-  spinDiameterMm: "55",
-  thicknessMm: "12.7",
-  thicknessWithButtonMm: null,
+  spinDiameter: { unit: "mm", value: "55" },
+  thickness: { unit: "mm", value: "12.7" },
+  thicknessWithButton: null,
   updatedAt: new Date("2026-01-02"),
-  weightG: "90",
-  widthMm: null,
+  weight: { unit: "g", value: "90" },
+  width: null,
 };
 
 /** Slider catalog fixture covering capability and reviewed relationships. */
 const slider: CatalogProduct = {
   ...product,
   bearing: null,
-  buttonDiameterMm: null,
+  buttonDiameter: null,
   clickCount: 3,
-  diameterMm: null,
+  diameter: null,
   id: 2000,
   includedInsert: null,
   includedPlate: {
@@ -103,7 +103,7 @@ const slider: CatalogProduct = {
     productTypeSlug: "slider-plate",
     slug: "matched-plates",
   },
-  lengthMm: "52",
+  length: { unit: "mm", value: "52" },
   magnetLayout: "2x4",
   usesInserts: false,
   name: "Rail Slider",
@@ -111,10 +111,10 @@ const slider: CatalogProduct = {
   productTypeName: "Slider",
   productTypeSlug: "slider",
   slug: "rail-slider",
-  spinDiameterMm: null,
-  thicknessMm: "12",
-  weightG: "96",
-  widthMm: "24",
+  spinDiameter: null,
+  thickness: { unit: "mm", value: "12" },
+  weight: { unit: "g", value: "96" },
+  width: { unit: "mm", value: "24" },
 };
 
 /** User collection shared by the stories. */

@@ -258,8 +258,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/services
       '@pocket-trash/localizations':
-        specifier: ^0.29.0
-        version: 0.29.0
+        specifier: ^0.30.0
+        version: 0.30.0
       '@t3-oss/env-core':
         specifier: ^0.13.11
         version: 0.13.11(typescript@6.0.2)(zod@4.4.3)
@@ -3069,8 +3069,8 @@ packages:
     resolution: {integrity: sha512-H0GoVrTZBQdqdY8ckTVY+SMZFsCYnt186119B1aIXU/HJyJQ6OeS5/0FWiXYVeQtVrf+a11D5Q8kgW+Ho1nxIw==}
     engines: {node: '>=22.20.0 <23'}
 
-  '@pocket-trash/localizations@0.29.0':
-    resolution: {integrity: sha512-5tC4N2Afyrju27dosD0iu1yS5quXo9AsQgs+zflAwmmMtQcERsJ5ptk8OcGDaVyqG9I04oTjOXEhTQA+6rSIXA==}
+  '@pocket-trash/localizations@0.30.0':
+    resolution: {integrity: sha512-9ipGrf8ZKghWt4mPZ8bEYqVAp/osliGyVjCNxTn08ZggfJ4rWGUxp2hotiCRe5xiBX5g1YG3qRJG+XTitc32JQ==}
     engines: {node: '>=22.20.0 <23'}
 
   '@polka/url@1.0.0-next.29':
@@ -9968,7 +9968,7 @@ snapshots:
 
   '@pocket-trash/localizations@0.27.0': {}
 
-  '@pocket-trash/localizations@0.29.0': {}
+  '@pocket-trash/localizations@0.30.0': {}
 
   '@polka/url@1.0.0-next.29': {}
 

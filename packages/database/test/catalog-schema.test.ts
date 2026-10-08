@@ -110,7 +110,8 @@ describe("catalog schema", () => {
       expect.arrayContaining([
         "bearing",
         "compatible_button_id",
-        "spin_diameter_mm",
+        "spin_diameter_unit",
+        "spin_diameter_value",
       ]),
     );
     expect(spinnerColumns).not.toEqual(
@@ -154,10 +155,14 @@ describe("catalog schema", () => {
       expect.arrayContaining([
         "id",
         "uses_inserts",
-        "weight_g",
-        "length_mm",
-        "width_mm",
-        "thickness_mm",
+        "weight_unit",
+        "weight_value",
+        "length_unit",
+        "length_value",
+        "width_unit",
+        "width_value",
+        "thickness_unit",
+        "thickness_value",
         "magnet_layout",
         "magnet_configuration",
         "included_plate_product_id",
@@ -173,7 +178,10 @@ describe("catalog schema", () => {
         "product_slider_magnet_layout_consistent",
         "product_slider_magnet_layout_valid",
         "product_slider_included_insert_distinct",
-        "product_slider_measurements_positive",
+        "product_slider_length_consistent",
+        "product_slider_thickness_consistent",
+        "product_slider_weight_consistent",
+        "product_slider_width_consistent",
       ]),
     );
     expect(slider.checks.map(({ name }) => name)).not.toContain(

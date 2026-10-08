@@ -103,7 +103,7 @@ vi.mock("@/hooks/use-pen-settings", () => ({
    *
    * @returns Fixed pen display settings.
    */
-  usePenSettings: () => ({ currency: "CAD", units: "mm", weight: "g" }),
+  usePenSettings: () => ({ currency: "CAD", measurementSystem: "metric" }),
 }));
 
 vi.mock("@/lib/pen-data", () => ({ products: [] }));

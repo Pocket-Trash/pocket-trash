@@ -37,6 +37,10 @@ import {
 } from "@/components/collection-form";
 import { CollectionSelector } from "@/components/collection-selector";
 import type { MarkdownEditorHandle } from "@/components/markdown-editor";
+import {
+  MeasurementInput,
+  type MeasurementInputValue,
+} from "@/components/measurement-input";
 import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
 import { FileDropInput } from "@/components/resource-file-input";
 import { SliderMagnetConfigurationEditor } from "@/components/slider-magnet-configuration-editor";
@@ -151,10 +155,36 @@ export function ProductFormPage({
   );
 }
 
+/** Editable dimension text and its independently selected unit. */
+type EditableDimensionMeasurement = {
+  /** Selected storage unit. */
+  unit: "in" | "mm";
+  /** Exact numeric input text. */
+  value: string;
+};
+
+/** Editable weight text and its independently selected unit. */
+type EditableWeightMeasurement = {
+  /** Selected storage unit. */
+  unit: "g" | "oz";
+  /** Exact numeric input text. */
+  value: string;
+};
+
 /** Controlled editor value keeps text inputs as strings before schema parsing. */
 type ProductEditorValue = Omit<
   ProductFormValue,
-  "bearing" | "description" | "makerProductUrl"
+  | "bearing"
+  | "buttonDiameter"
+  | "description"
+  | "diameter"
+  | "length"
+  | "makerProductUrl"
+  | "spinDiameter"
+  | "thickness"
+  | "thicknessWithButton"
+  | "weight"
+  | "width"
 > & {
   /** Bearing text before blank normalization. */
   bearing: string;
@@ -162,6 +192,22 @@ type ProductEditorValue = Omit<
   description: string;
   /** Maker URL before blank normalization. */
   makerProductUrl: string;
+  /** Button diameter text and independently selected unit. */
+  buttonDiameter: EditableDimensionMeasurement;
+  /** Diameter text and independently selected unit. */
+  diameter: EditableDimensionMeasurement;
+  /** Length text and independently selected unit. */
+  length: EditableDimensionMeasurement;
+  /** Spin diameter text and independently selected unit. */
+  spinDiameter: EditableDimensionMeasurement;
+  /** Thickness text and independently selected unit. */
+  thickness: EditableDimensionMeasurement;
+  /** Thickness-with-button text and independently selected unit. */
+  thicknessWithButton: EditableDimensionMeasurement;
+  /** Weight text and independently selected unit. */
+  weight: EditableWeightMeasurement;
+  /** Width text and independently selected unit. */
+  width: EditableDimensionMeasurement;
 };
 
 /**
@@ -230,10 +276,10 @@ export function ProductEditor({
   const [descriptionLoading, setDescriptionLoading] = React.useState(true);
   const defaultValues: ProductEditorValue = {
     bearing: initialProduct?.bearing ?? "",
-    buttonDiameterMm: initialProduct?.buttonDiameterMm ?? null,
+    buttonDiameter: initialProduct?.buttonDiameter ?? { unit: "mm", value: "" },
     compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
     description: initialProduct?.description ?? "",
-    diameterMm: initialProduct?.diameterMm ?? null,
+    diameter: initialProduct?.diameter ?? { unit: "mm", value: "" },
     finishOptions: initialProduct?.finishOptions.length
       ? initialProduct.finishOptions.map((option) => ({
           colorEffectId: option.colorEffect?.id ?? null,
@@ -250,7 +296,7 @@ export function ProductEditor({
       : [],
     includedInsertProductId: initialProduct?.includedInsert?.id ?? null,
     includedPlateProductId: initialProduct?.includedPlate?.id ?? null,
-    lengthMm: initialProduct?.lengthMm ?? null,
+    length: initialProduct?.length ?? { unit: "mm", value: "" },
     makerId: initialProduct?.makerId ?? 0,
     makerProductUrl: initialProduct?.makerProductUrl ?? "",
     magnetConfiguration: initialProduct?.magnetConfiguration ?? null,
@@ -264,11 +310,14 @@ export function ProductEditor({
     name: initialProduct?.name ?? "",
     productId: initialProduct?.id ?? null,
     productTypeSlug,
-    spinDiameterMm: initialProduct?.spinDiameterMm ?? null,
-    thicknessMm: initialProduct?.thicknessMm ?? null,
-    thicknessWithButtonMm: initialProduct?.thicknessWithButtonMm ?? null,
-    weightG: initialProduct?.weightG ?? null,
-    widthMm: initialProduct?.widthMm ?? null,
+    spinDiameter: initialProduct?.spinDiameter ?? { unit: "mm", value: "" },
+    thickness: initialProduct?.thickness ?? { unit: "mm", value: "" },
+    thicknessWithButton: initialProduct?.thicknessWithButton ?? {
+      unit: "mm",
+      value: "",
+    },
+    weight: initialProduct?.weight ?? { unit: "g", value: "" },
+    width: initialProduct?.width ?? { unit: "mm", value: "" },
     usesInserts:
       initialProduct?.usesInserts ??
       (productTypeSlug === "slider" ? false : null),
@@ -594,48 +643,49 @@ export function ProductEditor({
 
         {(productTypeSlug === "spinner"
           ? ([
-              "weightG",
-              "lengthMm",
-              "widthMm",
-              "thicknessMm",
-              "thicknessWithButtonMm",
-              "buttonDiameterMm",
-              "spinDiameterMm",
+              "weight",
+              "length",
+              "width",
+              "thickness",
+              "thicknessWithButton",
+              "buttonDiameter",
+              "spinDiameter",
             ] as const)
           : productTypeSlug === "spinner-button"
-            ? (["weightG", "diameterMm", "thicknessMm"] as const)
+            ? (["weight", "diameter", "thickness"] as const)
             : productTypeSlug === "slider-plate" ||
                 productTypeSlug === "slider-insert"
               ? ([] as const)
-              : (["weightG", "lengthMm", "widthMm", "thicknessMm"] as const)
+              : (["weight", "length", "width", "thickness"] as const)
         ).map((name) => {
           const labels = {
-            buttonDiameterMm: "web.catalog.field.buttonDiameter",
-            diameterMm: "web.archive.spec.diameter",
-            lengthMm: "web.archive.spec.length",
-            spinDiameterMm: "web.catalog.field.spinDiameter",
-            thicknessMm: "web.catalog.field.thickness",
-            thicknessWithButtonMm: "web.catalog.field.thicknessWithButton",
-            weightG: "web.archive.spec.weight",
-            widthMm: "web.catalog.field.width",
+            buttonDiameter: "web.catalog.field.buttonDiameter",
+            diameter: "web.archive.spec.diameter",
+            length: "web.archive.spec.length",
+            spinDiameter: "web.catalog.field.spinDiameter",
+            thickness: "web.catalog.field.thickness",
+            thicknessWithButton: "web.catalog.field.thicknessWithButton",
+            weight: "web.archive.spec.weight",
+            width: "web.catalog.field.width",
           } as const;
           return (
             <form.Field key={name} name={name}>
               {(field) => (
                 <Field label={t(labels[name])}>
-                  <Input
-                    aria-label={t(labels[name])}
-                    min="0"
+                  <MeasurementInput
+                    kind={name === "weight" ? "weight" : "dimension"}
+                    label={t(labels[name])}
                     onBlur={field.handleBlur}
-                    onChange={(event) => {
-                      field.handleChange(event.target.value || null);
-                      if (name === "buttonDiameterMm") {
+                    onChange={(value: MeasurementInputValue) => {
+                      field.handleChange(value as never);
+                      if (name === "buttonDiameter") {
                         form.setFieldValue("compatibleButtonId", null);
                       }
                     }}
-                    step="any"
-                    type="number"
-                    value={field.state.value ?? ""}
+                    unitLabel={t("web.catalog.field.measurementUnit", {
+                      field: t(labels[name]),
+                    })}
+                    value={field.state.value as never}
                   />
                   <FieldError error={serverErrors[name]?.[0]} t={t} />
                 </Field>
@@ -889,9 +939,7 @@ export function ProductEditor({
           </form.Subscribe>
         ) : null}
         {magnetConfigurationNotice ? (
-          <Notice>
-            {t("web.slider.magnet.layoutChanged" as TranslationKey)}
-          </Notice>
+          <Notice>{t("web.slider.magnet.layoutChanged")}</Notice>
         ) : null}
         {productTypeSlug === "spinner" ? (
           <form.Field name="bearing">
@@ -911,7 +959,7 @@ export function ProductEditor({
           </form.Field>
         ) : null}
         {productTypeSlug === "spinner" ? (
-          <form.Subscribe selector={(state) => state.values.buttonDiameterMm}>
+          <form.Subscribe selector={(state) => state.values.buttonDiameter}>
             {(diameter) => (
               <form.Field name="compatibleButtonId">
                 {(field) => {
@@ -3476,9 +3524,7 @@ export function CollectionEditPage({
                 />
               ) : null}
               {magnetConfigurationNotice ? (
-                <Notice>
-                  {t("web.slider.magnet.layoutChanged" as TranslationKey)}
-                </Notice>
+                <Notice>{t("web.slider.magnet.layoutChanged")}</Notice>
               ) : null}
               {collectionId !== item.collectionId ||
               selectedPlate?.collectionId !== collectionId ||

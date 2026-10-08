@@ -93,7 +93,7 @@ describe("product deletion", () => {
         throw new Error("Products missing.");
       await db
         .insert(schema.productSpinnerButton)
-        .values({ id: button.id, diameterMm: "22" });
+        .values({ diameter: "22", diameterUnit: "mm", id: button.id });
       await db
         .insert(schema.productSpinner)
         .values([

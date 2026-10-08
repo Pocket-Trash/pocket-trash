@@ -15,18 +15,27 @@ import {
   fetchLocaleSettingsState,
   updateLocaleSetting,
 } from "@/lib/locale-api";
+import type { MeasurementSystem } from "@/lib/pen-formatters";
 import type { UserSettingsState } from "@/lib/user-settings";
 
 /** Active locale and local preference update operation. */
 type LocaleProviderValue = {
   /** Active supported locale. */
   locale: SupportedLocale;
+  /** Active app-wide measurement display preference. */
+  measurementSystem: MeasurementSystem;
   /**
    * Updates and locally persists the active locale.
    *
    * @param locale - Supported locale selected by the user.
    */
   setLocale: (locale: SupportedLocale) => void;
+  /**
+   * Updates the active measurement display preference.
+   *
+   * @param system - Metric or imperial display preference.
+   */
+  setMeasurementSystem: (system: MeasurementSystem) => void;
 };
 
 /** Locale context, or `null` outside the provider. */
@@ -50,6 +59,10 @@ export function LocaleProvider({
   const [locale, setLocaleState] = React.useState<SupportedLocale>(
     () => initialSettingsState?.settings.locale ?? resolveBrowserLocale(),
   );
+  const [measurementSystem, setMeasurementSystem] =
+    React.useState<MeasurementSystem>(
+      () => initialSettingsState?.settings.measurementSystem ?? "metric",
+    );
 
   React.useEffect(() => {
     document.documentElement.lang = locale;
@@ -63,9 +76,11 @@ export function LocaleProvider({
   const value = React.useMemo(
     () => ({
       locale,
+      measurementSystem,
       setLocale,
+      setMeasurementSystem,
     }),
-    [locale, setLocale],
+    [locale, measurementSystem, setLocale],
   );
 
   return (

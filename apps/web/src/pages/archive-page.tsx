@@ -91,7 +91,7 @@ export function ArchivePage() {
     img?: number;
   };
 
-  const { currency, units, weight } = usePenSettings();
+  const { currency, measurementSystem } = usePenSettings();
   const { rates, refreshRates } = useCurrencyRates();
   const [refreshing, setRefreshing] = React.useState(false);
   const [query, setQuery] = React.useState(browseState.query);
@@ -268,6 +268,7 @@ export function ArchivePage() {
                 visibleProducts.map((product) => (
                   <AutmogProductCard
                     currency={currency}
+                    measurementSystem={measurementSystem}
                     key={product.id}
                     onOpen={(nextProduct) =>
                       navigate({
@@ -277,8 +278,6 @@ export function ArchivePage() {
                     }
                     product={product}
                     rates={rates}
-                    units={units}
-                    weight={weight}
                   />
                 ))
               ) : (
@@ -294,6 +293,7 @@ export function ArchivePage() {
       <ProductLightbox
         currency={currency}
         imageIndex={imageIndex}
+        measurementSystem={measurementSystem}
         onClose={() => navigate({ to: "/autmog" })}
         onImageChange={(nextIndex) => {
           if (!selectedProduct) return;
@@ -306,8 +306,6 @@ export function ArchivePage() {
         }}
         product={selectedProduct}
         rates={rates}
-        units={units}
-        weight={weight}
       />
       <div
         aria-hidden="true"

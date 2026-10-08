@@ -15,6 +15,10 @@ import {
   type SliderMagnetLayout,
   sliderMagnetLayoutDetails,
 } from "@package/services/constants";
+import {
+  formatMeasurement,
+  type Measurement,
+} from "@package/services/measurements";
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CircleHelp } from "lucide-react";
@@ -66,6 +70,7 @@ import {
   matchCatalogSearch,
 } from "@/lib/catalog-search";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
 
 export {
   getCatalogPageSize,
@@ -402,39 +407,36 @@ export function ProductDetailPage({
   product: CatalogProduct;
 }) {
   const t = useCatalogCopy();
+  const { locale, measurementSystem } = useLocale();
   const navigate = useNavigate();
-  let specs: Array<[TranslationKey, string | null, string]>;
+  let specs: Array<[TranslationKey, Measurement | null]>;
   switch (product.productTypeSlug) {
     case "spinner":
       specs = [
-        ["web.archive.spec.weight", product.weightG, "g"],
-        ["web.archive.spec.length", product.lengthMm, "mm"],
-        ["web.catalog.field.width", product.widthMm, "mm"],
-        ["web.catalog.field.thickness", product.thicknessMm, "mm"],
-        [
-          "web.catalog.field.thicknessWithButton",
-          product.thicknessWithButtonMm,
-          "mm",
-        ],
-        ["web.catalog.field.buttonDiameter", product.buttonDiameterMm, "mm"],
-        ["web.catalog.field.spinDiameter", product.spinDiameterMm, "mm"],
+        ["web.archive.spec.weight", product.weight],
+        ["web.archive.spec.length", product.length],
+        ["web.catalog.field.width", product.width],
+        ["web.catalog.field.thickness", product.thickness],
+        ["web.catalog.field.thicknessWithButton", product.thicknessWithButton],
+        ["web.catalog.field.buttonDiameter", product.buttonDiameter],
+        ["web.catalog.field.spinDiameter", product.spinDiameter],
       ];
       break;
     case "spinner-button":
       specs = [
-        ["web.archive.spec.weight", product.weightG, "g"],
-        ["web.archive.spec.diameter", product.diameterMm, "mm"],
-        ["web.catalog.field.thickness", product.thicknessMm, "mm"],
+        ["web.archive.spec.weight", product.weight],
+        ["web.archive.spec.diameter", product.diameter],
+        ["web.catalog.field.thickness", product.thickness],
       ];
       break;
     case "slider":
     case "slider-insert":
     case "slider-plate":
       specs = [
-        ["web.archive.spec.weight", product.weightG, "g"],
-        ["web.archive.spec.length", product.lengthMm, "mm"],
-        ["web.catalog.field.width", product.widthMm, "mm"],
-        ["web.catalog.field.thickness", product.thicknessMm, "mm"],
+        ["web.archive.spec.weight", product.weight],
+        ["web.archive.spec.length", product.length],
+        ["web.catalog.field.width", product.width],
+        ["web.catalog.field.thickness", product.thickness],
       ];
       break;
   }
@@ -637,10 +639,10 @@ export function ProductDetailPage({
               )}
             </Detail>
           ) : null}
-          {specs.map(([key, value, unit]) =>
+          {specs.map(([key, value]) =>
             value ? (
               <Detail key={key} label={t(key)}>
-                {value} {unit}
+                {formatMeasurement(value, measurementSystem, locale)}
               </Detail>
             ) : null,
           )}
@@ -1580,6 +1582,7 @@ export function CollectionItemDetailPage({
   product?: CatalogProduct | null;
 }) {
   const t = useCatalogCopy();
+  const { locale, measurementSystem } = useLocale();
   const ownImages = item.images.filter(({ deletedAt }) => !deletedAt);
   const productImages = item.productImages.filter(
     ({ deletedAt }) => !deletedAt,
@@ -1799,14 +1802,14 @@ export function CollectionItemDetailPage({
               <MagnetSetupDetails setup={displayedSliderSetup} t={t} />
             </Detail>
           ) : null}
-          {product?.widthMm ? (
+          {product?.width ? (
             <Detail label={t("web.catalog.field.width")}>
-              {product.widthMm} mm
+              {formatMeasurement(product.width, measurementSystem, locale)}
             </Detail>
           ) : null}
-          {product?.thicknessMm ? (
+          {product?.thickness ? (
             <Detail label={t("web.catalog.field.thickness")}>
-              {product.thicknessMm} mm
+              {formatMeasurement(product.thickness, measurementSystem, locale)}
             </Detail>
           ) : null}
         </dl>

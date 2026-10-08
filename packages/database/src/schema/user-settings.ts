@@ -2,6 +2,7 @@ import { bigint, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
 import {
   currencyCodes,
   dimensionUnits,
+  measurementSystems,
   themeModes,
   weightUnits,
 } from "./enums.js";
@@ -13,6 +14,11 @@ export const currencyCodeEnum = pgEnum("currency_code", currencyCodes);
 export const dimensionUnitEnum = pgEnum("dimension_unit", dimensionUnits);
 /** PostgreSQL enum for supported theme modes. */
 export const themeModeEnum = pgEnum("theme_mode", themeModes);
+/** PostgreSQL enum for app-wide measurement display systems. */
+export const measurementSystemEnum = pgEnum(
+  "measurement_system",
+  measurementSystems,
+);
 /** PostgreSQL enum for supported weight units. */
 export const weightUnitEnum = pgEnum("weight_unit", weightUnits);
 
@@ -22,11 +28,12 @@ export const userSettings = pgTable("user_settings", {
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
   currencyCode: currencyCodeEnum("currency_code").notNull().default("USD"),
-  dimensionUnit: dimensionUnitEnum("dimension_unit").notNull().default("in"),
   /** Explicit supported locale for localized application text. */
   locale: text("locale"),
+  measurementSystem: measurementSystemEnum("measurement_system")
+    .notNull()
+    .default("metric"),
   theme: themeModeEnum("theme").notNull().default("system"),
-  weightUnit: weightUnitEnum("weight_unit").notNull().default("g"),
 });
 
 /** Stored user settings row. */

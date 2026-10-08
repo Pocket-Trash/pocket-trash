@@ -121,10 +121,24 @@ const sliderMagnetPresetSchema = z
       });
     }
   });
-/**
- * Schema for optional positive numeric specifications.
- */
-const numericSpecSchema = positiveDecimalSchema;
+/** Schema for an optional entered dimension and its declared unit. */
+const dimensionMeasurementSchema = z
+  .object({
+    unit: z.enum(["mm", "in"]),
+    value: positiveDecimalSchema,
+  })
+  .strict()
+  .transform(({ unit, value }) => (value === null ? null : { unit, value }))
+  .nullable();
+/** Schema for an optional entered weight and its declared unit. */
+const weightMeasurementSchema = z
+  .object({
+    unit: z.enum(["g", "oz"]),
+    value: positiveDecimalSchema,
+  })
+  .strict()
+  .transform(({ unit, value }) => (value === null ? null : { unit, value }))
+  .nullable();
 /**
  * Schema for non-empty names that produce a usable slug.
  */
@@ -263,14 +277,14 @@ export const finishOptionSchema = z
 export const productFormSchema = z
   .object({
     bearing: optionalBearingSchema,
-    buttonDiameterMm: numericSpecSchema,
+    buttonDiameter: dimensionMeasurementSchema,
     compatibleButtonId: idSchema.nullable(),
     description: optionalDescriptionSchema,
-    diameterMm: numericSpecSchema,
+    diameter: dimensionMeasurementSchema,
     finishOptions: z.array(finishOptionSchema),
     includedInsertProductId: idSchema.nullable(),
     includedPlateProductId: idSchema.nullable(),
-    lengthMm: numericSpecSchema,
+    length: dimensionMeasurementSchema,
     makerId: idSchema,
     makerProductUrl: optionalUrlSchema,
     magnetConfiguration: sliderMagnetConfigurationSchema
@@ -282,11 +296,11 @@ export const productFormSchema = z
     productId: idSchema.nullable(),
     productTypeSlug: productTypeSchema,
     reason: z.string().trim().max(1000).optional(),
-    spinDiameterMm: numericSpecSchema,
-    thicknessMm: numericSpecSchema,
-    thicknessWithButtonMm: numericSpecSchema,
-    weightG: numericSpecSchema,
-    widthMm: numericSpecSchema,
+    spinDiameter: dimensionMeasurementSchema,
+    thickness: dimensionMeasurementSchema,
+    thicknessWithButton: dimensionMeasurementSchema,
+    weight: weightMeasurementSchema,
+    width: dimensionMeasurementSchema,
     usesInserts: z.boolean().nullable(),
   })
   .strict()
@@ -297,27 +311,27 @@ export const productFormSchema = z
         finishOptions,
         includedInsertProductId,
         includedPlateProductId,
-        lengthMm,
+        length,
         materialIds,
         magnetConfiguration,
         magnetLayout,
         productTypeSlug,
-        spinDiameterMm,
-        thicknessMm,
-        weightG,
-        widthMm,
+        spinDiameter,
+        thickness,
+        weight,
+        width,
         usesInserts,
       },
       context,
     ) => {
       if (
         productTypeSlug !== "spinner" &&
-        (bearing !== null || spinDiameterMm !== null)
+        (bearing !== null || spinDiameter !== null)
       ) {
         context.addIssue({
           code: "custom",
           message: "web.catalog.error.form",
-          path: [bearing !== null ? "bearing" : "spinDiameterMm"],
+          path: [bearing !== null ? "bearing" : "spinDiameter"],
         });
       }
       if (productTypeSlug === "slider" && usesInserts === null) {
@@ -407,14 +421,14 @@ export const productFormSchema = z
       if (
         (productTypeSlug === "slider-plate" ||
           productTypeSlug === "slider-insert") &&
-        [weightG, lengthMm, widthMm, thicknessMm].some(
+        [weight, length, width, thickness].some(
           (measurement) => measurement !== null,
         )
       ) {
         context.addIssue({
           code: "custom",
           message: "web.catalog.error.form",
-          path: ["weightG"],
+          path: ["weight"],
         });
       }
       if (productTypeSlug === "slider-insert" && materialIds.length !== 1) {
@@ -1407,9 +1421,9 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       ).find(({ id }) => id === parsed.data.compatibleButtonId);
       if (
         !compatibleButton ||
-        (parsed.data.buttonDiameterMm !== null &&
-          Number(compatibleButton.diameterMm) !==
-            Number(parsed.data.buttonDiameterMm))
+        (parsed.data.buttonDiameter !== null &&
+          Number(compatibleButton.diameter) !==
+            Number(parsed.data.buttonDiameter))
       ) {
         return {
           fieldErrors: {
@@ -1451,15 +1465,15 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       slug,
       specs: {
         bearing: parsed.data.bearing,
-        buttonDiameterMm: parsed.data.buttonDiameterMm,
+        buttonDiameter: parsed.data.buttonDiameter,
         compatibleButtonId: parsed.data.compatibleButtonId,
-        diameterMm: parsed.data.diameterMm,
-        lengthMm: parsed.data.lengthMm,
-        spinDiameterMm: parsed.data.spinDiameterMm,
-        thicknessMm: parsed.data.thicknessMm,
-        thicknessWithButtonMm: parsed.data.thicknessWithButtonMm,
-        weightG: parsed.data.weightG,
-        widthMm: parsed.data.widthMm,
+        diameter: parsed.data.diameter,
+        length: parsed.data.length,
+        spinDiameter: parsed.data.spinDiameter,
+        thickness: parsed.data.thickness,
+        thicknessWithButton: parsed.data.thicknessWithButton,
+        weight: parsed.data.weight,
+        width: parsed.data.width,
         usesInserts: parsed.data.usesInserts,
       },
     };

@@ -9,9 +9,8 @@ import {
   type CurrencyCode,
   type CurrencyRates,
   currencies,
-  type DimensionUnit,
+  type MeasurementSystem,
   todayUTCDateString,
-  type WeightUnit,
 } from "@/lib/pen-formatters";
 import {
   defaultUserSettings,
@@ -27,7 +26,7 @@ const rateStorageKey = `pocket-trash.fxRates.${baseCurrency}`;
 /** User-selectable pen measurement and display preferences. */
 type PenSettings = Pick<
   typeof defaultUserSettings,
-  "currencyCode" | "dimensionUnit" | "weightUnit"
+  "currencyCode" | "measurementSystem"
 >;
 
 /**
@@ -39,8 +38,7 @@ function readStoredPenSettings(): PenSettings {
   if (typeof window === "undefined") {
     return {
       currencyCode: defaultUserSettings.currencyCode,
-      dimensionUnit: defaultUserSettings.dimensionUnit,
-      weightUnit: defaultUserSettings.weightUnit,
+      measurementSystem: defaultUserSettings.measurementSystem,
     };
   }
 
@@ -54,20 +52,16 @@ function readStoredPenSettings(): PenSettings {
         stored?.currencyCode && currencies.includes(stored.currencyCode)
           ? stored.currencyCode
           : defaultUserSettings.currencyCode,
-      dimensionUnit:
-        stored?.dimensionUnit === "mm" || stored?.dimensionUnit === "in"
-          ? stored.dimensionUnit
-          : defaultUserSettings.dimensionUnit,
-      weightUnit:
-        stored?.weightUnit === "oz" || stored?.weightUnit === "g"
-          ? stored.weightUnit
-          : defaultUserSettings.weightUnit,
+      measurementSystem:
+        stored?.measurementSystem === "metric" ||
+        stored?.measurementSystem === "imperial"
+          ? stored.measurementSystem
+          : defaultUserSettings.measurementSystem,
     };
   } catch {
     return {
       currencyCode: defaultUserSettings.currencyCode,
-      dimensionUnit: defaultUserSettings.dimensionUnit,
-      weightUnit: defaultUserSettings.weightUnit,
+      measurementSystem: defaultUserSettings.measurementSystem,
     };
   }
 }
@@ -96,31 +90,32 @@ function writeStoredPenSettings(settings: PenSettings): void {
  */
 export function usePenSettings() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { locale } = useLocale();
+  const { locale, measurementSystem, setMeasurementSystem } = useLocale();
   const settingsSaveFailureMessage = formatTranslation(
     "web.error.settingsSaveFailed",
     {},
     locale,
   );
   const initialSettings = React.useMemo(readStoredPenSettings, []);
-  const [units, setUnitsState] = React.useState<DimensionUnit>(
-    initialSettings.dimensionUnit,
-  );
-  const [weight, setWeightState] = React.useState<WeightUnit>(
-    initialSettings.weightUnit,
-  );
   const [currency, setCurrencyState] = React.useState<CurrencyCode>(
     initialSettings.currencyCode,
   );
   const [saving, setSaving] = React.useState(false);
   const mutationVersionRef = React.useRef(0);
 
-  const applyPenSettings = React.useCallback((settings: PenSettings) => {
-    setUnitsState(settings.dimensionUnit);
-    setWeightState(settings.weightUnit);
-    setCurrencyState(settings.currencyCode);
-    writeStoredPenSettings(settings);
-  }, []);
+  const applyPenSettings = React.useCallback(
+    (settings: PenSettings) => {
+      setMeasurementSystem(settings.measurementSystem);
+      setCurrencyState(settings.currencyCode);
+      writeStoredPenSettings(settings);
+    },
+    [setMeasurementSystem],
+  );
+
+  React.useEffect(() => {
+    if (!isLoaded || isSignedIn) return;
+    applyPenSettings(initialSettings);
+  }, [applyPenSettings, initialSettings, isLoaded, isSignedIn]);
 
   React.useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -188,44 +183,32 @@ export function usePenSettings() {
     [applyPenSettings, isLoaded, isSignedIn, settingsSaveFailureMessage],
   );
 
-  const setUnits = React.useCallback(
-    (nextUnits: DimensionUnit) => {
+  const updateMeasurementSystem = React.useCallback(
+    (nextSystem: MeasurementSystem) => {
       saveSettings(
-        { dimensionUnit: nextUnits },
-        { currencyCode: currency, dimensionUnit: units, weightUnit: weight },
+        { measurementSystem: nextSystem },
+        { currencyCode: currency, measurementSystem },
       );
     },
-    [currency, saveSettings, units, weight],
-  );
-
-  const setWeight = React.useCallback(
-    (nextWeight: WeightUnit) => {
-      saveSettings(
-        { weightUnit: nextWeight },
-        { currencyCode: currency, dimensionUnit: units, weightUnit: weight },
-      );
-    },
-    [currency, saveSettings, units, weight],
+    [currency, measurementSystem, saveSettings],
   );
 
   const setCurrency = React.useCallback(
     (nextCurrency: CurrencyCode) => {
       saveSettings(
         { currencyCode: nextCurrency },
-        { currencyCode: currency, dimensionUnit: units, weightUnit: weight },
+        { currencyCode: currency, measurementSystem },
       );
     },
-    [currency, saveSettings, units, weight],
+    [currency, measurementSystem, saveSettings],
   );
 
   return {
     currency,
+    measurementSystem,
     setCurrency,
-    setUnits,
-    setWeight,
+    setMeasurementSystem: updateMeasurementSystem,
     saving,
-    units,
-    weight,
   };
 }
 

@@ -9,12 +9,11 @@ import { normalizedHeadline, splitTitle } from "@/lib/pen-filters";
 import {
   type CurrencyCode,
   type CurrencyRates,
-  type DimensionUnit,
   formatDiameter,
   formatLength,
   formatPrice,
   formatWeight,
-  type WeightUnit,
+  type MeasurementSystem,
 } from "@/lib/pen-formatters";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
@@ -42,14 +41,8 @@ type AutmogProductCardProps = {
    * Exchange rates used to convert the product price.
    */
   rates: CurrencyRates;
-  /**
-   * Unit used to display product dimensions.
-   */
-  units: DimensionUnit;
-  /**
-   * Unit used to display product weight.
-   */
-  weight: WeightUnit;
+  /** System used to display product measurements. */
+  measurementSystem: MeasurementSystem;
 };
 
 /**
@@ -60,18 +53,16 @@ type AutmogProductCardProps = {
  * @param props.onOpen - Callback that requests the product detail view.
  * @param props.product - Autmog product to summarize.
  * @param props.rates - Exchange rates used for price conversion.
- * @param props.units - Unit used for dimensions.
- * @param props.weight - Unit used for weight.
+ * @param props.measurementSystem - System used for measurements.
  * @returns The interactive product card.
  * @throws {Error} When rendered outside `LocaleProvider`.
  */
 export function AutmogProductCard({
   currency,
+  measurementSystem,
   onOpen,
   product,
   rates,
-  units,
-  weight,
 }: AutmogProductCardProps) {
   const { locale } = useLocale();
   /**
@@ -90,16 +81,20 @@ export function AutmogProductCard({
     ? `'${product.published_at.slice(2, 4)}`
     : "";
   const dimensions = [
-    { id: "weight", icon: Scale, value: formatWeight(product, weight) },
+    {
+      id: "weight",
+      icon: Scale,
+      value: formatWeight(product, measurementSystem),
+    },
     {
       id: "diameter",
       icon: CircleGauge,
-      value: formatDiameter(product, units),
+      value: formatDiameter(product, measurementSystem),
     },
     {
       id: "length",
       icon: MoveHorizontal,
-      value: formatLength(product, units),
+      value: formatLength(product, measurementSystem),
     },
   ].filter(
     (

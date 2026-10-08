@@ -17,8 +17,7 @@ import { usePenSettings } from "@/hooks/use-pen-settings";
 import {
   type CurrencyCode,
   currencies,
-  type DimensionUnit,
-  type WeightUnit,
+  type MeasurementSystem,
 } from "@/lib/pen-formatters";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -44,8 +43,13 @@ export function UserSettingsPage() {
    * @returns The localized message.
    */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
-  const { currency, saving, setCurrency, setUnits, setWeight, units, weight } =
-    usePenSettings();
+  const {
+    currency,
+    measurementSystem,
+    saving,
+    setCurrency,
+    setMeasurementSystem,
+  } = usePenSettings();
 
   return (
     <UserPageShell section="settings" title={t("web.settings.settings")}>
@@ -53,42 +57,21 @@ export function UserSettingsPage() {
         <div className="grid gap-6 rounded-lg border border-border bg-card p-4 sm:p-6">
           <fieldset className="grid gap-2">
             <legend className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              {t("web.settings.dimensions")}
+              {t("web.settings.measurementSystemLabel")}
             </legend>
             <ToggleGroup
-              aria-label={t("web.settings.dimensionUnits")}
+              aria-label={t("web.settings.measurementSystem")}
               onValueChange={(value) => {
-                if (value) setUnits(value as DimensionUnit);
+                if (value) setMeasurementSystem(value as MeasurementSystem);
               }}
               type="single"
-              value={units}
+              value={measurementSystem}
             >
-              <ToggleGroupItem disabled={saving} value="in">
-                {t("web.settings.inches")}
+              <ToggleGroupItem disabled={saving} value="metric">
+                {t("web.settings.metric")}
               </ToggleGroupItem>
-              <ToggleGroupItem disabled={saving} value="mm">
-                {t("web.settings.millimeters")}
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </fieldset>
-
-          <fieldset className="grid gap-2">
-            <legend className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              {t("web.settings.weight")}
-            </legend>
-            <ToggleGroup
-              aria-label={t("web.settings.weightUnits")}
-              onValueChange={(value) => {
-                if (value) setWeight(value as WeightUnit);
-              }}
-              type="single"
-              value={weight}
-            >
-              <ToggleGroupItem disabled={saving} value="g">
-                {t("web.settings.grams")}
-              </ToggleGroupItem>
-              <ToggleGroupItem disabled={saving} value="oz">
-                {t("web.settings.ounces")}
+              <ToggleGroupItem disabled={saving} value="imperial">
+                {t("web.settings.imperial")}
               </ToggleGroupItem>
             </ToggleGroup>
           </fieldset>

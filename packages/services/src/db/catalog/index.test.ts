@@ -963,7 +963,7 @@ describe("catalog lookup writes", () => {
       id: 900,
       makerProductUrl: "https://maker.example/spinner",
       makerProductUrlValid: true,
-      spinDiameterMm: "52",
+      spinDiameter: { unit: "mm", value: "52" },
     } as never);
 
     await expect(
@@ -983,7 +983,7 @@ describe("catalog lookup writes", () => {
         name: "Catla",
         productTypeSlug: "spinner",
         slug: "catla",
-        specs: { bearing: " R188 ", spinDiameterMm: "52" },
+        specs: { bearing: " R188 ", spinDiameter: { unit: "mm", value: "52" } },
       }),
     ).resolves.toEqual(
       expect.objectContaining({
@@ -991,7 +991,7 @@ describe("catalog lookup writes", () => {
         description: "**Fast** spinner",
         makerProductUrl: "https://maker.example/spinner",
         makerProductUrlValid: true,
-        spinDiameterMm: "52",
+        spinDiameter: { unit: "mm", value: "52" },
       }),
     );
     expect(writes).toEqual(
@@ -1008,7 +1008,8 @@ describe("catalog lookup writes", () => {
           table: schema.productSpinner,
           value: expect.objectContaining({
             bearing: "R188",
-            spinDiameterMm: "52",
+            spinDiameter: "52",
+            spinDiameterUnit: "mm",
           }),
         },
       ]),
@@ -1037,7 +1038,8 @@ describe("catalog lookup writes", () => {
             productTypeName: "Spinner",
             productTypeSlug: "spinner",
             slug: "catla",
-            spinDiameterMm: "52",
+            spinDiameter: "52",
+            spinDiameterUnit: "mm",
             updatedAt: new Date(0),
           },
         ],
@@ -1056,7 +1058,7 @@ describe("catalog lookup writes", () => {
         description: "**Fast** spinner",
         makerProductUrl: "https://maker.example/spinner",
         makerProductUrlValid: false,
-        spinDiameterMm: "52",
+        spinDiameter: { unit: "mm", value: "52" },
       }),
     );
   });
@@ -1121,7 +1123,10 @@ describe("catalog lookup writes", () => {
       productId: 900,
       productTypeSlug: "spinner",
       slug: "catla-edited",
-      specs: { bearing: " One Drop ", spinDiameterMm: "54" },
+      specs: {
+        bearing: " One Drop ",
+        spinDiameter: { unit: "mm", value: "54" },
+      },
     });
 
     const value = updates.find(({ table }) => table === schema.product)
@@ -1132,7 +1137,11 @@ describe("catalog lookup writes", () => {
     expect(
       updates.find(({ table }) => table === schema.productSpinner)?.value,
     ).toEqual(
-      expect.objectContaining({ bearing: "One Drop", spinDiameterMm: "54" }),
+      expect.objectContaining({
+        bearing: "One Drop",
+        spinDiameter: "54",
+        spinDiameterUnit: "mm",
+      }),
     );
     if (expectedValidity === undefined) {
       expect(value).not.toHaveProperty("makerProductUrlValid");

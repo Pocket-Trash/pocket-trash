@@ -192,6 +192,30 @@ const manifestSchema = z
       }
       records.set(record.key, record.entity);
       if (
+        record.entity === "product-spinner" ||
+        record.entity === "product-spinner-button" ||
+        record.entity === "product-slider"
+      ) {
+        for (const retiredField of [
+          "buttonDiameterMm",
+          "diameterMm",
+          "lengthMm",
+          "spinDiameterMm",
+          "thicknessMm",
+          "thicknessWithButtonMm",
+          "weightG",
+          "widthMm",
+        ]) {
+          if (retiredField in record.payload) {
+            context.addIssue({
+              code: "custom",
+              message: `Catalog import field ${retiredField} is retired.`,
+              path: ["records", index, "payload", retiredField],
+            });
+          }
+        }
+      }
+      if (
         record.entity === "product" &&
         (record.payload.ownerClerkId !== manifest.ownerClerkId ||
           record.payload.approvalStatus !== "approved" ||

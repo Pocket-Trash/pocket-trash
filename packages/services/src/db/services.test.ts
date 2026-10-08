@@ -226,11 +226,10 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const settings: UserSettings = {
       currencyCode: "CAD",
-      dimensionUnit: "in",
+      measurementSystem: "metric",
       locale: null,
       theme: "dark",
       userId: 1000,
-      weightUnit: "g",
     };
     const service = createUserSettingsService(
       createDbMock({
@@ -267,9 +266,8 @@ describe("database service logging", () => {
     };
     const settings = {
       currencyCode: "USD",
-      dimensionUnit: "mm",
+      measurementSystem: "metric",
       theme: "system",
-      weightUnit: "oz",
     } as const;
     const userSettings: UserSettings = {
       ...settings,
@@ -295,7 +293,7 @@ describe("database service logging", () => {
       clerkIdHash: hashLogIdentifier(clerkId),
       operation: loggerMessages.database.userSettings.upsertForClerkId,
       outcome: "success",
-      settingKeys: ["currencyCode", "dimensionUnit", "theme", "weightUnit"],
+      settingKeys: ["currencyCode", "measurementSystem", "theme"],
       settings,
     });
     expect(JSON.stringify(events)).not.toContain(clerkId);
@@ -307,11 +305,10 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const existingSettings: UserSettings = {
       currencyCode: "CAD",
-      dimensionUnit: "in",
+      measurementSystem: "metric",
       locale: null,
       theme: "dark",
       userId: 1000,
-      weightUnit: "g",
     };
     const user: User = {
       clerkId,
@@ -365,11 +362,10 @@ describe("database service logging", () => {
     };
     const patchedSettings: UserSettings = {
       currencyCode: "USD",
-      dimensionUnit: "in",
+      measurementSystem: "metric",
       locale: null,
       theme: "light",
       userId: user.id,
-      weightUnit: "g",
     };
     const db = createDbMock({
       insertRows: [[user], [patchedSettings]],
@@ -413,11 +409,10 @@ describe("database service logging", () => {
     };
     const settings: UserSettings = {
       currencyCode: "USD",
-      dimensionUnit: "in",
+      measurementSystem: "metric",
       locale: null,
       theme: "system",
       userId: user.id,
-      weightUnit: "g",
     };
     const db = createDbMock({
       insertRows: [[user], [user]],
@@ -448,11 +443,10 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const existingSettings: UserSettings = {
       currencyCode: "CAD",
-      dimensionUnit: "mm",
+      measurementSystem: "metric",
       locale: null,
       theme: "light",
       userId: 1000,
-      weightUnit: "oz",
     };
     const savedSettings: UserSettings = {
       ...existingSettings,
@@ -495,11 +489,10 @@ describe("database service logging", () => {
     const logger = captureLogger(events);
     const existingSettings = {
       currencyCode: "USD",
-      dimensionUnit: "in",
+      measurementSystem: "metric",
       locale: "en",
       theme: "system",
       userId: 1000,
-      weightUnit: "g",
     };
     const db = createDbMock({
       selectRows: [[existingSettings]],

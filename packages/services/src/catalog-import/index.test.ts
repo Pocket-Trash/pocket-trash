@@ -252,9 +252,17 @@ describe("catalog import manifest", () => {
   });
 
   it.each([
+    "buttonDiameterMm",
+    "diameterMm",
     "inherentClickCount",
+    "lengthMm",
     "magnetSetupSourceNote",
+    "spinDiameterMm",
+    "thicknessMm",
+    "thicknessWithButtonMm",
+    "weightG",
     "weightBasis",
+    "widthMm",
   ])("rejects retired slider field %s", (retiredField) => {
     expect(() =>
       parseCatalogImportManifest({
