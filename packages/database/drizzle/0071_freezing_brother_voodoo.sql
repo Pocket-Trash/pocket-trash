@@ -24,7 +24,7 @@ CREATE TABLE "slider_magnet_preset" (
 INSERT INTO "slider_magnet_preset" ("name", "normalized_name", "magnet_layout", "configuration") VALUES
 	('Hybrid', 'hybrid', '2x4', '{"sideA":["N48","N52","N52","N48","N48","N52","N52","N48"],"sideB":null}'),
 	('Strong', 'strong', '2x4', '{"sideA":["N52","N52","N52","N52","N52","N52","N52","N52"],"sideB":null}'),
-	('Medium Hybrid', 'mediumhybrid', '2x4', '{"sideA":["N52","N35","N35","N52","N52","N35","N35","N52"],"sideB":null}'),
+	('Medium Hybrid', 'medium hybrid', '2x4', '{"sideA":["N52","N35","N35","N52","N52","N35","N35","N52"],"sideB":null}'),
 	('Weak', 'weak', '2x4', '{"sideA":["N52","N35","N35","N52","N52","N35","N35","N52"],"sideB":["N42","N35","N35","N42","N42","N35","N35","N42"]}'),
 	('Weakest', 'weakest', '2x4', '{"sideA":["N42","N35","N35","N42","N42","N35","N35","N42"],"sideB":null}');--> statement-breakpoint
 DROP TABLE "magnet_configuration_label" CASCADE;--> statement-breakpoint
