@@ -4,4 +4,4 @@
 "@app/web": patch
 ---
 
-Separate preview database content changes from dependency-driven mutation isolation.
+Narrow dependency-driven preview isolation and label required preview databases.

@@ -141,57 +141,70 @@ jobs:
           {
             echo "### Preview database decisions"
             echo "- Database schema/seed content changed (db-change label): $DATABASE_CONTENT_CHANGED"
-            echo "- Isolated mutation database required: $MUTATION_ISOLATION_REQUIRED"
+            echo "- Isolated preview database required (preview-db label): $MUTATION_ISOLATION_REQUIRED"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Sync db-change label
+      - name: Sync database labels
         uses: actions/github-script@v8
         env:
           DATABASE_CONTENT_CHANGED: ${{ steps.db_changes.outputs.database_content_changed }}
+          ISOLATION_REQUIRED: ${{ needs.classify-changes.outputs.mutation_e2e == 'true' || contains(github.event.pull_request.labels.*.name, 'test:e2e') }}
         with:
           script: |
-            const label = "db-change";
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
 
-            if (process.env.DATABASE_CONTENT_CHANGED === "true") {
-              try {
-                await github.rest.issues.addLabels({
-                  owner,
-                  repo,
-                  issue_number,
-                  labels: [label],
-                });
-              } catch (error) {
-                if (error.status !== 404) {
-                  throw error;
-                }
+            for (const { label, enabled, description } of [
+              {
+                label: "db-change",
+                enabled: process.env.DATABASE_CONTENT_CHANGED === "true",
+                description: "Changes database schema, migrations, or seed content",
+              },
+              {
+                label: "preview-db",
+                enabled: process.env.ISOLATION_REQUIRED === "true",
+                description: "Requires an isolated preview database",
+              },
+            ]) {
+              if (enabled) {
+                try {
+                  await github.rest.issues.addLabels({
+                    owner,
+                    repo,
+                    issue_number,
+                    labels: [label],
+                  });
+                } catch (error) {
+                  if (error.status !== 404) {
+                    throw error;
+                  }
 
-                await github.rest.issues.createLabel({
-                  owner,
-                  repo,
-                  name: label,
-                  color: "0969da",
-                  description: "Changes database schema, migrations, or seed content",
-                });
-                await github.rest.issues.addLabels({
-                  owner,
-                  repo,
-                  issue_number,
-                  labels: [label],
-                });
-              }
-            } else {
-              try {
-                await github.rest.issues.removeLabel({
-                  owner,
-                  repo,
-                  issue_number,
-                  name: label,
-                });
-              } catch (error) {
-                if (error.status !== 404) {
-                  throw error;
+                  await github.rest.issues.createLabel({
+                    owner,
+                    repo,
+                    name: label,
+                    color: "0969da",
+                    description,
+                  });
+                  await github.rest.issues.addLabels({
+                    owner,
+                    repo,
+                    issue_number,
+                    labels: [label],
+                  });
+                }
+              } else {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner,
+                    repo,
+                    issue_number,
+                    name: label,
+                  });
+                } catch (error) {
+                  if (error.status !== 404) {
+                    throw error;
+                  }
                 }
               }
             }
@@ -204,7 +217,9 @@ jobs:
               timestamp: new Date().toISOString(),
               attributes: {
                 databaseContentChanged: process.env.DATABASE_CONTENT_CHANGED === "true",
-                label,
+                previewDatabaseRequired: process.env.ISOLATION_REQUIRED === "true",
+                label: "db-change",
+                labels: ["db-change", "preview-db"],
                 pullRequestNumber: String(issue_number),
               },
             }));

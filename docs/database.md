@@ -152,7 +152,7 @@ the Drizzle consistency check.
 
 ## Preview classification contract
 
-Three outputs answer different questions:
+The classifier and database labels answer different questions:
 
 - `database_validation` selects database checks for changes to the database or
   shared foundation. It does not indicate schema changes or require a PR branch.
@@ -162,6 +162,9 @@ Three outputs answer different questions:
 - `mutation_e2e` selects mutation fixtures and requires an isolated Neon PR
   branch. Schema/seed changes and the explicit `test:e2e` label require isolation;
   other runtime changes may also require it without changing database content.
+  The `preview-db` label follows this isolation decision, including `test:e2e`,
+  even when `db-change` is absent. It is removed when isolation is no longer
+  required during preview preparation, and both labels are removed on PR close.
 
 For dependency policy or lockfile changes, the classifier compares both committed
 pnpm lockfiles and traverses resolved dependencies, optional dependencies,
