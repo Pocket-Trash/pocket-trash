@@ -147,20 +147,14 @@ describe("catalog schema", () => {
     const slider = getTableConfig(schema.productSlider);
     const plate = getTableConfig(schema.productSliderPlate);
     const insert = getTableConfig(schema.productSliderInsert);
-    const inclusion = getTableConfig(schema.productIncludedComponent);
     const configuration = getTableConfig(schema.productMagnetConfiguration);
     const magnetGroup = getTableConfig(schema.productMagnetGroup);
     const magnetSlot = getTableConfig(schema.productMagnetSlot);
-    const clickOption = getTableConfig(schema.productInsertClickOption);
-    const insertOffer = getTableConfig(schema.productInsertMagnetOffer);
-    const insertOfferGroup = getTableConfig(schema.productInsertMagnetGroup);
-    const insertOfferSlot = getTableConfig(schema.productInsertMagnetSlot);
-    const sliderOffer = getTableConfig(schema.productSliderInsertOffer);
 
     expect(slider.columns.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
         "id",
-        "magnet_system",
+        "uses_inserts",
         "weight_g",
         "weight_basis",
         "length_mm",
@@ -169,11 +163,13 @@ describe("catalog schema", () => {
         "inherent_click_count",
         "magnet_setup_source_note",
         "included_plate_product_id",
+        "included_insert_product_id",
       ]),
     );
     expect(slider.checks.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
-        "product_slider_magnet_system_valid",
+        "product_slider_insert_choice_consistent",
+        "product_slider_included_insert_distinct",
         "product_slider_weight_basis_consistent",
         "product_slider_measurements_positive",
       ]),
@@ -183,16 +179,11 @@ describe("catalog schema", () => {
       "created_at",
       "updated_at",
     ]);
-    expect(insert.columns.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        "id",
-        "weight_g",
-        "length_mm",
-        "width_mm",
-        "thickness_mm",
-      ]),
-    );
-    expect(inclusion.primaryKeys).toHaveLength(1);
+    expect(insert.columns.map(({ name }) => name)).toEqual([
+      "id",
+      "created_at",
+      "updated_at",
+    ]);
     expect(configuration.columns.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
         "product_id",
@@ -226,60 +217,6 @@ describe("catalog schema", () => {
     expect(magnetSlot.columns.map(({ name }) => name)).not.toEqual(
       expect.arrayContaining(["polarity", "x", "y", "x_mm", "y_mm"]),
     );
-    expect(clickOption.columns.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        "id",
-        "insert_product_id",
-        "click_count",
-        "insertion_position",
-      ]),
-    );
-    expect(clickOption.checks.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        "product_insert_click_option_click_count_positive",
-        "product_insert_click_option_position_nonnegative",
-      ]),
-    );
-    expect(insertOffer.columns.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        "id",
-        "insert_product_id",
-        "configuration_label_id",
-        "click_option_id",
-        "is_advertised_default",
-      ]),
-    );
-    expect(insertOffer.indexes.map(({ config }) => config.name)).toContain(
-      "product_insert_magnet_offer_advertised_default_unique",
-    );
-    expect(insertOfferGroup.columns.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        "offer_id",
-        "group_key",
-        "diameter_mm",
-        "thickness_mm",
-        "grade",
-      ]),
-    );
-    expect(insertOfferSlot.columns.map(({ name }) => name)).not.toEqual(
-      expect.arrayContaining(["polarity", "x", "y", "x_mm", "y_mm"]),
-    );
-    expect(sliderOffer.columns.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        "slider_product_id",
-        "insert_offer_id",
-        "insert_product_id",
-        "is_advertised_default",
-      ]),
-    );
-    expect(sliderOffer.indexes.map(({ config }) => config.name)).toContain(
-      "product_slider_insert_offer_advertised_default_unique",
-    );
-    expect(
-      inclusion.foreignKeys.map(
-        ({ reference }) => reference().foreignColumns[0]?.name,
-      ),
-    ).toEqual(["id", "id"]);
   });
 
   it("models standalone slider items and unique installed assemblies", () => {

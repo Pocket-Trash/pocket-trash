@@ -652,20 +652,20 @@ describe("catalog seed", () => {
     const sliders = byType.slider ?? [];
     expect(
       sliders.some(
-        ({ magnetSystem, magnetConfiguration }) =>
-          magnetSystem === "body-hosted" && magnetConfiguration !== null,
+        ({ usesInserts, magnetConfiguration }) =>
+          usesInserts === false && magnetConfiguration !== null,
       ),
     ).toBe(true);
     expect(
       sliders.some(
-        ({ magnetSystem, magnetSetupSourceNote }) =>
-          magnetSystem === "body-hosted" && magnetSetupSourceNote !== null,
+        ({ usesInserts, magnetSetupSourceNote }) =>
+          usesInserts === false && magnetSetupSourceNote !== null,
       ),
     ).toBe(true);
     expect(
       sliders.some(
-        ({ defaultInsertSlug, magnetSystem }) =>
-          magnetSystem === "insert-driven" && defaultInsertSlug !== null,
+        ({ includedInsertSlug, usesInserts }) =>
+          usesInserts === true && includedInsertSlug !== null,
       ),
     ).toBe(true);
     expect(sliders.some(({ includedPlateSlug }) => includedPlateSlug)).toBe(

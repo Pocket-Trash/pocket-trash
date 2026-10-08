@@ -136,11 +136,11 @@ describe("owned slider assemblies", () => {
           .values({ id: spinnerButtonProductId }),
         db.insert(schema.productSlider).values({
           id: insertSliderProductId,
-          magnetSystem: "insert-driven",
+          usesInserts: true,
         }),
         db.insert(schema.productSlider).values({
           id: bodySliderProductId,
-          magnetSystem: "body-hosted",
+          usesInserts: false,
         }),
         db
           .insert(schema.productSliderPlate)
@@ -444,7 +444,7 @@ describe("owned slider assemblies", () => {
           installedInsert: { collectionItemId: insertId },
           materialId: material.id,
         }),
-      ).rejects.toThrow("Body-hosted sliders cannot install inserts.");
+      ).rejects.toThrow("This slider does not use inserts.");
       await expect(
         service.updateItem({
           actor,

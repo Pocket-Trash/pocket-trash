@@ -451,63 +451,22 @@ describe("catalog product persistence", () => {
         name: "Cassette Insert",
         productTypeSlug: "slider-insert",
         slug: "cassette-insert",
-        specs: {
-          lengthMm: "42",
-          thicknessMm: "3",
-          weightG: "18",
-          widthMm: "16",
-        },
+        specs: {},
       });
       const slider = await service.createProduct({
         actor: admin,
         finishOptions: [],
-        includedComponentIds: [insert.id],
+        includedInsertProductId: insert.id,
         includedPlateProductId: plate.id,
         makerId: maker.id,
         materialIds: [material.id],
         name: "Rail Slider",
         productTypeSlug: "slider",
         slug: "rail-slider",
-        bodyHostedMagnetSetup: {
-          clickCount: 4,
-          configuration: {
-            label: "Medium",
-            sourceLabel: "4-click layout",
-            sourceNotes: null,
-            groups: [
-              {
-                diameterMm: "6.35",
-                grade: "n52",
-                key: "corners",
-                label: "Corners",
-                thicknessMm: "3.175",
-              },
-            ],
-            slots: [
-              {
-                documentedColumn: 1,
-                documentedRow: 1,
-                groupKey: "corners",
-                half: "half-a",
-                key: "A1",
-                state: "occupied",
-              },
-              {
-                documentedColumn: 1,
-                documentedRow: 1,
-                groupKey: null,
-                half: "half-b",
-                key: "B1",
-                state: "empty",
-              },
-            ],
-          },
-          sourceNote: null,
-        },
         specs: {
           lengthMm: "52",
-          magnetSystem: "body-hosted",
           thicknessMm: "12",
+          usesInserts: true,
           weightBasis: "complete-build",
           weightG: "96",
           widthMm: "24",
@@ -516,39 +475,8 @@ describe("catalog product persistence", () => {
 
       expect(slider).toEqual(
         expect.objectContaining({
-          bodyHostedMagnetSetup: {
-            clickCount: 4,
-            configuration: {
-              label: "Medium",
-              sourceLabel: "4-click layout",
-              sourceNotes: null,
-              groups: [
-                expect.objectContaining({
-                  diameterMm: "6.35",
-                  grade: "N52",
-                  key: "corners",
-                  label: "Corners",
-                  thicknessMm: "3.175",
-                }),
-              ],
-              slots: [
-                expect.objectContaining({
-                  groupKey: "corners",
-                  half: "half-a",
-                  key: "A1",
-                  state: "occupied",
-                }),
-                expect.objectContaining({
-                  groupKey: null,
-                  half: "half-b",
-                  key: "B1",
-                  state: "empty",
-                }),
-              ],
-            },
-            sourceNote: null,
-          },
-          magnetSystem: "body-hosted",
+          bodyHostedMagnetSetup: null,
+          usesInserts: true,
           weightBasis: "complete-build",
           weightG: "96",
         }),
@@ -559,16 +487,16 @@ describe("catalog product persistence", () => {
           productTypeSlug: "slider-plate",
         }),
       );
-      expect(slider.includedComponents).toEqual([
+      expect(slider.includedInsert).toEqual(
         expect.objectContaining({
           id: insert.id,
           productTypeSlug: "slider-insert",
         }),
-      ]);
+      );
       expect(plate).toEqual(
         expect.objectContaining({
           lengthMm: null,
-          magnetSystem: null,
+          usesInserts: null,
           weightBasis: null,
           weightG: null,
         }),
@@ -587,7 +515,7 @@ describe("catalog product persistence", () => {
           name: "Invalid body setup",
           productTypeSlug: "slider",
           slug: "invalid-body-setup",
-          specs: { magnetSystem: "body-hosted" },
+          specs: { usesInserts: false },
         }),
       ).rejects.toThrow("Click count must be a positive integer");
       await expect(
@@ -627,7 +555,7 @@ describe("catalog product persistence", () => {
           name: "Cross configuration reference",
           productTypeSlug: "slider",
           slug: "cross-configuration-reference",
-          specs: { magnetSystem: "body-hosted" },
+          specs: { usesInserts: false },
         }),
       ).rejects.toThrow("Magnet group does not belong to this configuration");
       await expect(
@@ -638,180 +566,6 @@ describe("catalog product persistence", () => {
           reason: "Remove referenced component",
         }),
       ).resolves.toBe(false);
-    } finally {
-      await client.close();
-    }
-  }, 30_000);
-
-  it("round-trips insert offers with stable click order and exact slider defaults", async () => {
-    const client = new PGlite();
-    const db = drizzle(client, { schema });
-
-    try {
-      const migrationsFolder = fileURLToPath(
-        new URL("../../../../database/drizzle", import.meta.url),
-      );
-      for (const file of readdirSync(migrationsFolder)
-        .filter((name) => name.endsWith(".sql"))
-        .sort()) {
-        await client.exec(
-          readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
-            "--> statement-breakpoint",
-            "",
-          ),
-        );
-      }
-      const [maker] = await db
-        .insert(schema.maker)
-        .values({ name: "Insert Maker", slug: "insert-maker" })
-        .returning({ id: schema.maker.id });
-      await db.insert(schema.productType).values([
-        { name: "Slider", slug: "slider" },
-        { name: "Slider Insert", slug: "slider-insert" },
-      ]);
-      const [material] = await db
-        .insert(schema.material)
-        .values({ name: "Steel", slug: "steel" })
-        .returning({ id: schema.material.id });
-      await db.insert(schema.user).values({ clerkId: "admin-insert" });
-      if (!maker || !material) throw new Error("Insert fixtures failed.");
-      const service = createDbServices(
-        db as unknown as Database,
-        createLogger({ app: "api", environment: "test" }),
-      ).catalog;
-      const actor = { clerkId: "admin-insert", role: "admin" as const };
-      const configuration = {
-        groups: [
-          {
-            diameterMm: "6.35",
-            grade: "n52",
-            key: "corners",
-            label: "Corners",
-            thicknessMm: "3.175",
-          },
-        ],
-        label: "Medium",
-        slots: [
-          {
-            documentedColumn: null,
-            documentedRow: null,
-            groupKey: "corners",
-            half: "half-a" as const,
-            key: "A1",
-            state: "occupied" as const,
-          },
-        ],
-        sourceLabel: "Maker medium",
-        sourceNotes: null,
-      };
-      const insert = await service.createProduct({
-        actor,
-        finishOptions: [],
-        insertHostedMagnetOptions: {
-          clickCounts: [3, 5],
-          offers: [
-            {
-              clickCount: 3,
-              configuration,
-              isAdvertisedDefault: true,
-            },
-            {
-              clickCount: 5,
-              configuration: { ...configuration, label: "Strong" },
-              isAdvertisedDefault: false,
-            },
-          ],
-        },
-        makerId: maker.id,
-        materialIds: [material.id],
-        name: "Exact Insert",
-        productTypeSlug: "slider-insert",
-        slug: "exact-insert",
-        specs: {},
-      });
-      expect(
-        insert.insertClickOptions.map(({ clickCount }) => clickCount),
-      ).toEqual([3, 5]);
-      expect(insert.insertMagnetOffers).toEqual([
-        expect.objectContaining({
-          clickCount: 3,
-          isAdvertisedDefault: true,
-          configuration: expect.objectContaining({ label: "Medium" }),
-        }),
-        expect.objectContaining({
-          clickCount: 5,
-          isAdvertisedDefault: false,
-          configuration: expect.objectContaining({ label: "Strong" }),
-        }),
-      ]);
-      const advertisedOffer = insert.insertMagnetOffers[1];
-      if (!advertisedOffer) throw new Error("Offer fixture failed.");
-      const slider = await service.createProduct({
-        actor,
-        advertisedInsertOffers: [
-          { isAdvertisedDefault: true, offerId: advertisedOffer.id },
-        ],
-        finishOptions: [],
-        makerId: maker.id,
-        materialIds: [material.id],
-        name: "Insert Slider",
-        productTypeSlug: "slider",
-        slug: "insert-slider",
-        specs: { magnetSystem: "insert-driven" },
-      });
-      expect(slider.advertisedInsertOffers).toEqual([
-        expect.objectContaining({
-          id: advertisedOffer.id,
-          insertProductId: insert.id,
-          insertProductName: "Exact Insert",
-          isSliderAdvertisedDefault: true,
-        }),
-      ]);
-      const updated = await service.updateProduct({
-        actor,
-        finishOptions: [],
-        insertHostedMagnetOptions: {
-          clickCounts: [5, 7, 3],
-          offers: insert.insertMagnetOffers.map((offer) => ({
-            clickCount: offer.clickCount,
-            configuration: offer.configuration,
-            id: offer.id,
-            isAdvertisedDefault: offer.isAdvertisedDefault,
-          })),
-        },
-        makerId: maker.id,
-        materialIds: [material.id],
-        name: insert.name,
-        productId: insert.id,
-        productTypeSlug: "slider-insert",
-        slug: insert.slug,
-        specs: {},
-      });
-      expect(
-        updated.insertClickOptions.map(({ clickCount, insertionPosition }) => ({
-          clickCount,
-          insertionPosition,
-        })),
-      ).toEqual([
-        { clickCount: 3, insertionPosition: 0 },
-        { clickCount: 5, insertionPosition: 1 },
-        { clickCount: 7, insertionPosition: 2 },
-      ]);
-      await expect(
-        service.createProduct({
-          actor,
-          advertisedInsertOffers: [
-            { isAdvertisedDefault: false, offerId: advertisedOffer.id },
-          ],
-          finishOptions: [],
-          makerId: maker.id,
-          materialIds: [material.id],
-          name: "No default",
-          productTypeSlug: "slider",
-          slug: "no-default",
-          specs: { magnetSystem: "insert-driven" },
-        }),
-      ).rejects.toThrow("requires exactly one advertised default");
     } finally {
       await client.close();
     }
