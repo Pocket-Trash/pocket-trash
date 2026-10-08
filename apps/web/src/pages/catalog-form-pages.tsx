@@ -682,10 +682,9 @@ export function ProductEditor({
                         form.setFieldValue("compatibleButtonId", null);
                       }
                     }}
-                    unitLabel={t(
-                      "web.catalog.field.measurementUnit" as TranslationKey,
-                      { field: t(labels[name]) },
-                    )}
+                    unitLabel={t("web.catalog.field.measurementUnit", {
+                      field: t(labels[name]),
+                    })}
                     value={field.state.value as never}
                   />
                   <FieldError error={serverErrors[name]?.[0]} t={t} />
@@ -940,9 +939,7 @@ export function ProductEditor({
           </form.Subscribe>
         ) : null}
         {magnetConfigurationNotice ? (
-          <Notice>
-            {t("web.slider.magnet.layoutChanged" as TranslationKey)}
-          </Notice>
+          <Notice>{t("web.slider.magnet.layoutChanged")}</Notice>
         ) : null}
         {productTypeSlug === "spinner" ? (
           <form.Field name="bearing">
@@ -3527,9 +3524,7 @@ export function CollectionEditPage({
                 />
               ) : null}
               {magnetConfigurationNotice ? (
-                <Notice>
-                  {t("web.slider.magnet.layoutChanged" as TranslationKey)}
-                </Notice>
+                <Notice>{t("web.slider.magnet.layoutChanged")}</Notice>
               ) : null}
               {collectionId !== item.collectionId ||
               selectedPlate?.collectionId !== collectionId ||

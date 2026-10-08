@@ -4,7 +4,6 @@ import {
   type LocalePreference,
   resolveLocale,
   type SupportedLocale,
-  type TranslationKey,
 } from "@pocket-trash/localizations";
 import { createServerFn } from "@tanstack/react-start";
 import { activeAuth as auth } from "@/lib/auth";
@@ -115,11 +114,7 @@ function parseUserSettingsPatch(input: unknown): UserSettingsPatch {
 
   if ("measurementSystem" in value) {
     if (!isMeasurementSystem(value.measurementSystem)) {
-      throw new Error(
-        formatTranslation(
-          "web.error.invalidMeasurementSystem" as TranslationKey,
-        ),
-      );
+      throw new Error(formatTranslation("web.error.invalidMeasurementSystem"));
     }
     patch.measurementSystem = value.measurementSystem;
   }

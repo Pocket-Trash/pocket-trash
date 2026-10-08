@@ -57,10 +57,10 @@ export function UserSettingsPage() {
         <div className="grid gap-6 rounded-lg border border-border bg-card p-4 sm:p-6">
           <fieldset className="grid gap-2">
             <legend className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              {t("web.settings.measurementSystemLabel" as TranslationKey)}
+              {t("web.settings.measurementSystemLabel")}
             </legend>
             <ToggleGroup
-              aria-label={t("web.settings.measurementSystem" as TranslationKey)}
+              aria-label={t("web.settings.measurementSystem")}
               onValueChange={(value) => {
                 if (value) setMeasurementSystem(value as MeasurementSystem);
               }}
@@ -68,10 +68,10 @@ export function UserSettingsPage() {
               value={measurementSystem}
             >
               <ToggleGroupItem disabled={saving} value="metric">
-                {t("web.settings.metric" as TranslationKey)}
+                {t("web.settings.metric")}
               </ToggleGroupItem>
               <ToggleGroupItem disabled={saving} value="imperial">
-                {t("web.settings.imperial" as TranslationKey)}
+                {t("web.settings.imperial")}
               </ToggleGroupItem>
             </ToggleGroup>
           </fieldset>
