@@ -88,7 +88,7 @@ const manifest: CatalogImportManifest = {
       entity: "product-slider",
       expected: { state: "absent" },
       key: "slider:slider",
-      payload: { usesInserts: false },
+      payload: { magnetLayout: "2x4", usesInserts: false },
       references: { product: "product:slider" },
     },
   ],
@@ -249,6 +249,22 @@ describe("catalog import manifest", () => {
         ),
       }),
     ).toThrow(/approved and public/i);
+  });
+
+  it("rejects retired slider click and source-note fields", () => {
+    expect(() =>
+      parseCatalogImportManifest({
+        ...manifest,
+        records: manifest.records.map((record) =>
+          record.entity === "product-slider"
+            ? {
+                ...record,
+                payload: { ...record.payload, inherentClickCount: 4 },
+              }
+            : record,
+        ),
+      }),
+    ).toThrow(/retired/i);
   });
 
   it("hashes canonical content independent of object key order", () => {

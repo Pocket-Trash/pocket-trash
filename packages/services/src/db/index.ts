@@ -108,7 +108,6 @@ export type {
   AdminMaterialSummary,
   CatalogApprovalAction,
   CatalogApprovalStatus,
-  CatalogBodyHostedMagnetSetup,
   CatalogColor,
   CatalogFinishOption,
   CatalogImage,
@@ -139,6 +138,7 @@ export type {
   PublicMakerSummary,
   PublicMaterial,
   PublicMaterialSummary,
+  SliderMagnetLayout,
   SliderWeightBasis,
   UserCollectionItem,
   UserCollectionSummary,
@@ -148,6 +148,9 @@ export {
   CollectionButtonAlreadyInstalledError,
   CollectionItemPrivacyInheritedError,
   CollectionSliderComponentAlreadyInstalledError,
+  sliderClickCount,
+  sliderMagnetLayoutDetails,
+  sliderMagnetLayouts,
 } from "./catalog/index.js";
 export type {
   ApprovedErasureExceptionCode,

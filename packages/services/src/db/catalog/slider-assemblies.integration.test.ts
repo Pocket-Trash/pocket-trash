@@ -136,10 +136,12 @@ describe("owned slider assemblies", () => {
           .values({ id: spinnerButtonProductId }),
         db.insert(schema.productSlider).values({
           id: insertSliderProductId,
+          magnetLayout: "2x4",
           usesInserts: true,
         }),
         db.insert(schema.productSlider).values({
           id: bodySliderProductId,
+          magnetLayout: "2x4",
           usesInserts: false,
         }),
         db
