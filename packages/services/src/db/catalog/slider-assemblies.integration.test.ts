@@ -130,24 +130,26 @@ describe("owned slider assemblies", () => {
       const otherPlateProductId = requireId(productId, "other-plate");
       const insertProductId = requireId(productId, "insert");
       await Promise.all([
-        db.insert(schema.productSpinner).values({ id: spinnerProductId }),
+        db.insert(schema.productDetailSpinner).values({ id: spinnerProductId }),
         db
-          .insert(schema.productSpinnerButton)
+          .insert(schema.productDetailSpinnerButton)
           .values({ id: spinnerButtonProductId }),
-        db.insert(schema.productSlider).values({
+        db.insert(schema.productDetailSlider).values({
           id: insertSliderProductId,
           magnetLayout: "2x4",
           usesInserts: true,
         }),
-        db.insert(schema.productSlider).values({
+        db.insert(schema.productDetailSlider).values({
           id: bodySliderProductId,
           magnetLayout: "2x4",
           usesInserts: false,
         }),
         db
-          .insert(schema.productSliderPlate)
+          .insert(schema.productDetailSliderPlate)
           .values([{ id: plateProductId }, { id: otherPlateProductId }]),
-        db.insert(schema.productSliderInsert).values({ id: insertProductId }),
+        db
+          .insert(schema.productDetailSliderInsert)
+          .values({ id: insertProductId }),
       ]);
       await db.insert(schema.productMaterial).values(
         products.map((product) => ({
@@ -156,9 +158,9 @@ describe("owned slider assemblies", () => {
         })),
       );
       await db
-        .update(schema.productSlider)
+        .update(schema.productDetailSlider)
         .set({ includedPlateProductId: plateProductId })
-        .where(eq(schema.productSlider.id, insertSliderProductId));
+        .where(eq(schema.productDetailSlider.id, insertSliderProductId));
       const [primary, spares, destination] = await db
         .insert(schema.userCollection)
         .values([

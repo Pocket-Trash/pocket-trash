@@ -427,6 +427,71 @@
                   "full"
             ],
             "fields": [
+                  "id PK/FK bigint",
+                  "product_slider_id FK bigint",
+                  "installed_plate_id? FK bigint",
+                  "installed_insert_id? FK bigint",
+                  "magnet_configuration? jsonb"
+            ],
+            "id": "collection_detail_slider",
+            "name": "collection_detail_slider",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "product_slider_insert_id FK bigint"
+            ],
+            "id": "collection_detail_slider_insert",
+            "name": "collection_detail_slider_insert",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "product_slider_plate_id FK bigint"
+            ],
+            "id": "collection_detail_slider_plate",
+            "name": "collection_detail_slider_plate",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "product_spinner_id FK bigint",
+                  "installed_button_id? FK bigint",
+                  "bearing? text"
+            ],
+            "id": "collection_detail_spinner",
+            "name": "collection_detail_spinner",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "product_spinner_button_id FK bigint"
+            ],
+            "id": "collection_detail_spinner_button",
+            "name": "collection_detail_spinner_button",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
                   "id PK bigint",
                   "collection_id FK bigint",
                   "is_current boolean",
@@ -500,71 +565,6 @@
             ],
             "id": "collection_item_image",
             "name": "collection_item_image",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK/FK bigint",
-                  "product_slider_id FK bigint",
-                  "installed_plate_id? FK bigint",
-                  "installed_insert_id? FK bigint",
-                  "magnet_configuration? jsonb"
-            ],
-            "id": "collection_slider",
-            "name": "collection_slider",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK/FK bigint",
-                  "product_slider_insert_id FK bigint"
-            ],
-            "id": "collection_slider_insert",
-            "name": "collection_slider_insert",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK/FK bigint",
-                  "product_slider_plate_id FK bigint"
-            ],
-            "id": "collection_slider_plate",
-            "name": "collection_slider_plate",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK/FK bigint",
-                  "product_spinner_id FK bigint",
-                  "installed_button_id? FK bigint",
-                  "bearing? text"
-            ],
-            "id": "collection_spinner",
-            "name": "collection_spinner",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK/FK bigint",
-                  "product_spinner_button_id FK bigint"
-            ],
-            "id": "collection_spinner_button",
-            "name": "collection_spinner_button",
             "status": "existing"
       },
       {
@@ -923,6 +923,107 @@
                   "full"
             ],
             "fields": [
+                  "id PK/FK bigint",
+                  "included_plate_product_id? FK bigint",
+                  "uses_inserts boolean",
+                  "included_insert_product_id? FK bigint",
+                  "magnet_layout? text",
+                  "magnet_configuration? jsonb",
+                  "weight_value? numeric",
+                  "weight_unit? weight_unit",
+                  "length_value? numeric",
+                  "length_unit? dimension_unit",
+                  "width_value? numeric",
+                  "width_unit? dimension_unit",
+                  "thickness_value? numeric",
+                  "thickness_unit? dimension_unit",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_slider",
+            "name": "product_detail_slider",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "magnet_layout text",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_slider_insert",
+            "name": "product_detail_slider_insert",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_slider_plate",
+            "name": "product_detail_slider_plate",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "weight_value? numeric",
+                  "weight_unit? weight_unit",
+                  "length_value? numeric",
+                  "length_unit? dimension_unit",
+                  "width_value? numeric",
+                  "width_unit? dimension_unit",
+                  "thickness_value? numeric",
+                  "thickness_unit? dimension_unit",
+                  "thickness_with_button_value? numeric",
+                  "thickness_with_button_unit? dimension_unit",
+                  "button_diameter_value? numeric",
+                  "button_diameter_unit? dimension_unit",
+                  "spin_diameter_value? numeric",
+                  "spin_diameter_unit? dimension_unit",
+                  "bearing? text",
+                  "compatible_button_id? FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_spinner",
+            "name": "product_detail_spinner",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "weight_value? numeric",
+                  "weight_unit? weight_unit",
+                  "diameter_value? numeric",
+                  "diameter_unit? dimension_unit",
+                  "thickness_value? numeric",
+                  "thickness_unit? dimension_unit",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_spinner_button",
+            "name": "product_detail_spinner_button",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
                   "id PK bigint",
                   "product_id FK bigint",
                   "position integer",
@@ -954,107 +1055,6 @@
             ],
             "id": "product_material",
             "name": "product_material",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK/FK bigint",
-                  "included_plate_product_id? FK bigint",
-                  "uses_inserts boolean",
-                  "included_insert_product_id? FK bigint",
-                  "magnet_layout? text",
-                  "magnet_configuration? jsonb",
-                  "weight_value? numeric",
-                  "weight_unit? weight_unit",
-                  "length_value? numeric",
-                  "length_unit? dimension_unit",
-                  "width_value? numeric",
-                  "width_unit? dimension_unit",
-                  "thickness_value? numeric",
-                  "thickness_unit? dimension_unit",
-                  "created_at timestamp with time zone",
-                  "updated_at timestamp with time zone"
-            ],
-            "id": "product_slider",
-            "name": "product_slider",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK/FK bigint",
-                  "magnet_layout text",
-                  "created_at timestamp with time zone",
-                  "updated_at timestamp with time zone"
-            ],
-            "id": "product_slider_insert",
-            "name": "product_slider_insert",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK/FK bigint",
-                  "created_at timestamp with time zone",
-                  "updated_at timestamp with time zone"
-            ],
-            "id": "product_slider_plate",
-            "name": "product_slider_plate",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK/FK bigint",
-                  "weight_value? numeric",
-                  "weight_unit? weight_unit",
-                  "length_value? numeric",
-                  "length_unit? dimension_unit",
-                  "width_value? numeric",
-                  "width_unit? dimension_unit",
-                  "thickness_value? numeric",
-                  "thickness_unit? dimension_unit",
-                  "thickness_with_button_value? numeric",
-                  "thickness_with_button_unit? dimension_unit",
-                  "button_diameter_value? numeric",
-                  "button_diameter_unit? dimension_unit",
-                  "spin_diameter_value? numeric",
-                  "spin_diameter_unit? dimension_unit",
-                  "bearing? text",
-                  "compatible_button_id? FK bigint",
-                  "created_at timestamp with time zone",
-                  "updated_at timestamp with time zone"
-            ],
-            "id": "product_spinner",
-            "name": "product_spinner",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK/FK bigint",
-                  "weight_value? numeric",
-                  "weight_unit? weight_unit",
-                  "diameter_value? numeric",
-                  "diameter_unit? dimension_unit",
-                  "thickness_value? numeric",
-                  "thickness_unit? dimension_unit",
-                  "created_at timestamp with time zone",
-                  "updated_at timestamp with time zone"
-            ],
-            "id": "product_spinner_button",
-            "name": "product_spinner_button",
             "status": "existing"
       },
       {
@@ -1760,6 +1760,71 @@
             "canonical_key → slug"
       ],
       [
+            "collection_detail_slider",
+            "collection_item",
+            "id → id"
+      ],
+      [
+            "collection_detail_slider",
+            "product_detail_slider",
+            "product_slider_id → id"
+      ],
+      [
+            "collection_detail_slider",
+            "collection_detail_slider_plate",
+            "installed_plate_id → id"
+      ],
+      [
+            "collection_detail_slider",
+            "collection_detail_slider_insert",
+            "installed_insert_id → id"
+      ],
+      [
+            "collection_detail_slider_insert",
+            "collection_item",
+            "id → id"
+      ],
+      [
+            "collection_detail_slider_insert",
+            "product_detail_slider_insert",
+            "product_slider_insert_id → id"
+      ],
+      [
+            "collection_detail_slider_plate",
+            "collection_item",
+            "id → id"
+      ],
+      [
+            "collection_detail_slider_plate",
+            "product_detail_slider_plate",
+            "product_slider_plate_id → id"
+      ],
+      [
+            "collection_detail_spinner",
+            "collection_item",
+            "id → id"
+      ],
+      [
+            "collection_detail_spinner",
+            "product_detail_spinner",
+            "product_spinner_id → id"
+      ],
+      [
+            "collection_detail_spinner",
+            "collection_detail_spinner_button",
+            "installed_button_id → id"
+      ],
+      [
+            "collection_detail_spinner_button",
+            "collection_item",
+            "id → id"
+      ],
+      [
+            "collection_detail_spinner_button",
+            "product_detail_spinner_button",
+            "product_spinner_button_id → id"
+      ],
+      [
             "collection_image",
             "user_collection",
             "collection_id → id"
@@ -1793,71 +1858,6 @@
             "collection_item_image",
             "collection_item",
             "collection_item_id → id"
-      ],
-      [
-            "collection_slider",
-            "collection_item",
-            "id → id"
-      ],
-      [
-            "collection_slider",
-            "product_slider",
-            "product_slider_id → id"
-      ],
-      [
-            "collection_slider",
-            "collection_slider_plate",
-            "installed_plate_id → id"
-      ],
-      [
-            "collection_slider",
-            "collection_slider_insert",
-            "installed_insert_id → id"
-      ],
-      [
-            "collection_slider_insert",
-            "collection_item",
-            "id → id"
-      ],
-      [
-            "collection_slider_insert",
-            "product_slider_insert",
-            "product_slider_insert_id → id"
-      ],
-      [
-            "collection_slider_plate",
-            "collection_item",
-            "id → id"
-      ],
-      [
-            "collection_slider_plate",
-            "product_slider_plate",
-            "product_slider_plate_id → id"
-      ],
-      [
-            "collection_spinner",
-            "collection_item",
-            "id → id"
-      ],
-      [
-            "collection_spinner",
-            "product_spinner",
-            "product_spinner_id → id"
-      ],
-      [
-            "collection_spinner",
-            "collection_spinner_button",
-            "installed_button_id → id"
-      ],
-      [
-            "collection_spinner_button",
-            "collection_item",
-            "id → id"
-      ],
-      [
-            "collection_spinner_button",
-            "product_spinner_button",
-            "product_spinner_button_id → id"
       ],
       [
             "feature_flag_user_overrides",
@@ -1945,6 +1945,46 @@
             "maker_id → id"
       ],
       [
+            "product_detail_slider",
+            "product",
+            "id → id"
+      ],
+      [
+            "product_detail_slider",
+            "product",
+            "included_plate_product_id → id"
+      ],
+      [
+            "product_detail_slider",
+            "product",
+            "included_insert_product_id → id"
+      ],
+      [
+            "product_detail_slider_insert",
+            "product",
+            "id → id"
+      ],
+      [
+            "product_detail_slider_plate",
+            "product",
+            "id → id"
+      ],
+      [
+            "product_detail_spinner",
+            "product",
+            "id → id"
+      ],
+      [
+            "product_detail_spinner",
+            "product_detail_spinner_button",
+            "compatible_button_id → id"
+      ],
+      [
+            "product_detail_spinner_button",
+            "product",
+            "id → id"
+      ],
+      [
             "product_image",
             "product",
             "product_id → id"
@@ -1958,46 +1998,6 @@
             "product_material",
             "materials",
             "material_id → id"
-      ],
-      [
-            "product_slider",
-            "product",
-            "id → id"
-      ],
-      [
-            "product_slider",
-            "product",
-            "included_plate_product_id → id"
-      ],
-      [
-            "product_slider",
-            "product",
-            "included_insert_product_id → id"
-      ],
-      [
-            "product_slider_insert",
-            "product",
-            "id → id"
-      ],
-      [
-            "product_slider_plate",
-            "product",
-            "id → id"
-      ],
-      [
-            "product_spinner",
-            "product",
-            "id → id"
-      ],
-      [
-            "product_spinner",
-            "product_spinner_button",
-            "compatible_button_id → id"
-      ],
-      [
-            "product_spinner_button",
-            "product",
-            "id → id"
       ],
       [
             "resource_downloads",

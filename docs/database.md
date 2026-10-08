@@ -4,6 +4,14 @@ Database APIs, schema contracts, and row types are documented in
 [`packages/database/src`](../packages/database/src) beside their
 implementations. This runbook covers repository and Neon operations.
 
+## Product detail table names
+
+Catalog product-type detail tables use the reserved `product_detail_*` prefix,
+and collection-item product-type detail tables use `collection_detail_*`.
+`product` and `collection_item` remain the shared-ID base tables. Supporting
+entities, lookups, options, images, aliases, and relationships do not use either
+detail prefix.
+
 ## Migrations
 
 After changing a Drizzle schema declaration, generate migration artifacts:

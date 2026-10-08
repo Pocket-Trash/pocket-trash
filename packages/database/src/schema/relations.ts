@@ -1,14 +1,14 @@
 import { relations } from "drizzle-orm";
 import {
   catalogTerminologyAlias,
+  collectionDetailSlider,
+  collectionDetailSliderInsert,
+  collectionDetailSliderPlate,
+  collectionDetailSpinner,
+  collectionDetailSpinnerButton,
   collectionImage,
   collectionItem,
   collectionItemImage,
-  collectionSlider,
-  collectionSliderInsert,
-  collectionSliderPlate,
-  collectionSpinner,
-  collectionSpinnerButton,
   color,
   colorEffect,
   finish,
@@ -19,13 +19,13 @@ import {
   materialImage,
   pattern,
   product,
+  productDetailSlider,
+  productDetailSliderInsert,
+  productDetailSliderPlate,
+  productDetailSpinner,
+  productDetailSpinnerButton,
   productImage,
   productMaterial,
-  productSlider,
-  productSliderInsert,
-  productSliderPlate,
-  productSpinner,
-  productSpinnerButton,
   userCollection,
 } from "./collection.js";
 import { featureFlags, featureFlagUserOverrides } from "./feature-flags.js";
@@ -301,25 +301,25 @@ export const collectionItemRelations = relations(
       fields: [collectionItem.soldToUserId],
       references: [user.id],
     }),
-    spinner: one(collectionSpinner, {
+    spinner: one(collectionDetailSpinner, {
       fields: [collectionItem.id],
-      references: [collectionSpinner.id],
+      references: [collectionDetailSpinner.id],
     }),
-    spinnerButton: one(collectionSpinnerButton, {
+    spinnerButton: one(collectionDetailSpinnerButton, {
       fields: [collectionItem.id],
-      references: [collectionSpinnerButton.id],
+      references: [collectionDetailSpinnerButton.id],
     }),
-    slider: one(collectionSlider, {
+    slider: one(collectionDetailSlider, {
       fields: [collectionItem.id],
-      references: [collectionSlider.id],
+      references: [collectionDetailSlider.id],
     }),
-    sliderInsert: one(collectionSliderInsert, {
+    sliderInsert: one(collectionDetailSliderInsert, {
       fields: [collectionItem.id],
-      references: [collectionSliderInsert.id],
+      references: [collectionDetailSliderInsert.id],
     }),
-    sliderPlate: one(collectionSliderPlate, {
+    sliderPlate: one(collectionDetailSliderPlate, {
       fields: [collectionItem.id],
-      references: [collectionSliderPlate.id],
+      references: [collectionDetailSliderPlate.id],
     }),
   }),
 );
@@ -344,35 +344,35 @@ export const productRelations = relations(product, ({ many, one }) => ({
     references: [maker.id],
   }),
   materials: many(productMaterial),
-  includedAsSliderPlate: many(productSlider, {
+  includedAsSliderPlate: many(productDetailSlider, {
     relationName: "includedSliderPlate",
   }),
-  includedAsSliderInsert: many(productSlider, {
+  includedAsSliderInsert: many(productDetailSlider, {
     relationName: "includedSliderInsert",
   }),
   productType: one(productType, {
     fields: [product.productTypeId],
     references: [productType.id],
   }),
-  spinner: one(productSpinner, {
+  spinner: one(productDetailSpinner, {
     fields: [product.id],
-    references: [productSpinner.id],
+    references: [productDetailSpinner.id],
   }),
-  spinnerButton: one(productSpinnerButton, {
+  spinnerButton: one(productDetailSpinnerButton, {
     fields: [product.id],
-    references: [productSpinnerButton.id],
+    references: [productDetailSpinnerButton.id],
   }),
-  slider: one(productSlider, {
+  slider: one(productDetailSlider, {
     fields: [product.id],
-    references: [productSlider.id],
+    references: [productDetailSlider.id],
   }),
-  sliderInsert: one(productSliderInsert, {
+  sliderInsert: one(productDetailSliderInsert, {
     fields: [product.id],
-    references: [productSliderInsert.id],
+    references: [productDetailSliderInsert.id],
   }),
-  sliderPlate: one(productSliderPlate, {
+  sliderPlate: one(productDetailSliderPlate, {
     fields: [product.id],
-    references: [productSliderPlate.id],
+    references: [productDetailSliderPlate.id],
   }),
 }));
 
@@ -483,94 +483,100 @@ export const finishOptionColorRelations = relations(
 );
 
 /** Connects product spinner measurements to their catalog product. */
-export const productSpinnerRelations = relations(productSpinner, ({ one }) => ({
-  product: one(product, {
-    fields: [productSpinner.id],
-    references: [product.id],
-  }),
-}));
-
-/** Connects product spinner-button measurements to their catalog product. */
-export const productSpinnerButtonRelations = relations(
-  productSpinnerButton,
+export const productDetailSpinnerRelations = relations(
+  productDetailSpinner,
   ({ one }) => ({
     product: one(product, {
-      fields: [productSpinnerButton.id],
+      fields: [productDetailSpinner.id],
+      references: [product.id],
+    }),
+  }),
+);
+
+/** Connects product spinner-button measurements to their catalog product. */
+export const productDetailSpinnerButtonRelations = relations(
+  productDetailSpinnerButton,
+  ({ one }) => ({
+    product: one(product, {
+      fields: [productDetailSpinnerButton.id],
       references: [product.id],
     }),
   }),
 );
 
 /** Connects a slider body subtype to its catalog product. */
-export const productSliderRelations = relations(productSlider, ({ one }) => ({
-  includedInsert: one(product, {
-    fields: [productSlider.includedInsertProductId],
-    references: [product.id],
-    relationName: "includedSliderInsert",
+export const productDetailSliderRelations = relations(
+  productDetailSlider,
+  ({ one }) => ({
+    includedInsert: one(product, {
+      fields: [productDetailSlider.includedInsertProductId],
+      references: [product.id],
+      relationName: "includedSliderInsert",
+    }),
+    includedPlate: one(product, {
+      fields: [productDetailSlider.includedPlateProductId],
+      references: [product.id],
+      relationName: "includedSliderPlate",
+    }),
+    product: one(product, {
+      fields: [productDetailSlider.id],
+      references: [product.id],
+    }),
   }),
-  includedPlate: one(product, {
-    fields: [productSlider.includedPlateProductId],
-    references: [product.id],
-    relationName: "includedSliderPlate",
-  }),
-  product: one(product, {
-    fields: [productSlider.id],
-    references: [product.id],
-  }),
-}));
+);
 
 /** Connects a slider plate-set subtype to its catalog product. */
-export const productSliderPlateRelations = relations(
-  productSliderPlate,
+export const productDetailSliderPlateRelations = relations(
+  productDetailSliderPlate,
   ({ one }) => ({
     product: one(product, {
-      fields: [productSliderPlate.id],
+      fields: [productDetailSliderPlate.id],
       references: [product.id],
     }),
   }),
 );
 
 /** Connects a slider insert-set subtype to its catalog product. */
-export const productSliderInsertRelations = relations(
-  productSliderInsert,
+export const productDetailSliderInsertRelations = relations(
+  productDetailSliderInsert,
   ({ one }) => ({
     product: one(product, {
-      fields: [productSliderInsert.id],
+      fields: [productDetailSliderInsert.id],
       references: [product.id],
     }),
   }),
 );
 
 /** Connects a collection spinner to its item, catalog spinner, and installed button. */
-export const collectionSpinnerRelations = relations(
-  collectionSpinner,
+export const collectionDetailSpinnerRelations = relations(
+  collectionDetailSpinner,
   ({ one }) => ({
     item: one(collectionItem, {
-      fields: [collectionSpinner.id],
+      fields: [collectionDetailSpinner.id],
       references: [collectionItem.id],
     }),
-    product: one(productSpinner, {
-      fields: [collectionSpinner.productSpinnerId],
-      references: [productSpinner.id],
+    product: one(productDetailSpinner, {
+      fields: [collectionDetailSpinner.productSpinnerId],
+      references: [productDetailSpinner.id],
     }),
-    installedButton: one(collectionSpinnerButton, {
-      fields: [collectionSpinner.installedButtonId],
-      references: [collectionSpinnerButton.id],
+    installedButton: one(collectionDetailSpinnerButton, {
+      fields: [collectionDetailSpinner.installedButtonId],
+      references: [collectionDetailSpinnerButton.id],
     }),
   }),
 );
 
 /** Connects a collection spinner button to its item and catalog button. */
-export const collectionSpinnerButtonRelations = relations(
-  collectionSpinnerButton,
+export const collectionDetailSpinnerButtonRelations = relations(
+  collectionDetailSpinnerButton,
   ({ one }) => ({
     item: one(collectionItem, {
-      fields: [collectionSpinnerButton.id],
+      fields: [collectionDetailSpinnerButton.id],
       references: [collectionItem.id],
     }),
-    product: one(productSpinnerButton, {
-      fields: [collectionSpinnerButton.productSpinnerButtonId],
-      references: [productSpinnerButton.id],
+    product: one(productDetailSpinnerButton, {
+      fields: [collectionDetailSpinnerButton.productSpinnerButtonId],
+      references: [productDetailSpinnerButton.id],
     }),
   }),
 );

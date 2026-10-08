@@ -730,8 +730,8 @@ export const finishOptionColor = pgTable(
 );
 
 /** Spinner-specific measurements for catalog products. */
-export const productSpinner = pgTable(
-  "product_spinner",
+export const productDetailSpinner = pgTable(
+  "product_detail_spinner",
   {
     id: bigint("id", { mode: "number" })
       .primaryKey()
@@ -753,7 +753,7 @@ export const productSpinner = pgTable(
     bearing: text("bearing"),
     compatibleButtonId: bigint("compatible_button_id", {
       mode: "number",
-    }).references((): AnyPgColumn => productSpinnerButton.id, {
+    }).references((): AnyPgColumn => productDetailSpinnerButton.id, {
       onDelete: "set null",
     }),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -765,43 +765,43 @@ export const productSpinner = pgTable(
   },
   (table) => [
     check(
-      "product_spinner_weight_consistent",
+      "product_detail_spinner_weight_consistent",
       sql`(${table.weight} is null and ${table.weightUnit} is null) or (${table.weight} > 0 and ${table.weightUnit} is not null)`,
     ),
     check(
-      "product_spinner_length_consistent",
+      "product_detail_spinner_length_consistent",
       sql`(${table.length} is null and ${table.lengthUnit} is null) or (${table.length} > 0 and ${table.lengthUnit} is not null)`,
     ),
     check(
-      "product_spinner_width_consistent",
+      "product_detail_spinner_width_consistent",
       sql`(${table.width} is null and ${table.widthUnit} is null) or (${table.width} > 0 and ${table.widthUnit} is not null)`,
     ),
     check(
-      "product_spinner_thickness_consistent",
+      "product_detail_spinner_thickness_consistent",
       sql`(${table.thickness} is null and ${table.thicknessUnit} is null) or (${table.thickness} > 0 and ${table.thicknessUnit} is not null)`,
     ),
     check(
-      "product_spinner_thickness_with_button_consistent",
+      "product_detail_spinner_thickness_with_button_consistent",
       sql`(${table.thicknessWithButton} is null and ${table.thicknessWithButtonUnit} is null) or (${table.thicknessWithButton} > 0 and ${table.thicknessWithButtonUnit} is not null)`,
     ),
     check(
-      "product_spinner_button_diameter_consistent",
+      "product_detail_spinner_button_diameter_consistent",
       sql`(${table.buttonDiameter} is null and ${table.buttonDiameterUnit} is null) or (${table.buttonDiameter} > 0 and ${table.buttonDiameterUnit} is not null)`,
     ),
     check(
-      "product_spinner_spin_diameter_consistent",
+      "product_detail_spinner_spin_diameter_consistent",
       sql`(${table.spinDiameter} is null and ${table.spinDiameterUnit} is null) or (${table.spinDiameter} > 0 and ${table.spinDiameterUnit} is not null)`,
     ),
     check(
-      "product_spinner_bearing_length_valid",
+      "product_detail_spinner_bearing_length_valid",
       sql`${table.bearing} is null or char_length(${table.bearing}) <= 200`,
     ),
   ],
 );
 
 /** Spinner-button measurements for catalog products. */
-export const productSpinnerButton = pgTable(
-  "product_spinner_button",
+export const productDetailSpinnerButton = pgTable(
+  "product_detail_spinner_button",
   {
     id: bigint("id", { mode: "number" })
       .primaryKey()
@@ -821,15 +821,15 @@ export const productSpinnerButton = pgTable(
   },
   (table) => [
     check(
-      "product_spinner_button_weight_consistent",
+      "product_detail_spinner_button_weight_consistent",
       sql`(${table.weight} is null and ${table.weightUnit} is null) or (${table.weight} > 0 and ${table.weightUnit} is not null)`,
     ),
     check(
-      "product_spinner_button_diameter_consistent",
+      "product_detail_spinner_button_diameter_consistent",
       sql`(${table.diameter} is null and ${table.diameterUnit} is null) or (${table.diameter} > 0 and ${table.diameterUnit} is not null)`,
     ),
     check(
-      "product_spinner_button_thickness_consistent",
+      "product_detail_spinner_button_thickness_consistent",
       sql`(${table.thickness} is null and ${table.thicknessUnit} is null) or (${table.thickness} > 0 and ${table.thicknessUnit} is not null)`,
     ),
   ],
@@ -846,8 +846,8 @@ export type SliderMagnetConfigurationValue = {
 };
 
 /** Slider body measurements and catalog component choices. */
-export const productSlider = pgTable(
-  "product_slider",
+export const productDetailSlider = pgTable(
+  "product_detail_slider",
   {
     id: bigint("id", { mode: "number" })
       .primaryKey()
@@ -885,45 +885,47 @@ export const productSlider = pgTable(
   },
   (table) => [
     check(
-      "product_slider_insert_choice_consistent",
+      "product_detail_slider_insert_choice_consistent",
       sql`${table.usesInserts} or ${table.includedInsertProductId} is null`,
     ),
     check(
-      "product_slider_magnet_layout_consistent",
+      "product_detail_slider_magnet_layout_consistent",
       sql`(${table.includedInsertProductId} is null and ${table.magnetLayout} is not null) or (${table.includedInsertProductId} is not null and ${table.magnetLayout} is null)`,
     ),
     check(
-      "product_slider_magnet_layout_valid",
+      "product_detail_slider_magnet_layout_valid",
       sql`${table.magnetLayout} is null or ${table.magnetLayout} in ('2x2', '2x3', '2x4')`,
     ),
     check(
-      "product_slider_weight_consistent",
+      "product_detail_slider_weight_consistent",
       sql`(${table.weight} is null and ${table.weightUnit} is null) or (${table.weight} > 0 and ${table.weightUnit} is not null)`,
     ),
     check(
-      "product_slider_length_consistent",
+      "product_detail_slider_length_consistent",
       sql`(${table.length} is null and ${table.lengthUnit} is null) or (${table.length} > 0 and ${table.lengthUnit} is not null)`,
     ),
     check(
-      "product_slider_width_consistent",
+      "product_detail_slider_width_consistent",
       sql`(${table.width} is null and ${table.widthUnit} is null) or (${table.width} > 0 and ${table.widthUnit} is not null)`,
     ),
     check(
-      "product_slider_thickness_consistent",
+      "product_detail_slider_thickness_consistent",
       sql`(${table.thickness} is null and ${table.thicknessUnit} is null) or (${table.thickness} > 0 and ${table.thicknessUnit} is not null)`,
     ),
     check(
-      "product_slider_included_plate_distinct",
+      "product_detail_slider_included_plate_distinct",
       sql`${table.includedPlateProductId} is null or ${table.includedPlateProductId} <> ${table.id}`,
     ),
     check(
-      "product_slider_included_insert_distinct",
+      "product_detail_slider_included_insert_distinct",
       sql`${table.includedInsertProductId} is null or ${table.includedInsertProductId} <> ${table.id}`,
     ),
-    index("product_slider_included_insert_idx").on(
+    index("product_detail_slider_included_insert_idx").on(
       table.includedInsertProductId,
     ),
-    index("product_slider_included_plate_idx").on(table.includedPlateProductId),
+    index("product_detail_slider_included_plate_idx").on(
+      table.includedPlateProductId,
+    ),
   ],
 );
 
@@ -965,7 +967,7 @@ export const sliderMagnetPreset = pgTable(
 );
 
 /** Catalog subtype marker for one matched slider plate pair or set. */
-export const productSliderPlate = pgTable("product_slider_plate", {
+export const productDetailSliderPlate = pgTable("product_detail_slider_plate", {
   id: bigint("id", { mode: "number" })
     .primaryKey()
     .references(() => product.id, { onDelete: "cascade" }),
@@ -978,112 +980,134 @@ export const productSliderPlate = pgTable("product_slider_plate", {
 });
 
 /** Catalog subtype marker for one slider insert or cassette set. */
-export const productSliderInsert = pgTable("product_slider_insert", {
-  id: bigint("id", { mode: "number" })
-    .primaryKey()
-    .references(() => product.id, { onDelete: "cascade" }),
-  /** Immutable physical layout supplied by this insert. */
-  magnetLayout: text("magnet_layout", {
-    enum: ["2x2", "2x3", "2x4"],
-  })
-    .default("2x4")
-    .notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const productDetailSliderInsert = pgTable(
+  "product_detail_slider_insert",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .references(() => product.id, { onDelete: "cascade" }),
+    /** Immutable physical layout supplied by this insert. */
+    magnetLayout: text("magnet_layout", {
+      enum: ["2x2", "2x3", "2x4"],
+    })
+      .default("2x4")
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+);
 
 /** Catalog spinner-button mappings selected for collection items. */
-export const collectionSpinnerButton = pgTable("collection_spinner_button", {
-  id: bigint("id", { mode: "number" })
-    .primaryKey()
-    .references(() => collectionItem.id, { onDelete: "cascade" }),
-  productSpinnerButtonId: bigint("product_spinner_button_id", {
-    mode: "number",
-  })
-    .notNull()
-    .references(() => productSpinnerButton.id, { onDelete: "restrict" }),
-});
+export const collectionDetailSpinnerButton = pgTable(
+  "collection_detail_spinner_button",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .references(() => collectionItem.id, { onDelete: "cascade" }),
+    productSpinnerButtonId: bigint("product_spinner_button_id", {
+      mode: "number",
+    })
+      .notNull()
+      .references(() => productDetailSpinnerButton.id, {
+        onDelete: "restrict",
+      }),
+  },
+);
 
 /** Catalog spinner mappings and installed-button overrides for collection items. */
-export const collectionSpinner = pgTable(
-  "collection_spinner",
+export const collectionDetailSpinner = pgTable(
+  "collection_detail_spinner",
   {
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .references(() => collectionItem.id, { onDelete: "cascade" }),
     productSpinnerId: bigint("product_spinner_id", { mode: "number" })
       .notNull()
-      .references(() => productSpinner.id, { onDelete: "restrict" }),
+      .references(() => productDetailSpinner.id, { onDelete: "restrict" }),
     /** Owned spinner button currently installed on this spinner. */
     installedButtonId: bigint("installed_button_id", {
       mode: "number",
-    }).references(() => collectionSpinnerButton.id, { onDelete: "set null" }),
+    }).references(() => collectionDetailSpinnerButton.id, {
+      onDelete: "set null",
+    }),
     /** Optional bearing override for this owned spinner. */
     bearing: text("bearing"),
   },
   (table) => [
-    uniqueIndex("collection_spinner_installed_button_unique")
+    uniqueIndex("collection_detail_spinner_installed_button_unique")
       .on(table.installedButtonId)
       .where(sql`${table.installedButtonId} is not null`),
     check(
-      "collection_spinner_bearing_length_valid",
+      "collection_detail_spinner_bearing_length_valid",
       sql`${table.bearing} is null or char_length(${table.bearing}) <= 200`,
     ),
   ],
 );
 
 /** Catalog slider plate-set mapping selected for a standalone collection item. */
-export const collectionSliderPlate = pgTable("collection_slider_plate", {
-  id: bigint("id", { mode: "number" })
-    .primaryKey()
-    .references(() => collectionItem.id, { onDelete: "cascade" }),
-  productSliderPlateId: bigint("product_slider_plate_id", { mode: "number" })
-    .notNull()
-    .references(() => productSliderPlate.id, { onDelete: "restrict" }),
-});
+export const collectionDetailSliderPlate = pgTable(
+  "collection_detail_slider_plate",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .references(() => collectionItem.id, { onDelete: "cascade" }),
+    productSliderPlateId: bigint("product_slider_plate_id", { mode: "number" })
+      .notNull()
+      .references(() => productDetailSliderPlate.id, { onDelete: "restrict" }),
+  },
+);
 
 /** Catalog slider insert-set mapping selected for a standalone collection item. */
-export const collectionSliderInsert = pgTable("collection_slider_insert", {
-  id: bigint("id", { mode: "number" })
-    .primaryKey()
-    .references(() => collectionItem.id, { onDelete: "cascade" }),
-  productSliderInsertId: bigint("product_slider_insert_id", { mode: "number" })
-    .notNull()
-    .references(() => productSliderInsert.id, { onDelete: "restrict" }),
-});
+export const collectionDetailSliderInsert = pgTable(
+  "collection_detail_slider_insert",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .references(() => collectionItem.id, { onDelete: "cascade" }),
+    productSliderInsertId: bigint("product_slider_insert_id", {
+      mode: "number",
+    })
+      .notNull()
+      .references(() => productDetailSliderInsert.id, { onDelete: "restrict" }),
+  },
+);
 
 /** Catalog slider mapping and installed component relationships for collection items. */
-export const collectionSlider = pgTable(
-  "collection_slider",
+export const collectionDetailSlider = pgTable(
+  "collection_detail_slider",
   {
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .references(() => collectionItem.id, { onDelete: "cascade" }),
     productSliderId: bigint("product_slider_id", { mode: "number" })
       .notNull()
-      .references(() => productSlider.id, { onDelete: "restrict" }),
+      .references(() => productDetailSlider.id, { onDelete: "restrict" }),
     /** Owned plate set currently installed on this slider. */
     installedPlateId: bigint("installed_plate_id", {
       mode: "number",
-    }).references(() => collectionSliderPlate.id, { onDelete: "set null" }),
+    }).references(() => collectionDetailSliderPlate.id, {
+      onDelete: "set null",
+    }),
     /** Owned insert set currently installed on this slider. */
     installedInsertId: bigint("installed_insert_id", {
       mode: "number",
-    }).references(() => collectionSliderInsert.id, { onDelete: "set null" }),
+    }).references(() => collectionDetailSliderInsert.id, {
+      onDelete: "set null",
+    }),
     /** Durable owned snapshot; null means no recorded configuration. */
     magnetConfiguration: jsonb(
       "magnet_configuration",
     ).$type<SliderMagnetConfigurationValue>(),
   },
   (table) => [
-    uniqueIndex("collection_slider_installed_plate_unique")
+    uniqueIndex("collection_detail_slider_installed_plate_unique")
       .on(table.installedPlateId)
       .where(sql`${table.installedPlateId} is not null`),
-    uniqueIndex("collection_slider_installed_insert_unique")
+    uniqueIndex("collection_detail_slider_installed_insert_unique")
       .on(table.installedInsertId)
       .where(sql`${table.installedInsertId} is not null`),
   ],
@@ -1148,50 +1172,61 @@ export type FinishOptionColor = typeof finishOptionColor.$inferSelect;
 /** Values accepted when creating a finish option color row. */
 export type NewFinishOptionColor = typeof finishOptionColor.$inferInsert;
 /** Stored product spinner row. */
-export type ProductSpinner = typeof productSpinner.$inferSelect;
+export type ProductDetailSpinner = typeof productDetailSpinner.$inferSelect;
 /** Values accepted when creating a product spinner row. */
-export type NewProductSpinner = typeof productSpinner.$inferInsert;
+export type NewProductDetailSpinner = typeof productDetailSpinner.$inferInsert;
 /** Stored product spinner button row. */
-export type ProductSpinnerButton = typeof productSpinnerButton.$inferSelect;
+export type ProductDetailSpinnerButton =
+  typeof productDetailSpinnerButton.$inferSelect;
 /** Values accepted when creating a product spinner button row. */
-export type NewProductSpinnerButton = typeof productSpinnerButton.$inferInsert;
+export type NewProductDetailSpinnerButton =
+  typeof productDetailSpinnerButton.$inferInsert;
 /** Stored slider body row. */
-export type ProductSlider = typeof productSlider.$inferSelect;
+export type ProductDetailSlider = typeof productDetailSlider.$inferSelect;
 /** Values accepted when creating a slider body row. */
-export type NewProductSlider = typeof productSlider.$inferInsert;
+export type NewProductDetailSlider = typeof productDetailSlider.$inferInsert;
 /** Stored reusable slider magnet preset. */
 export type SliderMagnetPreset = typeof sliderMagnetPreset.$inferSelect;
 /** Values accepted for a reusable slider magnet preset. */
 export type NewSliderMagnetPreset = typeof sliderMagnetPreset.$inferInsert;
 /** Stored slider plate-set row. */
-export type ProductSliderPlate = typeof productSliderPlate.$inferSelect;
+export type ProductDetailSliderPlate =
+  typeof productDetailSliderPlate.$inferSelect;
 /** Values accepted when creating a slider plate-set row. */
-export type NewProductSliderPlate = typeof productSliderPlate.$inferInsert;
+export type NewProductDetailSliderPlate =
+  typeof productDetailSliderPlate.$inferInsert;
 /** Stored slider insert-set row. */
-export type ProductSliderInsert = typeof productSliderInsert.$inferSelect;
+export type ProductDetailSliderInsert =
+  typeof productDetailSliderInsert.$inferSelect;
 /** Values accepted when creating a slider insert-set row. */
-export type NewProductSliderInsert = typeof productSliderInsert.$inferInsert;
+export type NewProductDetailSliderInsert =
+  typeof productDetailSliderInsert.$inferInsert;
 /** Stored collection spinner row. */
-export type CollectionSpinner = typeof collectionSpinner.$inferSelect;
+export type CollectionDetailSpinner =
+  typeof collectionDetailSpinner.$inferSelect;
 /** Values accepted when creating a collection spinner row. */
-export type NewCollectionSpinner = typeof collectionSpinner.$inferInsert;
+export type NewCollectionDetailSpinner =
+  typeof collectionDetailSpinner.$inferInsert;
 /** Stored collection spinner button row. */
-export type CollectionSpinnerButton =
-  typeof collectionSpinnerButton.$inferSelect;
+export type CollectionDetailSpinnerButton =
+  typeof collectionDetailSpinnerButton.$inferSelect;
 /** Values accepted when creating a collection spinner button row. */
-export type NewCollectionSpinnerButton =
-  typeof collectionSpinnerButton.$inferInsert;
+export type NewCollectionDetailSpinnerButton =
+  typeof collectionDetailSpinnerButton.$inferInsert;
 /** Stored collection slider row. */
-export type CollectionSlider = typeof collectionSlider.$inferSelect;
+export type CollectionDetailSlider = typeof collectionDetailSlider.$inferSelect;
 /** Values accepted when creating a collection slider row. */
-export type NewCollectionSlider = typeof collectionSlider.$inferInsert;
+export type NewCollectionDetailSlider =
+  typeof collectionDetailSlider.$inferInsert;
 /** Stored collection slider plate-set row. */
-export type CollectionSliderPlate = typeof collectionSliderPlate.$inferSelect;
+export type CollectionDetailSliderPlate =
+  typeof collectionDetailSliderPlate.$inferSelect;
 /** Values accepted when creating a collection slider plate-set row. */
-export type NewCollectionSliderPlate =
-  typeof collectionSliderPlate.$inferInsert;
+export type NewCollectionDetailSliderPlate =
+  typeof collectionDetailSliderPlate.$inferInsert;
 /** Stored collection slider insert-set row. */
-export type CollectionSliderInsert = typeof collectionSliderInsert.$inferSelect;
+export type CollectionDetailSliderInsert =
+  typeof collectionDetailSliderInsert.$inferSelect;
 /** Values accepted when creating a collection slider insert-set row. */
-export type NewCollectionSliderInsert =
-  typeof collectionSliderInsert.$inferInsert;
+export type NewCollectionDetailSliderInsert =
+  typeof collectionDetailSliderInsert.$inferInsert;

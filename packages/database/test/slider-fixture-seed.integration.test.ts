@@ -19,10 +19,10 @@ import {
   finishOption,
   pattern,
   product,
+  productDetailSlider,
+  productDetailSliderInsert,
+  productDetailSliderPlate,
   productImage,
-  productSlider,
-  productSliderInsert,
-  productSliderPlate,
   productType,
 } from "../src/schema/index.js";
 
@@ -160,16 +160,16 @@ describe("deterministic slider fixture seed", () => {
   async function expectDiscoveryRelationships(productIds: number[]) {
     const [layouts, includedInserts] = await Promise.all([
       db
-        .select({ magnetLayout: productSlider.magnetLayout })
-        .from(productSlider)
-        .where(inArray(productSlider.id, productIds)),
+        .select({ magnetLayout: productDetailSlider.magnetLayout })
+        .from(productDetailSlider)
+        .where(inArray(productDetailSlider.id, productIds)),
       db
-        .select({ sliderProductId: productSlider.id })
-        .from(productSlider)
+        .select({ sliderProductId: productDetailSlider.id })
+        .from(productDetailSlider)
         .where(
           and(
-            inArray(productSlider.id, productIds),
-            isNotNull(productSlider.includedInsertProductId),
+            inArray(productDetailSlider.id, productIds),
+            isNotNull(productDetailSlider.includedInsertProductId),
           ),
         ),
     ]);
@@ -180,12 +180,12 @@ describe("deterministic slider fixture seed", () => {
 
     const [includedPlates, patternedProducts] = await Promise.all([
       db
-        .select({ productId: productSlider.id })
-        .from(productSlider)
+        .select({ productId: productDetailSlider.id })
+        .from(productDetailSlider)
         .where(
           and(
-            inArray(productSlider.id, productIds),
-            isNotNull(productSlider.includedPlateProductId),
+            inArray(productDetailSlider.id, productIds),
+            isNotNull(productDetailSlider.includedPlateProductId),
           ),
         ),
       db
@@ -201,13 +201,13 @@ describe("deterministic slider fixture seed", () => {
 
     const [plates, inserts] = await Promise.all([
       db
-        .select({ id: productSliderPlate.id })
-        .from(productSliderPlate)
-        .where(inArray(productSliderPlate.id, productIds)),
+        .select({ id: productDetailSliderPlate.id })
+        .from(productDetailSliderPlate)
+        .where(inArray(productDetailSliderPlate.id, productIds)),
       db
-        .select({ id: productSliderInsert.id })
-        .from(productSliderInsert)
-        .where(inArray(productSliderInsert.id, productIds)),
+        .select({ id: productDetailSliderInsert.id })
+        .from(productDetailSliderInsert)
+        .where(inArray(productDetailSliderInsert.id, productIds)),
     ]);
     expect(plates).toHaveLength(3);
     expect(inserts).toHaveLength(3);

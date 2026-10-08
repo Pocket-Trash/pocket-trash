@@ -92,10 +92,10 @@ describe("product deletion", () => {
       if (!spinner || !button || !oversized)
         throw new Error("Products missing.");
       await db
-        .insert(schema.productSpinnerButton)
+        .insert(schema.productDetailSpinnerButton)
         .values({ diameter: "22", diameterUnit: "mm", id: button.id });
       await db
-        .insert(schema.productSpinner)
+        .insert(schema.productDetailSpinner)
         .values([
           { id: spinner.id, bearing: "R188", compatibleButtonId: button.id },
           { id: oversized.id },
@@ -144,7 +144,7 @@ describe("product deletion", () => {
         .returning();
       if (!spinnerItem || !buttonItem) throw new Error("Items missing.");
       await db
-        .insert(schema.collectionSpinner)
+        .insert(schema.collectionDetailSpinner)
         .values({ id: spinnerItem.id, productSpinnerId: spinner.id });
       const request = {
         actor: ownerActor,
@@ -185,24 +185,24 @@ describe("product deletion", () => {
         false,
       );
       await db
-        .delete(schema.collectionSpinner)
-        .where(eq(schema.collectionSpinner.id, spinnerItem.id));
+        .delete(schema.collectionDetailSpinner)
+        .where(eq(schema.collectionDetailSpinner.id, spinnerItem.id));
       await expect(
         services.catalog.deleteProduct({ ...request, productId: button.id }),
       ).resolves.toBe(false);
       await db
-        .update(schema.productSpinner)
+        .update(schema.productDetailSpinner)
         .set({ compatibleButtonId: null })
-        .where(eq(schema.productSpinner.id, spinner.id));
+        .where(eq(schema.productDetailSpinner.id, spinner.id));
       await db
-        .insert(schema.collectionSpinnerButton)
+        .insert(schema.collectionDetailSpinnerButton)
         .values({ id: buttonItem.id, productSpinnerButtonId: button.id });
       await expect(
         services.catalog.deleteProduct({ ...request, productId: button.id }),
       ).resolves.toBe(false);
       await db
-        .delete(schema.collectionSpinnerButton)
-        .where(eq(schema.collectionSpinnerButton.id, buttonItem.id));
+        .delete(schema.collectionDetailSpinnerButton)
+        .where(eq(schema.collectionDetailSpinnerButton.id, buttonItem.id));
       const [selected] = await db
         .insert(schema.finishOption)
         .values({
@@ -291,8 +291,8 @@ describe("product deletion", () => {
       expect(
         await db
           .select()
-          .from(schema.productSpinner)
-          .where(eq(schema.productSpinner.id, spinner.id)),
+          .from(schema.productDetailSpinner)
+          .where(eq(schema.productDetailSpinner.id, spinner.id)),
       ).toHaveLength(0);
       expect(
         await db

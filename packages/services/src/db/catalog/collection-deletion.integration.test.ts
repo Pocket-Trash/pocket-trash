@@ -81,9 +81,11 @@ describe("collection deletion", () => {
         .returning();
       if (!spinnerProduct || !buttonProduct)
         throw new Error("Products missing.");
-      await db.insert(schema.productSpinner).values({ id: spinnerProduct.id });
       await db
-        .insert(schema.productSpinnerButton)
+        .insert(schema.productDetailSpinner)
+        .values({ id: spinnerProduct.id });
+      await db
+        .insert(schema.productDetailSpinnerButton)
         .values({ id: buttonProduct.id });
 
       const [spinnerItem, buttonItem, doomedItem] = await db
@@ -96,11 +98,11 @@ describe("collection deletion", () => {
         .returning();
       if (!spinnerItem || !buttonItem || !doomedItem)
         throw new Error("Items missing.");
-      await db.insert(schema.collectionSpinnerButton).values({
+      await db.insert(schema.collectionDetailSpinnerButton).values({
         id: buttonItem.id,
         productSpinnerButtonId: buttonProduct.id,
       });
-      await db.insert(schema.collectionSpinner).values({
+      await db.insert(schema.collectionDetailSpinner).values({
         id: spinnerItem.id,
         installedButtonId: buttonItem.id,
         productSpinnerId: spinnerProduct.id,
@@ -306,7 +308,7 @@ describe("collection deletion", () => {
       ).rejects.toThrow();
       await client.exec("drop trigger reject_collection_audit on audit_event;");
       expect(
-        (await db.select().from(schema.collectionSpinner))[0]
+        (await db.select().from(schema.collectionDetailSpinner))[0]
           ?.installedButtonId,
       ).toBe(buttonItem.id);
       expect(await db.select().from(schema.finishOption)).toHaveLength(1);
@@ -315,7 +317,7 @@ describe("collection deletion", () => {
       );
       await services.collections.deleteItem(itemDeletion);
       expect(
-        (await db.select().from(schema.collectionSpinner))[0]
+        (await db.select().from(schema.collectionDetailSpinner))[0]
           ?.installedButtonId,
       ).toBeNull();
       expect(await db.select().from(schema.finishOption)).toHaveLength(0);
@@ -358,14 +360,14 @@ describe("collection deletion", () => {
         .values({ collectionId: destination.id, ownerId: owner.id })
         .returning();
       if (!retainedButton) throw new Error("Retained button missing.");
-      await db.insert(schema.collectionSpinnerButton).values({
+      await db.insert(schema.collectionDetailSpinnerButton).values({
         id: retainedButton.id,
         productSpinnerButtonId: buttonProduct.id,
       });
       await db
-        .update(schema.collectionSpinner)
+        .update(schema.collectionDetailSpinner)
         .set({ installedButtonId: retainedButton.id })
-        .where(eq(schema.collectionSpinner.id, spinnerItem.id));
+        .where(eq(schema.collectionDetailSpinner.id, spinnerItem.id));
       await services.collections.deleteItem({
         actor: { clerkId: owner.clerkId, role: "editor" },
         confirmed: true,
@@ -426,7 +428,7 @@ describe("collection deletion", () => {
         .set({ displayName: null })
         .where(eq(schema.collectionItem.id, doomedItem.id));
       // Legacy cross-collection links must be cleared without deleting their spinner.
-      await db.insert(schema.collectionSpinnerButton).values({
+      await db.insert(schema.collectionDetailSpinnerButton).values({
         id: doomedItem.id,
         productSpinnerButtonId: buttonProduct.id,
       });
@@ -435,7 +437,7 @@ describe("collection deletion", () => {
         .values({ collectionId: destination.id, ownerId: owner.id })
         .returning();
       if (!externalSpinner) throw new Error("External spinner missing.");
-      await db.insert(schema.collectionSpinner).values({
+      await db.insert(schema.collectionDetailSpinner).values({
         id: externalSpinner.id,
         installedButtonId: doomedItem.id,
         productSpinnerId: spinnerProduct.id,
@@ -496,8 +498,8 @@ describe("collection deletion", () => {
         (
           await db
             .select()
-            .from(schema.collectionSpinner)
-            .where(eq(schema.collectionSpinner.id, externalSpinner.id))
+            .from(schema.collectionDetailSpinner)
+            .where(eq(schema.collectionDetailSpinner.id, externalSpinner.id))
         )[0]?.installedButtonId,
       ).toBeNull();
       expect(
@@ -613,9 +615,11 @@ describe("collection deletion", () => {
         .returning();
       if (!spinnerProduct || !buttonProduct)
         throw new Error("Products missing.");
-      await db.insert(schema.productSpinner).values({ id: spinnerProduct.id });
       await db
-        .insert(schema.productSpinnerButton)
+        .insert(schema.productDetailSpinner)
+        .values({ id: spinnerProduct.id });
+      await db
+        .insert(schema.productDetailSpinnerButton)
         .values({ id: buttonProduct.id });
 
       const [deletedSpinner, keptButton, keptSpinner, deletedButton] = await db
@@ -645,7 +649,7 @@ describe("collection deletion", () => {
         .returning();
       if (!deletedSpinner || !keptButton || !keptSpinner || !deletedButton)
         throw new Error("Collection items missing.");
-      await db.insert(schema.collectionSpinnerButton).values([
+      await db.insert(schema.collectionDetailSpinnerButton).values([
         {
           id: keptButton.id,
           productSpinnerButtonId: buttonProduct.id,
@@ -655,7 +659,7 @@ describe("collection deletion", () => {
           productSpinnerButtonId: buttonProduct.id,
         },
       ]);
-      await db.insert(schema.collectionSpinner).values([
+      await db.insert(schema.collectionDetailSpinner).values([
         {
           id: deletedSpinner.id,
           installedButtonId: keptButton.id,
@@ -703,14 +707,14 @@ describe("collection deletion", () => {
       expect(
         await db
           .select()
-          .from(schema.collectionSpinner)
-          .where(eq(schema.collectionSpinner.id, deletedSpinner.id)),
+          .from(schema.collectionDetailSpinner)
+          .where(eq(schema.collectionDetailSpinner.id, deletedSpinner.id)),
       ).toEqual([]);
       expect(
         await db
           .select()
-          .from(schema.collectionSpinnerButton)
-          .where(eq(schema.collectionSpinnerButton.id, keptButton.id)),
+          .from(schema.collectionDetailSpinnerButton)
+          .where(eq(schema.collectionDetailSpinnerButton.id, keptButton.id)),
       ).toHaveLength(1);
 
       await db
@@ -733,16 +737,16 @@ describe("collection deletion", () => {
       expect(
         await db
           .select()
-          .from(schema.collectionSpinnerButton)
-          .where(eq(schema.collectionSpinnerButton.id, deletedButton.id)),
+          .from(schema.collectionDetailSpinnerButton)
+          .where(eq(schema.collectionDetailSpinnerButton.id, deletedButton.id)),
       ).toEqual([]);
       expect(
         await db
           .select({
-            installedButtonId: schema.collectionSpinner.installedButtonId,
+            installedButtonId: schema.collectionDetailSpinner.installedButtonId,
           })
-          .from(schema.collectionSpinner)
-          .where(eq(schema.collectionSpinner.id, keptSpinner.id)),
+          .from(schema.collectionDetailSpinner)
+          .where(eq(schema.collectionDetailSpinner.id, keptSpinner.id)),
       ).toEqual([{ installedButtonId: null }]);
 
       expect(
