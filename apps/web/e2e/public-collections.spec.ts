@@ -173,6 +173,106 @@ test("@mutation public collection browsing preserves effective privacy", async (
   });
 });
 
+test("@mutation public profile pictures appear, change, and disappear on every owner surface", async ({
+  page,
+}) => {
+  test.skip(
+    process.env.E2E_RUN_MUTATIONS !== "true",
+    "Profile fixtures require an isolated preview.",
+  );
+  test.setTimeout(120_000);
+  const mutation = await createMutationFixture();
+  let privacy: PublicPrivacyFixture | undefined;
+  const database = createDb({
+    databaseUrl: requiredEnvironment("DATABASE_URL"),
+  });
+  const clerkId = requiredEnvironment("E2E_CLERK_REGULAR_USER_ID");
+  await page.route("https://img.clerk.com/e2e-*", async (route) => {
+    await route.fulfill({
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="green"/></svg>',
+    });
+  });
+  let original:
+    | {
+        /** Original picture restored after the isolated browser test. */
+        imageUrl: string | null;
+      }
+    | undefined;
+  try {
+    [original] = await database
+      .select({ imageUrl: schema.user.imageUrl })
+      .from(schema.user)
+      .where(eq(schema.user.clerkId, clerkId));
+    if (!original) throw new Error("Missing picture fixture owner.");
+    const fixture = await createPublicPrivacyFixture(mutation);
+    privacy = fixture;
+    const paths = [
+      "/collections",
+      `/collections/${fixture.ownerId}`,
+      `/collections/${fixture.ownerId}/${fixture.publicCollection.id}`,
+      `/collections/${fixture.ownerId}/${fixture.publicCollection.id}/${fixture.publicSpinner.id}`,
+    ];
+    for (const imageUrl of [
+      "https://img.clerk.com/e2e-original",
+      "https://img.clerk.com/e2e-replaced",
+      null,
+    ]) {
+      await database
+        .update(schema.user)
+        .set({ imageUrl })
+        .where(eq(schema.user.clerkId, clerkId));
+      for (const path of paths) {
+        await page.goto(path);
+        await waitForHydration(page);
+        const surface =
+          path === "/collections"
+            ? page
+                .getByRole("article")
+                .filter({ hasText: fixture.publicCollection.name })
+            : page.locator("header");
+        const avatar = surface
+          .locator('[data-slot="avatar"][aria-hidden="true"]')
+          .first();
+        await expect(avatar).toBeVisible();
+        if (imageUrl) {
+          const image = avatar.locator("img");
+          await expect(image).toBeVisible();
+          await expect(image).toHaveAttribute("alt", "");
+          const size = path === `/collections/${fixture.ownerId}` ? "80" : "48";
+          await expect(image).toHaveAttribute(
+            "src",
+            `${imageUrl}?width=${size}&height=${size}&fit=crop`,
+          );
+          await expect(avatar).toHaveCSS(
+            "width",
+            size === "80" ? "40px" : "24px",
+          );
+        } else {
+          await expect(avatar.locator("img")).toHaveCount(0);
+          await expect(
+            avatar.locator('[data-slot="avatar-fallback"]'),
+          ).toBeVisible();
+        }
+      }
+    }
+  } finally {
+    try {
+      if (original)
+        await database
+          .update(schema.user)
+          .set({ imageUrl: original.imageUrl })
+          .where(eq(schema.user.clerkId, clerkId));
+    } finally {
+      try {
+        await privacy?.cleanup();
+      } finally {
+        await mutation.cleanup();
+      }
+    }
+  }
+});
+
 test("@mutation admins can open private collection resources directly", async ({
   page,
   signInAs,

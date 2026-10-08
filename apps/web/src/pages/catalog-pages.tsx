@@ -36,6 +36,7 @@ import { MarkdownContent } from "@/components/markdown-content";
 import { PaginatedCards } from "@/components/paginated-cards";
 import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
 import { ProductCard } from "@/components/product-card";
+import { PublicProfileAvatar } from "@/components/public-profile-avatar";
 import { PublicResourceSwitch } from "@/components/resource-visibility-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -662,7 +663,16 @@ export function ProductDetailPage({
                     <h3 className="font-semibold">{item.collectionName}</h3>
                     <p className="text-sm text-muted-foreground">
                       {item.displayName}
-                      {item.ownerUsername ? ` · ${item.ownerUsername}` : ""}
+                      {item.ownerUsername ? (
+                        <span className="inline-flex items-center gap-1">
+                          <span aria-hidden="true"> · </span>
+                          <PublicProfileAvatar
+                            imageUrl={item.ownerImageUrl}
+                            username={item.ownerUsername}
+                          />
+                          {item.ownerUsername}
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                   <div className="flex justify-end gap-2">
@@ -838,6 +848,7 @@ export function PublicCollectionsPage({
                     itemCountLabel={t("web.collections.directory.itemCount", {
                       count: collection.itemCount,
                     })}
+                    ownerImageUrl={owner.imageUrl}
                     ownerName={owner.username}
                     privateLabel={t("web.resources.visibility.private")}
                   />
@@ -874,9 +885,16 @@ export function PublicCollectionPage({
       breadcrumbItems={[
         { label: t("web.navigation.collections"), to: "/collections" },
       ]}
-      meta={t("web.collections.directory.itemCount", {
-        count: owner.itemCount,
-      })}
+      meta={
+        <span className="flex items-center gap-2">
+          <PublicProfileAvatar
+            imageUrl={owner.imageUrl}
+            username={owner.username}
+            size="lg"
+          />
+          {t("web.collections.directory.itemCount", { count: owner.itemCount })}
+        </span>
+      }
       title={owner.username}
     >
       <PaginatedCards
@@ -1050,6 +1068,7 @@ export function UserCollectionsPage({
  * @param props.filters - Active catalog filters.
  * @param props.items - Collection items to display.
  * @param props.onFiltersChange - Optional filter state updater.
+ * @param props.ownerImageUrl - Selected public owner picture URL.
  * @param props.ownerUsername - Public owner username shown in navigation.
  * @param props.userArea - Whether the page is rendered in the signed-in user area.
  * @returns The collection page.
@@ -1061,6 +1080,7 @@ export function CollectionPage({
   items,
   onFiltersChange,
   ownerUsername,
+  ownerImageUrl = null,
   userArea = false,
 }: {
   /** Registered terminology aliases available to search and display. */
@@ -1075,6 +1095,8 @@ export function CollectionPage({
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
   /** Public owner username shown in navigation. */
   ownerUsername?: string;
+  /** Selected public owner picture URL, or null when absent. */
+  ownerImageUrl?: string | null;
   /** Whether the page is rendered in the signed-in user area. */
   userArea?: boolean;
 }) {
@@ -1308,6 +1330,7 @@ export function CollectionPage({
         ...(ownerUsername
           ? [
               {
+                imageUrl: ownerImageUrl,
                 label: ownerUsername,
                 params: { userId: collection.ownerUserId },
                 to: "/collections/$userId" as const,
@@ -1606,6 +1629,7 @@ export function CollectionItemDetailPage({
         ...(item.ownerUsername
           ? [
               {
+                imageUrl: item.ownerImageUrl,
                 label: item.ownerUsername,
                 params: { userId: item.ownerUserId },
                 to: "/collections/$userId" as const,

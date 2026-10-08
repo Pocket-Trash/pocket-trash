@@ -167,6 +167,7 @@ const item: UserCollectionItem = {
   material: product.materials[0] ?? null,
   name: product.name,
   ownerClerkId: "user_storybook",
+  ownerImageUrl: null,
   ownerUsername: "royanger",
   ownerUserId: collection.ownerUserId,
   productId: product.id,
@@ -192,6 +193,7 @@ const installedButton: UserCollectionItem = {
 
 /** Public collection owner shared by the stories. */
 const owner: PublicCollectionOwner = {
+  imageUrl: null,
   collections: [collection],
   itemCount: 1,
   items: [item],
@@ -262,6 +264,7 @@ export const Collection: Story = {
       collection={collection}
       items={[item]}
       onFiltersChange={fn()}
+      ownerImageUrl={owner.imageUrl}
       ownerUsername={owner.username}
     />
   ),
