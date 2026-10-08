@@ -29,6 +29,7 @@
     "dev:verbose": "INFISICAL_RUNNER_VERBOSE=1 pnpm dev",
     "dev:webhooks": "pnpm users:reconcile && tsx packages/infisical-runner/src/cli.ts webhooks listen -- node scripts/dev-webhooks.mjs",
     "diagram:infra": "node scripts/generate-infrastructure-diagram.mjs --once --refresh-metadata",
+    "diagram:pen-schema": "node scripts/generate-pen-schema-diagram.mjs",
     "e2e": "pnpm --filter @app/web test:e2e",
     "e2e:local": "pnpm --filter @app/web test:e2e:local",
     "format": "biome check --write --linter-enabled=false .",

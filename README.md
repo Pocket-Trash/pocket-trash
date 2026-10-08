@@ -159,6 +159,7 @@ keys.
 | --- | --- |
 | `pnpm bunny:audit` | Audits configured Bunny services, billing, and usage. |
 | `pnpm diagram:infra` | Regenerates the infrastructure diagram and metadata. |
+| `pnpm diagram:pen-schema` | Regenerates the proposed pen and refill database schema diagram. |
 | `pnpm logger:axiom:map-fields` | Configures the Axiom field mapping used by the logger. |
 | `pnpm resources:reconcile-storage` | Reconciles database resource records with object storage. |
 | `pnpm users:reconcile` | Reconciles Clerk users into the application database. |
