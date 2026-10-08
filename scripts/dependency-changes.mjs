@@ -97,11 +97,13 @@ function dependencyGraph(lock, importer, sections, runtimeOnly = false) {
    * Visits runtime dependencies of a linked workspace without following its dev tools.
    * @param {string} path - Linked workspace importer path.
    * @param {string[]} fields - Sections contributing to this traversal.
+   * @throws When a workspace importer cannot be resolved.
    */
   function visitImporter(path, fields) {
     const key = `importer:${path}:${fields.join(",")}`;
     if (entries.has(key)) return;
     const entry = lock.importers[path];
+    if (!entry) throw new Error(`Unresolved workspace importer: ${path}`);
     entries.set(
       key,
       fields.map((field) => relevant(entry?.[field])),

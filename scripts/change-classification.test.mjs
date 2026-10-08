@@ -592,3 +592,20 @@ test("unknown graphs stay conservative and explicit E2E overrides tooling-only i
     true,
   );
 });
+
+test("unresolved workspace links reject dependency classification", async () => {
+  const { findDependencyChanges } = await import("./dependency-changes.mjs");
+  const lock = `lockfileVersion: '9.0'
+importers:
+  apps/web:
+    dependencies:
+      '@package/storage':
+        version: link:../../packages/storage
+snapshots: {}
+packages: {}
+`;
+  assert.throws(
+    () => findDependencyChanges(lock, lock),
+    /Unresolved workspace importer/,
+  );
+});
