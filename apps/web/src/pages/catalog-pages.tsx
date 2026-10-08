@@ -14,7 +14,7 @@ import type {
 import {
   type SliderMagnetLayout,
   sliderMagnetLayoutDetails,
-} from "@package/services";
+} from "@package/services/constants";
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CircleHelp } from "lucide-react";

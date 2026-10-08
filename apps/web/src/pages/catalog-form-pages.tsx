@@ -13,13 +13,11 @@ import type {
   UserCollectionSummary,
 } from "@package/services";
 import {
-  sliderMagnetLayoutDetails,
-  sliderMagnetLayouts,
-} from "@package/services";
-import {
   maxImageBytes,
   maxImageSessionBytes,
   maxImageSessionFiles,
+  sliderMagnetLayoutDetails,
+  sliderMagnetLayouts,
 } from "@package/services/constants";
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { useForm } from "@tanstack/react-form";

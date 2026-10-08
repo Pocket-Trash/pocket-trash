@@ -13,16 +13,18 @@ import type {
   PublicMakerSummary,
   PublicMaterial,
   PublicMaterialSummary,
-  SliderMagnetLayout,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
 import {
   CollectionAssemblyPrivacyBlockedError,
   CollectionItemPrivacyInheritedError,
-  sliderMagnetLayouts,
 } from "@package/services";
 import { hasPermission } from "@package/services/authorization";
+import {
+  type SliderMagnetLayout,
+  sliderMagnetLayouts,
+} from "@package/services/constants";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getActor, requireActor, requirePermission } from "@/lib/authorization";

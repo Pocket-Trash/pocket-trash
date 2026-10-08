@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { sliderMagnetLayouts } from "../db/catalog/index.js";
+import { sliderMagnetLayouts } from "../constants.js";
 
 /** Catalog tables that an import manifest may own. Collection data is excluded. */
 export const catalogImportEntityTypes = [
