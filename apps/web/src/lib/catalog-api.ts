@@ -2,10 +2,8 @@ import type {
   AdminMaterial,
   AdminMaterialSummary,
   CatalogColor,
-  CatalogCompatibilityFamily,
   CatalogImage,
   CatalogLookup,
-  CatalogMagnetConfigurationTemplate,
   CatalogMaker,
   CatalogProduct,
   CatalogProductType,
@@ -312,7 +310,6 @@ const insertHostedMagnetOptionsSchema = z
       z.object({
         clickCount: z.number().int().positive().nullable(),
         configuration: magnetConfigurationSchema,
-        copiedFromTemplateId: idSchema.nullable().optional(),
         id: idSchema.nullable().default(null),
         isAdvertisedDefault: z.boolean(),
       }),
@@ -353,12 +350,6 @@ const insertHostedMagnetOptionsSchema = z
 const advertisedInsertOfferSchema = z.object({
   isAdvertisedDefault: z.boolean(),
   offerId: idSchema,
-});
-
-/** Schema for one reviewed, non-blocking exact-product compatibility warning. */
-const compatibilityAdvisorySchema = z.object({
-  relatedProductId: idSchema,
-  text: z.string().trim().min(1, requiredMessage).max(1000),
 });
 
 /**
@@ -459,8 +450,6 @@ export const productFormSchema = z
     bodyHostedMagnetSetup: bodyHostedMagnetSetupSchema.nullable().default(null),
     buttonDiameterMm: numericSpecSchema,
     compatibleButtonId: idSchema.nullable(),
-    compatibilityAdvisories: z.array(compatibilityAdvisorySchema),
-    compatibilityFamilyIds: z.array(idSchema),
     description: optionalDescriptionSchema,
     diameterMm: numericSpecSchema,
     finishOptions: z.array(finishOptionSchema),
@@ -490,13 +479,10 @@ export const productFormSchema = z
         bearing,
         bodyHostedMagnetSetup,
         advertisedInsertOffers,
-        compatibilityAdvisories,
-        compatibilityFamilyIds,
         finishOptions,
         includedComponentIds,
         insertHostedMagnetOptions,
         magnetSystem,
-        productId,
         productTypeSlug,
         spinDiameterMm,
         weightBasis,
@@ -594,39 +580,11 @@ export const productFormSchema = z
           path: ["includedComponentIds"],
         });
       }
-      for (const [path, ids] of [
-        ["compatibilityFamilyIds", compatibilityFamilyIds],
-        ["includedComponentIds", includedComponentIds],
-      ] as const) {
-        if (new Set(ids).size !== ids.length) {
-          context.addIssue({
-            code: "custom",
-            message: "web.catalog.error.form",
-            path: [path],
-          });
-        }
-      }
-      const advisoryKeys = compatibilityAdvisories.map(
-        ({ relatedProductId, text }) =>
-          `${relatedProductId}:${text.toLocaleLowerCase()}`,
-      );
-      if (new Set(advisoryKeys).size !== advisoryKeys.length) {
+      if (new Set(includedComponentIds).size !== includedComponentIds.length) {
         context.addIssue({
           code: "custom",
           message: "web.catalog.error.form",
-          path: ["compatibilityAdvisories"],
-        });
-      }
-      if (
-        productId !== null &&
-        compatibilityAdvisories.some(
-          ({ relatedProductId }) => relatedProductId === productId,
-        )
-      ) {
-        context.addIssue({
-          code: "custom",
-          message: "web.catalog.error.form",
-          path: ["compatibilityAdvisories"],
+          path: ["includedComponentIds"],
         });
       }
       const signatures = finishOptions.map(
@@ -686,11 +644,6 @@ const materialWriteSchema = materialSchema.extend({
 const finishSchema = z.object({ name: slugNameSchema });
 /** Schema for pattern names. */
 const patternSchema = z.object({ name: slugNameSchema });
-/** Schema for maker-scoped compatibility-family names. */
-const compatibilityFamilySchema = z.object({
-  makerId: idSchema,
-  name: slugNameSchema,
-});
 /**
  * Schema for color names and six-digit uppercase hexadecimal values.
  */
@@ -919,16 +872,12 @@ export type ProductFormValue = z.output<typeof productFormSchema>;
  * Lookup values and spinner buttons required by catalog forms.
  */
 export type CatalogOptions = {
-  /** Catalog-manager-only exact configuration authoring templates. */
-  magnetConfigurationTemplates?: CatalogMagnetConfigurationTemplate[];
   /** Maker-scoped registered catalog terminology aliases. */
   terminologyAliases?: CatalogTerminologyAlias[];
   /**
    * Available color effects.
    */
   colorEffects: Awaited<ReturnType<typeof listColorEffects>>;
-  /** Reviewed maker-scoped compatibility families. */
-  compatibilityFamilies: Awaited<ReturnType<typeof listCompatibilityFamilies>>;
   /**
    * Available catalog colors.
    */
@@ -973,11 +922,9 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
     const viewer = await getResourceViewer();
     const [
       colorEffects,
-      compatibilityFamilies,
       colors,
       finishes,
       makers,
-      magnetConfigurationTemplates,
       materials,
       patterns,
       productTypes,
@@ -986,11 +933,9 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       terminologyAliases,
     ] = await Promise.all([
       listColorEffects(),
-      listCompatibilityFamilies(),
       listColors(),
       listFinishes(),
       listMakers(),
-      s.db.catalog.listMagnetConfigurationTemplates(viewer),
       listMaterials(),
       listPatterns(),
       listProductTypes(),
@@ -1000,11 +945,9 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
     ]);
     return {
       colorEffects,
-      compatibilityFamilies,
       colors,
       finishes,
       makers,
-      magnetConfigurationTemplates,
       materials,
       patterns,
       productTypes,
@@ -1413,50 +1356,6 @@ export const saveAdminMaterial = createServerFn({ method: "POST" })
     }
   });
 
-/**
- * Validates and creates a maker-scoped reviewed compatibility family.
- *
- * @returns The created family or a validation-aware mutation failure.
- * @rejects If permission checking, service loading, or family lookup fails.
- */
-export const createCatalogCompatibilityFamily = createServerFn({
-  method: "POST",
-})
-  .validator((input: unknown) => input)
-  .handler(
-    async ({
-      data,
-    }): Promise<
-      CatalogLookupMutationResult<
-        "compatibilityFamily",
-        CatalogCompatibilityFamily
-      >
-    > => {
-      const actor = await requirePermission("products.manage");
-      const parsed = compatibilityFamilySchema.safeParse(data);
-      if (!parsed.success) return validationFailure(parsed.error);
-      const { s } = await import("@/lib/services");
-      const families = await s.db.catalog.listCompatibilityFamilies();
-      try {
-        const compatibilityFamily =
-          await s.db.catalog.createCompatibilityFamily({
-            actor,
-            makerId: parsed.data.makerId,
-            name: parsed.data.name,
-            slug: nextAvailableSlug(
-              parsed.data.name,
-              families
-                .filter(({ makerId }) => makerId === parsed.data.makerId)
-                .map(({ slug }) => slug),
-            ),
-          });
-        return { compatibilityFamily, ok: true as const };
-      } catch (error) {
-        return mutationFailure(error);
-      }
-    },
-  );
-
 /** Validates and creates an audited maker-scoped catalog terminology alias. */
 export const createCatalogTerminologyAlias = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
@@ -1616,8 +1515,6 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       actor,
       advertisedInsertOffers: parsed.data.advertisedInsertOffers,
       bodyHostedMagnetSetup: parsed.data.bodyHostedMagnetSetup,
-      compatibilityAdvisories: parsed.data.compatibilityAdvisories,
-      compatibilityFamilyIds: parsed.data.compatibilityFamilyIds,
       description: parsed.data.description,
       finishOptions: parsed.data.finishOptions.map(
         ({ colorEffectId, colorIds, finishIds, patternId }) => ({
@@ -2484,17 +2381,6 @@ async function listColorEffects(): Promise<CatalogLookup[]> {
 }
 
 /**
- * Loads reviewed compatibility families.
- *
- * @returns A promise resolving to maker-scoped compatibility families.
- * @rejects If the service module or family query fails.
- */
-async function listCompatibilityFamilies() {
-  const { s } = await import("@/lib/services");
-  return await s.db.catalog.listCompatibilityFamilies();
-}
-
-/**
  * Loads catalog colors.
  *
  * @returns A promise resolving to catalog colors.
@@ -2615,12 +2501,10 @@ function sliderAssemblyMutationFailure(error: unknown) {
     ? "web.slider.validation.bodyHostedInsert"
     : error.message.includes("already installed")
       ? "web.slider.validation.alreadyInstalled"
-      : error.message.includes("compatibility family")
-        ? "web.slider.validation.incompatible"
-        : error.message.includes("slider plate does not exist") ||
-            error.message.includes("slider insert does not exist")
-          ? "web.slider.validation.exactProduct"
-          : null;
+      : error.message.includes("slider plate does not exist") ||
+          error.message.includes("slider insert does not exist")
+        ? "web.slider.validation.exactProduct"
+        : null;
   return formError
     ? {
         fieldErrors: {},

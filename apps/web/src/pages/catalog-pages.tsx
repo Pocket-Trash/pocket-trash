@@ -114,7 +114,6 @@ function catalogFilterCopy(
     clear: t("web.action.clearAllFilters"),
     close: t("web.action.close"),
     colors: t("web.catalog.field.colors"),
-    compatibilityFamily: t("web.slider.filter.compatibilityFamily"),
     description: t("web.catalog.filter.description"),
     /**
      * Formats a fade option name.
@@ -668,32 +667,11 @@ export function ProductDetailPage({
               </Detail>
             ) : null,
           )}
-          {product.compatibilityFamilies.length ? (
-            <Detail label={t("web.slider.relationship.compatibilityFamilies")}>
-              {product.compatibilityFamilies
-                .map(({ makerName, name }) => `${makerName}: ${name}`)
-                .join(", ")}
-            </Detail>
-          ) : null}
           {product.includedComponents.length ? (
             <Detail label={t("web.slider.relationship.includedComponents")}>
               <ul className="grid gap-1">
                 {product.includedComponents.map((component) => (
                   <li key={component.id}>{component.name}</li>
-                ))}
-              </ul>
-            </Detail>
-          ) : null}
-          {product.compatibilityAdvisories.length ? (
-            <Detail label={t("web.slider.relationship.reviewedAdvisory")}>
-              <ul className="grid gap-1">
-                {product.compatibilityAdvisories.map((advisory) => (
-                  <li key={advisory.id}>
-                    <span className="font-medium">
-                      {advisory.relatedProductName}:
-                    </span>{" "}
-                    {advisory.text}
-                  </li>
                 ))}
               </ul>
             </Detail>
@@ -1741,14 +1719,6 @@ export function CollectionItemDetailPage({
           <Badge className="w-fit" variant="secondary">
             {t("web.resources.moderation.privateBadge")}
           </Badge>
-        ) : null}
-        {item.hasGrandfatheredInstallation ? (
-          <p
-            className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground"
-            role="status"
-          >
-            {t("web.slider.component.grandfatheredWarning")}
-          </p>
         ) : null}
         {[...ownImages, ...productImages][0] ? (
           <img

@@ -668,9 +668,6 @@ describe("catalog seed", () => {
           magnetSystem === "insert-driven" && defaultInsertSlug !== null,
       ),
     ).toBe(true);
-    expect(
-      sliders.every(({ compatibilityFamily }) => compatibilityFamily),
-    ).toBe(true);
     expect(sliders.every(({ includedPlateSlug }) => includedPlateSlug)).toBe(
       true,
     );

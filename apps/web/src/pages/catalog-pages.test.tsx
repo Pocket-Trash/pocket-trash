@@ -215,7 +215,6 @@ const owners = [
         collectionIsPrivate: false,
         collectionItemId: 2000,
         collectionName: "Daily Carry",
-        compatibilityFamilies: [],
         compatibleButtonId: null,
         compatibleButtonName: null,
         displayName: "My Catla",
@@ -225,7 +224,6 @@ const owners = [
         effectiveSliderSetup: null,
         imageCount: 0,
         images: [],
-        hasGrandfatheredInstallation: false,
         installedButtonId: null,
         installedInsertId: null,
         installedOnSliderId: null,
@@ -269,8 +267,6 @@ const product: CatalogProduct = {
   canEdit: false,
   compatibleButtonId: null,
   compatibleButtonName: null,
-  compatibilityAdvisories: [],
-  compatibilityFamilies: [],
   createdAt: new Date(0),
   description: null,
   diameterMm: null,
@@ -764,19 +760,10 @@ describe("ProductGrid", () => {
 });
 
 describe("ProductsPage", () => {
-  it("matches any offered pattern together with the live family and included plate", () => {
+  it("matches any offered pattern together with the included plate", () => {
     const ripple = { id: 201, name: "Ripple", slug: "ripple" };
     const qualifying = {
       ...product,
-      compatibilityFamilies: [
-        {
-          id: 301,
-          makerId: 1,
-          makerName: "KAP EDC",
-          name: "Small family",
-          slug: "small-family",
-        },
-      ],
       finishOptions: [
         {
           colorEffect: null,
@@ -819,7 +806,6 @@ describe("ProductsPage", () => {
       <ProductsPage
         filters={{
           ...emptyCatalogFilters(),
-          compatibilityFamilyIds: [301],
           patternIds: [ripple.id],
           plateIds: [401],
         }}
@@ -938,7 +924,6 @@ describe("ProductDetailPage", () => {
               clickCount: 3,
               clickOptionId: 3000,
               configuration,
-              copiedFromTemplateId: null,
               id: 4000,
               insertProductId: 2000,
               insertProductName: "Maker Insert",
@@ -1059,7 +1044,7 @@ describe("CollectionItemDetailPage", () => {
     expect(html).not.toContain("Build from scratch");
   });
 
-  it("shows installed slider components and grandfathered compatibility warnings", () => {
+  it("shows installed slider components", () => {
     const item = owners[0]?.items[0];
     if (!item) throw new Error("Collection item fixture is required.");
     const slider = {
@@ -1074,7 +1059,6 @@ describe("CollectionItemDetailPage", () => {
         installedPlate={{ ...item, displayName: "Installed plate" }}
         item={{
           ...item,
-          hasGrandfatheredInstallation: true,
           productTypeName: "Slider",
           productTypeSlug: "slider",
         }}
@@ -1084,9 +1068,6 @@ describe("CollectionItemDetailPage", () => {
 
     expect(html).toContain("Installed plate");
     expect(html).toContain("Installed insert");
-    expect(html).toContain(
-      "This installation can remain connected, but reinstalling will use current compatibility.",
-    );
   });
 
   it("labels redacted installed components as unavailable instead of defaults", () => {
@@ -1207,7 +1188,6 @@ describe("CollectionItemDetailPage", () => {
               clickCount: 5,
               clickOptionId: 3000,
               configuration,
-              copiedFromTemplateId: null,
               id: 4000,
               insertProductId: product.id,
               isAdvertisedDefault: true,

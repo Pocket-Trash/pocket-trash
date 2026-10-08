@@ -17,8 +17,6 @@ const product: CatalogProduct = {
   canEdit: true,
   compatibleButtonId: null,
   compatibleButtonName: null,
-  compatibilityAdvisories: [],
-  compatibilityFamilies: [],
   createdAt: new Date("2026-01-01"),
   description: null,
   diameterMm: "50.8",

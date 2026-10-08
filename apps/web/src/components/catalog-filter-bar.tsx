@@ -66,8 +66,6 @@ export type CatalogFilterCopy = {
    * Color facet label.
    */
   colors: string;
-  /** Compatibility-family facet label. */
-  compatibilityFamily: string;
   /**
    * Description of the advanced filter sheet.
    */
@@ -205,7 +203,6 @@ export function CatalogFilterBar({
     colors: facets.colors.map(({ id }) => id),
     fades: facets.fades.map(({ key }) => key),
     finishes: facets.finishes.map(({ id }) => id),
-    compatibilityFamilies: facets.compatibilityFamilies.map(({ id }) => id),
     makers: facets.makers.map(({ id }) => id),
     materials: facets.materials.map(({ id }) => id),
     patterns: facets.patterns.map(({ id }) => id),
@@ -739,15 +736,6 @@ function AdvancedFilters({
         onChange={(patternIds) => onChange({ ...filters, patternIds })}
         options={facets.patterns}
         selected={filters.patternIds}
-      />
-      <CheckboxFacet
-        copy={copy}
-        label={copy.compatibilityFamily}
-        onChange={(compatibilityFamilyIds) =>
-          onChange({ ...filters, compatibilityFamilyIds })
-        }
-        options={facets.compatibilityFamilies}
-        selected={filters.compatibilityFamilyIds}
       />
       <CheckboxFacet
         copy={copy}

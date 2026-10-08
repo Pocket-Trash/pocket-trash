@@ -101,7 +101,6 @@ describe("effective owned slider setup", () => {
     clickCount: 5,
     clickOptionId: 1000,
     configuration,
-    copiedFromTemplateId: null,
     id: 2000,
     insertProductId: 3000,
     insertProductName: "Matching insert",

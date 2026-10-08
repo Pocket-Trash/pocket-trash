@@ -16,11 +16,9 @@ import {
 import type { Database } from "../src/client.js";
 import * as schema from "../src/schema/index.js";
 import {
-  compatibilityFamily,
   finishOption,
   pattern,
   product,
-  productCompatibilityFamily,
   productImage,
   productIncludedComponent,
   productInsertMagnetOffer,
@@ -204,42 +202,27 @@ describe("deterministic slider fixture seed", () => {
     expect(incompleteSources).toHaveLength(1);
     expect(defaultOffers.length).toBeGreaterThan(0);
 
-    const [includedPlates, familyMemberships, patternedProducts] =
-      await Promise.all([
-        db
-          .select({ productId: productIncludedComponent.productId })
-          .from(productIncludedComponent)
-          .innerJoin(
-            productSliderPlate,
-            eq(
-              productSliderPlate.id,
-              productIncludedComponent.componentProductId,
-            ),
-          )
-          .where(inArray(productIncludedComponent.productId, productIds)),
-        db
-          .select({ productId: productCompatibilityFamily.productId })
-          .from(productCompatibilityFamily)
-          .innerJoin(
-            compatibilityFamily,
-            eq(
-              compatibilityFamily.id,
-              productCompatibilityFamily.compatibilityFamilyId,
-            ),
-          )
-          .where(inArray(productCompatibilityFamily.productId, productIds)),
-        db
-          .select({ productId: finishOption.productId })
-          .from(finishOption)
-          .innerJoin(pattern, eq(pattern.id, finishOption.patternId))
-          .where(inArray(finishOption.productId, productIds)),
-      ]);
+    const [includedPlates, patternedProducts] = await Promise.all([
+      db
+        .select({ productId: productIncludedComponent.productId })
+        .from(productIncludedComponent)
+        .innerJoin(
+          productSliderPlate,
+          eq(
+            productSliderPlate.id,
+            productIncludedComponent.componentProductId,
+          ),
+        )
+        .where(inArray(productIncludedComponent.productId, productIds)),
+      db
+        .select({ productId: finishOption.productId })
+        .from(finishOption)
+        .innerJoin(pattern, eq(pattern.id, finishOption.patternId))
+        .where(inArray(finishOption.productId, productIds)),
+    ]);
     expect(new Set(includedPlates.map(({ productId }) => productId)).size).toBe(
       21,
     );
-    expect(
-      new Set(familyMemberships.map(({ productId }) => productId)).size,
-    ).toBe(productIds.length);
     expect(patternedProducts.length).toBeGreaterThan(0);
 
     const [plates, inserts] = await Promise.all([

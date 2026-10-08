@@ -39,9 +39,6 @@ const colors = [
  */
 const facets = {
   colors,
-  compatibilityFamilies: [
-    { count: 4, id: 20, name: "Small family", slug: "small-family" },
-  ],
   fades: [{ colors: [blue, purple], count: 6, key: "1.2" }],
   finishes: [
     { count: 12, id: 1, name: "Anodized", slug: "anodized" },
@@ -80,7 +77,6 @@ const copy = {
   clear: "Clear",
   close: "Remove",
   colors: "Colour",
-  compatibilityFamily: "Compatibility family",
   description: "Filter the catalog",
   /**
    * Builds a story label for a color fade.

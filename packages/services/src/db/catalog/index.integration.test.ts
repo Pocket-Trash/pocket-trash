@@ -433,13 +433,6 @@ describe("catalog product persistence", () => {
         createLogger({ app: "api", environment: "test" }),
       ).catalog;
       const admin = { clerkId: "admin-test", role: "admin" as const };
-      const user = { clerkId: "user-test", role: "user" as const };
-      const family = await service.createCompatibilityFamily({
-        actor: admin,
-        makerId: maker.id,
-        name: "Rail 50",
-        slug: "rail-50",
-      });
       const plate = await service.createProduct({
         actor: admin,
         finishOptions: [],
@@ -472,13 +465,6 @@ describe("catalog product persistence", () => {
       });
       const slider = await service.createProduct({
         actor: admin,
-        compatibilityAdvisories: [
-          {
-            relatedProductId: insert.id,
-            text: "Requires the revised spring pack.",
-          },
-        ],
-        compatibilityFamilyIds: [family.id],
         finishOptions: [],
         includedComponentIds: [plate.id, insert.id],
         makerId: maker.id,
@@ -571,9 +557,6 @@ describe("catalog product persistence", () => {
           weightG: "96",
         }),
       );
-      expect(slider.compatibilityFamilies).toEqual([
-        expect.objectContaining({ id: family.id, makerId: maker.id }),
-      ]);
       expect(slider.includedComponents).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -586,12 +569,6 @@ describe("catalog product persistence", () => {
           }),
         ]),
       );
-      expect(slider.compatibilityAdvisories).toEqual([
-        expect.objectContaining({
-          relatedProductId: insert.id,
-          text: "Requires the revised spring pack.",
-        }),
-      ]);
       expect(plate).toEqual(
         expect.objectContaining({
           lengthMm: "50",
@@ -657,19 +634,6 @@ describe("catalog product persistence", () => {
           specs: { magnetSystem: "body-hosted" },
         }),
       ).rejects.toThrow("Magnet group does not belong to this configuration");
-      await expect(
-        service.createProduct({
-          actor: user,
-          compatibilityFamilyIds: [family.id],
-          finishOptions: [],
-          makerId: maker.id,
-          materialIds: [material.id],
-          name: "Unreviewed Slider",
-          productTypeSlug: "slider",
-          slug: "unreviewed-slider",
-          specs: { magnetSystem: "insert-driven" },
-        }),
-      ).rejects.toThrow("Product does not exist.");
       await expect(
         service.deleteProduct({
           actor: admin,
@@ -744,23 +708,6 @@ describe("catalog product persistence", () => {
         sourceLabel: "Maker medium",
         sourceNotes: null,
       };
-      const template = await service.createMagnetConfigurationTemplate({
-        actor,
-        compatibilityFamilyId: null,
-        configuration,
-        makerId: null,
-        name: "Standard medium",
-        scope: "global",
-      });
-      await expect(
-        service.listMagnetConfigurationTemplates({
-          clerkId: "collection-owner",
-          role: "user",
-        }),
-      ).resolves.toEqual([]);
-      await expect(
-        service.listMagnetConfigurationTemplates(actor),
-      ).resolves.toEqual([expect.objectContaining({ id: template.id })]);
       const insert = await service.createProduct({
         actor,
         finishOptions: [],
@@ -770,7 +717,6 @@ describe("catalog product persistence", () => {
             {
               clickCount: 3,
               configuration,
-              copiedFromTemplateId: template.id,
               isAdvertisedDefault: true,
             },
             {
@@ -793,7 +739,6 @@ describe("catalog product persistence", () => {
       expect(insert.insertMagnetOffers).toEqual([
         expect.objectContaining({
           clickCount: 3,
-          copiedFromTemplateId: template.id,
           isAdvertisedDefault: true,
           configuration: expect.objectContaining({ label: "Medium" }),
         }),

@@ -106,18 +106,6 @@ describe("owned slider insert setups", () => {
           productId: product.id,
         })),
       );
-      const [family] = await db
-        .insert(schema.compatibilityFamily)
-        .values({ makerId: maker.id, name: "Setup family", slug: "setup" })
-        .returning();
-      if (!family) throw new Error("Compatibility family missing.");
-      await db.insert(schema.productCompatibilityFamily).values(
-        [sliderProductId, insertProductId].map((productId) => ({
-          compatibilityFamilyId: family.id,
-          productId,
-          reviewedByClerkId: owner.clerkId,
-        })),
-      );
       const clickOptions = await db
         .insert(schema.productInsertClickOption)
         .values([

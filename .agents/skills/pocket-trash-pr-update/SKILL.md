@@ -36,18 +36,36 @@ suggest a branch, create a branch, push, fetch, or update a PR from `main`.
    `gh pr edit`.
 8. Determine the base branch from `baseRefName`; default to `main` only if the
    PR lookup does not return a base.
-9. Fetch the base branch if needed:
-   - `git fetch origin <base>`
+9. Fetch the base branch and current PR branch:
+   - `git fetch origin <base> <branch>`
 10. Inspect committed branch changes:
 
 - `git log --oneline origin/<base>..HEAD`
 - `git diff --stat origin/<base>...HEAD`
 - `git diff --name-only origin/<base>...HEAD`
+- `git rev-list --left-right --count origin/<branch>...HEAD`
+- `git log --oneline origin/<base>..origin/<branch>`
+- `git diff --stat origin/<base>...origin/<branch>`
+- `git diff --name-only origin/<base>...origin/<branch>`
 
 11. Read `./docs/changesets.md` when it exists.
 12. If there are no commits relative to the base branch, stop and report that
     there is nothing to summarize.
-13. Create or update branch Changeset files:
+13. Determine the update mode. This workflow is identical in Codex and Claude
+    Code:
+    - Read `git rev-list --left-right --count` as `<remote-only> <local-only>`.
+    - **Publishing commits:** use this mode for `0 N`, where `N` is greater than
+      zero, when intended uncommitted changes belong to the current PR, or when
+      the required Changeset or generated artifacts must be committed. Unrelated
+      dirty changes still stop publication at the clean-state guard.
+    - **Metadata-only update:** use this mode for `0 0` or `N 0` only when there
+      are no intended uncommitted branch changes. Inspect and summarize
+      `origin/<branch>`, leave unrelated local work untouched, do not run
+      `git push`, and do not claim that commits were pushed. If a remote-ahead
+      branch needs a new commit, stop and synchronize it before publishing.
+    - For `N M`, where both values are greater than zero, stop and report the
+      divergence instead of guessing which history to publish.
+14. In publishing-commits mode, create or update branch Changeset files:
     - Inspect changed `.changeset/*.md` files relative to the base.
     - If none exists, create one under `.changeset/`.
     - If one exists and no longer matches the branch, update it.
@@ -66,15 +84,45 @@ suggest a branch, create a branch, push, fetch, or update a PR from `main`.
          confirmation is required.
     - Keep the Changeset description succinct, terse, human friendly, and
       changelog-ready.
-14. Generate a proposed title and body from the commits, changed files, and any
-    relevant test output already available in the conversation or shell history.
-15. Compare the proposed title and body with the current PR values.
-16. If neither title nor body needs a meaningful update, report that the PR
-    title and body are already current.
-17. If one or both values should change, update only those fields:
-    - `gh pr edit <number-or-url> --title "<title>"`
-    - `gh pr edit <number-or-url> --body "<body>"`
-18. Return the PR URL and a concise summary of what changed.
+15. In publishing-commits mode, commit the complete branch state before final
+    validation:
+    - Generate or refresh every artifact the repository expects in the PR.
+    - Include the current Changeset and generated artifacts in logical commits
+      using `$pocket-trash-commit`.
+    - Require `git status --porcelain` to be empty. If unrelated user changes
+      prevent a clean state, stop and preserve them.
+16. In publishing-commits mode, run the repository's final validation on the
+    exact clean commit that will be pushed:
+    - When the root `package.json` exposes `validate:pr`, run
+      `pnpm validate:pr -- origin/<base>`.
+    - Otherwise, read the repository's `AGENTS.md` and run its documented
+      repository-specific validation. The skills, CLI, and localizations
+      repositories keep their own required validation suites; do not require
+      them to expose Pocket Trash's `validate:pr` command.
+    - If validation writes or regenerates a tracked file, commit it and rerun
+      the complete selected validation until the worktree is clean.
+    - If validation fails, stop. Do not run `git push` and do not call
+      `gh pr edit`. Preserve the commits and working tree for correction so PR
+      metadata is not partially updated.
+17. In publishing-commits mode, immediately after successful validation and its
+    final clean-worktree check, push the current branch. If the push fails, stop
+    before changing PR metadata.
+18. Generate a proposed title and body only after any validation-generated
+    commits and required push are complete. In publishing-commits mode, use the
+    final local branch and validation output. In metadata-only mode, use
+    `origin/<branch>` and do not summarize stale local `HEAD` state.
+19. Compare the proposed title and body with the current PR values.
+20. If neither title nor body needs a meaningful update, report that the PR
+    title and body are already current. State separately whether commits were
+    published or whether this was a metadata-only check.
+21. If one or both values should change, update only those fields after any
+    required push has succeeded:
+    - When both change, update them atomically with
+      `gh pr edit <number-or-url> --title "<title>" --body "<body>"`.
+    - When only one changes, pass only its corresponding `--title` or `--body`
+      flag in one `gh pr edit` call.
+22. Return the PR URL and a concise summary of what changed. In metadata-only
+    mode, say which metadata changed and explicitly say that no push was needed.
 
 ## Title
 

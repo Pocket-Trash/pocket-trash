@@ -17,8 +17,6 @@ const product: CatalogProduct = {
   canEdit: true,
   compatibleButtonId: null,
   compatibleButtonName: null,
-  compatibilityAdvisories: [],
-  compatibilityFamilies: [],
   createdAt: new Date(0),
   description: null,
   diameterMm: null,
@@ -126,7 +124,6 @@ const meta = {
     initialProductId: 1000,
     options: {
       colorEffects: [],
-      compatibilityFamilies: [],
       colors: [],
       finishes: [],
       makers: [],

@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
 describe("owned slider assemblies", () => {
-  it("installs compatible components, moves the connected assembly, and grandfathers uninterrupted installs", async () => {
+  it("installs available components and moves the connected assembly", async () => {
     const client = new PGlite();
     const db = drizzle(client, { schema }) as unknown as Database;
     const folder = fileURLToPath(
@@ -153,41 +153,6 @@ describe("owned slider assemblies", () => {
           productId: product.id,
         })),
       );
-      const [family, otherFamily] = await db
-        .insert(schema.compatibilityFamily)
-        .values([
-          { makerId: maker.id, name: "Family", slug: "family" },
-          { makerId: maker.id, name: "Other", slug: "other" },
-        ])
-        .returning();
-      if (!family || !otherFamily) throw new Error("Families missing.");
-      await db.insert(schema.productCompatibilityFamily).values([
-        {
-          compatibilityFamilyId: family.id,
-          productId: insertSliderProductId,
-          reviewedByClerkId: owner.clerkId,
-        },
-        {
-          compatibilityFamilyId: family.id,
-          productId: bodySliderProductId,
-          reviewedByClerkId: owner.clerkId,
-        },
-        {
-          compatibilityFamilyId: family.id,
-          productId: plateProductId,
-          reviewedByClerkId: owner.clerkId,
-        },
-        {
-          compatibilityFamilyId: otherFamily.id,
-          productId: otherPlateProductId,
-          reviewedByClerkId: owner.clerkId,
-        },
-        {
-          compatibilityFamilyId: family.id,
-          productId: insertProductId,
-          reviewedByClerkId: owner.clerkId,
-        },
-      ]);
       await db.insert(schema.productIncludedComponent).values({
         componentProductId: plateProductId,
         productId: insertSliderProductId,
@@ -378,9 +343,6 @@ describe("owned slider assemblies", () => {
         service.getOwnedItem(actor, insertSliderId),
       ).resolves.toEqual(
         expect.objectContaining({
-          compatibilityFamilies: [
-            expect.objectContaining({ id: family.id, name: family.name }),
-          ],
           includedComponents: [
             expect.objectContaining({
               id: plateProductId,
@@ -405,7 +367,6 @@ describe("owned slider assemblies", () => {
         service.getOwnedItem(actor, insertSliderId),
       ).resolves.toEqual(
         expect.objectContaining({
-          hasGrandfatheredInstallation: false,
           installedInsertId: insertId,
           installedPlateId: plateId,
         }),
@@ -497,23 +458,6 @@ describe("owned slider assemblies", () => {
           materialId: material.id,
         }),
       ).rejects.toThrow("already installed on another slider");
-      await expect(
-        service.updateItem({
-          actor,
-          collectionItemId: bodySliderId,
-          customFinish: null,
-          displayName: "Body slider",
-          finishOptionId: null,
-          installedPlate: { collectionItemId: otherPlateId },
-          materialId: material.id,
-        }),
-      ).rejects.toThrow("does not share a compatibility family");
-
-      await db.insert(schema.productCompatibilityFamily).values({
-        compatibilityFamilyId: family.id,
-        productId: otherPlateProductId,
-        reviewedByClerkId: owner.clerkId,
-      });
       await service.updateItem({
         actor,
         collectionItemId: insertSliderId,
@@ -551,15 +495,10 @@ describe("owned slider assemblies", () => {
         expect.objectContaining({ collectionId: destination.id }),
       );
 
-      await db
-        .delete(schema.productCompatibilityFamily)
-        .where(
-          eq(schema.productCompatibilityFamily.productId, otherPlateProductId),
-        );
       await expect(
         service.getOwnedItem(actor, insertSliderId),
       ).resolves.toEqual(
-        expect.objectContaining({ hasGrandfatheredInstallation: true }),
+        expect.objectContaining({ installedPlateId: otherPlateId }),
       );
       await service.updateItem({
         actor,
@@ -578,17 +517,15 @@ describe("owned slider assemblies", () => {
         installedPlate: null,
         materialId: material.id,
       });
-      await expect(
-        service.updateItem({
-          actor,
-          collectionItemId: insertSliderId,
-          customFinish: null,
-          displayName: "Reinstall rejected",
-          finishOptionId: null,
-          installedPlate: { collectionItemId: otherPlateId },
-          materialId: material.id,
-        }),
-      ).rejects.toThrow("does not share a compatibility family");
+      await service.updateItem({
+        actor,
+        collectionItemId: insertSliderId,
+        customFinish: null,
+        displayName: "Reinstalled",
+        finishOptionId: null,
+        installedPlate: { collectionItemId: otherPlateId },
+        materialId: material.id,
+      });
 
       await service.deleteItem({
         actor,
@@ -599,11 +536,6 @@ describe("owned slider assemblies", () => {
         service.getOwnedItem(actor, insertSliderId),
       ).resolves.toEqual(expect.objectContaining({ installedInsertId: null }));
 
-      await db.insert(schema.productCompatibilityFamily).values({
-        compatibilityFamilyId: family.id,
-        productId: otherPlateProductId,
-        reviewedByClerkId: owner.clerkId,
-      });
       await service.updateItem({
         actor,
         collectionItemId: insertSliderId,
