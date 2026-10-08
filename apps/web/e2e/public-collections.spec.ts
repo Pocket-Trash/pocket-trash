@@ -239,14 +239,14 @@ test("@mutation public profile pictures appear, change, and disappear on every o
           const image = avatar.locator("img");
           await expect(image).toBeVisible();
           await expect(image).toHaveAttribute("alt", "");
-          const size = path === `/collections/${fixture.ownerId}` ? "80" : "48";
+          const size = path === `/collections/${fixture.ownerId}` ? "75" : "45";
           await expect(image).toHaveAttribute(
             "src",
             `${imageUrl}?width=${size}&height=${size}&fit=crop`,
           );
           await expect(avatar).toHaveCSS(
             "width",
-            size === "80" ? "40px" : "24px",
+            size === "75" ? "37.5px" : "22.5px",
           );
         } else {
           await expect(avatar.locator("img")).toHaveCount(0);

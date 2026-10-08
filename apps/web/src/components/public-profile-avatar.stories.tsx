@@ -19,9 +19,28 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 /** Missing and removed pictures retain the decorative initials fallback. */
 export const Absent: Story = {};
-/** A profile uses a 40px avatar with an 80px square image request. */
+/** A profile uses a 37.5px avatar with a 75px square image request. */
 export const ProfilePicture: Story = {
   args: { imageUrl: picture, size: "lg" },
+  /**
+   * Verifies the profile crop matches twice its rendered dimensions.
+   *
+   * @param context - Story canvas.
+   * @param context.canvasElement - Rendered story container.
+   * @returns Completion after crop assertions.
+   * @rejects When the profile avatar is missing.
+   */
+  play: async ({ canvasElement }) => {
+    await waitFor(() =>
+      expect(canvasElement.querySelector("img")).not.toBeNull(),
+    );
+    const avatar = canvasElement.querySelector('[data-slot="avatar"]');
+    if (!avatar) throw new Error("Profile avatar missing");
+    const pixels = 2 * parseFloat(getComputedStyle(avatar).width);
+    expect(canvasElement.querySelector("img")?.getAttribute("src")).toContain(
+      `width=${pixels}&height=${pixels}&fit=crop`,
+    );
+  },
 };
 
 /**
@@ -57,6 +76,7 @@ export const ChangedAndRemoved: Story = {
    * @param context - Story canvas.
    * @param context.canvasElement - Rendered story container.
    * @returns Completion after replacement and fallback assertions.
+   * @rejects When the attribution avatar is missing.
    */
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -65,9 +85,11 @@ export const ChangedAndRemoved: Story = {
     );
     const avatar = canvasElement.querySelector('[data-slot="avatar"]');
     expect(avatar).toHaveAttribute("aria-hidden", "true");
+    if (!avatar) throw new Error("Attribution avatar missing");
+    const pixels = 2 * parseFloat(getComputedStyle(avatar).width);
     expect(canvasElement.querySelector("img")).toHaveAttribute("alt", "");
     expect(canvasElement.querySelector("img")?.getAttribute("src")).toContain(
-      "width=48&height=48&fit=crop",
+      `width=${pixels}&height=${pixels}&fit=crop`,
     );
     await userEvent.click(canvas.getByRole("button", { name: "Replace" }));
     await waitFor(() =>

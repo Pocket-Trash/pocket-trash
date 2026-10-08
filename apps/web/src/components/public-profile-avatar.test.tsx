@@ -7,8 +7,8 @@ import {
 
 describe("public profile pictures", () => {
   it.each([
-    ["sm", "48"],
-    ["lg", "80"],
+    ["sm", "45"],
+    ["lg", "75"],
   ] as const)("requests a square 2x crop for %s avatars", (size, pixels) => {
     const url = publicProfileImageUrl(
       "https://img.clerk.com/picture?quality=90&width=999",
