@@ -26,6 +26,13 @@
 
 
 
+
+## 0.7.1
+
+### Patch Changes
+
+* Fix Railway uploads missing required install and build inputs. (@app/scraper)
+
 ## 0.7.0
 
 ### Minor Changes
