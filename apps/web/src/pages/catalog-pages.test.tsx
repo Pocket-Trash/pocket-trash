@@ -239,6 +239,7 @@ const owners = [
         material: null,
         name: "Catla",
         ownerClerkId: "user_1002",
+        ownerImageUrl: null,
         ownerUsername: "royanger",
         ownerUserId: 1002,
         productId: 1,
@@ -249,6 +250,7 @@ const owners = [
         sourceProductFinishOptionId: null,
       },
     ],
+    imageUrl: null,
     userId: 1002,
     username: "royanger",
   },
@@ -468,6 +470,24 @@ describe("UserCollectionsPage", () => {
 });
 
 describe("CollectionPage", () => {
+  it("places the owner avatar beside the title in the details card", () => {
+    const collection = owners[0]?.collections[0];
+    if (!collection) throw new Error("Collection fixture is required.");
+    const html = renderToStaticMarkup(
+      <CollectionPage
+        collection={collection}
+        items={[]}
+        ownerImageUrl="https://img.clerk.com/picture"
+        ownerUsername="royanger"
+      />,
+    );
+    const content = html.slice(html.indexOf("<main"));
+    expect(content).toContain('data-slot="avatar"');
+    expect(content).toContain('data-size="lg"');
+    expect(content.indexOf('data-slot="avatar"')).toBeGreaterThan(
+      content.indexOf(collection.name),
+    );
+  });
   it("shows owner controls on the public collection view", () => {
     const collection = owners[0]?.collections[0];
     if (!collection) throw new Error("Collection fixture is required.");

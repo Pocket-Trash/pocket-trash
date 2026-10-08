@@ -526,6 +526,13 @@
       "when": 1791434152294,
       "tag": "0074_fine_black_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1791445755686,
+      "tag": "0075_chunky_the_hood",
+      "breakpoints": true
     }
   ]
 }

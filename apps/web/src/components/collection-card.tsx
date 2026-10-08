@@ -1,4 +1,5 @@
 import type { UserCollectionSummary } from "@package/services";
+import { PublicProfileAvatar } from "@/components/public-profile-avatar";
 import { Badge } from "@/components/ui/badge";
 import { cardImageUrl } from "@/lib/card-image";
 
@@ -9,6 +10,7 @@ import { cardImageUrl } from "@/lib/card-image";
  * @param props.collection - Collection summary to present.
  * @param props.coverAlt - Alternative text for the cover image.
  * @param props.itemCountLabel - Localized item-count text.
+ * @param props.ownerImageUrl - Selected public Clerk picture URL.
  * @param props.ownerName - Optional collection owner name.
  * @param props.privateLabel - Localized label for private collections.
  * @returns The collection card UI.
@@ -18,6 +20,7 @@ export function CollectionCard({
   coverAlt,
   itemCountLabel,
   ownerName,
+  ownerImageUrl = null,
   privateLabel,
 }: {
   /**
@@ -36,6 +39,8 @@ export function CollectionCard({
    * Optional collection owner name.
    */
   ownerName?: string;
+  /** Selected public Clerk picture URL, or null when absent. */
+  ownerImageUrl?: string | null;
   /**
    * Localized label for private collections.
    */
@@ -61,7 +66,13 @@ export function CollectionCard({
           ) : null}
         </div>
         {ownerName ? (
-          <p className="text-sm text-muted-foreground">{ownerName}</p>
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <PublicProfileAvatar
+              imageUrl={ownerImageUrl}
+              username={ownerName}
+            />
+            {ownerName}
+          </p>
         ) : null}
         {collection.summary ? (
           <p className="line-clamp-3 text-sm text-muted-foreground">

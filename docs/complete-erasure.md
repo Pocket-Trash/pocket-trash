@@ -47,7 +47,7 @@ at the start of a request. Only the subject HMAC may remain on the receipt.
 
 | Location and linkage | Sensitivity / ownership | Disposition | Mechanism and required negative check | Exception, access, and expiry |
 | --- | --- | --- | --- | --- |
-| `users` (`id`, `clerk_id`, `username`, Clerk sync time) | Private direct identity; user-owned | Delete last among database rows | Delete by `id` after dependants; verify no row by `id` or `clerk_id` | None |
+| `users` (`id`, `clerk_id`, `username`, `image_url`, Clerk sync time) | Private direct identity; user-owned | Delete last among database rows | Delete by `id` after dependants; verify no row by `id` or `clerk_id` | None |
 | `user_settings`; `feature_flag_user_overrides` by `user_id` | Private preferences and account targeting; user-owned | Delete | FK cascade plus explicit zero-count check by the captured `user_id` | None |
 | `user_collection`, `collection_item`, `finish_option` and its color/finish joins, `collection_spinner`, `collection_spinner_button` | Private or public collection content, purchase/sale history, and customizations; user-owned | Delete | Delete owned collections/items; cascades remove dependent rows; verify captured collection/item IDs are absent | None |
 | Other users' `collection_item.purchased_from_user_id` / `sold_to_user_id` and matching free-text names | Private counterparty identity in another user's record | Anonymize | Set both matching FK and corresponding free-text field to `NULL`; verify neither FK equals `:user_id` and no captured identifying value remains | None |
@@ -71,6 +71,11 @@ at the start of a request. Only the subject HMAC may remain on the receipt.
 | Erasure request/receipt | Restricted privacy operations record | Preserve the minimum receipt temporarily | Store request ID, verification result, decision, timestamps, step results/error categories, subject HMAC, and exception expiries; never store raw ID, email, name, content, or object path after active deletion | Privacy-ops access only; delete 30 days after active-system completion and after every exception expires |
 | Support/privacy request source message | May contain direct identity and free text | Delete or redact to the minimum receipt | Delete the source message/attachment after verification; verify by provider search and operator attestation | No general support-record exception is approved |
 | Manual exports, local downloads, ad-hoc SQL/CSV files, and copied secrets containing account data | Unmanaged direct or derived account data | Delete | Named operator searches approved export locations, deletes matches, and attests completion on the receipt | None; an undiscovered or undeletable export blocks completion |
+
+
+Public profile pictures remain hosted and managed by Clerk. Pocket Trash stores only
+the nullable `users.image_url` mirror, which is deleted with the user row. There
+is no Pocket Trash or Bunny profile-image object to clean up.
 
 Any new table, queue, provider, log field, export path, storage namespace, or
 user-level analytic event must update this matrix and its verification fixture

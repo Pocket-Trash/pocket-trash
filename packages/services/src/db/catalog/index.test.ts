@@ -307,6 +307,7 @@ describe("collection catalog writes", () => {
             name: "Catla",
             ownerClerkId: "user-secret",
             ownerUserId: 1000,
+            ownerImageUrl: "https://img.clerk.com/selected",
             ownerUsername: "ranger",
             privatedByClerkId: null,
             productId: 1100,
@@ -355,6 +356,7 @@ describe("collection catalog writes", () => {
       name: "Catla",
       ownerClerkId: "user-secret",
       ownerUserId: 1000,
+      ownerImageUrl: "https://img.clerk.com/selected",
       ownerUsername: "ranger",
       privatedByClerkId: null,
       productBearing: "R188",
@@ -385,6 +387,7 @@ describe("collection catalog writes", () => {
 
     await expect(service.listProductItems(1100)).resolves.toEqual([
       expect.objectContaining({
+        ownerImageUrl: "https://img.clerk.com/selected",
         bearing: "R188",
         bearingOverride: null,
         description: "**Fast** spinner",
@@ -421,7 +424,14 @@ describe("collection catalog writes", () => {
         ],
         [],
         [],
-        [{ clerkId: "user-secret", userId: 1015, username: null }],
+        [
+          {
+            clerkId: "user-secret",
+            imageUrl: null,
+            userId: 1015,
+            username: null,
+          },
+        ],
       ],
     );
 
@@ -430,6 +440,7 @@ describe("collection catalog writes", () => {
         collections: [
           expect.objectContaining({ id: 1000, name: "Roy's Collection" }),
         ],
+        imageUrl: null,
         itemCount: 0,
         items: [],
         userId: 1015,

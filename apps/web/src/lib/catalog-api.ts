@@ -1870,6 +1870,7 @@ export const getPublicCollection = createServerFn({ method: "GET" })
     return {
       collection: signedCollection,
       items: await Promise.all(items.map(signCollectionItem)),
+      ownerImageUrl: matchingOwner?.imageUrl ?? null,
       ownerUsername: matchingOwner?.username,
     };
   });

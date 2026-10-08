@@ -936,6 +936,7 @@ function collectionFixture(
     material: product.materials[0] ?? null,
     name: product.name,
     ownerClerkId: "user_test",
+    ownerImageUrl: null,
     ownerUsername: "tester",
     ownerUserId: 1,
     productId: product.id,

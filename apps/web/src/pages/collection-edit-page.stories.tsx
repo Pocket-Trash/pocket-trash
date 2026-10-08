@@ -131,6 +131,7 @@ function item(
     name: catalogProduct.name,
     ownerClerkId: "user_storybook",
     ownerUserId: 1000,
+    ownerImageUrl: null,
     ownerUsername: "collector",
     productId: catalogProduct.id,
     productImages: [],

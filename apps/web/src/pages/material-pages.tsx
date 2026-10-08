@@ -12,6 +12,7 @@ import { ImageGallery } from "@/components/image-gallery";
 import { MarkdownContent } from "@/components/markdown-content";
 import { MaterialCard } from "@/components/material-card";
 import { ProductCard } from "@/components/product-card";
+import { PublicProfileAvatar } from "@/components/public-profile-avatar";
 import { Button } from "@/components/ui/button";
 import { cardImageUrl } from "@/lib/card-image";
 import { useCatalogCopy } from "@/lib/catalog-copy";
@@ -370,7 +371,16 @@ function MaterialCollectionItemCard({ item }: MaterialCollectionItemCardProps) {
         <h3 className="font-semibold">{item.displayName}</h3>
         <p className="text-sm text-muted-foreground">
           {item.collectionName}
-          {item.ownerUsername ? ` · ${item.ownerUsername}` : ""}
+          {item.ownerUsername ? (
+            <span className="inline-flex items-center gap-1">
+              <span aria-hidden="true"> · </span>
+              <PublicProfileAvatar
+                imageUrl={item.ownerImageUrl}
+                username={item.ownerUsername}
+              />
+              {item.ownerUsername}
+            </span>
+          ) : null}
         </p>
         <Link
           className="mt-2 w-fit text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

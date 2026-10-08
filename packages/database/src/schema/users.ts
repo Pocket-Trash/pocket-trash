@@ -30,6 +30,8 @@ export const user = pgTable("users", {
     mode: "date",
     withTimezone: true,
   }),
+  /** Selected public Clerk picture URL; generated avatars and removals are null. */
+  imageUrl: text("image_url"),
   username: text("username"),
 });
 

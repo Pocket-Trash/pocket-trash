@@ -93,6 +93,7 @@ function PublicCollectionRoute() {
       filters={filters}
       items={data.items}
       onFiltersChange={setFilters}
+      ownerImageUrl={data.ownerImageUrl}
       ownerUsername={data.ownerUsername}
     />
   );
