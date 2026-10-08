@@ -262,6 +262,7 @@ const changeClassificationRules = [
       "scripts/scraper-command.mjs",
       "scripts/scraper-redis.mjs",
       "scripts/check-railway-context.mjs",
+      "scripts/check-railway-context.test.mjs",
       "scripts/workspace-packages.mjs",
     ],
     domains: ["scraper", "validation"],

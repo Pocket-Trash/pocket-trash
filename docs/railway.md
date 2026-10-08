@@ -37,7 +37,12 @@ For the preview scraper service:
   while native auto-deploy is enabled; that would create two builds per push.
 
 The root [`.railwayignore`](../.railwayignore) keeps CLI uploads below Railway's
-source-upload limit. Update it when the scraper gains a workspace dependency.
+source-upload limit. It must include pnpm's referenced patches, the security
+audit script and exception manifest, and workspace dependencies of both the root
+manifest and scraper. CI and the production workflow run
+`node scripts/check-railway-context.mjs` to reject missing, untracked, or excluded
+build inputs before upload. When adding build inputs, update the allowlist and
+the watched paths in `railway.json` together.
 
 ## Cron operation
 
