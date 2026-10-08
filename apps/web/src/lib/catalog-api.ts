@@ -21,6 +21,10 @@ import {
   CollectionItemPrivacyInheritedError,
 } from "@package/services";
 import { hasPermission } from "@package/services/authorization";
+import {
+  type SliderMagnetLayout,
+  sliderMagnetLayouts,
+} from "@package/services/constants";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getActor, requireActor, requirePermission } from "@/lib/authorization";
@@ -167,68 +171,6 @@ const magnetSlotSchema = z.object({
   state: z.enum(["occupied", "empty"]),
 });
 
-/** Complete exact catalog magnet configuration form contract. */
-const magnetConfigurationSchema = z
-  .object({
-    groups: z.array(magnetGroupSchema),
-    label: z.string().trim().min(1, requiredMessage).max(100),
-    slots: z
-      .array(magnetSlotSchema)
-      .min(1, "web.slider.validation.completeConfiguration"),
-    sourceLabel: optionalMagnetTextSchema(200),
-    sourceNotes: optionalMagnetTextSchema(5000),
-  })
-  .superRefine((configuration, context) => {
-    const groupKeys = configuration.groups.map(({ key }) => key);
-    if (new Set(groupKeys).size !== groupKeys.length) {
-      context.addIssue({
-        code: "custom",
-        message: "web.catalog.error.form",
-        path: ["configuration", "groups"],
-      });
-    }
-    const slotKeys = configuration.slots.map(({ key }) => key);
-    if (new Set(slotKeys).size !== slotKeys.length) {
-      context.addIssue({
-        code: "custom",
-        message: "web.catalog.error.form",
-        path: ["configuration", "slots"],
-      });
-    }
-    const referenced = new Set<string>();
-    for (const [index, slot] of configuration.slots.entries()) {
-      if (slot.state === "occupied" && !slot.groupKey) {
-        context.addIssue({
-          code: "custom",
-          message: "web.slider.validation.incompleteSlot",
-          path: ["configuration", "slots", index, "groupKey"],
-        });
-      }
-      if (slot.state === "empty" && slot.groupKey) {
-        context.addIssue({
-          code: "custom",
-          message: "web.slider.validation.overlappingGroup",
-          path: ["configuration", "slots", index, "groupKey"],
-        });
-      }
-      if (slot.groupKey && !groupKeys.includes(slot.groupKey)) {
-        context.addIssue({
-          code: "custom",
-          message: "web.slider.validation.crossConfiguration",
-          path: ["configuration", "slots", index, "groupKey"],
-        });
-      }
-      if (slot.groupKey) referenced.add(slot.groupKey);
-    }
-    if (groupKeys.some((key) => !referenced.has(key))) {
-      context.addIssue({
-        code: "custom",
-        message: "web.slider.validation.completeConfiguration",
-        path: ["configuration", "groups"],
-      });
-    }
-  });
-
 /** Owner-recorded layout contract that additionally permits unknown positions. */
 const ownedMagnetConfigurationSchema = z
   .object({
@@ -294,13 +236,6 @@ const ownedMagnetConfigurationSchema = z
       });
     }
   });
-
-/** Body-hosted setup form contract. */
-const bodyHostedMagnetSetupSchema = z.object({
-  clickCount: z.number().int().positive().nullable(),
-  configuration: magnetConfigurationSchema.nullable(),
-  sourceNote: optionalMagnetTextSchema(5000),
-});
 
 /**
  * Checks whether an optional URL uses HTTP or HTTPS.
@@ -396,7 +331,6 @@ export const finishOptionSchema = z
 export const productFormSchema = z
   .object({
     bearing: optionalBearingSchema,
-    bodyHostedMagnetSetup: bodyHostedMagnetSetupSchema.nullable().default(null),
     buttonDiameterMm: numericSpecSchema,
     compatibleButtonId: idSchema.nullable(),
     description: optionalDescriptionSchema,
@@ -407,6 +341,7 @@ export const productFormSchema = z
     lengthMm: numericSpecSchema,
     makerId: idSchema,
     makerProductUrl: optionalUrlSchema,
+    magnetLayout: z.enum(sliderMagnetLayouts).nullable(),
     materialIds: z.array(idSchema).min(1, requiredMessage),
     name: slugNameSchema,
     productId: idSchema.nullable(),
@@ -424,12 +359,12 @@ export const productFormSchema = z
     (
       {
         bearing,
-        bodyHostedMagnetSetup,
         finishOptions,
         includedInsertProductId,
         includedPlateProductId,
         lengthMm,
         materialIds,
+        magnetLayout,
         productTypeSlug,
         spinDiameterMm,
         thicknessMm,
@@ -464,14 +399,11 @@ export const productFormSchema = z
           path: ["usesInserts"],
         });
       }
-      if (
-        bodyHostedMagnetSetup !== null &&
-        (productTypeSlug !== "slider" || usesInserts !== false)
-      ) {
+      if (productTypeSlug !== "slider" && magnetLayout !== null) {
         context.addIssue({
           code: "custom",
-          message: "web.slider.validation.bodyHostedInsert",
-          path: ["bodyHostedMagnetSetup"],
+          message: "web.catalog.error.form",
+          path: ["magnetLayout"],
         });
       }
       if (
@@ -503,6 +435,16 @@ export const productFormSchema = z
           code: "custom",
           message: "web.catalog.error.form",
           path: ["includedInsertProductId"],
+        });
+      }
+      if (
+        productTypeSlug === "slider" &&
+        (includedInsertProductId === null) !== (magnetLayout !== null)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.slider.validation.layoutRequired",
+          path: ["magnetLayout"],
         });
       }
       if (productTypeSlug !== "slider" && includedPlateProductId !== null) {
@@ -1465,7 +1407,6 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     const slug = nextAvailableSlug(parsed.data.name, slugs);
     const input: ProductWriteInput = {
       actor,
-      bodyHostedMagnetSetup: parsed.data.bodyHostedMagnetSetup,
       description: parsed.data.description,
       finishOptions: parsed.data.finishOptions.map(
         ({ colorEffectId, colorIds, finishIds, patternId }) => ({
@@ -1477,6 +1418,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       ),
       makerId: parsed.data.makerId,
       makerProductUrl: parsed.data.makerProductUrl,
+      magnetLayout: parsed.data.magnetLayout as SliderMagnetLayout | null,
       materialIds: parsed.data.materialIds,
       includedInsertProductId: parsed.data.includedInsertProductId,
       includedPlateProductId: parsed.data.includedPlateProductId,

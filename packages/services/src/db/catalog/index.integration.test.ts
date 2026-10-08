@@ -475,7 +475,8 @@ describe("catalog product persistence", () => {
 
       expect(slider).toEqual(
         expect.objectContaining({
-          bodyHostedMagnetSetup: null,
+          clickCount: null,
+          magnetLayout: null,
           usesInserts: true,
           weightBasis: "complete-build",
           weightG: "96",
@@ -501,63 +502,32 @@ describe("catalog product persistence", () => {
           weightG: null,
         }),
       );
+      const bodySlider = await service.createProduct({
+        actor: admin,
+        finishOptions: [],
+        magnetLayout: "2x2",
+        makerId: maker.id,
+        materialIds: [material.id],
+        name: "Body Slider",
+        productTypeSlug: "slider",
+        slug: "body-slider",
+        specs: { usesInserts: false },
+      });
+      expect(bodySlider).toMatchObject({ clickCount: 1, magnetLayout: "2x2" });
       await expect(
         service.createProduct({
           actor: admin,
-          bodyHostedMagnetSetup: {
-            clickCount: 0,
-            configuration: null,
-            sourceNote: "The maker documents an incomplete layout.",
-          },
           finishOptions: [],
+          includedInsertProductId: insert.id,
+          magnetLayout: "2x3",
           makerId: maker.id,
           materialIds: [material.id],
-          name: "Invalid body setup",
+          name: "Duplicate Insert Layout",
           productTypeSlug: "slider",
-          slug: "invalid-body-setup",
-          specs: { usesInserts: false },
+          slug: "duplicate-insert-layout",
+          specs: { usesInserts: true },
         }),
-      ).rejects.toThrow("Click count must be a positive integer");
-      await expect(
-        service.createProduct({
-          actor: admin,
-          bodyHostedMagnetSetup: {
-            clickCount: 2,
-            configuration: {
-              label: "Small",
-              sourceLabel: null,
-              sourceNotes: null,
-              groups: [
-                {
-                  diameterMm: "6",
-                  grade: "N42",
-                  key: "center",
-                  label: "Center",
-                  thicknessMm: "3",
-                },
-              ],
-              slots: [
-                {
-                  documentedColumn: null,
-                  documentedRow: null,
-                  groupKey: "missing",
-                  half: "half-a",
-                  key: "A1",
-                  state: "occupied",
-                },
-              ],
-            },
-            sourceNote: null,
-          },
-          finishOptions: [],
-          makerId: maker.id,
-          materialIds: [material.id],
-          name: "Cross configuration reference",
-          productTypeSlug: "slider",
-          slug: "cross-configuration-reference",
-          specs: { usesInserts: false },
-        }),
-      ).rejects.toThrow("Magnet group does not belong to this configuration");
+      ).rejects.toThrow("exact included insert owns the magnet layout");
       await expect(
         service.deleteProduct({
           actor: admin,

@@ -92,6 +92,7 @@ describe("standalone slider collection items", () => {
       await Promise.all([
         db.insert(schema.productSlider).values({
           id: sliderProductId,
+          magnetLayout: "2x4",
           usesInserts: false,
         }),
         db.insert(schema.productSliderPlate).values({

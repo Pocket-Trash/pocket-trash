@@ -1,7 +1,6 @@
 import type {
   CatalogApprovalAction,
   CatalogApprovalStatus,
-  CatalogBodyHostedMagnetSetup,
   CatalogFinishOption,
   CatalogProduct,
   CatalogProductType,
@@ -12,6 +11,10 @@ import type {
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
+import {
+  type SliderMagnetLayout,
+  sliderMagnetLayoutDetails,
+} from "@package/services/constants";
 import type { TranslationKey } from "@pocket-trash/localizations";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CircleHelp } from "lucide-react";
@@ -594,12 +597,9 @@ export function ProductDetailPage({
               )}
             </Detail>
           ) : null}
-          {product.bodyHostedMagnetSetup ? (
-            <Detail label={t("web.slider.setup.title")}>
-              <BodyHostedMagnetSetupDetails
-                setup={product.bodyHostedMagnetSetup}
-                t={t}
-              />
+          {product.magnetLayout ? (
+            <Detail label={t("web.slider.layout.label")}>
+              <SliderMagnetLayoutValue layout={product.magnetLayout} t={t} />
             </Detail>
           ) : null}
           {product.productTypeSlug === "slider" ? (
@@ -1586,12 +1586,20 @@ export function CollectionItemDetailPage({
     ({ deletedAt }) => !deletedAt,
   );
   const displayedSliderSetup:
-    | CatalogBodyHostedMagnetSetup
     | EffectiveSliderSetup
     | OwnedSliderInsertSetup
     | null =
     item.productTypeSlug === "slider"
-      ? (item.effectiveSliderSetup ?? product?.bodyHostedMagnetSetup ?? null)
+      ? (item.effectiveSliderSetup ??
+        (product?.magnetLayout
+          ? {
+              clickCount: product.clickCount,
+              configuration: null,
+              isLiveCatalog: true,
+              magnetLayout: product.magnetLayout,
+              source: "body-hosted" as const,
+            }
+          : null))
       : item.productTypeSlug === "slider-insert"
         ? item.ownedInsertSetup
         : null;
@@ -1794,8 +1802,15 @@ export function CollectionItemDetailPage({
             </Detail>
           ) : null}
           {displayedSliderSetup ? (
-            <Detail label={t("web.slider.setup.title")}>
-              <BodyHostedMagnetSetupDetails
+            <Detail
+              label={t(
+                "magnetLayout" in displayedSliderSetup &&
+                  displayedSliderSetup.magnetLayout
+                  ? "web.slider.layout.label"
+                  : "web.slider.setup.title",
+              )}
+            >
+              <MagnetSetupDetails
                 missingConfigurationLabel={t("web.slider.setup.notRecorded")}
                 setup={displayedSliderSetup}
                 t={t}
@@ -2069,28 +2084,27 @@ function Detail({
 }
 
 /**
- * Renders the live catalog setup of a body-hosted slider as read-only facts.
+ * Renders an effective slider setup as read-only facts.
  *
  * @param props - Setup and localized formatter.
  * @returns Read-only exact setup details without install or custom controls.
  */
-function BodyHostedMagnetSetupDetails({
+function MagnetSetupDetails({
   missingConfigurationLabel,
   setup,
   t,
 }: {
   /** Optional copy used when an owner snapshot omitted its layout. */
   missingConfigurationLabel?: string;
-  /** Live inherent catalog setup. */
-  setup:
-    | CatalogBodyHostedMagnetSetup
-    | EffectiveSliderSetup
-    | OwnedSliderInsertSetup;
+  /** Effective or owner-recorded setup. */
+  setup: EffectiveSliderSetup | OwnedSliderInsertSetup;
   /** Localized catalog message formatter. */
   t: ReturnType<typeof useCatalogCopy>;
 }) {
+  const magnetLayout = "magnetLayout" in setup ? setup.magnetLayout : null;
+  if (magnetLayout)
+    return <SliderMagnetLayoutValue layout={magnetLayout} t={t} />;
   const configuration = setup.configuration;
-  const sourceNote = "sourceNote" in setup ? setup.sourceNote : null;
   return (
     <div className="grid gap-3 rounded-md border border-border p-3">
       <p className="m-0 text-sm">
@@ -2099,16 +2113,6 @@ function BodyHostedMagnetSetupDetails({
           ? t("web.slider.setup.notRecorded")
           : t("web.slider.setup.clicks", { count: setup.clickCount })}
       </p>
-      {sourceNote ? (
-        <div>
-          <p className="m-0 text-sm font-medium">
-            {t("web.slider.setup.sourceNote")}
-          </p>
-          <p className="m-0 whitespace-pre-wrap text-sm text-muted-foreground">
-            {sourceNote}
-          </p>
-        </div>
-      ) : null}
       {configuration ? (
         <div className="grid gap-3">
           <p className="m-0 text-sm font-medium">
@@ -2159,10 +2163,48 @@ function BodyHostedMagnetSetupDetails({
         </div>
       ) : (
         <p className="m-0 text-sm text-muted-foreground">
-          {missingConfigurationLabel ??
-            t("web.slider.setup.incompleteSourceNote")}
+          {missingConfigurationLabel ?? t("web.slider.setup.notRecorded")}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Renders a localized physical layout and its derived facts.
+ *
+ * @param root0 - Component properties.
+ * @param root0.layout - Physical magnet layout.
+ * @param root0.t - Catalog localization helper.
+ * @returns Localized layout details.
+ */
+function SliderMagnetLayoutValue({
+  layout,
+  t,
+}: {
+  /** Physical magnet layout. */
+  layout: SliderMagnetLayout;
+  /** Catalog localization helper. */
+  t: ReturnType<typeof useCatalogCopy>;
+}) {
+  const details = sliderMagnetLayoutDetails[layout];
+  return (
+    <div className="grid gap-1">
+      <span>
+        {t("web.slider.layout.option", {
+          count: details.clickCount,
+          layout: details.label,
+        })}
+      </span>
+      <span className="text-sm text-muted-foreground">
+        {t("web.slider.layout.help", {
+          clicks: details.clickCount,
+          columns: details.columnCount,
+          layout: details.label,
+          rows: details.rowCount,
+          slots: details.slotsPerSide,
+        })}
+      </span>
     </div>
   );
 }

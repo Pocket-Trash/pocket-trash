@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { sliderMagnetLayouts } from "../constants.js";
 
 /** Catalog tables that an import manifest may own. Collection data is excluded. */
 export const catalogImportEntityTypes = [
@@ -203,6 +204,32 @@ const manifestSchema = z
             "Imported products must use the manifest owner and start approved and public.",
           path: ["records", index, "payload"],
         });
+      }
+      if (record.entity === "product-slider") {
+        for (const retiredField of [
+          "inherentClickCount",
+          "magnetSetupSourceNote",
+        ]) {
+          if (retiredField in record.payload) {
+            context.addIssue({
+              code: "custom",
+              message: `Slider import field ${retiredField} is retired.`,
+              path: ["records", index, "payload", retiredField],
+            });
+          }
+        }
+        const layout = record.payload.magnetLayout;
+        if (
+          layout !== undefined &&
+          layout !== null &&
+          !sliderMagnetLayouts.some((candidate) => candidate === layout)
+        ) {
+          context.addIssue({
+            code: "custom",
+            message: "Slider import magnet layout is invalid.",
+            path: ["records", index, "payload", "magnetLayout"],
+          });
+        }
       }
     }
     const imageKeys = new Set<string>();

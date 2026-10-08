@@ -809,9 +809,8 @@ export const productSlider = pgTable(
     includedInsertProductId: bigint("included_insert_product_id", {
       mode: "number",
     }).references(() => product.id, { onDelete: "restrict" }),
-    inherentClickCount: integer("inherent_click_count"),
-    /** Source text retained when a complete layout is not documented. */
-    magnetSetupSourceNote: text("magnet_setup_source_note"),
+    /** Immutable physical layout owned by the slider or its unnamed included insert. */
+    magnetLayout: text("magnet_layout", { enum: ["2x2", "2x3", "2x4"] }),
     weightG: decimal("weight_g"),
     weightBasis: text("weight_basis", {
       enum: ["body-only", "complete-build"],
@@ -832,6 +831,14 @@ export const productSlider = pgTable(
       sql`${table.usesInserts} or ${table.includedInsertProductId} is null`,
     ),
     check(
+      "product_slider_magnet_layout_consistent",
+      sql`(${table.includedInsertProductId} is null and ${table.magnetLayout} is not null) or (${table.includedInsertProductId} is not null and ${table.magnetLayout} is null)`,
+    ),
+    check(
+      "product_slider_magnet_layout_valid",
+      sql`${table.magnetLayout} is null or ${table.magnetLayout} in ('2x2', '2x3', '2x4')`,
+    ),
+    check(
       "product_slider_weight_basis_consistent",
       sql`num_nonnulls(${table.weightG}, ${table.weightBasis}) in (0, 2)`,
     ),
@@ -842,14 +849,6 @@ export const productSlider = pgTable(
     check(
       "product_slider_measurements_positive",
       sql`${table.weightG} > 0 and ${table.lengthMm} > 0 and ${table.widthMm} > 0 and ${table.thicknessMm} > 0`,
-    ),
-    check(
-      "product_slider_inherent_click_count_positive",
-      sql`${table.inherentClickCount} is null or ${table.inherentClickCount} > 0`,
-    ),
-    check(
-      "product_slider_setup_source_note_valid",
-      sql`${table.magnetSetupSourceNote} is null or char_length(trim(${table.magnetSetupSourceNote})) between 1 and 5000`,
     ),
     check(
       "product_slider_included_plate_distinct",

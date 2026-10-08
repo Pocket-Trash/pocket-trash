@@ -18,16 +18,11 @@ import {
   finishOption,
   finishOptionColor,
   finishOptionFinish,
-  magnetConfigurationLabel,
-  magnetGroupLabel,
   maker,
   material,
   pattern,
   product,
   productImage,
-  productMagnetConfiguration,
-  productMagnetGroup,
-  productMagnetSlot,
   productMaterial,
   productSlider,
   productSliderInsert,
@@ -232,14 +227,6 @@ export type SliderFixtureImage = {
   key: string;
 };
 
-/** Complete body-hosted magnet configuration used by one fixture slider. */
-export type SliderFixtureMagnetConfiguration = {
-  /** Human-readable configuration label. */
-  label: string;
-  /** Source-relative layout label. */
-  sourceLabel: string;
-};
-
 /** One catalog product in the deterministic development slider fixture. */
 export type SliderFixtureProduct = {
   /** Exact included insert product slug for a slider. */
@@ -250,10 +237,8 @@ export type SliderFixtureProduct = {
   includedPlateSlug: string | null;
   /** Whether a slider uses inserts. */
   usesInserts: boolean | null;
-  /** Complete body-hosted configuration, when the source is complete. */
-  magnetConfiguration: SliderFixtureMagnetConfiguration | null;
-  /** Retained note when a complete body-hosted layout is unavailable. */
-  magnetSetupSourceNote: string | null;
+  /** Slider-owned physical layout, or null when an exact insert owns it. */
+  magnetLayout: "2x2" | "2x3" | "2x4" | null;
   /** Catalog maker display name. */
   maker: "FidgetBoy" | "Magnus Fidgets" | "Novel Carry";
   /** Catalog product display name. */
@@ -289,24 +274,24 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
         const ordinal = makerIndex * 7 + productIndex + 1;
         const slug = `${fixtureMaker.slug}-demo-slider-${String(productIndex + 1).padStart(2, "0")}`;
         const bodyHosted = productIndex % 2 === 0;
-        const hasCompleteConfiguration = makerIndex === 0 && productIndex === 0;
-        const hasIncompleteSource = makerIndex === 1 && productIndex === 2;
+        const exactInsert = !bodyHosted && productIndex % 3 !== 0;
         return {
-          includedInsertSlug: bodyHosted
-            ? null
-            : `${fixtureMaker.slug}-demo-insert`,
+          includedInsertSlug: exactInsert
+            ? `${fixtureMaker.slug}-demo-insert`
+            : null,
           images: [
             { key: `${slug}-primary` },
             ...(ordinal === 21 ? [{ key: `${slug}-gallery` }] : []),
           ],
           includedPlateSlug:
             ordinal === 21 ? null : `${fixtureMaker.slug}-demo-plate`,
-          magnetConfiguration: hasCompleteConfiguration
-            ? { label: "Medium", sourceLabel: "Four-corner layout" }
-            : null,
-          magnetSetupSourceNote: hasIncompleteSource
-            ? "The maker documents the click count but not every magnet position."
-            : null,
+          magnetLayout: exactInsert
+            ? null
+            : productIndex === 0
+              ? "2x2"
+              : productIndex === 2
+                ? "2x3"
+                : "2x4",
           usesInserts: !bodyHosted,
           maker: fixtureMaker.name,
           name: `${fixtureMaker.name} Demo Slider ${String(productIndex + 1).padStart(2, "0")}`,
@@ -333,8 +318,7 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
             : []),
         ],
         includedPlateSlug: null,
-        magnetConfiguration: null,
-        magnetSetupSourceNote: null,
+        magnetLayout: null,
         usesInserts: null,
         maker: fixtureMaker.name,
         name: `${fixtureMaker.name} Demo Plate`,
@@ -355,8 +339,7 @@ export const sliderFixtureCatalog: SliderFixtureCatalog = {
             : []),
         ],
         includedPlateSlug: null,
-        magnetConfiguration: null,
-        magnetSetupSourceNote: null,
+        magnetLayout: null,
         usesInserts: null,
         maker: fixtureMaker.name,
         name: `${fixtureMaker.name} Demo Insert`,
@@ -1085,9 +1068,9 @@ export async function seedSliderFixtures(
         .insert(productSlider)
         .values({
           id: seededProduct.id,
-          inherentClickCount: fixtureProduct.usesInserts === false ? 4 : null,
+          includedInsertProductId: null,
           lengthMm: "52",
-          magnetSetupSourceNote: fixtureProduct.magnetSetupSourceNote,
+          magnetLayout: "2x4",
           thicknessMm: "12",
           updatedAt,
           weightBasis: "complete-build",
@@ -1097,9 +1080,9 @@ export async function seedSliderFixtures(
         })
         .onConflictDoUpdate({
           set: {
-            inherentClickCount: fixtureProduct.usesInserts === false ? 4 : null,
+            includedInsertProductId: null,
             lengthMm: "52",
-            magnetSetupSourceNote: fixtureProduct.magnetSetupSourceNote,
+            magnetLayout: "2x4",
             thicknessMm: "12",
             updatedAt,
             weightBasis: "complete-build",
@@ -1178,25 +1161,6 @@ export async function seedSliderFixtures(
     ]);
   }
 
-  const [configurationLabel] = await db
-    .insert(magnetConfigurationLabel)
-    .values({ name: "Medium", normalizedName: "medium" })
-    .onConflictDoUpdate({
-      set: { name: "Medium" },
-      target: magnetConfigurationLabel.normalizedName,
-    })
-    .returning({ id: magnetConfigurationLabel.id });
-  const [groupLabel] = await db
-    .insert(magnetGroupLabel)
-    .values({ name: "Corners", normalizedName: "corners" })
-    .onConflictDoUpdate({
-      set: { name: "Corners" },
-      target: magnetGroupLabel.normalizedName,
-    })
-    .returning({ id: magnetGroupLabel.id });
-  if (!configurationLabel || !groupLabel)
-    throw new Error("Slider fixture magnet vocabulary could not be seeded.");
-
   for (const fixtureSlider of sliderFixtureCatalog.products.filter(
     ({ type }) => type === "slider",
   )) {
@@ -1214,75 +1178,9 @@ export async function seedSliderFixtures(
       .set({
         includedInsertProductId: insertProductId,
         includedPlateProductId: plateProductId,
+        magnetLayout: insertProductId ? null : fixtureSlider.magnetLayout,
       })
       .where(eq(productSlider.id, sliderProductId));
-
-    if (fixtureSlider.magnetConfiguration) {
-      await db
-        .insert(productMagnetConfiguration)
-        .values({
-          configurationLabelId: configurationLabel.id,
-          productId: sliderProductId,
-          sourceLabel: fixtureSlider.magnetConfiguration.sourceLabel,
-          sourceNotes: null,
-        })
-        .onConflictDoUpdate({
-          set: {
-            configurationLabelId: configurationLabel.id,
-            sourceLabel: fixtureSlider.magnetConfiguration.sourceLabel,
-            sourceNotes: null,
-          },
-          target: productMagnetConfiguration.productId,
-        });
-      const [group] = await db
-        .insert(productMagnetGroup)
-        .values({
-          configurationProductId: sliderProductId,
-          diameterMm: "6.35",
-          displayOrder: 0,
-          grade: "N52",
-          groupKey: "corners",
-          groupLabelId: groupLabel.id,
-          thicknessMm: "3.175",
-        })
-        .onConflictDoUpdate({
-          set: {
-            diameterMm: "6.35",
-            displayOrder: 0,
-            grade: "N52",
-            groupLabelId: groupLabel.id,
-            thicknessMm: "3.175",
-          },
-          target: [
-            productMagnetGroup.configurationProductId,
-            productMagnetGroup.groupKey,
-          ],
-        })
-        .returning({ id: productMagnetGroup.id });
-      if (!group)
-        throw new Error(`Fixture body group ${fixtureSlider.slug} is missing.`);
-      for (const [displayOrder, half] of ["half-a", "half-b"].entries()) {
-        await db
-          .insert(productMagnetSlot)
-          .values({
-            configurationProductId: sliderProductId,
-            displayOrder,
-            documentedColumn: 1,
-            documentedRow: 1,
-            groupId: group.id,
-            half: half as "half-a" | "half-b",
-            slotKey: half === "half-a" ? "A1" : "B1",
-            state: "occupied",
-          })
-          .onConflictDoUpdate({
-            set: { displayOrder, groupId: group.id, state: "occupied" },
-            target: [
-              productMagnetSlot.configurationProductId,
-              productMagnetSlot.slotKey,
-            ],
-          });
-      }
-    }
   }
 
   for (const fixtureProduct of sliderFixtureCatalog.products) {

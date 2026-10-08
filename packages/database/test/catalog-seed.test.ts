@@ -650,22 +650,21 @@ describe("catalog seed", () => {
     }
 
     const sliders = byType.slider ?? [];
-    expect(
-      sliders.some(
-        ({ usesInserts, magnetConfiguration }) =>
-          usesInserts === false && magnetConfiguration !== null,
-      ),
-    ).toBe(true);
-    expect(
-      sliders.some(
-        ({ usesInserts, magnetSetupSourceNote }) =>
-          usesInserts === false && magnetSetupSourceNote !== null,
-      ),
-    ).toBe(true);
+    expect(new Set(sliders.map(({ magnetLayout }) => magnetLayout))).toEqual(
+      new Set(["2x2", "2x3", "2x4", null]),
+    );
     expect(
       sliders.some(
         ({ includedInsertSlug, usesInserts }) =>
           usesInserts === true && includedInsertSlug !== null,
+      ),
+    ).toBe(true);
+    expect(
+      sliders.some(
+        ({ includedInsertSlug, magnetLayout, usesInserts }) =>
+          usesInserts === true &&
+          includedInsertSlug === null &&
+          magnetLayout !== null,
       ),
     ).toBe(true);
     expect(sliders.some(({ includedPlateSlug }) => includedPlateSlug)).toBe(

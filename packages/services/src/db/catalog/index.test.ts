@@ -9,6 +9,8 @@ import {
   createCollectionsService,
   normalizeCollectionName,
   resolveEffectiveSliderSetup,
+  sliderClickCount,
+  sliderMagnetLayouts,
 } from "./index.js";
 
 /**
@@ -80,36 +82,24 @@ describe("collection name normalization", () => {
   });
 });
 
+describe("slider magnet layouts", () => {
+  it("derives clicks from the three supported physical layouts", () => {
+    expect(sliderMagnetLayouts).toEqual(["2x2", "2x3", "2x4"]);
+    expect(sliderMagnetLayouts.map(sliderClickCount)).toEqual([1, 2, 3]);
+  });
+});
+
 describe("effective owned slider setup", () => {
-  const configuration = {
-    groups: [],
-    label: "Catalog layout",
-    slots: [
-      {
-        documentedColumn: null,
-        documentedRow: null,
-        groupKey: null,
-        half: "half-a" as const,
-        key: "A1",
-        state: "empty" as const,
-      },
-    ],
-    sourceLabel: null,
-    sourceNotes: null,
-  };
   it("uses the slider body setup when present", () => {
     expect(
       resolveEffectiveSliderSetup({
-        bodyHostedSetup: {
-          clickCount: 5,
-          configuration,
-          sourceNote: null,
-        },
+        bodyMagnetLayout: "2x4",
         installedInsertProductId: null,
         ownedInsertSetup: null,
       }),
     ).toMatchObject({
-      clickCount: 5,
+      clickCount: 3,
+      magnetLayout: "2x4",
       source: "body-hosted",
     });
   });
@@ -117,7 +107,7 @@ describe("effective owned slider setup", () => {
   it("lets a partial owned snapshot win without filling catalog gaps", () => {
     expect(
       resolveEffectiveSliderSetup({
-        bodyHostedSetup: null,
+        bodyMagnetLayout: null,
         installedInsertProductId: 3000,
         ownedInsertSetup: {
           clickCount: null,
@@ -129,6 +119,7 @@ describe("effective owned slider setup", () => {
       clickCount: null,
       configuration: null,
       isLiveCatalog: false,
+      magnetLayout: null,
       source: "owned-insert",
     });
   });
@@ -136,7 +127,7 @@ describe("effective owned slider setup", () => {
   it("does not invent an insert setup", () => {
     expect(
       resolveEffectiveSliderSetup({
-        bodyHostedSetup: null,
+        bodyMagnetLayout: null,
         installedInsertProductId: null,
         ownedInsertSetup: null,
       }),

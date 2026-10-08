@@ -27,8 +27,8 @@ function product(
   return {
     approvalStatus: "approved",
     bearing: null,
-    bodyHostedMagnetSetup: null,
     buttonDiameterMm: null,
+    clickCount: productTypeSlug === "slider" ? 3 : null,
     canAdminister: false,
     canEdit: true,
     compatibleButtonId: null,
@@ -52,6 +52,7 @@ function product(
     makerProductUrl: null,
     makerProductUrlValid: true,
     makerUrl: null,
+    magnetLayout: productTypeSlug === "slider" ? "2x4" : null,
     materials: [material],
     name,
     ownerClerkId: "user_storybook",

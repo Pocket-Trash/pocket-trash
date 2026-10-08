@@ -39,7 +39,6 @@ export type {
   AuditWriteInput,
   CatalogApprovalAction,
   CatalogApprovalStatus,
-  CatalogBodyHostedMagnetSetup,
   CatalogColor,
   CatalogFinishOption,
   CatalogImage,
@@ -90,6 +89,7 @@ export type {
   PublicMakerSummary,
   PublicMaterial,
   PublicMaterialSummary,
+  SliderMagnetLayout,
   SliderWeightBasis,
   SubmitFeedbackInput,
   UpdateAdminFeedbackInput,
@@ -121,6 +121,9 @@ export {
   FeedbackPlanRecoveryRequiredError,
   FeedbackStateError,
   FeedbackSubmissionLimitError,
+  sliderClickCount,
+  sliderMagnetLayoutDetails,
+  sliderMagnetLayouts,
   UserBanStateError,
 } from "./db/index.js";
 

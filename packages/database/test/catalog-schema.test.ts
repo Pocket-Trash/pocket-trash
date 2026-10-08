@@ -160,8 +160,7 @@ describe("catalog schema", () => {
         "length_mm",
         "width_mm",
         "thickness_mm",
-        "inherent_click_count",
-        "magnet_setup_source_note",
+        "magnet_layout",
         "included_plate_product_id",
         "included_insert_product_id",
       ]),
@@ -169,6 +168,8 @@ describe("catalog schema", () => {
     expect(slider.checks.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
         "product_slider_insert_choice_consistent",
+        "product_slider_magnet_layout_consistent",
+        "product_slider_magnet_layout_valid",
         "product_slider_included_insert_distinct",
         "product_slider_weight_basis_consistent",
         "product_slider_measurements_positive",

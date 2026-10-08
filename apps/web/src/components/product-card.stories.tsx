@@ -8,8 +8,8 @@ import { ProductCard } from "./product-card";
 const product: CatalogProduct = {
   approvalStatus: "approved",
   bearing: null,
-  bodyHostedMagnetSetup: null,
   buttonDiameterMm: null,
+  clickCount: null,
   canAdminister: false,
   canEdit: true,
   compatibleButtonId: null,
@@ -42,6 +42,7 @@ const product: CatalogProduct = {
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
+  magnetLayout: null,
   usesInserts: null,
   materials: [
     { id: 1000, name: "Bronze", slug: "bronze" },

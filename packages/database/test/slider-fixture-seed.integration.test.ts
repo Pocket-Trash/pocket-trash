@@ -20,7 +20,6 @@ import {
   pattern,
   product,
   productImage,
-  productMagnetConfiguration,
   productSlider,
   productSliderInsert,
   productSliderPlate,
@@ -159,36 +158,24 @@ describe("deterministic slider fixture seed", () => {
    * @returns Completion after every relationship assertion passes.
    */
   async function expectDiscoveryRelationships(productIds: number[]) {
-    const [bodyConfigurations, incompleteSources, includedInserts] =
-      await Promise.all([
-        db
-          .select({ productId: productMagnetConfiguration.productId })
-          .from(productMagnetConfiguration)
-          .where(inArray(productMagnetConfiguration.productId, productIds)),
-        db
-          .select({ id: productSlider.id })
-          .from(productSlider)
-          .where(
-            and(
-              inArray(productSlider.id, productIds),
-              eq(
-                productSlider.magnetSetupSourceNote,
-                "The maker documents the click count but not every magnet position.",
-              ),
-            ),
+    const [layouts, includedInserts] = await Promise.all([
+      db
+        .select({ magnetLayout: productSlider.magnetLayout })
+        .from(productSlider)
+        .where(inArray(productSlider.id, productIds)),
+      db
+        .select({ sliderProductId: productSlider.id })
+        .from(productSlider)
+        .where(
+          and(
+            inArray(productSlider.id, productIds),
+            isNotNull(productSlider.includedInsertProductId),
           ),
-        db
-          .select({ sliderProductId: productSlider.id })
-          .from(productSlider)
-          .where(
-            and(
-              inArray(productSlider.id, productIds),
-              isNotNull(productSlider.includedInsertProductId),
-            ),
-          ),
-      ]);
-    expect(bodyConfigurations).toHaveLength(1);
-    expect(incompleteSources).toHaveLength(1);
+        ),
+    ]);
+    expect(new Set(layouts.map(({ magnetLayout }) => magnetLayout))).toEqual(
+      new Set(["2x2", "2x3", "2x4", null]),
+    );
     expect(includedInserts.length).toBeGreaterThan(0);
 
     const [includedPlates, patternedProducts] = await Promise.all([

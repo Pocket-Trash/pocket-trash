@@ -8,8 +8,8 @@ import { CollectionAddPage } from "./catalog-form-pages";
 const product: CatalogProduct = {
   approvalStatus: "approved",
   bearing: null,
-  bodyHostedMagnetSetup: null,
   buttonDiameterMm: null,
+  clickCount: null,
   canAdminister: false,
   canEdit: true,
   compatibleButtonId: null,
@@ -38,6 +38,7 @@ const product: CatalogProduct = {
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: null,
+  magnetLayout: null,
   usesInserts: null,
   materials: [{ id: 1001, name: "Bronze", slug: "bronze" }],
   name: "Product 1",
@@ -92,11 +93,7 @@ const products: CatalogProduct[] = [
   },
   {
     ...product,
-    bodyHostedMagnetSetup: {
-      clickCount: 3,
-      configuration: null,
-      sourceNote: "Documented maker setup",
-    },
+    clickCount: 3,
     id: 3000,
     includedInsert: null,
     includedPlate: {
@@ -105,6 +102,7 @@ const products: CatalogProduct[] = [
       productTypeSlug: "slider-plate",
       slug: "included-plate",
     },
+    magnetLayout: "2x4",
     usesInserts: false,
     name: "Standalone slider",
     productTypeId: 3,

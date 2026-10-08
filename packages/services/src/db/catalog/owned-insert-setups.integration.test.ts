@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
 describe("owned slider insert setups", () => {
-  it("keeps an owned setup with its installed insert", async () => {
+  it("keeps an owned setup without overriding a body-hosted layout", async () => {
     const client = new PGlite();
     const db = drizzle(client, { schema }) as unknown as Database;
     const folder = fileURLToPath(
@@ -82,6 +82,7 @@ describe("owned slider insert setups", () => {
         throw new Error("Products missing.");
       await db.insert(schema.productSlider).values({
         id: sliderProductId,
+        magnetLayout: "2x4",
         usesInserts: true,
       });
       await db
@@ -175,7 +176,12 @@ describe("owned slider insert setups", () => {
       });
       expect(
         (await service.getOwnedItem(actor, sliderId))?.effectiveSliderSetup,
-      ).toMatchObject({ configuration, source: "owned-insert" });
+      ).toMatchObject({
+        clickCount: 3,
+        configuration: null,
+        magnetLayout: "2x4",
+        source: "body-hosted",
+      });
     } finally {
       await client.close();
     }
