@@ -561,17 +561,17 @@ describe("product form conditional fields", () => {
     }
     expect(html).not.toContain('aria-label="Diameter"');
     if (productTypeSlug === "slider") {
-      expect(html).toContain("web.slider.capability.usesInserts");
-      expect(html).toContain('aria-label="web.slider.layout.label"');
+      expect(html).toContain("This slider uses inserts");
+      expect(html).toContain('aria-label="Magnet layout"');
       expect(html).not.toContain('aria-label="Weight basis"');
       expect(html).not.toContain('aria-label="Click count"');
       expect(html).toContain("Magnet configuration");
-      expect(html).toContain("web.slider.relationship.includedPlates");
-      expect(html).toContain("web.slider.relationship.addPlates");
-      expect(html).not.toContain("Included components");
+      expect(html).toContain("Included plates");
+      expect(html).toContain("Add plates");
+      expect(html).not.toContain("Included parts");
     } else {
-      expect(html).not.toContain("web.slider.capability.usesInserts");
-      expect(html).not.toContain("Included components");
+      expect(html).not.toContain("This slider uses inserts");
+      expect(html).not.toContain("Included parts");
       if (productTypeSlug === "slider-insert") {
         expect(html).not.toContain("Appearance");
         expect(html).not.toContain("Available insert setups");
@@ -810,7 +810,7 @@ describe("collection add form", () => {
     );
 
     expect(html).toContain(
-      "Included components describe what is sold with this product. They do not create collection items.",
+      "Included parts describe what is sold with this product. They do not create collection items.",
     );
     expect(html).toContain("Suggested plate");
     expect(html).toContain("Suggested insert");

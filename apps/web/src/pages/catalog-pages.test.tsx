@@ -1091,7 +1091,7 @@ describe("CollectionItemDetailPage", () => {
       />,
     );
 
-    expect(html).toContain("web.slider.layout.option");
+    expect(html).toContain("2×2 — 1-click");
     expect(html).toContain("N52");
     expect(html).toContain("Empty");
   });

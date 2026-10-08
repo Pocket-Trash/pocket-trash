@@ -63,9 +63,9 @@ describe("UserSettingsPage", () => {
   it("renders display preferences and links to beta features", () => {
     const html = renderToStaticMarkup(<UserSettingsPage />);
 
-    expect(html).toContain('aria-label="web.settings.measurementSystem"');
-    expect(html).toContain("web.settings.metric");
-    expect(html).toContain("web.settings.imperial");
+    expect(html).toContain('aria-label="Measurement system options"');
+    expect(html).toContain("Metric");
+    expect(html).toContain("Imperial");
     expect(html).toContain('aria-label="Display currency"');
     expect(html).toContain('href="/user/settings/beta-features"');
   });
