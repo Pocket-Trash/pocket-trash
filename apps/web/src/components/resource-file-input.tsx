@@ -252,7 +252,7 @@ export function FileDropInput({
           accept={accept}
           aria-describedby={descriptionId}
           aria-label={label}
-          className="peer sr-only"
+          className="peer sr-only size-px p-0 border-0"
           disabled={disabled}
           id={id}
           multiple={multiple}

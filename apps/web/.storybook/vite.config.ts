@@ -5,6 +5,9 @@ import { defineConfig } from "vite";
 export default defineConfig({
   optimizeDeps: {
     include: [
+      "react",
+      "react-dom/client",
+      "react/jsx-runtime",
       "@base-ui/react/drawer",
       "@base-ui/react/select",
       "@base-ui/react/separator",
