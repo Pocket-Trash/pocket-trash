@@ -71,11 +71,11 @@ export class CollectionButtonAlreadyInstalledError extends Error {
 }
 
 /** Error raised when a slider component is already installed elsewhere. */
-export class CollectionDetailSliderComponentAlreadyInstalledError extends Error {
+export class CollectionSliderComponentAlreadyInstalledError extends Error {
   /** Creates the error reported when a plate or insert is assigned elsewhere. */
   constructor() {
     super("Collection component is already installed on another slider.");
-    this.name = "CollectionDetailSliderComponentAlreadyInstalledError";
+    this.name = "CollectionSliderComponentAlreadyInstalledError";
   }
 }
 
@@ -6428,7 +6428,7 @@ export function createCollectionsService(
                   constraint ===
                     "collection_detail_slider_installed_insert_unique"
                 ) {
-                  throw new CollectionDetailSliderComponentAlreadyInstalledError();
+                  throw new CollectionSliderComponentAlreadyInstalledError();
                 }
                 throw error;
               }
@@ -9647,7 +9647,7 @@ async function validateSliderComponentInstallation(
     )
     .limit(1);
   if (existingInstallation) {
-    throw new CollectionDetailSliderComponentAlreadyInstalledError();
+    throw new CollectionSliderComponentAlreadyInstalledError();
   }
 
   return component;

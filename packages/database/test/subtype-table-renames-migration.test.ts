@@ -2,6 +2,20 @@ import { readdirSync, readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+/** Renamed table, compatibility view, and preserved fixture identifier. */
+const detailTables = [
+  ["collection_detail_slider", "collection_slider", 1002],
+  ["collection_detail_slider_insert", "collection_slider_insert", 1004],
+  ["collection_detail_slider_plate", "collection_slider_plate", 1003],
+  ["collection_detail_spinner", "collection_spinner", 1000],
+  ["collection_detail_spinner_button", "collection_spinner_button", 1001],
+  ["product_detail_slider", "product_slider", 1002],
+  ["product_detail_slider_insert", "product_slider_insert", 1004],
+  ["product_detail_slider_plate", "product_slider_plate", 1003],
+  ["product_detail_spinner", "product_spinner", 1000],
+  ["product_detail_spinner_button", "product_spinner_button", 1001],
+] as const;
+
 describe("subtype table rename migration", () => {
   const database = new PGlite();
 
@@ -29,19 +43,24 @@ describe("subtype table rename migration", () => {
     await database.close();
   });
 
-  it("preserves shared IDs and exposes the renamed tables", async () => {
+  it.each(
+    detailTables,
+  )("preserves shared IDs in %s", async (table, _view, id) => {
     await expect(
       database.query<{
-        /** Preserved catalog detail identifier. */
+        /** Preserved detail identifier. */
         id: number;
-      }>('SELECT id::integer AS id FROM "product_detail_spinner"'),
-    ).resolves.toMatchObject({ rows: [{ id: 1000 }] });
+      }>(`SELECT id::integer AS id FROM "${table}"`),
+    ).resolves.toMatchObject({ rows: [{ id }] });
+  });
+
+  it.each(detailTables)("reads %s through %s", async (_table, view, id) => {
     await expect(
       database.query<{
-        /** Preserved collection detail identifier. */
+        /** Detail identifier read through the compatibility view. */
         id: number;
-      }>('SELECT id::integer AS id FROM "collection_detail_slider_insert"'),
-    ).resolves.toMatchObject({ rows: [{ id: 1004 }] });
+      }>(`SELECT id::integer AS id FROM "${view}"`),
+    ).resolves.toMatchObject({ rows: [{ id }] });
   });
 
   it("keeps old-name views updatable for rollout compatibility", async () => {
@@ -54,9 +73,13 @@ describe("subtype table rename migration", () => {
 
     await database.exec(`
       INSERT INTO product (product_type_id, maker_id, name, slug)
-      VALUES (1000, 1000, 'Compatibility spinner', 'compatibility-spinner');
+      VALUES
+        (1000, 1000, 'Compatibility spinner', 'compatibility-spinner'),
+        (1000, 1000, 'Renamed spinner', 'renamed-spinner');
       INSERT INTO product_spinner (id, bearing) VALUES (1005, 'R188');
+      INSERT INTO product_detail_spinner (id, bearing) VALUES (1006, 'R188');
       UPDATE product_spinner SET bearing = 'R188 hybrid' WHERE id = 1005;
+      UPDATE product_detail_spinner SET bearing = 'R188 ceramic' WHERE id = 1006;
     `);
     await expect(
       database.query<{
@@ -64,8 +87,17 @@ describe("subtype table rename migration", () => {
         bearing: string;
       }>("SELECT bearing FROM product_detail_spinner WHERE id = 1005"),
     ).resolves.toMatchObject({ rows: [{ bearing: "R188 hybrid" }] });
+    await expect(
+      database.query<{
+        /** Bearing value written through the renamed table. */
+        bearing: string;
+      }>("SELECT bearing FROM product_detail_spinner WHERE id = 1006"),
+    ).resolves.toMatchObject({ rows: [{ bearing: "R188 ceramic" }] });
 
-    await database.exec("DELETE FROM product_spinner WHERE id = 1005");
+    await database.exec(`
+      DELETE FROM product_spinner WHERE id = 1005;
+      DELETE FROM product_detail_spinner WHERE id = 1006;
+    `);
     await expect(
       database.query("SELECT id FROM product_detail_spinner WHERE id = 1005"),
     ).resolves.toMatchObject({ rows: [] });
@@ -82,6 +114,32 @@ describe("subtype table rename migration", () => {
         "UPDATE product_detail_spinner SET weight_value = '-1', weight_unit = 'g' WHERE id = 1000",
       ),
     ).rejects.toThrow(/product_detail_spinner_weight_consistent/iu);
+  });
+
+  it("renames every table-owned constraint and index", async () => {
+    const result = await database.query<{
+      /** Constraint or index name. */
+      objectName: string;
+      /** Renamed table that owns the object. */
+      tableName: string;
+    }>(`
+      SELECT constraint_name AS "objectName", table_name AS "tableName"
+      FROM information_schema.table_constraints
+      WHERE table_schema = 'public'
+        AND table_name LIKE '%_detail_%'
+        AND constraint_name NOT LIKE '%_not_null'
+      UNION ALL
+      SELECT indexname AS "objectName", tablename AS "tableName"
+      FROM pg_indexes
+      WHERE schemaname = 'public' AND tablename LIKE '%_detail_%'
+    `);
+
+    expect(result.rows.length).toBeGreaterThan(10);
+    expect(
+      result.rows.filter(
+        ({ objectName, tableName }) => !objectName.startsWith(tableName),
+      ),
+    ).toEqual([]);
   });
 });
 

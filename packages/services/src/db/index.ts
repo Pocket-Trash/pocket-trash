@@ -141,8 +141,8 @@ export type {
 export {
   CollectionAssemblyPrivacyBlockedError,
   CollectionButtonAlreadyInstalledError,
-  CollectionDetailSliderComponentAlreadyInstalledError,
   CollectionItemPrivacyInheritedError,
+  CollectionSliderComponentAlreadyInstalledError,
   sliderClickCount,
   sliderMagnetConfigurationIsValid,
   sliderMagnetLayoutDetails,

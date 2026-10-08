@@ -9,6 +9,17 @@ ALTER TABLE "product_slider_plate" RENAME TO "product_detail_slider_plate";--> s
 ALTER TABLE "product_spinner" RENAME TO "product_detail_spinner";--> statement-breakpoint
 ALTER TABLE "product_spinner_button" RENAME TO "product_detail_spinner_button";--> statement-breakpoint
 
+ALTER TABLE "collection_detail_slider" RENAME CONSTRAINT "collection_slider_pkey" TO "collection_detail_slider_pkey";--> statement-breakpoint
+ALTER TABLE "collection_detail_slider_insert" RENAME CONSTRAINT "collection_slider_insert_pkey" TO "collection_detail_slider_insert_pkey";--> statement-breakpoint
+ALTER TABLE "collection_detail_slider_plate" RENAME CONSTRAINT "collection_slider_plate_pkey" TO "collection_detail_slider_plate_pkey";--> statement-breakpoint
+ALTER TABLE "collection_detail_spinner" RENAME CONSTRAINT "collection_spinner_pkey" TO "collection_detail_spinner_pkey";--> statement-breakpoint
+ALTER TABLE "collection_detail_spinner_button" RENAME CONSTRAINT "collection_spinner_button_pkey" TO "collection_detail_spinner_button_pkey";--> statement-breakpoint
+ALTER TABLE "product_detail_slider" RENAME CONSTRAINT "product_slider_pkey" TO "product_detail_slider_pkey";--> statement-breakpoint
+ALTER TABLE "product_detail_slider_insert" RENAME CONSTRAINT "product_slider_insert_pkey" TO "product_detail_slider_insert_pkey";--> statement-breakpoint
+ALTER TABLE "product_detail_slider_plate" RENAME CONSTRAINT "product_slider_plate_pkey" TO "product_detail_slider_plate_pkey";--> statement-breakpoint
+ALTER TABLE "product_detail_spinner" RENAME CONSTRAINT "product_spinner_pkey" TO "product_detail_spinner_pkey";--> statement-breakpoint
+ALTER TABLE "product_detail_spinner_button" RENAME CONSTRAINT "product_spinner_button_pkey" TO "product_detail_spinner_button_pkey";--> statement-breakpoint
+
 ALTER TABLE "collection_detail_slider" RENAME CONSTRAINT "collection_slider_id_collection_item_id_fk" TO "collection_detail_slider_id_collection_item_id_fk";--> statement-breakpoint
 ALTER TABLE "collection_detail_slider" RENAME CONSTRAINT "collection_slider_product_slider_id_product_slider_id_fk" TO "collection_detail_slider_product_slider_id_product_detail_slider_id_fk";--> statement-breakpoint
 ALTER TABLE "collection_detail_slider" RENAME CONSTRAINT "collection_slider_installed_plate_id_collection_slider_plate_id_fk" TO "collection_detail_slider_installed_plate_id_collection_detail_slider_plate_id_fk";--> statement-breakpoint
