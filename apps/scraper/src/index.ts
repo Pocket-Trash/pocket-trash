@@ -1,10 +1,8 @@
 import { serve } from "@hono/node-server";
 import { loggerMessages } from "@package/logger";
 import { createApp } from "./app.js";
-import { readProcessScraperRuntimeEnv, scraperEnv } from "./env.js";
-import { createScraperJobEnv } from "./env.schema.js";
+import { scraperEnv } from "./env.js";
 import { createScraperLogger } from "./lib/logger.js";
-import { type ScraperScheduler, startScraperScheduler } from "./scheduler.js";
 
 /**
  * Process-wide scraper server logger.
@@ -33,10 +31,9 @@ void main().catch(async (error) => {
 });
 
 /**
- * Starts the scraper HTTP server and optional in-process scheduler.
+ * Starts the scraper HTTP server.
  */
 async function main() {
-  let scheduler: ScraperScheduler | undefined;
   const app = createApp({ logger });
   const server = serve({
     fetch: app.fetch,
@@ -46,53 +43,26 @@ async function main() {
   logger.info(loggerMessages.scraper.serverListening, {
     attributes: {
       port: scraperEnv.PORT,
-      schedulerEnabled: scraperEnv.SCRAPER_SCHEDULER_ENABLED,
     },
   });
 
-  if (scraperEnv.SCRAPER_SCHEDULER_ENABLED) {
-    void Promise.resolve()
-      .then(() =>
-        startScraperScheduler({
-          env: createScraperJobEnv(readProcessScraperRuntimeEnv()),
-          logger,
-        }),
-      )
-      .then((startedScheduler) => {
-        scheduler = startedScheduler;
-      })
-      .catch((error) => {
-        logger.fatal(loggerMessages.scraper.serverFailed, {
-          attributes: {
-            source: "scheduler",
-          },
-          error,
-        });
-      });
-  }
-
   process.once("SIGINT", () => {
-    void shutdown({ scheduler, server, signal: "SIGINT" });
+    void shutdown({ server, signal: "SIGINT" });
   });
   process.once("SIGTERM", () => {
-    void shutdown({ scheduler, server, signal: "SIGTERM" });
+    void shutdown({ server, signal: "SIGTERM" });
   });
 }
 
 /**
- * Stops the scheduler and HTTP server, then flushes pending logs.
+ * Stops the HTTP server, then flushes pending logs.
  *
  * @param options - Runtime resources and the process signal requesting shutdown.
  */
 async function shutdown({
-  scheduler,
   server,
   signal,
 }: {
-  /**
-   * Scheduler to stop when one finished starting.
-   */
-  scheduler: ScraperScheduler | undefined;
   /**
    * Node server returned by Hono's adapter.
    */
@@ -108,7 +78,6 @@ async function shutdown({
     },
   });
 
-  await scheduler?.stop();
   await closeServer(server);
   await logger.flush();
 }

@@ -41,8 +41,8 @@ source-upload limit. Update it when the scraper gains a workspace dependency.
 
 ## Cron operation
 
-[`railway.json`](../railway.json) owns the build command, start command, hourly
-schedule, and no-restart policy. Railway cron services must exit after each
+[`railway.json`](../railway.json) owns the build command, start command, five-minute
+dispatcher schedule, and no-restart policy. Railway cron services must exit after each
 run. If a run is still active when the next schedule is due, Railway skips the
 new run.
 
@@ -53,6 +53,34 @@ form populated, set it to the same value as `deploy.cronSchedule`.
 Preview runs are gated by `SCRAPER_CRON_ENABLED`. The deploy workflow enables
 them only for database-changing PRs with an isolated Neon branch; other previews
 share the preview database and keep cron disabled.
+
+Source schedules are a complete, reviewed registry of standard five-field UTC
+expressions in [`cron.ts`](../apps/scraper/src/cron.ts). All five current sources
+remain hourly (`0 * * * *`); Railway invokes the dispatcher with `*/5 * * * *`.
+The complete registry is validated before any Redis or task side effects. One
+invocation-wide timestamp determines every source's latest scheduled occurrence.
+
+Each source stores its last attempted slot at
+`scraper:cron:last-attempted-slot:<source>` in Redis without a TTL. A newer slot
+runs one catch-up attempt, collapsing multiple missed occurrences into the latest.
+Missing, malformed, or future-dated state runs only when that occurrence belongs
+to the current five-minute tick; otherwise the dispatcher saves a baseline and
+skips the producer. A first run at 12:55 therefore waits until 13:00. Losing Redis
+resets this baseline without deleting persisted scraper history in Postgres.
+
+The dispatcher records the slot before running a producer. Redis failures skip
+that producer; producer failures wait for the next committed slot without a
+five-minute retry. Both failures remain inside the per-task boundary, so later
+sources and the queue still run and the command exits successfully after logging
+its aggregate result. Normal not-due skips appear only in the aggregate log.
+Manual `scrape <source>` commands do not touch dispatcher state.
+
+Producers run sequentially in registry order, followed by one queue-processing
+pass on every five-minute invocation, even when no producer is due. Queue batch
+sizes, concurrency, retries, and the empty-queue fast path remain unchanged.
+Railway skips a tick when the preceding invocation is still active: as sources
+increase, runs longer than five minutes can skip dispatcher ticks. No additional
+Redis lock is used; the existing active-run database constraint remains in place.
 
 The cron task ordering and failure behavior are documented beside
 [`runRailwayCronJob`](../apps/scraper/src/cron.ts). Runtime inputs and their

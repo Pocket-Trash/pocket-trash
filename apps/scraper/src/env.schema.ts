@@ -82,14 +82,6 @@ export type ScraperRuntimeEnv = {
    */
   REDIS_URL?: string;
   /**
-   * Autmog scheduling interval in minutes before numeric coercion.
-   */
-  SCRAPER_AUTMOG_INTERVAL_MINUTES?: string;
-  /**
-   * Autmog startup delay in seconds before numeric coercion.
-   */
-  SCRAPER_AUTMOG_START_DELAY_SECONDS?: string;
-  /**
    * Dry-run flag encoded as `"true"` or `"false"`.
    */
   SCRAPER_DRY_RUN?: string;
@@ -97,26 +89,6 @@ export type ScraperRuntimeEnv = {
    * Optional HTTP proxy URL for Grimsmo requests.
    */
   GRIMSMO_PROXY_URL?: string;
-  /**
-   * Grimsmo Fjell startup delay in seconds before numeric coercion.
-   */
-  SCRAPER_GRIMSMO_FJELL_START_DELAY_SECONDS?: string;
-  /**
-   * Grimsmo scheduling interval in minutes before numeric coercion.
-   */
-  SCRAPER_GRIMSMO_INTERVAL_MINUTES?: string;
-  /**
-   * Grimsmo Norseman startup delay in seconds before numeric coercion.
-   */
-  SCRAPER_GRIMSMO_NORSEMAN_START_DELAY_SECONDS?: string;
-  /**
-   * Grimsmo Rask startup delay in seconds before numeric coercion.
-   */
-  SCRAPER_GRIMSMO_RASK_START_DELAY_SECONDS?: string;
-  /**
-   * Grimsmo Saga startup delay in seconds before numeric coercion.
-   */
-  SCRAPER_GRIMSMO_SAGA_START_DELAY_SECONDS?: string;
   /**
    * Maximum image jobs handled per queue batch before numeric coercion.
    */
@@ -126,14 +98,6 @@ export type ScraperRuntimeEnv = {
    */
   SCRAPER_ITEM_BATCH_SIZE?: string;
   /**
-   * Queue processor scheduling interval in minutes before numeric coercion.
-   */
-  SCRAPER_QUEUE_PROCESSOR_INTERVAL_MINUTES?: string;
-  /**
-   * Queue processor startup delay in seconds before numeric coercion.
-   */
-  SCRAPER_QUEUE_PROCESSOR_START_DELAY_SECONDS?: string;
-  /**
    * Concurrent queue worker count before numeric coercion.
    */
   SCRAPER_QUEUE_CONCURRENCY?: string;
@@ -141,10 +105,6 @@ export type ScraperRuntimeEnv = {
    * Optional Railway cron flag encoded as `"true"` or `"false"`.
    */
   SCRAPER_CRON_ENABLED?: string;
-  /**
-   * Scheduler flag encoded as `"true"` or `"false"`.
-   */
-  SCRAPER_SCHEDULER_ENABLED?: string;
 };
 
 /**
@@ -212,10 +172,6 @@ const scraperServerSchema = {
   LOG_LEVEL: z.string().min(1).optional(),
   PORT: z.coerce.number().int().min(1).max(65_535).default(4007),
   RAILWAY_ENVIRONMENT_NAME: z.string().min(1).optional(),
-  SCRAPER_SCHEDULER_ENABLED: z
-    .enum(["true", "false"])
-    .optional()
-    .transform((value) => value === "true"),
 } as const;
 
 /**
@@ -285,52 +241,12 @@ export function createScraperJobEnv(runtimeEnv: ScraperRuntimeEnv) {
       IMAGE_STORAGE_PROVIDER: z.string().min(1).default("bunny"),
       REDIS_URL: redisUrlSchema,
       GRIMSMO_PROXY_URL: z.string().min(1).url().optional(),
-      SCRAPER_AUTMOG_INTERVAL_MINUTES: z.coerce
-        .number()
-        .int()
-        .min(1)
-        .max(24 * 60)
-        .default(60),
-      SCRAPER_AUTMOG_START_DELAY_SECONDS: z.coerce
-        .number()
-        .int()
-        .min(0)
-        .max(60 * 60)
-        .default(0),
+
       SCRAPER_DRY_RUN: z
         .enum(["true", "false"])
         .optional()
         .transform((value) => value === "true"),
-      SCRAPER_GRIMSMO_FJELL_START_DELAY_SECONDS: z.coerce
-        .number()
-        .int()
-        .min(0)
-        .max(60 * 60)
-        .default(30 * 60),
-      SCRAPER_GRIMSMO_INTERVAL_MINUTES: z.coerce
-        .number()
-        .int()
-        .min(1)
-        .max(24 * 60)
-        .default(60),
-      SCRAPER_GRIMSMO_NORSEMAN_START_DELAY_SECONDS: z.coerce
-        .number()
-        .int()
-        .min(0)
-        .max(60 * 60)
-        .default(45 * 60),
-      SCRAPER_GRIMSMO_RASK_START_DELAY_SECONDS: z.coerce
-        .number()
-        .int()
-        .min(0)
-        .max(60 * 60)
-        .default(15 * 60),
-      SCRAPER_GRIMSMO_SAGA_START_DELAY_SECONDS: z.coerce
-        .number()
-        .int()
-        .min(0)
-        .max(60 * 60)
-        .default(0),
+
       SCRAPER_IMAGE_BATCH_SIZE: z.coerce
         .number()
         .int()
@@ -343,18 +259,7 @@ export function createScraperJobEnv(runtimeEnv: ScraperRuntimeEnv) {
         .min(1)
         .max(1_000)
         .default(100),
-      SCRAPER_QUEUE_PROCESSOR_INTERVAL_MINUTES: z.coerce
-        .number()
-        .int()
-        .min(1)
-        .max(24 * 60)
-        .default(15),
-      SCRAPER_QUEUE_PROCESSOR_START_DELAY_SECONDS: z.coerce
-        .number()
-        .int()
-        .min(0)
-        .max(60 * 60)
-        .default(30),
+
       SCRAPER_QUEUE_CONCURRENCY: z.coerce
         .number()
         .int()
@@ -398,29 +303,14 @@ function getScraperRuntimeEnvStrict(runtimeEnv: ScraperRuntimeEnv) {
     PORT: runtimeEnv.PORT,
     RAILWAY_ENVIRONMENT_NAME: runtimeEnv.RAILWAY_ENVIRONMENT_NAME,
     REDIS_URL: selectRedisUrl(runtimeEnv),
-    SCRAPER_AUTMOG_INTERVAL_MINUTES: runtimeEnv.SCRAPER_AUTMOG_INTERVAL_MINUTES,
-    SCRAPER_AUTMOG_START_DELAY_SECONDS:
-      runtimeEnv.SCRAPER_AUTMOG_START_DELAY_SECONDS,
+
     SCRAPER_DRY_RUN: runtimeEnv.SCRAPER_DRY_RUN,
-    SCRAPER_GRIMSMO_FJELL_START_DELAY_SECONDS:
-      runtimeEnv.SCRAPER_GRIMSMO_FJELL_START_DELAY_SECONDS,
-    SCRAPER_GRIMSMO_INTERVAL_MINUTES:
-      runtimeEnv.SCRAPER_GRIMSMO_INTERVAL_MINUTES,
-    SCRAPER_GRIMSMO_NORSEMAN_START_DELAY_SECONDS:
-      runtimeEnv.SCRAPER_GRIMSMO_NORSEMAN_START_DELAY_SECONDS,
-    SCRAPER_GRIMSMO_RASK_START_DELAY_SECONDS:
-      runtimeEnv.SCRAPER_GRIMSMO_RASK_START_DELAY_SECONDS,
-    SCRAPER_GRIMSMO_SAGA_START_DELAY_SECONDS:
-      runtimeEnv.SCRAPER_GRIMSMO_SAGA_START_DELAY_SECONDS,
+
     SCRAPER_IMAGE_BATCH_SIZE: runtimeEnv.SCRAPER_IMAGE_BATCH_SIZE,
     SCRAPER_ITEM_BATCH_SIZE: runtimeEnv.SCRAPER_ITEM_BATCH_SIZE,
-    SCRAPER_QUEUE_PROCESSOR_INTERVAL_MINUTES:
-      runtimeEnv.SCRAPER_QUEUE_PROCESSOR_INTERVAL_MINUTES,
-    SCRAPER_QUEUE_PROCESSOR_START_DELAY_SECONDS:
-      runtimeEnv.SCRAPER_QUEUE_PROCESSOR_START_DELAY_SECONDS,
+
     SCRAPER_QUEUE_CONCURRENCY: runtimeEnv.SCRAPER_QUEUE_CONCURRENCY,
     SCRAPER_CRON_ENABLED: runtimeEnv.SCRAPER_CRON_ENABLED,
-    SCRAPER_SCHEDULER_ENABLED: runtimeEnv.SCRAPER_SCHEDULER_ENABLED,
   };
 }
 

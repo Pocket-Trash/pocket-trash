@@ -95,14 +95,17 @@ describe("scraper jobs", () => {
     expect(scraperSourceKeys).toContain(scraperSources.grimsmoFjell);
   });
 
-  it("runs the Autmog source producer", async () => {
+  it("runs a manual Autmog producer without dispatcher state", async () => {
+    const context = createContext();
     await expect(
       runSourceProducerJob({
-        context: createContext(),
+        context,
         logger: createNoopLogger(),
         source: scraperSources.autmog,
       }),
     ).resolves.toBeUndefined();
+    expect(context.redis.get).not.toHaveBeenCalled();
+    expect(context.redis.set).not.toHaveBeenCalled();
   });
 
   it("runs Grimsmo source producers", async () => {
@@ -245,7 +248,10 @@ function createContext(
         getJobCounts: vi.fn(async () => counts.items),
       } as unknown as ScraperJobContext["queues"]["items"],
     },
-    redis: {} as ScraperJobContext["redis"],
+    redis: {
+      get: vi.fn(),
+      set: vi.fn(),
+    } as unknown as ScraperJobContext["redis"],
   };
 }
 

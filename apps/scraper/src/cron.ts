@@ -1,4 +1,5 @@
 import { type Logger, loggerMessages } from "@package/logger";
+import cronParser from "cron-parser";
 import {
   runQueueProcessorJob,
   runSourceProducerJob,
@@ -6,6 +7,16 @@ import {
   type ScraperJobEnv,
   scraperSourceKeys,
 } from "./jobs.js";
+import type { ScraperSourceName } from "./scraper-types.js";
+
+/** Reviewed UTC producer schedules; every source must declare one. */
+export const scraperSchedules: Record<ScraperSourceName, string> = {
+  autmog: "0 * * * *",
+  "grimsmo-fjell": "0 * * * *",
+  "grimsmo-norseman": "0 * * * *",
+  "grimsmo-rask": "0 * * * *",
+  "grimsmo-saga": "0 * * * *",
+};
 
 /**
  * Captured failure from one task in a Railway cron run.
@@ -22,12 +33,13 @@ type CronTaskFailure = {
 };
 
 /**
- * Runs every configured source producer sequentially, then processes the queue.
+ * Runs due source producers sequentially, then processes the queue on every tick.
  * Individual task failures are logged and accumulated so later tasks still run;
  * they do not reject the cron command after its dependencies are initialized.
  *
  * @param options - Job dependencies and optional schedule time.
  * @returns A promise that settles after every source and queue task is attempted.
+ * @rejects When the invocation time or any committed schedule is invalid.
  */
 export async function runRailwayCronJob({
   context,
@@ -48,42 +60,111 @@ export async function runRailwayCronJob({
    */
   logger: Logger;
   /**
-   * Scheduled time recorded in logs; defaults to the current time.
+   * Invocation snapshot used for every schedule decision; defaults to the current time.
    */
   now?: Date;
 }) {
   const startedAt = Date.now();
+  const snapshot = now.getTime();
+  const scheduledAt = new Date(snapshot).toISOString();
+  const tickStart = Math.floor(snapshot / 300_000) * 300_000;
+  const slots = scraperSourceKeys.map((source) => {
+    const schedule = scraperSchedules[source];
+    const numeric = schedule.replace(
+      /\b(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC|SUN|MON|TUE|WED|THU|FRI|SAT)\b/giu,
+      "1",
+    );
+    if (
+      schedule.trim().split(/\s+/u).length !== 5 ||
+      !/^[\d*,/\-\s]+$/u.test(numeric)
+    ) {
+      throw new Error(
+        `Expected a standard five-field cron schedule for ${source}.`,
+      );
+    }
+    return {
+      source,
+      schedule,
+      latestSlot: cronParser
+        .parseExpression(schedule, {
+          currentDate: new Date(snapshot + 1),
+          tz: "UTC",
+        })
+        .prev()
+        .toDate(),
+    };
+  });
   const failures: CronTaskFailure[] = [];
+  let skippedSources = 0;
+  const recoveries: Record<string, unknown>[] = [];
 
   logger.info(loggerMessages.scraper.cron.started, {
     attributes: {
       imageFolderPrefix: context.imageFolderPrefix,
-      scheduledAt: now.toISOString(),
+      scheduledAt,
     },
   });
 
-  for (const source of scraperSourceKeys) {
-    await runCronTask({
-      attributes: {
-        source,
-        task: `scrape:${source}`,
-      },
+  for (const { source, schedule, latestSlot } of slots) {
+    const attributes: Record<string, unknown> = {
+      source,
+      task: `scrape:${source}`,
+      schedule,
+      latestSlot: latestSlot.toISOString(),
+      storedSlot: null,
+      recoveryReason: "scheduled-slot",
+    };
+    const attempted = await runCronTask({
+      attributes,
       failures,
       logger,
       /**
-       * Runs the producer for the current source.
-       *
-       * @returns A promise that settles after the source producer finishes.
+       * Records due attempts or establishes an uninitialized source's baseline.
+       * @returns Whether a producer should run.
+       * @rejects When Redis cannot read or remember the attempted slot.
+       */
+      prepare: async () => {
+        const key = `scraper:cron:last-attempted-slot:${source}`;
+        const stored = await context.redis.get(key);
+        attributes.storedSlot = stored;
+        const storedTime = stored === null ? Number.NaN : Date.parse(stored);
+        const valid =
+          Number.isFinite(storedTime) &&
+          stored === new Date(storedTime).toISOString();
+        const initialized = valid && storedTime <= snapshot;
+        if (!initialized) {
+          attributes.recoveryReason =
+            stored === null
+              ? "missing-state"
+              : valid
+                ? "future-state"
+                : "malformed-state";
+          await context.redis.set(key, latestSlot.toISOString());
+          recoveries.push({ ...attributes });
+          return latestSlot.getTime() >= tickStart;
+        }
+        if (latestSlot.getTime() <= storedTime) return false;
+        if (latestSlot.getTime() < tickStart)
+          attributes.recoveryReason = "missed-slot";
+        await context.redis.set(key, latestSlot.toISOString());
+        return true;
+      },
+      /**
+       * Runs the producer after remembering its calendar slot.
+       * @returns Completion of this source's producer.
        */
       run: () => runSourceProducerJob({ context, env, logger, source }),
     });
+    if (attempted === false) skippedSources += 1;
   }
   await runQueueProcessor({ context, env, failures, logger });
 
   const attributes = {
     durationMs: Date.now() - startedAt,
     failedTasks: failures.length,
-    scheduledAt: now.toISOString(),
+    skippedSources,
+    recoveries,
+    scheduledAt,
   };
 
   if (failures.length > 0) {
@@ -168,11 +249,13 @@ async function runQueueProcessor({
  * Runs and logs one cron task without aborting the remaining cron run on failure.
  *
  * @param options - Task callback, log attributes, logger, and failure accumulator.
+ * @returns False when the task is not due; otherwise completion after its attempt.
  */
 async function runCronTask({
   attributes,
   failures,
   logger,
+  prepare,
   run,
 }: {
   /**
@@ -193,14 +276,17 @@ async function runCronTask({
    * @returns A promise that settles when the task finishes.
    */
   run: () => Promise<void>;
+  /**
+   * Prepares the task and returns false when it is not due.
+   * @returns Whether execution should proceed.
+   */
+  prepare?: () => Promise<boolean>;
 }) {
   const startedAt = Date.now();
 
-  logger.info(loggerMessages.scraper.cron.taskStarted, {
-    attributes,
-  });
-
   try {
+    if (prepare && !(await prepare())) return false;
+    logger.info(loggerMessages.scraper.cron.taskStarted, { attributes });
     await run();
     logger.info(loggerMessages.scraper.cron.taskCompleted, {
       attributes: {
