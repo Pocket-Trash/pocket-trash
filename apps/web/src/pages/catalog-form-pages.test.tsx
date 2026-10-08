@@ -212,8 +212,8 @@ describe("finish option editor", () => {
     const product: CatalogProduct = {
       approvalStatus: "approved",
       bearing: null,
-      bodyHostedMagnetSetup: null,
       buttonDiameterMm: null,
+      clickCount: null,
       canAdminister: false,
       canEdit: true,
       compatibleButtonId: null,
@@ -242,6 +242,7 @@ describe("finish option editor", () => {
       makerProductUrl: null,
       makerProductUrlValid: true,
       makerUrl: null,
+      magnetLayout: null,
       usesInserts: null,
       materials: [{ id: 1000, name: "Bronze", slug: "bronze" }],
       name: "Spinner",
@@ -610,9 +611,10 @@ describe("product form conditional fields", () => {
     expect(html).not.toContain('aria-label="Diameter"');
     if (productTypeSlug === "slider") {
       expect(html).toContain("web.slider.capability.usesInserts");
+      expect(html).toContain('aria-label="web.slider.layout.label"');
       expect(html).toContain('aria-label="Weight basis"');
-      expect(html).toContain('aria-label="Click count"');
-      expect(html).toContain("Magnet configuration");
+      expect(html).not.toContain('aria-label="Click count"');
+      expect(html).not.toContain("Magnet configuration");
       expect(html).toContain("web.slider.relationship.includedPlates");
       expect(html).toContain("web.slider.relationship.addPlates");
       expect(html).not.toContain("Included components");
@@ -880,11 +882,8 @@ function productFixture(
   return {
     approvalStatus: "approved",
     bearing: null,
-    bodyHostedMagnetSetup:
-      productTypeSlug === "slider"
-        ? { clickCount: null, configuration: null, sourceNote: null }
-        : null,
     buttonDiameterMm: null,
+    clickCount: productTypeSlug === "slider" ? 3 : null,
     canAdminister: false,
     canEdit: true,
     compatibleButtonId: null,
@@ -913,6 +912,7 @@ function productFixture(
     makerProductUrl: null,
     makerProductUrlValid: true,
     makerUrl: null,
+    magnetLayout: productTypeSlug === "slider" ? "2x4" : null,
     usesInserts: productTypeSlug === "slider" ? false : null,
     materials: [{ id: id + 1, name: "Bronze", slug: "bronze" }],
     name,

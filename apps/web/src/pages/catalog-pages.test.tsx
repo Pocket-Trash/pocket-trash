@@ -259,8 +259,8 @@ const owners = [
 const product: CatalogProduct = {
   approvalStatus: "approved",
   bearing: null,
-  bodyHostedMagnetSetup: null,
   buttonDiameterMm: null,
+  clickCount: null,
   canAdminister: false,
   canEdit: false,
   compatibleButtonId: null,
@@ -283,6 +283,7 @@ const product: CatalogProduct = {
   makerProductUrl: null,
   makerProductUrlValid: true,
   makerUrl: "https://www.kapedc.com",
+  magnetLayout: null,
   usesInserts: null,
   materials: [],
   name: "Catla",
@@ -845,40 +846,14 @@ describe("ProductsPage", () => {
 });
 
 describe("ProductDetailPage", () => {
-  it("shows the live body-hosted setup as exact read-only catalog facts", () => {
+  it("shows the slider layout and derived click count", () => {
     const html = renderToStaticMarkup(
       <ProductDetailPage
         collectionItems={[]}
         product={{
           ...product,
-          bodyHostedMagnetSetup: {
-            clickCount: 4,
-            configuration: {
-              groups: [
-                {
-                  diameterMm: "6.35",
-                  grade: "N52",
-                  key: "corners",
-                  label: "Corners",
-                  thicknessMm: "3.175",
-                },
-              ],
-              label: "Medium",
-              slots: [
-                {
-                  documentedColumn: 1,
-                  documentedRow: 1,
-                  groupKey: "corners",
-                  half: "half-a",
-                  key: "A1",
-                  state: "occupied",
-                },
-              ],
-              sourceLabel: "4-click layout",
-              sourceNotes: null,
-            },
-            sourceNote: null,
-          },
+          clickCount: 3,
+          magnetLayout: "2x4",
           usesInserts: false,
           productTypeName: "Slider",
           productTypeSlug: "slider",
@@ -886,10 +861,8 @@ describe("ProductDetailPage", () => {
       />,
     );
 
-    expect(html).toContain("4 clicks");
-    expect(html).toContain("Medium — 4-click layout");
-    expect(html).toContain("6.35×3.175 mm, N52");
-    expect(html).toContain("Half A A1");
+    expect(html).toMatch(/2×4 — 3-click|web\.slider\.layout\.option/);
+    expect(html).toMatch(/8 slots per side|web\.slider\.layout\.help/);
     expect(html).not.toContain("Install");
     expect(html).not.toContain("Custom setup");
   });
@@ -989,11 +962,8 @@ describe("CollectionItemDetailPage", () => {
     if (!item) throw new Error("Collection item fixture is required.");
     const slider = {
       ...product,
-      bodyHostedMagnetSetup: {
-        clickCount: 3,
-        configuration: null,
-        sourceNote: "Documented by the maker.",
-      },
+      clickCount: 3,
+      magnetLayout: "2x4" as const,
       usesInserts: false,
       productTypeName: "Slider",
       productTypeSlug: "slider" as const,
@@ -1014,8 +984,8 @@ describe("CollectionItemDetailPage", () => {
     expect(html).toMatch(
       /Slider body holds magnets|web\.slider\.capability\.sliderBodyHoldsMagnets/,
     );
-    expect(html).toContain("Magnet setup");
-    expect(html).toContain("Documented by the maker.");
+    expect(html).toMatch(/Magnet layout|web\.slider\.layout\.label/);
+    expect(html).toMatch(/2×4 — 3-click|web\.slider\.layout\.option/);
     expect(html).toContain("40 mm");
     expect(html).toContain("12 mm");
     expect(html).not.toContain("Build from scratch");
@@ -1121,6 +1091,7 @@ describe("CollectionItemDetailPage", () => {
               sourceNotes: null,
             },
             isLiveCatalog: false,
+            magnetLayout: null,
             source: "owned-insert",
           },
           productTypeName: "Slider",

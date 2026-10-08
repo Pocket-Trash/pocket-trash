@@ -35,6 +35,7 @@ const base = {
   lengthMm: null,
   makerId: 1000,
   makerProductUrl: "",
+  magnetLayout: null,
   materialIds: [1000],
   name: "Spinner",
   productId: null,
@@ -324,6 +325,7 @@ describe("slider catalog product validation", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
+        magnetLayout: productTypeSlug === "slider" ? "2x4" : null,
         usesInserts: productTypeSlug === "slider" ? false : null,
         productTypeSlug,
       }).success,
@@ -340,6 +342,7 @@ describe("slider catalog product validation", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
+        magnetLayout: "2x4",
         usesInserts: true,
         productTypeSlug: "slider",
         weightG: "120",
@@ -348,6 +351,7 @@ describe("slider catalog product validation", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
+        magnetLayout: "2x4",
         usesInserts: true,
         productTypeSlug: "slider",
         weightBasis: "complete-build",
@@ -380,6 +384,7 @@ describe("slider catalog product validation", () => {
       productFormSchema.safeParse({
         ...base,
         includedPlateProductId: 2000,
+        magnetLayout: "2x4",
         productTypeSlug: "slider",
         usesInserts: false,
       }).success,
@@ -403,60 +408,31 @@ describe("slider catalog product validation", () => {
     ).toBe(false);
   });
 
-  it("accepts complete exact body-hosted layouts and rejects incomplete slots", () => {
-    const bodyHostedMagnetSetup = {
-      clickCount: 4,
-      configuration: {
-        groups: [
-          {
-            diameterMm: "6.35",
-            grade: "N52",
-            key: "corners",
-            label: "Corners",
-            thicknessMm: "3.175",
-          },
-        ],
-        label: "Medium",
-        slots: [
-          {
-            documentedColumn: 1,
-            documentedRow: 1,
-            groupKey: "corners",
-            half: "half-a" as const,
-            key: "A1",
-            state: "occupied" as const,
-          },
-        ],
-        sourceLabel: null,
-        sourceNotes: null,
-      },
-      sourceNote: null,
-    };
+  it("requires a supported slider-owned layout unless an exact insert owns it", () => {
+    for (const magnetLayout of ["2x2", "2x3", "2x4"] as const) {
+      expect(
+        productFormSchema.safeParse({
+          ...base,
+          magnetLayout,
+          productTypeSlug: "slider",
+          usesInserts: false,
+        }).success,
+      ).toBe(true);
+    }
     expect(
       productFormSchema.safeParse({
         ...base,
-        bodyHostedMagnetSetup,
         productTypeSlug: "slider",
         usesInserts: false,
       }).success,
-    ).toBe(true);
+    ).toBe(false);
     expect(
       productFormSchema.safeParse({
         ...base,
-        bodyHostedMagnetSetup: {
-          ...bodyHostedMagnetSetup,
-          configuration: {
-            ...bodyHostedMagnetSetup.configuration,
-            slots: [
-              {
-                ...bodyHostedMagnetSetup.configuration.slots[0],
-                groupKey: null,
-              },
-            ],
-          },
-        },
+        includedInsertProductId: 2000,
+        magnetLayout: "2x4",
         productTypeSlug: "slider",
-        usesInserts: false,
+        usesInserts: true,
       }).success,
     ).toBe(false);
   });

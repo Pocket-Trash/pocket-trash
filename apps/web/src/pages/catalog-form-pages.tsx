@@ -1,6 +1,5 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import type {
-  CatalogBodyHostedMagnetSetup,
   CatalogColor,
   CatalogFinishOption,
   CatalogImage,
@@ -12,6 +11,10 @@ import type {
   OwnedMagnetConfiguration,
   UserCollectionItem,
   UserCollectionSummary,
+} from "@package/services";
+import {
+  sliderMagnetLayoutDetails,
+  sliderMagnetLayouts,
 } from "@package/services";
 import {
   maxImageBytes,
@@ -225,11 +228,6 @@ export function ProductEditor({
   const [descriptionLoading, setDescriptionLoading] = React.useState(true);
   const defaultValues: ProductEditorValue = {
     bearing: initialProduct?.bearing ?? "",
-    bodyHostedMagnetSetup:
-      initialProduct?.bodyHostedMagnetSetup ??
-      (initialProduct?.usesInserts === false
-        ? { clickCount: null, configuration: null, sourceNote: null }
-        : null),
     buttonDiameterMm: initialProduct?.buttonDiameterMm ?? null,
     compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
     description: initialProduct?.description ?? "",
@@ -253,6 +251,11 @@ export function ProductEditor({
     lengthMm: initialProduct?.lengthMm ?? null,
     makerId: initialProduct?.makerId ?? 0,
     makerProductUrl: initialProduct?.makerProductUrl ?? "",
+    magnetLayout:
+      initialProduct?.magnetLayout ??
+      (productTypeSlug === "slider" && !initialProduct?.includedInsert
+        ? "2x4"
+        : null),
     materialIds: initialProduct?.materials.map(({ id }) => id) ?? [],
     name: initialProduct?.name ?? "",
     productId: initialProduct?.id ?? null,
@@ -680,16 +683,7 @@ export function ProductEditor({
                       const usesInserts = event.target.checked;
                       field.handleChange(usesInserts);
                       form.setFieldValue("includedInsertProductId", null);
-                      form.setFieldValue(
-                        "bodyHostedMagnetSetup",
-                        usesInserts
-                          ? null
-                          : (form.state.values.bodyHostedMagnetSetup ?? {
-                              clickCount: null,
-                              configuration: null,
-                              sourceNote: null,
-                            }),
-                      );
+                      form.setFieldValue("magnetLayout", "2x4");
                     }}
                     type="checkbox"
                   />
@@ -720,13 +714,17 @@ export function ProductEditor({
                         <CatalogCombobox
                           ariaLabel={t("web.slider.relationship.inserts")}
                           items={[included, ...inserts]}
-                          onValueChange={(value) =>
-                            field.handleChange(
+                          onValueChange={(value) => {
+                            const insertId =
                               value && value.id !== "included"
                                 ? Number(value.id)
-                                : null,
-                            )
-                          }
+                                : null;
+                            field.handleChange(insertId);
+                            form.setFieldValue(
+                              "magnetLayout",
+                              insertId === null ? "2x4" : null,
+                            );
+                          }}
                           placeholder={t(
                             "web.slider.relationship.includedInsert",
                           )}
@@ -747,6 +745,65 @@ export function ProductEditor({
                         </Button>
                         <FieldError
                           error={serverErrors.includedInsertProductId?.[0]}
+                          t={t}
+                        />
+                      </Field>
+                    );
+                  }}
+                </form.Field>
+              ) : null
+            }
+          </form.Subscribe>
+        ) : null}
+        {productTypeSlug === "slider" ? (
+          <form.Subscribe
+            selector={(state) => state.values.includedInsertProductId}
+          >
+            {(includedInsertProductId) =>
+              includedInsertProductId === null ? (
+                <form.Field name="magnetLayout">
+                  {(field) => {
+                    const items = sliderMagnetLayouts.map((layout) => ({
+                      id: layout,
+                      name: t("web.slider.layout.option", {
+                        count: sliderMagnetLayoutDetails[layout].clickCount,
+                        layout: sliderMagnetLayoutDetails[layout].label,
+                      }),
+                    }));
+                    const selected = items.find(
+                      ({ id }) => id === field.state.value,
+                    );
+                    const details = field.state.value
+                      ? sliderMagnetLayoutDetails[field.state.value]
+                      : null;
+                    return (
+                      <Field label={t("web.slider.layout.label")}>
+                        <CatalogCombobox
+                          ariaLabel={t("web.slider.layout.label")}
+                          items={items}
+                          onValueChange={(value) =>
+                            field.handleChange(
+                              sliderMagnetLayouts.find(
+                                (layout) => layout === value?.id,
+                              ) ?? "2x4",
+                            )
+                          }
+                          placeholder={t("web.slider.layout.label")}
+                          value={selected ?? items[2] ?? null}
+                        />
+                        {details ? (
+                          <p className="m-0 text-sm text-muted-foreground">
+                            {t("web.slider.layout.help", {
+                              clicks: details.clickCount,
+                              columns: details.columnCount,
+                              layout: details.label,
+                              rows: details.rowCount,
+                              slots: details.slotsPerSide,
+                            })}
+                          </p>
+                        ) : null}
+                        <FieldError
+                          error={serverErrors.magnetLayout?.[0]}
                           t={t}
                         />
                       </Field>
@@ -794,29 +851,6 @@ export function ProductEditor({
               );
             }}
           </form.Field>
-        ) : null}
-        {productTypeSlug === "slider" ? (
-          <form.Subscribe selector={(state) => state.values.usesInserts}>
-            {(usesInserts) =>
-              usesInserts === false ? (
-                <form.Field name="bodyHostedMagnetSetup">
-                  {(field) =>
-                    field.state.value ? (
-                      <BodyHostedMagnetSetupEditor
-                        onChange={(setup) =>
-                          field.handleChange(
-                            setup as CatalogBodyHostedMagnetSetup,
-                          )
-                        }
-                        t={t}
-                        value={field.state.value}
-                      />
-                    ) : null
-                  }
-                </form.Field>
-              ) : null
-            }
-          </form.Subscribe>
         ) : null}
         {productTypeSlug === "spinner" ? (
           <form.Field name="bearing">
@@ -1062,6 +1096,7 @@ export function ProductEditor({
                       ].sort((a, b) => a.name.localeCompare(b.name)),
                     }));
                     form.setFieldValue("includedInsertProductId", insert.id);
+                    form.setFieldValue("magnetLayout", null);
                     insertDialog.current?.close();
                     insertTrigger.current?.focus();
                   }}
@@ -1078,12 +1113,9 @@ export function ProductEditor({
   );
 }
 
-/** Setup shape shared by catalog and owner-recorded layout editors. */
-type EditableMagnetSetup = Omit<
-  CatalogBodyHostedMagnetSetup,
-  "configuration"
-> & {
-  /** Catalog-complete or owner-recorded layout. */
+/** Owner-recorded magnet setup being edited. */
+type EditableMagnetSetup = {
+  /** Owner-recorded layout. */
   configuration: OwnedMagnetConfiguration | null;
 };
 
@@ -1093,12 +1125,10 @@ type EditableMagnetSetup = Omit<
  * @param props - Current setup and replacement callback.
  * @returns Structured setup authoring fields.
  */
-function BodyHostedMagnetSetupEditor({
+function MagnetSetupEditor({
   allowUnknown = false,
   legend,
   onChange,
-  showClickCount = true,
-  showSourceNote = true,
   t,
   value,
 }: {
@@ -1112,10 +1142,6 @@ function BodyHostedMagnetSetupEditor({
    * @param value - Next complete body-hosted setup.
    */
   onChange(value: EditableMagnetSetup): void;
-  /** Whether to show the body-level click count field. */
-  showClickCount?: boolean;
-  /** Whether to show the incomplete-layout note field. */
-  showSourceNote?: boolean;
   /** Localized catalog message formatter. */
   t: ReturnType<typeof useCatalogCopy>;
   /** Current inherent setup. */
@@ -1136,39 +1162,6 @@ function BodyHostedMagnetSetupEditor({
       <legend className="px-1 text-sm font-medium">
         {legend ?? t("web.slider.setup.title")}
       </legend>
-      {showClickCount ? (
-        <Field label={t("web.slider.setup.clickCount")}>
-          <Input
-            aria-label={t("web.slider.setup.clickCount")}
-            min="1"
-            onChange={(event) =>
-              onChange({
-                ...value,
-                clickCount: event.target.value
-                  ? Number(event.target.value)
-                  : null,
-              })
-            }
-            step="1"
-            type="number"
-            value={value.clickCount ?? ""}
-          />
-        </Field>
-      ) : null}
-      {showSourceNote ? (
-        <Field label={t("web.slider.setup.sourceNote")}>
-          <textarea
-            aria-label={t("web.slider.setup.sourceNote")}
-            className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            maxLength={5000}
-            onChange={(event) =>
-              onChange({ ...value, sourceNote: event.target.value })
-            }
-            placeholder={t("web.slider.setup.incompleteSourceNote")}
-            value={value.sourceNote ?? ""}
-          />
-        </Field>
-      ) : null}
       {configuration ? (
         <section className="grid gap-4 rounded-lg border border-border bg-muted/20 p-4">
           <div className="grid gap-3 md:grid-cols-2">
@@ -1688,7 +1681,7 @@ function OwnedInsertSetupEditor({
         {t("web.slider.setup.fromScratch")}
       </Button>
       {value ? (
-        <BodyHostedMagnetSetupEditor
+        <MagnetSetupEditor
           allowUnknown
           legend={t("web.slider.setup.custom")}
           onChange={(setup) =>
@@ -1696,13 +1689,9 @@ function OwnedInsertSetupEditor({
               ownedInsertSetupAfterLayoutChange(value, setup.configuration),
             )
           }
-          showClickCount={false}
-          showSourceNote={false}
           t={t}
           value={{
-            clickCount: null,
             configuration: value.configuration,
-            sourceNote: null,
           }}
         />
       ) : null}
