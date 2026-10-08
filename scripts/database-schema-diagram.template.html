@@ -1,0 +1,550 @@
+<!-- Edit this template, then run: pnpm diagram:database -->
+<style>
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  #pen-schema-erd {
+    color-scheme: light dark;
+    background: light-dark(#f8fafc, #0b1220);
+    box-sizing: border-box;
+    color: light-dark(#172033, #e5edf8);
+    display: flex;
+    flex-direction: column;
+    font-family:
+      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", sans-serif;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    padding: 20px;
+  }
+
+  #pen-schema-erd * {
+    box-sizing: border-box;
+  }
+
+  #pen-schema-erd h1 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  #pen-schema-erd .ps-subtitle {
+    color: light-dark(#526077, #a9b7ca);
+    margin: 6px 0 0;
+  }
+
+  #pen-schema-erd .ps-toolbar {
+    align-items: end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+    margin: 18px 0 12px;
+  }
+
+  #pen-schema-erd .ps-fields,
+  #pen-schema-erd .ps-actions,
+  #pen-schema-erd .ps-legend {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  #pen-schema-erd label {
+    display: grid;
+    font-size: 0.8rem;
+    gap: 4px;
+  }
+
+  #pen-schema-erd input,
+  #pen-schema-erd select,
+  #pen-schema-erd button {
+    background: light-dark(#ffffff, #121c2d);
+    border: 1px solid light-dark(#cbd5e1, #42516a);
+    border-radius: 6px;
+    color: inherit;
+    font: inherit;
+    min-height: 38px;
+    padding: 7px 10px;
+  }
+
+  #pen-schema-erd input {
+    min-width: 230px;
+  }
+
+  #pen-schema-erd button {
+    cursor: pointer;
+  }
+
+  #pen-schema-erd button:hover {
+    background: light-dark(#eef2f7, #1b2940);
+  }
+
+  #pen-schema-erd :focus-visible {
+    outline: 3px solid light-dark(#2563eb, #60a5fa);
+    outline-offset: 2px;
+  }
+
+  #pen-schema-erd .ps-legend {
+    color: light-dark(#445168, #bdc9d9);
+    font-size: 0.82rem;
+    margin-bottom: 10px;
+  }
+
+  #pen-schema-erd .ps-key {
+    align-items: center;
+    display: inline-flex;
+    gap: 6px;
+  }
+
+  #pen-schema-erd .ps-swatch {
+    border: 2px solid;
+    border-radius: 4px;
+    display: inline-block;
+    height: 14px;
+    width: 20px;
+  }
+
+  #pen-schema-erd .ps-existing {
+    background: light-dark(#dbeafe, #152b4c);
+    border-color: light-dark(#2563eb, #60a5fa);
+  }
+
+  #pen-schema-erd .ps-changed {
+    background: light-dark(#fef3c7, #3d2b10);
+    border-color: light-dark(#d97706, #fbbf24);
+  }
+
+  #pen-schema-erd .ps-new {
+    background: light-dark(#dcfce7, #123622);
+    border-color: light-dark(#16a34a, #4ade80);
+  }
+
+  #pen-schema-erd .ps-graph {
+    background-color: light-dark(#ffffff, #0e1727);
+    background-image:
+      linear-gradient(light-dark(#edf2f7, #19263a) 1px, transparent 1px),
+      linear-gradient(90deg, light-dark(#edf2f7, #19263a) 1px, transparent 1px);
+    background-size: 24px 24px;
+    border: 1px solid light-dark(#d8e0eb, #334158);
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+  }
+
+  #pen-schema-erd .ps-status {
+    color: light-dark(#445168, #bdc9d9);
+    font-size: 0.85rem;
+    margin-top: 10px;
+    min-height: 1.3em;
+  }
+
+  #pen-schema-erd .ps-help {
+    color: light-dark(#526077, #a9b7ca);
+    font-size: 0.8rem;
+    margin: 0 0 12px;
+  }
+
+  #pen-schema-erd .ps-sr-only {
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  @media (max-width: 640px) {
+    #pen-schema-erd {
+      padding: 14px;
+    }
+
+    #pen-schema-erd .ps-toolbar,
+    #pen-schema-erd .ps-fields {
+      align-items: stretch;
+      display: grid;
+      width: 100%;
+    }
+
+    #pen-schema-erd input,
+    #pen-schema-erd select,
+    #pen-schema-erd button {
+      min-height: 44px;
+      width: 100%;
+    }
+
+    #pen-schema-erd .ps-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 100%;
+    }
+
+  }
+</style>
+
+<section id="pen-schema-erd" aria-labelledby="pen-schema-title">
+  <header>
+    <h1 id="pen-schema-title">Database schema</h1>
+    <p class="ps-subtitle">
+      Generated from the Drizzle schema in the current checkout.
+    </p>
+  </header>
+
+  <div class="ps-toolbar">
+    <div class="ps-fields">
+      <label>
+        Diagram view
+        <select id="ps-view">
+          <option value="full">Full schema</option>
+        </select>
+      </label>
+      <label>
+        Find a table or field
+        <input
+          id="ps-search"
+          type="search"
+          placeholder="For example: product or owner_id"
+          autocomplete="off"
+        />
+      </label>
+    </div>
+    <div class="ps-actions">
+      <button id="ps-fit" type="button">Fit diagram</button>
+      <button id="ps-clear" type="button">Clear highlight</button>
+    </div>
+  </div>
+
+  <div class="ps-legend" aria-label="Diagram legend">
+    <span class="ps-key"><span class="ps-swatch ps-existing"></span>Drizzle table</span>
+  </div>
+
+  <p class="ps-help">
+    Drag to pan, scroll or pinch to zoom, and select a table to isolate its direct relationships.
+  </p>
+
+  <div
+    id="ps-graph"
+    class="ps-graph"
+    role="img"
+    aria-label="Interactive entity relationship diagram generated from the Drizzle schema"
+    aria-describedby="ps-accessible-summary"
+  ></div>
+  <p id="ps-status" class="ps-status" aria-live="polite">
+    Full schema shown. Select a table to inspect its immediate relationships.
+  </p>
+  <p id="ps-accessible-summary" class="ps-sr-only">
+    The diagram lists every table exported by the checked-out Drizzle schema and
+    draws its declared foreign-key relationships.
+  </p>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+<script>
+  (() => {
+    const root = document.getElementById("pen-schema-erd");
+    const graph = document.getElementById("ps-graph");
+    const status = document.getElementById("ps-status");
+    const search = document.getElementById("ps-search");
+    const view = document.getElementById("ps-view");
+    const fitButton = document.getElementById("ps-fit");
+    const clearButton = document.getElementById("ps-clear");
+
+    if (!root || !graph || !status || !search || !view || !window.cytoscape) {
+      if (status) status.textContent = "The diagram library could not be loaded.";
+      return;
+    }
+
+    if (window.cytoscapeDagre) window.cytoscape.use(window.cytoscapeDagre);
+
+    const tables = __DATABASE_TABLES__;
+
+    const relationships = __DATABASE_RELATIONSHIPS__;
+
+    const statusName = {
+      existing: "EXISTING",
+      changed: "CHANGE",
+      new: "NEW",
+    };
+
+    const nodes = tables.map((table) => ({
+      data: {
+        id: table.id,
+        label: `${statusName[table.status]}  ${table.name}\n${table.fields.join("\n")}`,
+        name: table.name,
+        status: table.status,
+        areas: table.areas.join(" "),
+        searchText: `${table.name} ${table.fields.join(" ")}`.toLowerCase(),
+      },
+      classes: table.status,
+    }));
+
+    const edges = relationships.map(([source, target, label], index) => ({
+      data: { id: `edge-${index}`, source, target, label },
+    }));
+
+    const darkMode = window.matchMedia("(prefers-color-scheme: dark)");
+
+    const palette = () =>
+      darkMode.matches
+        ? {
+            text: "#e5edf8",
+            muted: "#9eacc0",
+            edge: "#60708a",
+            edgeLabel: "#d6e0ed",
+            edgeLabelBackground: "#0e1727",
+            existingFill: "#152b4c",
+            existingBorder: "#60a5fa",
+            changedFill: "#3d2b10",
+            changedBorder: "#fbbf24",
+            newFill: "#123622",
+            newBorder: "#4ade80",
+            highlight: "#c084fc",
+          }
+        : {
+            text: "#172033",
+            muted: "#526077",
+            edge: "#8795aa",
+            edgeLabel: "#3d4a60",
+            edgeLabelBackground: "#ffffff",
+            existingFill: "#dbeafe",
+            existingBorder: "#2563eb",
+            changedFill: "#fef3c7",
+            changedBorder: "#d97706",
+            newFill: "#dcfce7",
+            newBorder: "#16a34a",
+            highlight: "#7e22ce",
+          };
+
+    let colors = palette();
+
+    const cy = window.cytoscape({
+      container: graph,
+      elements: [...nodes, ...edges],
+      minZoom: 0.15,
+      maxZoom: 2.5,
+      wheelSensitivity: 0.18,
+      boxSelectionEnabled: false,
+      style: [
+        {
+          selector: "node",
+          style: {
+            "background-color": colors.newFill,
+            "border-color": colors.newBorder,
+            "border-width": 2,
+            color: colors.text,
+            "font-family": "Inter, system-ui, sans-serif",
+            "font-size": 12,
+            "font-weight": 400,
+            height: "label",
+            label: "data(label)",
+            padding: 13,
+            shape: "round-rectangle",
+            "text-halign": "center",
+            "text-justify": "left",
+            "text-max-width": 270,
+            "text-valign": "center",
+            "text-wrap": "wrap",
+            width: "label",
+          },
+        },
+        {
+          selector: "node.existing",
+          style: {
+            "background-color": colors.existingFill,
+            "border-color": colors.existingBorder,
+          },
+        },
+        {
+          selector: "node.changed",
+          style: {
+            "background-color": colors.changedFill,
+            "border-color": colors.changedBorder,
+          },
+        },
+        {
+          selector: "edge",
+          style: {
+            "curve-style": "bezier",
+            "font-family": "Inter, system-ui, sans-serif",
+            "font-size": 10,
+            label: "data(label)",
+            "line-color": colors.edge,
+            "target-arrow-color": colors.edge,
+            "target-arrow-shape": "triangle",
+            "text-background-color": colors.edgeLabelBackground,
+            "text-background-opacity": 0.92,
+            "text-background-padding": 3,
+            "text-color": colors.edgeLabel,
+            "text-rotation": "autorotate",
+            width: 1.4,
+          },
+        },
+        {
+          selector: ".dimmed",
+          style: { opacity: 0.12 },
+        },
+        {
+          selector: "node.highlighted",
+          style: {
+            "border-color": colors.highlight,
+            "border-width": 5,
+            "z-index": 10,
+          },
+        },
+        {
+          selector: "edge.highlighted",
+          style: {
+            "line-color": colors.highlight,
+            "target-arrow-color": colors.highlight,
+            opacity: 1,
+            width: 3,
+            "z-index": 9,
+          },
+        },
+      ],
+    });
+
+    const layout = () => {
+      const name = window.cytoscapeDagre ? "dagre" : "breadthfirst";
+      cy.layout({
+        name,
+        animate: false,
+        directed: true,
+        edgeSep: 24,
+        fit: true,
+        nodeSep: 40,
+        padding: 45,
+        rankDir: "LR",
+        rankSep: 90,
+        spacingFactor: 1.05,
+      }).run();
+    };
+
+    const visibleNodes = () =>
+      cy.nodes().filter((node) => node.style("display") !== "none");
+
+    const clearHighlight = (message) => {
+      cy.elements().removeClass("dimmed highlighted");
+      if (message) status.textContent = message;
+    };
+
+    const applyView = () => {
+      const selectedArea = view.value;
+      search.value = "";
+      clearHighlight();
+      cy.batch(() => {
+        cy.nodes().forEach((node) => {
+          const areas = node.data("areas").split(" ");
+          node.style(
+            "display",
+            selectedArea === "full" || areas.includes(selectedArea)
+              ? "element"
+              : "none",
+          );
+        });
+        cy.edges().forEach((edge) => {
+          const visible =
+            edge.source().style("display") !== "none" &&
+            edge.target().style("display") !== "none";
+          edge.style("display", visible ? "element" : "none");
+        });
+      });
+      layout();
+      status.textContent = `${view.options[view.selectedIndex].text} shown: ${visibleNodes().length} tables.`;
+    };
+
+    cy.on("tap", "node", (event) => {
+      const node = event.target;
+      const neighborhood = node.closedNeighborhood().filter((element) => {
+        return element.style("display") !== "none";
+      });
+      cy.elements().removeClass("highlighted").addClass("dimmed");
+      neighborhood.removeClass("dimmed").addClass("highlighted");
+      status.textContent = `${node.data("name")}: ${node.connectedEdges().filter((edge) => edge.style("display") !== "none").length} visible relationships.`;
+    });
+
+    cy.on("tap", (event) => {
+      if (event.target === cy) {
+        clearHighlight("Highlight cleared. Select a table to inspect its immediate relationships.");
+      }
+    });
+
+    search.addEventListener("input", () => {
+      const query = search.value.trim().toLowerCase();
+      clearHighlight();
+      if (!query) {
+        status.textContent = `${view.options[view.selectedIndex].text} shown: ${visibleNodes().length} tables.`;
+        return;
+      }
+
+      const visible = visibleNodes();
+      const matches = visible.filter((node) => node.data("searchText").includes(query));
+      cy.elements().addClass("dimmed");
+      matches.forEach((node) => {
+        node.removeClass("dimmed").addClass("highlighted");
+        node.connectedEdges().forEach((edge) => {
+          if (edge.style("display") === "none") return;
+          edge.removeClass("dimmed");
+          edge.connectedNodes().removeClass("dimmed");
+        });
+      });
+      status.textContent = `${matches.length} matching table${matches.length === 1 ? "" : "s"} for “${search.value.trim()}”.`;
+    });
+
+    view.addEventListener("change", applyView);
+    fitButton.addEventListener("click", () => cy.fit(visibleNodes(), 45));
+    clearButton.addEventListener("click", () => {
+      search.value = "";
+      clearHighlight("Highlight cleared. Select a table to inspect its immediate relationships.");
+    });
+
+    darkMode.addEventListener("change", () => {
+      colors = palette();
+      cy.style()
+        .selector("node")
+        .style({
+          "background-color": colors.newFill,
+          "border-color": colors.newBorder,
+          color: colors.text,
+        })
+        .selector("node.existing")
+        .style({
+          "background-color": colors.existingFill,
+          "border-color": colors.existingBorder,
+        })
+        .selector("node.changed")
+        .style({
+          "background-color": colors.changedFill,
+          "border-color": colors.changedBorder,
+        })
+        .selector("edge")
+        .style({
+          "line-color": colors.edge,
+          "target-arrow-color": colors.edge,
+          "text-background-color": colors.edgeLabelBackground,
+          "text-color": colors.edgeLabel,
+        })
+        .selector("node.highlighted")
+        .style({ "border-color": colors.highlight })
+        .selector("edge.highlighted")
+        .style({
+          "line-color": colors.highlight,
+          "target-arrow-color": colors.highlight,
+        })
+        .update();
+    });
+
+    new ResizeObserver(() => cy.resize()).observe(graph);
+    layout();
+  })();
+</script>
