@@ -53,7 +53,7 @@ test("reports classification failures and every unknown path", () => {
 test("selects validation, build, and Storybook checks by domain", () => {
   const plan = createValidationPlan({
     api: true,
-    database: true,
+    database_validation: true,
     scraper: false,
     safe_e2e: true,
     storybook: true,
@@ -87,7 +87,7 @@ test("selects validation, build, and Storybook checks by domain", () => {
 
 test("runs credential-free checks before credential-dependent checks", () => {
   const selected = createValidationPlan({
-    database: true,
+    database_validation: true,
     validation: true,
     web: true,
   }).filter((check) => check.selected);

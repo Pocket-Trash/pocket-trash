@@ -2,7 +2,11 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { classifyChanges, getChangedFiles } from "./classify-changes.mjs";
+import {
+  classifyChanges,
+  getChangedFiles,
+  requiresDependencyComparison,
+} from "./classify-changes.mjs";
 
 /** Absolute repository root used by pull-request validation. */
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -141,7 +145,7 @@ export function createValidationPlan(domains) {
       label: "Disposable database migration chain",
       command: "pnpm",
       args: ["db:validate:chain"],
-      selected: domains.database,
+      selected: domains.database_validation,
       requiresCredentials: false,
       reason: "no database-domain changes",
     },
@@ -213,7 +217,7 @@ export function createValidationPlan(domains) {
       label: "Personal Neon migration history",
       command: "pnpm",
       args: ["db:validate:personal"],
-      selected: domains.database,
+      selected: domains.database_validation,
       requiresCredentials: true,
       reason: "no database-domain changes",
     },
@@ -304,12 +308,25 @@ function runCheck(check, { baseSha, cwd, headSha }) {
  * @returns {void}
  * @throws When preconditions, classification, or a selected check fails.
  */
-function main() {
+async function main() {
   const { baseRef } = parseArguments(process.argv.slice(2));
   assertCleanStatus(getWorktreeStatus());
 
   const context = getValidationContext({ baseRef });
-  const classification = classifyChanges(context.files);
+  let dependencyChanges;
+  if (context.files.some(requiresDependencyComparison)) {
+    try {
+      const { getDependencyChanges } = await import("./dependency-changes.mjs");
+      dependencyChanges = getDependencyChanges({
+        baseSha: context.mergeBase,
+        headSha: context.headSha,
+        cwd: repoRoot,
+      });
+    } catch {
+      /* Unreadable dependency graphs keep conservative checks. */
+    }
+  }
+  const classification = classifyChanges(context.files, { dependencyChanges });
   assertKnownPaths(classification);
   const plan = createValidationPlan(classification.domains);
   const selected = plan
@@ -361,7 +378,7 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   try {
-    main();
+    await main();
   } catch (error) {
     process.stderr.write(
       `validate:pr failed: ${error instanceof Error ? error.message : String(error)}\n`,

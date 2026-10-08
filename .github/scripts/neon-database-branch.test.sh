@@ -124,7 +124,7 @@ run_branch_command() {
     NEON_PROJECT_ID="test-project" \
     NEON_DATABASE_NAME="test-database" \
     NEON_DATABASE_USER="test-user" \
-    ISOLATION_REQUIRED=true \
+    ISOLATION_REQUIRED="${ISOLATION_REQUIRED:-true}" \
     PREVIEW_BASE_SHA=base-sha \
     BRANCH_NAME=preview-pr-42 \
     BRANCH_ID=br_target \
@@ -257,3 +257,14 @@ MAX_NEON_BRANCHES=2 run_branch_command branch-limit prepare-preview > /dev/null
 grep -Fx 'can_deploy=false' "$test_dir/branch-limit-output" > /dev/null
 grep -Fx 'blocked_reason=branch_limit' "$test_dir/branch-limit-output" > /dev/null
 ! grep -F 'POST https://neon.example.test/projects/test-project/branches' "$test_dir/branch-limit-curl-log" > /dev/null
+
+# Dependency-only previews use the shared database and remove stale isolation.
+ISOLATION_REQUIRED=false run_branch_command dependency-only prepare-preview > /dev/null
+grep -Fx 'isolated=false' "$test_dir/dependency-only-output" > /dev/null
+grep -Fx 'database_url=postgresql://user@ep-preview-pooler.example.test/db' "$test_dir/dependency-only-output" > /dev/null
+! grep -F 'POST ' "$test_dir/dependency-only-curl-log" > /dev/null
+[[ ! -s "$test_dir/dependency-only-pnpm-log" ]]
+ISOLATION_REQUIRED=false run_branch_command reuse prepare-preview > /dev/null
+grep -Fx 'isolated=false' "$test_dir/reuse-output" > /dev/null
+grep -F 'DELETE https://neon.example.test/projects/test-project/branches/br_target' "$test_dir/reuse-curl-log" > /dev/null
+[[ ! -f "$test_dir/reuse-state" ]]

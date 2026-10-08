@@ -149,3 +149,77 @@ The command prints instructions for Codex to use the shared
 `$pocket-trash db-migration-conflicts` workflow. That workflow preserves
 schema intent and hand-written SQL, regenerates migration artifacts, and runs
 the Drizzle consistency check.
+
+## Preview classification contract
+
+The classifier and database labels answer different questions:
+
+- `database_validation` selects database checks for changes to the database or
+  shared foundation. It does not indicate schema changes or require a PR branch.
+- `database_content_changed` detects schema, migrations, Drizzle configuration,
+  and seed scripts/data. It alone controls the `db-change` label and development
+  database refresh. Dependency-only changes do not receive that label.
+- `mutation_e2e` selects mutation fixtures and requires an isolated Neon PR
+  branch. Schema/seed changes and the explicit `test:e2e` label require isolation;
+  other runtime changes may also require it without changing database content.
+  The `preview-db` label follows this isolation decision, including `test:e2e`,
+  even when `db-change` is absent. It is removed when isolation is no longer
+  required during preview preparation, and both labels are removed on PR close.
+
+For dependency policy or lockfile changes, the classifier compares both committed
+pnpm lockfiles and traverses resolved dependencies, optional dependencies,
+workspace links, and package integrity metadata. Known build entrypoints (Vite,
+TypeScript, Tailwind's Vite plugin, and TanStack build plugins) stay in the build
+graph even when declared as runtime dependencies. Runtime consumers retain their
+normal mutation domains; build-only consumers receive build/preview/safe E2E
+checks without mutation isolation. Unchanged graphs select validation only.
+Unreadable or unsupported graphs retain conservative full checks and isolation.
+Release-age policy changes alone select validation only. Other workspace policy
+changes retain conservative isolation; root and workspace manifest script/engine changes select build
+and smoke checks. A manifest path alone never requests mutation tests when the
+dependency graph is known: dependency changes follow affected runtime consumers;
+package name/version-only changes select validation. Lint policy and skill lockfiles select validation only; Railway configuration
+selects scraper checks and a preview. Unknown paths and workflows remain
+conservative. Deployment summaries show content changes and mutation isolation
+separately; removing isolation also removes stale PR branches and overrides.
+
+
+### Standalone script classification
+
+Reviewed script paths use the following checks. These rules apply to a script-only
+change; runtime source changes and explicit `test:e2e` labels add their normal checks.
+
+| Script under `scripts/` | Checks | Reason |
+| --- | --- | --- |
+| `audit-bunny-services.mjs` | Validation only | Read-only management API audit and local report output |
+| `change-classification.test.mjs` | Validation only | Isolated tooling/contract tests |
+| `check-changelog-reminder.mjs` | Validation only | Changelog advisory checking |
+| `check-changelog-reminder.test.mjs` | Validation only | Isolated tooling/contract tests |
+| `check-jsdoc.mjs` | Validation only | Source documentation checking |
+| `check-jsdoc.test.mjs` | Validation only | Isolated tooling/contract tests |
+| `check-pr-changeset.mjs` | Validation only | Release marker checking |
+| `check-pr-changeset.test.mjs` | Validation only | Isolated tooling/contract tests |
+| `classify-changes.mjs` | Validation only | Validation-domain policy; covered by classification tests |
+| `database-change-detection.test.mjs` | Validation only | Isolated tooling/contract tests |
+| `database-schema-diagram.template.html` | Validation only | Documentation template |
+| `dependency-changes.mjs` | Validation only | Committed dependency graph comparison; covered by classification tests |
+| `developer-commands.test.mjs` | Validation only | Isolated tooling/contract tests |
+| `drizzle-view.mjs` | Validation only | Local diagram CLI bootstrap |
+| `e2e-local-contract.test.mjs` | Validation only | Isolated tooling/contract tests |
+| `generate-database-schema-diagram.mjs` | Validation only | Drizzle schema metadata reading and documentation output |
+| `generate-infrastructure-diagram.mjs` | Validation only | Local source/metadata scanning and documentation output |
+| `release.mjs` | Validation only | Release preparation and publishing; covered by release tests |
+| `release.test.mjs` | Validation only | Isolated tooling/contract tests |
+| `security-audit.mjs` | Validation only | Dependency policy checking; covered by security tests |
+| `security-policy.test.mjs` | Validation only | Isolated tooling/contract tests |
+| `validate-pr.mjs` | Validation only | Local validation orchestration; covered by validation-plan tests |
+| `validate-pr.test.mjs` | Validation only | Isolated tooling/contract tests |
+| `check-railway-context.mjs` | Scraper and validation | Scraper build-context checking or local scraper orchestration |
+| `dev-scraper.mjs` | Scraper and validation | Scraper build-context checking or local scraper orchestration |
+| `scraper-command.mjs` | Scraper and validation | Scraper build-context checking or local scraper orchestration |
+| `scraper-redis.mjs` | Scraper and validation | Scraper build-context checking or local scraper orchestration |
+| `workspace-packages.mjs` | Scraper and validation | Scraper build-context checking or local scraper orchestration |
+| `dev-webhooks.mjs` | API, preview, safe E2E, mutation E2E, and validation | Registers webhook targets and runs the local API/web workflow |
+
+New, unreviewed scripts retain full conservative checks. Add a reviewed explicit
+path rule rather than making the entire `scripts/` directory validation-only.

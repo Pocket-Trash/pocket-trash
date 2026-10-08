@@ -106,20 +106,22 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: pnpm --filter @package/storage run cleanup:preview
 
-      - name: Remove db-change label
+      - name: Remove database labels
         uses: actions/github-script@v8
         with:
           script: |
-            try {
-              await github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                name: "db-change",
-              });
-            } catch (error) {
-              if (error.status !== 404) {
-                throw error;
+            for (const label of ["db-change", "preview-db"]) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name: label,
+                });
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
               }
             }
 

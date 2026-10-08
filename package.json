@@ -53,7 +53,7 @@
     "test:security": "node --test scripts/security-policy.test.mjs",
     "test:watch": "turbo run test:watch",
     "test:watch:no-infisical": "turbo run test:watch:no-infisical",
-    "test:workflows": "node --test scripts/change-classification.test.mjs scripts/database-change-detection.test.mjs scripts/check-changelog-reminder.test.mjs scripts/developer-commands.test.mjs scripts/e2e-local-contract.test.mjs scripts/validate-pr.test.mjs",
+    "test:workflows": "node --test scripts/change-classification.test.mjs scripts/database-change-detection.test.mjs scripts/check-changelog-reminder.test.mjs scripts/developer-commands.test.mjs scripts/e2e-local-contract.test.mjs scripts/validate-pr.test.mjs scripts/check-pr-changeset.test.mjs scripts/release.test.mjs",
     "typecheck": "turbo run typecheck",
     "users:reconcile": "pnpm --filter @app/api users:reconcile",
     "validate:pr": "node scripts/validate-pr.mjs"
