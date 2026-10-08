@@ -422,9 +422,9 @@ export function productFilterItem(
     ),
     plateComponents:
       product.productTypeSlug === "slider"
-        ? product.includedComponents.filter(
-            ({ productTypeSlug }) => productTypeSlug === "slider-plate",
-          )
+        ? product.includedPlate
+          ? [product.includedPlate]
+          : []
         : [],
     productTypeName: product.productTypeName,
     productTypeSlug: product.productTypeSlug,
@@ -472,9 +472,7 @@ export function collectionFilterItem(
     plateComponents:
       item.productTypeSlug === "slider"
         ? [
-            ...(item.includedComponents ?? []).filter(
-              ({ productTypeSlug }) => productTypeSlug === "slider-plate",
-            ),
+            ...(item.includedPlate ? [item.includedPlate] : []),
             ...(installedPlate
               ? [
                   {

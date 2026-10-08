@@ -654,10 +654,27 @@ export function ProductDetailPage({
               </ul>
             </Detail>
           ) : null}
-          {product.productTypeSlug === "slider-plate" ||
-          product.productTypeSlug === "slider-insert" ? (
+          {product.productTypeSlug === "slider-insert" ? (
             <Detail label={t("web.slider.measurement.basis")}>
               {t("web.slider.measurement.setLevel")}
+            </Detail>
+          ) : null}
+          {product.productTypeSlug === "slider" ? (
+            <Detail label={t("web.slider.relationship.plates")}>
+              {product.includedPlate ? (
+                <Link
+                  className="text-primary underline-offset-4 hover:underline"
+                  params={{
+                    productSlug: product.includedPlate.slug,
+                    productTypeSlug: product.includedPlate.productTypeSlug,
+                  }}
+                  to="/products/$productTypeSlug/$productSlug"
+                >
+                  {product.includedPlate.name}
+                </Link>
+              ) : (
+                t("web.slider.relationship.includedPlates")
+              )}
             </Detail>
           ) : null}
           {specs.map(([key, value, unit]) =>
@@ -1769,6 +1786,24 @@ export function CollectionItemDetailPage({
                     ? "web.slider.moderation.unavailableComponent"
                     : "web.catalog.defaultButton",
                 )
+              )}
+            </Detail>
+          ) : null}
+          {item.productTypeSlug === "slider" ? (
+            <Detail label={t("web.slider.relationship.plates")}>
+              {product?.includedPlate ? (
+                <Link
+                  className="text-primary underline-offset-4 hover:underline"
+                  params={{
+                    productSlug: product.includedPlate.slug,
+                    productTypeSlug: product.includedPlate.productTypeSlug,
+                  }}
+                  to="/products/$productTypeSlug/$productSlug"
+                >
+                  {product.includedPlate.name}
+                </Link>
+              ) : (
+                t("web.slider.relationship.includedPlates")
               )}
             </Detail>
           ) : null}

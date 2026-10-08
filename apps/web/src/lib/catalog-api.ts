@@ -454,6 +454,7 @@ export const productFormSchema = z
     diameterMm: numericSpecSchema,
     finishOptions: z.array(finishOptionSchema),
     includedComponentIds: z.array(idSchema),
+    includedPlateProductId: idSchema.nullable(),
     insertHostedMagnetOptions: insertHostedMagnetOptionsSchema
       .nullable()
       .default(null),
@@ -481,12 +482,16 @@ export const productFormSchema = z
         advertisedInsertOffers,
         finishOptions,
         includedComponentIds,
+        includedPlateProductId,
         insertHostedMagnetOptions,
+        lengthMm,
         magnetSystem,
         productTypeSlug,
         spinDiameterMm,
+        thicknessMm,
         weightBasis,
         weightG,
+        widthMm,
       },
       context,
     ) => {
@@ -578,6 +583,25 @@ export const productFormSchema = z
           code: "custom",
           message: "web.catalog.error.form",
           path: ["includedComponentIds"],
+        });
+      }
+      if (productTypeSlug !== "slider" && includedPlateProductId !== null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["includedPlateProductId"],
+        });
+      }
+      if (
+        productTypeSlug === "slider-plate" &&
+        [weightG, lengthMm, widthMm, thicknessMm].some(
+          (measurement) => measurement !== null,
+        )
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["weightG"],
         });
       }
       if (new Set(includedComponentIds).size !== includedComponentIds.length) {
@@ -1528,6 +1552,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       makerProductUrl: parsed.data.makerProductUrl,
       materialIds: parsed.data.materialIds,
       includedComponentIds: parsed.data.includedComponentIds,
+      includedPlateProductId: parsed.data.includedPlateProductId,
       insertHostedMagnetOptions: parsed.data.insertHostedMagnetOptions
         ? {
             ...parsed.data.insertHostedMagnetOptions,

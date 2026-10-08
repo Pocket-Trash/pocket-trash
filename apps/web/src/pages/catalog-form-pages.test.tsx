@@ -236,6 +236,7 @@ describe("finish option editor", () => {
       imageCount: 0,
       images: [],
       includedComponents: [],
+      includedPlate: null,
       id: 1000,
       lengthMm: null,
       makerId: 1000,
@@ -615,24 +616,55 @@ describe("product form conditional fields", () => {
     expect(html).not.toContain("Reviewed advisory");
     expect(html).toContain("Maker terminology");
     expect(html).toContain("Add terminology alias");
-    expect(html).toContain('aria-label="Length"');
+    if (productTypeSlug === "slider-plate") {
+      expect(html).not.toContain('aria-label="Length"');
+      expect(html).not.toContain('aria-label="Weight"');
+    } else {
+      expect(html).toContain('aria-label="Length"');
+    }
     expect(html).not.toContain('aria-label="Diameter"');
     if (productTypeSlug === "slider") {
       expect(html).toContain('aria-label="Magnet host"');
       expect(html).toContain('aria-label="Weight basis"');
       expect(html).toContain('aria-label="Click count"');
       expect(html).toContain("Magnet configuration");
+      expect(html).toContain("web.slider.relationship.includedPlates");
+      expect(html).toContain("web.slider.relationship.addPlates");
       expect(html).toContain("Included components");
     } else {
-      expect(html).toContain(
-        "Plate and insert measurements and weight describe the complete matched set.",
-      );
       expect(html).not.toContain('aria-label="Magnet host"');
       expect(html).not.toContain("Included components");
       if (productTypeSlug === "slider-insert") {
+        expect(html).toContain(
+          "Plate and insert measurements and weight describe the complete matched set.",
+        );
         expect(html).toContain("Available insert setups");
+      } else {
+        expect(html).not.toContain(
+          "Plate and insert measurements and weight describe the complete matched set.",
+        );
       }
     }
+  });
+
+  it("limits inline plate creation to the requested fields", () => {
+    const html = renderToStaticMarkup(
+      createElement(ProductEditor, {
+        options: emptyCatalogOptions,
+        productTypeSlug: "slider-plate",
+        quickCreate: true,
+      }),
+    );
+
+    expect(html).toContain('aria-label="Name"');
+    expect(html).toContain('aria-label="Maker"');
+    expect(html).toContain('aria-label="Materials"');
+    expect(html).toContain("Appearance");
+    expect(html).toContain("Description");
+    expect(html).not.toContain("Maker terminology");
+    expect(html).not.toContain('name="makerProductUrl"');
+    expect(html).not.toContain('aria-label="Images"');
+    expect(html).not.toContain('aria-label="Length"');
   });
 });
 
@@ -808,13 +840,13 @@ describe("collection add form", () => {
   it("presents included slider components as explicit suggestions only", () => {
     const product = {
       ...productFixture(1200, "Suggested slider", "slider"),
+      includedPlate: {
+        id: 1201,
+        name: "Suggested plate",
+        productTypeSlug: "slider-plate" as const,
+        slug: "suggested-plate",
+      },
       includedComponents: [
-        {
-          id: 1201,
-          name: "Suggested plate",
-          productTypeSlug: "slider-plate" as const,
-          slug: "suggested-plate",
-        },
         {
           id: 1202,
           name: "Suggested insert",
@@ -893,6 +925,7 @@ function productFixture(
     imageCount: 0,
     images: [],
     includedComponents: [],
+    includedPlate: null,
     id,
     lengthMm: null,
     makerId: 1,
@@ -966,6 +999,7 @@ function collectionFixture(
     installedOnSliderId: null,
     installedPlateId: null,
     includedComponents: [],
+    includedPlate: null,
     makerId: product.makerId,
     makerName: product.makerName,
     makerSlug: product.makerSlug,
