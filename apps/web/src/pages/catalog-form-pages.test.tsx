@@ -257,7 +257,6 @@ describe("finish option editor", () => {
       thicknessWithButtonMm: null,
       updatedAt: new Date(0),
       weightG: null,
-      weightBasis: null,
       widthMm: null,
     };
     const html = renderToStaticMarkup(
@@ -564,7 +563,7 @@ describe("product form conditional fields", () => {
     if (productTypeSlug === "slider") {
       expect(html).toContain("web.slider.capability.usesInserts");
       expect(html).toContain('aria-label="web.slider.layout.label"');
-      expect(html).toContain('aria-label="Weight basis"');
+      expect(html).not.toContain('aria-label="Weight basis"');
       expect(html).not.toContain('aria-label="Click count"');
       expect(html).toContain("Magnet configuration");
       expect(html).toContain("web.slider.relationship.includedPlates");
@@ -886,7 +885,6 @@ function productFixture(
     thicknessWithButtonMm: null,
     updatedAt: new Date(0),
     weightG: null,
-    weightBasis: null,
     widthMm: null,
   };
 }

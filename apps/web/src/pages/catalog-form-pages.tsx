@@ -268,7 +268,6 @@ export function ProductEditor({
     thicknessMm: initialProduct?.thicknessMm ?? null,
     thicknessWithButtonMm: initialProduct?.thicknessWithButtonMm ?? null,
     weightG: initialProduct?.weightG ?? null,
-    weightBasis: initialProduct?.weightBasis ?? null,
     widthMm: initialProduct?.widthMm ?? null,
     usesInserts:
       initialProduct?.usesInserts ??
@@ -893,44 +892,6 @@ export function ProductEditor({
           <Notice>
             {t("web.slider.magnet.layoutChanged" as TranslationKey)}
           </Notice>
-        ) : null}
-        {productTypeSlug === "slider" ? (
-          <form.Field name="weightBasis">
-            {(field) => {
-              const items = [
-                {
-                  id: "body-only",
-                  name: t("web.slider.measurement.bodyOnly"),
-                },
-                {
-                  id: "complete-build",
-                  name: t("web.slider.measurement.completeBuild"),
-                },
-              ];
-              return (
-                <Field label={t("web.slider.measurement.weightBasis")}>
-                  <CatalogCombobox
-                    ariaLabel={t("web.slider.measurement.weightBasis")}
-                    items={items}
-                    onValueChange={(value) =>
-                      field.handleChange(
-                        value?.id === "body-only" ||
-                          value?.id === "complete-build"
-                          ? value.id
-                          : null,
-                      )
-                    }
-                    placeholder={t("web.slider.measurement.weightBasis")}
-                    removeLabel={t("web.action.close")}
-                    value={
-                      items.find(({ id }) => id === field.state.value) ?? null
-                    }
-                  />
-                  <FieldError error={serverErrors.weightBasis?.[0]} t={t} />
-                </Field>
-              );
-            }}
-          </form.Field>
         ) : null}
         {productTypeSlug === "spinner" ? (
           <form.Field name="bearing">

@@ -85,7 +85,6 @@ const product: CatalogProduct = {
   thicknessWithButtonMm: null,
   updatedAt: new Date("2026-01-02"),
   weightG: "90",
-  weightBasis: null,
   widthMm: null,
 };
 
@@ -114,7 +113,6 @@ const slider: CatalogProduct = {
   slug: "rail-slider",
   spinDiameterMm: null,
   thicknessMm: "12",
-  weightBasis: "complete-build",
   weightG: "96",
   widthMm: "24",
 };

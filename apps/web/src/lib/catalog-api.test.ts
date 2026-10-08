@@ -48,7 +48,6 @@ const base = {
   includedInsertProductId: null,
   includedPlateProductId: null,
   usesInserts: null,
-  weightBasis: null,
 };
 
 /**
@@ -335,7 +334,7 @@ describe("slider catalog product validation", () => {
     ).toBe(true);
   });
 
-  it("requires an explicit insert choice and paired slider weight basis", () => {
+  it("requires an explicit insert choice and rejects retired weight basis", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
@@ -350,7 +349,7 @@ describe("slider catalog product validation", () => {
         productTypeSlug: "slider",
         weightG: "120",
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       productFormSchema.safeParse({
         ...base,
@@ -360,7 +359,7 @@ describe("slider catalog product validation", () => {
         weightBasis: "complete-build",
         weightG: "120",
       }).success,
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("accepts one exact included insert only for sliders that use inserts", () => {

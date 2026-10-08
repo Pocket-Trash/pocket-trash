@@ -286,10 +286,10 @@ export const productFormSchema = z
     thicknessMm: numericSpecSchema,
     thicknessWithButtonMm: numericSpecSchema,
     weightG: numericSpecSchema,
-    weightBasis: z.enum(["body-only", "complete-build"]).nullable(),
     widthMm: numericSpecSchema,
     usesInserts: z.boolean().nullable(),
   })
+  .strict()
   .superRefine(
     (
       {
@@ -304,7 +304,6 @@ export const productFormSchema = z
         productTypeSlug,
         spinDiameterMm,
         thicknessMm,
-        weightBasis,
         weightG,
         widthMm,
         usesInserts,
@@ -373,23 +372,6 @@ export const productFormSchema = z
             path: ["magnetConfiguration"],
           });
         }
-      }
-      if (
-        productTypeSlug === "slider" &&
-        (weightG === null) !== (weightBasis === null)
-      ) {
-        context.addIssue({
-          code: "custom",
-          message: "web.catalog.error.form",
-          path: [weightG === null ? "weightG" : "weightBasis"],
-        });
-      }
-      if (productTypeSlug !== "slider" && weightBasis !== null) {
-        context.addIssue({
-          code: "custom",
-          message: "web.catalog.error.form",
-          path: ["weightBasis"],
-        });
       }
       if (productTypeSlug !== "slider" && includedInsertProductId !== null) {
         context.addIssue({
@@ -1477,7 +1459,6 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
         thicknessMm: parsed.data.thicknessMm,
         thicknessWithButtonMm: parsed.data.thicknessWithButtonMm,
         weightG: parsed.data.weightG,
-        weightBasis: parsed.data.weightBasis,
         widthMm: parsed.data.widthMm,
         usesInserts: parsed.data.usesInserts,
       },

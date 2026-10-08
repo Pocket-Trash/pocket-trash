@@ -69,7 +69,6 @@ function product(
     thicknessMm: null,
     thicknessWithButtonMm: null,
     updatedAt: new Date(0),
-    weightBasis: null,
     weightG: null,
     widthMm: null,
   };
