@@ -540,6 +540,13 @@
       "when": 1791495436940,
       "tag": "0076_exotic_the_initiative",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1791496606492,
+      "tag": "0077_remove_old_name_subtype_compatibility_views",
+      "breakpoints": true
     }
   ]
 }
