@@ -211,11 +211,8 @@ describe("finish option editor", () => {
   it("renders the owned material and product finish choices", () => {
     const product: CatalogProduct = {
       approvalStatus: "approved",
-      advertisedInsertOffers: [],
       bearing: null,
       bodyHostedMagnetSetup: null,
-      insertClickOptions: [],
-      insertMagnetOffers: [],
       buttonDiameterMm: null,
       canAdminister: false,
       canEdit: true,
@@ -235,7 +232,7 @@ describe("finish option editor", () => {
       ],
       imageCount: 0,
       images: [],
-      includedComponents: [],
+      includedInsert: null,
       includedPlate: null,
       id: 1000,
       lengthMm: null,
@@ -245,7 +242,7 @@ describe("finish option editor", () => {
       makerProductUrl: null,
       makerProductUrlValid: true,
       makerUrl: null,
-      magnetSystem: null,
+      usesInserts: null,
       materials: [{ id: 1000, name: "Bronze", slug: "bronze" }],
       name: "Spinner",
       ownerClerkId: "user_test",
@@ -367,7 +364,7 @@ describe("finish option editor", () => {
   it("offers only available slider components and restores the installed assembly", () => {
     const slider = {
       ...productFixture(3000, "Slider", "slider"),
-      magnetSystem: "insert-driven" as const,
+      usesInserts: true,
     };
     const plate = productFixture(3001, "Plate", "slider-plate");
     const insert = productFixture(3002, "Insert", "slider-insert");
@@ -401,39 +398,8 @@ describe("finish option editor", () => {
     expect(html).not.toContain("Busy plate");
   });
 
-  it("offers live defaults, exact offers, and custom owned insert setups", () => {
-    const insert = {
-      ...productFixture(3100, "Setup insert", "slider-insert"),
-      insertClickOptions: [
-        { clickCount: 3, id: 4100, insertionPosition: 0 },
-        { clickCount: 5, id: 4101, insertionPosition: 1 },
-      ],
-      insertMagnetOffers: [
-        {
-          clickCount: 5,
-          clickOptionId: 4101,
-          configuration: {
-            groups: [],
-            label: "Catalog layout",
-            slots: [
-              {
-                documentedColumn: null,
-                documentedRow: null,
-                groupKey: null,
-                half: "half-a" as const,
-                key: "A1",
-                state: "empty" as const,
-              },
-            ],
-            sourceLabel: null,
-            sourceNotes: null,
-          },
-          id: 4200,
-          insertProductId: 3100,
-          isAdvertisedDefault: true,
-        },
-      ],
-    };
+  it("offers default and custom owned insert setups", () => {
+    const insert = productFixture(3100, "Setup insert", "slider-insert");
     const html = renderToStaticMarkup(
       createElement(CollectionEditPage, {
         buttonProducts: [],
@@ -441,7 +407,7 @@ describe("finish option editor", () => {
         item: {
           ...collectionFixture(41, insert, 3101),
           ownedInsertSetup: {
-            clickCount: 3,
+            clickCount: null,
             configuration: null,
             sourceOfferId: null,
           },
@@ -453,10 +419,8 @@ describe("finish option editor", () => {
     );
 
     expect(html).toContain("Default setup");
-    expect(html).toContain("Select a setup offer");
     expect(html).toContain("Build from scratch");
-    expect(html).toContain("Click count");
-    expect(html.indexOf(">3<")).toBeLessThan(html.indexOf(">5<"));
+    expect(html).not.toContain("Select a setup offer");
   });
 
   it("clears a linked click option after any layout edit", () => {
@@ -477,7 +441,7 @@ describe("finish option editor", () => {
       ),
     ).toMatchObject({
       clickOptionId: null,
-      sourceOfferId: 4200,
+      sourceOfferId: null,
     });
   });
 });
@@ -634,7 +598,10 @@ describe("product form conditional fields", () => {
     expect(html).not.toContain("Reviewed advisory");
     expect(html).toContain("Maker terminology");
     expect(html).toContain("Add terminology alias");
-    if (productTypeSlug === "slider-plate") {
+    if (
+      productTypeSlug === "slider-plate" ||
+      productTypeSlug === "slider-insert"
+    ) {
       expect(html).not.toContain('aria-label="Length"');
       expect(html).not.toContain('aria-label="Weight"');
     } else {
@@ -642,21 +609,19 @@ describe("product form conditional fields", () => {
     }
     expect(html).not.toContain('aria-label="Diameter"');
     if (productTypeSlug === "slider") {
-      expect(html).toContain('aria-label="Magnet host"');
+      expect(html).toContain("web.slider.capability.usesInserts");
       expect(html).toContain('aria-label="Weight basis"');
       expect(html).toContain('aria-label="Click count"');
       expect(html).toContain("Magnet configuration");
       expect(html).toContain("web.slider.relationship.includedPlates");
       expect(html).toContain("web.slider.relationship.addPlates");
-      expect(html).toContain("Included components");
+      expect(html).not.toContain("Included components");
     } else {
-      expect(html).not.toContain('aria-label="Magnet host"');
+      expect(html).not.toContain("web.slider.capability.usesInserts");
       expect(html).not.toContain("Included components");
       if (productTypeSlug === "slider-insert") {
-        expect(html).toContain(
-          "Plate and insert measurements and weight describe the complete matched set.",
-        );
-        expect(html).toContain("Available insert setups");
+        expect(html).not.toContain("Appearance");
+        expect(html).not.toContain("Available insert setups");
       } else {
         expect(html).not.toContain(
           "Plate and insert measurements and weight describe the complete matched set.",
@@ -864,14 +829,13 @@ describe("collection add form", () => {
         productTypeSlug: "slider-plate" as const,
         slug: "suggested-plate",
       },
-      includedComponents: [
-        {
-          id: 1202,
-          name: "Suggested insert",
-          productTypeSlug: "slider-insert" as const,
-          slug: "suggested-insert",
-        },
-      ],
+      includedInsert: {
+        id: 1202,
+        name: "Suggested insert",
+        productTypeSlug: "slider-insert" as const,
+        slug: "suggested-insert",
+      },
+      usesInserts: true,
     };
     const html = renderToStaticMarkup(
       createElement(CollectionAddPage, {
@@ -915,14 +879,11 @@ function productFixture(
 ): CatalogProduct {
   return {
     approvalStatus: "approved",
-    advertisedInsertOffers: [],
     bearing: null,
     bodyHostedMagnetSetup:
       productTypeSlug === "slider"
         ? { clickCount: null, configuration: null, sourceNote: null }
         : null,
-    insertClickOptions: [],
-    insertMagnetOffers: [],
     buttonDiameterMm: null,
     canAdminister: false,
     canEdit: true,
@@ -942,7 +903,7 @@ function productFixture(
     ],
     imageCount: 0,
     images: [],
-    includedComponents: [],
+    includedInsert: null,
     includedPlate: null,
     id,
     lengthMm: null,
@@ -952,7 +913,7 @@ function productFixture(
     makerProductUrl: null,
     makerProductUrlValid: true,
     makerUrl: null,
-    magnetSystem: productTypeSlug === "slider" ? "body-hosted" : null,
+    usesInserts: productTypeSlug === "slider" ? false : null,
     materials: [{ id: id + 1, name: "Bronze", slug: "bronze" }],
     name,
     ownerClerkId: "user_test",
@@ -1016,7 +977,7 @@ function collectionFixture(
     installedInsertId: null,
     installedOnSliderId: null,
     installedPlateId: null,
-    includedComponents: [],
+    includedInsert: null,
     includedPlate: null,
     makerId: product.makerId,
     makerName: product.makerName,

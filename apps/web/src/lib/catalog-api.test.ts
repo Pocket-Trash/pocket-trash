@@ -44,9 +44,9 @@ const base = {
   thicknessWithButtonMm: null,
   weightG: null,
   widthMm: null,
-  includedComponentIds: [],
+  includedInsertProductId: null,
   includedPlateProductId: null,
-  magnetSystem: null,
+  usesInserts: null,
   weightBasis: null,
 };
 
@@ -324,13 +324,13 @@ describe("slider catalog product validation", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
-        magnetSystem: productTypeSlug === "slider" ? "body-hosted" : null,
+        usesInserts: productTypeSlug === "slider" ? false : null,
         productTypeSlug,
       }).success,
     ).toBe(true);
   });
 
-  it("requires an explicit slider magnet host and paired slider weight basis", () => {
+  it("requires an explicit insert choice and paired slider weight basis", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
@@ -340,7 +340,7 @@ describe("slider catalog product validation", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
-        magnetSystem: "insert-driven",
+        usesInserts: true,
         productTypeSlug: "slider",
         weightG: "120",
       }).success,
@@ -348,7 +348,7 @@ describe("slider catalog product validation", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
-        magnetSystem: "insert-driven",
+        usesInserts: true,
         productTypeSlug: "slider",
         weightBasis: "complete-build",
         weightG: "120",
@@ -356,15 +356,23 @@ describe("slider catalog product validation", () => {
     ).toBe(true);
   });
 
-  it("accepts exact included components for sliders", () => {
+  it("accepts one exact included insert only for sliders that use inserts", () => {
     const parsed = productFormSchema.parse({
       ...base,
-      includedComponentIds: [2000],
-      magnetSystem: "body-hosted",
+      includedInsertProductId: 2000,
       productTypeSlug: "slider",
+      usesInserts: true,
     });
 
-    expect(parsed.includedComponentIds).toEqual([2000]);
+    expect(parsed.includedInsertProductId).toBe(2000);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        includedInsertProductId: 2000,
+        productTypeSlug: "slider",
+        usesInserts: false,
+      }).success,
+    ).toBe(false);
   });
 
   it("accepts one included plate only for sliders", () => {
@@ -372,8 +380,8 @@ describe("slider catalog product validation", () => {
       productFormSchema.safeParse({
         ...base,
         includedPlateProductId: 2000,
-        magnetSystem: "body-hosted",
         productTypeSlug: "slider",
+        usesInserts: false,
       }).success,
     ).toBe(true);
     expect(
@@ -428,8 +436,8 @@ describe("slider catalog product validation", () => {
       productFormSchema.safeParse({
         ...base,
         bodyHostedMagnetSetup,
-        magnetSystem: "body-hosted",
         productTypeSlug: "slider",
+        usesInserts: false,
       }).success,
     ).toBe(true);
     expect(
@@ -447,75 +455,38 @@ describe("slider catalog product validation", () => {
             ],
           },
         },
-        magnetSystem: "body-hosted",
         productTypeSlug: "slider",
+        usesInserts: false,
       }).success,
     ).toBe(false);
   });
 
-  it("validates insert-owned offers and exactly one slider advertised default", () => {
-    const configuration = {
-      groups: [
-        {
-          diameterMm: "6.35",
-          grade: "N52",
-          key: "corners",
-          label: "Corners",
-          thicknessMm: "3.175",
-        },
-      ],
-      label: "Medium",
-      slots: [
-        {
-          documentedColumn: null,
-          documentedRow: null,
-          groupKey: "corners",
-          half: "half-a" as const,
-          key: "A1",
-          state: "occupied" as const,
-        },
-      ],
-      sourceLabel: null,
-      sourceNotes: null,
-    };
+  it("requires exactly one material and no appearance or measurements for inserts", () => {
     expect(
       productFormSchema.safeParse({
         ...base,
-        insertHostedMagnetOptions: {
-          clickCounts: [3, 5],
-          offers: [
-            {
-              clickCount: 3,
-              configuration,
-              isAdvertisedDefault: true,
-            },
-          ],
-        },
         productTypeSlug: "slider-insert",
       }).success,
     ).toBe(true);
     expect(
       productFormSchema.safeParse({
         ...base,
-        insertHostedMagnetOptions: {
-          clickCounts: [3],
-          offers: [
-            {
-              clickCount: 5,
-              configuration,
-              isAdvertisedDefault: false,
-            },
-          ],
-        },
+        materialIds: [1000, 2000],
         productTypeSlug: "slider-insert",
       }).success,
     ).toBe(false);
     expect(
       productFormSchema.safeParse({
         ...base,
-        advertisedInsertOffers: [{ isAdvertisedDefault: false, offerId: 4000 }],
-        magnetSystem: "insert-driven",
-        productTypeSlug: "slider",
+        finishOptions: validFinishOptions,
+        productTypeSlug: "slider-insert",
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        productTypeSlug: "slider-insert",
+        weightG: "12",
       }).success,
     ).toBe(false);
   });

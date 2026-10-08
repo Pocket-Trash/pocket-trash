@@ -25,7 +25,6 @@ function product(
   productTypeSlug: "slider" | "slider-insert" | "slider-plate",
 ): CatalogProduct {
   return {
-    advertisedInsertOffers: [],
     approvalStatus: "approved",
     bearing: null,
     bodyHostedMagnetSetup: null,
@@ -41,14 +40,12 @@ function product(
     id,
     imageCount: 0,
     images: [],
-    includedComponents: [],
+    includedInsert: null,
     includedPlate: null,
-    insertClickOptions: [],
-    insertMagnetOffers: [],
     isAdminPrivate: false,
     isPrivate: false,
     lengthMm: null,
-    magnetSystem: productTypeSlug === "slider" ? "insert-driven" : null,
+    usesInserts: productTypeSlug === "slider" ? true : null,
     makerId: 1000,
     makerName: "Assembly maker",
     makerSlug: "assembly-maker",
@@ -83,30 +80,8 @@ const slider = product(2000, "Assembly slider", "slider");
 const plate = product(2001, "Assembly plate", "slider-plate");
 /** Insert catalog product used by the edit page. */
 const insert = product(2002, "Assembly insert", "slider-insert");
-/** Insert catalog product with selectable setup vocabulary. */
-const setupInsert: CatalogProduct = {
-  ...insert,
-  insertClickOptions: [
-    { clickCount: 3, id: 2100, insertionPosition: 0 },
-    { clickCount: 5, id: 2101, insertionPosition: 1 },
-  ],
-  insertMagnetOffers: [
-    {
-      clickCount: 5,
-      clickOptionId: 2101,
-      configuration: {
-        groups: [],
-        label: "Maker five-click layout",
-        slots: [],
-        sourceLabel: null,
-        sourceNotes: null,
-      },
-      id: 2200,
-      insertProductId: insert.id,
-      isAdvertisedDefault: true,
-    },
-  ],
-};
+/** Insert catalog product used by the setup editor story. */
+const setupInsert = insert;
 
 /**
  * Creates one owned assembly item.
@@ -144,7 +119,7 @@ function item(
     installedInsertId: null,
     installedOnSliderId: null,
     installedPlateId: null,
-    includedComponents: [],
+    includedInsert: null,
     includedPlate: null,
     isAdminPrivate: false,
     isOwner: true,
@@ -280,7 +255,7 @@ export const InstalledSliderAssembly: Story = {
   },
 };
 
-/** Owned insert setup editor with live default, offer, and custom paths. */
+/** Owned insert setup editor with default and custom paths. */
 export const OwnedInsertSetup: Story = {
   args: {
     item: item(4010, setupInsert, "Setup insert"),
@@ -288,7 +263,7 @@ export const OwnedInsertSetup: Story = {
     product: setupInsert,
   },
   /**
-   * Verifies custom setup initialization and click-link clearing after layout edits.
+   * Verifies custom setup initialization.
    *
    * @param context - Story interaction context.
    * @param context.canvas - Rendered story queries.
@@ -301,16 +276,10 @@ export const OwnedInsertSetup: Story = {
         name: /build from scratch|web\.slider\.setup\.fromScratch/iu,
       }),
     );
-    const clickSelector = canvas.getByRole("combobox", {
-      name: /click count|web\.slider\.setup\.clickCount/iu,
+    const label = canvas.getByRole("textbox", {
+      name: /configuration label|web\.slider\.magnet\.vocabularyLabel/iu,
     });
-    await expect(clickSelector).toHaveValue("2100");
-    await userEvent.type(
-      canvas.getByRole("textbox", {
-        name: /configuration label|web\.slider\.magnet\.vocabularyLabel/iu,
-      }),
-      "Owner layout",
-    );
-    await expect(clickSelector).toHaveValue("");
+    await userEvent.type(label, "Owner layout");
+    await expect(label).toHaveValue("Owner layout");
   },
 };
