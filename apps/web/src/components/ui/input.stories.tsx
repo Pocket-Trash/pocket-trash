@@ -38,6 +38,33 @@ export const Disabled: Story = {
 };
 
 /**
+ * Shows the input read-only example.
+ */
+export const ReadOnly: Story = {
+  args: { readOnly: true, value: "Generated value" },
+  decorators: [withThemePanels],
+  /**
+   * Verifies read-only inputs remain focusable without accepting edits.
+   *
+   * @param context - Storybook interaction context.
+   * @param context.canvas - Queries scoped to the rendered story canvas.
+   * @param context.userEvent - Storybook interaction driver.
+   */
+  play: async ({ canvas, userEvent }) => {
+    const input = canvas.getAllByRole("textbox", { name: "Search" }).at(0);
+
+    await expect(input).toBeDefined();
+    if (!input) return;
+    await expect(input).toHaveAttribute("readonly");
+    await expect(input).not.toBeDisabled();
+    await userEvent.click(input);
+    await expect(input).toHaveFocus();
+    await userEvent.type(input, " changed");
+    await expect(input).toHaveValue("Generated value");
+  },
+};
+
+/**
  * Shows the input types example.
  */
 export const Types: Story = {

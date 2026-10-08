@@ -534,6 +534,24 @@ describe("collection item deletion", () => {
 });
 
 describe("product form conditional fields", () => {
+  it("renders the product and lookup slug previews as read-only inputs", () => {
+    const html = renderToStaticMarkup(
+      createElement(ProductEditor, {
+        initialProduct: productFixture(1004, "Test product", "spinner"),
+        options: emptyCatalogOptions,
+        productTypeSlug: "spinner",
+      }),
+    );
+    const slugInputs = html.match(
+      /<input(?=[^>]*aria-label="Slug")(?=[^>]*readOnly="")(?=[^>]*value="[^"]*")[^>]*>/gu,
+    );
+
+    expect(slugInputs).toContainEqual(
+      expect.stringContaining('value="test-product"'),
+    );
+    expect(slugInputs).toContainEqual(expect.stringContaining('value=""'));
+  });
+
   it.each([
     "spinner",
     "spinner-button",
