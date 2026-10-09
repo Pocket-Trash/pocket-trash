@@ -56,9 +56,9 @@
     "test:watch:no-infisical": "turbo run test:watch:no-infisical",
     "test:workflows": "node --import tsx --test scripts/change-classification.test.mjs scripts/database-change-detection.test.mjs scripts/check-changelog-reminder.test.mjs scripts/developer-commands.test.mjs scripts/e2e-local-contract.test.mjs scripts/validate-pr.test.mjs scripts/check-pr-changeset.test.mjs scripts/check-railway-context.test.mjs scripts/release.test.mjs scripts/railway-config.test.mjs",
     "typecheck": "turbo run typecheck && pnpm typecheck:railway",
+    "typecheck:railway": "tsc -p .railway/tsconfig.json --noEmit",
     "users:reconcile": "pnpm --filter @app/api users:reconcile",
-    "validate:pr": "node scripts/validate-pr.mjs",
-    "typecheck:railway": "tsc -p .railway/tsconfig.json --noEmit"
+    "validate:pr": "node scripts/validate-pr.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.1",
