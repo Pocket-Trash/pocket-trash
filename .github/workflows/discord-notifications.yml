@@ -29,22 +29,22 @@ jobs:
   notify:
     name: Notify Discord
     if: ${{ !((github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && github.event.pull_request.head.repo.full_name != github.repository) && !(github.event_name == 'workflow_run' && github.event.workflow_run.head_repository.full_name != github.repository) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       id-token: write
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22.20.0
+          node-version: 24.21.0
           cache: pnpm
 
       - name: Install dependencies

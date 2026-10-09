@@ -61,7 +61,7 @@ deployment succeeds.
 
 ## Dependency Security
 
-Use Node 22.20.0 or newer within Node 22 and pnpm 11.27.1. Installs reject
+Use Node 24.21.0 or newer within Node 24 and pnpm 11.27.1. Installs reject
 external package releases younger than seven days, missing publication times,
 and lockfiles that do not satisfy the current policy. Run the blocking audit
 before building or deploying:
