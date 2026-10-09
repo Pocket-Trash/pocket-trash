@@ -311,7 +311,7 @@ describe("collection-item approval", () => {
         collectionItemId: item.id,
         customFinish: null,
         finishOptionId: null,
-        materialId: material.id,
+
         displayName: "Owner-edited spinner",
       });
       await expect(

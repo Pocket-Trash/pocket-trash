@@ -43,7 +43,10 @@ describe("catalog schema", () => {
       "created_at",
       "updated_at",
     ]);
-    expect(productMaterial.primaryKeys).toHaveLength(1);
+    expect(schema.productMaterial.id.primary).toBe(true);
+    expect(productMaterial.uniqueConstraints.map(({ name }) => name)).toContain(
+      "product_material_assignment_unique",
+    );
     expect(productMaterial.indexes.map(({ config }) => config.name)).toContain(
       "product_material_material_id_idx",
     );
@@ -66,7 +69,7 @@ describe("catalog schema", () => {
       ]),
     );
     expect(materialImage.indexes.map(({ config }) => config.name)).toContain(
-      "material_image_material_id_idx",
+      "material_image_scope_position_idx",
     );
     expect(color.columns.find(({ name }) => name === "hex")?.notNull).toBe(
       true,

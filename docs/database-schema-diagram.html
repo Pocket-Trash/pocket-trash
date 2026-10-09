@@ -520,6 +520,7 @@
                   "collection_id FK bigint",
                   "display_name? text",
                   "description? text",
+                  "material_specific_id? FK bigint",
                   "material_id? FK bigint",
                   "purchased_at? timestamp with time zone",
                   "sold_at? timestamp with time zone",
@@ -825,6 +826,7 @@
             ],
             "fields": [
                   "id PK bigint",
+                  "material_specific_id? FK bigint",
                   "material_id FK bigint",
                   "position integer",
                   "file_name text",
@@ -842,6 +844,23 @@
             ],
             "id": "material_image",
             "name": "material_image",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "material_id FK bigint",
+                  "name text",
+                  "slug text",
+                  "description? text",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "material_specific",
+            "name": "material_specific",
             "status": "existing"
       },
       {
@@ -1050,8 +1069,10 @@
                   "full"
             ],
             "fields": [
-                  "product_id PK/FK bigint",
-                  "material_id PK/FK bigint"
+                  "id PK bigint",
+                  "product_id FK bigint",
+                  "material_specific_id? FK bigint",
+                  "material_id FK bigint"
             ],
             "id": "product_material",
             "name": "product_material",
@@ -1851,6 +1872,11 @@
       ],
       [
             "collection_item",
+            "material_specific",
+            "material_id, material_specific_id → material_id, id"
+      ],
+      [
+            "collection_item",
             "user_collection",
             "collection_id, owner_id → id, owner_id"
       ],
@@ -1935,6 +1961,16 @@
             "material_id → id"
       ],
       [
+            "material_image",
+            "material_specific",
+            "material_id, material_specific_id → material_id, id"
+      ],
+      [
+            "material_specific",
+            "materials",
+            "material_id → id"
+      ],
+      [
             "product",
             "product_types",
             "product_type_id → id"
@@ -1998,6 +2034,11 @@
             "product_material",
             "materials",
             "material_id → id"
+      ],
+      [
+            "product_material",
+            "material_specific",
+            "material_id, material_specific_id → material_id, id"
       ],
       [
             "resource_downloads",

@@ -11,6 +11,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -339,6 +340,53 @@ export const material = pgTable(
       sql`${table.description} is null or char_length(${table.description}) <= 5000`,
     ),
   }),
+);
+
+/** PostgreSQL trim character set matching JavaScript String.trim(). */
+const materialNameWhitespace = sql.raw(
+  "E' \\t\\n\\r\\f\\013\\u00a0\\u1680\\u2000\\u2001\\u2002\\u2003\\u2004\\u2005\\u2006\\u2007\\u2008\\u2009\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff'",
+);
+
+/** Canonical alloys and grades whose general material never changes. */
+export const materialSpecific = pgTable(
+  "material_specific",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    materialId: bigint("material_id", { mode: "number" })
+      .notNull()
+      .references(() => material.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    /** Optional Markdown content for this alloy or grade. */
+    description: text("description"),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("material_specific_parent_id_unique").on(table.materialId, table.id),
+    unique("material_specific_parent_slug_unique").on(
+      table.materialId,
+      table.slug,
+    ),
+    uniqueIndex("material_specific_parent_name_unique").on(
+      table.materialId,
+      sql`lower(btrim(${table.name}, ${materialNameWhitespace}))`,
+    ),
+    check(
+      "material_specific_name_valid",
+      sql`char_length(btrim(${table.name}, ${materialNameWhitespace})) > 0`,
+    ),
+    check(
+      "material_specific_description_length_valid",
+      sql`${table.description} is null or char_length(${table.description}) <= 5000`,
+    ),
+  ],
 );
 
 /** Canonical pen mechanisms shared by scraped and user-created products. */

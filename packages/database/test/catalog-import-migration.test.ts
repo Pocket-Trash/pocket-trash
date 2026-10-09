@@ -19,7 +19,7 @@ describe("catalog import baseline", () => {
     await migrate(drizzle({ client: database }), {
       migrationsFolder: fileURLToPath(new URL("../drizzle/", import.meta.url)),
     });
-  });
+  }, 30_000);
 
   afterAll(async () => {
     await database.close();

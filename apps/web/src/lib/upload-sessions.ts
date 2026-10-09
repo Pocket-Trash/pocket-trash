@@ -906,6 +906,8 @@ export async function uploadImages(input: {
    * Optional moderation or audit reason.
    */
   reason?: string;
+  /** Optional alloy or grade scope for one material upload batch. */
+  materialSpecificId?: number | null;
   /**
    * Identifier of the upload target.
    */
@@ -931,7 +933,13 @@ export async function uploadImages(input: {
       files: [],
       images: input.files,
       getToken: input.getToken,
-      payload: input.reason ? { reason: input.reason } : undefined,
+      payload:
+        input.reason || input.materialSpecificId !== undefined
+          ? {
+              reason: input.reason,
+              materialSpecificId: input.materialSpecificId,
+            }
+          : undefined,
     });
     return { uploaded: input.files, failed: [] };
   } catch (error) {

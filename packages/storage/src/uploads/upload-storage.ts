@@ -139,7 +139,7 @@ export type UploadStorage = {
     size: number,
   ): ArchiveTarget;
   /**
-   * Creates a content-addressed image destination.
+   * Creates an image destination using its digest or a supplied unique name.
    *
    * @param input - Validated image metadata and digest.
    * @param target - Image-owning entity and positive identifier.
@@ -153,6 +153,8 @@ export type UploadStorage = {
       entity: ImageEntity;
       /** Positive owning record identifier. */
       entityId: number;
+      /** Optional unique object name while preserving entity ownership. */
+      name?: string;
     },
   ): UploadTarget;
   /**
@@ -346,14 +348,14 @@ export function createUploadStorage(input: UploadStorageConfig): UploadStorage {
       }
     },
     /**
-     * Creates a content-addressed image destination.
+     * Creates an image destination using its digest or a supplied unique name.
      *
      * @param metadata - Validated image metadata and digest.
      * @param target - Image-owning entity and positive identifier.
      * @returns Server-owned image upload target.
      * @throws When metadata, ownership, digest, or path configuration are invalid.
      */
-    createImageTarget(metadata, { entity, entityId }) {
+    createImageTarget(metadata, { entity, entityId, name }) {
       assertEntityId(entityId);
       const extension = validateUploadMetadata(
         metadata,
@@ -366,7 +368,7 @@ export function createUploadStorage(input: UploadStorageConfig): UploadStorage {
         prefix: config.imageFolderPrefix,
         entity,
         entityId,
-        name: metadata.sha256,
+        name: name ?? metadata.sha256,
         extension,
       });
       return {

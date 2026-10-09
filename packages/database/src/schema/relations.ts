@@ -150,12 +150,26 @@ export const relations = defineRelations(tables, (r) => ({
     }),
   },
   material: {
+    specifics: r.many.materialSpecific(),
     autmogPens: r.many.tmpAutmogPenMaterials(),
     collectionItems: r.many.collectionItem(),
     images: r.many.materialImage(),
     products: r.many.productMaterial(),
   },
+  materialSpecific: {
+    material: r.one.material({
+      from: [r.materialSpecific.materialId],
+      to: [r.material.id],
+    }),
+    images: r.many.materialImage(),
+    products: r.many.productMaterial(),
+    collectionItems: r.many.collectionItem(),
+  },
   materialImage: {
+    specific: r.one.materialSpecific({
+      from: [r.materialImage.materialSpecificId],
+      to: [r.materialSpecific.id],
+    }),
     material: r.one.material({
       from: [r.materialImage.materialId],
       to: [r.material.id],
@@ -171,6 +185,10 @@ export const relations = defineRelations(tables, (r) => ({
   },
   scraperRuns: {},
   collectionItem: {
+    specific: r.one.materialSpecific({
+      from: [r.collectionItem.materialSpecificId],
+      to: [r.materialSpecific.id],
+    }),
     collection: r.one.userCollection({
       from: [r.collectionItem.collectionId],
       to: [r.userCollection.id],
@@ -267,6 +285,10 @@ export const relations = defineRelations(tables, (r) => ({
     }),
   },
   productMaterial: {
+    specific: r.one.materialSpecific({
+      from: [r.productMaterial.materialSpecificId],
+      to: [r.materialSpecific.id],
+    }),
     material: r.one.material({
       from: [r.productMaterial.materialId],
       to: [r.material.id],

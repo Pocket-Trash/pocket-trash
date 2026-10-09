@@ -93,6 +93,22 @@ export const productAudit = {
     "products.product.maker_url_validity_changed",
     "products.product",
   ),
+  materialImageMoved: definition(
+    "products.material_image.moved",
+    "products.material",
+  ),
+  materialImagesReordered: definition(
+    "products.material_images.reordered",
+    "products.material",
+  ),
+  materialSpecificCreated: definition(
+    "products.material_specific.created",
+    "products.material_specific",
+  ),
+  materialSpecificUpdated: definition(
+    "products.material_specific.updated",
+    "products.material_specific",
+  ),
   materialCreated: definition("products.material.created", "products.material"),
   materialImageAdded: definition(
     "products.material_image.added",

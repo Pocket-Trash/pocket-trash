@@ -116,11 +116,38 @@ function permissionFor(target: UploadTarget["type"]): Permission {
   return "collections.manage";
 }
 /**
+ * Verifies that an optional image scope belongs to its general material.
+ *
+ * @param db - Transaction that owns the material target lock.
+ * @param target - General image target.
+ * @param materialSpecificId - Optional alloy or grade identifier.
+ * @rejects When a scope is supplied on another target or belongs to another material.
+ */
+export async function assertMaterialScope(
+  db: StorageDb,
+  target: UploadTarget,
+  materialSpecificId?: number | null,
+) {
+  if (target.type !== "material") {
+    if (materialSpecificId !== undefined)
+      throw new UploadSessionError("invalid_request", 400);
+    return;
+  }
+  if (materialSpecificId == null) return;
+  if (!Number.isSafeInteger(materialSpecificId) || materialSpecificId <= 0)
+    throw new UploadSessionError("invalid_request", 400);
+  const result = await db.execute(sql`select 1 from material_specific
+    where id = ${materialSpecificId} and material_id = ${target.id}`);
+  if (!result.rows.length) throw new UploadSessionError("invalid_request", 400);
+}
+
+/**
  * Rejects catalog images whose digest already exists on their target.
  *
  * @param db - Application database.
  * @param target - Entity receiving the images.
  * @param files - Uploaded image digests to compare.
+ * @param materialSpecificId - Optional material scope, defaulting to General.
  * @rejects When duplicate lookup fails or an active or soft-deleted duplicate exists.
  */
 export async function assertNoDuplicateImages(
@@ -130,6 +157,7 @@ export async function assertNoDuplicateImages(
     /** SHA-256 digest used for duplicate detection. */
     sha256: string;
   }>,
+  materialSpecificId?: number | null,
 ) {
   if (target.type === "resource") return;
   const mapping = imageTargets[target.type];
@@ -143,7 +171,7 @@ export async function assertNoDuplicateImages(
     /** Deleting role, or `null` for an active image. */
     deletedByRole: string | null;
   }>(
-    sql`select id, sha256, ${mapping.softDelete ? sql`deleted_at` : sql`null`} as "deletedAt", ${mapping.softDelete ? sql`deleted_by_role` : sql`null`} as "deletedByRole" from ${sql.identifier(mapping.table)} where ${sql.identifier(mapping.column)} = ${target.id}`,
+    sql`select id, sha256, ${mapping.softDelete ? sql`deleted_at` : sql`null`} as "deletedAt", ${mapping.softDelete ? sql`deleted_by_role` : sql`null`} as "deletedByRole" from ${sql.identifier(mapping.table)} where ${sql.identifier(mapping.column)} = ${target.id} ${target.type === "material" ? sql`and material_specific_id is not distinct from ${materialSpecificId ?? null}` : sql``}`,
   );
   for (const file of files) {
     const existing = result.rows.find((row) => row.sha256 === file.sha256);
@@ -172,6 +200,8 @@ export async function attachImages(
   input: {
     /** Entity receiving the images. */
     target: UploadTarget;
+    /** Optional alloy or grade scope for material targets only. */
+    materialSpecificId?: number | null;
     /** Images appended in upload order. */
     files: UploadedFile[];
     /** Actor requesting the attachment. */
@@ -191,8 +221,10 @@ export async function attachImages(
   }
   if (target.type === "resource")
     throw new UploadSessionError("invalid_request", 400);
+  await lockTarget(db, target);
   await assertCanEditTarget(db, target, actor);
-  await assertNoDuplicateImages(db, target, files);
+  await assertMaterialScope(db, target, input.materialSpecificId);
+  await assertNoDuplicateImages(db, target, files, input.materialSpecificId);
   const mapping = imageTargets[target.type];
   const table = sql.identifier(mapping.table),
     column = sql.identifier(mapping.column);
@@ -202,7 +234,7 @@ export async function attachImages(
      */
     position: number;
   }>(
-    sql`select coalesce(max(position),-1)::int + 1 as position from ${table} where ${column} = ${target.id}`,
+    sql`select coalesce(max(position),-1)::int + 1 as position from ${table} where ${column} = ${target.id} ${target.type === "material" ? sql`and material_specific_id is not distinct from ${input.materialSpecificId ?? null}` : sql``}`,
   );
   let position = result.rows[0]?.position ?? 0;
   const collectionHasCover =
@@ -214,7 +246,7 @@ export async function attachImages(
     ).rows.length > 0;
   for (const [index, file] of files.entries()) {
     await db.execute(
-      sql`insert into ${table} (${column}, position, file_name, content_type, size, sha256, object_path, url, uploaded_by_clerk_id${target.type === "collection" ? sql`, is_current` : sql``}) values (${target.id}, ${position++}, ${file.fileName}, ${file.contentType}, ${file.size}, ${file.sha256}, ${file.objectPath}, ${file.url}, ${actor.clerkId}${target.type === "collection" ? sql`, ${!collectionHasCover && index === 0}` : sql``})`,
+      sql`insert into ${table} (${column}${target.type === "material" ? sql`, material_specific_id` : sql``}, position, file_name, content_type, size, sha256, object_path, url, uploaded_by_clerk_id${target.type === "collection" ? sql`, is_current` : sql``}) values (${target.id}${target.type === "material" ? sql`, ${input.materialSpecificId ?? null}` : sql``}, ${position++}, ${file.fileName}, ${file.contentType}, ${file.size}, ${file.sha256}, ${file.objectPath}, ${file.url}, ${actor.clerkId}${target.type === "collection" ? sql`, ${!collectionHasCover && index === 0}` : sql``})`,
     );
   }
   if (target.type === "collection")

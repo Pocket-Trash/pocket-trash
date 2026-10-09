@@ -205,7 +205,12 @@ describe("owned slider assemblies", () => {
           customFinish: null,
           displayName: productTypeSlug,
           finishOptionId: null,
-          materialId: material.id,
+          materialAssignmentId: (
+            await db
+              .select({ id: schema.productMaterial.id })
+              .from(schema.productMaterial)
+              .where(eq(schema.productMaterial.productId, productId))
+          )[0]!.id,
           productId,
           productTypeSlug,
         });
@@ -226,13 +231,13 @@ describe("owned slider assemblies", () => {
         actor,
         buttonCustomFinish: null,
         buttonFinishOptionId: null,
-        buttonMaterialId: null,
+        buttonMaterialAssignmentId: null,
         buttonProductId: null,
         collectionId: primary.id,
         displayName: "Spinner",
         spinnerCustomFinish: null,
         spinnerFinishOptionId: null,
-        spinnerMaterialId: material.id,
+        spinnerMaterialAssignmentId: material.id,
         spinnerProductId,
       });
       const spinnerButtonId = await service.addSpinnerButton({
@@ -241,7 +246,12 @@ describe("owned slider assemblies", () => {
         customFinish: null,
         displayName: "Spinner button",
         finishOptionId: null,
-        materialId: material.id,
+        materialAssignmentId: (
+          await db
+            .select({ id: schema.productMaterial.id })
+            .from(schema.productMaterial)
+            .where(eq(schema.productMaterial.productId, spinnerButtonProductId))
+        )[0]!.id,
         productId: spinnerButtonProductId,
       });
 
@@ -269,9 +279,7 @@ describe("owned slider assemblies", () => {
           collectionItemId: spinnerButtonId,
           customFinish: null,
           finishOptionId: null,
-          materialId: material.id,
         },
-        materialId: material.id,
       });
       await expect(
         service.getPublicCollection({
@@ -302,7 +310,6 @@ describe("owned slider assemblies", () => {
         displayName: "Spinner",
         finishOptionId: null,
         installedButton: null,
-        materialId: material.id,
       });
       await expect(
         service.getOwnedItem(actor, spinnerButtonId),
@@ -358,7 +365,6 @@ describe("owned slider assemblies", () => {
         finishOptionId: null,
         installedInsert: { collectionItemId: insertId },
         installedPlate: { collectionItemId: plateId },
-        materialId: material.id,
       });
       await expect(
         service.getOwnedItem(actor, insertSliderId),
@@ -441,7 +447,6 @@ describe("owned slider assemblies", () => {
           displayName: "Body slider",
           finishOptionId: null,
           installedInsert: { collectionItemId: insertId },
-          materialId: material.id,
         }),
       ).rejects.toThrow("This slider does not use inserts.");
       await expect(
@@ -452,7 +457,6 @@ describe("owned slider assemblies", () => {
           displayName: "Body slider",
           finishOptionId: null,
           installedPlate: { collectionItemId: plateId },
-          materialId: material.id,
         }),
       ).rejects.toThrow("already installed on another slider");
       await service.updateItem({
@@ -462,7 +466,6 @@ describe("owned slider assemblies", () => {
         displayName: "Insert slider",
         finishOptionId: null,
         installedPlate: { collectionItemId: otherPlateId },
-        materialId: material.id,
       });
       await expect(service.getOwnedItem(actor, plateId)).resolves.toEqual(
         expect.objectContaining({
@@ -481,7 +484,6 @@ describe("owned slider assemblies", () => {
         customFinish: null,
         displayName: "Plate",
         finishOptionId: null,
-        materialId: material.id,
       });
       await expect(
         service.getOwnedItem(actor, insertSliderId),
@@ -503,7 +505,6 @@ describe("owned slider assemblies", () => {
         customFinish: null,
         displayName: "Still installed",
         finishOptionId: null,
-        materialId: material.id,
       });
       await service.updateItem({
         actor,
@@ -512,7 +513,6 @@ describe("owned slider assemblies", () => {
         displayName: "Uninstalled",
         finishOptionId: null,
         installedPlate: null,
-        materialId: material.id,
       });
       await service.updateItem({
         actor,
@@ -521,7 +521,6 @@ describe("owned slider assemblies", () => {
         displayName: "Reinstalled",
         finishOptionId: null,
         installedPlate: { collectionItemId: otherPlateId },
-        materialId: material.id,
       });
 
       await service.deleteItem({
@@ -540,7 +539,6 @@ describe("owned slider assemblies", () => {
         displayName: "Ready to delete",
         finishOptionId: null,
         installedPlate: { collectionItemId: otherPlateId },
-        materialId: material.id,
       });
       await service.deleteItem({
         actor,
@@ -574,7 +572,6 @@ describe("owned slider assemblies", () => {
           displayName: "Blocked public install",
           finishOptionId: null,
           installedPlate: { collectionItemId: otherPlateId },
-          materialId: material.id,
         }),
       ).rejects.toThrow("slider-plate");
 
@@ -590,7 +587,6 @@ describe("owned slider assemblies", () => {
         displayName: "Private assembly",
         finishOptionId: null,
         installedPlate: { collectionItemId: otherPlateId },
-        materialId: material.id,
       });
       await expect(
         service.setItemVisibility({
@@ -606,7 +602,6 @@ describe("owned slider assemblies", () => {
         displayName: "Detached assembly",
         finishOptionId: null,
         installedPlate: null,
-        materialId: material.id,
       });
       await expect(service.getOwnedItem(actor, otherPlateId)).resolves.toEqual(
         expect.objectContaining({

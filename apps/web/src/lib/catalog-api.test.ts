@@ -36,7 +36,7 @@ const base = {
   makerId: 1000,
   makerProductUrl: "",
   magnetLayout: null,
-  materialIds: [1000],
+  materialAssignments: [{ materialId: 1000, materialSpecificId: null }],
   name: "Spinner",
   productId: null,
   productTypeSlug: "spinner" as const,
@@ -468,7 +468,10 @@ describe("slider catalog product validation", () => {
       productFormSchema.safeParse({
         ...base,
         magnetLayout: "2x4",
-        materialIds: [1000, 2000],
+        materialAssignments: [
+          { materialId: 1000, materialSpecificId: null },
+          { materialId: 2000, materialSpecificId: null },
+        ],
         productTypeSlug: "slider-insert",
       }).success,
     ).toBe(false);

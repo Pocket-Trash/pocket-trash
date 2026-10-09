@@ -341,7 +341,9 @@ describe("product deletion", () => {
           name: "Spinner",
           description: "Catalog description",
           bearing: "R188",
-          materialIds: [material.id],
+          materialAssignments: [
+            { materialId: material.id, materialSpecificId: null },
+          ],
           finishOptions: [{ id: option.id, finishIds: [finish.id] }],
           images: expect.any(Array),
         },

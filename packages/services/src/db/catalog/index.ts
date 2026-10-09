@@ -5,6 +5,7 @@ import {
   and,
   asc,
   count,
+  countDistinct,
   desc,
   eq,
   inArray,
@@ -16,7 +17,7 @@ import {
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { type Actor, hasPermission } from "../../authorization.js";
-import { nextAvailableSlug } from "../../catalog-slug.js";
+import { nextAvailableSlug, slugify } from "../../catalog-slug.js";
 import { normalizeCatalogSearch } from "../../catalog-terminology.js";
 import {
   type SliderMagnetConfiguration,
@@ -34,6 +35,7 @@ import type {
   WeightUnit,
 } from "../../measurements.js";
 import {
+  assertMaterialScope,
   attachImages as attachStoredImages,
   lockTarget,
   selectCollectionCover as selectStoredCover,
@@ -131,7 +133,7 @@ export class CollectionAssemblyPrivacyBlockedError extends Error {
 }
 
 /**
- * Returns the violated PostgreSQL unique-constraint name.
+ * Returns the violated PostgreSQL unique or check constraint name.
  *
  * @param error - Candidate error.
  * @returns Constraint name, or `undefined` for other errors.
@@ -143,7 +145,7 @@ function uniqueConstraint(error: unknown): string | undefined {
     typeof databaseError === "object" &&
     databaseError !== null &&
     "code" in databaseError &&
-    databaseError.code === "23505" &&
+    (databaseError.code === "23505" || databaseError.code === "23514") &&
     "constraint" in databaseError &&
     typeof databaseError.constraint === "string"
   ) {
@@ -161,6 +163,15 @@ const catalogNameConflictMessages: Record<string, string> = {
   makers_name_case_insensitive_unique: "Maker name already exists.",
   makers_root_url_unique: "Maker root URL already exists.",
   makers_slug_unique: "Maker slug already exists.",
+  material_specific_parent_name_unique:
+    "web.materials.validation.duplicateSpecific",
+  material_specific_parent_slug_unique:
+    "web.materials.validation.slugCollision",
+  materials_slug_unique: "web.materials.validation.slugCollision",
+  material_specific_parent_name_protection:
+    "web.materials.validation.parentNameConflict",
+  material_specific_immutable_parent:
+    "web.materials.validation.immutableParent",
   materials_name_case_insensitive_unique: "Material name already exists.",
   pattern_name_case_insensitive_unique: "Pattern name already exists.",
   catalog_terminology_alias_maker_concept_value_unique:
@@ -358,6 +369,8 @@ export type CatalogViewer = Actor;
  * Stored catalog image metadata, ordering, and soft-deletion state.
  */
 export type CatalogImage = {
+  /** Optional alloy or grade association for material images. */
+  materialSpecificId?: number | null;
   /**
    * Content type.
    */
@@ -404,8 +417,34 @@ export type CatalogImage = {
   url: string;
 };
 
+/** One currently offered general material and optional alloy or grade. */
+export type ProductMaterialAssignment = CatalogLookup & {
+  /** Stable product-material assignment identifier. */
+  assignmentId: number;
+  /** Canonical alloy or grade, or null for the generic material. */
+  specific: CatalogLookup | null;
+};
+
+/** Canonical material pair supplied to a product write. */
+export type MaterialSelection = {
+  /** General material identifier. */
+  materialId: number;
+  /** Alloy or grade identifier belonging to that general material. */
+  materialSpecificId: number | null;
+};
+
+/** Canonical alloy or grade exposed to catalog forms and administrators. */
+export type MaterialSpecific = CatalogLookup & {
+  /** Immutable general material identifier. */
+  materialId: number;
+  /** Optional Markdown description. */
+  description: string | null;
+};
+
 /** Material content and image state exposed to product administrators. */
 export type AdminMaterial = CatalogLookup & {
+  /** Canonical alloys and grades sorted by name. */
+  specifics: MaterialSpecific[];
   /** Optional Markdown description. */
   description: string | null;
   /** Active and soft-deleted material images in display order. */
@@ -660,20 +699,7 @@ export type CatalogProduct = {
   /**
    * Materials assigned to the product.
    */
-  materials: Array<{
-    /**
-     * Database identifier.
-     */
-    id: number;
-    /**
-     * Display name.
-     */
-    name: string;
-    /**
-     * URL-safe identifier.
-     */
-    slug: string;
-  }>;
+  materials: ProductMaterialAssignment[];
   /**
    * Display name.
    */
@@ -751,9 +777,9 @@ export type ProductWriteInput = {
    */
   finishOptions: ProductWriteFinishOption[];
   /**
-   * Material identifiers.
+   * Canonical general material and optional specific selections.
    */
-  materialIds: number[];
+  materialAssignments: MaterialSelection[];
   /** Slider-owned immutable layout, or null when an exact insert owns it. */
   magnetLayout?: SliderMagnetLayout | null;
   /** Optional catalog-default magnet configuration. */
@@ -847,6 +873,8 @@ export type CatalogService = {
      * Image-owning catalog entity.
      */
     target: UploadTarget;
+    /** Optional alloy or grade scope for material targets only. */
+    materialSpecificId?: number | null;
     /**
      * Uploaded image files.
      */
@@ -973,6 +1001,68 @@ export type CatalogService = {
      */
     name: string;
   }): Promise<AdminMaterial>;
+  /**
+   * Creates or edits an alloy or grade without changing its parent.
+   *
+   * @param input - Parent, optional existing specific, content, and administrator.
+   * @returns Canonical alloy or grade.
+   * @rejects When permissions, parent ownership, names, slugs, or persistence fail.
+   */
+  saveMaterialSpecific(input: {
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** Immutable general material context. */
+    materialId: number;
+    /** Existing specific, omitted when creating. */
+    specificId?: number;
+    /** Canonical display name. */
+    name: string;
+    /** Optional Markdown description. */
+    description?: string | null;
+    /** Whether the user confirmed replacing the stable slug. */
+    updateSlug?: boolean;
+  }): Promise<MaterialSpecific>;
+  /**
+   * Moves an image to another scope under the same general material.
+   *
+   * @param input - Image, destination scope, and administrator.
+   * @returns Completion after the audited scope move.
+   * @rejects When ownership, destination duplication, auditing, or persistence fails.
+   */
+  moveMaterialImage(input: {
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** General material identifier retained by the move. */
+    materialId: number;
+    /** Image to move. */
+    imageId: number;
+    /** Destination alloy or grade, or null for General. */
+    materialSpecificId: number | null;
+  }): Promise<void>;
+  /**
+   * Reorders all active images within one exact scope.
+   *
+   * @param input - General material, optional scope, complete image order, and administrator.
+   * @returns Completion after the audited order update.
+   * @rejects When ownership, scope membership, auditing, or persistence fails.
+   */
+  reorderMaterialImages(input: {
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** General material context. */
+    materialId: number;
+    /** Alloy or grade, or null for General. */
+    materialSpecificId: number | null;
+    /** Complete ordered list of active images in that scope. */
+    imageIds: number[];
+  }): Promise<void>;
+  /**
+   * Lists canonical specifics for product and collection selectors.
+   *
+   * @returns Name-sorted specifics with their immutable parent identifiers.
+   * @rejects When the database query fails.
+   */
+  listMaterialSpecifics(): Promise<MaterialSpecific[]>;
   /**
    * Creates pattern.
    *
@@ -1209,6 +1299,8 @@ export type CatalogService = {
     materialId: number;
     /** Replacement display name. */
     name: string;
+    /** Whether the user confirmed replacing the stable slug. */
+    updateSlug?: boolean;
   }): Promise<AdminMaterial>;
   /**
    * Updates a reusable slider magnet preset.
@@ -1565,7 +1657,12 @@ export type UserCollectionItem = {
   /**
    * Selected material, or `null` when none is assigned.
    */
-  material: CatalogLookup | null;
+  material:
+    | (CatalogLookup & {
+        /** Canonical alloy or grade retained independently of current product offers. */
+        specific: CatalogLookup | null;
+      })
+    | null;
   /**
    * Display name.
    */
@@ -1776,7 +1873,7 @@ export type CollectionsService = {
     /**
      * Button material identifier.
      */
-    buttonMaterialId: number | null;
+    buttonMaterialAssignmentId: number | null;
     /**
      * Button product identifier.
      */
@@ -1792,7 +1889,7 @@ export type CollectionsService = {
     /**
      * Spinner material identifier.
      */
-    spinnerMaterialId: number;
+    spinnerMaterialAssignmentId: number;
     /**
      * Spinner product identifier.
      */
@@ -1846,7 +1943,7 @@ export type CollectionsService = {
     /**
      * Material identifier.
      */
-    materialId: number;
+    materialAssignmentId: number;
     /**
      * Product identifier.
      */
@@ -1889,7 +1986,7 @@ export type CollectionsService = {
     /** Optional catalog finish option to snapshot. */
     finishOptionId: number | null;
     /** Required selected material. */
-    materialId: number;
+    materialAssignmentId: number;
     /** Optional collection created with the item. */
     newCollection?: CollectionWriteInput | null;
     /** Exact catalog product identifier. */
@@ -2223,7 +2320,7 @@ export type CollectionsService = {
       /**
        * Material identifier.
        */
-      materialId: number;
+      materialAssignmentId?: number | null;
     } | null;
     /** Slider insert to install, or `null` to detach the current insert. */
     installedInsert?: {
@@ -2240,7 +2337,7 @@ export type CollectionsService = {
     /**
      * Material identifier.
      */
-    materialId: number;
+    materialAssignmentId?: number | null;
     /**
      * Administrative reason for the operation.
      */
@@ -2723,7 +2820,7 @@ export function createCatalogService(
                 targetId: row.id,
               });
             }
-            return { ...row, images: [] };
+            return { ...row, images: [], specifics: [] };
           }),
         actorAttributes(input.actor.clerkId),
       );
@@ -2877,10 +2974,10 @@ export function createCatalogService(
               .returning({ id: schema.product.id });
             if (!row) throw new Error("Failed to create product.");
 
-            if (input.materialIds.length) {
+            if (input.materialAssignments.length) {
               await tx.insert(schema.productMaterial).values(
-                input.materialIds.map((materialId) => ({
-                  materialId,
+                input.materialAssignments.map((selection) => ({
+                  ...selection,
                   productId: row.id,
                 })),
               );
@@ -3510,6 +3607,249 @@ export function createCatalogService(
      * @returns Matching materials.
      * @rejects When the database query fails.
      */
+    /**
+     * Moves an image within its general material, preserving storage ownership.
+     *
+     * @param input - Image, destination scope, and administrator.
+     * @returns Completion after the audited scope move.
+     * @rejects When validation, authorization, auditing, or persistence fails.
+     */
+    async moveMaterialImage(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("error.forbidden");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      await logger.operation(
+        loggerMessages.database.catalog.moveMaterialImage,
+        async () =>
+          await db.transaction(async (tx) => {
+            const target = { type: "material" as const, id: input.materialId };
+            await lockTarget(tx, target);
+            await assertMaterialScope(tx, target, input.materialSpecificId);
+            const [image] = await tx
+              .select()
+              .from(schema.materialImage)
+              .where(
+                and(
+                  eq(schema.materialImage.id, input.imageId),
+                  eq(schema.materialImage.materialId, input.materialId),
+                ),
+              );
+            if (!image) throw new Error("error.generic");
+            if (image.materialSpecificId === input.materialSpecificId) return;
+            const destination = await tx
+              .select()
+              .from(schema.materialImage)
+              .where(
+                and(
+                  eq(schema.materialImage.materialId, input.materialId),
+                  sql`${schema.materialImage.materialSpecificId} is not distinct from ${input.materialSpecificId}`,
+                ),
+              );
+            if (destination.some(({ sha256 }) => sha256 === image.sha256))
+              throw new Error(
+                "web.materials.validation.duplicateAtDestination",
+              );
+            await tx
+              .update(schema.materialImage)
+              .set({
+                materialSpecificId: input.materialSpecificId,
+                position:
+                  Math.max(-1, ...destination.map(({ position }) => position)) +
+                  1,
+              })
+              .where(eq(schema.materialImage.id, image.id));
+            if (dependencies && actorUser)
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                before: {
+                  imageId: image.id,
+                  materialId: image.materialId,
+                  materialSpecificId: image.materialSpecificId,
+                },
+                after: {
+                  imageId: image.id,
+                  materialId: image.materialId,
+                  materialSpecificId: input.materialSpecificId,
+                },
+                definition: productAudit.materialImageMoved,
+                targetId: input.materialId,
+              });
+          }),
+        actorAttributes(input.actor.clerkId, {
+          materialId: input.materialId,
+          imageId: input.imageId,
+        }),
+      );
+    },
+    /**
+     * Reorders only active images inside an exact material scope.
+     *
+     * @param input - Material scope, complete active order, and administrator.
+     * @rejects When validation, authorization, auditing, or persistence fails.
+     */
+    async reorderMaterialImages(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("error.forbidden");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      await logger.operation(
+        loggerMessages.database.catalog.reorderMaterialImages,
+        async () =>
+          await db.transaction(async (tx) => {
+            const target = { type: "material" as const, id: input.materialId };
+            await lockTarget(tx, target);
+            await assertMaterialScope(tx, target, input.materialSpecificId);
+            const images = await tx
+              .select()
+              .from(schema.materialImage)
+              .where(
+                and(
+                  eq(schema.materialImage.materialId, input.materialId),
+                  isNull(schema.materialImage.deletedAt),
+                  sql`${schema.materialImage.materialSpecificId} is not distinct from ${input.materialSpecificId}`,
+                ),
+              )
+              .orderBy(
+                asc(schema.materialImage.position),
+                asc(schema.materialImage.id),
+              );
+            if (
+              new Set(input.imageIds).size !== images.length ||
+              input.imageIds.length !== images.length ||
+              images.some(({ id }) => !input.imageIds.includes(id))
+            )
+              throw new Error("error.generic");
+            for (const [position, id] of input.imageIds.entries())
+              await tx
+                .update(schema.materialImage)
+                .set({ position })
+                .where(eq(schema.materialImage.id, id));
+            if (dependencies && actorUser)
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                before: {
+                  imageIds: images.map(({ id }) => id),
+                  materialSpecificId: input.materialSpecificId,
+                },
+                after: {
+                  imageIds: input.imageIds,
+                  materialSpecificId: input.materialSpecificId,
+                },
+                definition: productAudit.materialImagesReordered,
+                targetId: input.materialId,
+              });
+          }),
+        actorAttributes(input.actor.clerkId, { materialId: input.materialId }),
+      );
+    },
+    /**
+     * Lists canonical alloys and grades for catalog selectors.
+     * @returns Name-sorted canonical specifics.
+     */
+    async listMaterialSpecifics() {
+      return await queryMaterialSpecifics(db);
+    },
+    /**
+     * Creates or edits a specific under its immutable parent with audited state.
+     *
+     * @param input - Parent context, specific content, and administrator.
+     * @returns Saved canonical alloy or grade.
+     * @rejects When validation, authorization, auditing, or persistence fails.
+     */
+    async saveMaterialSpecific(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("error.forbidden");
+      const values = normalizeMaterialWrite(input);
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await logger.operation(
+        loggerMessages.database.catalog.saveMaterialSpecific,
+        async () =>
+          await db.transaction(async (tx) => {
+            const [parent] = await tx
+              .select()
+              .from(schema.material)
+              .where(eq(schema.material.id, input.materialId))
+              .for("update");
+            if (!parent)
+              throw new Error("web.materials.validation.invalidSpecific");
+            if (parent.name.trim().toLowerCase() === values.name.toLowerCase())
+              throw new Error("web.materials.validation.parentNameConflict");
+            const specifics = await queryMaterialSpecifics(
+              tx,
+              input.materialId,
+            );
+            const before = specifics.find(({ id }) => id === input.specificId);
+            if (input.specificId && !before)
+              throw new Error("web.materials.validation.invalidSpecific");
+            if (
+              specifics.some(
+                ({ id, name }) =>
+                  id !== input.specificId &&
+                  name.trim().toLowerCase() === values.name.toLowerCase(),
+              )
+            )
+              throw new Error("web.materials.validation.duplicateSpecific");
+            const slug =
+              !before || input.updateSlug ? slugify(values.name) : before.slug;
+            if (
+              !slug ||
+              specifics.some(
+                ({ id, slug: existing }) =>
+                  id !== input.specificId && existing === slug,
+              )
+            )
+              throw new Error("web.materials.validation.slugCollision");
+            const write = { ...values, slug, updatedAt: new Date() };
+            const [after] = before
+              ? await tx
+                  .update(schema.materialSpecific)
+                  .set(write)
+                  .where(eq(schema.materialSpecific.id, before.id))
+                  .returning()
+              : await tx
+                  .insert(schema.materialSpecific)
+                  .values({ ...write, materialId: input.materialId })
+                  .returning();
+            if (!after) throw new Error("error.generic");
+            if (dependencies && actorUser)
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                before,
+                after: {
+                  id: after.id,
+                  materialId: after.materialId,
+                  name: after.name,
+                  slug: after.slug,
+                  description: after.description,
+                },
+                definition: before
+                  ? productAudit.materialSpecificUpdated
+                  : productAudit.materialSpecificCreated,
+                targetId: after.id,
+              });
+            return after;
+          }),
+        actorAttributes(input.actor.clerkId, {
+          materialId: input.materialId,
+          specificId: input.specificId,
+        }),
+      );
+    },
+    /**
+     * Lists general materials for catalog selectors.
+     * @returns Name-sorted general materials.
+     */
     async listMaterials() {
       return await db
         .select({
@@ -3603,6 +3943,7 @@ export function createCatalogService(
             ? {
                 ...material,
                 images: await queryMaterialImages(db, material.id),
+                specifics: await queryMaterialSpecifics(db, material.id),
               }
             : null;
         },
@@ -3731,8 +4072,8 @@ export function createCatalogService(
             await writeProductAdminAudit(dependencies.audit, tx, {
               actor: input.actor,
               actorUser,
-              after: { deleted: false, imageId: input.imageId },
-              before: { deleted: true, imageId: input.imageId },
+              after: { deleted: false, imageId: input.imageId, ...context },
+              before: { deleted: true, imageId: input.imageId, ...context },
               definition: productAudit.materialImageRestored,
               targetId: context.materialId,
             });
@@ -4044,8 +4385,8 @@ export function createCatalogService(
             await writeProductAdminAudit(dependencies.audit, tx, {
               actor: input.actor,
               actorUser,
-              after: { deleted: true, imageId: input.imageId },
-              before: { deleted: false, imageId: input.imageId },
+              after: { deleted: true, imageId: input.imageId, ...context },
+              before: { deleted: false, imageId: input.imageId, ...context },
               definition: productAudit.materialImageDeleted,
               targetId: context.materialId,
             });
@@ -4231,7 +4572,19 @@ export function createCatalogService(
             if (duplicate) throw new Error("Material name already exists.");
             const [after] = await tx
               .update(schema.material)
-              .set({ ...values, updatedAt: new Date() })
+              .set({
+                ...values,
+                ...(input.updateSlug
+                  ? {
+                      slug: await nextMaterialSlug(
+                        tx,
+                        values.name,
+                        input.materialId,
+                      ),
+                    }
+                  : {}),
+                updatedAt: new Date(),
+              })
               .where(eq(schema.material.id, input.materialId))
               .returning({
                 description: schema.material.description,
@@ -4252,7 +4605,11 @@ export function createCatalogService(
               });
             }
             const images = await queryMaterialImages(tx, input.materialId);
-            return { ...after, images };
+            return {
+              ...after,
+              images,
+              specifics: await queryMaterialSpecifics(tx, input.materialId),
+            };
           }),
         actorAttributes(input.actor.clerkId, {
           materialId: input.materialId,
@@ -4353,15 +4710,46 @@ export function createCatalogService(
                 updatedAt: new Date(),
               })
               .where(eq(schema.product.id, input.productId));
-            await tx
-              .delete(schema.productMaterial)
+            const assignments = await tx
+              .select()
+              .from(schema.productMaterial)
               .where(eq(schema.productMaterial.productId, input.productId));
-            await tx.insert(schema.productMaterial).values(
-              input.materialIds.map((materialId) => ({
-                materialId,
-                productId: input.productId,
-              })),
+            /**
+             * Compares an offered canonical pair with its durable assignment.
+             * @param selection - Requested canonical pair.
+             * @param row - Existing durable assignment.
+             * @returns Whether the pair is unchanged.
+             */
+            const matches = (
+              selection: MaterialSelection,
+              row: (typeof assignments)[number],
+            ) =>
+              selection.materialId === row.materialId &&
+              selection.materialSpecificId === row.materialSpecificId;
+            const removed = assignments.filter(
+              (row) =>
+                !input.materialAssignments.some((selection) =>
+                  matches(selection, row),
+                ),
             );
+            if (removed.length)
+              await tx.delete(schema.productMaterial).where(
+                inArray(
+                  schema.productMaterial.id,
+                  removed.map(({ id }) => id),
+                ),
+              );
+            const additions = input.materialAssignments.filter(
+              (selection) =>
+                !assignments.some((row) => matches(selection, row)),
+            );
+            if (additions.length)
+              await tx.insert(schema.productMaterial).values(
+                additions.map((selection) => ({
+                  ...selection,
+                  productId: input.productId,
+                })),
+              );
             await replaceProductFinishOptions(
               tx,
               input.productId,
@@ -4583,7 +4971,7 @@ export function createCollectionsService(
             let buttonItemId: number | null = null;
             if (
               input.buttonProductId === null &&
-              (input.buttonMaterialId !== null ||
+              (input.buttonMaterialAssignmentId !== null ||
                 input.buttonFinishOptionId !== null ||
                 input.buttonCustomFinish !== null)
             ) {
@@ -4591,22 +4979,22 @@ export function createCollectionsService(
             }
             if (input.buttonProductId !== null) {
               if (
-                input.buttonMaterialId === null ||
+                input.buttonMaterialAssignmentId === null ||
                 (input.buttonFinishOptionId !== null &&
                   input.buttonCustomFinish !== null)
               ) {
                 throw new Error("Button material is required.");
               }
-              await assertProductMaterial(
+              const buttonMaterial = await resolveProductMaterial(
                 tx,
                 input.buttonProductId,
-                input.buttonMaterialId,
+                input.buttonMaterialAssignmentId,
               );
               const [buttonItem] = await tx
                 .insert(schema.collectionItem)
                 .values({
                   collectionId,
-                  materialId: input.buttonMaterialId,
+                  ...buttonMaterial,
                   ownerId: owner.id,
                 })
                 .returning({ id: schema.collectionItem.id });
@@ -4628,7 +5016,8 @@ export function createCollectionsService(
                 after: {
                   collectionId,
                   id: buttonItem.id,
-                  materialId: input.buttonMaterialId,
+                  materialAssignmentId: input.buttonMaterialAssignmentId,
+                  ...buttonMaterial,
                 },
                 definition: collectionAudit.itemCreated,
                 ownerUserId: owner.id,
@@ -4636,10 +5025,10 @@ export function createCollectionsService(
               });
             }
 
-            await assertProductMaterial(
+            const spinnerMaterial = await resolveProductMaterial(
               tx,
               input.spinnerProductId,
-              input.spinnerMaterialId,
+              input.spinnerMaterialAssignmentId,
             );
             const [spinnerItem] = await tx
               .insert(schema.collectionItem)
@@ -4653,7 +5042,7 @@ export function createCollectionsService(
                     }
                   : {}),
                 displayName: input.displayName,
-                materialId: input.spinnerMaterialId,
+                ...spinnerMaterial,
                 ownerId: owner.id,
               })
               .returning({ id: schema.collectionItem.id });
@@ -4682,7 +5071,8 @@ export function createCollectionsService(
                 displayName: input.displayName,
                 id: spinnerItem.id,
                 installedButtonId: buttonItemId,
-                materialId: input.spinnerMaterialId,
+                materialAssignmentId: input.spinnerMaterialAssignmentId,
+                ...spinnerMaterial,
               },
               definition: collectionAudit.itemCreated,
               ownerUserId: owner.id,
@@ -4730,7 +5120,11 @@ export function createCollectionsService(
                 targetId: collectionId,
               });
             }
-            await assertProductMaterial(tx, input.productId, input.materialId);
+            const materialSelection = await resolveProductMaterial(
+              tx,
+              input.productId,
+              input.materialAssignmentId,
+            );
             const [item] = await tx
               .insert(schema.collectionItem)
               .values({
@@ -4743,7 +5137,7 @@ export function createCollectionsService(
                     }
                   : {}),
                 displayName: input.displayName,
-                materialId: input.materialId,
+                ...materialSelection,
                 ownerId: owner.id,
               })
               .returning({ id: schema.collectionItem.id });
@@ -4767,7 +5161,8 @@ export function createCollectionsService(
                 description: normalizeOptionalDescription(input.description),
                 displayName: input.displayName,
                 id: item.id,
-                materialId: input.materialId,
+                materialAssignmentId: input.materialAssignmentId,
+                ...materialSelection,
               },
               definition: collectionAudit.itemCreated,
               ownerUserId: owner.id,
@@ -4811,7 +5206,11 @@ export function createCollectionsService(
                 targetId: resolvedCollection.id,
               });
             }
-            await assertProductMaterial(tx, input.productId, input.materialId);
+            const materialSelection = await resolveProductMaterial(
+              tx,
+              input.productId,
+              input.materialAssignmentId,
+            );
             const [product] = await tx
               .select({
                 bodyMagnetLayout: schema.productDetailSlider.magnetLayout,
@@ -4854,7 +5253,7 @@ export function createCollectionsService(
                     }
                   : {}),
                 displayName: input.displayName,
-                materialId: input.materialId,
+                ...materialSelection,
                 ownerId: owner.id,
               })
               .returning({ id: schema.collectionItem.id });
@@ -4900,7 +5299,8 @@ export function createCollectionsService(
                 description: normalizeOptionalDescription(input.description),
                 displayName: input.displayName,
                 id: item.id,
-                materialId: input.materialId,
+                materialAssignmentId: input.materialAssignmentId,
+                ...materialSelection,
                 productId: input.productId,
                 productTypeSlug: input.productTypeSlug,
               },
@@ -6040,6 +6440,7 @@ export function createCollectionsService(
                   schema.productDetailSlider.includedInsertProductId,
                 isPrivate: schema.collectionItem.isPrivate,
                 materialId: schema.collectionItem.materialId,
+                materialSpecificId: schema.collectionItem.materialSpecificId,
                 magnetConfiguration:
                   schema.collectionDetailSlider.magnetConfiguration,
                 usesInserts: schema.productDetailSlider.usesInserts,
@@ -6122,6 +6523,7 @@ export function createCollectionsService(
               magnetConfiguration: item.magnetConfiguration,
               isPrivate: item.isPrivate,
               materialId: item.materialId,
+              materialSpecificId: item.materialSpecificId,
             };
 
             const targetCollectionId = input.collectionId ?? item.collectionId;
@@ -6203,11 +6605,11 @@ export function createCollectionsService(
               ]);
             }
 
-            await updateCollectionItemSnapshot(tx, {
+            const selectedMaterial = await updateCollectionItemSnapshot(tx, {
               collectionItemId: input.collectionItemId,
               customFinish: input.customFinish,
               finishOptionId: input.finishOptionId,
-              materialId: input.materialId,
+              materialAssignmentId: input.materialAssignmentId,
               productId,
             });
             await tx
@@ -6286,9 +6688,23 @@ export function createCollectionsService(
                     updatedAt: new Date(),
                   })
                   .where(eq(schema.collectionItem.id, button.id));
-                await updateCollectionItemSnapshot(tx, {
+                const buttonMaterial = await updateCollectionItemSnapshot(tx, {
                   ...input.installedButton,
                   productId: button.productId,
+                });
+                await writeCollectionAudit(audit, tx, {
+                  actor: input.actor,
+                  actorUser: owner,
+                  after: {
+                    id: button.id,
+                    materialAssignmentId:
+                      input.installedButton.materialAssignmentId ?? null,
+                    ...buttonMaterial,
+                  },
+                  definition: collectionAudit.itemUpdated,
+                  ownerUserId: item.ownerId,
+                  reason: input.reason,
+                  targetId: button.id,
                 });
               }
               try {
@@ -6544,7 +6960,8 @@ export function createCollectionsService(
                   ? item.installedPlateId
                   : (input.installedPlate?.collectionItemId ?? null),
               magnetConfiguration: normalizedMagnetConfiguration,
-              materialId: input.materialId,
+              materialAssignmentId: input.materialAssignmentId ?? null,
+              ...selectedMaterial,
             };
             await writeCollectionAudit(audit, tx, {
               actor: input.actor,
@@ -6579,7 +6996,7 @@ export function createCollectionsService(
             input.magnetConfiguration === undefined
               ? undefined
               : input.magnetConfiguration !== null,
-          materialId: input.materialId,
+          materialAssignmentId: input.materialAssignmentId,
         }),
       );
     },
@@ -6712,7 +7129,7 @@ async function collectionImageState(
       .select({ id: schema.materialImage.id })
       .from(schema.materialImage)
       .where(eq(schema.materialImage.materialId, target.id));
-    return { imageIds: images.map(({ id }) => id) };
+    return { imageIds: images.map(({ id }) => id), materialScopes: images };
   }
   return {};
 }
@@ -6757,7 +7174,10 @@ async function materialImageContext(
   imageId: number,
 ) {
   const [row] = await db
-    .select({ materialId: schema.materialImage.materialId })
+    .select({
+      materialId: schema.materialImage.materialId,
+      materialSpecificId: schema.materialImage.materialSpecificId,
+    })
     .from(schema.materialImage)
     .where(eq(schema.materialImage.id, imageId))
     .limit(1);
@@ -6885,7 +7305,13 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     makerProductUrlValid: product.makerProductUrlValid,
     magnetConfiguration: product.magnetConfiguration ?? null,
     magnetLayout: product.magnetLayout,
-    materialIds: product.materials.map(({ id }) => id),
+    materialAssignments: product.materials.map(
+      ({ assignmentId, id, specific }) => ({
+        assignmentId,
+        materialId: id,
+        materialSpecificId: specific?.id ?? null,
+      }),
+    ),
     name: product.name,
     productTypeId: product.productTypeId,
     productTypeSlug: product.productTypeSlug,
@@ -7325,6 +7751,7 @@ async function queryCollections(
  *
  * @param tx - Caller-owned database transaction.
  * @param input - Item identifier and replacement product snapshot.
+ * @returns Canonical material pair retained or selected for the item.
  * @rejects When validation or the database update fails.
  */
 async function updateCollectionItemSnapshot(
@@ -7345,17 +7772,34 @@ async function updateCollectionItemSnapshot(
     /**
      * Material identifier.
      */
-    materialId: number;
+    materialAssignmentId?: number | null;
     /**
      * Product identifier.
      */
     productId: number;
   },
 ) {
-  await assertProductMaterial(tx, input.productId, input.materialId);
+  let selection;
+  if (input.materialAssignmentId === undefined) {
+    const [retained] = await tx
+      .select({
+        materialId: schema.collectionItem.materialId,
+        materialSpecificId: schema.collectionItem.materialSpecificId,
+      })
+      .from(schema.collectionItem)
+      .where(eq(schema.collectionItem.id, input.collectionItemId));
+    if (!retained) throw new Error("error.generic");
+    selection = retained;
+  } else {
+    selection = await resolveProductMaterial(
+      tx,
+      input.productId,
+      input.materialAssignmentId,
+    );
+  }
   await tx
     .update(schema.collectionItem)
-    .set({ materialId: input.materialId })
+    .set(selection)
     .where(eq(schema.collectionItem.id, input.collectionItemId));
 
   await tx
@@ -7369,6 +7813,7 @@ async function updateCollectionItemSnapshot(
       productId: input.productId,
     });
   }
+  return selection;
 }
 
 /**
@@ -7504,6 +7949,10 @@ async function queryProducts(
       makerUrl: schema.maker.rootUrl,
       magnetConfiguration: schema.productDetailSlider.magnetConfiguration,
       magnetLayout: sql<SliderMagnetLayout | null>`coalesce(${schema.productDetailSlider.magnetLayout}, ${schema.productDetailSliderInsert.magnetLayout})`,
+      materialAssignmentId: schema.productMaterial.id,
+      materialSpecificId: schema.materialSpecific.id,
+      materialSpecificName: schema.materialSpecific.name,
+      materialSpecificSlug: schema.materialSpecific.slug,
       materialId: schema.material.id,
       materialName: schema.material.name,
       materialSlug: schema.material.slug,
@@ -7548,6 +7997,10 @@ async function queryProducts(
       eq(schema.productMaterial.materialId, schema.material.id),
     )
     .leftJoin(
+      schema.materialSpecific,
+      eq(schema.productMaterial.materialSpecificId, schema.materialSpecific.id),
+    )
+    .leftJoin(
       schema.productDetailSpinner,
       eq(schema.product.id, schema.productDetailSpinner.id),
     )
@@ -7586,8 +8039,24 @@ async function queryProducts(
   for (const row of rows) {
     const existing = products.get(row.id);
     if (existing) {
-      if (row.materialId && row.materialName && row.materialSlug) {
+      if (
+        row.materialAssignmentId &&
+        row.materialId &&
+        row.materialName &&
+        row.materialSlug
+      ) {
         existing.materials.push({
+          assignmentId: row.materialAssignmentId!,
+          specific:
+            row.materialSpecificId &&
+            row.materialSpecificName &&
+            row.materialSpecificSlug
+              ? {
+                  id: row.materialSpecificId,
+                  name: row.materialSpecificName,
+                  slug: row.materialSpecificSlug,
+                }
+              : null,
           id: row.materialId,
           name: row.materialName,
           slug: row.materialSlug,
@@ -7632,6 +8101,17 @@ async function queryProducts(
         row.materialId && row.materialName && row.materialSlug
           ? [
               {
+                assignmentId: row.materialAssignmentId!,
+                specific:
+                  row.materialSpecificId &&
+                  row.materialSpecificName &&
+                  row.materialSpecificSlug
+                    ? {
+                        id: row.materialSpecificId,
+                        name: row.materialSpecificName,
+                        slug: row.materialSpecificSlug,
+                      }
+                    : null,
                 id: row.materialId,
                 name: row.materialName,
                 slug: row.materialSlug,
@@ -8187,6 +8667,9 @@ async function queryOwnedItems(
       makerName: schema.maker.name,
       makerSlug: schema.maker.slug,
       makerUrl: schema.maker.rootUrl,
+      materialSpecificId: schema.materialSpecific.id,
+      materialSpecificName: schema.materialSpecific.name,
+      materialSpecificSlug: schema.materialSpecific.slug,
       materialId: schema.material.id,
       materialName: schema.material.name,
       materialSlug: schema.material.slug,
@@ -8221,6 +8704,10 @@ async function queryOwnedItems(
     .leftJoin(
       schema.material,
       eq(schema.collectionItem.materialId, schema.material.id),
+    )
+    .leftJoin(
+      schema.materialSpecific,
+      eq(schema.collectionItem.materialSpecificId, schema.materialSpecific.id),
     )
     .leftJoin(
       schema.finishOption,
@@ -8368,6 +8855,16 @@ async function queryOwnedItems(
       material:
         row.materialId && row.materialName && row.materialSlug
           ? {
+              specific:
+                row.materialSpecificId &&
+                row.materialSpecificName &&
+                row.materialSpecificSlug
+                  ? {
+                      id: row.materialSpecificId,
+                      name: row.materialSpecificName,
+                      slug: row.materialSpecificSlug,
+                    }
+                  : null,
               id: row.materialId,
               name: row.materialName,
               slug: row.materialSlug,
@@ -8662,45 +9159,62 @@ function normalizeMaterialWrite(input: {
 }
 
 /**
- * Converts a material name to a lowercase ASCII slug.
- *
- * @param value - Material display name.
- * @returns Normalized slug, possibly empty.
- */
-function materialSlug(value: string) {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-|-$/gu, "");
-}
-
-/**
- * Generates the first available material slug under a transaction lock.
+ * Validates the generated material slug under a transaction lock.
  *
  * @param db - Transaction used to serialize and inspect slug allocation.
  * @param name - Material display name.
- * @returns Stable unique slug for a newly created material.
+ * @param excludeId - Existing row allowed to retain its slug.
+ * @returns Stable unique slug without numeric suffixes.
  * @rejects When the name cannot form a slug or database access fails.
  */
 async function nextMaterialSlug(
   db: Pick<Database, "execute" | "select">,
   name: string,
+  excludeId?: number,
 ) {
-  const base = materialSlug(name);
+  const base = slugify(name);
   if (!base) throw new Error("Material name is invalid.");
   await db.execute(
     sql`select pg_advisory_xact_lock(hashtextextended('material-slug-allocation', 0))`,
   );
   const rows = await db
-    .select({ slug: schema.material.slug })
+    .select({ id: schema.material.id, slug: schema.material.slug })
     .from(schema.material);
-  const used = new Set(rows.map(({ slug }) => slug));
-  if (!used.has(base)) return base;
-  let suffix = 2;
-  while (used.has(`${base}-${suffix}`)) suffix += 1;
-  return `${base}-${suffix}`;
+  if (rows.some(({ id, slug }) => id !== excludeId && slug === base))
+    throw new Error("web.materials.validation.slugCollision");
+  return base;
+}
+
+/**
+ * Loads canonical specifics, optionally limited to one parent.
+ *
+ * @param db - Database or transaction used for the query.
+ * @param materialId - Optional general material filter.
+ * @returns Canonical specifics ordered by display name and identifier.
+ * @rejects When the database query fails.
+ */
+async function queryMaterialSpecifics(
+  db: Pick<Database, "select">,
+  materialId?: number,
+) {
+  return await db
+    .select({
+      id: schema.materialSpecific.id,
+      materialId: schema.materialSpecific.materialId,
+      name: schema.materialSpecific.name,
+      slug: schema.materialSpecific.slug,
+      description: schema.materialSpecific.description,
+    })
+    .from(schema.materialSpecific)
+    .where(
+      materialId === undefined
+        ? undefined
+        : eq(schema.materialSpecific.materialId, materialId),
+    )
+    .orderBy(
+      asc(schema.materialSpecific.name),
+      asc(schema.materialSpecific.id),
+    );
 }
 
 /**
@@ -8724,6 +9238,7 @@ async function queryMaterialImages(
       deletedByRole: schema.materialImage.deletedByRole,
       fileName: schema.materialImage.fileName,
       id: schema.materialImage.id,
+      materialSpecificId: schema.materialImage.materialSpecificId,
       objectPath: schema.materialImage.objectPath,
       position: schema.materialImage.position,
       size: schema.materialImage.size,
@@ -8795,6 +9310,7 @@ async function queryPublicMaterialSummaries(
         deletedByRole: schema.materialImage.deletedByRole,
         fileName: schema.materialImage.fileName,
         id: schema.materialImage.id,
+        materialSpecificId: schema.materialImage.materialSpecificId,
         materialId: schema.materialImage.materialId,
         objectPath: schema.materialImage.objectPath,
         position: schema.materialImage.position,
@@ -8814,7 +9330,7 @@ async function queryPublicMaterialSummaries(
       ),
     db
       .select({
-        count: count(schema.productMaterial.productId),
+        count: countDistinct(schema.productMaterial.productId),
         materialId: schema.productMaterial.materialId,
       })
       .from(schema.productMaterial)
@@ -9259,18 +9775,23 @@ async function listCatalogImageTrash(
         deletedByRole: schema.materialImage.deletedByRole,
         fileName: schema.materialImage.fileName,
         id: schema.materialImage.id,
+        materialSpecificId: schema.materialImage.materialSpecificId,
         objectPath: schema.materialImage.objectPath,
         ownerClerkId: sql<string | null>`null`,
         position: schema.materialImage.position,
         size: schema.materialImage.size,
         targetId: schema.material.id,
-        targetName: schema.material.name,
+        targetName: sql<string>`case when ${schema.materialSpecific.name} is null then ${schema.material.name} else ${schema.material.name} || ': ' || ${schema.materialSpecific.name} end`,
         url: schema.materialImage.url,
       })
       .from(schema.materialImage)
       .innerJoin(
         schema.material,
         eq(schema.materialImage.materialId, schema.material.id),
+      )
+      .leftJoin(
+        schema.materialSpecific,
+        eq(schema.materialImage.materialSpecificId, schema.materialSpecific.id),
       )
       .where(
         and(
@@ -9905,25 +10426,32 @@ async function assertProductRelationships(
  *
  * @param tx - Caller-owned database transaction.
  * @param productId - Product identifier.
- * @param materialId - Material identifier.
+ * @param materialAssignmentId - Currently offered assignment, or null for no material.
+ * @returns Canonical general and optional specific identifiers.
  * @rejects When the material is not assigned to the product or the query fails.
  */
-async function assertProductMaterial(
+async function resolveProductMaterial(
   tx: CatalogTransaction,
   productId: number,
-  materialId: number,
+  materialAssignmentId: number | null,
 ) {
+  if (materialAssignmentId === null)
+    return { materialId: null, materialSpecificId: null };
   const [row] = await tx
-    .select({ materialId: schema.productMaterial.materialId })
+    .select({
+      materialId: schema.productMaterial.materialId,
+      materialSpecificId: schema.productMaterial.materialSpecificId,
+    })
     .from(schema.productMaterial)
     .where(
       and(
         eq(schema.productMaterial.productId, productId),
-        eq(schema.productMaterial.materialId, materialId),
+        eq(schema.productMaterial.id, materialAssignmentId),
       ),
     )
-    .limit(1);
-  if (!row) throw new Error("Material is not available for this product.");
+    .for("share");
+  if (!row) throw new Error("web.materials.validation.invalidSpecific");
+  return row;
 }
 
 /**
@@ -10250,10 +10778,16 @@ function assertNoSliderInsertBodySpecs(input: ProductWriteInput) {
  * @throws When required materials are missing or inserts carry unsupported appearance.
  */
 function assertProductMaterialsAndAppearance(input: ProductWriteInput) {
-  if (!input.materialIds.length)
+  if (!input.materialAssignments.length)
     throw new Error("At least one material is required.");
+  const pairs = input.materialAssignments.map(
+    ({ materialId, materialSpecificId }) =>
+      `${materialId}:${materialSpecificId ?? "general"}`,
+  );
+  if (new Set(pairs).size !== pairs.length)
+    throw new Error("web.materials.validation.duplicateAssignment");
   if (input.productTypeSlug !== "slider-insert") return;
-  if (input.materialIds.length !== 1)
+  if (input.materialAssignments.length !== 1)
     throw new Error("Slider inserts require exactly one material.");
   if (input.finishOptions.length)
     throw new Error("Slider inserts do not support appearance options.");
@@ -10449,7 +10983,7 @@ function actorAttributes(
 function productAttributes(input: ProductWriteInput) {
   return actorAttributes(input.actor.clerkId, {
     finishOptionCount: input.finishOptions.length,
-    materialIds: input.materialIds,
+    materialAssignments: input.materialAssignments,
     productTypeSlug: input.productTypeSlug,
     slug: input.slug,
   });

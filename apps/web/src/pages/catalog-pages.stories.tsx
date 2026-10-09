@@ -73,7 +73,15 @@ const product: CatalogProduct = {
   makerUrl: "https://www.kapedc.com",
   magnetLayout: null,
   usesInserts: null,
-  materials: [{ id: 1000, name: "Titanium", slug: "titanium" }],
+  materials: [
+    {
+      assignmentId: 1000,
+      specific: null,
+      id: 1000,
+      name: "Titanium",
+      slug: "titanium",
+    },
+  ],
   name: "Katla",
   ownerClerkId: "user_storybook",
   productTypeId: 1000,

@@ -20,6 +20,7 @@ import {
   finishOptionFinish,
   maker,
   material,
+  materialSpecific,
   pattern,
   product,
   productDetailSlider,
@@ -134,7 +135,6 @@ export const seedMaterials = [
   { name: "Copper", slug: "copper" },
   { name: "Cupronickel", slug: "cupronickel" },
   { name: "Damascus Steel", slug: "damascus-steel" },
-  { name: "M390 Steel", slug: "m390-steel" },
   { name: "Mokume", slug: "mokume" },
   { name: "Mokuti", slug: "mokuti" },
   { name: "Stainless Steel", slug: "stainless-steel" },
@@ -147,23 +147,42 @@ export const seedMaterials = [
 ] as const;
 
 /** Maps reviewed KAP material labels to catalog slugs. */
-const materialTermSlugs: Readonly<Record<string, string>> = {
-  "Aluminum / 7075 Al": "aluminum",
-  Brass: "brass",
-  Bronze: "bronze",
-  Copper: "copper",
-  Cupronickel: "cupronickel",
-  "Damascus (Dama / BT Dama)": "damascus-steel",
-  "M390 steel": "m390-steel",
-  Mokume: "mokume",
-  Mokuti: "mokuti",
-  "Stainless steel (SS / 304SS)": "stainless-steel",
-  "Superconductor (SC)": "superconductor",
-  "Titanium (Ti / crystallized Ti)": "titanium",
-  "Tungsten (W)": "tungsten",
-  "Ultem / PEI": "ultem",
-  "Zirconium (Zirc)": "zirconium",
-  ZircuTi: "zircuti",
+const materialTerms: Readonly<
+  Record<
+    string,
+    {
+      /** General material slug. */
+      materialSlug: string;
+      /** Optional canonical alloy or grade slug. */
+      specificSlug: string | null;
+    }
+  >
+> = {
+  "Aluminum / 7075 Al": { materialSlug: "aluminum", specificSlug: null },
+  Brass: { materialSlug: "brass", specificSlug: null },
+  Bronze: { materialSlug: "bronze", specificSlug: null },
+  Copper: { materialSlug: "copper", specificSlug: null },
+  Cupronickel: { materialSlug: "cupronickel", specificSlug: null },
+  "Damascus (Dama / BT Dama)": {
+    materialSlug: "damascus-steel",
+    specificSlug: null,
+  },
+  "M390 steel": { materialSlug: "stainless-steel", specificSlug: "m390-steel" },
+  Mokume: { materialSlug: "mokume", specificSlug: null },
+  Mokuti: { materialSlug: "mokuti", specificSlug: null },
+  "Stainless steel (SS / 304SS)": {
+    materialSlug: "stainless-steel",
+    specificSlug: null,
+  },
+  "Superconductor (SC)": { materialSlug: "superconductor", specificSlug: null },
+  "Titanium (Ti / crystallized Ti)": {
+    materialSlug: "titanium",
+    specificSlug: null,
+  },
+  "Tungsten (W)": { materialSlug: "tungsten", specificSlug: null },
+  "Ultem / PEI": { materialSlug: "ultem", specificSlug: null },
+  "Zirconium (Zirc)": { materialSlug: "zirconium", specificSlug: null },
+  ZircuTi: { materialSlug: "zircuti", specificSlug: null },
 };
 
 /**
@@ -522,16 +541,16 @@ export function normalizeSeedUrl(url: string | null): string | null {
 }
 
 /**
- * Resolves a reviewed KAP material label to its catalog slug.
+ * Resolves a reviewed KAP label to its canonical general and optional specific slugs.
  *
  * @param term - Reviewed source material label.
- * @returns Matching catalog material slug.
+ * @returns Matching canonical material pair.
  * @throws When the reviewed label has no catalog mapping.
  */
-export function materialSlugForTerm(term: string): string {
-  const slug = materialTermSlugs[term];
-  if (!slug) throw new Error(`Unmapped KAP material term: ${term}.`);
-  return slug;
+export function materialPairForTerm(term: string) {
+  const pair = materialTerms[term];
+  if (!pair) throw new Error(`Unmapped KAP material term: ${term}.`);
+  return pair;
 }
 
 /**
@@ -665,6 +684,24 @@ export async function seedCatalog(db: ReturnType<typeof createDb>) {
       });
   }
 
+  const materials = await db.select().from(material);
+  const stainlessSteel = materials.find(
+    ({ slug }) => slug === "stainless-steel",
+  );
+  if (!stainlessSteel)
+    throw new Error("Stainless Steel is missing after seeding.");
+  await db
+    .insert(materialSpecific)
+    .values({
+      materialId: stainlessSteel.id,
+      name: "M390 Steel",
+      slug: "m390-steel",
+    })
+    .onConflictDoUpdate({
+      target: [materialSpecific.materialId, materialSpecific.slug],
+      set: { name: "M390 Steel" },
+    });
+
   for (const [table, values] of [
     [finish, seedFinishes],
     [colorEffect, seedColorEffects],
@@ -720,6 +757,7 @@ export async function seedKapedcProducts(
     .select({ id: material.id, slug: material.slug })
     .from(material);
   const materialIds = new Map(materials.map(({ id, slug }) => [slug, id]));
+  const specifics = await db.select().from(materialSpecific);
   const seeded = [];
   const updatedAt = catalogSeedTimestamp(snapshot.importedAt);
 
@@ -763,12 +801,25 @@ export async function seedKapedcProducts(
       });
 
     for (const term of value.materialTerms) {
-      const slug = materialSlugForTerm(term);
-      const materialId = materialIds.get(slug);
-      if (!materialId) throw new Error(`Seed material ${slug} is missing.`);
+      const pair = materialPairForTerm(term);
+      const materialId = materialIds.get(pair.materialSlug);
+      if (!materialId)
+        throw new Error(`Seed material ${pair.materialSlug} is missing.`);
+      const specific = pair.specificSlug
+        ? specifics.find(
+            (row) =>
+              row.materialId === materialId && row.slug === pair.specificSlug,
+          )
+        : null;
+      if (pair.specificSlug && !specific)
+        throw new Error(`Seed specific ${pair.specificSlug} is missing.`);
       await db
         .insert(productMaterial)
-        .values({ materialId, productId: seededProduct.id })
+        .values({
+          materialId,
+          materialSpecificId: specific?.id ?? null,
+          productId: seededProduct.id,
+        })
         .onConflictDoNothing();
     }
 

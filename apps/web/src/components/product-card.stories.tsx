@@ -45,8 +45,20 @@ const product: CatalogProduct = {
   magnetLayout: null,
   usesInserts: null,
   materials: [
-    { id: 1000, name: "Bronze", slug: "bronze" },
-    { id: 1001, name: "Titanium", slug: "titanium" },
+    {
+      assignmentId: 1000,
+      specific: null,
+      id: 1000,
+      name: "Bronze",
+      slug: "bronze",
+    },
+    {
+      assignmentId: 1001,
+      specific: null,
+      id: 1001,
+      name: "Titanium",
+      slug: "titanium",
+    },
   ],
   name: "Katla",
   ownerClerkId: "user_storybook",

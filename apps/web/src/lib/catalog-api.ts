@@ -291,7 +291,14 @@ export const productFormSchema = z
       .nullable()
       .default(null),
     magnetLayout: z.enum(sliderMagnetLayouts).nullable(),
-    materialIds: z.array(idSchema).min(1, requiredMessage),
+    materialAssignments: z
+      .array(
+        z.object({
+          materialId: idSchema,
+          materialSpecificId: idSchema.nullable(),
+        }),
+      )
+      .min(1, requiredMessage),
     name: slugNameSchema,
     productId: idSchema.nullable(),
     productTypeSlug: productTypeSchema,
@@ -312,7 +319,7 @@ export const productFormSchema = z
         includedInsertProductId,
         includedPlateProductId,
         length,
-        materialIds,
+        materialAssignments,
         magnetConfiguration,
         magnetLayout,
         productTypeSlug,
@@ -431,11 +438,14 @@ export const productFormSchema = z
           path: ["weight"],
         });
       }
-      if (productTypeSlug === "slider-insert" && materialIds.length !== 1) {
+      if (
+        productTypeSlug === "slider-insert" &&
+        materialAssignments.length !== 1
+      ) {
         context.addIssue({
           code: "custom",
           message: "web.slider.validation.insertMaterial",
-          path: ["materialIds"],
+          path: ["materialAssignments"],
         });
       }
       if (productTypeSlug === "slider-insert" && finishOptions.length) {
@@ -445,6 +455,16 @@ export const productFormSchema = z
           path: ["finishOptions"],
         });
       }
+      const materialPairs = materialAssignments.map(
+        ({ materialId, materialSpecificId }) =>
+          `${materialId}:${materialSpecificId ?? "general"}`,
+      );
+      if (new Set(materialPairs).size !== materialPairs.length)
+        context.addIssue({
+          code: "custom",
+          message: "web.materials.validation.duplicateAssignment",
+          path: ["materialAssignments"],
+        });
       const signatures = finishOptions.map(
         ({ colorEffectId, colorIds, finishIds, patternId }) =>
           `${finishIds.join(",")}|${colorEffectId ?? ""}|${colorIds.join(",")}|${patternId ?? ""}`,
@@ -494,6 +514,7 @@ const materialSchema = z.object({
 /** Schema for creating or updating an administrator-managed material. */
 const materialWriteSchema = materialSchema.extend({
   materialId: idSchema.nullable(),
+  updateSlug: z.boolean().optional(),
 });
 
 /**
@@ -604,7 +625,7 @@ const collectionAddSchema = z
     bearing: optionalBearingSchema,
     buttonCustomFinish: finishOptionSchema.nullable(),
     buttonFinishOptionId: idSchema.nullable(),
-    buttonMaterialId: idSchema.nullable(),
+    buttonMaterialAssignmentId: idSchema.nullable(),
     buttonProductId: idSchema.nullable(),
     collectionId: idSchema.nullable().optional().default(null),
     confirmed: z.boolean(),
@@ -612,7 +633,7 @@ const collectionAddSchema = z
     displayName: displayNameSchema,
     description: optionalDescriptionSchema,
     finishOptionId: idSchema.nullable(),
-    materialId: idSchema,
+    materialAssignmentId: idSchema,
     newCollection: collectionWriteSchema.nullable().optional().default(null),
     productId: idSchema,
     productTypeSlug: collectionProductTypeSchema,
@@ -636,11 +657,12 @@ const collectionAddSchema = z
       buttonFinishCount > 1 ||
       (input.productTypeSlug !== "spinner" &&
         (input.buttonProductId !== null ||
-          input.buttonMaterialId !== null ||
+          input.buttonMaterialAssignmentId !== null ||
           buttonFinishCount > 0)) ||
       (input.buttonProductId === null &&
-        (input.buttonMaterialId !== null || buttonFinishCount > 0)) ||
-      (input.buttonProductId !== null && input.buttonMaterialId === null)
+        (input.buttonMaterialAssignmentId !== null || buttonFinishCount > 0)) ||
+      (input.buttonProductId !== null &&
+        input.buttonMaterialAssignmentId === null)
     ) {
       context.addIssue({
         code: "custom",
@@ -674,7 +696,7 @@ const collectionEditSchema = z
         collectionItemId: idSchema,
         customFinish: finishOptionSchema.nullable(),
         finishOptionId: idSchema.nullable(),
-        materialId: idSchema,
+        materialAssignmentId: idSchema.nullable().optional(),
       })
       .nullable()
       .optional(),
@@ -687,7 +709,7 @@ const collectionEditSchema = z
       .nullable()
       .optional(),
     magnetConfiguration: sliderMagnetConfigurationSchema.nullable().optional(),
-    materialId: idSchema,
+    materialAssignmentId: idSchema.nullable().optional(),
     reason: z.string().trim().max(1000).optional(),
   })
   .superRefine((input, context) => {
@@ -745,6 +767,8 @@ export type CatalogOptions = {
    * Available materials.
    */
   materials: Awaited<ReturnType<typeof listMaterials>>;
+  /** Canonical parent-scoped alloys and grades. */
+  materialSpecifics?: Awaited<ReturnType<typeof listMaterialSpecifics>>;
   /** Reusable slider magnet presets. */
   magnetPresets?: SliderMagnetPreset[];
   /**
@@ -780,6 +804,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       makers,
       magnetPresets,
       materials,
+      materialSpecifics,
       patterns,
       productTypes,
       relationshipProducts,
@@ -792,6 +817,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       listMakers(),
       s.db.catalog.listSliderMagnetPresets(),
       listMaterials(),
+      listMaterialSpecifics(),
       listPatterns(),
       listProductTypes(),
       s.db.catalog.listProducts(undefined, viewer),
@@ -805,6 +831,7 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       makers,
       magnetPresets,
       materials,
+      materialSpecifics,
       patterns,
       productTypes,
       relationshipProducts,
@@ -1273,6 +1300,7 @@ export const saveAdminMaterial = createServerFn({ method: "POST" })
             description: parsed.data.description,
             materialId: parsed.data.materialId,
             name: parsed.data.name,
+            updateSlug: parsed.data.updateSlug,
           })
         : await s.db.catalog.createMaterial({
             actor,
@@ -1283,6 +1311,85 @@ export const saveAdminMaterial = createServerFn({ method: "POST" })
     } catch (error) {
       return mutationFailure(error);
     }
+  });
+
+/**
+ * Validates an administrator's alloy or grade creation or edit.
+ *
+ * @returns Saved specific or localized field validation failure.
+ * @rejects When authorization or service loading fails.
+ */
+export const saveAdminMaterialSpecific = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("products.manage");
+    const parsed = materialSchema
+      .extend({
+        materialId: idSchema,
+        specificId: idSchema.optional(),
+        updateSlug: z.boolean().optional(),
+      })
+      .safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+    const { s } = await import("@/lib/services");
+    try {
+      const specific = await s.db.catalog.saveMaterialSpecific({
+        actor,
+        ...parsed.data,
+      });
+      return { ok: true as const, specific };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
+
+/**
+ * Moves a material image to one validated scope under its existing parent.
+ *
+ * @returns Completion after the audited move.
+ * @rejects When authorization, scope validation, or persistence fails.
+ */
+export const moveAdminMaterialImage = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z
+      .object({
+        materialId: idSchema,
+        imageId: idSchema,
+        materialSpecificId: idSchema.nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("products.manage");
+    const { s } = await import("@/lib/services");
+    try {
+      await s.db.catalog.moveMaterialImage({ actor, ...data });
+      return { ok: true as const };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
+
+/**
+ * Reorders a complete active image list inside one exact material scope.
+ *
+ * @returns Completion after the audited order update.
+ * @rejects When authorization, scope membership, or persistence fails.
+ */
+export const reorderAdminMaterialImages = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z
+      .object({
+        materialId: idSchema,
+        imageIds: z.array(idSchema),
+        materialSpecificId: idSchema.nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("products.manage");
+    const { s } = await import("@/lib/services");
+    await s.db.catalog.reorderMaterialImages({ actor, ...data });
   });
 
 /** Validates and creates an audited maker-scoped catalog terminology alias. */
@@ -1456,7 +1563,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       magnetConfiguration: parsed.data
         .magnetConfiguration as SliderMagnetConfiguration | null,
       magnetLayout: parsed.data.magnetLayout as SliderMagnetLayout | null,
-      materialIds: parsed.data.materialIds,
+      materialAssignments: parsed.data.materialAssignments,
       includedInsertProductId: parsed.data.includedInsertProductId,
       includedPlateProductId: parsed.data.includedPlateProductId,
       name: parsed.data.name,
@@ -1532,13 +1639,13 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
               ? toFinishWriteOption(parsed.data.buttonCustomFinish)
               : null,
             buttonFinishOptionId: parsed.data.buttonFinishOptionId,
-            buttonMaterialId: parsed.data.buttonMaterialId,
+            buttonMaterialAssignmentId: parsed.data.buttonMaterialAssignmentId,
             buttonProductId: parsed.data.buttonProductId,
             spinnerFinishOptionId: parsed.data.finishOptionId,
             spinnerCustomFinish: parsed.data.customFinish
               ? toFinishWriteOption(parsed.data.customFinish)
               : null,
-            spinnerMaterialId: parsed.data.materialId,
+            spinnerMaterialAssignmentId: parsed.data.materialAssignmentId,
             spinnerProductId: parsed.data.productId,
             collectionId: parsed.data.collectionId,
             displayName: parsed.data.displayName,
@@ -1553,7 +1660,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
             ? toFinishWriteOption(parsed.data.customFinish)
             : null,
           finishOptionId: parsed.data.finishOptionId,
-          materialId: parsed.data.materialId,
+          materialAssignmentId: parsed.data.materialAssignmentId,
           collectionId: parsed.data.collectionId,
           displayName: parsed.data.displayName,
           description: parsed.data.description,
@@ -1570,7 +1677,7 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
           description: parsed.data.description,
           displayName: parsed.data.displayName,
           finishOptionId: parsed.data.finishOptionId,
-          materialId: parsed.data.materialId,
+          materialAssignmentId: parsed.data.materialAssignmentId,
           newCollection: parsed.data.newCollection,
           productId: parsed.data.productId,
           productTypeSlug: parsed.data.productTypeSlug,
@@ -2334,6 +2441,17 @@ async function listMaterials() {
 }
 
 /**
+ * Loads canonical specifics for dependent catalog selectors.
+ *
+ * @returns Name-sorted alloys and grades with their general material identifiers.
+ * @rejects When service loading or persistence fails.
+ */
+async function listMaterialSpecifics() {
+  const { s } = await import("@/lib/services");
+  return await s.db.catalog.listMaterialSpecifics();
+}
+
+/**
  * Loads catalog patterns.
  *
  * @returns A promise resolving to catalog patterns.
@@ -2377,6 +2495,22 @@ function validationFailure(error: z.ZodError) {
  * @returns The standard mutation failure payload.
  */
 function mutationFailure(error: unknown) {
+  if (
+    error instanceof Error &&
+    error.message.startsWith("web.materials.validation.")
+  )
+    return {
+      fieldErrors: {
+        [error.message.endsWith("slugCollision")
+          ? "slug"
+          : error.message.endsWith("duplicateAssignment")
+            ? "materialAssignments"
+            : "name"]: [error.message],
+      },
+      formError: error.message,
+      ok: false as const,
+      requiresConfirmation: false as const,
+    };
   return {
     fieldErrors: {},
     formError:

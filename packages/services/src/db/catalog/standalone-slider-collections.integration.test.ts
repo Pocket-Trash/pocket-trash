@@ -130,17 +130,23 @@ describe("standalone slider collection items", () => {
       ).collections;
 
       const itemIds = await Promise.all(
-        (["slider", "slider-plate", "slider-insert"] as const).map((slug) =>
-          collectionsService.addSliderProduct({
-            actor,
-            collectionId: primary.id,
-            customFinish: null,
-            displayName: slug,
-            finishOptionId: null,
-            materialId: material.id,
-            productId: productIds[slug],
-            productTypeSlug: slug,
-          }),
+        (["slider", "slider-plate", "slider-insert"] as const).map(
+          async (slug) =>
+            collectionsService.addSliderProduct({
+              actor,
+              collectionId: primary.id,
+              customFinish: null,
+              displayName: slug,
+              finishOptionId: null,
+              materialAssignmentId: (
+                await db
+                  .select({ id: schema.productMaterial.id })
+                  .from(schema.productMaterial)
+                  .where(eq(schema.productMaterial.productId, productIds[slug]))
+              )[0]!.id,
+              productId: productIds[slug],
+              productTypeSlug: slug,
+            }),
         ),
       );
       const sliderItemId = itemIds[0];
@@ -169,7 +175,6 @@ describe("standalone slider collection items", () => {
         customFinish: null,
         displayName: "Moved slider",
         finishOptionId: null,
-        materialId: material.id,
       });
       await expect(
         collectionsService.getOwnedItem(actor, sliderItemId),

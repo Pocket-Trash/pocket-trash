@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   catalogSeedTimestamp,
   loadKapedcSeedData,
-  materialSlugForTerm,
+  materialPairForTerm,
   seedCatalog,
   seedColorEffects,
   seedColors,
@@ -26,6 +26,7 @@ import {
   finish,
   maker,
   material,
+  materialSpecific,
   productType,
   user,
   userSettings,
@@ -53,6 +54,8 @@ function createSeedDb() {
   const materials = new Map<
     string,
     {
+      /** Material identifier. */
+      id: number;
       /** Material display name. */
       name: string;
       /** Stable material slug. */
@@ -122,7 +125,11 @@ function createSeedDb() {
                 slug: value.slug ?? "",
               });
             } else if (table === material && value.slug) {
-              materials.set(value.slug, { name: value.name, slug: value.slug });
+              materials.set(value.slug, {
+                id: materials.size + 1000,
+                name: value.name,
+                slug: value.slug,
+              });
             } else if (table === finish && value.slug) {
               finishes.set(value.slug, { name: value.name, slug: value.slug });
             } else if (table === color && value.slug && value.hex) {
@@ -149,7 +156,9 @@ function createSeedDb() {
       ),
     })),
     select: vi.fn(() => ({
-      from: vi.fn(async () => [...makers.values()]),
+      from: vi.fn(async (table: unknown) =>
+        table === material ? [...materials.values()] : [...makers.values()],
+      ),
     })),
     update: vi.fn(() => ({
       set: vi.fn(
@@ -575,6 +584,12 @@ describe("catalog seed", () => {
     );
     expect(state.makers.size).toBe(seedMakers.length);
     expect(state.materials.size).toBe(seedMaterials.length);
+    expect(state.materials.has("m390-steel")).toBe(false);
+    expect(state.db.insert).toHaveBeenCalledWith(materialSpecific);
+    expect(materialPairForTerm("M390 steel")).toEqual({
+      materialSlug: "stainless-steel",
+      specificSlug: "m390-steel",
+    });
     expect(state.finishes.size).toBe(seedFinishes.length);
     expect(state.colors.size).toBe(seedColors.length);
     expect(state.colorEffects.size).toBe(seedColorEffects.length);
@@ -615,7 +630,7 @@ describe("catalog seed", () => {
     expect(
       snapshot.products
         .flatMap(({ materialTerms }) => materialTerms)
-        .every((term) => materialSlugForTerm(term).length > 0),
+        .every((term) => materialPairForTerm(term).materialSlug.length > 0),
     ).toBe(true);
     expect(catalogSeedTimestamp(snapshot.importedAt).toISOString()).toBe(
       snapshot.importedAt,

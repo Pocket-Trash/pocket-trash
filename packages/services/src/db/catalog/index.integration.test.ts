@@ -131,7 +131,9 @@ describe("catalog product persistence", () => {
         ],
         makerId: maker.id,
         makerProductUrl: "https://maker.example/spinner/",
-        materialIds: [material.id],
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
         name: "Spinner",
         productTypeSlug: "spinner",
         slug: "spinner",
@@ -256,7 +258,9 @@ describe("catalog product persistence", () => {
         ],
         makerId: maker.id,
         makerProductUrl: "https://maker.example/spinner/",
-        materialIds: [material.id],
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
         name: "Edited spinner",
         productId: created.id,
         productTypeSlug: "spinner",
@@ -282,18 +286,19 @@ describe("catalog product persistence", () => {
         description: "Lightweight composite.",
         name: "Carbon Fiber",
       });
-      const carbonCollision = await service.createMaterial({
-        actor: { clerkId: "admin-test", role: "admin" },
-        description: null,
-        name: "Carbon/Fiber",
-      });
+      await expect(
+        service.createMaterial({
+          actor: { clerkId: "admin-test", role: "admin" },
+          description: null,
+          name: "Carbon/Fiber",
+        }),
+      ).rejects.toThrow("web.materials.validation.slugCollision");
       expect(carbon).toEqual(
         expect.objectContaining({
           description: "Lightweight composite.",
           slug: "carbon-fiber",
         }),
       );
-      expect(carbonCollision.slug).toBe("carbon-fiber-2");
 
       const renamed = await service.updateMaterial({
         actor: { clerkId: "admin-test", role: "admin" },
@@ -418,7 +423,9 @@ describe("catalog product persistence", () => {
         actor: admin,
         finishOptions: [],
         makerId: maker.id,
-        materialIds: [material.id],
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
         name: "Matched Plates",
         productTypeSlug: "slider-plate",
         slug: "matched-plates",
@@ -429,7 +436,9 @@ describe("catalog product persistence", () => {
         finishOptions: [],
         magnetLayout: "2x4",
         makerId: maker.id,
-        materialIds: [material.id],
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
         name: "Cassette Insert",
         productTypeSlug: "slider-insert",
         slug: "cassette-insert",
@@ -441,7 +450,9 @@ describe("catalog product persistence", () => {
         includedInsertProductId: insert.id,
         includedPlateProductId: plate.id,
         makerId: maker.id,
-        materialIds: [material.id],
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
         name: "Rail Slider",
         productTypeSlug: "slider",
         slug: "rail-slider",
@@ -486,7 +497,9 @@ describe("catalog product persistence", () => {
         finishOptions: [],
         magnetLayout: "2x2",
         makerId: maker.id,
-        materialIds: [material.id],
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
         name: "Body Slider",
         productTypeSlug: "slider",
         slug: "body-slider",
@@ -500,7 +513,9 @@ describe("catalog product persistence", () => {
           includedInsertProductId: insert.id,
           magnetLayout: "2x3",
           makerId: maker.id,
-          materialIds: [material.id],
+          materialAssignments: [
+            { materialId: material.id, materialSpecificId: null },
+          ],
           name: "Duplicate Insert Layout",
           productTypeSlug: "slider",
           slug: "duplicate-insert-layout",
@@ -562,7 +577,9 @@ describe("catalog product persistence", () => {
             actor,
             finishOptions: [],
             makerId: maker.id,
-            materialIds: [material.id],
+            materialAssignments: [
+              { materialId: material.id, materialSpecificId: null },
+            ],
             name,
             productTypeSlug: "spinner",
             slug,
@@ -613,7 +630,9 @@ describe("catalog product persistence", () => {
         actor,
         finishOptions: [],
         makerId: maker.id,
-        materialIds: [material.id],
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
         name: beta.name,
         productId: beta.id,
         productTypeSlug: "spinner",
