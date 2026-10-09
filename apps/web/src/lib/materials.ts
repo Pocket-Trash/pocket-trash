@@ -1,6 +1,11 @@
 import type { PublicMaterial, PublicMaterialSummary } from "@package/services";
 import { z } from "zod";
-import { absoluteUrl } from "@/lib/site-url";
+
+/** Public material route data with a server-resolved canonical URL. */
+export type PublicMaterialPage = PublicMaterial & {
+  /** Canonical URL retained unchanged during hydration, including on previews. */
+  canonicalUrl: string;
+};
 
 /** Directory section used for names that do not begin with A-Z. */
 export const OTHER_MATERIALS = "Other" as const;
@@ -102,12 +107,11 @@ export const materialSearchSchema = z.object({
  * @param material - Public route data, or undefined while not found.
  * @returns Route head metadata; empty specifics stay accessible with noindex.
  */
-export function materialHead(material: PublicMaterial | undefined) {
+export function materialHead(material: PublicMaterialPage | undefined) {
   if (!material) return {};
   const name = material.specific?.name ?? material.name;
-  const path = `/materials/${material.slug}${material.specific ? `/${material.specific.slug}` : ""}`;
   return {
-    links: [{ rel: "canonical", href: absoluteUrl(path) }],
+    links: [{ rel: "canonical", href: material.canonicalUrl }],
     meta: [
       { title: name },
       ...(material.specific

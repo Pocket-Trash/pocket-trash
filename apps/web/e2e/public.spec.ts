@@ -25,8 +25,11 @@ test("public material specifics have scoped URLs, canonical metadata, and slug-p
     "M390 Steel",
   );
   await expect(
-    page.getByRole("link", { name: "Stainless Steel", exact: true }),
+    page
+      .locator("header")
+      .getByRole("link", { name: "Stainless Steel", exact: true }),
   ).toBeVisible();
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(1);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     "href",
     /\/materials\/stainless-steel\/m390-steel$/,

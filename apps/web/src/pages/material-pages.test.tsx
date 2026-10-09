@@ -2,7 +2,11 @@ import type { PublicMaterial } from "@package/services";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { MaterialLink } from "@/components/material-link";
-import { materialHead, materialSearchSchema } from "@/lib/materials";
+import {
+  materialHead,
+  materialSearchSchema,
+  type PublicMaterialPage,
+} from "@/lib/materials";
 import { MaterialDetailPage, MaterialsPage } from "./material-pages";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -153,7 +157,8 @@ describe("material specifics", () => {
   });
 
   it("renders scoped title, parent breadcrumb, and normal empty states on the shared detail page", () => {
-    const exact: PublicMaterial = {
+    const exact: PublicMaterialPage = {
+      canonicalUrl: "https://pocket-trash.app/materials/aluminum/6061",
       ...material,
       specific: {
         id: 2000,
@@ -184,6 +189,7 @@ describe("material specifics", () => {
       name: "robots",
       content: "noindex,follow",
     });
+    expect(materialHead(exact).links?.[0]?.href).toBe(exact.canonicalUrl);
     expect(materialHead(exact).links?.[0]?.href).toMatch(
       /\/materials\/aluminum\/6061$/,
     );

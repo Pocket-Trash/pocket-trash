@@ -11,7 +11,6 @@ import type {
   ProductWriteInput,
   PublicMakerDetail,
   PublicMakerSummary,
-  PublicMaterial,
   PublicMaterialSummary,
   SliderMagnetPreset,
   UserCollectionItem,
@@ -32,6 +31,8 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getActor, requireActor, requirePermission } from "@/lib/authorization";
+import type { PublicMaterialPage } from "@/lib/materials";
+import { absoluteUrl } from "@/lib/site-url";
 import {
   nextAvailableSlug,
   normalizeOptionalUrl,
@@ -1244,7 +1245,7 @@ export const getPublicMaterial = createServerFn({ method: "GET" })
       })
       .parse(input),
   )
-  .handler(async ({ data }): Promise<PublicMaterial | null> => {
+  .handler(async ({ data }): Promise<PublicMaterialPage | null> => {
     const { s } = await import("@/lib/services");
     const material = await s.db.catalog.getPublicMaterial(
       data.materialSlug,
@@ -1258,6 +1259,9 @@ export const getPublicMaterial = createServerFn({ method: "GET" })
     ]);
     return {
       ...material,
+      canonicalUrl: absoluteUrl(
+        `/materials/${material.slug}${material.specific ? `/${material.specific.slug}` : ""}`,
+      ),
       collectionItems,
       images,
       leadImage: images.find(({ id }) => id === material.leadImage?.id) ?? null,
