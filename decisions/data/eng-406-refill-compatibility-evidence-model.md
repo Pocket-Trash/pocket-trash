@@ -37,9 +37,9 @@ Do not add separate `fits`, `needs_trim`, `tested`, or `reliability` flags. The 
 
 ### Evidence
 
-- Store one or more evidence records separately from the approved assertion. Evidence can support or contradict the current conclusion.
+- Store evidence records separately from the approved assertion. An approved assertion requires at least one record that supports its current outcome. Contradictory and superseded evidence may coexist, but cannot alone justify the assertion.
 - Classify evidence as a manufacturer statement, dimensional comparison, physical fit test, or curated observation. Do not reduce those methods to a `tested` boolean or confidence percentage.
-- Manufacturer and documentary evidence records identify the source URL plus source date or catalogue edition. Dimensional comparisons identify both measured formats and their sources. Physical fit tests identify the tested pen, required tip when applicable, refill, date, result, and repeatable procedure or notes.
+- Manufacturer statements and curated observations identify the source URL plus source date or catalogue edition. Dimensional comparisons identify both measured formats and their sources. Physical fit tests identify the tested pen, required tip when applicable, refill, date, result, and repeatable procedure or notes.
 - The same evidence shape supports refill-to-group membership decisions. Group admission thresholds remain a separate decision.
 - Preserve superseded evidence for auditability. Changing the approved conclusion does not erase the sources that led to the prior conclusion.
 - Public owner reports remain out of scope. Curated observations enter through staff review and carry normal audit provenance.
@@ -55,14 +55,22 @@ For an owned pen and selected refill, resolve the first applicable assertion in 
 
 Ignore tip-scoped assertions when the owned pen has no matching installed tip. Reject conflicting assertions at the same specificity during authoring or import instead of choosing one at runtime.
 
-An installed-tip change recomputes compatibility with the same order. It never clears or changes the installed refill or offering.
+An installed-tip change recomputes compatibility with the same order. It never clears or changes the installed refill or offering, and it shows the same non-blocking warning when the new result is incompatible or unknown.
 
 ### User-facing behavior
 
 - Compatible, conditional, and variable matches remain in the compatible-first tier. Conditional and variable matches show their accessible warning or remedy.
-- Explicitly incompatible and unknown models remain selectable in the later tier and show a red indicator with accessible text that distinguishes known incompatibility from missing evidence.
+- Explicitly incompatible and unknown models remain selectable in the later tier. Selecting one shows a non-blocking warning, and the selected value shows a red indicator with accessible text that distinguishes known incompatibility from missing evidence.
 - Search filters within the same two tiers and preserves their order.
-- Refill detail pages may show compatible pens and any required tip. They do not expose owners, installation counts, or collection usage.
+- Refill detail pages list compatible pens and any required tip. They do not expose owners, installation counts, or collection usage.
+
+### Migration mapping
+
+- Import a verified legacy positive match as a `compatible` assertion. Convert `needs_trim` to `conditional` with the preserved trimming instructions as its remedy. Preserve a legacy warning on the assertion.
+- Convert a cited manufacturer claim, measurement, or physical test into the matching evidence class. A bare `tested` or reliability value without the required source or test details is not evidence and must remain unresolved for review.
+- Treat planning-seed `compatibilityGroup` values as proposed refill-to-group membership, not as pen compatibility assertions. Group membership requires its own supporting evidence before approval.
+- Do not infer incompatible assertions from missing legacy matches, group differences, or absent source rows. Absence remains unknown.
+- Leave unresolved Floatune and Pilot Precise V5 RT/PP43 claims pending ENG-423 and ENG-424. ENG-407 must identify the authoritative preserved Autmog and Saga sources before their rows can be mapped.
 
 ## Consequences
 
