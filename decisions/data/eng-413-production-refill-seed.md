@@ -23,7 +23,7 @@ The content selection is complete independently of ENG-412's physical table name
 
 - Import a refill product when an official source confirms the stable maker model or family identity. A product may exist without an offering when the reviewed evidence does not establish a complete tip-and-colour combination.
 - Import an offering only for an explicitly verified model, tip-size or maker-grade, tip-style when known, and colour combination. Unknown geometry or size stays null; never infer it from another maker's grade, a product photo, a code sequence, or a family name. ENG-412 must make null-bearing identities duplicate-safe.
-- Preserve an exact maker code or SKU only when the reviewed source publishes it. Package-size SKUs identify the same offering and never create another refill product or compatibility format.
+- Preserve an exact maker code or SKU assignment only when the reviewed source publishes it and establishes a controlled market scope. When scope is unknown, retain the value in the evidence claim but do not import an identifier assignment. Package-size SKUs identify the same offering and never create another refill product or compatibility format.
 - Create market and lifecycle assertions only from the source's actual scope. Current regional pages produce regional `current` assertions; dated catalogues produce `historical` assertions unless the audit identifies the edition as the current reviewed catalogue. Press releases prove introduction, not continuing availability. Do not create a `GLOBAL` assertion from a storefront, language, or multi-region audit.
 - Use the audit date, `2026-10-08`, as the capture date for ENG-405 sources. Use `2026-10-09` for the Floatune and PP43 decision evidence. Preserve a catalogue's edition/publication date and a captured document checksum when available.
 - Import only approved compatibility-group memberships. Do not infer exact pen compatibility from membership, missing rows, family names, or shared ink technology.
@@ -77,7 +77,7 @@ The following matrices are the approved offering facts. Each listed colour appli
 | Monteverde | `P41` 0.5 Extra-fine needle | Black, blue |
 | Monteverde | `P42` Fine | Black, blue, red, purple, green, turquoise, blue-black |
 | Monteverde | `P44` Broad | Black, blue, blue-black |
-| Monteverde | `PP43` Medium | Black; `PP432BK` and `PP433BK` are pack identifiers for this one offering |
+| Monteverde | `PP43` Medium | Black; published pack codes remain evidence-only until their market scope is established |
 | Parker | `QUINKflow Ballpoint` Fine | Black, blue |
 | Parker | `QUINKflow Ballpoint` Medium | Black, red, blue |
 | Parker | `QUINKflow Ballpoint` Broad | Black, blue |
@@ -112,10 +112,10 @@ The following matrices are the approved offering facts. Each listed colour appli
 
 Every product in the initial import has at least one offering row above. Products without an approved offering remain deferred rather than entering production as unsupported product-only records.
 
-Apply the audit's maker-code corrections:
+Apply the audit's maker-code corrections when a controlled scope supports an identifier assignment:
 
-- Parker `1950370` is Medium Red; add `1950371` as Medium Blue and `2020761` as Fine Blue. Remove the unsupported `Economy` label from `2136210` and `2136231`.
-- Monteverde uses `BU`, `PL`, `BN`, and `PK`; do not seed `BL` or `PU` as maker codes.
+- Parker `1950370` is Medium Red; `1950371` is Medium Blue and `2020761` is Fine Blue. Remove the unsupported `Economy` label from `2136210` and `2136231`. The initial import retains these mappings as evidence claims but creates no identifier assignments because the catalogue's market scope is unknown.
+- Monteverde uses `BU`, `PL`, `BN`, and `PK`; `BL` and `PU` are unsupported. The initial import retains the published codes as evidence claims but creates no identifier assignments because the storefront's controlled market scope is unknown.
 - Do not seed Schmidt's numeric P900 SKUs or its supplied exact grade diameters; the reviewed maker sources did not confirm them.
 - Exclude Schneider `7354`. Treat `7361`, `7362`, `7363`, `7364`, and `7373` as confirmed by the current official pages.
 - Do not seed exact full ZENTO `.24`, `.15`, or `.33` ordering codes until an official table confirms them. The model-and-colour offerings themselves are approved.
