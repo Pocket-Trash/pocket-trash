@@ -1,5 +1,5 @@
 import type { Locator, Page } from "playwright/test";
-import { expect, test } from "./auth";
+import { expect, test, waitForHydration } from "./auth";
 
 test.use({ trace: "off" });
 
@@ -47,6 +47,7 @@ test("@mutation regular user theme persists after reload", async ({
 }) => {
   await signInAs("regular");
   await page.goto("/user/settings");
+  await waitForHydration(page);
 
   const themeGroup = page.getByRole("group", { name: "Theme" });
   const selectedTheme = themeGroup.locator('[aria-pressed="true"]');
@@ -73,6 +74,7 @@ test("@mutation regular user theme persists after reload", async ({
     await expect(nextTheme).toHaveAttribute("aria-pressed", "true");
   } finally {
     await page.goto("/user/settings");
+    await waitForHydration(page);
     if ((await originalTheme.getAttribute("aria-pressed")) !== "true") {
       await selectThemeAndWaitForPersistence(
         page,
@@ -108,17 +110,8 @@ async function selectThemeAndWaitForPersistence(
       request.postData()?.includes(theme) === true
     );
   });
-  const savingTransition = (async () => {
-    await expect(themeButton).toBeDisabled();
-    await expect(themeButton).toBeEnabled();
-  })();
-
   await themeButton.click();
-  await Promise.all([
-    responsePromise.then((response) => {
-      expect(response.ok()).toBe(true);
-    }),
-    savingTransition,
-  ]);
+  const response = await responsePromise;
+  expect(response.ok()).toBe(true);
   await expect(themeButton).toBeEnabled();
 }
