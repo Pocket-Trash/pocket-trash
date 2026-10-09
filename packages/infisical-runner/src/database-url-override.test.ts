@@ -36,10 +36,10 @@ describe("normalizeDatabaseUrlSslMode", () => {
   it("promotes Neon's required SSL mode while preserving channel binding", () => {
     expect(
       normalizeDatabaseUrlSslMode(
-        "postgresql://user:password@example.com/database?sslmode=require&channel_binding=require",
+        "postgresql://user:password@example.com/database?application_name=a%20b&sslmode=require&channel_binding=require",
       ),
     ).toBe(
-      "postgresql://user:password@example.com/database?sslmode=verify-full&channel_binding=require",
+      "postgresql://user:password@example.com/database?application_name=a%20b&sslmode=verify-full&channel_binding=require",
     );
   });
 

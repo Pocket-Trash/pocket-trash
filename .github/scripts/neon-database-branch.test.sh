@@ -44,8 +44,8 @@ case "$url" in
     ;;
   *branch_id=br_target*pooled=true*) printf '{"uri":"postgresql://user@ep-target-pooler.example.test/db?sslmode=require&channel_binding=require"}' ;;
   *branch_id=br_target*pooled=false*) printf '{"uri":"postgresql://user@ep-target.example.test/db?sslmode=require&channel_binding=require"}' ;;
-  *branch_id=br_development*pooled=true*) printf '{"uri":"postgresql://user@ep-development-pooler.example.test/db?sslmode=require&channel_binding=require"}' ;;
-  *branch_id=br_development*pooled=false*) printf '{"uri":"postgresql://user@ep-development.example.test/db?sslmode=require&channel_binding=require"}' ;;
+  *branch_id=br_development*pooled=true*) printf '{"uri":"postgresql://user@ep-development-pooler.example.test/db?application_name=sslmode=require&sslmode=require&channel_binding=require"}' ;;
+  *branch_id=br_development*pooled=false*) printf '{"uri":"postgresql://user@ep-development.example.test/db?application_name=a%%20b&sslmode=verify-full&channel_binding=require"}' ;;
   *branch_id=br_preview*pooled=true*) printf '{"uri":"postgresql://user@ep-preview-pooler.example.test/db?sslmode=require&channel_binding=require"}' ;;
   *branch_id=br_preview*pooled=false*) printf '{"uri":"postgresql://user@ep-preview.example.test/db?sslmode=require&channel_binding=require"}' ;;
   */branches/br_target)
@@ -153,8 +153,8 @@ PATH="$test_dir:$PATH" \
   BRANCH_NAME=development \
   GITHUB_OUTPUT="$branch_url_output" \
   bash "$script_dir/neon-database-branch.sh" branch-url > /dev/null
-grep -Fx 'database_url=postgresql://user@ep-development-pooler.example.test/db?sslmode=verify-full&channel_binding=require' "$branch_url_output" > /dev/null
-grep -Fx 'migration_database_url=postgresql://user@ep-development.example.test/db?sslmode=verify-full&channel_binding=require' "$branch_url_output" > /dev/null
+grep -Fx 'database_url=postgresql://user@ep-development-pooler.example.test/db?application_name=sslmode=require&sslmode=verify-full&channel_binding=require' "$branch_url_output" > /dev/null
+grep -Fx 'migration_database_url=postgresql://user@ep-development.example.test/db?application_name=a%20b&sslmode=verify-full&channel_binding=require' "$branch_url_output" > /dev/null
 
 # A fresh isolated preview is created from development.
 run_branch_command fresh prepare-preview > /dev/null

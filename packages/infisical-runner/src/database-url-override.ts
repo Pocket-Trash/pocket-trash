@@ -5,10 +5,11 @@ import { parseEnv } from "node:util";
 const urlInitialsPattern = /^[A-Z0-9]+$/;
 
 /**
- * Preserves node-postgres certificate verification for Neon connection URLs.
+ * Preserves node-postgres certificate verification for database connection URLs.
  *
  * @param databaseUrl - PostgreSQL connection URL to normalize.
- * @returns The URL with Neon's required SSL mode promoted to `verify-full`.
+ * @returns The URL with an exact `sslmode=require` query parameter promoted to
+ * `verify-full`, or the original value for other modes and unparseable values.
  */
 export function normalizeDatabaseUrlSslMode(databaseUrl: string): string {
   try {
@@ -16,8 +17,10 @@ export function normalizeDatabaseUrlSslMode(databaseUrl: string): string {
     if (url.searchParams.get("sslmode") !== "require") {
       return databaseUrl;
     }
-    url.searchParams.set("sslmode", "verify-full");
-    return url.toString();
+    return databaseUrl.replace(
+      /([?&])sslmode=require(?=(&|#|$))/u,
+      "$1sslmode=verify-full",
+    );
   } catch {
     return databaseUrl;
   }
