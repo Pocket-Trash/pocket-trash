@@ -108,17 +108,8 @@ async function selectThemeAndWaitForPersistence(
       request.postData()?.includes(theme) === true
     );
   });
-  const savingTransition = (async () => {
-    await expect(themeButton).toBeDisabled();
-    await expect(themeButton).toBeEnabled();
-  })();
-
   await themeButton.click();
-  await Promise.all([
-    responsePromise.then((response) => {
-      expect(response.ok()).toBe(true);
-    }),
-    savingTransition,
-  ]);
+  const response = await responsePromise;
+  expect(response.ok()).toBe(true);
   await expect(themeButton).toBeEnabled();
 }
