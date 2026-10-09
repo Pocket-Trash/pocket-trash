@@ -243,7 +243,15 @@ describe("finish option editor", () => {
       makerUrl: null,
       magnetLayout: null,
       usesInserts: null,
-      materials: [{ id: 1000, name: "Bronze", slug: "bronze" }],
+      materials: [
+        {
+          assignmentId: 1000,
+          specific: null,
+          id: 1000,
+          name: "Bronze",
+          slug: "bronze",
+        },
+      ],
       name: "Spinner",
       ownerClerkId: "user_test",
       isAdminPrivate: false,
@@ -865,7 +873,15 @@ function productFixture(
     makerUrl: null,
     magnetLayout: productTypeSlug === "slider" ? "2x4" : null,
     usesInserts: productTypeSlug === "slider" ? false : null,
-    materials: [{ id: id + 1, name: "Bronze", slug: "bronze" }],
+    materials: [
+      {
+        assignmentId: id + 1,
+        specific: null,
+        id: id + 1,
+        name: "Bronze",
+        slug: "bronze",
+      },
+    ],
     name,
     ownerClerkId: "user_test",
     isAdminPrivate: false,

@@ -9,7 +9,13 @@ import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
 import { CollectionEditPage } from "./catalog-form-pages";
 
 /** Material shared by the slider assembly story fixtures. */
-const material = { id: 1000, name: "Titanium", slug: "titanium" };
+const material = {
+  assignmentId: 1000,
+  specific: null,
+  id: 1000,
+  name: "Titanium",
+  slug: "titanium",
+};
 
 /**
  * Creates a compact catalog product for an assembly member.

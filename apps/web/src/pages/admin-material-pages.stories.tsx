@@ -1,6 +1,6 @@
 import type { AdminMaterial } from "@package/services";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 import { mockStoryRole, StoryProviders } from "../../.storybook/story-fixtures";
 import {
   AdminMaterialFormPage,
@@ -9,6 +9,7 @@ import {
 
 /** Representative material with active and archived images. */
 const carbonFiber: AdminMaterial = {
+  specifics: [],
   description: "A woven carbon composite.",
   id: 1,
   images: [
@@ -153,5 +154,58 @@ export const Edit: Story = {
     await expect(
       canvas.getByRole("button", { name: "Restore image" }),
     ).toBeVisible();
+  },
+};
+
+/** Scoped gallery and specific editing retain their general-material context. */
+export const Specifics: Story = {
+  args: { materials: [] },
+  /**
+   * Renders the scoped material editor.
+   * @returns An editor with general and grade-scoped images.
+   */
+  render: () => (
+    <AdminMaterialFormPage
+      initialMaterial={{
+        ...carbonFiber,
+        specifics: [
+          {
+            id: 21,
+            materialId: 1,
+            name: "Woven",
+            slug: "woven",
+            description: null,
+          },
+        ],
+        images: carbonFiber.images.map((image) => ({
+          ...image,
+          materialSpecificId: image.id === 12 ? 21 : null,
+        })),
+      }}
+    />
+  ),
+  /**
+   * Checks slug access and the add-specific editor's immutable context.
+   * @param root0 - Story interaction context.
+   * @param root0.canvas - Rendered story canvas.
+   * @returns Completion after scoped editor assertions.
+   */
+  play: async ({ canvas }) => {
+    await expect(
+      canvas.getByRole("checkbox", { name: "Update slug" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("heading", { name: "General" }),
+    ).toBeVisible();
+    await expect(canvas.getByRole("heading", { name: "Woven" })).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Add alloy or grade" }),
+    );
+    await expect(
+      canvas.getByRole("textbox", { name: "Alloy or grade name" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("textbox", { name: "Materials" }),
+    ).toHaveAttribute("readonly");
   },
 };

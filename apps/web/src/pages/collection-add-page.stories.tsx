@@ -40,7 +40,15 @@ const product: CatalogProduct = {
   makerUrl: null,
   magnetLayout: null,
   usesInserts: null,
-  materials: [{ id: 1001, name: "Bronze", slug: "bronze" }],
+  materials: [
+    {
+      assignmentId: 1001,
+      specific: null,
+      id: 1001,
+      name: "Bronze",
+      slug: "bronze",
+    },
+  ],
   name: "Product 1",
   ownerClerkId: "user_test",
   isAdminPrivate: false,

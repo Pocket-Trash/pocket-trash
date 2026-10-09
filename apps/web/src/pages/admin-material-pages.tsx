@@ -3,6 +3,7 @@ import type {
   AdminMaterial,
   AdminMaterialSummary,
   CatalogImage,
+  MaterialSpecific,
 } from "@package/services";
 import {
   maxImageBytes,
@@ -10,18 +11,23 @@ import {
   maxImageSessionFiles,
 } from "@package/services/constants";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { RotateCcw, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, RotateCcw, Trash2 } from "lucide-react";
 import * as React from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import { CatalogMarkdownEditor } from "@/components/catalog-markdown-editor";
 import type { MarkdownEditorHandle } from "@/components/markdown-editor";
 import { FileDropInput } from "@/components/resource-file-input";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { CatalogCombobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import { slugify } from "@/lib/catalog";
 import {
   getAdminMaterial,
+  moveAdminMaterialImage,
+  reorderAdminMaterialImages,
   restoreCatalogImage,
   saveAdminMaterial,
+  saveAdminMaterialSpecific,
   softDeleteCatalogImage,
 } from "@/lib/catalog-api";
 import { useCatalogCopy } from "@/lib/catalog-copy";
@@ -125,6 +131,15 @@ export function AdminMaterialFormPage({
   const [files, setFiles] = React.useState<File[]>([]);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [name, setName] = React.useState(initialMaterial?.name ?? "");
+  const [specifics, setSpecifics] = React.useState(
+    initialMaterial?.specifics ?? [],
+  );
+  const [editingSpecific, setEditingSpecific] = React.useState<
+    MaterialSpecific | "new" | null
+  >(null);
+  const [uploadScope, setUploadScope] = React.useState<number | null>(null);
+  const [slug, setSlug] = React.useState(initialMaterial?.slug ?? "");
+  const [updateSlug, setUpdateSlug] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [status, setStatus] = React.useState<string | null>(null);
   const imageGuidance = getImageUploadGuidance(locale);
@@ -141,6 +156,15 @@ export function AdminMaterialFormPage({
       setFormError(imageError.key);
       return;
     }
+    if (
+      initialMaterial &&
+      updateSlug &&
+      slugify(name) !== slug &&
+      !window.confirm(
+        `${t("web.materials.slug.confirmation", { oldUrl: `/materials/${slug}`, newUrl: `/materials/${slugify(name)}` })} ${t("web.materials.slug.affected", { count: specifics.length })}`,
+      )
+    )
+      return;
     setSaving(true);
     try {
       const result = await saveAdminMaterial({
@@ -148,6 +172,7 @@ export function AdminMaterialFormPage({
           description,
           materialId: initialMaterial?.id ?? null,
           name,
+          updateSlug,
         },
       });
       if (!result.ok) {
@@ -156,6 +181,8 @@ export function AdminMaterialFormPage({
         return;
       }
       setFieldErrors({});
+      setSlug(result.material.slug);
+      setUpdateSlug(false);
       if (files.length) {
         try {
           const uploads = await uploadImages({
@@ -179,6 +206,7 @@ export function AdminMaterialFormPage({
             },
             targetId: result.material.id,
             targetType: "material",
+            materialSpecificId: uploadScope,
           });
           setFiles(uploads.failed);
           if (uploads.failed.length) {
@@ -235,13 +263,36 @@ export function AdminMaterialFormPage({
               <FieldError error={fieldErrors.name?.[0]} />
             </label>
             {initialMaterial ? (
-              <label className="grid gap-2 text-sm font-medium">
-                {t("web.catalog.field.slug")}
-                <Input readOnly value={initialMaterial.slug} />
+              <div className="grid gap-2 text-sm font-medium">
+                <label htmlFor="material-slug">
+                  {t("web.catalog.field.slug")}
+                </label>
+                <Input
+                  id="material-slug"
+                  readOnly
+                  value={slug}
+                  aria-invalid={Boolean(fieldErrors.slug?.length)}
+                />
+                <FieldError error={fieldErrors.slug?.[0]} />
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={updateSlug}
+                    onChange={(event) => setUpdateSlug(event.target.checked)}
+                  />
+                  {t("web.materials.slug.update")}
+                </label>
+                {updateSlug ? (
+                  <span className="text-xs text-muted-foreground">
+                    {t("web.materials.slug.preview", {
+                      url: `/materials/${slugify(name)}`,
+                    })}
+                  </span>
+                ) : null}
                 <span className="text-xs font-normal text-muted-foreground">
-                  {t("web.materials.admin.slugHelp")}
+                  {t("web.materials.slug.help")}
                 </span>
-              </label>
+              </div>
             ) : null}
             <CatalogMarkdownEditor
               defaultValue={description}
@@ -259,6 +310,22 @@ export function AdminMaterialFormPage({
             />
           </div>
           <div className="grid min-w-0 content-start gap-5">
+            {initialMaterial ? (
+              <label className="grid gap-2 text-sm">
+                {t("web.materials.image.scope")}
+                <CatalogCombobox
+                  ariaLabel={t("web.materials.image.scope")}
+                  items={specifics}
+                  value={specifics.find(({ id }) => id === uploadScope) ?? null}
+                  placeholder={t("web.materials.image.generalScope")}
+                  removeLabel={t("web.action.close")}
+                  showSelectedPill
+                  onValueChange={(value) =>
+                    setUploadScope(value ? Number(value.id) : null)
+                  }
+                />
+              </label>
+            ) : null}
             <FileDropInput
               accept=".avif,.jpeg,.jpg,.png,.webp"
               aspectRatio={4 / 3}
@@ -287,14 +354,99 @@ export function AdminMaterialFormPage({
               removeFileLabel={t("web.resources.action.removeFile")}
             />
             {initialMaterial ? (
-              <MaterialImageEditor
-                images={existingImages}
-                materialName={name || initialMaterial.name}
-                onChange={setExistingImages}
-                onError={setFormError}
-              />
+              <div className="grid gap-5">
+                {[
+                  { id: null, name: t("web.materials.image.generalScope") },
+                  ...specifics,
+                ].map((scope) => (
+                  <section className="grid gap-2" key={scope.id ?? "general"}>
+                    <h3 className="text-sm font-semibold">{scope.name}</h3>
+                    <MaterialImageEditor
+                      images={existingImages.filter(
+                        (image) =>
+                          (image.materialSpecificId ?? null) === scope.id,
+                      )}
+                      materialId={initialMaterial.id}
+                      materialSpecificId={scope.id}
+                      specifics={specifics}
+                      materialName={name || initialMaterial.name}
+                      onChange={(images) =>
+                        setExistingImages((current) => [
+                          ...current.filter(
+                            (image) =>
+                              (image.materialSpecificId ?? null) !== scope.id,
+                          ),
+                          ...images,
+                        ])
+                      }
+                      onRefresh={async () => {
+                        const refreshed = await getAdminMaterial({
+                          data: { materialId: initialMaterial.id },
+                        });
+                        if (refreshed) setExistingImages(refreshed.images);
+                      }}
+                      onError={setFormError}
+                    />
+                  </section>
+                ))}
+              </div>
             ) : null}
           </div>
+          {initialMaterial ? (
+            <section
+              className="grid gap-3 lg:col-span-2"
+              aria-label={t("web.materials.specific.title")}
+            >
+              <h2 className="font-semibold">
+                {t("web.materials.specific.title")}
+              </h2>
+              {specifics.length ? (
+                specifics.map((specific) => (
+                  <div
+                    className="flex items-center justify-between gap-2 border border-border p-3"
+                    key={specific.id}
+                  >
+                    <span>{specific.name}</span>
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditingSpecific(specific)}
+                    >
+                      {t("web.action.edit")}
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {t("web.materials.specific.empty")}
+                </p>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => setEditingSpecific("new")}
+              >
+                {t("web.materials.specific.add")}
+              </Button>
+              {editingSpecific ? (
+                <MaterialSpecificEditor
+                  key={editingSpecific === "new" ? "new" : editingSpecific.id}
+                  material={{ ...initialMaterial, name, slug }}
+                  specific={
+                    editingSpecific === "new" ? undefined : editingSpecific
+                  }
+                  onCancel={() => setEditingSpecific(null)}
+                  onSaved={(saved) => {
+                    setSpecifics((current) =>
+                      [
+                        ...current.filter(({ id }) => id !== saved.id),
+                        saved,
+                      ].sort((a, b) => a.name.localeCompare(b.name)),
+                    );
+                    setEditingSpecific(null);
+                  }}
+                />
+              ) : null}
+            </section>
+          ) : null}
           {formError ? (
             <div
               className="rounded-lg border border-destructive p-4 text-destructive lg:col-span-2"
@@ -347,11 +499,26 @@ export function AdminMaterialFormPage({
  * @returns Material image controls.
  */
 function MaterialImageEditor({
+  materialId,
+  materialSpecificId,
+  specifics,
+  onRefresh,
   images,
   materialName,
   onChange,
   onError,
 }: {
+  /** General material context retained by every image. */
+  materialId: number;
+  /** Exact scope being reordered. */
+  materialSpecificId: number | null;
+  /** Allowed destination scopes under this parent. */
+  specifics: MaterialSpecific[];
+  /**
+   * Reloads canonical images after a scope move.
+   * @returns Completion after canonical state reloads.
+   */
+  onRefresh(): Promise<void>;
   /** Active and archived images. */
   images: CatalogImage[];
   /** Material name used in alternative text. */
@@ -381,14 +548,14 @@ function MaterialImageEditor({
 
   return (
     <section
-      aria-label={t("web.resources.upload.imagesLabel")}
+      aria-label={`${t("web.resources.upload.imagesLabel")}: ${materialSpecificId === null ? t("web.materials.image.generalScope") : specifics.find(({ id }) => id === materialSpecificId)?.name}`}
       className="grid gap-3"
     >
       {images.map((image) => {
         const archived = Boolean(image.deletedAt);
         return (
           <div
-            className="flex min-w-0 items-center gap-3 rounded-lg border border-border p-3"
+            className="flex min-w-0 flex-wrap items-center gap-3 rounded-lg border border-border p-3"
             key={image.id}
           >
             <img
@@ -399,6 +566,90 @@ function MaterialImageEditor({
             <span className="min-w-0 flex-1 truncate text-sm">
               {image.fileName}
             </span>
+            <CatalogCombobox
+              ariaLabel={t("web.materials.image.move")}
+              items={[
+                { id: 0, name: t("web.materials.image.generalScope") },
+                ...specifics,
+              ]}
+              value={
+                specifics.find(({ id }) => id === image.materialSpecificId) ?? {
+                  id: 0,
+                  name: t("web.materials.image.generalScope"),
+                }
+              }
+              placeholder={t("web.materials.image.move")}
+              onValueChange={async (value) => {
+                if (
+                  !value ||
+                  Number(value.id) === (image.materialSpecificId ?? 0)
+                )
+                  return;
+                if (
+                  !window.confirm(
+                    t("web.materials.image.moveConfirmation", {
+                      scope: value.name,
+                    }),
+                  )
+                )
+                  return;
+                try {
+                  const result = await moveAdminMaterialImage({
+                    data: {
+                      materialId,
+                      imageId: image.id,
+                      materialSpecificId: Number(value.id) || null,
+                    },
+                  });
+                  if (!result.ok) {
+                    onError(result.formError);
+                    return;
+                  }
+                  await onRefresh();
+                } catch {
+                  onError("error.generic");
+                }
+              }}
+            />
+            {!archived
+              ? ([-1, 1] as const).map((direction) => {
+                  const active = images.filter(({ deletedAt }) => !deletedAt);
+                  const index = active.findIndex(({ id }) => id === image.id);
+                  return (
+                    <Button
+                      key={direction}
+                      variant="outline"
+                      size="sm"
+                      aria-label={`${t("web.materials.image.move")} ${direction < 0 ? "↑" : "↓"} ${image.fileName}`}
+                      disabled={
+                        index + direction < 0 ||
+                        index + direction >= active.length
+                      }
+                      onClick={async () => {
+                        const next = [...active];
+                        [next[index], next[index + direction]] = [
+                          next[index + direction]!,
+                          next[index]!,
+                        ];
+                        try {
+                          await reorderAdminMaterialImages({
+                            data: {
+                              materialId,
+                              materialSpecificId,
+                              imageIds: next.map(({ id }) => id),
+                            },
+                          });
+                          await onRefresh();
+                        } catch {
+                          onError("error.generic");
+                        }
+                      }}
+                    >
+                      {direction < 0 ? <ArrowUp /> : <ArrowDown />}
+                    </Button>
+                  );
+                })
+              : null}
             <Button
               aria-label={
                 archived
@@ -452,6 +703,161 @@ function MaterialImageEditor({
           </div>
         );
       })}
+    </section>
+  );
+}
+
+/**
+ * Edits one alloy or grade in read-only general material context.
+ *
+ * @param props - Parent, optional existing specific, and completion callbacks.
+ * @returns Localized specific editor with stable-slug confirmation.
+ */
+function MaterialSpecificEditor({
+  material,
+  specific,
+  onSaved,
+  onCancel,
+}: {
+  /** Read-only general material context. */
+  material: AdminMaterial;
+  /** Existing specific, omitted for creation. */
+  specific?: MaterialSpecific;
+  /**
+   * Receives the saved canonical specific.
+   * @param specific - Saved canonical alloy or grade.
+   */
+  onSaved(specific: MaterialSpecific): void;
+  /** Closes the transient editor. */
+  onCancel(): void;
+}) {
+  const t = useCatalogCopy();
+  const [name, setName] = React.useState(specific?.name ?? "");
+  const [description, setDescription] = React.useState(
+    specific?.description ?? "",
+  );
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [updateSlug, setUpdateSlug] = React.useState(false);
+  const [fieldErrors, setFieldErrors] = React.useState<
+    Record<string, string[]>
+  >({});
+  const [error, setError] = React.useState<string | null>(null);
+  return (
+    <section className="grid gap-4 border border-border bg-card p-4">
+      <h3 className="font-semibold">
+        {t(
+          specific
+            ? "web.materials.specific.edit"
+            : "web.materials.specific.add",
+        )}
+      </h3>
+      <label className="grid gap-2 text-sm">
+        {t("web.catalog.field.materials")}
+        <Input readOnly value={material.name} />
+      </label>
+      <label className="grid gap-2 text-sm">
+        {t("web.materials.specific.name")}
+        <Input
+          aria-invalid={Boolean(fieldErrors.name?.length)}
+          value={name}
+          maxLength={255}
+          required
+          onChange={(event) => setName(event.target.value)}
+        />
+        <FieldError error={fieldErrors.name?.[0]} />
+      </label>
+      {specific ? (
+        <div className="grid gap-2 text-sm">
+          <Input
+            aria-label={t("web.catalog.field.slug")}
+            readOnly
+            aria-invalid={Boolean(fieldErrors.slug?.length)}
+            value={specific.slug}
+          />
+          <FieldError error={fieldErrors.slug?.[0]} />
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={updateSlug}
+              onChange={(event) => setUpdateSlug(event.target.checked)}
+            />
+            {t("web.materials.slug.update")}
+          </label>
+          <p className="text-xs text-muted-foreground">
+            {t("web.materials.slug.help")}
+          </p>
+          {updateSlug ? (
+            <p>
+              {t("web.materials.slug.preview", {
+                url: `/materials/${material.slug}/${slugify(name)}`,
+              })}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      <CatalogMarkdownEditor
+        id={`specific-description-${specific?.id ?? "new"}`}
+        defaultValue={description}
+        label={t("web.catalog.field.description")}
+        help={t("web.catalog.help.markdownDescription")}
+        onChange={setDescription}
+        onLoadingChange={setLoading}
+      />
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {t(error)}
+        </p>
+      ) : null}
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={onCancel}>
+          {t("action.cancel")}
+        </Button>
+        <Button
+          disabled={
+            saving || loading || !name.trim() || description.length > 5000
+          }
+          onClick={async () => {
+            if (
+              specific &&
+              updateSlug &&
+              slugify(name) !== specific.slug &&
+              !window.confirm(
+                t("web.materials.slug.confirmation", {
+                  oldUrl: `/materials/${material.slug}/${specific.slug}`,
+                  newUrl: `/materials/${material.slug}/${slugify(name)}`,
+                }),
+              )
+            )
+              return;
+            setSaving(true);
+            setError(null);
+            setFieldErrors({});
+            try {
+              const result = await saveAdminMaterialSpecific({
+                data: {
+                  materialId: material.id,
+                  specificId: specific?.id,
+                  name,
+                  description,
+                  updateSlug,
+                },
+              });
+              if (result.ok) onSaved(result.specific);
+              else {
+                setFieldErrors(result.fieldErrors);
+                setError(result.formError ?? "error.generic");
+              }
+            } catch {
+              setError("error.generic");
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          {t("action.save")}
+        </Button>
+      </div>
     </section>
   );
 }
