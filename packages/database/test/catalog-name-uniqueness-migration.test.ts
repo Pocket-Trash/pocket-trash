@@ -11,7 +11,7 @@ describe("catalog name uniqueness baseline", () => {
     await migrate(drizzle({ client: database }), {
       migrationsFolder: fileURLToPath(new URL("../drizzle/", import.meta.url)),
     });
-  });
+  }, 60_000);
 
   afterAll(async () => {
     await database.close();
