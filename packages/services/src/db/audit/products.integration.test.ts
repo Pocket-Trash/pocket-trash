@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
@@ -7,6 +5,7 @@ import { schema } from "@package/database";
 import { createNoopLogger } from "@package/logger";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
@@ -14,7 +13,10 @@ describe("product audit adoption", () => {
   it("records product administration and rolls back staff edits without reasons", async () => {
     const client = new PGlite();
     await migrate(client);
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     const services = createDbServices(
       db,
       createNoopLogger({ app: "test", environment: "test" }),
@@ -137,7 +139,10 @@ describe("product audit adoption", () => {
   it("audits reusable slider magnet preset CRUD", async () => {
     const client = new PGlite();
     await migrate(client);
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     const services = createDbServices(
       db,
       createNoopLogger({ app: "test", environment: "test" }),
@@ -203,14 +208,7 @@ async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
     new URL("../../../../database/drizzle", import.meta.url),
   );
-  for (const file of readdirSync(migrationsFolder)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()) {
-    await client.exec(
-      readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
-        "--> statement-breakpoint",
-        "",
-      ),
-    );
-  }
+  await migratePglite(drizzle({ client: client }), {
+    migrationsFolder: migrationsFolder,
+  });
 }

@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
@@ -12,6 +10,7 @@ import {
 } from "@package/logger";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it, vi } from "vitest";
 import {
   AccountErasureInProgressError,
@@ -25,7 +24,10 @@ describe("complete erasure service", () => {
   it("deduplicates, resumes fixed steps, and completes only after verification", async () => {
     const client = new PGlite();
     await migrate(client);
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     const events: LogEvent[] = [];
     let currentTime = new Date("2026-09-29T12:00:00.000Z");
     const service = createErasureService(
@@ -204,7 +206,10 @@ describe("complete erasure service", () => {
   it("converges after a retryable failure at every operation step", async () => {
     const client = new PGlite();
     await migrate(client);
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     let currentTime = new Date("2026-09-29T12:00:00.000Z");
     const service = createErasureService(
       db,
@@ -279,7 +284,10 @@ describe("complete erasure service", () => {
   it("hides content and pauses on an unexpected Clerk deletion", async () => {
     const client = new PGlite();
     await migrate(client);
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     const events: LogEvent[] = [];
     const occurredAt = new Date("2026-09-29T13:00:00.000Z");
     const service = createErasureService(
@@ -390,7 +398,10 @@ describe("complete erasure service", () => {
   it("retries provider failures for 24 hours before alerting", async () => {
     const client = new PGlite();
     await migrate(client);
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     const events: LogEvent[] = [];
     let currentTime = new Date("2026-09-29T12:00:00.000Z");
     const service = createErasureService(
@@ -479,7 +490,10 @@ describe("complete erasure service", () => {
   it("lets an admin retry without letting an exception bypass a failed step", async () => {
     const client = new PGlite();
     await migrate(client);
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     let currentTime = new Date("2026-09-29T14:00:00.000Z");
     const service = createErasureService(
       db,
@@ -622,14 +636,7 @@ async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
     new URL("../../../../database/drizzle", import.meta.url),
   );
-  for (const file of readdirSync(migrationsFolder)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()) {
-    await client.exec(
-      readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
-        "--> statement-breakpoint",
-        "",
-      ),
-    );
-  }
+  await migratePglite(drizzle({ client: client }), {
+    migrationsFolder: migrationsFolder,
+  });
 }

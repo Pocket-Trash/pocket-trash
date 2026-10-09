@@ -1,9 +1,10 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
 import process from "node:process";
 import { setTimeout } from "node:timers";
-import { URL } from "node:url";
+import { fileURLToPath } from "node:url";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 
 /** Unique Docker container name for the isolated storage integration test. */
@@ -45,12 +46,11 @@ try {
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
     }
-    const migrations = new URL("../../database/drizzle/", import.meta.url);
-    const journal = JSON.parse(
-      readFileSync(new URL("meta/_journal.json", migrations), "utf8"),
-    );
-    for (const { tag } of journal.entries)
-      await pool.query(readFileSync(new URL(`${tag}.sql`, migrations), "utf8"));
+    await migrate(drizzle({ client: pool }), {
+      migrationsFolder: fileURLToPath(
+        new URL("../../database/drizzle/", import.meta.url),
+      ),
+    });
     const result = spawnSync(
       "pnpm",
       ["exec", "vitest", "run", "src/storage/storage.integration.test.ts"],

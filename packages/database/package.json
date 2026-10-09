@@ -23,9 +23,6 @@
     "db:studio": "tsx ../infisical-runner/src/cli.ts database db:studio -- drizzle-kit studio --config=drizzle.config.ts --host=127.0.0.1 --port=4009",
     "db:validate:chain": "tsx scripts/validate-migration-chain.ts",
     "db:validate:personal": "tsx ../infisical-runner/src/cli.ts database db:validate:personal -- tsx scripts/validate-personal-migrations.ts",
-    "db:view": "concurrently --kill-others --names studio,visualizer,view \"pnpm db:studio\" \"pnpm db:visualizer\" \"wait-on tcp:127.0.0.1:4009 tcp:127.0.0.1:4010 && pnpm db:view:shell\"",
-    "db:view:shell": "node ../../scripts/drizzle-view.mjs --studio \"https://local.drizzle.studio?port=4009\" --visualizer http://127.0.0.1:4010 --port 4011",
-    "db:visualizer": "drizzle-lab visualizer --config drizzle.config.ts --ts-config tsconfig.json --port=4010",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p scripts/tsconfig.json",
     "test": "vitest run --passWithNoTests --exclude \"dist/**\"",
     "test:ci": "vitest run --passWithNoTests --exclude \"dist/**\"",
@@ -36,12 +33,12 @@
     "@neondatabase/serverless": "latest",
     "@package/feature-flags": "workspace:*",
     "@t3-oss/env-core": "^0.13.11",
-    "drizzle-orm": "latest",
+    "drizzle-orm": "1.0.0-rc.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@package/tsconfig": "workspace:*",
-    "drizzle-kit": "latest"
+    "drizzle-kit": "1.0.0-rc.4"
   }
 }

@@ -1,1 +1,0 @@
-ALTER TABLE "product_image" ADD COLUMN "storage_owned" boolean DEFAULT true NOT NULL;

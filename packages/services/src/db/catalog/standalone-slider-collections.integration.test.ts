@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
@@ -7,27 +5,24 @@ import { schema } from "@package/database";
 import { createNoopLogger } from "@package/logger";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
 describe("standalone slider collection items", () => {
   it("creates, reads, counts, moves, edits, audits, and permanently deletes every slider subtype", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     const folder = fileURLToPath(
       new URL("../../../../database/drizzle", import.meta.url),
     );
     try {
-      for (const file of readdirSync(folder)
-        .filter((name) => name.endsWith(".sql"))
-        .sort()) {
-        await client.exec(
-          readFileSync(join(folder, file), "utf8").replaceAll(
-            "--> statement-breakpoint",
-            "",
-          ),
-        );
-      }
+      await migratePglite(drizzle({ client: client }), {
+        migrationsFolder: folder,
+      });
       const [owner] = await db
         .insert(schema.user)
         .values({ clerkId: "slider-owner", username: "Slider owner" })

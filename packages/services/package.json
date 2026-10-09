@@ -51,7 +51,7 @@
     "@package/logger": "workspace:*",
     "@package/storage": "workspace:*",
     "@pocket-trash/localizations": "^0.27.0",
-    "drizzle-orm": "latest",
+    "drizzle-orm": "1.0.0-rc.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {

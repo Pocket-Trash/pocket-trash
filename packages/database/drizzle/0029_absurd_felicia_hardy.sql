@@ -1,1 +1,0 @@
-ALTER TABLE "collection_item" ADD COLUMN "display_name" text;

@@ -1,11 +1,10 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
@@ -16,20 +15,13 @@ import { createDbServices } from "../index.js";
  */
 async function createTestDatabase() {
   const client = new PGlite();
-  const db = drizzle(client, { schema });
+  const db = drizzle({ client: client, relations: schema.relations });
   const migrationsFolder = fileURLToPath(
     new URL("../../../../database/drizzle", import.meta.url),
   );
-  for (const file of readdirSync(migrationsFolder)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()) {
-    await client.exec(
-      readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
-        "--> statement-breakpoint",
-        "",
-      ),
-    );
-  }
+  await migratePglite(drizzle({ client: client }), {
+    migrationsFolder: migrationsFolder,
+  });
   return { client, db };
 }
 

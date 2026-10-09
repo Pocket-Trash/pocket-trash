@@ -21,7 +21,7 @@ export function createDb({ databaseUrl }: DatabaseConfig) {
 
   return drizzle({
     connection: databaseUrl,
-    schema,
+    relations: schema.relations,
   });
 }
 

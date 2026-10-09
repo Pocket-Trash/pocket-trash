@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
@@ -7,6 +5,7 @@ import { schema } from "@package/database";
 import { createNoopLogger } from "@package/logger";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 import { FeedbackPlanRecoveryRequiredError } from "./index.js";
@@ -30,7 +29,7 @@ function createFeedbackTestService(db: Database) {
 describe("feedback lifecycle", () => {
   it("creates a pending request, permanent vote, and submitted notification atomically", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -79,7 +78,7 @@ describe("feedback lifecycle", () => {
 
   it("lists repeated completion notifications and marks one read", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -131,7 +130,7 @@ describe("feedback lifecycle", () => {
 
   it("allows only one concurrent submission at the active-request limit", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -175,7 +174,7 @@ describe("feedback lifecycle", () => {
 
   it("requires a category for approval and hides denied feedback from its submitter", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -240,7 +239,7 @@ describe("feedback lifecycle", () => {
 
   it("paginates the pending queue at thirty newest requests", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -267,7 +266,7 @@ describe("feedback lifecycle", () => {
 
   it("searches before the active cap and groups by status then votes", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -339,7 +338,7 @@ describe("feedback lifecycle", () => {
 
   it("toggles ordinary votes without removing a submitter's permanent vote", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -383,7 +382,7 @@ describe("feedback lifecycle", () => {
 
   it("suggests at most five active duplicates and excludes pending and completed feedback", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -433,7 +432,7 @@ describe("feedback lifecycle", () => {
 
   it("searches and paginates eligible My Requests before applying the page limit", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -487,7 +486,7 @@ describe("feedback lifecycle", () => {
 
   it("lists searchable admin active and archived feedback with bounded sorting", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -582,7 +581,7 @@ describe("feedback lifecycle", () => {
 
   it("reserves one Linear UUID and completes planning idempotently", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -625,7 +624,7 @@ describe("feedback lifecycle", () => {
 
   it("synchronizes linked Linear lifecycle changes once and in order", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -753,7 +752,7 @@ describe("feedback lifecycle", () => {
 
   it("edits through Completed and protects immutable or reserved feedback", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -836,7 +835,7 @@ describe("feedback lifecycle", () => {
 
   it("merges only pending feedback and transfers one removable vote", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
 
     try {
       await migrate(client);
@@ -957,14 +956,7 @@ async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
     new URL("../../../../database/drizzle", import.meta.url),
   );
-  for (const file of readdirSync(migrationsFolder)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()) {
-    await client.exec(
-      readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
-        "--> statement-breakpoint",
-        "",
-      ),
-    );
-  }
+  await migratePglite(drizzle({ client: client }), {
+    migrationsFolder: migrationsFolder,
+  });
 }

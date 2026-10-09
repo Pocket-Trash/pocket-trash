@@ -86,7 +86,8 @@ test("database detection includes schema and seed changes", (context) => {
     ["packages/database/scripts/seed.ts", true],
     ["packages/database/seed-data/catalog.json", true],
     ["packages/database/src/schema/topic.ts", true],
-    ["packages/database/drizzle/0001_topic.sql", true],
+    ["packages/database/drizzle/20261008000000_topic/migration.sql", true],
+    ["packages/database/drizzle/20261008000000_topic/snapshot.json", true],
     ["packages/database/drizzle.config.ts", true],
   ]) {
     git("checkout", "--detach", ancestor);
@@ -146,10 +147,17 @@ test("PR mutation isolation is independent of migration detection", () => {
   );
 });
 
-test("real Neon deploy workflows use the repair-aware migration runner", () => {
+test("real Neon deploy workflows use the standard direct migration runner", () => {
   for (const source of deploymentSources) {
     assert.match(source, /db:migrate:direct/u);
   }
+});
+
+test("production deployment applies migrations without fixtures or user reconciliation", () => {
+  const steps = deployWorkflow.jobs.production.steps;
+  const commands = steps.map((step) => step.run ?? "").join("\n");
+  assert.match(commands, /db:migrate:direct/u);
+  assert.doesNotMatch(commands, /db:seed|scripts\/seed|reconcile-clerk-users/u);
 });
 
 test("preview database compatibility and preflight gate deployment", () => {

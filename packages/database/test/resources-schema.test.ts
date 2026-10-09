@@ -16,7 +16,7 @@ import { uploadFile, uploadSession } from "../src/schema/uploads.js";
 describe("resource schema", () => {
   it("stores version-level archives and authenticated downloads", () => {
     expect(getTableName(resources)).toBe("resources");
-    expect(resources.id.dataType).toBe("number");
+    expect(resources.id.dataType).toBe("number int53");
     expect(resources.uploaderClerkId.notNull).toBe(true);
     expect(resources.isPrivate.notNull).toBe(true);
     expect(resources.isPrivate.default).toBe(false);

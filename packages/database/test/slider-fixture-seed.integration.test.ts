@@ -1,9 +1,8 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createUploadStorage } from "../../storage/src/index.js";
 import {
@@ -28,7 +27,10 @@ import {
 
 describe("deterministic slider fixture seed", () => {
   const client = new PGlite();
-  const db = drizzle(client, { schema }) as unknown as Database;
+  const db = drizzle({
+    client: client,
+    relations: schema.relations,
+  }) as unknown as Database;
   const uploadedObjectPaths: string[] = [];
   const fetchMock = vi.fn(
     async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -51,16 +53,9 @@ describe("deterministic slider fixture seed", () => {
   beforeAll(async () => {
     vi.stubGlobal("fetch", fetchMock);
     const folder = fileURLToPath(new URL("../drizzle", import.meta.url));
-    for (const file of readdirSync(folder)
-      .filter((name) => name.endsWith(".sql"))
-      .sort()) {
-      await client.exec(
-        readFileSync(join(folder, file), "utf8").replaceAll(
-          "--> statement-breakpoint",
-          "",
-        ),
-      );
-    }
+    await migratePglite(drizzle({ client: client }), {
+      migrationsFolder: folder,
+    });
     await seedUsersAndSettings(db);
     await seedCatalog(db);
   }, 30_000);

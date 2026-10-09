@@ -1,1 +1,0 @@
-ALTER TABLE "tmp_images" DROP COLUMN "image_thumbnail_url";

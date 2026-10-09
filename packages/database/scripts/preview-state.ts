@@ -22,8 +22,8 @@ const previewStateMismatchExitCode = 10;
 /**
  * Computes a stable fingerprint of the ordered Drizzle migration chain.
  *
- * @returns SHA-256 fingerprint of journal tags and SQL contents.
- * @throws When the journal or a referenced migration cannot be read.
+ * @returns SHA-256 fingerprint of timestamp-folder names and SQL contents.
+ * @throws When the migration artifacts are invalid or unreadable.
  */
 export function migrationFingerprint() {
   const migrations = loadRepositoryMigrations(migrationsDirectory).map(

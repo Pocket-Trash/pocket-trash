@@ -1,16 +1,18 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createCatalogImportRepository } from "./repository.js";
 
 describe("catalog import repository", () => {
   const client = new PGlite();
-  const db = drizzle(client, { schema }) as unknown as Database;
+  const db = drizzle({
+    client: client,
+    relations: schema.relations,
+  }) as unknown as Database;
   const repository = createCatalogImportRepository(db);
   const manifestHash = "a".repeat(64);
 
@@ -18,16 +20,9 @@ describe("catalog import repository", () => {
     const folder = fileURLToPath(
       new URL("../../../database/drizzle", import.meta.url),
     );
-    for (const file of readdirSync(folder)
-      .filter((name) => name.endsWith(".sql"))
-      .sort()) {
-      await client.exec(
-        readFileSync(join(folder, file), "utf8").replaceAll(
-          "--> statement-breakpoint",
-          "",
-        ),
-      );
-    }
+    await migratePglite(drizzle({ client: client }), {
+      migrationsFolder: folder,
+    });
   }, 30_000);
 
   afterAll(async () => {

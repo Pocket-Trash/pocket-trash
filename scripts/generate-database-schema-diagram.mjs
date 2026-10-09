@@ -92,7 +92,7 @@ async function main() {
           column.isUnique ? "UQ" : null,
         ].filter(Boolean);
         const suffix = column.notNull ? "" : "?";
-        return `${column.name}${suffix} ${flags.join("/")} ${column.getSQLType()}`
+        return `${column.name}${suffix} ${flags.join("/")} ${column.getSQLType()}${"[]".repeat(column.dimensions)}`
           .replaceAll(/\s+/g, " ")
           .trim();
       }),

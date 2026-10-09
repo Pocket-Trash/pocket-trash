@@ -2,8 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, test } from "vitest";
-
+import { describe, expect, onTestFinished, test } from "vitest";
 import {
   type AppliedMigration,
   compareMigrationHistories,
@@ -11,129 +10,98 @@ import {
   type MigrationRecord,
 } from "../scripts/migration-history.js";
 
-/** Repository history fixture used by comparison tests. */
+/** Baseline identity reused by malformed applied-history fixtures. */
+const first: MigrationRecord = {
+  createdAt: Date.UTC(2026, 9, 1),
+  hash: "aaa",
+  tag: "20261001000000_first",
+};
+/** Named repository history used independently of insertion order. */
 const expected: MigrationRecord[] = [
-  { createdAt: 100, hash: "aaa", tag: "0000_first" },
-  { createdAt: 200, hash: "bbb", tag: "0001_second" },
+  first,
   {
-    createdAt: 300,
-    hash: "repair",
-    tag: "0066_repair_rebased_slider_history",
+    createdAt: Date.UTC(2026, 9, 2),
+    hash: "bbb",
+    tag: "20261002000000_second",
   },
-  { createdAt: 400, hash: "after", tag: "0067_after_repair" },
 ];
-
-/** Applied form of the expected history. */
-const applied: AppliedMigration[] = expected.map(({ createdAt, hash }) => ({
-  createdAt,
-  hash,
+/** Applied form of the repository history. */
+const applied: AppliedMigration[] = expected.map((migration) => ({
+  ...migration,
 }));
 
 describe("compareMigrationHistories", () => {
   test.each([
     ["exact", applied],
-    ["behind", applied.slice(0, 1)],
-    ["ahead", [...applied, { createdAt: 500, hash: "ccc" }]],
-    ["reordered", [...applied].reverse()],
-    ["diverged", [{ createdAt: 100, hash: "changed" }]],
+    ["exact", [...applied].reverse()],
+    ["behind", applied.slice(1)],
+    [
+      "ahead",
+      [
+        ...applied,
+        {
+          createdAt: Date.UTC(2026, 9, 3),
+          hash: "ccc",
+          tag: "20261003000000_extra",
+        },
+      ],
+    ],
+    ["diverged", [{ ...first, hash: "changed" }]],
+    ["diverged", [...applied, first]],
+    ["diverged", [{ ...first, tag: null }]],
+    ["diverged", [{ ...first, createdAt: 1 }]],
     ["missing-history", null],
-  ] as const)("classifies %s history", (state, databaseHistory) => {
-    const comparison = compareMigrationHistories(expected, databaseHistory);
-
+  ] as const)("classifies %s named history", (state, history) => {
+    const comparison = compareMigrationHistories(expected, history);
     expect(comparison.state).toBe(state);
     expect(comparison.summary).not.toBe("");
     expect(comparison.guidance).not.toBe("");
-    if (state !== "exact") {
-      expect(comparison.guidance).toMatch(/Do not|Never/u);
-    }
-  });
-
-  test("accepts a divergent prefix after the forward repair marker", () => {
-    const comparison = compareMigrationHistories(expected, [
-      { createdAt: 50, hash: "legacy" },
-      { createdAt: 300, hash: "repair" },
-      { createdAt: 400, hash: "after" },
-    ]);
-
-    expect(comparison.state).toBe("reconciled");
-  });
-
-  test("reports a reconciled database behind later migrations", () => {
-    const comparison = compareMigrationHistories(expected, [
-      { createdAt: 50, hash: "legacy" },
-      { createdAt: 300, hash: "repair" },
-    ]);
-
-    expect(comparison.state).toBe("behind");
+    if (state !== "exact") expect(comparison.guidance).toMatch(/Do not|Never/u);
   });
 });
 
-test("loads journal order and hashes the unmodified SQL", (context) => {
-  const directory = mkdtempSync(join(tmpdir(), "migration-history-"));
+test("loads UTC timestamp folders and hashes unmodified SQL without a journal", (context) => {
+  const directory = mkdtempSync(join(tmpdir(), "migration-history-v1-"));
   context.onTestFinished(() =>
     rmSync(directory, { force: true, recursive: true }),
   );
-  mkdirSync(join(directory, "meta"), { recursive: true });
   const sql = "select 1;\n--> statement-breakpoint\nselect 2;\n";
-  writeFileSync(
-    join(directory, "meta", "_journal.json"),
-    JSON.stringify({
-      entries: [
-        {
-          breakpoints: true,
-          idx: 0,
-          tag: "0000_first",
-          when: 100,
-        },
-      ],
-    }),
-  );
-  writeFileSync(join(directory, "0000_first.sql"), sql);
-
-  expect(loadRepositoryMigrations(directory)).toEqual([
-    {
-      createdAt: 100,
+  for (const tag of ["20261001000000_b", "20261001000000_a"]) {
+    mkdirSync(join(directory, tag));
+    writeFileSync(join(directory, tag, "migration.sql"), sql);
+  }
+  expect(loadRepositoryMigrations(directory)).toEqual(
+    ["20261001000000_a", "20261001000000_b"].map((tag) => ({
+      createdAt: Date.UTC(2026, 9, 1),
       hash: createHash("sha256").update(sql).digest("hex"),
       statements: ["select 1;", "select 2;"],
-      tag: "0000_first",
-    },
-  ]);
-});
-
-test("rejects SQL files omitted from the journal", (context) => {
-  const directory = mkdtempSync(join(tmpdir(), "migration-history-orphan-"));
-  context.onTestFinished(() =>
-    rmSync(directory, { force: true, recursive: true }),
-  );
-  mkdirSync(join(directory, "meta"), { recursive: true });
-  writeFileSync(
-    join(directory, "meta", "_journal.json"),
-    JSON.stringify({ entries: [] }),
-  );
-  writeFileSync(join(directory, "0000_orphan.sql"), "select 1;");
-
-  expect(() => loadRepositoryMigrations(directory)).toThrow(
-    /missing from the migration journal/u,
+      tag,
+    })),
   );
 });
 
-test("rejects timestamps that Drizzle would skip", (context) => {
-  const directory = mkdtempSync(join(tmpdir(), "migration-history-order-"));
+test.each([
+  "0000_legacy.sql",
+  "unexpected",
+  "20260230000000_invalid",
+])("rejects unsupported or incomplete artifact %s", (name) => {
+  const directory = mkdtempSync(join(tmpdir(), "migration-history-invalid-"));
+  onTestFinished(() => rmSync(directory, { force: true, recursive: true }));
+  if (name.endsWith(".sql")) writeFileSync(join(directory, name), "select 1;");
+  else {
+    mkdirSync(join(directory, name));
+    writeFileSync(join(directory, name, "migration.sql"), "select 1;");
+  }
+  expect(() => loadRepositoryMigrations(directory)).toThrow();
+});
+
+test("rejects a migration folder missing its SQL instead of silently skipping it", (context) => {
+  const directory = mkdtempSync(
+    join(tmpdir(), "migration-history-missing-sql-"),
+  );
   context.onTestFinished(() =>
     rmSync(directory, { force: true, recursive: true }),
   );
-  mkdirSync(join(directory, "meta"), { recursive: true });
-  writeFileSync(
-    join(directory, "meta", "_journal.json"),
-    JSON.stringify({
-      entries: [
-        { breakpoints: true, idx: 0, tag: "0000_first", when: 200 },
-        { breakpoints: true, idx: 1, tag: "0001_second", when: 100 },
-      ],
-    }),
-  );
-  writeFileSync(join(directory, "0000_first.sql"), "select 1;");
-  writeFileSync(join(directory, "0001_second.sql"), "select 2;");
-
-  expect(() => loadRepositoryMigrations(directory)).toThrow(/must be newer/u);
+  mkdirSync(join(directory, "20261001000000_missing"));
+  expect(() => loadRepositoryMigrations(directory)).toThrow();
 });

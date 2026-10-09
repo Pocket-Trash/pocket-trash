@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
@@ -7,30 +5,28 @@ import { schema } from "@package/database";
 import { createNoopLogger } from "@package/logger";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
 describe("collection-item approval", () => {
   it("preserves existing items, authorizes decisions, and gates public reads without changing ownership or privacy", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     const folder = fileURLToPath(
       new URL("../../../../database/drizzle", import.meta.url),
     );
-    const files = readdirSync(folder)
-      .filter((name) => name.endsWith(".sql"))
-      .sort();
-    const approvalMigration = files.indexOf("0051_stiff_spectrum.sql");
-    expect(approvalMigration).toBeGreaterThan(0);
     try {
-      for (const file of files.slice(0, approvalMigration))
-        await runMigration(client, folder, file);
+      await migrate(drizzle({ client }), { migrationsFolder: folder });
       const {
         rows: [owner, editor],
       } = await client.query<{
-        /** User identifier from the historical users schema. */
+        /** User identifier in the rebuilt schema. */
         id: number;
-        /** Clerk identity from the historical users schema. */
+        /** Clerk identity in the rebuilt schema. */
         clerkId: string;
       }>(
         'INSERT INTO users (clerk_id, username) VALUES ($1, $2), ($3, $4) RETURNING id::integer AS id, clerk_id AS "clerkId"',
@@ -40,7 +36,7 @@ describe("collection-item approval", () => {
       const {
         rows: [collection],
       } = await client.query<{
-        /** Identifier inserted before later collection columns existed. */
+        /** Seeded collection identifier. */
         id: number;
       }>(
         "INSERT INTO user_collection (owner_id, name, normalized_name, is_private) VALUES ($1, $2, $3, false) RETURNING id::integer AS id",
@@ -50,14 +46,12 @@ describe("collection-item approval", () => {
       const {
         rows: [legacy],
       } = await client.query<{
-        /** Identifier inserted before approval columns existed. */
+        /** Seeded approved collection-item identifier. */
         id: number;
       }>(
-        "INSERT INTO collection_item (owner_id, collection_id) VALUES ($1, $2) RETURNING id::integer AS id",
+        "INSERT INTO collection_item (owner_id, collection_id, approval_status) VALUES ($1, $2, 'approved') RETURNING id::integer AS id",
         [owner.id, collection.id],
       );
-      for (const file of files.slice(approvalMigration))
-        await runMigration(client, folder, file);
       const [maker] = await db
         .insert(schema.maker)
         .values({ name: "Review maker", slug: "review-maker" })
@@ -394,21 +388,3 @@ describe("collection-item approval", () => {
     }
   }, 60_000);
 });
-
-/**
- * Applies one repository SQL migration to the isolated test database.
- *
- * @param client - Isolated PostgreSQL client.
- * @param folder - Repository migration directory.
- * @param file - SQL migration filename.
- * @returns Completion after executing the migration.
- * @rejects When migration SQL cannot be read or applied.
- */
-async function runMigration(client: PGlite, folder: string, file: string) {
-  await client.exec(
-    readFileSync(join(folder, file), "utf8").replaceAll(
-      "--> statement-breakpoint",
-      "",
-    ),
-  );
-}

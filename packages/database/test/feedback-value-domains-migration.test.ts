@@ -1,39 +1,16 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-describe("feedback value domains migration", () => {
+describe("feedback value domains baseline", () => {
   const database = new PGlite();
 
   beforeAll(async () => {
-    await database.exec(`
-      CREATE TABLE "feedback" (
-        "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        "category" text,
-        "status" text NOT NULL,
-        CONSTRAINT "feedback_approved_category_required"
-          CHECK ("status" in ('pending', 'merged', 'denied') or "category" is not null)
-      );
-      CREATE TABLE "feedback_notifications" (
-        "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        "type" text NOT NULL
-      );
-    `);
-    const migrations = new URL("../drizzle/", import.meta.url);
-    const migration = readdirSync(migrations).find(
-      (name) =>
-        name.endsWith(".sql") &&
-        readFileSync(new URL(name, migrations), "utf8").includes(
-          "feedback_notifications_type_valid",
-        ),
-    );
-    if (!migration) throw new Error("Feedback value migration was not found.");
-    await database.exec(
-      readFileSync(new URL(migration, migrations), "utf8").replaceAll(
-        "--> statement-breakpoint",
-        "",
-      ),
-    );
+    await migrate(drizzle({ client: database }), {
+      migrationsFolder: fileURLToPath(new URL("../drizzle/", import.meta.url)),
+    });
   });
 
   afterAll(async () => {
@@ -52,7 +29,7 @@ describe("feedback value domains migration", () => {
   ])("allows the %s feedback lifecycle branch", async (status, category) => {
     await expect(
       database.exec(
-        `INSERT INTO "feedback" ("category", "status") VALUES (${category}, '${status}')`,
+        `INSERT INTO "feedback" ("submitter_clerk_id", "title", "description", "category", "status") VALUES ('feedback-owner', 'Domain test', 'Domain description', ${category}, '${status}')`,
       ),
     ).resolves.toBeDefined();
   });
@@ -63,7 +40,7 @@ describe("feedback value domains migration", () => {
   ])("allows the %s notification type", async (type) => {
     await expect(
       database.exec(
-        `INSERT INTO "feedback_notifications" ("type") VALUES ('${type}')`,
+        `INSERT INTO "feedback_notifications" ("feedback_id", "type") VALUES (1000, '${type}')`,
       ),
     ).resolves.toBeDefined();
   });
@@ -71,7 +48,7 @@ describe("feedback value domains migration", () => {
   it("rejects an invalid category insert and update", async () => {
     await expect(
       database.exec(
-        `INSERT INTO "feedback" ("category", "status") VALUES ('unknown', 'pending')`,
+        `INSERT INTO "feedback" ("submitter_clerk_id", "title", "description", "category", "status") VALUES ('feedback-owner', 'Domain test', 'Domain description', 'unknown', 'pending')`,
       ),
     ).rejects.toThrow(/feedback_category_valid/iu);
     await expect(
@@ -84,7 +61,7 @@ describe("feedback value domains migration", () => {
   it("rejects an invalid status insert and update", async () => {
     await expect(
       database.exec(
-        `INSERT INTO "feedback" ("category", "status") VALUES ('feature', 'unknown')`,
+        `INSERT INTO "feedback" ("submitter_clerk_id", "title", "description", "category", "status") VALUES ('feedback-owner', 'Domain test', 'Domain description', 'feature', 'unknown')`,
       ),
     ).rejects.toThrow(/feedback_status_valid/iu);
     await expect(
@@ -97,7 +74,7 @@ describe("feedback value domains migration", () => {
   it("rejects an invalid notification type insert and update", async () => {
     await expect(
       database.exec(
-        `INSERT INTO "feedback_notifications" ("type") VALUES ('unknown')`,
+        `INSERT INTO "feedback_notifications" ("feedback_id", "type") VALUES (1000, 'unknown')`,
       ),
     ).rejects.toThrow(/feedback_notifications_type_valid/iu);
     await expect(

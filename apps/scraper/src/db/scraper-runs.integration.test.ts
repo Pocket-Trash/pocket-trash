@@ -1,11 +1,10 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
 import { finishScraperRun, startScraperRun } from "./autmog.js";
 
@@ -13,7 +12,10 @@ describe("scraper run locking", () => {
   it("allows exactly one concurrent run while preserving historical runs", async () => {
     const client = new PGlite();
     await migrate(client);
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client,
+      relations: schema.relations,
+    }) as unknown as Database;
     const input = { jobType: "scrape", source: "autmog" };
 
     try {
@@ -162,14 +164,7 @@ async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
     new URL("../../../../packages/database/drizzle", import.meta.url),
   );
-  for (const file of readdirSync(migrationsFolder)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()) {
-    await client.exec(
-      readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
-        "--> statement-breakpoint",
-        "",
-      ),
-    );
-  }
+  await migratePglite(drizzle({ client: client }), {
+    migrationsFolder: migrationsFolder,
+  });
 }

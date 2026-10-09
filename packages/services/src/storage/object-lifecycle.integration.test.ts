@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
@@ -7,6 +5,7 @@ import { schema } from "@package/database";
 import { createNoopLogger } from "@package/logger";
 import { createUploadStorage, type UploadStorage } from "@package/storage";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
 import {
   cleanupObjectDeletions,
@@ -25,7 +24,10 @@ describe("storage object ownership", () => {
     try {
       await migrate(client);
       await seedImages(client);
-      const db = drizzle(client, { schema }) as unknown as Database;
+      const db = drizzle({
+        client: client,
+        relations: schema.relations,
+      }) as unknown as Database;
       const sharedPath = "images/preview/products/1000/shared.png";
       const copyOnWrite = createUploadStorage({
         accessKey: "key",
@@ -107,16 +109,9 @@ async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
     new URL("../../../database/drizzle", import.meta.url),
   );
-  for (const file of readdirSync(migrationsFolder)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()) {
-    await client.exec(
-      readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
-        "--> statement-breakpoint",
-        "",
-      ),
-    );
-  }
+  await migratePglite(drizzle({ client: client }), {
+    migrationsFolder: migrationsFolder,
+  });
 }
 
 /**

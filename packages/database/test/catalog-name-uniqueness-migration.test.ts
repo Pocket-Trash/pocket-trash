@@ -1,32 +1,16 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-describe("catalog name uniqueness migration", () => {
+describe("catalog name uniqueness baseline", () => {
   const database = new PGlite();
 
   beforeAll(async () => {
-    await database.exec(`
-      CREATE TABLE "makers" ("id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, "name" text NOT NULL);
-      CREATE TABLE "materials" ("id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, "name" text NOT NULL, "slug" text NOT NULL);
-      CREATE TABLE "finish" ("id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, "name" text NOT NULL, "slug" text NOT NULL);
-      CREATE TABLE "color" ("id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, "name" text NOT NULL, "slug" text NOT NULL, "hex" text NOT NULL);
-    `);
-    const migrations = new URL("../drizzle/", import.meta.url);
-    const migration = readdirSync(migrations).find(
-      (name) =>
-        name.endsWith(".sql") &&
-        readFileSync(new URL(name, migrations), "utf8").includes(
-          "makers_name_case_insensitive_unique",
-        ),
-    );
-    if (!migration) throw new Error("Catalog name migration was not found.");
-    await database.exec(
-      readFileSync(new URL(migration, migrations), "utf8").replaceAll(
-        "--> statement-breakpoint",
-        "",
-      ),
-    );
+    await migrate(drizzle({ client: database }), {
+      migrationsFolder: fileURLToPath(new URL("../drizzle/", import.meta.url)),
+    });
   });
 
   afterAll(async () => {
@@ -34,7 +18,7 @@ describe("catalog name uniqueness migration", () => {
   });
 
   it.each([
-    ["makers", "('Bronze')", "('BRONZE')"],
+    ["makers", "('Bronze', 'bronze')", "('BRONZE', 'bronze-alt')"],
     ["materials", "('Bronze', 'bronze')", "('BRONZE', 'bronze-alt')"],
     ["finish", "('Bronze', 'bronze')", "('BRONZE', 'bronze-alt')"],
     [
@@ -44,11 +28,7 @@ describe("catalog name uniqueness migration", () => {
     ],
   ])("allows exactly one case variant in %s", async (table, first, second) => {
     const columns =
-      table === "makers"
-        ? '"name"'
-        : table === "color"
-          ? '"name", "slug", "hex"'
-          : '"name", "slug"';
+      table === "color" ? '"name", "slug", "hex"' : '"name", "slug"';
     const results = await Promise.allSettled([
       database.exec(`INSERT INTO "${table}" (${columns}) VALUES ${first}`),
       database.exec(`INSERT INTO "${table}" (${columns}) VALUES ${second}`),
