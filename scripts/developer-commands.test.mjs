@@ -10,6 +10,37 @@ test("exposes the safe root E2E command", () => {
   assert.equal(scripts.e2e, "pnpm --filter @app/web test:e2e");
 });
 
+test("keeps Studio without the retired visualizer or combined viewer", () => {
+  const root = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  );
+  const database = JSON.parse(
+    readFileSync(
+      new URL("../packages/database/package.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.equal(
+    scripts["db:studio"],
+    "pnpm --filter @package/database db:studio",
+  );
+  assert.equal(scripts["db:view"], undefined);
+  for (const command of ["db:view", "db:view:shell", "db:visualizer"]) {
+    assert.equal(database.scripts[command], undefined);
+  }
+  for (const dependency of ["drizzle-lab", "drizzle-view"]) {
+    assert.equal(root.devDependencies[dependency], undefined);
+  }
+});
+
+test("the generated database diagram preserves PostgreSQL array types", () => {
+  const diagram = readFileSync(
+    new URL("../docs/database-schema-diagram.html", import.meta.url),
+    "utf8",
+  );
+  assert.ok(diagram.includes("storage_targets? text[]"));
+});
+
 test("exposes the committed pull-request validation command", () => {
   assert.equal(scripts["validate:pr"], "node scripts/validate-pr.mjs");
 });
