@@ -65,6 +65,11 @@ URL_INITIALS=RA
 Infisical secret fails before a database connection is attempted. See
 [Database Operations](./database.md) for the workflow.
 
+Neon connection strings may contain `sslmode=require`. The Infisical runner
+promotes that value to `sslmode=verify-full` after selecting the final URL and
+preserves `channel_binding=require` and all other connection details. Do not
+add `uselibpqcompat=true`; that opts into weaker libpq `require` semantics.
+
 ### Web build values
 
 Browser-visible values must reach Vercel at build time. Shared server values

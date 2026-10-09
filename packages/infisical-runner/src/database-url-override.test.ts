@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   applyDatabaseUrlOverride,
   getDatabaseUrlOverride,
+  normalizeDatabaseUrlSslMode,
 } from "./database-url-override.js";
 
 /** Temporary directories removed after each database override test. */
@@ -29,6 +30,26 @@ afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { force: true, recursive: true });
   }
+});
+
+describe("normalizeDatabaseUrlSslMode", () => {
+  it("promotes Neon's required SSL mode while preserving channel binding", () => {
+    expect(
+      normalizeDatabaseUrlSslMode(
+        "postgresql://user:password@example.com/database?sslmode=require&channel_binding=require",
+      ),
+    ).toBe(
+      "postgresql://user:password@example.com/database?sslmode=verify-full&channel_binding=require",
+    );
+  });
+
+  it.each([
+    "postgresql://user:password@example.com/database?sslmode=verify-full&channel_binding=require",
+    "postgresql://user:password@localhost/database",
+    "postgresql://user:password@example.com/database?sslmode=prefer",
+  ])("leaves %s unchanged", (databaseUrl) => {
+    expect(normalizeDatabaseUrlSslMode(databaseUrl)).toBe(databaseUrl);
+  });
 });
 
 describe("getDatabaseUrlOverride", () => {
@@ -112,6 +133,23 @@ describe("getDatabaseUrlOverride", () => {
     expect(environment).toMatchObject({
       DATABASE_URL: "postgresql://personal",
       URL_INITIALS: "RA",
+    });
+  });
+
+  it("keeps the selected personal URL equal after promoting its SSL mode", () => {
+    const filePath = createEnvFile("URL_INITIALS=ra\n");
+    const environment = {
+      DATABASE_URL_RA:
+        "postgresql://personal/database?sslmode=require&channel_binding=require",
+    };
+
+    applyDatabaseUrlOverride([filePath], environment);
+
+    expect(environment).toMatchObject({
+      DATABASE_URL:
+        "postgresql://personal/database?sslmode=verify-full&channel_binding=require",
+      DATABASE_URL_RA:
+        "postgresql://personal/database?sslmode=verify-full&channel_binding=require",
     });
   });
 });
