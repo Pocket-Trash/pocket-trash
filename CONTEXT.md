@@ -48,6 +48,18 @@ _Avoid_: Button, bolt pin, lock pin, thumb stud
 A function that a pen part performs independently of its product type.
 _Avoid_: Product type
 
+**Configuration slot**:
+One ordered selection dimension for a configurable product, such as material, appearance, tip, clip, mechanism, or actuator.
+_Avoid_: Field, property
+
+**Configuration choice**:
+One selectable value in a configuration slot, backed by an existing catalog fact or a virtual selection.
+_Avoid_: Variant
+
+**Choice availability rule**:
+One conjunction of earlier configuration choices that permits a target choice; multiple rules for the target are alternatives.
+_Avoid_: Restriction, exclusion, compatibility rule
+
 ## Refills and compatibility
 
 **Refill**:
