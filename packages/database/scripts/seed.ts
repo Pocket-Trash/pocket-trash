@@ -584,7 +584,7 @@ export function catalogSeedTimestamp(importedAt: string): Date {
 }
 
 /**
- * Loads the reviewed KAP product and primary-image snapshot.
+ * Loads the compact KAP fixture used by development and preview.
  *
  * @returns The reviewed KAP seed snapshot.
  */
@@ -592,7 +592,24 @@ export async function loadKapedcSeedData(): Promise<KapedcSeedSnapshot> {
   const path = fileURLToPath(
     new URL("../seed-data/kapedc.json", import.meta.url),
   );
-  return JSON.parse(await readFile(path, "utf8")) as KapedcSeedSnapshot;
+  const snapshot = JSON.parse(
+    await readFile(path, "utf8"),
+  ) as KapedcSeedSnapshot;
+  const products = (["spinner", "spinner-button"] as const).flatMap((type) => {
+    const selected = snapshot.products
+      .filter((product) => product.type === type)
+      .slice(0, 21);
+    const galleryIndex = selected.findIndex(
+      (product) => product.images.length >= 4,
+    );
+    if (galleryIndex === -1)
+      throw new Error(`KAP ${type} fixture has no gallery product.`);
+    return selected.map((product, index) => ({
+      ...product,
+      images: product.images.slice(0, index === galleryIndex ? 5 : 1),
+    }));
+  });
+  return { ...snapshot, products };
 }
 
 /**
