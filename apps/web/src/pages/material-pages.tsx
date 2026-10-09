@@ -11,6 +11,7 @@ import { AppShell } from "@/components/app-shell";
 import { ImageGallery } from "@/components/image-gallery";
 import { MarkdownContent } from "@/components/markdown-content";
 import { MaterialCard } from "@/components/material-card";
+import { MaterialLink } from "@/components/material-link";
 import { ProductCard } from "@/components/product-card";
 import { PublicProfileAvatar } from "@/components/public-profile-avatar";
 import { Button } from "@/components/ui/button";
@@ -337,6 +338,13 @@ function MaterialProductCard({ product }: MaterialProductCardProps) {
         privateLabel={t("web.resources.moderation.privateBadge")}
         product={product}
       />
+      <ul className="flex flex-wrap gap-x-3 gap-y-1 p-3 text-sm">
+        {product.materials.map((material) => (
+          <li key={material.assignmentId}>
+            <MaterialLink material={material} />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -369,6 +377,11 @@ function MaterialCollectionItemCard({ item }: MaterialCollectionItemCardProps) {
       ) : null}
       <div className="grid flex-1 content-start gap-2 p-4">
         <h3 className="font-semibold">{item.displayName}</h3>
+        {item.material ? (
+          <p className="text-sm text-muted-foreground">
+            <MaterialLink material={item.material} />
+          </p>
+        ) : null}
         <p className="text-sm text-muted-foreground">
           {item.collectionName}
           {item.ownerUsername ? (
@@ -431,10 +444,20 @@ export function MaterialDetailPage({
   productsPage: number;
 }) {
   const t = useCatalogCopy();
+  const name = material.specific?.name ?? material.name;
   return (
     <AppShell
       breadcrumbItems={[
         { label: t("web.navigation.materials"), to: "/materials" },
+        ...(material.specific
+          ? [
+              {
+                label: material.name,
+                to: "/materials/$materialSlug" as const,
+                params: { materialSlug: material.slug },
+              },
+            ]
+          : []),
       ]}
       meta={
         <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -450,18 +473,34 @@ export function MaterialDetailPage({
           </span>
         </div>
       }
-      title={material.name}
+      title={name}
     >
       <main className="mx-auto grid w-full max-w-7xl gap-10 p-4 md:p-6">
         {material.images.length ? (
           <ImageGallery
-            alt={t("web.materials.image.alt", { name: material.name })}
+            alt={t("web.materials.image.alt", { name })}
             closeLabel={t("web.resources.action.closeImage")}
             groups={[{ images: material.images }]}
             label={t("web.resources.upload.imagesLabel")}
             nextLabel={t("web.resources.action.nextImage")}
             previousLabel={t("web.resources.action.previousImage")}
           />
+        ) : material.specific ? (
+          <EmptyState>{t("web.materials.specific.noImages")}</EmptyState>
+        ) : null}
+        {material.specifics.length ? (
+          <section aria-labelledby="material-specifics" className="grid gap-3">
+            <h2 id="material-specifics" className="text-xl font-semibold">
+              {t("web.materials.specific.title")}
+            </h2>
+            <ul className="flex flex-wrap gap-x-4 gap-y-2">
+              {material.specifics.map((specific) => (
+                <li key={specific.id}>
+                  <MaterialLink material={{ ...material, specific }} />
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
         {material.description ? (
           <MarkdownContent
@@ -490,7 +529,13 @@ export function MaterialDetailPage({
               )}
             </MaterialResultPage>
           ) : (
-            <EmptyState>{t("web.materials.detail.noProducts")}</EmptyState>
+            <EmptyState>
+              {t(
+                material.specific
+                  ? "web.materials.specific.noProducts"
+                  : "web.materials.detail.noProducts",
+              )}
+            </EmptyState>
           )}
         </section>
 
@@ -521,7 +566,11 @@ export function MaterialDetailPage({
             </MaterialResultPage>
           ) : (
             <EmptyState>
-              {t("web.materials.detail.noCollectionItems")}
+              {t(
+                material.specific
+                  ? "web.materials.specific.noCollectionItems"
+                  : "web.materials.detail.noCollectionItems",
+              )}
             </EmptyState>
           )}
         </section>

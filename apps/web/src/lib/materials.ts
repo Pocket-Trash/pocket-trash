@@ -1,4 +1,6 @@
-import type { PublicMaterialSummary } from "@package/services";
+import type { PublicMaterial, PublicMaterialSummary } from "@package/services";
+import { z } from "zod";
+import { absoluteUrl } from "@/lib/site-url";
 
 /** Directory section used for names that do not begin with A-Z. */
 export const OTHER_MATERIALS = "Other" as const;
@@ -86,4 +88,41 @@ export function clampMaterialPage(
     Math.max(1, Math.trunc(requestedPage) || 1),
     Math.max(1, Math.ceil(itemCount / pageSize)),
   );
+}
+
+/** Independent one-based pagination values shared by general and specific routes. */
+export const materialSearchSchema = z.object({
+  collectionItemsPage: z.coerce.number().int().positive().catch(1),
+  productsPage: z.coerce.number().int().positive().catch(1),
+});
+
+/**
+ * Builds canonical material metadata without exposing non-public usage.
+ *
+ * @param material - Public route data, or undefined while not found.
+ * @returns Route head metadata; empty specifics stay accessible with noindex.
+ */
+export function materialHead(material: PublicMaterial | undefined) {
+  if (!material) return {};
+  const name = material.specific?.name ?? material.name;
+  const path = `/materials/${material.slug}${material.specific ? `/${material.specific.slug}` : ""}`;
+  return {
+    links: [{ rel: "canonical", href: absoluteUrl(path) }],
+    meta: [
+      { title: name },
+      ...(material.specific
+        ? [
+            {
+              name: "robots",
+              content:
+                material.productCount ||
+                material.collectionItemCount ||
+                material.images.length
+                  ? "index,follow"
+                  : "noindex,follow",
+            },
+          ]
+        : []),
+    ],
+  };
 }

@@ -33,6 +33,7 @@ import { CollectionGallery } from "@/components/collection-gallery";
 import { ImageGallery } from "@/components/image-gallery";
 import { MakerLink } from "@/components/maker-link";
 import { MarkdownContent } from "@/components/markdown-content";
+import { MaterialLink } from "@/components/material-link";
 import { PaginatedCards } from "@/components/paginated-cards";
 import { PermanentDeletionControls } from "@/components/permanent-deletion-controls";
 import { ProductCard } from "@/components/product-card";
@@ -561,7 +562,13 @@ export function ProductDetailPage({
             </Detail>
           ) : null}
           <Detail label={t("web.catalog.field.materials")}>
-            {product.materials.map(({ name }) => name).join(", ")}
+            <ul className="flex flex-wrap gap-x-3 gap-y-1">
+              {product.materials.map((material) => (
+                <li key={material.assignmentId}>
+                  <MaterialLink material={material} />
+                </li>
+              ))}
+            </ul>
           </Detail>
           {product.finishOptions.length ? (
             <Detail label={t("web.catalog.field.finishOptions")}>
@@ -1288,7 +1295,7 @@ export function CollectionPage({
                 ) : null}
                 {item.material ? (
                   <p className="mt-3 text-xs text-muted-foreground">
-                    {item.material.name}
+                    <MaterialLink material={item.material} />
                   </p>
                 ) : null}
                 {item.finishOption ? (
@@ -1725,7 +1732,7 @@ export function CollectionItemDetailPage({
           </Detail>
           {item.material ? (
             <Detail label={t("web.catalog.field.materials")}>
-              {item.material.name}
+              <MaterialLink material={item.material} />
             </Detail>
           ) : null}
           {item.finishOption ? (
@@ -1740,7 +1747,7 @@ export function CollectionItemDetailPage({
                   <span>{installedButton.displayName}</span>
                   {installedButton.material ? (
                     <span className="text-sm text-muted-foreground">
-                      {installedButton.material.name}
+                      <MaterialLink material={installedButton.material} />
                     </span>
                   ) : null}
                   {installedButton.finishOption ? (

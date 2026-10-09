@@ -4,8 +4,10 @@ import { getPublicMaterial } from "@/lib/catalog-api";
 import { materialHead, materialSearchSchema } from "@/lib/materials";
 import { MaterialDetailPage } from "@/pages/material-pages";
 
-/** Shows one public material and its catalog usage. */
-export const Route = createFileRoute("/materials/$materialSlug")({
+/** Shows one canonical alloy or grade and its exact public usage. */
+export const Route = createFileRoute(
+  "/materials/$materialSlug_/$materialSpecificSlug",
+)({
   params: {
     /**
      * Rejects malformed material route slugs.
@@ -15,7 +17,11 @@ export const Route = createFileRoute("/materials/$materialSlug")({
      * @throws A not-found response when the material slug is malformed.
      */
     parse: (params) => {
-      if (!slugPattern.test(params.materialSlug)) throw notFound();
+      if (
+        !slugPattern.test(params.materialSlug) ||
+        !slugPattern.test(params.materialSpecificSlug)
+      )
+        throw notFound();
       return params;
     },
   },
@@ -27,7 +33,7 @@ export const Route = createFileRoute("/materials/$materialSlug")({
    */
   validateSearch: (search) => materialSearchSchema.parse(search),
   /**
-   * Loads public material detail by its stable slug.
+   * Loads public material detail by its scoped slug pair.
    *
    * @param context - Route loader context.
    * @param context.params - Validated material route parameters.
@@ -40,7 +46,7 @@ export const Route = createFileRoute("/materials/$materialSlug")({
     return material;
   },
   /**
-   * Describes the canonical general material page.
+   * Describes the canonical exact-specific material page.
    *
    * @param context - Loaded public material context.
    * @param context.loaderData - Public material data.
@@ -58,7 +64,7 @@ export const Route = createFileRoute("/materials/$materialSlug")({
 function MaterialRoute() {
   const material = Route.useLoaderData();
   const search = Route.useSearch();
-  const { materialSlug } = Route.useParams();
+  const { materialSlug, materialSpecificSlug } = Route.useParams();
   const navigate = useNavigate();
   return (
     <MaterialDetailPage
@@ -66,18 +72,18 @@ function MaterialRoute() {
       material={material}
       onCollectionItemsPageChange={(collectionItemsPage) =>
         void navigate({
-          params: { materialSlug },
+          params: { materialSlug, materialSpecificSlug },
           replace: true,
           search: { ...search, collectionItemsPage },
-          to: "/materials/$materialSlug",
+          to: "/materials/$materialSlug/$materialSpecificSlug",
         })
       }
       onProductsPageChange={(productsPage) =>
         void navigate({
-          params: { materialSlug },
+          params: { materialSlug, materialSpecificSlug },
           replace: true,
           search: { ...search, productsPage },
-          to: "/materials/$materialSlug",
+          to: "/materials/$materialSlug/$materialSpecificSlug",
         })
       }
       productsPage={search.productsPage}
