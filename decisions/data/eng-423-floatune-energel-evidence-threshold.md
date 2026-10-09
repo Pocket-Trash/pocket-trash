@@ -18,9 +18,17 @@ Admit only an exact Floatune refill model whose physical interchangeability with
 1. a Pentel statement that explicitly names the two exact refill models or formats as interchangeable; or
 2. a fit-critical dimensional comparison plus repeatable physical fit tests.
 
-A dimensional comparison must record the sources or calibrated measurements for overall length, maximum barrel diameter, tip diameter and profile, shoulder or stop position, rear-end geometry, and any other surface used for retention or actuation. Nominal overall length and barrel diameter alone are not enough. When manufacturer tolerances are unavailable, the physical tests must cover at least two samples from different lots for each refill model.
+A dimensional comparison must record the sources or calibrated measurements for overall length, maximum barrel diameter, tip diameter and profile, shoulder or stop position, rear-end geometry, and any other surface used for retention or actuation. Nominal overall length and barrel diameter alone are not enough. When manufacturer tolerances are unavailable, the physical tests must cover at least two independently sourced samples of each refill model. Use different maker lot codes when present. When no lot code exists, source the samples from separate sellers or orders and record that provenance and the missing lot identifier.
 
-The physical test path must substitute both refill models in both directions across at least two representative pens designed for the EnerGel format and the current Floatune pen for that refill. Record the exact pen and refill models, lot identifiers when available, measuring equipment, insertion and removal, retention, tip projection, actuation through repeated cycles, writing, and any modification or failure. A result that needs trimming, a spacer, or another remedy is evidence for an exact conditional compatibility assertion, not group membership.
+The physical test path must substitute both refill models in both directions across at least two pens designed for the EnerGel format with different tip or actuation designs and the current Floatune pen for that refill. Test every refill sample in every host and run the host's specified refill as a control. Record the exact pen and refill models, sample provenance, measuring equipment, and results. Each combination passes only when it:
+
+- inserts and removes without a tool, modification, or more force than the native controls;
+- seats without binding and has no more axial or radial movement than the worst native control;
+- deploys fully and retracts below the tip opening for 20 consecutive actuation cycles;
+- has deployed tip projection within the range measured for the native controls; and
+- writes continuously for five minutes and finishes without leakage, visible damage, loosening, or a new actuation failure.
+
+Any failure rejects group admission for that model until contrary evidence explains and resolves it. A result that needs trimming, a spacer, or another remedy is evidence for an exact conditional compatibility assertion, not group membership.
 
 Apply the decision per stable refill model. Evidence for ZRN5 does not automatically admit ZRN3, ZRN4, YR8, YR10, or future Floatune models. Tip size and ink-colour offerings of an admitted model inherit its group membership only when they share the same documented physical format.
 
@@ -35,6 +43,6 @@ Keep regional identities distinct during review. Japanese `XZRN3/4/5`, North Ame
 
 ## Consequences
 
-- ENG-413 must seed Floatune separately from the EnerGel compatibility group unless new qualifying evidence is reviewed first.
+- ENG-413 must seed each Floatune refill as an ungrouped refill product unless separately reviewed evidence supports a specific Floatune-only group. It must not infer one group across `XZRN`, `ZRN`, and `YR` families or regions.
 - The final schema does not need Floatune-specific fields. It needs exact refill-to-group membership with supporting evidence, as established by ENG-406.
 - Partial or contradictory results remain preserved evidence and may justify exact compatible, incompatible, conditional, or variable assertions without changing group membership.
