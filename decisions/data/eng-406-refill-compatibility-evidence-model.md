@@ -70,7 +70,7 @@ An installed-tip change recomputes compatibility with the same order. It never c
 - Convert a cited manufacturer claim, measurement, or physical test into the matching evidence class. A bare `tested` or reliability value without the required source or test details is not evidence and must remain unresolved for review.
 - Treat planning-seed `compatibilityGroup` values as proposed refill-to-group membership, not as pen compatibility assertions. Group membership requires its own supporting evidence before approval.
 - Do not infer incompatible assertions from missing legacy matches, group differences, or absent source rows. Absence remains unknown.
-- Leave unresolved Floatune and Pilot Precise V5 RT/PP43 claims pending ENG-423 and ENG-424. ENG-407 must identify the authoritative preserved Autmog and Saga sources before their rows can be mapped.
+- Leave unresolved Floatune and Monteverde PP43 claims pending ENG-423 and ENG-424. ENG-407 must identify the authoritative preserved Autmog and Saga sources before their rows can be mapped.
 
 ## Consequences
 
