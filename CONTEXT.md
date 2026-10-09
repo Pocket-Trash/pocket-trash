@@ -55,8 +55,12 @@ A maker's stable refill model, independent of tip size and ink colour offerings.
 _Avoid_: Offering, installed refill
 
 **Refill offering**:
-One confirmed combination of refill model, tip, ink colour, and, when meaningful, maker code.
+One confirmed combination of refill model, tip style, tip size, and ink colour. Maker codes and commercial SKUs are sourced identifiers for the offering.
 _Avoid_: Refill product, variant
+
+**Offering market status**:
+An approved, source-backed current, discontinued, or historical conclusion for one refill offering in one controlled market.
+_Avoid_: Global availability, offering lifecycle
 
 **Compatibility group**:
 A set of refills with verified physical interchangeability.
@@ -109,3 +113,7 @@ _Avoid_: Catalog product, preserved source
 **Source listing identity**:
 The maker source ID and listing URL that distinguish one listing from another, even when their titles or images match.
 _Avoid_: Product identity
+
+**Catalog source evidence**:
+A dated maker page, catalog edition, or other authoritative source capture that supports catalog identity, offering, market, or lifecycle claims.
+_Avoid_: Live URL, refill offering
