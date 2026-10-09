@@ -11,6 +11,7 @@ Sources:
 - `plans/pen-refill-seed-catalog.json`, the non-loadable planning input
 - [Refill compatibility evidence model](./eng-406-refill-compatibility-evidence-model.md)
 - [Refill-offering provenance and lifecycle](./eng-425-refill-offering-provenance-lifecycle.md)
+- [Production refill offering provenance manifest](./eng-413-production-refill-provenance.md)
 
 ## Decision
 
@@ -103,13 +104,13 @@ The following matrices are the approved offering facts. Each listed colour appli
 | Uni-ball | `UMR-85E` 0.5 | Black is current in Japan; red and blue are discontinued in Japan |
 | Uni-ball | `UMR-87E` 0.7 | Black, red, blue |
 | Uni-ball | `UMR-38S` 0.38, `UMR-05S` 0.5 | Black, red, blue, orange, blue-black for each model |
-| Uni-ball | `SNP-5` 0.5 | Black, red; do not seed blue as current in Japan |
-| Uni-ball | `SNP-7` 0.7, `SNP-10` 1.0 | Black, red, blue for each model |
 | Uni-ball | `UBR-Z-38` 0.38, `UBR-Z-05` 0.5, `UBR-Z-07` 0.7 | Black, red, blue for each model |
 | Uni-ball | `UBR-ZML-38` 0.38, `UBR-ZML-05` 0.5 | Black, red, blue for each model |
 | OHTO | `PG-105NP` 0.5 needle gel | Black, blue |
 
 Products without a row in this table remain product-only in the initial import. Add no offering until an approved source establishes its exact combination.
+
+`SNP-5`, `SNP-7`, and `SNP-10` are product-only. ENG-405 records a Japan colour conclusion but cites no offering-level source that can support a deterministic production row.
 
 Apply the audit's maker-code corrections:
 
@@ -150,7 +151,7 @@ These are terminology aliases under ENG-408. They do not rename products, duplic
 
 ## Evidence imported with the facts
 
-- Preserve one source-evidence record per reviewed official page, catalogue, technical sheet, or press release cited by ENG-405. Store publisher, source kind, URL, capture date, edition/publication date when present, preserved identity/checksum when available, reviewed claim, and market scope.
+- Preserve one source-evidence record per reviewed official page, catalogue, technical sheet, or press release cited by ENG-405. Store publisher, source kind, URL, capture date, edition/publication date when present, preserved identity/checksum when available, reviewed claim, and market scope. The production provenance manifest is the controlling offering-to-source mapping.
 - Link every offering-market assertion and maker identifier to the evidence that publishes that exact fact. A maker-wide colour-code table cannot by itself prove a model offers that colour.
 - Link group memberships to their manufacturer statements or dimensional evidence. For Floatune, preserve Roy Anger's `ZRN5-CX` versus `ZLRN5-SA` visual and caliper comparison and the successful installation observation, together with the explicit domain-owner decision that all Floatune models join `EnerGel`.
 - Link PP43 to Monteverde's PP43 page and Parker-refill collection. Preserve the copied-body-text caveat and do not import unverified dimensions, construction material, or the broad brand list.
