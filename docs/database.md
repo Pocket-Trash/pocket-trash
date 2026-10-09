@@ -36,6 +36,12 @@ checks migration-history consistency with:
 pnpm --filter @package/database db:check
 ```
 
+Neon connection strings commonly use `sslmode=require`. Local commands and
+deployment workflows promote that value to `sslmode=verify-full` so PostgreSQL
+clients continue to verify the server certificate and hostname. Keep
+`channel_binding=require`; do not add `uselibpqcompat=true` to suppress SSL
+warnings because it opts into weaker libpq `require` semantics.
+
 Drizzle records applied migration names, timestamps, and SQL hashes in
 `drizzle.__drizzle_migrations`. Validation compares named sets, not a highest
 timestamp or an ordered prefix. Never edit applied SQL, snapshots, or ledger rows.
@@ -64,6 +70,8 @@ URL_INITIALS=RA
 
 `.env.local` takes precedence over `.env`. If a selector is present but the
 matching secret is missing, the command fails before accessing a database.
+The Infisical runner promotes Neon's `sslmode=require` query parameter to
+`sslmode=verify-full` after selecting the shared or personal URL.
 See [Local Database Override](./environment-variables.md#local-database-override)
 for the complete selection contract.
 

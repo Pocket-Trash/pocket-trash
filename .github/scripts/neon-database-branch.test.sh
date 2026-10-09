@@ -42,12 +42,12 @@ case "$url" in
     fi
     printf '{}'
     ;;
-  *branch_id=br_target*pooled=true*) printf '{"uri":"postgresql://user@ep-target-pooler.example.test/db"}' ;;
-  *branch_id=br_target*pooled=false*) printf '{"uri":"postgresql://user@ep-target.example.test/db"}' ;;
-  *branch_id=br_development*pooled=true*) printf '{"uri":"postgresql://user@ep-development-pooler.example.test/db"}' ;;
-  *branch_id=br_development*pooled=false*) printf '{"uri":"postgresql://user@ep-development.example.test/db"}' ;;
-  *branch_id=br_preview*pooled=true*) printf '{"uri":"postgresql://user@ep-preview-pooler.example.test/db"}' ;;
-  *branch_id=br_preview*pooled=false*) printf '{"uri":"postgresql://user@ep-preview.example.test/db"}' ;;
+  *branch_id=br_target*pooled=true*) printf '{"uri":"postgresql://user@ep-target-pooler.example.test/db?sslmode=require&channel_binding=require"}' ;;
+  *branch_id=br_target*pooled=false*) printf '{"uri":"postgresql://user@ep-target.example.test/db?sslmode=require&channel_binding=require"}' ;;
+  *branch_id=br_development*pooled=true*) printf '{"uri":"postgresql://user@ep-development-pooler.example.test/db?application_name=sslmode=require&sslmode=require&channel_binding=require"}' ;;
+  *branch_id=br_development*pooled=false*) printf '{"uri":"postgresql://user@ep-development.example.test/db?application_name=a%%20b&sslmode=verify-full&channel_binding=require"}' ;;
+  *branch_id=br_preview*pooled=true*) printf '{"uri":"postgresql://user@ep-preview-pooler.example.test/db?sslmode=require&channel_binding=require"}' ;;
+  *branch_id=br_preview*pooled=false*) printf '{"uri":"postgresql://user@ep-preview.example.test/db?sslmode=require&channel_binding=require"}' ;;
   */branches/br_target)
     if [[ "$method" == "DELETE" ]]; then
       if [[ "$CURL_SCENARIO" == "cleanup-failure" || "$CURL_SCENARIO" == "preflight-cleanup-failure" ]]; then
@@ -153,8 +153,8 @@ PATH="$test_dir:$PATH" \
   BRANCH_NAME=development \
   GITHUB_OUTPUT="$branch_url_output" \
   bash "$script_dir/neon-database-branch.sh" branch-url > /dev/null
-grep -Fx 'database_url=postgresql://user@ep-development-pooler.example.test/db' "$branch_url_output" > /dev/null
-grep -Fx 'migration_database_url=postgresql://user@ep-development.example.test/db' "$branch_url_output" > /dev/null
+grep -Fx 'database_url=postgresql://user@ep-development-pooler.example.test/db?application_name=sslmode=require&sslmode=verify-full&channel_binding=require' "$branch_url_output" > /dev/null
+grep -Fx 'migration_database_url=postgresql://user@ep-development.example.test/db?application_name=a%20b&sslmode=verify-full&channel_binding=require' "$branch_url_output" > /dev/null
 
 # A fresh isolated preview is created from development.
 run_branch_command fresh prepare-preview > /dev/null
@@ -261,7 +261,7 @@ grep -Fx 'blocked_reason=branch_limit' "$test_dir/branch-limit-output" > /dev/nu
 # Dependency-only previews use the shared database and remove stale isolation.
 ISOLATION_REQUIRED=false run_branch_command dependency-only prepare-preview > /dev/null
 grep -Fx 'isolated=false' "$test_dir/dependency-only-output" > /dev/null
-grep -Fx 'database_url=postgresql://user@ep-preview-pooler.example.test/db' "$test_dir/dependency-only-output" > /dev/null
+grep -Fx 'database_url=postgresql://user@ep-preview-pooler.example.test/db?sslmode=verify-full&channel_binding=require' "$test_dir/dependency-only-output" > /dev/null
 ! grep -F 'POST ' "$test_dir/dependency-only-curl-log" > /dev/null
 [[ ! -s "$test_dir/dependency-only-pnpm-log" ]]
 ISOLATION_REQUIRED=false run_branch_command reuse prepare-preview > /dev/null
