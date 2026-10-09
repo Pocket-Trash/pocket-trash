@@ -10,9 +10,15 @@ import {
   type MigrationRecord,
 } from "../scripts/migration-history.js";
 
+/** Baseline identity reused by malformed applied-history fixtures. */
+const first: MigrationRecord = {
+  createdAt: Date.UTC(2026, 9, 1),
+  hash: "aaa",
+  tag: "20261001000000_first",
+};
 /** Named repository history used independently of insertion order. */
 const expected: MigrationRecord[] = [
-  { createdAt: Date.UTC(2026, 9, 1), hash: "aaa", tag: "20261001000000_first" },
+  first,
   {
     createdAt: Date.UTC(2026, 9, 2),
     hash: "bbb",
@@ -40,10 +46,10 @@ describe("compareMigrationHistories", () => {
         },
       ],
     ],
-    ["diverged", [{ ...applied[0]!, hash: "changed" }]],
-    ["diverged", [...applied, applied[0]!]],
-    ["diverged", [{ ...applied[0]!, tag: null }]],
-    ["diverged", [{ ...applied[0]!, createdAt: 1 }]],
+    ["diverged", [{ ...first, hash: "changed" }]],
+    ["diverged", [...applied, first]],
+    ["diverged", [{ ...first, tag: null }]],
+    ["diverged", [{ ...first, createdAt: 1 }]],
     ["missing-history", null],
   ] as const)("classifies %s named history", (state, history) => {
     const comparison = compareMigrationHistories(expected, history);
