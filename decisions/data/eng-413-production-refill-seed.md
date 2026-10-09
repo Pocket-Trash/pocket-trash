@@ -11,7 +11,7 @@ Sources:
 - `plans/pen-refill-seed-catalog.json`, the non-loadable planning input
 - [Refill compatibility evidence model](./eng-406-refill-compatibility-evidence-model.md)
 - [Refill-offering provenance and lifecycle](./eng-425-refill-offering-provenance-lifecycle.md)
-- [Production refill offering provenance manifest](./eng-413-production-refill-provenance.md)
+- [Production refill offering provenance manifest](https://linear.app/pocket-trash/document/production-refill-offering-provenance-manifest-008a1f2bed7d)
 
 ## Decision
 
