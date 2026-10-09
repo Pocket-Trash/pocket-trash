@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { expect } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import { mockStoryAuth, StoryProviders } from "../../.storybook/story-fixtures";
+import { ThemeContext } from "../providers/theme-provider";
 import { ThemeToggle } from "./theme-toggle";
 
 /**
@@ -46,5 +47,31 @@ export const Default: Story = {
       "aria-pressed",
       "true",
     );
+  },
+};
+
+/** Theme controls remain disabled while an authenticated save is pending. */
+export const Saving: Story = {
+  decorators: [
+    (Story) => (
+      <ThemeContext.Provider
+        value={{ saving: true, setTheme: fn(), theme: "light" }}
+      >
+        <Story />
+      </ThemeContext.Provider>
+    ),
+  ],
+  /**
+   * Checks that every theme option is disabled during persistence.
+   *
+   * @param context - Storybook play context.
+   * @param context.canvas - Queries scoped to the rendered theme controls.
+   * @returns Nothing after the disabled-state assertions pass.
+   * @rejects If a theme option remains enabled during persistence.
+   */
+  play: async ({ canvas }) => {
+    for (const button of canvas.getAllByRole("button")) {
+      await expect(button).toBeDisabled();
+    }
   },
 };
