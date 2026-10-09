@@ -35,12 +35,13 @@ Seed these stable products. Names separated by commas are separate refill produc
 | Maker | Products |
 | --- | --- |
 | Pentel | `LRN3`, `LRN4`, `LRN5`, `LR7`, `LR10`, `LRN5H`, `ZRN3`, `ZRN4`, `ZRN5`, `YR8`, `YR10` |
-| Pilot | `BLS-G2-38`, `BLS-G2-5`, `BLS-G2-7`, `BLS-G2-10` |
+| Pilot | `BLS-G2-38`, `BLS-G2-5`, `BLS-G2-7`, `BLS-G2-10`, `LP3RF`, `LPTRF`, `LP2RF`, `BXS-V5-RT`, `BXS-V7-RT` |
 | Monteverde | `P11`, `P13`, `P15`, `P41`, `P42`, `P44`, `PP43` |
 | Parker | `QUINKflow Ballpoint`, `QUINK Gel`, `QUINK Rollerball` |
 | Schmidt | `P900`, `easyFLOW 9000`, `P900 Softline`, `MegaLine P950` |
 | Schneider | `Express 735`, `Eco 725` |
-| Uni-ball / Mitsubishi Pencil | `SXR-38`, `SXR-5`, `SXR-7`, `SXR-10`, `SXR-600-38`, `SXR-600-05`, `SXR-600-07`, `SXR-80-38`, `SXR-80-05`, `SXR-80-07`, `SXR-80-10`, `SXR-200-05`, `SXR-200-07`, `UMR-82`, `UMR-83`, `UMR-83E`, `UMR-85N`, `UMR-85E`, `UMR-87E`, `UMR-38S`, `UMR-05S`, `UBR-Z-38`, `UBR-Z-05`, `UBR-Z-07`, `UBR-ZML-38`, `UBR-ZML-05` |
+| Zebra | `JF`, `JLV`, `MJF`, `JRV`, `NJK`, `JK`, `BJF`, `BioTube JF` |
+| Uni-ball / Mitsubishi Pencil | `SXR-38`, `SXR-5`, `SXR-7`, `SXR-10`, `SXR-L-5`, `SXR-L-7`, `SXR-600-38`, `SXR-600-05`, `SXR-600-07`, `SXR-80-38`, `SXR-80-05`, `SXR-80-07`, `SXR-80-10`, `SXR-L80-05`, `SXR-200-05`, `SXR-200-07`, `UMR-82`, `UMR-83`, `UMR-83E`, `UMR-85N`, `UMR-85E`, `UMR-87E`, `UMR-38S`, `UMR-05S`, `UBR-Z-38`, `UBR-Z-05`, `UBR-Z-07`, `UBR-ZML-38`, `UBR-ZML-05` |
 | OHTO | `PG-105NP` |
 
 Apply these identity corrections while importing:
@@ -50,6 +51,9 @@ Apply these identity corrections while importing:
 - Use `PG-105NP` as the OHTO product. `Flash Dry` is a marketed family name.
 - Treat `XLRN*` and `XZRN*` as sourced regional identifiers for the stable Pentel model, not duplicate products. Do not invent unprefixed `LRN4` or `ZRN4` maker identifiers.
 - Preserve `G22/23/24` and `W22/23/24` as deferred historical evidence from the 2022 Monteverde catalogue. Do not mark them current from their absence or presence in current navigation.
+- Preserve Pilot punctuation exactly: the Juice Up multi-pen identifiers are `LPTRF-10S4-*`, not bare `LPTRF*` reconstructions. Keep `12` in each `LP3RF12*` identifier without treating it as a refill attribute.
+- Treat `BXS-V-RT` as Pilot Europe's Precise/Hi-Tecpoint RT family label. The stable products are the published `BXS-V5-RT` and `BXS-V7-RT` descriptions; do not merge the capped `BXS-IC-S3` cartridge system into them.
+- Preserve Zebra's `P-` prefixes and packaging semantics. BioTube five-pack codes identify the same black or red offering as the one-pack code, not another product or geometry.
 
 Defer `LRP5`, `LRP7`, `LRN5TL`, Monteverde `G22/23/24`, `G42/43`, `W22/23/24`, `M13/14`, `M42/43/44`, `D13`, and Uni-ball `SNP-5/7/10`. The audit confirms useful family facts, but the initial import has no atomic product or offering provenance entry for them. They do not enter production until a later reviewed manifest supplies one.
 
@@ -71,6 +75,13 @@ The following matrices are the approved offering facts. Each listed colour appli
 | Pilot | `BLS-G2-5` 0.5 conical | Black, red, blue, green, blue-black |
 | Pilot | `BLS-G2-7` 0.7 conical | Black, red, blue, green, violet, pink, dark red, orange |
 | Pilot | `BLS-G2-10` 1.0 conical | Black, red, blue, green |
+| Pilot | `LP3RF` 0.3 Synergy Tip | Black, red, blue, blue-black |
+| Pilot | `LP3RF` 0.4 Synergy Tip | Black, red, blue, blue-black, orange |
+| Pilot | `LP3RF` 0.5 Synergy Tip | Black, red, blue, blue-black |
+| Pilot | `LPTRF` 0.4 Synergy Tip, multi-pen format | Black, red, blue, green |
+| Pilot | `LP2RF` 0.38, 0.5, 0.7, or 1.0 regular Juice gel | Black, red, blue for each size |
+| Pilot | `BXS-V5-RT` 0.5 needle liquid rollerball | Black, blue, red in EU; black and blue in MX |
+| Pilot | `BXS-V7-RT` 0.7 needle liquid rollerball | Black, blue in EU |
 | Monteverde | `P11` Extra-fine | Black, blue, blue-black |
 | Monteverde | `P13` Medium | Black, blue, blue-black, red, green, turquoise, purple, brown, pink |
 | Monteverde | `P15` Super-broad | Black, blue |
@@ -94,10 +105,26 @@ The following matrices are the approved offering facts. Each listed colour appli
 | Schneider | `Express 735` Medium | Black, red, blue, green |
 | Schneider | `Express 735` Broad | Black, blue |
 | Schneider | `Eco 725` Fine or Medium | Black, blue for each grade |
+| Zebra | `JF` 0.3 | Black, blue, red, blue-black, green-black, camel yellow, brown gray, cassis black |
+| Zebra | `JF` 0.38 | Black, blue, red |
+| Zebra | `JF` 0.4 | Black, blue, red, blue-black, orange |
+| Zebra | `JF` 0.5 | Black, blue, red, blue-black, sepia black, blue gray, green black, dark gray, brown gray, red black, cassis black, bordeaux purple, camel yellow, orange |
+| Zebra | `JF` 0.7 or 1.0 | Black, blue, red, blue-black for each size |
+| Zebra | `JLV` 0.4, 0.5, or 0.7 fast-drying gel | Black, blue, red for each size |
+| Zebra | `MJF` 0.4 or 0.5 Mark On gel | Black for each size |
+| Zebra | `JRV` 0.4 vivid gel | Black, blue, red, orange |
+| Zebra | `JRV` 0.5 vivid gel | Black, blue, red |
+| Zebra | `NJK` 0.4 or 0.5 multi-pen format | Black, blue, red, green for each size |
+| Zebra | `JK` 0.4 multi-pen format | Black, blue, red |
+| Zebra | `JK` 0.5 multi-pen format | Black, blue, red, green |
+| Zebra | `BJF` 0.5 Study gel | Black, blue, red |
+| Zebra | `BioTube JF` 0.5 | Black, red |
 | Uni-ball | `SXR-38` 0.38, `SXR-5` 0.5, `SXR-7` 0.7, `SXR-10` 1.0 | Black, red, blue for each model |
+| Uni-ball | `SXR-L-5` 0.5, `SXR-L-7` 0.7 Lite Touch | Black, red, blue, limited-quantity blue-black for each model |
 | Uni-ball | `SXR-600-38` 0.38, `SXR-600-05` 0.5, `SXR-600-07` 0.7 | Black for each model |
 | Uni-ball | `SXR-80-38` 0.38, `SXR-80-05` 0.5, `SXR-80-07` 0.7 | Black, red, blue, green for each model |
 | Uni-ball | `SXR-80-10` 1.0 | Black, red, blue |
+| Uni-ball | `SXR-L80-05` 0.5 Lite Touch multi-pen | Black, red, blue, green, limited-quantity blue-black |
 | Uni-ball | `SXR-200-05` 0.5, `SXR-200-07` 0.7 | Black, red, blue for each model |
 | Uni-ball | `UMR-82` 0.28 | Black, red, blue |
 | Uni-ball | `UMR-83` 0.38 | Black, red, blue, blue-black |
@@ -120,6 +147,8 @@ Apply the audit's maker-code corrections when a controlled scope supports an ide
 - Exclude Schneider `7354`. Treat `7361`, `7362`, `7363`, `7364`, and `7373` as confirmed by the current official pages.
 - Do not seed exact full ZENTO `.24`, `.15`, or `.33` ordering codes until an official table confirms them. The model-and-colour offerings themselves are approved.
 - Do not seed Pilot hyphenless forms as maker identifiers. They may be added later as reviewed product aliases, not source facts.
+- Use the exact Pilot Japan Juice/Juice Up, Zebra Japan, and Mitsubishi Pencil codes enumerated in the production provenance manifest. Those current manufacturer catalogues establish JP identifier assignments and `current` assertions.
+- For Precise/Hi-Tecpoint RT, seed the current EU `BXS-V5-RT` and `BXS-V7-RT` rows and their published barcodes. Pilot Mexico supports `PV5RR` items `77273` black and `77274` blue only in MX. Hold the proposed full `PV5RR*`, `PV7RR*`, and `PV1RR*` North American matrix until a first-party Pilot US source is captured.
 
 ## Compatibility groups and aliases
 
@@ -130,13 +159,16 @@ Seed these group memberships:
 | `EnerGel` | Pentel `LRN3`, `LRN4`, `LRN5`, `LR7`, `LR10`, plus every Floatune model: `ZRN3`, `ZRN4`, `ZRN5`, `YR8`, `YR10` |
 | `Parker G2` | Monteverde `P11`, `P13`, `P15`, `P41`, `P42`, `P44`, `PP43`; Parker `QUINKflow Ballpoint`, `QUINK Gel`; Schmidt `P900`, `easyFLOW 9000`, `P900 Softline`, `MegaLine P950`; Schneider `Express 735`, `Eco 725`; Uni-ball `SXR-600-38`, `SXR-600-05`, `SXR-600-07`; OHTO `PG-105NP` |
 | `Pilot G2 standard` | Pilot `BLS-G2-38`, `BLS-G2-5`, `BLS-G2-7`, `BLS-G2-10` |
-| `Jetstream SXR full-size` | Uni-ball `SXR-38`, `SXR-5`, `SXR-7`, `SXR-10` |
-| `Jetstream SXR-80 multi-pen` | Uni-ball `SXR-80-38`, `SXR-80-05`, `SXR-80-07`, `SXR-80-10` |
+| `Pilot Precise RT` | Pilot `BXS-V5-RT`, `BXS-V7-RT` |
+| `Jetstream SXR full-size` | Uni-ball `SXR-38`, `SXR-5`, `SXR-7`, `SXR-10`, `SXR-L-5`, `SXR-L-7` |
+| `Jetstream SXR-80 multi-pen` | Uni-ball `SXR-80-38`, `SXR-80-05`, `SXR-80-07`, `SXR-80-10`, `SXR-L80-05` |
 | `Jetstream SXR-200 multi-pen` | Uni-ball `SXR-200-05`, `SXR-200-07` |
 | `ZENTO standard` | Uni-ball `UBR-Z-38`, `UBR-Z-05`, `UBR-Z-07` |
 | `ZENTO 3 Color` | Uni-ball `UBR-ZML-38`, `UBR-ZML-05` |
 
 `LRN5H`, Parker `QUINK Rollerball`, Monteverde rollerballs, Signo/One, and Power Tank remain outside these groups. Absence is unknown or a distinct documented format, never an incompatible assertion.
+
+Pilot publishes separate Juice Up, Juice Up multi-pen, regular Juice, Precise RT, and capped Precise cartridge systems. No reviewed first-party source places `LP3RF`, `LPTRF`, `LP2RF`, `BXS-V-RT`, or `BLS-G2` in one physical compatibility group. Zebra's equal nominal dimensions also do not prove that `JF`, `JLV`, `MJF`, `JRV`, and `BJF` interchange; retain separate products unless manufacturer evidence or controlled measurements establish a relationship.
 
 Seed only these reviewed terminology aliases:
 
