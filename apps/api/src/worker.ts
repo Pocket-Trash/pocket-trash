@@ -9,8 +9,12 @@ import { createErasureOperations, drainErasureQueue } from "./erasure.js";
 import { createApiLogger, createApiServices } from "./lib/services.js";
 import { createLinearWebhookHandler } from "./linear-webhooks.js";
 
-/** API application configured for the Cloudflare worker runtime. */
-const app = createApp({
+/**
+ * API application configured for the Cloudflare worker runtime.
+ *
+ * @internal Exported for independent route inventory and OpenAPI coverage checks.
+ */
+export const app = createApp({
   /**
    * Creates the Clerk webhook runtime for a request.
    *

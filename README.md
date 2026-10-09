@@ -102,6 +102,7 @@ are needed. Webhook setup and relay requirements are documented in
 | `pnpm format` | Formats files and organizes imports with Biome. |
 | `pnpm lint` | Runs repository ESLint and the complete JSDoc check. |
 | `pnpm lint:jsdoc` | Checks JSDoc on eligible tracked JavaScript and TypeScript declarations. |
+| `pnpm lint:openapi` | Checks every API endpoint against the live OpenAPI document. |
 | `pnpm typecheck` | Typechecks all apps and packages through Turborepo. |
 
 ## Tests

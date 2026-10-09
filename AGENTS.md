@@ -10,6 +10,8 @@
   staging and Git base refs do not restrict coverage.
 - Follow [`docs/documentation.md`](docs/documentation.md) when creating or storing
   repository documentation, research, findings, or engineering decision records.
+- Every new or changed API endpoint must update the live OpenAPI contract and
+  pass `pnpm lint:openapi`. Follow [`docs/api-openapi.md`](docs/api-openapi.md).
 
 - After implementing features or code changes, run focused checks while iterating.
   Before the final push:
