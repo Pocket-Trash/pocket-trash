@@ -62,6 +62,22 @@ _Avoid_: Refill product, variant
 A set of refills with verified physical interchangeability.
 _Avoid_: Brand family, ink family
 
+**Compatibility subject**:
+A pen product alone or that pen with one required pen-tip product.
+_Avoid_: Owned pen, body-tip pairing
+
+**Compatibility assertion**:
+An approved claim about how one compatibility subject fits a refill product or compatibility group.
+_Avoid_: Fit report
+
+**Compatibility evidence**:
+A sourced manufacturer statement, dimensional comparison, physical fit test, or curated observation that supports or contradicts a compatibility claim.
+_Avoid_: Tested flag, reliability score
+
+**Unknown compatibility**:
+The absence of an applicable compatibility assertion.
+_Avoid_: Incompatible
+
 ## Names
 
 **Terminology alias**:
