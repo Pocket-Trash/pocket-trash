@@ -1,0 +1,68 @@
+name: Railway Configuration
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "27 13 * * *"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".railway/**"
+      - ".github/workflows/railway-config.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Railway drift (${{ matrix.environment }})
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [production, preview]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Fetch GitHub secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ secrets.INFISICAL_GITHUB_IDENTITY_ID }}
+          oidc-audience: ${{ secrets.INFISICAL_OIDC_AUDIENCE || format('https://github.com/{0}', github.repository_owner) }}
+          domain: ${{ secrets.INFISICAL_DOMAIN || 'https://app.infisical.com' }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+          env-slug: prod
+          secret-path: tools/github/secrets
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm security:audit
+
+      - name: Check Railway drift
+        env:
+          RAILWAY_ENVIRONMENT: ${{ matrix.environment }}
+        run: |
+          set -euo pipefail
+          : "${RAILWAY_API_TOKEN:?RAILWAY_API_TOKEN is required}"
+          : "${RAILWAY_PROJECT_ID:?RAILWAY_PROJECT_ID is required}"
+          pnpm exec railway link --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT"
+          # Use the saved link's project name in the IaC context.
+          unset RAILWAY_PROJECT_ID
+          pnpm exec railway config plan --detailed-exit-code

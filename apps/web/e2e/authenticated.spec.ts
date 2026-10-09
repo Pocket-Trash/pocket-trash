@@ -48,6 +48,7 @@ test("@mutation regular user theme persists after reload", async ({
 }) => {
   await signInAs("regular");
   await page.goto("/user/settings");
+  await waitForHydration(page);
 
   const themeGroup = page.getByRole("group", { name: "Theme" });
   const selectedTheme = themeGroup.locator('[aria-pressed="true"]');
@@ -74,6 +75,7 @@ test("@mutation regular user theme persists after reload", async ({
     await expect(nextTheme).toHaveAttribute("aria-pressed", "true");
   } finally {
     await page.goto("/user/settings");
+    await waitForHydration(page);
     if ((await originalTheme.getAttribute("aria-pressed")) !== "true") {
       await selectThemeAndWaitForPersistence(
         page,

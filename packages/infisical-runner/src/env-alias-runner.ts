@@ -1,5 +1,8 @@
 import { spawn } from "node:child_process";
-import { applyDatabaseUrlOverride } from "./database-url-override.js";
+import {
+  applyDatabaseUrlOverride,
+  normalizeDatabaseUrlSslMode,
+} from "./database-url-override.js";
 
 /** A source and destination pair for an environment variable alias. */
 type EnvironmentAlias = {
@@ -94,6 +97,12 @@ if (!optionsJson || separator !== "--" || !command) {
 
   if (options.databaseUrlUserOverride) {
     applyDatabaseUrlUserOverride(options.databaseUrlUserOverrideFilePaths);
+  }
+
+  if (process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = normalizeDatabaseUrlSslMode(
+      process.env.DATABASE_URL,
+    );
   }
 
   const child = spawn(command, commandArgs, {

@@ -206,8 +206,10 @@ connection_uri() {
   local role_name
   role_name="$(url_encode "$NEON_DATABASE_USER")"
 
-  api GET "/projects/${NEON_PROJECT_ID}/connection_uri?branch_id=${branch_id}&database_name=${database_name}&role_name=${role_name}&pooled=${pooled}" |
-    jq -r '.uri'
+  local uri
+  uri="$(api GET "/projects/${NEON_PROJECT_ID}/connection_uri?branch_id=${branch_id}&database_name=${database_name}&role_name=${role_name}&pooled=${pooled}" |
+    jq -r '.uri')"
+  sed -E 's/([?&])sslmode=require([&#]|$)/\1sslmode=verify-full\2/' <<< "$uri"
 }
 
 mask_and_output_database_urls() {
