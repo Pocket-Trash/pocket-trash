@@ -27,6 +27,36 @@
 
 
 
+
+## 0.8.0
+
+### Minor Changes
+
+* Add alloy and grade pages with scoped material discovery and public images. (@app/web, @package/services)
+* Add material alloys and grades, durable product assignments, retained collection selections, and scoped image administration. (@app/web, @package/database, @package/services, @package/storage, @package/logger)
+* Upgrade to Drizzle RC4 with timestamp-folder migrations and a fresh baseline requiring all existing databases to be rebuilt. (@package/database, @package/services, @app/api, @app/web, @app/scraper)
+
+### Patch Changes
+
+* Document the refill compatibility evidence and exception model. (@package/database)
+* Document refill-offering provenance and market lifecycle representation. (@package/database)
+* Rename catalog and collection subtype tables with rollout compatibility views. (@package/database, @package/services)
+* Document reusable catalog terminology and product alias behavior for the Pens schema. (@package/database)
+* Document the canonical Pens and refill domain baseline. (@package/database)
+* Fix intermittent theme persistence E2E failures. (@app/web)
+* Run development and CI on Node 24 and Ubuntu 26.04. (@app/api, @app/scraper, @app/web)
+* Document Monteverde PP43 membership in the Parker G2 compatibility group. (@package/database)
+* Remove the retired catalog and collection subtype compatibility views. (@package/database)
+* Migrate scraper deployment settings to Railway Infrastructure as Code. (@app/scraper)
+* Preserve full SSL verification for Neon database URLs (@package/infisical-runner)
+* Document the authoritative Autmog source inventory and the missing preserved Saga dataset gate. (@package/database)
+* Enforce complete OpenAPI coverage for API endpoints.
+  Fix theme persistence test timing and cover disabled theme controls. (@app/api, @app/web)
+* Stabilize Markdown table keyboard interaction tests. (@app/web)
+* Document the decision to group all Floatune refills with EnerGel. (@package/database)
+* Allow baseline migration tests more setup time. (@package/database)
+* update skills to 0.5.4 (@package/database)
+
 ## 0.7.1
 
 ### Patch Changes
