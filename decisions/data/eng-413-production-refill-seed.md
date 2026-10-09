@@ -34,13 +34,13 @@ Seed these stable products. Names separated by commas are separate refill produc
 
 | Maker | Products |
 | --- | --- |
-| Pentel | `LRN3`, `LRN4`, `LRN5`, `LR7`, `LR10`, `LRP5`, `LRP7`, `LRN5TL`, `LRN5H`, `ZRN3`, `ZRN4`, `ZRN5`, `YR8`, `YR10` |
+| Pentel | `LRN3`, `LRN4`, `LRN5`, `LR7`, `LR10`, `LRN5H`, `ZRN3`, `ZRN4`, `ZRN5`, `YR8`, `YR10` |
 | Pilot | `BLS-G2-38`, `BLS-G2-5`, `BLS-G2-7`, `BLS-G2-10` |
-| Monteverde | `P11`, `P13`, `P15`, `P41`, `P42`, `P44`, `PP43`, `G22`, `G23`, `G24`, `G42`, `G43`, `W22`, `W23`, `W24`, `M13`, `M14`, `M42`, `M43`, `M44`, `D13` |
+| Monteverde | `P11`, `P13`, `P15`, `P41`, `P42`, `P44`, `PP43` |
 | Parker | `QUINKflow Ballpoint`, `QUINK Gel`, `QUINK Rollerball` |
 | Schmidt | `P900`, `easyFLOW 9000`, `P900 Softline`, `MegaLine P950` |
 | Schneider | `Express 735`, `Eco 725` |
-| Uni-ball / Mitsubishi Pencil | `SXR-38`, `SXR-5`, `SXR-7`, `SXR-10`, `SXR-600-38`, `SXR-600-05`, `SXR-600-07`, `SXR-80-38`, `SXR-80-05`, `SXR-80-07`, `SXR-80-10`, `SXR-200-05`, `SXR-200-07`, `UMR-82`, `UMR-83`, `UMR-83E`, `UMR-85N`, `UMR-85E`, `UMR-87E`, `UMR-38S`, `UMR-05S`, `SNP-5`, `SNP-7`, `SNP-10`, `UBR-Z-38`, `UBR-Z-05`, `UBR-Z-07`, `UBR-ZML-38`, `UBR-ZML-05` |
+| Uni-ball / Mitsubishi Pencil | `SXR-38`, `SXR-5`, `SXR-7`, `SXR-10`, `SXR-600-38`, `SXR-600-05`, `SXR-600-07`, `SXR-80-38`, `SXR-80-05`, `SXR-80-07`, `SXR-80-10`, `SXR-200-05`, `SXR-200-07`, `UMR-82`, `UMR-83`, `UMR-83E`, `UMR-85N`, `UMR-85E`, `UMR-87E`, `UMR-38S`, `UMR-05S`, `UBR-Z-38`, `UBR-Z-05`, `UBR-Z-07`, `UBR-ZML-38`, `UBR-ZML-05` |
 | OHTO | `PG-105NP` |
 
 Apply these identity corrections while importing:
@@ -49,7 +49,9 @@ Apply these identity corrections while importing:
 - Use the exact Monteverde models `M13`, `M14`, `M42`, `M43`, `M44`, and `D13`; `M1`, `M4`, and `D1` remain family/format terms.
 - Use `PG-105NP` as the OHTO product. `Flash Dry` is a marketed family name.
 - Treat `XLRN*` and `XZRN*` as sourced regional identifiers for the stable Pentel model, not duplicate products. Do not invent unprefixed `LRN4` or `ZRN4` maker identifiers.
-- Keep `G22/23/24` and `W22/23/24` as historical products from the 2022 Monteverde catalogue. Do not mark them current from their absence or presence in current navigation.
+- Preserve `G22/23/24` and `W22/23/24` as deferred historical evidence from the 2022 Monteverde catalogue. Do not mark them current from their absence or presence in current navigation.
+
+Defer `LRP5`, `LRP7`, `LRN5TL`, Monteverde `G22/23/24`, `G42/43`, `W22/23/24`, `M13/14`, `M42/43/44`, `D13`, and Uni-ball `SNP-5/7/10`. The audit confirms useful family facts, but the initial import has no atomic product or offering provenance entry for them. They do not enter production until a later reviewed manifest supplies one.
 
 ## Production offerings
 
@@ -108,9 +110,7 @@ The following matrices are the approved offering facts. Each listed colour appli
 | Uni-ball | `UBR-ZML-38` 0.38, `UBR-ZML-05` 0.5 | Black, red, blue for each model |
 | OHTO | `PG-105NP` 0.5 needle gel | Black, blue |
 
-Products without a row in this table remain product-only in the initial import. Add no offering until an approved source establishes its exact combination.
-
-`SNP-5`, `SNP-7`, and `SNP-10` are product-only. ENG-405 records a Japan colour conclusion but cites no offering-level source that can support a deterministic production row.
+Every product in the initial import has at least one offering row above. Products without an approved offering remain deferred rather than entering production as unsupported product-only records.
 
 Apply the audit's maker-code corrections:
 
@@ -127,7 +127,7 @@ Seed these group memberships:
 
 | Group | Members |
 | --- | --- |
-| `EnerGel` | Pentel `LRN3`, `LRN4`, `LRN5`, `LR7`, `LR10`, `LRN5TL`, plus every Floatune model: `ZRN3`, `ZRN4`, `ZRN5`, `YR8`, `YR10` |
+| `EnerGel` | Pentel `LRN3`, `LRN4`, `LRN5`, `LR7`, `LR10`, plus every Floatune model: `ZRN3`, `ZRN4`, `ZRN5`, `YR8`, `YR10` |
 | `Parker G2` | Monteverde `P11`, `P13`, `P15`, `P41`, `P42`, `P44`, `PP43`; Parker `QUINKflow Ballpoint`, `QUINK Gel`; Schmidt `P900`, `easyFLOW 9000`, `P900 Softline`, `MegaLine P950`; Schneider `Express 735`, `Eco 725`; Uni-ball `SXR-600-38`, `SXR-600-05`, `SXR-600-07`; OHTO `PG-105NP` |
 | `Pilot G2 standard` | Pilot `BLS-G2-38`, `BLS-G2-5`, `BLS-G2-7`, `BLS-G2-10` |
 | `Jetstream SXR full-size` | Uni-ball `SXR-38`, `SXR-5`, `SXR-7`, `SXR-10` |
