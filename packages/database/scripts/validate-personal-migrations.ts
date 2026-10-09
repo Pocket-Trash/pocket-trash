@@ -32,7 +32,7 @@ async function main(): Promise<void> {
 
   console.log(`Personal Neon migration state: ${comparison.state}.`);
   console.log(comparison.summary);
-  if (comparison.state !== "exact" && comparison.state !== "reconciled") {
+  if (comparison.state !== "exact") {
     throw new Error(comparison.guidance);
   }
 }
@@ -77,7 +77,7 @@ async function readAppliedMigrations(
     const [rows] = await database.transaction(
       (transaction) => [
         transaction`
-          select hash, created_at::float8 as "createdAt"
+          select hash, created_at::float8 as "createdAt", name as tag
           from drizzle.__drizzle_migrations
           order by id
         `,
@@ -87,6 +87,11 @@ async function readAppliedMigrations(
     return rows as AppliedMigration[];
   } catch (error) {
     if (error instanceof NeonDbError && error.code === "42P01") return null;
+    if (error instanceof NeonDbError && error.code === "42703") {
+      throw new Error(
+        "The selected personal branch has a legacy migration ledger. Rebuild the approved local target before applying the fresh baseline; do not convert or edit ledger rows.",
+      );
+    }
     throw error;
   }
 }

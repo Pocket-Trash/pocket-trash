@@ -1,39 +1,16 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-describe("erasure request verification migration", () => {
+describe("erasure request verification baseline", () => {
   const database = new PGlite();
 
   beforeAll(async () => {
-    await database.exec(`
-      CREATE TABLE "erasure_request" (
-        "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        "target_clerk_id" text,
-        "initiator" text NOT NULL,
-        "verification_reference" text,
-        "verification_method" text,
-        "verified_by_clerk_id" text,
-        "verified_at" timestamp with time zone,
-        "status" text NOT NULL
-      );
-    `);
-    const migrations = new URL("../drizzle/", import.meta.url);
-    const migration = readdirSync(migrations).find(
-      (name) =>
-        name.endsWith(".sql") &&
-        readFileSync(new URL(name, migrations), "utf8").includes(
-          "erasure_request_verification_provenance_valid",
-        ),
-    );
-    if (!migration)
-      throw new Error("Erasure verification migration was not found.");
-    await database.exec(
-      readFileSync(new URL(migration, migrations), "utf8").replaceAll(
-        "--> statement-breakpoint",
-        "",
-      ),
-    );
+    await migrate(drizzle({ client: database }), {
+      migrationsFolder: fileURLToPath(new URL("../drizzle/", import.meta.url)),
+    });
   });
 
   afterAll(async () => {
@@ -113,15 +90,15 @@ describe("erasure request verification migration", () => {
    */
   function insert(values: string) {
     return database.exec(`
-      INSERT INTO "erasure_request" (
-        "target_clerk_id",
-        "initiator",
-        "verification_reference",
-        "verification_method",
-        "verified_by_clerk_id",
-        "verified_at",
-        "status"
-      ) VALUES (${values});
+      INSERT INTO erasure_request (
+        subject_hmac, step_results, target_clerk_id, initiator,
+        verification_reference, verification_method, verified_by_clerk_id,
+        verified_at, status, completed_at, expires_at
+      ) SELECT gen_random_uuid()::text, '{}'::jsonb, target, initiator,
+        reference, method, actor, verified::timestamptz, status,
+        CASE WHEN status = 'completed' THEN now() END,
+        CASE WHEN status = 'completed' THEN now() + interval '30 days' END
+      FROM (VALUES (${values})) AS provenance(target, initiator, reference, method, actor, verified, status);
     `);
   }
 });

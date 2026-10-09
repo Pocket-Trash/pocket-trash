@@ -20,8 +20,10 @@ After changing a Drizzle schema declaration, generate migration artifacts:
 pnpm db:generate
 ```
 
-Review and commit the generated SQL, journal, and snapshot changes under
-`packages/database/drizzle/`. Apply committed migrations with:
+Review and commit each generated timestamp folder under
+`packages/database/drizzle/<YYYYMMDDHHmmss>_<name>/`, including `migration.sql`
+and `snapshot.json`. There is no numbered SQL file or shared journal. Apply
+committed migrations with:
 
 ```sh
 pnpm db:migrate
@@ -34,8 +36,20 @@ checks migration-history consistency with:
 pnpm --filter @package/database db:check
 ```
 
-Do not edit Drizzle snapshots or the journal by hand to resolve a parallel
-migration conflict; use the recovery workflow below.
+Drizzle records applied migration names, timestamps, and SQL hashes in
+`drizzle.__drizzle_migrations`. Validation compares named sets, not a highest
+timestamp or an ordered prefix. Never edit applied SQL, snapshots, or ledger rows.
+Functions and triggers unsupported by schema generation belong in a custom
+migration after their dependent tables:
+
+```sh
+pnpm --filter @package/database db:generate --custom --name=database_protections
+```
+
+After adding custom SQL, unchanged schema generation must still emit no DDL.
+Use `pnpm db:validate:chain` to replay native migrations twice on disposable
+PGlite, and `pnpm db:validate:personal` to compare the selected personal Neon
+history read-only.
 
 ## Local Database Selection
 
@@ -55,28 +69,14 @@ for the complete selection contract.
 
 ## Database Viewer
 
-Start Drizzle Studio, Drizzle Lab Visualizer, and Drizzle View together:
+Start Drizzle Studio for the selected local database:
 
 ```sh
-pnpm db:view
+pnpm db:studio
 ```
 
-Open `http://127.0.0.1:4011` for the combined view.
-
-| Component | Command | Port |
-| --- | --- | ---: |
-| Studio | `pnpm --filter @package/database db:studio` | 4009 |
-| Visualizer | `pnpm --filter @package/database db:visualizer` | 4010 |
-| Drizzle View | `pnpm --filter @package/database db:view:shell` | 4011 |
-
 Drizzle Studio exposes its browser UI through
-`https://local.drizzle.studio?port=4009`. Port 4009 itself is the local bridge,
-so configuring Drizzle View with `http://127.0.0.1:4009` can produce an empty
-response.
-
-Drizzle View downloads its platform binary on first use. The repository wrapper
-at [`scripts/drizzle-view.mjs`](../scripts/drizzle-view.mjs) removes incomplete
-zero-byte downloads and repairs executable permissions before starting it.
+`https://local.drizzle.studio?port=4009`. Port 4009 is its local database bridge.
 
 ## Neon Branch Lifecycle
 
@@ -143,9 +143,13 @@ cache metrics to confirm the cause.
 
 ## Parallel Migration Recovery
 
-Drizzle migration history is linear. When another database PR merges first,
-update from `main`, remove only the stale generated artifacts from the current
-branch, and regenerate against the new mainline history.
+Independently generated timestamp-folder migrations can coexist when their
+changes commute. Update from `main`, preserve both complete folders, and run
+`db:check` before regenerating anything. A check failure means the histories
+need review; it is not permission to delete mainline or applied migrations.
+For an incompatible change, retain the TypeScript intent and custom SQL, then
+regenerate only the current branch's never-applied conflicting artifacts against
+the latest mainline schema. Coordinate if either history has been applied.
 
 Print the repository-specific recovery instructions with:
 
@@ -155,8 +159,54 @@ pnpm db:resolve-conflicts
 
 The command prints instructions for Codex to use the shared
 `$pocket-trash db-migration-conflicts` workflow. That workflow preserves
-schema intent and hand-written SQL, regenerates migration artifacts, and runs
-the Drizzle consistency check.
+schema intent and hand-written SQL, retains compatible sibling migrations, and
+regenerates only confirmed unapplied conflicts before consistency and replay checks.
+
+## Fresh-baseline maintenance
+
+This history is for empty or already rebuilt targets. It cannot be applied over
+an old schema or ledger. Production receives schema, custom protections, and
+migration records only; deployment does not seed or reconcile Clerk users.
+Development and preview use the existing non-production fixtures.
+
+Maintenance bypasses personal-selector wrappers: the Infisical runner can replace
+an explicitly supplied `DATABASE_URL` with the selected personal secret. Securely
+inject a nonempty direct URL into the following unwrapped commands; never paste
+credentials into a shell command or report:
+
+```sh
+pnpm --filter @package/database db:migrate:direct
+pnpm --filter @package/database exec tsx scripts/seed.ts
+pnpm --filter @package/database exec tsx scripts/preview-state.ts mark
+```
+
+Before DDL, verify the project, branch ID, parent, endpoint, protection, database
+`neondb`, and role against the live Neon inventory and `current_database()` /
+`current_user` on that connection. Confirm the destructive procedure separately.
+Stop on unexpected branches, databases, consumers, or dependencies. Verify the
+native ledger on the same target after migration. Seeding also requires the
+environment's Bunny credentials and namespace; never run it on production.
+
+For the one-time upgrade PR, pause Deploy and drain preparation before pushing
+or opening the PR—even a draft triggers deployment. Resolve only its owned
+`preview-pr-<number>` branch, empty only its identity-checked application target,
+apply the committed history, and seed with `images/preview/pr-<number>` and
+`resources/preview/pr-<number>`. Set `PREVIEW_BASE_SHA` to the exact PR base SHA,
+write and verify the new migration fingerprint with `preview-state.ts mark` /
+`check`, then resume Deploy and trigger its supported PR event. Re-bootstrap
+under a pause if the branch, base SHA, or migration artifacts change. There is
+no general automatic reset exception.
+
+Merge and shared rebuild remain a separate maintenance operation: freeze Deploy,
+Preview Refresh, writers, queues/webhooks, scraper schedules, local writers,
+main pushes, and release tags; drain old runs; merge the verified integration PR
+and record its actual SHA. Remove its owned preview branch and require zero PR
+branches before resetting shared databases. Rebuild production and development
+in place, reset preview from rebuilt seeded development, replace the old personal
+branch, verify credentials, and deploy only the recorded main SHA. Restore
+production protection before resuming traffic. No recovery dumps are retained
+under the approved cutover policy; reverting code does not recover removed data.
+The authoritative target/credential checklist is in [ENG-422](https://linear.app/pocket-trash/issue/ENG-422/cut-over-every-database-and-retire-the-temporary-drizzle-setup).
 
 ## Preview classification contract
 
@@ -212,7 +262,6 @@ change; runtime source changes and explicit `test:e2e` labels add their normal c
 | `database-schema-diagram.template.html` | Validation only | Documentation template |
 | `dependency-changes.mjs` | Validation only | Committed dependency graph comparison; covered by classification tests |
 | `developer-commands.test.mjs` | Validation only | Isolated tooling/contract tests |
-| `drizzle-view.mjs` | Validation only | Local diagram CLI bootstrap |
 | `e2e-local-contract.test.mjs` | Validation only | Isolated tooling/contract tests |
 | `generate-database-schema-diagram.mjs` | Validation only | Drizzle schema metadata reading and documentation output |
 | `generate-infrastructure-diagram.mjs` | Validation only | Local source/metadata scanning and documentation output |

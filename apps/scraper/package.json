@@ -27,7 +27,7 @@
     "@t3-oss/env-core": "^0.13.11",
     "bullmq": "^5.80.4",
     "cron-parser": "4.9.0",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "1.0.0-rc.4",
     "hono": "^4.13.9",
     "ioredis": "^5.11.1",
     "undici": "^8.11.2",

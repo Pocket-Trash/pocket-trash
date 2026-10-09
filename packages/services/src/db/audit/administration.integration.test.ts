@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
@@ -7,6 +5,7 @@ import { schema } from "@package/database";
 import { createNoopLogger } from "@package/logger";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
 import { createFeatureFlagsService } from "../../flags/index.js";
 import { createFeedbackService } from "../feedback/index.js";
@@ -17,7 +16,10 @@ describe("administration audit adoption", () => {
   it("audits feedback and feature-flag mutations with safe erasure links", async () => {
     const client = new PGlite();
     await migrate(client);
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     const logger = createNoopLogger({ app: "test", environment: "test" });
     const services = createDbServices(db, logger);
     const flags = createFeatureFlagsService(
@@ -251,14 +253,7 @@ async function migrate(client: PGlite): Promise<void> {
   const migrationsFolder = fileURLToPath(
     new URL("../../../../database/drizzle", import.meta.url),
   );
-  for (const file of readdirSync(migrationsFolder)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()) {
-    await client.exec(
-      readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
-        "--> statement-breakpoint",
-        "",
-      ),
-    );
-  }
+  await migratePglite(drizzle({ client: client }), {
+    migrationsFolder: migrationsFolder,
+  });
 }

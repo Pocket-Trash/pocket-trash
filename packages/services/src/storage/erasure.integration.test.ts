@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
@@ -8,6 +6,7 @@ import { createNoopLogger } from "@package/logger";
 import { createUploadStorage } from "@package/storage";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it, vi } from "vitest";
 import { createErasureService } from "../db/erasure/index.js";
 import { createStorageService } from "./index.js";
@@ -16,7 +15,10 @@ describe("account storage erasure", () => {
   it("retries exact keys, preserves shared and product objects, and clears its snapshot", async () => {
     const client = new PGlite();
     await migrate(client);
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     const logger = createNoopLogger({ app: "api", environment: "test" });
     const storage = createUploadStorage({
       accessKey: "storage-key",
@@ -289,14 +291,7 @@ async function migrate(client: PGlite) {
   const migrationsFolder = fileURLToPath(
     new URL("../../../database/drizzle", import.meta.url),
   );
-  for (const file of readdirSync(migrationsFolder)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()) {
-    await client.exec(
-      readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
-        "--> statement-breakpoint",
-        "",
-      ),
-    );
-  }
+  await migratePglite(drizzle({ client: client }), {
+    migrationsFolder: migrationsFolder,
+  });
 }

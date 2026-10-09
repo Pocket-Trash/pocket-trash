@@ -1,87 +1,21 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
 describe("maker profile persistence", () => {
-  it("preserves migrated makers and assigns stable deterministic slugs", async () => {
-    const client = new PGlite();
-    try {
-      const migrations = migrationFiles();
-      for (const file of migrations.filter((name) => name < "0053_")) {
-        await runMigration(client, file);
-      }
-      await client.exec(`
-        insert into makers (name, root_url, created_at, updated_at)
-        values
-          ('Acme & Co', 'https://acme-one.test', '2025-01-01', '2025-02-01'),
-          ('Acme Co', 'https://acme-two.test', '2025-03-01', '2025-04-01');
-      `);
-      const before = await client.query<{
-        /** Preserved creation timestamp. */
-        created_at: Date;
-        /** Preserved maker identifier. */
-        id: number;
-        /** Preserved maker name. */
-        name: string;
-        /** Preserved root URL. */
-        root_url: string;
-        /** Preserved update timestamp. */
-        updated_at: Date;
-      }>(
-        "select id, name, root_url, created_at, updated_at from makers order by id",
-      );
-
-      for (const file of migrations.filter((name) => name >= "0053_")) {
-        await runMigration(client, file);
-      }
-
-      const after = await client.query<{
-        /** Preserved creation timestamp. */
-        created_at: Date;
-        /** Preserved maker identifier. */
-        id: number;
-        /** Preserved maker name. */
-        name: string;
-        /** Preserved root URL. */
-        root_url: string;
-        /** Generated stable slug. */
-        slug: string;
-        /** Preserved update timestamp. */
-        updated_at: Date;
-      }>(
-        "select id, name, root_url, slug, created_at, updated_at from makers order by id",
-      );
-
-      expect(
-        after.rows.map(({ created_at, id, name, root_url, updated_at }) => ({
-          created_at,
-          id,
-          name,
-          root_url,
-          updated_at,
-        })),
-      ).toEqual(before.rows);
-      expect(after.rows.map(({ slug }) => slug)).toEqual([
-        "acme-co",
-        "acme-co-2",
-      ]);
-    } finally {
-      await client.close();
-    }
-  }, 30_000);
-
   it("creates, protects, and updates maker profiles without changing slugs", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
     try {
-      for (const file of migrationFiles()) await runMigration(client, file);
+      await migrate(drizzle({ client }), {
+        migrationsFolder: migrationsFolder(),
+      });
       const service = createDbServices(
         db as unknown as Database,
         createLogger({ app: "api", environment: "test" }),
@@ -192,9 +126,11 @@ describe("maker profile persistence", () => {
 
   it("aggregates only approved public products and owned public collection items", async () => {
     const client = new PGlite();
-    const db = drizzle(client, { schema });
+    const db = drizzle({ client: client, relations: schema.relations });
     try {
-      for (const file of migrationFiles()) await runMigration(client, file);
+      await migrate(drizzle({ client }), {
+        migrationsFolder: migrationsFolder(),
+      });
       await client.exec(`
         insert into users (clerk_id) values ('directory-owner');
         insert into makers (name, slug) values ('Directory Maker', 'directory-maker');
@@ -290,17 +226,6 @@ describe("maker profile persistence", () => {
 });
 
 /**
- * Lists repository migrations in execution order.
- *
- * @returns Sorted SQL migration filenames.
- */
-function migrationFiles() {
-  return readdirSync(migrationsFolder())
-    .filter((name) => name.endsWith(".sql"))
-    .sort();
-}
-
-/**
  * Resolves the repository migration directory.
  *
  * @returns Absolute migration directory path.
@@ -308,22 +233,5 @@ function migrationFiles() {
 function migrationsFolder() {
   return fileURLToPath(
     new URL("../../../../database/drizzle", import.meta.url),
-  );
-}
-
-/**
- * Applies one repository migration to the isolated database.
- *
- * @param client - PGlite database instance.
- * @param file - Migration filename.
- * @returns Completion after the migration is applied.
- * @rejects When migration SQL cannot be read or executed.
- */
-async function runMigration(client: PGlite, file: string) {
-  await client.exec(
-    readFileSync(join(migrationsFolder(), file), "utf8").replaceAll(
-      "--> statement-breakpoint",
-      "",
-    ),
   );
 }

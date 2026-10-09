@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
@@ -7,6 +5,7 @@ import { schema } from "@package/database";
 import { createLogger } from "@package/logger";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it, vi } from "vitest";
 import { type AuditService, createAuditService } from "../audit/index.js";
 import { userBanAudit, userBanAuditEvents } from "../audit/users.js";
@@ -17,7 +16,10 @@ describe("user ban management", () => {
   it("mirrors pictures, backfills equal timestamps, and ignores stale changes", async () => {
     const client = new PGlite();
     await migrate(client);
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     const services = createDbServices(
       db,
       createLogger({ app: "test", environment: "test", transports: [] }),
@@ -87,7 +89,10 @@ describe("user ban management", () => {
   it("authorizes transitions, preserves pending work, and edits ban reasons", async () => {
     const client = new PGlite();
     await migrate(client);
-    const db = drizzle(client, { schema }) as unknown as Database;
+    const db = drizzle({
+      client: client,
+      relations: schema.relations,
+    }) as unknown as Database;
     const logger = createLogger({
       app: "test",
       environment: "test",
@@ -322,14 +327,7 @@ async function migrate(client: PGlite): Promise<void> {
   const migrationsFolder = fileURLToPath(
     new URL("../../../../database/drizzle", import.meta.url),
   );
-  for (const file of readdirSync(migrationsFolder)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()) {
-    await client.exec(
-      readFileSync(join(migrationsFolder, file), "utf8").replaceAll(
-        "--> statement-breakpoint",
-        "",
-      ),
-    );
-  }
+  await migratePglite(drizzle({ client: client }), {
+    migrationsFolder: migrationsFolder,
+  });
 }

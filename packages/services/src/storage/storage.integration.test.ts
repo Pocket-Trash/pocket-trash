@@ -23,7 +23,10 @@ import { createStorageService } from "./index.js";
 const url = process.env.STORAGE_TEST_DATABASE_URL;
 describe.skipIf(!url)("storage sessions against PostgreSQL", () => {
   const pool = new pg.Pool({ connectionString: url });
-  const db = drizzle(pool, { schema }) as unknown as Database;
+  const db = drizzle({
+    client: pool,
+    relations: schema.relations,
+  }) as unknown as Database;
   const objects = new Map<string, Uint8Array>();
   let failDelete = false;
   const storage = createUploadStorage({

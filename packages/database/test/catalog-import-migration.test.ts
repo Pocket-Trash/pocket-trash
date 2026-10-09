@@ -1,5 +1,7 @@
-import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /** Generated application row returned by the migration test insert. */
@@ -8,17 +10,15 @@ type ApplicationRow = {
   id: string;
 };
 
-describe("catalog import migration", () => {
+describe("catalog import baseline", () => {
   const database = new PGlite();
   const hash = "a".repeat(64);
   const fingerprint = "b".repeat(64);
 
   beforeAll(async () => {
-    const migration = readFileSync(
-      new URL("../drizzle/0065_rare_warhawk.sql", import.meta.url),
-      "utf8",
-    ).replaceAll("--> statement-breakpoint", "");
-    await database.exec(migration);
+    await migrate(drizzle({ client: database }), {
+      migrationsFolder: fileURLToPath(new URL("../drizzle/", import.meta.url)),
+    });
   });
 
   afterAll(async () => {

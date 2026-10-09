@@ -288,7 +288,6 @@ const changeClassificationRules = [
       "scripts/database-change-detection.test.mjs",
       "scripts/dependency-changes.mjs",
       "scripts/developer-commands.test.mjs",
-      "scripts/drizzle-view.mjs",
       "scripts/e2e-local-contract.test.mjs",
       "scripts/generate-infrastructure-diagram.mjs",
       "scripts/release.mjs",

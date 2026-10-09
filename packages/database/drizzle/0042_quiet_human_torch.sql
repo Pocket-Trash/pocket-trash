@@ -1,3 +1,0 @@
-ALTER TABLE "feedback" ADD CONSTRAINT "feedback_category_valid" CHECK ("feedback"."category" is null or "feedback"."category" in ('product_type', 'feature', 'improvement', 'bug'));--> statement-breakpoint
-ALTER TABLE "feedback" ADD CONSTRAINT "feedback_status_valid" CHECK ("feedback"."status" in ('pending', 'requested', 'planned', 'in_progress', 'completed', 'merged', 'denied', 'canceled'));--> statement-breakpoint
-ALTER TABLE "feedback_notifications" ADD CONSTRAINT "feedback_notifications_type_valid" CHECK ("feedback_notifications"."type" in ('submitted', 'completed'));

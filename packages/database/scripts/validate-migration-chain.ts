@@ -1,63 +1,40 @@
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
-
+import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import {
   type AppliedMigration,
   compareMigrationHistories,
   loadRepositoryMigrations,
 } from "./migration-history.js";
 
-/** Repository migration directory resolved independently of the caller. */
+/** Repository migration directory, independent of the caller. */
 const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
 
 /**
- * Applies the complete repository migration chain to disposable PGlite.
+ * Replays native migrations on disposable PostgreSQL and proves repeatability.
  *
- * @rejects When discovery, SQL execution, or resulting history validation fails.
+ * @rejects When discovery, replay, repeated migration, or ledger validation fails.
  */
 async function main(): Promise<void> {
   const migrations = loadRepositoryMigrations(migrationsFolder);
   const database = new PGlite();
-
   try {
-    await database.exec(`
-      create schema drizzle;
-      create table drizzle.__drizzle_migrations (
-        id serial primary key,
-        hash text not null,
-        created_at bigint
-      );
-      begin;
-    `);
-
-    try {
-      for (const migration of migrations) {
-        for (const statement of migration.statements) {
-          await database.exec(statement);
-        }
-        await database.query(
-          "insert into drizzle.__drizzle_migrations (hash, created_at) values ($1, $2)",
-          [migration.hash, migration.createdAt],
-        );
-      }
-      await database.exec("commit;");
-    } catch (error) {
-      await database.exec("rollback;");
-      throw error;
-    }
-
+    const db = drizzle({ client: database });
+    await migrate(db, { migrationsFolder });
+    await migrate(db, { migrationsFolder });
     const result = await database.query<AppliedMigration>(`
-      select hash, created_at::float8 as "createdAt"
+      select hash, created_at::float8 as "createdAt", name as tag
       from drizzle.__drizzle_migrations
       order by id
     `);
     const comparison = compareMigrationHistories(migrations, result.rows);
-    if (comparison.state !== "exact") {
-      throw new Error(`${comparison.summary} ${comparison.guidance}`);
-    }
-
+    if (comparison.state !== "exact")
+      throw new Error(comparison.summary + " " + comparison.guidance);
     console.log(
-      `Disposable migration chain passed (${migrations.length} migrations).`,
+      "Disposable native migration chain passed (" +
+        migrations.length +
+        " migrations; repeat unchanged).",
     );
   } finally {
     await database.close();

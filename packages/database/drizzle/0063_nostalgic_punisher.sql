@@ -1,6 +1,0 @@
-ALTER TABLE "collection_slider" ADD COLUMN "installed_plate_id" bigint;--> statement-breakpoint
-ALTER TABLE "collection_slider" ADD COLUMN "installed_insert_id" bigint;--> statement-breakpoint
-ALTER TABLE "collection_slider" ADD CONSTRAINT "collection_slider_installed_plate_id_collection_slider_plate_id_fk" FOREIGN KEY ("installed_plate_id") REFERENCES "public"."collection_slider_plate"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "collection_slider" ADD CONSTRAINT "collection_slider_installed_insert_id_collection_slider_insert_id_fk" FOREIGN KEY ("installed_insert_id") REFERENCES "public"."collection_slider_insert"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "collection_slider_installed_plate_unique" ON "collection_slider" USING btree ("installed_plate_id") WHERE "collection_slider"."installed_plate_id" is not null;--> statement-breakpoint
-CREATE UNIQUE INDEX "collection_slider_installed_insert_unique" ON "collection_slider" USING btree ("installed_insert_id") WHERE "collection_slider"."installed_insert_id" is not null;
