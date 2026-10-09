@@ -1343,12 +1343,6 @@ jobs:
               branchId: $branch_id
             }')"
 
-      - name: Reconcile production Clerk users
-        working-directory: apps/api
-        env:
-          DATABASE_URL: ${{ steps.production_db.outputs.database_url }}
-        run: pnpm exec tsx src/scripts/reconcile-clerk-users.ts
-
       - name: Deploy production API
         working-directory: apps/api
         shell: bash
