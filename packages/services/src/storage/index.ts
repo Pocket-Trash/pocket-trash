@@ -1,4 +1,4 @@
-import { type Database, schema } from "@package/database";
+import { type AuditJsonObject, type Database, schema } from "@package/database";
 import { type LogContext, type Logger, loggerMessages } from "@package/logger";
 import {
   maxImageBytes,
@@ -36,6 +36,7 @@ import { hashLogIdentifier, loggedMutation } from "../logging.js";
 import { completeResource, completeVersion } from "./complete-resource.js";
 import {
   assertCanEditTarget,
+  assertMaterialScope,
   assertNoDuplicateImages,
   attachImages,
   imageTargets,
@@ -153,7 +154,7 @@ export function createStorageService(input: {
       const catalog =
         manifest.target.type === "resource"
           ? null
-          : catalogUploadPayload(manifest.payload);
+          : catalogUploadPayload(manifest.payload, manifest.target.type);
       const payload = resource ?? catalog;
       validateManifest(manifest, resource?.operation);
       return db.transaction(async (tx) => {
@@ -183,7 +184,13 @@ export function createStorageService(input: {
             resource.reason,
           );
         }
-        await assertNoDuplicateImages(tx, target, manifest.files);
+        await assertMaterialScope(tx, target, catalog?.materialSpecificId);
+        await assertNoDuplicateImages(
+          tx,
+          target,
+          manifest.files,
+          catalog?.materialSpecificId,
+        );
         let version: number | null = null;
         if (resource) {
           const pending = await tx
@@ -212,10 +219,11 @@ export function createStorageService(input: {
         attributes.sessionIdHash = hashLogIdentifier(id);
         const positions = { image: 0, file: 0 };
         const files = manifest.files.map((file) => {
+          const fileId = uuid();
           try {
             return {
               ...file,
-              id: uuid(),
+              id: fileId,
               sessionId: id,
               position: positions[file.kind]++,
               ...(file.kind === "image"
@@ -225,6 +233,9 @@ export function createStorageService(input: {
                         ? "resources"
                         : imageTargets[target.type].entity,
                     entityId: targetId,
+                    ...(target.type === "material"
+                      ? { name: `${file.sha256}-${fileId}` }
+                      : {}),
                   })
                 : storage.createFileTarget(file, {
                     resourceId: targetId,
@@ -454,7 +465,15 @@ export function createStorageService(input: {
           const materialContext = await materialTargetContext(tx, target);
           const makerContext = await makerTargetContext(tx, target);
           const before = await collectionTargetImageState(tx, target);
-          await attachImages(tx, { target, files, actor });
+          await attachImages(tx, {
+            target,
+            files,
+            actor,
+            materialSpecificId: catalogUploadPayload(
+              session.payload,
+              target.type,
+            )?.materialSpecificId,
+          });
           if (
             collectionContext ||
             productContext ||
@@ -468,7 +487,10 @@ export function createStorageService(input: {
               .where(eq(schema.user.clerkId, actor.clerkId))
               .limit(1);
             if (!actorUser) throw new Error("Image target does not exist.");
-            const reason = catalogUploadPayload(session.payload)?.reason;
+            const reason = catalogUploadPayload(
+              session.payload,
+              target.type,
+            )?.reason;
             const after = await collectionTargetImageState(tx, target);
             if (collectionContext) {
               await writeCollectionAudit(audit, tx, {
@@ -971,23 +993,33 @@ export function createStorageService(input: {
  * Validates and normalizes an optional catalog-image audit reason.
  *
  * @param value - Untrusted upload payload.
+ * @param targetType - Target kind used to reject misplaced material scope.
  * @returns Trimmed reason object, or `null` when no non-empty reason is supplied.
  * @throws {UploadSessionError} When the payload shape or reason is invalid.
  */
-function catalogUploadPayload(value: unknown): {
-  /**
-   * Administrative reason for the operation.
-   */
+function catalogUploadPayload(
+  value: unknown,
+  targetType: UploadTarget["type"],
+): {
+  /** Administrative reason for the operation. */
   reason?: string;
+  /** Optional material-specific scope preserved through session completion. */
+  materialSpecificId?: number | null;
 } | null {
   if (value === undefined || value === null) return null;
-  if (typeof value !== "object" || Array.isArray(value))
+  const parsed = z
+    .object({
+      reason: z.string().trim().max(1000).optional(),
+      materialSpecificId: z.number().int().positive().nullable().optional(),
+    })
+    .strict()
+    .safeParse(value);
+  if (
+    !parsed.success ||
+    (targetType !== "material" && parsed.data.materialSpecificId !== undefined)
+  )
     throw new UploadSessionError("invalid_request", 400);
-  const reason = (value as Record<string, unknown>).reason;
-  if (reason === undefined) return null;
-  if (typeof reason !== "string" || reason.trim().length > 1000)
-    throw new UploadSessionError("invalid_request", 400);
-  return reason.trim() ? { reason: reason.trim() } : null;
+  return parsed.data;
 }
 
 /**
@@ -1102,7 +1134,7 @@ async function makerTargetContext(
 async function collectionTargetImageState(
   db: Pick<Database, "select">,
   target: UploadTarget,
-) {
+): Promise<AuditJsonObject> {
   if (target.type === "maker") {
     const images = await db
       .select({ id: schema.makerImage.id })
@@ -1139,10 +1171,18 @@ async function collectionTargetImageState(
   }
   if (target.type === "material") {
     const images = await db
-      .select({ id: schema.materialImage.id })
+      .select({
+        id: schema.materialImage.id,
+        materialId: schema.materialImage.materialId,
+        materialSpecificId: schema.materialImage.materialSpecificId,
+      })
       .from(schema.materialImage)
       .where(eq(schema.materialImage.materialId, target.id));
-    return { currentImageId: null, imageIds: images.map(({ id }) => id) };
+    return {
+      currentImageId: null,
+      imageIds: images.map(({ id }) => id),
+      materialScopes: images,
+    };
   }
   return { currentImageId: null, imageIds: [] };
 }
@@ -1295,8 +1335,9 @@ export function validateManifest(
   const files = manifest.files.filter((file) => file.kind === "file"),
     images = manifest.files.filter((file) => file.kind === "image");
   const resource = manifest.target.type === "resource";
+  if (!resource) catalogUploadPayload(manifest.payload, manifest.target.type);
   if (
-    (!resource && (!manifest.target.id || files.length || manifest.payload)) ||
+    (!resource && (!manifest.target.id || files.length)) ||
     (resource &&
       ((operation === "create" && manifest.target.id !== undefined) ||
         (operation === "version" && (!manifest.target.id || images.length)) ||

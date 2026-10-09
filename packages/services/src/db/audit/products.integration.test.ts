@@ -66,7 +66,9 @@ describe("product audit adoption", () => {
           },
         ],
         makerId: maker.id,
-        materialIds: [material.id],
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
         name: "Original",
         productTypeSlug: "spinner",
         slug: "original",
@@ -82,7 +84,9 @@ describe("product audit adoption", () => {
           },
         ],
         makerId: maker.id,
-        materialIds: [material.id],
+        materialAssignments: [
+          { materialId: material.id, materialSpecificId: null },
+        ],
         name: "Changed",
         productId: product.id,
         productTypeSlug: "spinner" as const,

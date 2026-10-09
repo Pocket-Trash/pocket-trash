@@ -3,6 +3,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
 import { createNoopLogger } from "@package/logger";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
@@ -110,7 +111,12 @@ describe("owned slider magnet snapshots", () => {
         customFinish: null,
         displayName: "Slider",
         finishOptionId: null,
-        materialId: material.id,
+        materialAssignmentId: (
+          await db
+            .select({ id: schema.productMaterial.id })
+            .from(schema.productMaterial)
+            .where(eq(schema.productMaterial.productId, sliderProductId))
+        )[0]!.id,
         productId: sliderProductId,
         productTypeSlug: "slider",
       });
@@ -120,7 +126,12 @@ describe("owned slider magnet snapshots", () => {
         customFinish: null,
         displayName: "Insert",
         finishOptionId: null,
-        materialId: material.id,
+        materialAssignmentId: (
+          await db
+            .select({ id: schema.productMaterial.id })
+            .from(schema.productMaterial)
+            .where(eq(schema.productMaterial.productId, insertProductId))
+        )[0]!.id,
         productId: insertProductId,
         productTypeSlug: "slider-insert",
       });
@@ -131,7 +142,6 @@ describe("owned slider magnet snapshots", () => {
         displayName: "Slider",
         finishOptionId: null,
         installedInsert: { collectionItemId: insertId },
-        materialId: material.id,
       });
       const configuration = {
         sideA: Array.from({ length: 8 }, () => "N52" as const),
@@ -144,7 +154,6 @@ describe("owned slider magnet snapshots", () => {
         displayName: "Slider",
         finishOptionId: null,
         magnetConfiguration: configuration,
-        materialId: material.id,
       });
       expect(
         (await service.getOwnedItem(actor, sliderId))?.magnetConfiguration,

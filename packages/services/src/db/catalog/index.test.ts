@@ -199,6 +199,7 @@ function setup(
       ) => take().then(resolve, reject),
     };
     for (const method of [
+      "for",
       "from",
       "groupBy",
       "innerJoin",
@@ -535,11 +536,11 @@ describe("collection catalog writes", () => {
       [[{ id: 2000 }], [{ id: 3000 }], [{ id: 2001 }], [{ id: 3001 }]],
       [
         [{ id: 900 }],
-        [{ materialId: 1201 }],
+        [{ materialId: 1201, materialSpecificId: null }],
         [{ colorEffectId: null, patternId: 1203 }],
         [{ finishId: 1202, position: 0 }],
         [],
-        [{ materialId: 1101 }],
+        [{ materialId: 1101, materialSpecificId: null }],
         [{ colorEffectId: null, patternId: 1103 }],
         [{ finishId: 1102, position: 0 }],
         [],
@@ -551,13 +552,13 @@ describe("collection catalog writes", () => {
         actor: actor("user-secret"),
         buttonCustomFinish: null,
         buttonFinishOptionId: 1202,
-        buttonMaterialId: 1201,
+        buttonMaterialAssignmentId: 1201,
         buttonProductId: 1200,
         collectionId: 900,
         displayName: "My spinner",
         spinnerFinishOptionId: 1102,
         spinnerCustomFinish: null,
-        spinnerMaterialId: 1101,
+        spinnerMaterialAssignmentId: 1101,
         spinnerProductId: 1100,
       }),
     ).resolves.toEqual({ buttonItemId: 2000, spinnerItemId: 2001 });
@@ -567,7 +568,12 @@ describe("collection catalog writes", () => {
       expect.arrayContaining([
         {
           table: schema.collectionItem,
-          value: { collectionId: 900, materialId: 1201, ownerId: 1000 },
+          value: {
+            collectionId: 900,
+            materialId: 1201,
+            materialSpecificId: null,
+            ownerId: 1000,
+          },
         },
         {
           table: schema.collectionDetailSpinnerButton,
@@ -589,6 +595,7 @@ describe("collection catalog writes", () => {
             collectionId: 900,
             displayName: "My spinner",
             materialId: 1101,
+            materialSpecificId: null,
             ownerId: 1000,
           },
         },
@@ -609,7 +616,7 @@ describe("collection catalog writes", () => {
       [[{ id: 2001 }], [{ id: 3001 }]],
       [
         [{ id: 900 }],
-        [{ materialId: 1101 }],
+        [{ materialId: 1101, materialSpecificId: null }],
         [{ colorEffectId: null, patternId: 1103 }],
         [{ finishId: 1102, position: 0 }],
         [],
@@ -621,13 +628,13 @@ describe("collection catalog writes", () => {
         actor: actor("user-secret"),
         buttonCustomFinish: null,
         buttonFinishOptionId: null,
-        buttonMaterialId: null,
+        buttonMaterialAssignmentId: null,
         buttonProductId: null,
         collectionId: 900,
         displayName: "My spinner",
         spinnerFinishOptionId: 1102,
         spinnerCustomFinish: null,
-        spinnerMaterialId: 1101,
+        spinnerMaterialAssignmentId: 1101,
         spinnerProductId: 1100,
       }),
     ).resolves.toEqual({ buttonItemId: null, spinnerItemId: 2001 });
@@ -639,6 +646,7 @@ describe("collection catalog writes", () => {
           collectionId: 900,
           displayName: "My spinner",
           materialId: 1101,
+          materialSpecificId: null,
           ownerId: 1000,
         },
       },
@@ -670,7 +678,7 @@ describe("collection catalog writes", () => {
   it("stores a collection item without an appearance snapshot", async () => {
     const { service, writes } = setup(
       [[{ id: 2001 }]],
-      [[{ id: 900 }], [{ materialId: 1101 }]],
+      [[{ id: 900 }], [{ materialId: 1101, materialSpecificId: null }]],
     );
 
     await expect(
@@ -678,13 +686,13 @@ describe("collection catalog writes", () => {
         actor: actor("user-secret"),
         buttonCustomFinish: null,
         buttonFinishOptionId: null,
-        buttonMaterialId: null,
+        buttonMaterialAssignmentId: null,
         buttonProductId: null,
         collectionId: 900,
         displayName: "My spinner",
         spinnerCustomFinish: null,
         spinnerFinishOptionId: null,
-        spinnerMaterialId: 1101,
+        spinnerMaterialAssignmentId: 1101,
         spinnerProductId: 1100,
       }),
     ).resolves.toEqual({ buttonItemId: null, spinnerItemId: 2001 });
@@ -697,7 +705,11 @@ describe("collection catalog writes", () => {
   it("stores a private custom finish with ordered fade colors", async () => {
     const { service, writes } = setup(
       [[{ id: 2000 }], [{ id: 3000 }]],
-      [[{ id: 900 }], [{ materialId: 1201 }], [{ id: 10, slug: "fade" }]],
+      [
+        [{ id: 900 }],
+        [{ materialId: 1201, materialSpecificId: null }],
+        [{ id: 10, slug: "fade" }],
+      ],
     );
 
     await expect(
@@ -712,7 +724,7 @@ describe("collection catalog writes", () => {
         finishOptionId: null,
         collectionId: 900,
         displayName: "My button",
-        materialId: 1201,
+        materialAssignmentId: 1201,
         productId: 1200,
       }),
     ).resolves.toBe(2000);
@@ -762,7 +774,7 @@ describe("collection catalog writes", () => {
         customFinish: null,
         displayName: "My spinner",
         finishOptionId: 1102,
-        materialId: 1101,
+        materialAssignmentId: 1101,
       }),
     ).rejects.toThrow(/does not exist/i);
     expect(db.transaction).not.toHaveBeenCalled();
@@ -782,11 +794,9 @@ describe("collection catalog writes", () => {
           },
         ],
         [{ id: 900 }],
-        [{ materialId: 1101 }],
-        [{ id: 3100 }],
+        [{ materialId: 1101, materialSpecificId: null }],
         [{ id: 2000, productId: 1200 }],
-        [{ materialId: 1201 }],
-        [{ id: 3200 }],
+        [{ materialId: 1201, materialSpecificId: null }],
       ],
     );
 
@@ -802,17 +812,23 @@ describe("collection catalog writes", () => {
           collectionItemId: 2000,
           customFinish: null,
           finishOptionId: null,
-          materialId: 1201,
+          materialAssignmentId: 1201,
         },
-        materialId: 1101,
+        materialAssignmentId: 1101,
       }),
     ).resolves.toBeUndefined();
 
     expect(db.transaction).toHaveBeenCalledOnce();
     expect(updates).toEqual(
       expect.arrayContaining([
-        { table: schema.collectionItem, value: { materialId: 1101 } },
-        { table: schema.collectionItem, value: { materialId: 1201 } },
+        {
+          table: schema.collectionItem,
+          value: { materialId: 1101, materialSpecificId: null },
+        },
+        {
+          table: schema.collectionItem,
+          value: { materialId: 1201, materialSpecificId: null },
+        },
         {
           table: schema.collectionDetailSpinner,
           value: { installedButtonId: 2000 },
@@ -835,10 +851,10 @@ describe("collection catalog writes", () => {
           },
         ],
         [{ id: 900 }],
-        [{ materialId: 1101 }],
+        [{ materialId: 1101, materialSpecificId: null }],
         [{ id: 3100 }],
         [{ id: 2000, productId: 1200 }],
-        [{ materialId: 1201 }],
+        [{ materialId: 1201, materialSpecificId: null }],
         [{ id: 3200 }],
       ],
       new Error("Query failed", {
@@ -860,9 +876,9 @@ describe("collection catalog writes", () => {
           collectionItemId: 2000,
           customFinish: null,
           finishOptionId: null,
-          materialId: 1201,
+          materialAssignmentId: 1201,
         },
-        materialId: 1101,
+        materialAssignmentId: 1101,
       })
       .catch((cause: unknown) => cause);
 
@@ -888,7 +904,7 @@ describe("collection catalog writes", () => {
         ],
         [{ id: 901 }],
         [{ id: 2002 }],
-        [{ materialId: 1101 }],
+        [{ materialId: 1101, materialSpecificId: null }],
         [{ id: 3100 }],
       ],
     );
@@ -900,7 +916,7 @@ describe("collection catalog writes", () => {
       customFinish: null,
       displayName: "My spinner",
       finishOptionId: null,
-      materialId: 1101,
+      materialAssignmentId: 1101,
     });
 
     expect(updates).toEqual(
@@ -921,13 +937,13 @@ describe("collection catalog writes", () => {
         actor: actor("user-secret"),
         buttonCustomFinish: null,
         buttonFinishOptionId: null,
-        buttonMaterialId: null,
+        buttonMaterialAssignmentId: null,
         buttonProductId: null,
         collectionId: 900,
         displayName: "My spinner",
         spinnerFinishOptionId: 1102,
         spinnerCustomFinish: null,
-        spinnerMaterialId: 9999,
+        spinnerMaterialAssignmentId: 9999,
         spinnerProductId: 1100,
       }),
     ).rejects.toThrow(/material/i);
@@ -937,7 +953,7 @@ describe("collection catalog writes", () => {
   it("rejects a finish option from another product", async () => {
     const { service } = setup(
       [[{ id: 2001 }]],
-      [[{ id: 900 }], [{ materialId: 1101 }], []],
+      [[{ id: 900 }], [{ materialId: 1101, materialSpecificId: null }], []],
     );
 
     await expect(
@@ -945,13 +961,13 @@ describe("collection catalog writes", () => {
         actor: actor("user-secret"),
         buttonCustomFinish: null,
         buttonFinishOptionId: null,
-        buttonMaterialId: null,
+        buttonMaterialAssignmentId: null,
         buttonProductId: null,
         collectionId: 900,
         displayName: "My spinner",
         spinnerFinishOptionId: 9999,
         spinnerCustomFinish: null,
-        spinnerMaterialId: 1101,
+        spinnerMaterialAssignmentId: 1101,
         spinnerProductId: 1100,
       }),
     ).rejects.toThrow(/finish option/i);
@@ -990,7 +1006,7 @@ describe("catalog lookup writes", () => {
         ],
         makerId: 100,
         makerProductUrl: " https://maker.example/spinner/ ",
-        materialIds: [1000],
+        materialAssignments: [{ materialId: 1000, materialSpecificId: null }],
         name: "Catla",
         productTypeSlug: "spinner",
         slug: "catla",
@@ -1129,7 +1145,7 @@ describe("catalog lookup writes", () => {
       ],
       makerId: 100,
       makerProductUrl,
-      materialIds: [1000],
+      materialAssignments: [{ materialId: 1000, materialSpecificId: null }],
       name: "Catla edited",
       productId: 900,
       productTypeSlug: "spinner",
