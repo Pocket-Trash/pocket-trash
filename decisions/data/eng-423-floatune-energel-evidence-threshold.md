@@ -13,7 +13,7 @@ Sources:
 
 Place all Pentel Floatune refill models in the EnerGel compatibility group. This includes the Japanese `XZRN3`, `XZRN4`, and `XZRN5` range and the North American or UK `ZRN5`, `YR8`, and `YR10` range.
 
-Roy Anger supplied representative physical evidence for the grouping: he compared a Floatune `ZRN5-CX` with an EnerGel `ZLRN5-SA`, visually aligned them, measured multiple refill interfaces with calipers, found them to be a physical match, and installed the Floatune refill in an EnerGel pen. Treat this as the supporting dimensional-comparison and physical-fit evidence under ENG-406.
+Roy Anger supplied representative physical evidence for the grouping: he compared a Floatune `ZRN5-CX` with an EnerGel `ZLRN5-SA`, visually aligned them, measured multiple refill interfaces with calipers, found them to be a physical match, and installed the Floatune refill in an EnerGel pen. Treat the caliper comparison between those identified samples as the supporting dimensional-comparison evidence under ENG-406. The installed fit is corroborating staff context, not a separately migrated physical-fit-test record unless its exact pen model and test date are recovered.
 
 Floatune models remain distinct refill products and retain their regional maker codes. Group membership does not collapse `XZRN`, `ZRN`, and `YR` into one refill product, and it does not merge tip-size or ink-colour offerings.
 
@@ -21,9 +21,9 @@ Floatune models remain distinct refill products and retain their regional maker 
 
 - Seed all Floatune refill models in the EnerGel compatibility group.
 - Normalize planning-seed codes against their regional Pentel sources; do not create duplicate products solely because a retail prefix is present or absent.
-- Attach the staff dimensional comparison and fit observation as the supporting membership evidence.
+- Attach the staff caliper comparison as the supporting membership evidence and preserve the installed-fit observation as context.
 - Keep Pentel's regional product pages and catalogs as model-identity and offering provenance.
-- Preserve later contradictory results as exact pen assertions under ENG-406 precedence.
+- Preserve a later pen-specific contradiction as an exact pen assertion under ENG-406 precedence. A contradiction in the refill geometry or format remains group-membership evidence and triggers review of the affected model's membership.
 
 ## Consequences
 
