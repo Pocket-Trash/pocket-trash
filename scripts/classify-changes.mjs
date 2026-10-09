@@ -57,11 +57,12 @@ const changeClassificationRules = [
       "AGENTS.md",
       "CHANGELOG.md",
       "CLAUDE.md",
+      "CONTEXT.md",
       "README.md",
       ".railway/README.md",
       "scrapers/README.md",
     ],
-    prefixes: [".agents/", ".changeset/", ".claude/", "docs/"],
+    prefixes: [".agents/", ".changeset/", ".claude/", "decisions/", "docs/"],
     domains: [],
   },
   {
