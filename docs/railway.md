@@ -81,6 +81,9 @@ PR environments inherit the preview template; the Deploy workflow still stages
 each preview's database, image prefix, cron flag, and logging metadata. Keep
 real scraping disabled on shared-database previews.
 
+Automation that exports `RAILWAY_PROJECT_ID` must unset it after linking so the
+CLI passes the saved project's name into the IaC context.
+
 Railway does not read IaC during a source deployment. Apply reviewed configuration
 changes explicitly before deploying code that depends on them. Production source
 uploads still use the tag release workflow; applying a plan is not a release.

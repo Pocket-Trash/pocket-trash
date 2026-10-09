@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { createRailwayContext, project } from "railway/iac";
@@ -114,6 +115,32 @@ test("checks both templates without applying changes or exposing secrets to fork
   assert.doesNotMatch(run, /config apply|show-values|include-variables/);
   assert.match(run, /railway link --project/);
   assert.match(run, /--environment/);
+  for (const environment of job.strategy.matrix.environment) {
+    execFileSync(
+      "bash",
+      [
+        "-c",
+        `
+      pnpm() {
+        case "$3" in
+          link) test "$5" = expected-project && test "$7" = "$RAILWAY_ENVIRONMENT" ;;
+          config) test -z "\${RAILWAY_PROJECT_ID+x}" ;;
+          *) return 1 ;;
+        esac
+      }
+      ${run}
+    `,
+      ],
+      {
+        env: {
+          ...process.env,
+          RAILWAY_API_TOKEN: "test-token",
+          RAILWAY_PROJECT_ID: "expected-project",
+          RAILWAY_ENVIRONMENT: environment,
+        },
+      },
+    );
+  }
 });
 
 test("classifies IaC as scraper infrastructure and its guide as documentation", () => {
