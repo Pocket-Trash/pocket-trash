@@ -16,8 +16,9 @@ Represent regional availability with versioned offering-market status assertions
 
 ### Markets
 
-- Use controlled market identities, not free-form region text or UI locales.
-- Support `GLOBAL` plus ISO 3166-1 alpha-2 country codes. Expand a multi-country source to the countries it explicitly covers rather than inventing an ambiguous region.
+- Use controlled market identities, not free-form region text or UI locales. A market is typed as global, country, or region.
+- Use `GLOBAL` for the root and ISO 3166-1 alpha-2 codes for countries. Add a controlled region only through staff review, with a stable code, display name, source-backed definition, and explicit country membership or containment links. This permits truthful source scopes such as a maker's Europe catalog without inventing country claims.
+- Keep the market containment graph acyclic. A region may contain countries or narrower regions; overlapping regions are allowed only with the conflict rules below.
 - A language, storefront domain, shipping destination, or currency alone does not prove market availability.
 - Omit a market assertion when the source scope is unknown. Absence means unknown, not unavailable.
 
@@ -46,10 +47,20 @@ A live URL without a capture date is not sufficient seed provenance. Catalog edi
 
 ### Versioning and conflicts
 
-- Allow one approved current assertion per offering and market. Replacing it closes or supersedes that assertion; it does not overwrite or delete its evidence.
+- Allow one active approved assertion per offering and market, regardless of lifecycle conclusion. Each version records its approval time, effective date when known, and optional superseded time and successor. A partial unique constraint must allow only one assertion with no superseded time for an offering-market pair.
 - Record the status as an as-of conclusion, not an eternal property of the refill product.
 - A later authoritative source may supersede an earlier conclusion. Conflicting sources with no clear precedence block approval instead of being resolved by URL order or scrape time.
-- Maker codes and SKUs carry their own market and source links. A code can be retired without discontinuing the underlying offering, and a pack-size code never changes refill compatibility.
+- Resolve a country by its exact assertion first, then assertions for containing regions from narrowest to widest, then `GLOBAL`. A narrower scope may intentionally override a broader one. Two active, disagreeing assertions for overlapping scopes that are not ordered by containment block approval until a more specific assertion or scope correction resolves them.
+- A `GLOBAL` assertion is a fallback, not a claim that country exceptions cannot exist.
+
+### Maker codes and SKUs
+
+Represent a maker code or SKU as a versioned identifier assignment, separate from offering identity and offering-market lifecycle. An assignment records the offering, maker, identifier kind, normalized value, controlled market scope, source evidence, effective date when known, and optional superseded time and successor.
+
+- Allow only one active assignment for the same maker, identifier kind, normalized value, and exact market scope. Resolve scoped identifiers with the same country, containing-region, then `GLOBAL` precedence.
+- Preserve superseded assignments so historical catalogs remain explainable. Do not delete or move an old code when a replacement appears.
+- Retiring or superseding an identifier does not discontinue the offering. A pack-size SKU never changes refill compatibility.
+- Conflicting active assignments at incomparable overlapping scopes block approval under the same rule as lifecycle assertions.
 
 ## Migration mapping
 
