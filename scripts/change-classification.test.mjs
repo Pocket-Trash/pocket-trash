@@ -222,7 +222,13 @@ test("assigns every mutation specification to an explicit domain", () => {
 });
 
 test("returns intentional no-code paths explicitly", () => {
-  const paths = ["docs/storybook.md", ".changeset/calm-rules.md", "README.md"];
+  const paths = [
+    "docs/storybook.md",
+    "decisions/data/eng-404-pens-domain-baseline.md",
+    ".changeset/calm-rules.md",
+    "CONTEXT.md",
+    "README.md",
+  ];
 
   assert.deepEqual(
     classifyChanges(paths),
