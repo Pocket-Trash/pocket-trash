@@ -16,7 +16,7 @@ Use the committed Autmog append-only archive and its two manual audit files as m
 
 Do not approve a Saga source-to-target mapping until the raw append-only archive and image directory are recovered from the Raspberry Pi scraper runner. The expected recovery location is `/home/bvg/autmog/scrapers/sites/grimsmo-saga/data/`. Hostinger receives only derived `data.json` and add-only images, so its missing public Saga path does not prove that the raw archive is absent.
 
-The fresh-baseline database schema, normalization code, synthetic tests, current maker pages, and mutable published output describe shapes or current behavior. They do not replace preserved source captures. Current personal-development and production staging tables contain no Autmog or Saga source records.
+The fresh-baseline database schema, normalization code, synthetic tests, current maker pages, and mutable published output describe shapes or current behavior. They do not replace preserved source captures. Read-only checks found zero `tmp_autmog_pens` and `tmp_grimsmo_pen_variations` rows in both personal development and production; other staging tables were not used as absence evidence.
 
 ## Capture and mapping gates
 
