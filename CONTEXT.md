@@ -80,9 +80,17 @@ _Avoid_: Incompatible
 
 ## Names
 
+**Terminology concept**:
+A registered canonical catalog meaning, identified by a stable namespace and key and shown with a localized canonical label.
+_Avoid_: Alias, product
+
 **Terminology alias**:
-An alternate term for a canonical catalog concept, with optional maker scope.
+A searchable alternate term for one terminology concept, with global or maker scope.
 _Avoid_: Product alias
+
+**Preferred maker term**:
+The one maker-scoped terminology alias selected for contextual display instead of the canonical label.
+_Avoid_: Canonical label, product name
 
 **Product alias**:
 An alternate searchable name for one catalog product.
