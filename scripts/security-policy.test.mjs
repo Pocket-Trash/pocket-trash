@@ -5,6 +5,8 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { createRailwayContext, project } from "railway/iac";
+import railway from "../.railway/railway.ts";
 
 /** Repository pnpm workspace policy under test. */
 const workspacePolicy = await readFile("pnpm-workspace.yaml", "utf8");
@@ -24,7 +26,15 @@ const rootPackage = JSON.parse(await readFile("package.json", "utf8"));
 /** API package manifest under test. */
 const apiPackage = JSON.parse(await readFile("apps/api/package.json", "utf8"));
 /** Railway build configuration under test. */
-const railwayConfig = JSON.parse(await readFile("railway.json", "utf8"));
+const railwayConfig = (
+  await railway(
+    createRailwayContext({
+      projectName: "Pocket Trash",
+      environment: "production",
+    }),
+    project,
+  )
+).resources.find((resource) => resource.type === "service");
 
 test("gates artifacts, releases, and deployments on the audit", () => {
   assert.match(ciWorkflow, /name: Security/);

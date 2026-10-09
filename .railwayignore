@@ -8,7 +8,6 @@
 !package.json
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
-!railway.json
 !security-audit-exceptions.json
 !tsconfig.json
 !turbo.json
