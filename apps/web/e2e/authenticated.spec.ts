@@ -1,5 +1,6 @@
+import { clerk } from "@clerk/testing/playwright";
 import type { Locator, Page } from "playwright/test";
-import { expect, test } from "./auth";
+import { expect, test, waitForHydration } from "./auth";
 
 test.use({ trace: "off" });
 
@@ -99,6 +100,8 @@ async function selectThemeAndWaitForPersistence(
   themeButton: Locator,
   themeName: "Dark" | "Light" | "System",
 ): Promise<void> {
+  await waitForHydration(page);
+  await clerk.loaded({ page });
   const theme = themeName.toLowerCase();
   const responsePromise = page.waitForResponse((response) => {
     const request = response.request();
