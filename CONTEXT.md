@@ -95,3 +95,17 @@ _Avoid_: Canonical label, product name
 **Product alias**:
 An alternate searchable name for one catalog product.
 _Avoid_: Terminology alias, product name
+
+## Source evidence
+
+**Preserved source**:
+An immutable or append-only capture of maker data whose identity, capture date, and integrity can be verified independently of the current maker site.
+_Avoid_: Live source, staging row
+
+**Staging row**:
+A normalized scraper record used for processing and review. It is migration evidence only when its originating preserved source and transformation are known.
+_Avoid_: Catalog product, preserved source
+
+**Source listing identity**:
+The maker source ID and listing URL that distinguish one listing from another, even when their titles or images match.
+_Avoid_: Product identity
