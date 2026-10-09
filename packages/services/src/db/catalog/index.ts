@@ -467,8 +467,22 @@ export type PublicMaterialSummary = CatalogLookup & {
   productCount: number;
 };
 
+/** Public usage and lead image for one canonical specific. */
+export type PublicMaterialSpecificSummary = MaterialSpecific & {
+  /** Visible currently owned items using this exact pair. */
+  collectionItemCount: number;
+  /** First active image within this specific, or null. */
+  leadImage: CatalogImage | null;
+  /** Distinct visible approved products offering this exact pair. */
+  productCount: number;
+};
+
 /** Material content and related public catalog records exposed by its detail page. */
 export type PublicMaterial = PublicMaterialSummary & {
+  /** Exact-specific context, or null for an aggregated general page. */
+  specific: MaterialSpecific | null;
+  /** Non-empty specifics in name order; empty on an exact-specific page. */
+  specifics: PublicMaterialSpecificSummary[];
   /** Optional Markdown description. */
   description: string | null;
   /** Visible collection items assigned directly to this material. */
@@ -1259,10 +1273,14 @@ export type CatalogService = {
    * Loads one material and its publicly visible related catalog records.
    *
    * @param materialSlug - Stable material route slug.
+   * @param materialSpecificSlug - Optional exact child slug, resolved within the material.
    * @returns Public material detail, or `null` when the slug is unknown.
    * @rejects When material or related catalog queries fail.
    */
-  getPublicMaterial(materialSlug: string): Promise<PublicMaterial | null>;
+  getPublicMaterial(
+    materialSlug: string,
+    materialSpecificSlug?: string,
+  ): Promise<PublicMaterial | null>;
   /**
    * Lists material content for product administrators.
    *
@@ -3870,13 +3888,14 @@ export function createCatalogService(
       return await queryPublicMaterialSummaries(db);
     },
     /**
-     * Loads one material with public related products and directly assigned items.
+     * Loads general or exact-specific public products, canonical items, and images.
      *
      * @param materialSlug - Stable material route slug.
+     * @param materialSpecificSlug - Optional child slug within this material.
      * @returns Material detail, or `null` when no material matches.
      * @rejects When material or related catalog queries fail.
      */
-    async getPublicMaterial(materialSlug) {
+    async getPublicMaterial(materialSlug, materialSpecificSlug) {
       const [material] = await db
         .select({
           description: schema.material.description,
@@ -3889,23 +3908,67 @@ export function createCatalogService(
         .limit(1);
       if (!material) return null;
 
-      const [summaries, images, products, collectionItems] = await Promise.all([
-        queryPublicMaterialSummaries(db, material.id),
-        queryMaterialImages(db, material.id),
-        queryPublicMaterialProducts(db, material.id),
-        queryOwnedItems(db, undefined, undefined, {
-          materialId: material.id,
-          publicOnly: true,
-        }),
-      ]);
-      const summary = summaries[0];
+      const specific =
+        materialSpecificSlug === undefined
+          ? null
+          : (await queryMaterialSpecifics(db, material.id)).find(
+              ({ slug }) => slug === materialSpecificSlug,
+            );
+      if (specific === undefined) return null;
+      const [summaries, storedImages, products, collectionItems] =
+        await Promise.all([
+          queryPublicMaterialSummaries(db, material.id),
+          queryMaterialImages(db, material.id),
+          queryPublicMaterialProducts(db, material.id, specific?.id),
+          queryOwnedItems(db, undefined, undefined, {
+            materialId: material.id,
+            materialSpecificId: specific?.id,
+            publicOnly: true,
+          }),
+        ]);
+      const general = summaries[0];
+      if (!general) return null;
+      const summary = specific
+        ? general.specifics.find(({ id }) => id === specific.id)
+        : general;
       if (!summary) return null;
+      const names = new Map(
+        general.specifics.map(({ id, name }) => [id, name]),
+      );
+      const images = storedImages
+        .filter(
+          ({ deletedAt, materialSpecificId }) =>
+            deletedAt === null &&
+            (!specific || materialSpecificId === specific.id),
+        )
+        .sort((a, b) => {
+          if (a.materialSpecificId !== b.materialSpecificId) {
+            if (a.materialSpecificId === null) return -1;
+            if (b.materialSpecificId === null) return 1;
+            return (names.get(a.materialSpecificId) ?? "").localeCompare(
+              names.get(b.materialSpecificId) ?? "",
+            );
+          }
+          return a.position - b.position || a.id - b.id;
+        });
       return {
-        ...summary,
+        ...material,
+        collectionItemCount: collectionItems.length,
+        productCount: products.length,
+        leadImage: summary.leadImage,
         collectionItems,
-        description: material.description,
-        images: images.filter(({ deletedAt }) => deletedAt === null),
+        description: specific?.description || material.description,
+        images,
         products,
+        specific,
+        specifics: specific
+          ? []
+          : general.specifics.filter(
+              ({ productCount, collectionItemCount, leadImage }) =>
+                productCount > 0 ||
+                collectionItemCount > 0 ||
+                leadImage !== null,
+            ),
       };
     },
     /**
@@ -7562,6 +7625,23 @@ function effectiveCollectionItemIsPrivate() {
 }
 
 /**
+ * Restricts joined collection items to public, approved, currently owned records.
+ *
+ * @returns Visibility predicate requiring owner, collection, subtype, and product joins.
+ */
+function publicCollectionItemCondition() {
+  return sql<boolean>`${and(
+    eq(schema.collectionItem.owned, true),
+    isNull(schema.collectionItem.soldAt),
+    eq(schema.collectionItem.approvalStatus, "approved"),
+    eq(schema.userCollection.isPrivate, false),
+    eq(effectiveCollectionItemIsPrivate(), false),
+    eq(schema.product.approvalStatus, "approved"),
+    eq(schema.product.isPrivate, false),
+  )}`;
+}
+
+/**
  * Lists collections visible to the requested viewer.
  *
  * @param db - Application database.
@@ -7821,14 +7901,26 @@ async function updateCollectionItemSnapshot(
  *
  * @param db - Database used for product lookup.
  * @param materialId - Material whose products are returned.
+ * @param materialSpecificId - Optional exact canonical child filter.
  * @returns Visible approved products assigned to the material.
  * @rejects When product identifiers or display data cannot be queried.
  */
-async function queryPublicMaterialProducts(db: Database, materialId: number) {
+async function queryPublicMaterialProducts(
+  db: Database,
+  materialId: number,
+  materialSpecificId?: number,
+) {
   const rows = await db
-    .select({ productId: schema.productMaterial.productId })
+    .selectDistinct({ productId: schema.productMaterial.productId })
     .from(schema.productMaterial)
-    .where(eq(schema.productMaterial.materialId, materialId));
+    .where(
+      and(
+        eq(schema.productMaterial.materialId, materialId),
+        materialSpecificId === undefined
+          ? undefined
+          : eq(schema.productMaterial.materialSpecificId, materialSpecificId),
+      ),
+    );
   return await queryProducts(
     db,
     undefined,
@@ -8509,6 +8601,8 @@ async function queryOwnedItems(
      * Directly assigned material identifier.
      */
     materialId?: number;
+    /** Exact canonical specific identifier, scoped by materialId. */
+    materialSpecificId?: number;
     /**
      * Owner database user identifier.
      */
@@ -8555,6 +8649,11 @@ async function queryOwnedItems(
   if (options.materialId !== undefined) {
     conditions.push(eq(schema.collectionItem.materialId, options.materialId));
   }
+  if (options.materialSpecificId !== undefined) {
+    conditions.push(
+      eq(schema.collectionItem.materialSpecificId, options.materialSpecificId),
+    );
+  }
   if (options.makerId !== undefined) {
     conditions.push(eq(schema.maker.id, options.makerId));
   }
@@ -8564,7 +8663,7 @@ async function queryOwnedItems(
   if (options.productId !== undefined) {
     conditions.push(eq(schema.product.id, options.productId));
   }
-  const publicItem = sql`(${schema.userCollection.isPrivate} = false and ${effectiveItemIsPrivate} = false and ${schema.collectionItem.soldAt} is null and ${schema.collectionItem.approvalStatus} = 'approved' and ${schema.product.approvalStatus} = 'approved' and ${schema.product.isPrivate} = false)`;
+  const publicItem = publicCollectionItemCondition();
   if (options.publicOnly) {
     conditions.push(publicItem);
   } else if (!options.includePrivate) {
@@ -9283,10 +9382,7 @@ async function queryAdminMaterialRows(db: Database, materialId?: number) {
  * @returns Name-sorted public material summaries.
  * @rejects When material, image, product, or collection queries fail.
  */
-async function queryPublicMaterialSummaries(
-  db: Database,
-  materialId?: number,
-): Promise<PublicMaterialSummary[]> {
+async function queryPublicMaterialSummaries(db: Database, materialId?: number) {
   const materials = await db
     .select({
       id: schema.material.id,
@@ -9300,7 +9396,14 @@ async function queryPublicMaterialSummaries(
     .orderBy(asc(schema.material.name));
   if (!materials.length) return [];
   const materialIds = materials.map(({ id }) => id);
-  const [images, productCounts, collectionItemCounts] = await Promise.all([
+  const [
+    specifics,
+    images,
+    generalProductCounts,
+    productCounts,
+    collectionItemCounts,
+  ] = await Promise.all([
+    queryMaterialSpecifics(db, materialId),
     db
       .select({
         contentType: schema.materialImage.contentType,
@@ -9348,10 +9451,34 @@ async function queryPublicMaterialSummaries(
       .groupBy(schema.productMaterial.materialId),
     db
       .select({
-        count: count(schema.collectionItem.id),
+        count: countDistinct(schema.productMaterial.productId),
+        materialId: schema.productMaterial.materialId,
+        materialSpecificId: schema.productMaterial.materialSpecificId,
+      })
+      .from(schema.productMaterial)
+      .innerJoin(
+        schema.product,
+        eq(schema.productMaterial.productId, schema.product.id),
+      )
+      .where(
+        and(
+          inArray(schema.productMaterial.materialId, materialIds),
+          eq(schema.product.approvalStatus, "approved"),
+          eq(schema.product.isPrivate, false),
+        ),
+      )
+      .groupBy(
+        schema.productMaterial.materialId,
+        schema.productMaterial.materialSpecificId,
+      ),
+    db
+      .select({
+        count: countDistinct(schema.collectionItem.id),
         materialId: schema.collectionItem.materialId,
+        materialSpecificId: schema.collectionItem.materialSpecificId,
       })
       .from(schema.collectionItem)
+      .innerJoin(schema.user, eq(schema.collectionItem.ownerId, schema.user.id))
       .innerJoin(
         schema.userCollection,
         eq(schema.collectionItem.collectionId, schema.userCollection.id),
@@ -9364,49 +9491,85 @@ async function queryPublicMaterialSummaries(
         schema.collectionDetailSpinnerButton,
         eq(schema.collectionItem.id, schema.collectionDetailSpinnerButton.id),
       )
+      .leftJoin(
+        schema.collectionDetailSlider,
+        eq(schema.collectionItem.id, schema.collectionDetailSlider.id),
+      )
+      .leftJoin(
+        schema.collectionDetailSliderPlate,
+        eq(schema.collectionItem.id, schema.collectionDetailSliderPlate.id),
+      )
+      .leftJoin(
+        schema.collectionDetailSliderInsert,
+        eq(schema.collectionItem.id, schema.collectionDetailSliderInsert.id),
+      )
       .innerJoin(
         schema.product,
         eq(
           schema.product.id,
-          sql`coalesce(${schema.collectionDetailSpinner.productSpinnerId}, ${schema.collectionDetailSpinnerButton.productSpinnerButtonId})`,
+          sql`coalesce(${schema.collectionDetailSpinner.productSpinnerId}, ${schema.collectionDetailSpinnerButton.productSpinnerButtonId}, ${schema.collectionDetailSlider.productSliderId}, ${schema.collectionDetailSliderPlate.productSliderPlateId}, ${schema.collectionDetailSliderInsert.productSliderInsertId})`,
         ),
       )
       .where(
         and(
           inArray(schema.collectionItem.materialId, materialIds),
-          eq(schema.collectionItem.owned, true),
-          isNull(schema.collectionItem.soldAt),
-          eq(schema.collectionItem.approvalStatus, "approved"),
-          eq(schema.collectionItem.isPrivate, false),
-          eq(schema.userCollection.isPrivate, false),
-          eq(schema.product.approvalStatus, "approved"),
-          eq(schema.product.isPrivate, false),
+          publicCollectionItemCondition(),
         ),
       )
-      .groupBy(schema.collectionItem.materialId),
+      .groupBy(
+        schema.collectionItem.materialId,
+        schema.collectionItem.materialSpecificId,
+      ),
   ]);
-  const firstImageByMaterial = new Map<number, CatalogImage>();
-  for (const { materialId: imageMaterialId, ...image } of images) {
-    if (!firstImageByMaterial.has(imageMaterialId)) {
-      firstImageByMaterial.set(imageMaterialId, image);
-    }
-  }
   const productCountByMaterial = new Map(
-    productCounts.map((row) => [row.materialId, Number(row.count)]),
+    generalProductCounts.map(({ materialId, count }) => [
+      materialId,
+      Number(count),
+    ]),
   );
-  const itemCountByMaterial = new Map(
-    collectionItemCounts.flatMap((row) =>
-      row.materialId === null
-        ? []
-        : [[row.materialId, Number(row.count)] as const],
+  const specificSummaries = specifics.map((specific) => ({
+    ...specific,
+    collectionItemCount: Number(
+      collectionItemCounts.find(
+        ({ materialSpecificId }) => materialSpecificId === specific.id,
+      )?.count ?? 0,
     ),
-  );
-  return materials.map((material) => ({
-    ...material,
-    collectionItemCount: itemCountByMaterial.get(material.id) ?? 0,
-    leadImage: firstImageByMaterial.get(material.id) ?? null,
-    productCount: productCountByMaterial.get(material.id) ?? 0,
+    productCount: Number(
+      productCounts.find(
+        ({ materialSpecificId }) => materialSpecificId === specific.id,
+      )?.count ?? 0,
+    ),
+    leadImage:
+      images.find(
+        ({ materialSpecificId }) => materialSpecificId === specific.id,
+      ) ?? null,
   }));
+  return materials.map((material) => {
+    const children = specificSummaries.filter(
+      ({ materialId }) => materialId === material.id,
+    );
+    const fallback = [...children]
+      .sort(
+        (a, b) =>
+          b.productCount - a.productCount || a.name.localeCompare(b.name),
+      )
+      .find(({ leadImage }) => leadImage !== null);
+    return {
+      ...material,
+      collectionItemCount: collectionItemCounts
+        .filter(({ materialId }) => materialId === material.id)
+        .reduce((total, { count }) => total + Number(count), 0),
+      leadImage:
+        images.find(
+          ({ materialId, materialSpecificId }) =>
+            materialId === material.id && materialSpecificId === null,
+        ) ??
+        fallback?.leadImage ??
+        null,
+      productCount: productCountByMaterial.get(material.id) ?? 0,
+      specifics: children,
+    };
+  });
 }
 
 /**
