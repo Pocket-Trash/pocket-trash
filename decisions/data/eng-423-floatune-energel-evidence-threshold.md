@@ -11,38 +11,22 @@ Sources:
 
 ## Decision
 
-Do not place a Floatune refill in the EnerGel compatibility group yet. Pentel's current regional catalogs identify Floatune and EnerGel as separate refill families and do not state that they are interchangeable. Pentel Japan publishes the same nominal 111 mm length but different maximum cross-sections: 6.3 × 6.3 mm for Floatune `XZRN3/4/5` and 6 × 6 mm for standard EnerGel `XLRN3/4/5` and `XLR7/10`. Those envelope dimensions omit tolerances and fit-critical geometry. Visual similarity, a shared maker, or successful use in one pen is insufficient evidence for group admission.
+Place all Pentel Floatune refill models in the EnerGel compatibility group. This includes the Japanese `XZRN3`, `XZRN4`, and `XZRN5` range and the North American or UK `ZRN5`, `YR8`, and `YR10` range.
 
-Admit only an exact Floatune refill model whose physical interchangeability with the full-size EnerGel format is supported by one of these evidence paths:
+Roy Anger supplied representative physical evidence for the grouping: he compared a Floatune `ZRN5-CX` with an EnerGel `ZLRN5-SA`, visually aligned them, measured multiple refill interfaces with calipers, found them to be a physical match, and installed the Floatune refill in an EnerGel pen. Treat this as the supporting dimensional-comparison and physical-fit evidence under ENG-406.
 
-1. a Pentel statement that explicitly names the two exact refill models or formats as interchangeable; or
-2. a fit-critical dimensional comparison plus repeatable physical fit tests.
+Floatune models remain distinct refill products and retain their regional maker codes. Group membership does not collapse `XZRN`, `ZRN`, and `YR` into one refill product, and it does not merge tip-size or ink-colour offerings.
 
-A dimensional comparison must record the sources or calibrated measurements for overall length, maximum barrel diameter, tip diameter and profile, shoulder or stop position, rear-end geometry, and any other surface used for retention or actuation. Nominal overall length and barrel diameter alone are not enough. When manufacturer tolerances are unavailable, the physical tests must cover at least two independently sourced samples of each refill model. Use different maker lot codes when present. When no lot code exists, source the samples from separate sellers or orders and record that provenance and the missing lot identifier.
+## Migration mapping
 
-The physical test path must substitute both refill models in both directions across at least two pens designed for the EnerGel format with different tip or actuation designs and the current Floatune pen for that refill. Test every refill sample in every host and run the host's specified refill as a control. Record the exact pen and refill models, sample provenance, measuring equipment, and results. Each combination passes only when it:
-
-- inserts and removes without a tool, modification, or more force than the native controls;
-- seats without binding and has no more axial or radial movement than the worst native control;
-- deploys fully and retracts below the tip opening for 20 consecutive actuation cycles;
-- has deployed tip projection within the range measured for the native controls; and
-- writes continuously for five minutes and finishes without leakage, visible damage, loosening, or a new actuation failure.
-
-Any failure rejects group admission for that model until contrary evidence explains and resolves it. A result that needs trimming, a spacer, or another remedy is evidence for an exact conditional compatibility assertion, not group membership.
-
-Apply the decision per stable refill model. Evidence for ZRN5 does not automatically admit ZRN3, ZRN4, YR8, YR10, or future Floatune models. Tip size and ink-colour offerings of an admitted model inherit its group membership only when they share the same documented physical format.
-
-Keep regional identities distinct during review. Japanese `XZRN3/4/5`, North American `ZRN5` and `YR8/10`, and UK `YR8` claims retain their source market and date; a shared Floatune name does not establish a shared housing format.
-
-## Current conclusion
-
-- Keep all known Floatune models outside the EnerGel compatibility group.
-- Record Pentel's Floatune and EnerGel pages as manufacturer evidence that establishes the distinct catalog identities, not incompatibility.
-- A successful one-pen substitution may support an exact pen-to-refill compatibility assertion under the ENG-406 evidence model, but it does not establish refill-format interchangeability.
-- Revisit group admission when either qualifying manufacturer confirmation or the complete dimensional-and-fit-test package exists.
+- Seed all Floatune refill models in the EnerGel compatibility group.
+- Normalize planning-seed codes against their regional Pentel sources; do not create duplicate products solely because a retail prefix is present or absent.
+- Attach the staff dimensional comparison and fit observation as the supporting membership evidence.
+- Keep Pentel's regional product pages and catalogs as model-identity and offering provenance.
+- Preserve later contradictory results as exact pen assertions under ENG-406 precedence.
 
 ## Consequences
 
-- ENG-413 must seed each Floatune refill as an ungrouped refill product unless separately reviewed evidence supports a specific Floatune-only group. It must not infer one group across `XZRN`, `ZRN`, and `YR` families or regions.
-- The final schema does not need Floatune-specific fields. It needs exact refill-to-group membership with supporting evidence, as established by ENG-406.
-- Partial or contradictory results remain preserved evidence and may justify exact compatible, incompatible, conditional, or variable assertions without changing group membership.
+- ENG-413 must seed the Floatune range in the EnerGel group.
+- The final schema needs no Floatune-specific compatibility path. It needs exact refill-to-group membership with supporting evidence and ENG-406 exception precedence.
+- Search and display may present Floatune as its own refill family while compatibility resolves through EnerGel group membership.
