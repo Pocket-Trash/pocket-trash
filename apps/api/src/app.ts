@@ -14,11 +14,16 @@ import {
   uploadManifestSchema,
 } from "@package/services";
 import { Scalar } from "@scalar/hono-api-reference";
+import { Hono, type MiddlewareHandler } from "hono";
 import { clerkWebhookPath } from "./clerk-webhooks.js";
-import { linearWebhookPath } from "./linear-webhooks.js";
+import { linearWebhookPath, linearWebhookSchema } from "./linear-webhooks.js";
 
 /** OpenAPI schema for storage upload error codes. */
-const uploadErrorSchema = z.object({ error: z.string() });
+const uploadErrorSchema = z.object({
+  error: z.string(),
+  imageId: z.number().int().positive().optional(),
+  sha256: z.string().optional(),
+});
 
 /** Versioned prefix for public API routes. */
 export const apiPrefix = "/api/v0";
@@ -201,6 +206,17 @@ export type UploadRuntime = {
   service: StorageService;
 };
 
+/** Request bindings and variables shared by API routes and their middleware. */
+type ApiEnv = {
+  /** Cloudflare environment bindings. */
+  Bindings: ApiBindings;
+  /** Request-local state. */
+  Variables: {
+    /** Authenticated storage runtime attached by upload middleware. */
+    uploadRuntime: UploadRuntime;
+  };
+};
+
 /**
  * Wraps a schema as OpenAPI JSON response content.
  *
@@ -225,6 +241,47 @@ const ErrorResponseSchema = z
     error: z.string().openapi({ example: "Expected a JSON request body." }),
   })
   .openapi("ErrorResponse");
+
+/** Deployed worker response for an unhandled infrastructure or handler failure. */
+const internalErrorResponse = {
+  description: "An unhandled runtime, service, or logging failure occurred.",
+  content: jsonContent(ErrorResponseSchema),
+};
+
+/** Optional audit reason accepted when deleting a storage attachment. */
+const DeleteFileRequestSchema = z.object({
+  reason: z.string().trim().max(1000).optional(),
+});
+
+/** Bearer credentials required by storage routes. */
+const storageSecurity = [{ ClerkBearer: [] }];
+
+/** Session identifier shared by upload and completion operations. */
+const sessionParams = z.object({ sessionId: z.uuid() });
+
+/** Successful session reservation and its ordered file upload descriptors. */
+const UploadSessionResponseSchema = z
+  .object({
+    id: z.uuid(),
+    expiresAt: z.iso.datetime(),
+    uploads: z.array(
+      uploadManifestSchema.shape.files.element
+        .omit({ sha256: true })
+        .extend({ id: z.uuid() }),
+    ),
+  })
+  .openapi("UploadSessionResponse");
+
+/** Identity returned when an upload session completes, including retries. */
+const UploadCompletionResponseSchema = z
+  .union([
+    z.object({
+      resourceId: z.number().int().positive(),
+      version: z.number().int().positive(),
+    }),
+    z.object({ targetId: z.number().int().positive() }),
+  ])
+  .openapi("UploadCompletionResponse");
 
 /** Validates one structured client log event. */
 const ClientLogEventSchema = z
@@ -282,19 +339,8 @@ const HealthRoute = createRoute({
  * @returns The configured API application.
  */
 export function createApp(dependencies: AppDependencies = {}) {
-  const app = new OpenAPIHono<{
-    /** Cloudflare environment bindings. */
-    Bindings: ApiBindings;
-  }>();
-  const api = new OpenAPIHono<{
-    /** Cloudflare environment bindings. */
-    Bindings: ApiBindings;
-    /** Request-local Hono variables. */
-    Variables: {
-      /** Authenticated storage runtime attached by upload middleware. */
-      uploadRuntime: UploadRuntime;
-    };
-  }>();
+  const app = new OpenAPIHono<ApiEnv>();
+  const api = new OpenAPIHono<ApiEnv>();
 
   api.openapi(HealthRoute, (context) =>
     context.json({ ok: true, service: "api" }, 200),
@@ -341,6 +387,11 @@ export function createApp(dependencies: AppDependencies = {}) {
     summary: "Accept client log events",
     tags: ["Logs"],
     request: {
+      headers: z.object({
+        [loggerValues.logProxy.clientKeyHeader]: z.string().optional().openapi({
+          description: "Must match LOG_PROXY_CLIENT_KEY when configured.",
+        }),
+      }),
       body: {
         required: true,
         content: jsonContent(ClientLogRequestSchema),
@@ -361,6 +412,7 @@ export function createApp(dependencies: AppDependencies = {}) {
         description: "The configured client log key did not match.",
         content: jsonContent(ErrorResponseSchema),
       },
+      500: internalErrorResponse,
     },
   });
 
@@ -408,7 +460,18 @@ export function createApp(dependencies: AppDependencies = {}) {
     return context.json({ accepted: events.value.length });
   });
 
-  api.use("/storage/*", async (context, next) => {
+  /**
+   * Configures storage requests and serves preflight before authentication.
+   *
+   * @param context - Storage request context.
+   * @param next - Next handler for non-preflight requests.
+   * @returns Empty preflight response, or completion of the next handler.
+   * @rejects When runtime resolution, the handler, or logger flushing fails.
+   */
+  const storageMiddleware: MiddlewareHandler<ApiEnv> = async (
+    context,
+    next,
+  ) => {
     const runtime = await resolveUploadRuntime(dependencies, context.env);
     if (runtime) context.set("uploadRuntime", runtime);
     const origin = context.req.header("origin");
@@ -432,8 +495,9 @@ export function createApp(dependencies: AppDependencies = {}) {
     } finally {
       await runtime?.logger?.flush();
     }
-  });
-  api.post("/storage/upload-sessions", async (context) => {
+  };
+  api.options("/storage/*", storageMiddleware);
+  api.post("/storage/upload-sessions", storageMiddleware, async (context) => {
     const runtime = requireUploadRuntime(context.get("uploadRuntime"));
     const actor = await runtime.authenticate(context.req.raw);
     if (!actor) return context.json({ error: "unauthorized" }, 401);
@@ -452,6 +516,7 @@ export function createApp(dependencies: AppDependencies = {}) {
   });
   api.put(
     "/storage/upload-sessions/:sessionId/files/:fileId",
+    storageMiddleware,
     async (context) => {
       const runtime = requireUploadRuntime(context.get("uploadRuntime"));
       const actor = await runtime.authenticate(context.req.raw);
@@ -470,58 +535,68 @@ export function createApp(dependencies: AppDependencies = {}) {
       }
     },
   );
-  api.post("/storage/upload-sessions/:sessionId/complete", async (context) => {
-    const runtime = requireUploadRuntime(context.get("uploadRuntime"));
-    const actor = await runtime.authenticate(context.req.raw);
-    if (!actor) return context.json({ error: "unauthorized" }, 401);
-    const sessionId = context.req.param("sessionId");
-    if (!z.string().uuid().safeParse(sessionId).success)
-      return context.json({ error: "invalid_request" }, 400);
-    try {
-      return context.json(
-        await runtime.service.completeUpload(sessionId, actor),
-      );
-    } catch (error) {
-      return uploadErrorResponse(error);
-    }
-  });
-  api.delete("/storage/file/:fileType/:fileId", async (context) => {
-    const runtime = requireUploadRuntime(context.get("uploadRuntime"));
-    const actor = await runtime.authenticate(context.req.raw);
-    if (!actor) return context.json({ error: "unauthorized" }, 401);
-    const type = z.enum(fileTypes).safeParse(context.req.param("fileType"));
-    const fileId = Number(context.req.param("fileId"));
-    if (!type.success || !Number.isSafeInteger(fileId) || fileId <= 0)
-      return context.json({ error: "invalid_request" }, 400);
-    try {
-      const body = await context.req.json().catch(() => ({}));
-      const parsed = z
-        .object({ reason: z.string().trim().max(1000).optional() })
-        .safeParse(body);
-      if (!parsed.success)
+  api.post(
+    "/storage/upload-sessions/:sessionId/complete",
+    storageMiddleware,
+    async (context) => {
+      const runtime = requireUploadRuntime(context.get("uploadRuntime"));
+      const actor = await runtime.authenticate(context.req.raw);
+      if (!actor) return context.json({ error: "unauthorized" }, 401);
+      const sessionId = context.req.param("sessionId");
+      if (!z.string().uuid().safeParse(sessionId).success)
         return context.json({ error: "invalid_request" }, 400);
-      await runtime.service.deleteFile({
-        fileType: type.data,
-        fileId,
-        actor,
-        reason: parsed.data.reason,
-      });
-      return context.body(null, 204);
-    } catch (error) {
-      return uploadErrorResponse(error);
-    }
-  });
+      try {
+        return context.json(
+          await runtime.service.completeUpload(sessionId, actor),
+        );
+      } catch (error) {
+        return uploadErrorResponse(error);
+      }
+    },
+  );
+  api.delete(
+    "/storage/file/:fileType/:fileId",
+    storageMiddleware,
+    async (context) => {
+      const runtime = requireUploadRuntime(context.get("uploadRuntime"));
+      const actor = await runtime.authenticate(context.req.raw);
+      if (!actor) return context.json({ error: "unauthorized" }, 401);
+      const type = z.enum(fileTypes).safeParse(context.req.param("fileType"));
+      const fileId = Number(context.req.param("fileId"));
+      if (!type.success || !Number.isSafeInteger(fileId) || fileId <= 0)
+        return context.json({ error: "invalid_request" }, 400);
+      try {
+        const body = await context.req.json().catch(() => ({}));
+        const parsed = DeleteFileRequestSchema.safeParse(body);
+        if (!parsed.success)
+          return context.json({ error: "invalid_request" }, 400);
+        await runtime.service.deleteFile({
+          fileType: type.data,
+          fileId,
+          actor,
+          reason: parsed.data.reason,
+        });
+        return context.body(null, 204);
+      } catch (error) {
+        return uploadErrorResponse(error);
+      }
+    },
+  );
   api.openAPIRegistry.registerPath({
     method: "post",
     path: "/storage/upload-sessions",
     operationId: "createUploadSession",
     summary: "Create an upload session",
     tags: ["Storage"],
+    security: storageSecurity,
     request: {
       body: { required: true, content: jsonContent(uploadManifestSchema) },
     },
     responses: {
-      201: { description: "The upload session was created." },
+      201: {
+        description: "The upload session was created.",
+        content: jsonContent(UploadSessionResponseSchema),
+      },
       400: {
         description: "The upload declaration was invalid.",
         content: jsonContent(uploadErrorSchema),
@@ -530,10 +605,334 @@ export function createApp(dependencies: AppDependencies = {}) {
         description: "Authentication is required.",
         content: jsonContent(uploadErrorSchema),
       },
+      404: {
+        description: "The upload target was not found.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      409: {
+        description:
+          "An active upload or duplicate image conflicts with this declaration.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      500: internalErrorResponse,
+    },
+  });
+
+  api.openAPIRegistry.registerComponent("securitySchemes", "ClerkBearer", {
+    type: "http",
+    scheme: "bearer",
+    bearerFormat: "JWT",
+    description:
+      "Clerk session token. Storage also checks account activity, origin, and ownership or editor permissions.",
+  });
+  for (const header of [
+    "svix-id",
+    "svix-timestamp",
+    "svix-signature",
+    "linear-signature",
+  ]) {
+    api.openAPIRegistry.registerComponent("securitySchemes", header, {
+      type: "apiKey",
+      in: "header",
+      name: header,
+      description:
+        "Provider signature metadata verified against the unchanged raw request body.",
+    });
+  }
+  for (const provider of ["clerk", "linear"] as const) {
+    for (const local of [false, true]) {
+      api.openAPIRegistry.registerPath({
+        method: "post",
+        path: `/webhooks/${provider}${local ? "/{initials}" : ""}`,
+        operationId: `${provider}${local ? "Local" : "Primary"}Webhook`,
+        summary: `Receive ${provider === "clerk" ? "Clerk" : "Linear"} ${local ? "local forwarded" : "primary"} webhook deliveries`,
+        description:
+          provider === "linear"
+            ? "Verifies the raw body with HMAC-SHA256 and rejects timestamps more than 60 seconds from server time."
+            : "Verifies Clerk deliveries with Svix before synchronizing users or account erasure.",
+        tags: ["Webhooks"],
+        security:
+          provider === "clerk"
+            ? [{ "svix-id": [], "svix-timestamp": [], "svix-signature": [] }]
+            : [{ "linear-signature": [] }],
+        request: {
+          ...(local
+            ? {
+                params: z.object({
+                  initials: z.string().openapi({
+                    description:
+                      "Case-insensitive initials matching URL_INITIALS; other values return 404.",
+                  }),
+                }),
+              }
+            : {}),
+          ...(provider === "linear"
+            ? {
+                headers: z.object({ "linear-delivery": z.string().optional() }),
+              }
+            : {}),
+          body: {
+            required: true,
+            content: jsonContent(
+              provider === "linear"
+                ? linearWebhookSchema
+                : z
+                    .object({
+                      type: z.string(),
+                      data: z.record(z.string(), z.unknown()),
+                    })
+                    .passthrough(),
+            ),
+          },
+        },
+        responses: {
+          [provider === "clerk" ? 204 : 200]: {
+            description:
+              "The signed delivery was processed. The response body is empty.",
+          },
+          400: {
+            description:
+              provider === "clerk"
+                ? "Webhook verification failed."
+                : "The signed payload or event date was invalid.",
+          },
+          ...(provider === "linear"
+            ? {
+                401: {
+                  description:
+                    "Signature verification or replay protection failed.",
+                },
+              }
+            : {}),
+          ...(local
+            ? {
+                404: {
+                  description: "The initials did not match the local target.",
+                },
+              }
+            : {}),
+          500: {
+            description:
+              "Webhook runtime configuration, processing, or forwarding failed; processing failures return an empty body.",
+            content: jsonContent(ErrorResponseSchema),
+          },
+        },
+      });
+    }
+  }
+  api.openAPIRegistry.registerPath({
+    method: "put",
+    path: "/storage/upload-sessions/{sessionId}/files/{fileId}",
+    operationId: "uploadSessionFile",
+    summary: "Upload reserved file bytes",
+    tags: ["Storage"],
+    security: storageSecurity,
+    description:
+      "Uploads exactly the declared content type, length, and SHA-256 digest. Retrying a stored file or completed session succeeds without another write.",
+    request: {
+      params: sessionParams.extend({ fileId: z.uuid() }),
+      headers: z.object({
+        "content-length": z.string().optional().openapi({
+          description:
+            "Exact declared byte count; required before the first upload.",
+        }),
+        "content-type": z.string().optional().openapi({
+          description:
+            "Must match the manifest contentType; required before the first upload.",
+        }),
+      }),
+      body: {
+        required: false,
+        description:
+          "Exact declared bytes are required for the first upload; retries may omit the body.",
+        content: { "*/*": { schema: { type: "string", format: "binary" } } },
+      },
+    },
+    responses: {
+      204: {
+        description:
+          "The file was stored or already uploaded; the response body is empty.",
+      },
+      400: {
+        description: "Parameters, type, length, or digest were invalid.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      401: {
+        description: "Authentication is required.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      404: {
+        description: "An owned session or its reserved file was not found.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      409: {
+        description: "The session expired.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      411: {
+        description: "A valid content-length header is required.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      502: {
+        description: "Object storage rejected the upload.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      500: internalErrorResponse,
+    },
+  });
+  api.openAPIRegistry.registerPath({
+    method: "post",
+    path: "/storage/upload-sessions/{sessionId}/complete",
+    operationId: "completeUploadSession",
+    summary: "Complete an upload session",
+    tags: ["Storage"],
+    security: storageSecurity,
+    description:
+      "Attaches uploaded files atomically. Retrying a completed session returns its recorded identity.",
+    request: { params: sessionParams },
+    responses: {
+      200: {
+        description: "The upload completed or was already completed.",
+        content: jsonContent(UploadCompletionResponseSchema),
+      },
+      400: {
+        description: "The session identifier or stored payload was invalid.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      401: {
+        description: "Authentication is required.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      404: {
+        description: "An owned session was not found.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      409: {
+        description: "The session expired or uploads are incomplete.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      500: internalErrorResponse,
+    },
+  });
+  api.openAPIRegistry.registerPath({
+    method: "delete",
+    path: "/storage/file/{fileType}/{fileId}",
+    operationId: "deleteStorageFile",
+    summary: "Delete an authorized file attachment",
+    tags: ["Storage"],
+    security: storageSecurity,
+    request: {
+      params: z.object({
+        fileType: z.enum(fileTypes),
+        fileId: z.string().openapi({
+          description:
+            "Positive safe integer identifying the persisted attachment.",
+        }),
+      }),
+      body: {
+        required: false,
+        content: jsonContent(DeleteFileRequestSchema),
+      },
+    },
+    responses: {
+      204: {
+        description:
+          "The attachment was removed and object cleanup was queued; the response body is empty.",
+      },
+      400: {
+        description:
+          "Parameters or reason were invalid, or the final file/image cannot be removed.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      401: {
+        description: "Authentication is required.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      404: {
+        description: "The attachment or its target was not found.",
+        content: jsonContent(uploadErrorSchema),
+      },
+      500: internalErrorResponse,
+    },
+  });
+  api.openAPIRegistry.registerPath({
+    method: "options",
+    path: "/storage/{path}",
+    operationId: "storagePreflight",
+    summary: "Serve storage CORS preflight",
+    description:
+      "The path parameter is a greedy tail including slashes. Preflight also responds for unknown storage paths and requires no authentication. Allowed origins receive access-control-allow-origin and Vary: Origin.",
+    tags: ["Storage"],
+    "x-hono-path": `${apiPrefix}/storage/*`,
+    request: {
+      params: z.object({
+        path: z.string().openapi({
+          description: "Remaining storage path, including embedded slashes.",
+        }),
+      }),
+      headers: z.object({ origin: z.string().optional() }),
+    },
+    responses: {
+      204: {
+        description: "Empty preflight response.",
+        headers: {
+          "access-control-allow-headers": {
+            schema: { type: "string", const: "authorization, content-type" },
+          },
+          "access-control-allow-methods": {
+            schema: { type: "string", const: "DELETE, POST, PUT, OPTIONS" },
+          },
+          "access-control-allow-origin": {
+            schema: { type: "string" },
+            description: "Included only for an allowed origin.",
+          },
+          vary: {
+            schema: { type: "string", const: "Origin" },
+            description: "Included only for an allowed origin.",
+          },
+        },
+      },
+      500: internalErrorResponse,
     },
   });
 
   app.route(apiPrefix, api);
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: openApiJsonPath,
+    operationId: "getOpenApiDocument",
+    summary: "Read the OpenAPI document",
+    tags: ["Documentation"],
+    responses: {
+      200: {
+        description: "The current OpenAPI 3.1 document.",
+        content: jsonContent(
+          z
+            .object({
+              openapi: z.literal("3.1.0"),
+              info: z
+                .object({ title: z.string(), version: z.string() })
+                .passthrough(),
+              paths: z.record(z.string(), z.unknown()),
+            })
+            .passthrough(),
+        ),
+      },
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: apiDocsPath,
+    operationId: "getApiReference",
+    summary: "Read the interactive API reference",
+    tags: ["Documentation"],
+    responses: {
+      200: {
+        description: "Scalar reference HTML using the live OpenAPI document.",
+        content: { "text/html": { schema: z.string() } },
+      },
+    },
+  });
   app.get(openApiJsonPath, (context) =>
     context.json(
       app.getOpenAPI31Document(
@@ -560,6 +959,23 @@ export function createApp(dependencies: AppDependencies = {}) {
       url: openApiJsonPath,
     }),
   );
+
+  /** Default Hono fallback retained for unknown storage routes and HTTP methods. */
+  const notFoundApp = new Hono<ApiEnv>();
+  app.notFound(async (context) => {
+    const path = context.req.path;
+    if (
+      path === `${apiPrefix}/storage` ||
+      path.startsWith(`${apiPrefix}/storage/`)
+    ) {
+      await storageMiddleware(context, async () => {
+        const response = await notFoundApp.fetch(context.req.raw, context.env);
+        context.res = context.newResponse(response.body, response);
+      });
+      return context.res;
+    }
+    return notFoundApp.fetch(context.req.raw, context.env);
+  });
 
   return app;
 }

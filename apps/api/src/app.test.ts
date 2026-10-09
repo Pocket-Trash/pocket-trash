@@ -256,6 +256,55 @@ describe("api", () => {
     );
   });
 
+  it("preserves CORS and logging for unknown storage paths and methods", async () => {
+    const logger = createNoopLogger();
+    const flush = vi.spyOn(logger, "flush");
+    const app = createApp({
+      uploadRuntime: {
+        /**
+         * Skips authentication because fallback responses never call it.
+         *
+         * @returns No actor.
+         */
+        authenticate: async () => null,
+        /**
+         * Allows the preview origin used by the fallback regression.
+         *
+         * @param origin - Request origin.
+         * @returns Whether it is the expected preview.
+         */
+        isAllowedOrigin: (origin) => origin === "https://preview.vercel.app",
+        logger,
+        service: createUploadServiceMock(),
+      },
+    });
+    for (const [method, path] of [
+      ["GET", `${uploadSessionsPath}`],
+      ["POST", "/api/v0/storage/unknown/nested"],
+      ["PROPFIND", "/api/v0/storage/unknown/nested"],
+    ] as const) {
+      const response = await app.request(path, {
+        method,
+        headers: { origin: "https://preview.vercel.app" },
+      });
+      expect(response.status).toBe(404);
+      expect(response.headers.get("access-control-allow-origin")).toBe(
+        "https://preview.vercel.app",
+      );
+      expect(response.headers.get("vary")).toBe("Origin");
+    }
+    expect(flush).toHaveBeenCalledTimes(3);
+    const preflight = await app.request("/api/v0/storage/unknown/nested", {
+      method: "OPTIONS",
+      headers: { origin: "https://preview.vercel.app" },
+    });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-origin")).toBe(
+      "https://preview.vercel.app",
+    );
+    expect(flush).toHaveBeenCalledTimes(3);
+  });
+
   it("rejects unauthenticated resource upload sessions", async () => {
     const app = createApp({
       uploadRuntime: {

@@ -20,7 +20,7 @@ type TargetKind =
   | "unknown";
 
 /** Accepted Linear lifecycle webhook payload. */
-const webhookSchema = z.object({
+export const linearWebhookSchema = z.object({
   action: z.enum(["create", "remove", "update"]),
   createdAt: z.string(),
   data: z.object({
@@ -80,9 +80,9 @@ export function createLinearWebhookHandler(options: {
       return new Response(null, { status: 401 });
     }
 
-    let parsed: z.infer<typeof webhookSchema>;
+    let parsed: z.infer<typeof linearWebhookSchema>;
     try {
-      parsed = webhookSchema.parse(
+      parsed = linearWebhookSchema.parse(
         JSON.parse(new TextDecoder().decode(rawBody)),
       );
     } catch {
