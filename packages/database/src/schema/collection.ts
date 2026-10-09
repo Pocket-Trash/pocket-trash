@@ -16,7 +16,7 @@ import {
   unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { maker, material, productType } from "./scraper.js";
+import { maker, material, materialSpecific, productType } from "./scraper.js";
 import { dimensionUnitEnum, weightUnitEnum } from "./user-settings.js";
 import { user } from "./users.js";
 
@@ -110,6 +110,8 @@ export const collectionItem = pgTable(
     displayName: text("display_name"),
     /** Optional Markdown description shown instead of the product description. */
     description: text("description"),
+    /** Optional alloy or grade belonging to the general material. */
+    materialSpecificId: bigint("material_specific_id", { mode: "number" }),
     materialId: bigint("material_id", { mode: "number" }).references(
       () => material.id,
       { onDelete: "restrict" },
@@ -151,6 +153,16 @@ export const collectionItem = pgTable(
       .notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.materialId, table.materialSpecificId],
+      foreignColumns: [materialSpecific.materialId, materialSpecific.id],
+      name: "collection_item_specific_parent_fk",
+    }).onDelete("restrict"),
+    index("collection_item_specific_id_idx").on(table.materialSpecificId),
+    check(
+      "collection_item_specific_requires_material",
+      sql`${table.materialSpecificId} is null or ${table.materialId} is not null`,
+    ),
     foreignKey({
       columns: [table.collectionId, table.ownerId],
       foreignColumns: [userCollection.id, userCollection.ownerId],
@@ -198,6 +210,8 @@ export const materialImage = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
+    /** Optional alloy or grade belonging to the general material. */
+    materialSpecificId: bigint("material_specific_id", { mode: "number" }),
     materialId: bigint("material_id", { mode: "number" })
       .notNull()
       .references(() => material.id, { onDelete: "cascade" }),
@@ -218,12 +232,21 @@ export const materialImage = pgTable(
       .notNull(),
   },
   (table) => [
-    index("material_image_material_id_idx").on(table.materialId),
-    unique("material_image_object_path_unique").on(table.objectPath),
-    unique("material_image_material_hash_unique").on(
+    foreignKey({
+      columns: [table.materialId, table.materialSpecificId],
+      foreignColumns: [materialSpecific.materialId, materialSpecific.id],
+      name: "material_image_specific_parent_fk",
+    }).onDelete("restrict"),
+    index("material_image_specific_id_idx").on(table.materialSpecificId),
+    index("material_image_scope_position_idx").on(
       table.materialId,
-      table.sha256,
+      table.materialSpecificId,
+      table.position,
     ),
+    unique("material_image_object_path_unique").on(table.objectPath),
+    unique("material_image_scope_hash_unique")
+      .on(table.materialId, table.materialSpecificId, table.sha256)
+      .nullsNotDistinct(),
     check("material_image_position_valid", sql`${table.position} >= 0`),
     check("material_image_size_positive", sql`${table.size} > 0`),
     check(
@@ -514,15 +537,28 @@ export const collectionItemImage = pgTable(
 export const productMaterial = pgTable(
   "product_material",
   {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity({ startWith: 1000 }),
     productId: bigint("product_id", { mode: "number" })
       .notNull()
       .references(() => product.id, { onDelete: "cascade" }),
+    /** Optional alloy or grade belonging to the general material. */
+    materialSpecificId: bigint("material_specific_id", { mode: "number" }),
     materialId: bigint("material_id", { mode: "number" })
       .notNull()
       .references(() => material.id, { onDelete: "restrict" }),
   },
   (table) => [
-    primaryKey({ columns: [table.productId, table.materialId] }),
+    foreignKey({
+      columns: [table.materialId, table.materialSpecificId],
+      foreignColumns: [materialSpecific.materialId, materialSpecific.id],
+      name: "product_material_specific_parent_fk",
+    }).onDelete("restrict"),
+    index("product_material_specific_id_idx").on(table.materialSpecificId),
+    unique("product_material_assignment_unique")
+      .on(table.productId, table.materialId, table.materialSpecificId)
+      .nullsNotDistinct(),
     index("product_material_material_id_idx").on(table.materialId),
   ],
 );
