@@ -58,7 +58,6 @@ const requiredBuildFiles = [
   "package.json",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
-  "railway.json",
   "scripts/security-audit.mjs",
   "security-audit-exceptions.json",
   "tsconfig.json",

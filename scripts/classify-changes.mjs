@@ -58,6 +58,7 @@ const changeClassificationRules = [
       "CHANGELOG.md",
       "CLAUDE.md",
       "README.md",
+      ".railway/README.md",
       "scrapers/README.md",
     ],
     prefixes: [".agents/", ".changeset/", ".claude/", "docs/"],
@@ -252,7 +253,12 @@ const changeClassificationRules = [
   },
   {
     category: "railway",
-    paths: ["railway.json", ".railwayignore"],
+    paths: [
+      "railway.json",
+      ".railwayignore",
+      ".github/workflows/railway-config.yml",
+    ],
+    prefixes: [".railway/"],
     domains: ["scraper", "preview", "validation"],
   },
   {
@@ -263,6 +269,7 @@ const changeClassificationRules = [
       "scripts/scraper-redis.mjs",
       "scripts/check-railway-context.mjs",
       "scripts/check-railway-context.test.mjs",
+      "scripts/railway-config.test.mjs",
       "scripts/workspace-packages.mjs",
     ],
     domains: ["scraper", "validation"],
