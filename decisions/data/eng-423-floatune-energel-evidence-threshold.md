@@ -15,13 +15,15 @@ Place all Pentel Floatune refill models in the EnerGel compatibility group. This
 
 Roy Anger supplied representative physical evidence for the grouping: he compared a Floatune `ZRN5-CX` with an EnerGel `ZLRN5-SA`, visually aligned them, measured multiple refill interfaces with calipers, found them to be a physical match, and installed the Floatune refill in an EnerGel pen. Treat the caliper comparison between those identified samples as the supporting dimensional-comparison evidence under ENG-406. The installed fit is corroborating staff context, not a separately migrated physical-fit-test record unless its exact pen model and test date are recovered.
 
+Extending that representative result to every Floatune model is an explicit domain-owner decision. It is not a claim that each sibling model was independently measured or fit-tested. Link the representative dimensional-comparison evidence to each accepted membership with a scope note that records this policy inference.
+
 Floatune models remain distinct refill products and retain their regional maker codes. Group membership does not collapse `XZRN`, `ZRN`, and `YR` into one refill product, and it does not merge tip-size or ink-colour offerings.
 
 ## Migration mapping
 
 - Seed all Floatune refill models in the EnerGel compatibility group.
 - Normalize planning-seed codes against their regional Pentel sources; do not create duplicate products solely because a retail prefix is present or absent.
-- Attach the staff caliper comparison as the supporting membership evidence and preserve the installed-fit observation as context.
+- Attach the staff caliper comparison to each membership with a scope note that identifies `ZRN5-CX` as the measured representative and the all-Floatune expansion as an accepted policy inference. Preserve the installed-fit report as context rather than a physical-fit-test evidence record.
 - Keep Pentel's regional product pages and catalogs as model-identity and offering provenance.
 - Preserve a later pen-specific contradiction as an exact pen assertion under ENG-406 precedence. A contradiction in the refill geometry or format remains group-membership evidence and triggers review of the affected model's membership.
 
