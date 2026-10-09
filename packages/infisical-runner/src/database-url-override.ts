@@ -5,6 +5,28 @@ import { parseEnv } from "node:util";
 const urlInitialsPattern = /^[A-Z0-9]+$/;
 
 /**
+ * Preserves node-postgres certificate verification for database connection URLs.
+ *
+ * @param databaseUrl - PostgreSQL connection URL to normalize.
+ * @returns The URL with an exact `sslmode=require` query parameter promoted to
+ * `verify-full`, or the original value for other modes and unparseable values.
+ */
+export function normalizeDatabaseUrlSslMode(databaseUrl: string): string {
+  try {
+    const url = new URL(databaseUrl);
+    if (url.searchParams.get("sslmode") !== "require") {
+      return databaseUrl;
+    }
+    return databaseUrl.replace(
+      /([?&])sslmode=require(?=(&|#|$))/u,
+      "$1sslmode=verify-full",
+    );
+  } catch {
+    return databaseUrl;
+  }
+}
+
+/**
  * Finds the first configured personal database URL override.
  *
  * @param filePaths - Environment files to inspect in precedence order.
@@ -76,8 +98,11 @@ export function applyDatabaseUrlOverride(
 ) {
   const override = getDatabaseUrlOverride(filePaths, environment);
   if (override) {
-    environment.DATABASE_URL = override.value;
+    const databaseUrl = normalizeDatabaseUrlSslMode(override.value);
+    environment[override.name] = databaseUrl;
+    environment.DATABASE_URL = databaseUrl;
     environment.URL_INITIALS = override.initials;
+    return { ...override, value: databaseUrl };
   }
   return override;
 }
