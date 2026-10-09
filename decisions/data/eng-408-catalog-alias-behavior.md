@@ -65,7 +65,7 @@ Normalize canonical search text and aliases with the existing catalog rule: Unic
 - A product-alias match includes only products assigned that alias.
 - Multiple matching aliases produce the union of results. Do not stop at the first alias.
 - Searching filters the existing catalog order; alias type does not change ranking.
-- Match context may show the authored alias that caused the result, but the result title remains the canonical product name.
+- Match context may show the authored alias that caused the result. Catalog-product titles remain canonical product names, and collection-item titles remain owner-defined display names when present.
 
 Descriptions remain outside alias matching.
 
@@ -95,7 +95,7 @@ Foreign keys use `RESTRICT` for concepts and makers while aliases exist. Product
 
 The current `catalog_terminology_alias` implementation supports maker-scoped product-type terms only. ENG-412 must evolve it additively:
 
-1. query existing rows by `(maker_id, canonical_namespace, normalized_value)` and report any group that maps to more than one canonical key; abort migration until each collision receives an explicit, audited resolution;
+1. query existing rows by `(maker_id, canonical_namespace, normalized_value)` and report any group that maps to more than one canonical key; also compare every normalized alias with registered canonical keys and labels to find cross-concept collisions and same-concept redundancy; abort migration until each finding receives an explicit, audited resolution;
 2. add the registered concept target and seed existing supported product types;
 3. migrate the conflict-free current alias rows to their `product-type` concepts without changing labels, normalized values, maker scope, or preference;
 4. add global terminology scope, nulls-not-distinct scope uniqueness, and the separate product-alias mapping;
