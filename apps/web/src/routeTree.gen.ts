@@ -73,6 +73,7 @@ import { Route as AdminTrashCatalogImagesRouteImport } from './routes/admin.tras
 import { Route as AdminTrashResourcesRouteImport } from './routes/admin.trash.resources'
 import { Route as CollectionsEditCollectionItemIdRouteImport } from './routes/collections.edit.$collectionItemId'
 import { Route as CollectionsUserIdCollectionIdRouteImport } from './routes/collections_.$userId.$collectionId'
+import { Route as MaterialsMaterialSlugMaterialSpecificSlugRouteImport } from './routes/materials.$materialSlug_.$materialSpecificSlug'
 import { Route as ProductsProductTypeSlugProductSlugRouteImport } from './routes/products.$productTypeSlug.$productSlug'
 import { Route as ResourcesResourceIdEditRouteImport } from './routes/resources.$resourceId_.edit'
 import { Route as UserCollectionsCollectionIdRouteImport } from './routes/user.collections_.$collectionId'
@@ -412,6 +413,12 @@ const CollectionsUserIdCollectionIdRoute =
     path: '/collections/$userId/$collectionId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const MaterialsMaterialSlugMaterialSpecificSlugRoute =
+  MaterialsMaterialSlugMaterialSpecificSlugRouteImport.update({
+    id: '/materials/$materialSlug_/$materialSpecificSlug',
+    path: '/materials/$materialSlug/$materialSpecificSlug',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ProductsProductTypeSlugProductSlugRoute =
   ProductsProductTypeSlugProductSlugRouteImport.update({
     id: '/products/$productTypeSlug/$productSlug',
@@ -541,6 +548,7 @@ export interface FileRoutesByFullPath {
   '/admin/trash/resources': typeof AdminTrashResourcesRoute
   '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
   '/collections/$userId/$collectionId': typeof CollectionsUserIdCollectionIdRoute
+  '/materials/$materialSlug/$materialSpecificSlug': typeof MaterialsMaterialSlugMaterialSpecificSlugRoute
   '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
   '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
   '/user/collections/$collectionId': typeof UserCollectionsCollectionIdRoute
@@ -615,6 +623,7 @@ export interface FileRoutesByTo {
   '/admin/trash/resources': typeof AdminTrashResourcesRoute
   '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
   '/collections/$userId/$collectionId': typeof CollectionsUserIdCollectionIdRoute
+  '/materials/$materialSlug/$materialSpecificSlug': typeof MaterialsMaterialSlugMaterialSpecificSlugRoute
   '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
   '/resources/$resourceId/edit': typeof ResourcesResourceIdEditRoute
   '/user/collections/$collectionId': typeof UserCollectionsCollectionIdRoute
@@ -694,6 +703,7 @@ export interface FileRoutesById {
   '/admin/trash/resources': typeof AdminTrashResourcesRoute
   '/collections/edit/$collectionItemId': typeof CollectionsEditCollectionItemIdRoute
   '/collections_/$userId/$collectionId': typeof CollectionsUserIdCollectionIdRoute
+  '/materials/$materialSlug_/$materialSpecificSlug': typeof MaterialsMaterialSlugMaterialSpecificSlugRoute
   '/products/$productTypeSlug/$productSlug': typeof ProductsProductTypeSlugProductSlugRoute
   '/resources/$resourceId_/edit': typeof ResourcesResourceIdEditRoute
   '/user/collections_/$collectionId': typeof UserCollectionsCollectionIdRoute
@@ -774,6 +784,7 @@ export interface FileRouteTypes {
     | '/admin/trash/resources'
     | '/collections/edit/$collectionItemId'
     | '/collections/$userId/$collectionId'
+    | '/materials/$materialSlug/$materialSpecificSlug'
     | '/products/$productTypeSlug/$productSlug'
     | '/resources/$resourceId/edit'
     | '/user/collections/$collectionId'
@@ -848,6 +859,7 @@ export interface FileRouteTypes {
     | '/admin/trash/resources'
     | '/collections/edit/$collectionItemId'
     | '/collections/$userId/$collectionId'
+    | '/materials/$materialSlug/$materialSpecificSlug'
     | '/products/$productTypeSlug/$productSlug'
     | '/resources/$resourceId/edit'
     | '/user/collections/$collectionId'
@@ -926,6 +938,7 @@ export interface FileRouteTypes {
     | '/admin/trash/resources'
     | '/collections/edit/$collectionItemId'
     | '/collections_/$userId/$collectionId'
+    | '/materials/$materialSlug_/$materialSpecificSlug'
     | '/products/$productTypeSlug/$productSlug'
     | '/resources/$resourceId_/edit'
     | '/user/collections_/$collectionId'
@@ -976,6 +989,7 @@ export interface RootRouteChildren {
   ProductsIndexRoute: typeof ProductsIndexRoute
   CollectionsEditCollectionItemIdRoute: typeof CollectionsEditCollectionItemIdRoute
   CollectionsUserIdCollectionIdRoute: typeof CollectionsUserIdCollectionIdRoute
+  MaterialsMaterialSlugMaterialSpecificSlugRoute: typeof MaterialsMaterialSlugMaterialSpecificSlugRoute
   ProductsProductTypeSlugProductSlugRoute: typeof ProductsProductTypeSlugProductSlugRoute
   CollectionsUserIdCollectionIdCollectionItemIdRoute: typeof CollectionsUserIdCollectionIdCollectionItemIdRoute
   ProductsProductTypeSlugProductSlugEditRoute: typeof ProductsProductTypeSlugProductSlugEditRoute
@@ -1431,6 +1445,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CollectionsUserIdCollectionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/materials/$materialSlug_/$materialSpecificSlug': {
+      id: '/materials/$materialSlug_/$materialSpecificSlug'
+      path: '/materials/$materialSlug/$materialSpecificSlug'
+      fullPath: '/materials/$materialSlug/$materialSpecificSlug'
+      preLoaderRoute: typeof MaterialsMaterialSlugMaterialSpecificSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/products/$productTypeSlug/$productSlug': {
       id: '/products/$productTypeSlug/$productSlug'
       path: '/products/$productTypeSlug/$productSlug'
@@ -1690,6 +1711,8 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsIndexRoute: ProductsIndexRoute,
   CollectionsEditCollectionItemIdRoute: CollectionsEditCollectionItemIdRoute,
   CollectionsUserIdCollectionIdRoute: CollectionsUserIdCollectionIdRoute,
+  MaterialsMaterialSlugMaterialSpecificSlugRoute:
+    MaterialsMaterialSlugMaterialSpecificSlugRoute,
   ProductsProductTypeSlugProductSlugRoute:
     ProductsProductTypeSlugProductSlugRoute,
   CollectionsUserIdCollectionIdCollectionItemIdRoute:

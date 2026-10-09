@@ -1,4 +1,11 @@
-import type { PublicMaterialSummary } from "@package/services";
+import type { PublicMaterial, PublicMaterialSummary } from "@package/services";
+import { z } from "zod";
+
+/** Public material route data with a server-resolved canonical URL. */
+export type PublicMaterialPage = PublicMaterial & {
+  /** Canonical URL retained unchanged during hydration, including on previews. */
+  canonicalUrl: string;
+};
 
 /** Directory section used for names that do not begin with A-Z. */
 export const OTHER_MATERIALS = "Other" as const;
@@ -86,4 +93,40 @@ export function clampMaterialPage(
     Math.max(1, Math.trunc(requestedPage) || 1),
     Math.max(1, Math.ceil(itemCount / pageSize)),
   );
+}
+
+/** Independent one-based pagination values shared by general and specific routes. */
+export const materialSearchSchema = z.object({
+  collectionItemsPage: z.coerce.number().int().positive().catch(1),
+  productsPage: z.coerce.number().int().positive().catch(1),
+});
+
+/**
+ * Builds canonical material metadata without exposing non-public usage.
+ *
+ * @param material - Public route data, or undefined while not found.
+ * @returns Route head metadata; empty specifics stay accessible with noindex.
+ */
+export function materialHead(material: PublicMaterialPage | undefined) {
+  if (!material) return {};
+  const name = material.specific?.name ?? material.name;
+  return {
+    links: [{ rel: "canonical", href: material.canonicalUrl }],
+    meta: [
+      { title: name },
+      ...(material.specific
+        ? [
+            {
+              name: "robots",
+              content:
+                material.productCount ||
+                material.collectionItemCount ||
+                material.images.length
+                  ? "index,follow"
+                  : "noindex,follow",
+            },
+          ]
+        : []),
+    ],
+  };
 }

@@ -304,3 +304,23 @@ describe("catalog filters", () => {
     expect(search).not.toHaveProperty("family");
   });
 });
+
+it("keeps material facets general-only and counts repeated general assignments once", () => {
+  const genericAndSpecific = {
+    ...item([]),
+    materials: [
+      lookup(10, "Stainless Steel"),
+      lookup(10, "Stainless Steel"),
+      lookup(10, "Stainless Steel"),
+    ],
+  };
+  expect(buildCatalogFacets([genericAndSpecific], null).materials).toEqual([
+    { ...lookup(10, "Stainless Steel"), count: 1 },
+  ]);
+  expect(
+    matchesCatalogFilters(genericAndSpecific, {
+      ...emptyCatalogFilters(),
+      materialIds: [10],
+    }),
+  ).toBe(true);
+});

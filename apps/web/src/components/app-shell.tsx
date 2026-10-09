@@ -41,6 +41,14 @@ export type AppShellProps = {
           | "/user/collections";
       }
     | {
+        /** General material breadcrumb label. */
+        label: string;
+        /** Stable parent material slug. */
+        params: { /** Parent material route slug. */ materialSlug: string };
+        /** General material destination. */
+        to: "/materials/$materialSlug";
+      }
+    | {
         /** Breadcrumb label. */
         label: string;
         /** Parameters for the user collection route. */
@@ -125,6 +133,16 @@ export function AppShell({
                     <Link
                       className="truncate hover:text-foreground"
                       params={item.params}
+                      to={item.to}
+                    >
+                      {item.label}
+                    </Link>
+                  ) : item.to === "/materials/$materialSlug" ? (
+                    <Link
+                      activeOptions={{ exact: true }}
+                      className="truncate hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      params={item.params}
+                      search={{ productsPage: 1, collectionItemsPage: 1 }}
                       to={item.to}
                     >
                       {item.label}

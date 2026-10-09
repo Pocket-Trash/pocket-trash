@@ -84,6 +84,7 @@ export type {
   PublicMakerDetail,
   PublicMakerSummary,
   PublicMaterial,
+  PublicMaterialSpecificSummary,
   PublicMaterialSummary,
   SliderMagnetConfiguration,
   SliderMagnetLayout,

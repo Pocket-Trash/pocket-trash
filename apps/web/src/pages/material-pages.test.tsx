@@ -1,6 +1,12 @@
 import type { PublicMaterial } from "@package/services";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { MaterialLink } from "@/components/material-link";
+import {
+  materialHead,
+  materialSearchSchema,
+  type PublicMaterialPage,
+} from "@/lib/materials";
 import { MaterialDetailPage, MaterialsPage } from "./material-pages";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -81,6 +87,8 @@ vi.mock("@/providers/locale-provider", () => ({
 
 /** Public material fixture used by static page tests. */
 const material: PublicMaterial = {
+  specific: null,
+  specifics: [],
   collectionItemCount: 0,
   collectionItems: [],
   description: "A **lightweight** metal.",
@@ -127,5 +135,149 @@ describe("material pages", () => {
     expect(html).toContain("A <strong>lightweight</strong> metal.");
     expect(html).toContain("No products use this material yet.");
     expect(html).toContain("No collection items use this material yet.");
+  });
+});
+
+describe("material specifics", () => {
+  it("links canonical general and specific assignments using the appropriate name and route", () => {
+    const html = renderToStaticMarkup(
+      <>
+        <MaterialLink material={material} />
+        <MaterialLink
+          material={{
+            ...material,
+            specific: { id: 2000, name: "Aluminum 6061", slug: "6061" },
+          }}
+        />
+      </>,
+    );
+    expect(html).toContain('href="/materials/aluminum"');
+    expect(html).toContain('href="/materials/aluminum/6061"');
+    expect(html).toContain(">Aluminum 6061</a>");
+  });
+
+  it("renders scoped title, parent breadcrumb, and normal empty states on the shared detail page", () => {
+    const exact: PublicMaterialPage = {
+      canonicalUrl: "https://pocket-trash.app/materials/aluminum/6061",
+      ...material,
+      specific: {
+        id: 2000,
+        materialId: material.id,
+        name: "Aluminum 6061",
+        slug: "6061",
+        description: null,
+      },
+    };
+    const html = renderToStaticMarkup(
+      <MaterialDetailPage
+        collectionItemsPage={1}
+        material={exact}
+        onCollectionItemsPageChange={vi.fn()}
+        onProductsPageChange={vi.fn()}
+        productsPage={1}
+      />,
+    );
+    expect(html).toContain('data-breadcrumbs="Materials &gt; Aluminum"');
+    expect(html).toContain("<h1>Aluminum 6061</h1>");
+    expect(html).toContain("A <strong>lightweight</strong> metal.");
+    expect(html).toContain("No products use this alloy or grade yet.");
+    expect(html).toContain("No collection items use this alloy or grade yet.");
+    expect(html).toContain(
+      "No images have been added for this alloy or grade.",
+    );
+    expect(materialHead(exact).meta).toContainEqual({
+      name: "robots",
+      content: "noindex,follow",
+    });
+    expect(materialHead(exact).links?.[0]?.href).toBe(exact.canonicalUrl);
+    expect(materialHead(exact).links?.[0]?.href).toMatch(
+      /\/materials\/aluminum\/6061$/,
+    );
+    expect(materialHead({ ...exact, productCount: 1 }).meta).toContainEqual({
+      name: "robots",
+      content: "index,follow",
+    });
+    expect(
+      materialHead({ ...exact, collectionItemCount: 1 }).meta,
+    ).toContainEqual({ name: "robots", content: "index,follow" });
+    expect(
+      materialHead({
+        ...exact,
+        images: [
+          {
+            contentType: "image/webp",
+            createdAt: new Date(),
+            deletedAt: null,
+            deletedByClerkId: null,
+            deletedByRole: null,
+            fileName: "one.webp",
+            id: 1,
+            objectPath: "one.webp",
+            position: 0,
+            size: 1,
+            url: "https://cdn.test/one.webp",
+          },
+        ],
+      }).meta,
+    ).toContainEqual({ name: "robots", content: "index,follow" });
+  });
+
+  it("renders non-empty child links and one gallery without scope headings", () => {
+    const html = renderToStaticMarkup(
+      <MaterialDetailPage
+        collectionItemsPage={1}
+        material={{
+          ...material,
+          specifics: [
+            {
+              id: 2000,
+              materialId: material.id,
+              name: "Aluminum 6061",
+              slug: "6061",
+              description: null,
+              productCount: 1,
+              collectionItemCount: 0,
+              leadImage: null,
+            },
+          ],
+          images: ["general", "alpha", "beta"].map((fileName, id) => ({
+            contentType: "image/webp",
+            createdAt: new Date(),
+            deletedAt: null,
+            deletedByClerkId: null,
+            deletedByRole: null,
+            fileName,
+            id,
+            objectPath: fileName,
+            position: 0,
+            size: 1,
+            url: `https://cdn.test/${fileName}`,
+          })),
+        }}
+        onCollectionItemsPageChange={vi.fn()}
+        onProductsPageChange={vi.fn()}
+        productsPage={1}
+      />,
+    );
+    expect(html).toContain('href="/materials/aluminum/6061"');
+    expect(html.match(/<section aria-label="Images"/g)).toHaveLength(1);
+    expect(html.indexOf("general")).toBeLessThan(html.indexOf("alpha"));
+    expect(html.indexOf("alpha")).toBeLessThan(html.indexOf("beta"));
+    expect(html).not.toContain('<h2 class="m-0 text-lg font-semibold">');
+  });
+
+  it("normalizes both pagination parameters independently", () => {
+    expect(
+      materialSearchSchema.parse({
+        productsPage: "2",
+        collectionItemsPage: "3",
+      }),
+    ).toEqual({ productsPage: 2, collectionItemsPage: 3 });
+    expect(
+      materialSearchSchema.parse({
+        productsPage: "bad",
+        collectionItemsPage: "3",
+      }),
+    ).toEqual({ productsPage: 1, collectionItemsPage: 3 });
   });
 });

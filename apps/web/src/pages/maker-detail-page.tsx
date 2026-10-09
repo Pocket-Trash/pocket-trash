@@ -8,6 +8,7 @@ import { ExternalLink } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ImageGallery } from "@/components/image-gallery";
 import { MarkdownContent } from "@/components/markdown-content";
+import { MaterialLink } from "@/components/material-link";
 import { ProductCard } from "@/components/product-card";
 import { buttonVariants } from "@/components/ui/button";
 import { useCatalogCopy } from "@/lib/catalog-copy";
@@ -311,7 +312,7 @@ function CollectionItemCard({ item }: CollectionItemCardProps) {
         </p>
         {item.material ? (
           <p className="mt-3 text-xs text-muted-foreground">
-            {item.material.name}
+            <MaterialLink material={item.material} />
           </p>
         ) : null}
       </div>
