@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import * as React from "react";
-import { expect, fireEvent, fn, mocked, waitFor } from "storybook/test";
+import { expect, fireEvent, fn, mocked, waitFor, within } from "storybook/test";
 import { StoryProviders } from "../../.storybook/story-fixtures";
 import { MarkdownEditor } from "./markdown-editor";
 import type { MarkdownVisualEditorProps } from "./markdown-visual-editor";
@@ -299,16 +299,32 @@ export const VisualTable: Story = {
    * @returns A promise that resolves after assertions complete.
    */
   play: async ({ canvas, userEvent }) => {
-    await canvas.findByRole("textbox", { name: "Description" });
+    const editor = await canvas.findByRole("textbox", { name: "Description" });
     await userEvent.click(canvas.getByRole("button", { name: "Table" }));
     const table = canvas.getByRole("table");
-    await expect(table.querySelectorAll("tr")).toHaveLength(2);
-    await expect(table.querySelectorAll("th")).toHaveLength(3);
-    await expect(table.querySelectorAll("td")).toHaveLength(3);
-    const lastCell = table.querySelectorAll("td").item(2);
-    await userEvent.click(lastCell);
+    const tableCanvas = within(table);
+    await expect(tableCanvas.getAllByRole("row")).toHaveLength(2);
+    await expect(tableCanvas.getAllByRole("columnheader")).toHaveLength(3);
+    await expect(tableCanvas.getAllByRole("cell")).toHaveLength(3);
+    await expect(editor).toHaveFocus();
+    // Keyboard navigation avoids racing ProseMirror's delayed focus restoration.
+    await userEvent.keyboard("{Tab}{Tab}{Tab}{Tab}{Tab}");
+    const selection = editor.ownerDocument.getSelection();
+    await expect(
+      tableCanvas
+        .getAllByRole("cell")[2]
+        ?.contains(selection?.anchorNode ?? null),
+    ).toBe(true);
     await userEvent.keyboard("{Tab}");
-    await expect(table.querySelectorAll("tr")).toHaveLength(3);
+    await expect(tableCanvas.getAllByRole("row")).toHaveLength(3);
+    await expect(tableCanvas.getAllByRole("cell")).toHaveLength(6);
+    const firstNewCell = tableCanvas.getAllByRole("cell")[3];
+    await expect(editor).toHaveFocus();
+    await expect(firstNewCell?.contains(selection?.anchorNode ?? null)).toBe(
+      true,
+    );
+    await userEvent.keyboard("New row");
+    await expect(firstNewCell).toHaveTextContent("New row");
   },
 };
 
