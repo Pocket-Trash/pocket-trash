@@ -10,7 +10,7 @@ Sources:
 
 ## Decision
 
-Keep refill-offering identity independent of market, source, and lifecycle. One confirmed refill model, tip size, and ink-colour combination is one offering. Maker codes and commercial SKUs are sourced identifiers for that offering; different regional codes or pack sizes do not create duplicate refill products or offerings unless they identify a genuinely different model, tip, or colour combination.
+Keep refill-offering identity independent of market, source, and lifecycle. One confirmed refill model, tip style, tip size, and ink-colour combination is one offering. Tip style records geometry such as needle or conical; tip size records the maker's writing grade or ball diameter. Maker codes and commercial SKUs are sourced identifiers for that offering; different regional codes or pack sizes do not create duplicate refill products or offerings unless they identify a genuinely different model, tip style, tip size, or colour combination.
 
 Represent regional availability with versioned offering-market status assertions. Each assertion belongs to one offering and one controlled market, records one lifecycle conclusion, and links to the source evidence that supports it. An offering can therefore be current in one market, historical in another, and absent with unknown status elsewhere.
 
@@ -55,16 +55,17 @@ A live URL without a capture date is not sufficient seed provenance. Catalog edi
 
 ### Maker codes and SKUs
 
-Represent a maker code or SKU as a versioned identifier assignment, separate from offering identity and offering-market lifecycle. An assignment records the offering, maker, identifier kind, normalized value, controlled market scope, source evidence, effective date when known, and optional superseded time and successor.
+Represent a maker code or SKU as a versioned identifier assignment, separate from offering identity and offering-market lifecycle. An assignment records the offering, maker, identifier kind, exact source value, comparison value, controlled market scope, source evidence, effective date when known, and optional superseded time and successor.
 
-- Allow only one active assignment for the same maker, identifier kind, normalized value, and exact market scope. Resolve scoped identifiers with the same country, containing-region, then `GLOBAL` precedence.
+- Preserve the exact source value byte-for-byte except for transport decoding. By default, derive the comparison value by trimming surrounding whitespace only; preserve case, punctuation, and internal whitespace. A maker-specific reviewed rule may define additional comparison normalization, but search normalization never changes identifier identity.
+- Allow only one active assignment for the same maker, identifier kind, comparison value, and exact market scope. Resolve scoped identifiers with the same country, containing-region, then `GLOBAL` precedence.
 - Preserve superseded assignments so historical catalogs remain explainable. Do not delete or move an old code when a replacement appears.
 - Retiring or superseding an identifier does not discontinue the offering. A pack-size SKU never changes refill compatibility.
 - Conflicting active assignments at incomparable overlapping scopes block approval under the same rule as lifecycle assertions.
 
 ## Migration mapping
 
-- Deduplicate rows first by stable refill model, tip size, and ink colour. Attach verified maker codes and SKUs as sourced identifiers.
+- Deduplicate rows first by stable refill model, tip style, tip size, and ink colour. Attach verified maker codes and SKUs as sourced identifiers.
 - Create a market status only when the source explicitly establishes both the market and one lifecycle conclusion.
 - Import a currently published regional product page as `current` with its capture date.
 - Import a dated catalog entry as `current` only when that edition represents the current reviewed catalog; otherwise import it as `historical`.

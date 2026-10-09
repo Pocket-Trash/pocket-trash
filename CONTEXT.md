@@ -55,7 +55,7 @@ A maker's stable refill model, independent of tip size and ink colour offerings.
 _Avoid_: Offering, installed refill
 
 **Refill offering**:
-One confirmed combination of refill model, tip, and ink colour. Maker codes and commercial SKUs are sourced identifiers for the offering.
+One confirmed combination of refill model, tip style, tip size, and ink colour. Maker codes and commercial SKUs are sourced identifiers for the offering.
 _Avoid_: Refill product, variant
 
 **Offering market status**:
