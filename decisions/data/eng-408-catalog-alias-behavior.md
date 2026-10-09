@@ -26,6 +26,15 @@ Initial Pens namespaces are:
 
 The registry may contain existing catalog concepts outside Pens. Adding a namespace or concept is a schema/seed change, not free-form alias authoring. Canonical keys are immutable identifiers; editing a label or alias never changes classification.
 
+Each namespace has one carrier and result projection:
+
+| Namespace | Concept carrier | Search results |
+| --- | --- | --- |
+| `product-type` | A product's product-type relationship | Products of that type and collection items linked to them |
+| `pen-part-role` | An explicit role assignment on a pen-part product | Assigned part products, including a Pen clip with the Actuator role, and linked collection items |
+| `pen-nose-profile` | An explicit profile assignment on a Pen or Pen tip product | The assigned Pen or Pen tip products and linked collection items; do not expand between pens and compatible tips |
+| `refill-compatibility-group` | Verified refill-to-group membership | Member refill products only; compatible pens remain discoverable through compatibility UI, not terminology search |
+
 ### Terminology alias scope and precedence
 
 A terminology alias points to one concept and is either global or scoped to one maker.
@@ -45,6 +54,8 @@ A product alias maps one normalized label to one product. The same label may be 
 
 Product aliases participate in search but do not replace full product names, create redirects, change slugs, or merge listings. Public product pages do not show them by default; admin product editing may list them as search metadata.
 
+Collection items inherit terminology concepts, terminology aliases, product aliases, and preferred maker display terms through their linked catalog product. Alias matches never replace an owner-defined collection-item display name; they only make the item discoverable and may provide match context.
+
 ### Search behavior
 
 Normalize canonical search text and aliases with the existing catalog rule: Unicode NFKD, remove combining marks, lowercase with the `en-US` locale, trim, and collapse whitespace. Preserve the authored label separately for display and audit.
@@ -58,6 +69,8 @@ Normalize canonical search text and aliases with the existing catalog rule: Unic
 
 Descriptions remain outside alias matching.
 
+Alias matching remains in the existing client-side catalog and collection search over the loaded alias set. Database B-tree indexes support constraints, concept loading, and exact scope lookups; they are not claimed to accelerate substring matching. A later server-side search change must measure the query and add an appropriate `pg_trgm` GIN index separately if needed.
+
 ### Uniqueness and validation
 
 - A concept is unique by `(namespace, key)`.
@@ -68,11 +81,11 @@ Descriptions remain outside alias matching.
 - A product-alias assignment is unique by `(product, normalized label)`. The normalized label may map to other products.
 - Labels are trimmed, non-empty, at most 80 characters, and retain the current audit trail and `products.manage` authorization boundary.
 
-Foreign keys use `RESTRICT` for concepts and makers while aliases exist. Product-alias assignments use `CASCADE` when their product is deleted. Index terminology aliases by concept and by normalized label plus scope; index product aliases by product and normalized label.
+Foreign keys use `RESTRICT` for concepts and makers while aliases exist. Product-alias assignments use `CASCADE` when their product is deleted. Index terminology aliases by concept and by normalized label plus scope for loading and exact lookups; index product aliases by product and normalized label.
 
 ### Approved examples
 
-- `Actuator` remains the canonical product-type label. `bolt pin`, `lock pin`, and `thumb stud` are searchable aliases; a maker term is scoped and preferred only when that maker uses it.
+- `Actuator` is a canonical label in both `product-type/pen-actuator` and `pen-part-role/actuator`. `bolt pin`, `lock pin`, and `thumb stud` may alias both concepts where intended. A clip assigned the Actuator role remains a Pen clip but matches role aliases; standalone actuator products match the product-type aliases.
 - `bullet nose` is a global alias of the `Round` nose profile.
 - `triple bezel` is a maker-scoped alias of `Step` only where preserved source evidence confirms that maker's usage; it is not a global synonym.
 - `smooth` means no pattern and is not a pattern concept or alias.
@@ -82,10 +95,11 @@ Foreign keys use `RESTRICT` for concepts and makers while aliases exist. Product
 
 The current `catalog_terminology_alias` implementation supports maker-scoped product-type terms only. ENG-412 must evolve it additively:
 
-1. add the registered concept target and seed existing supported product types;
-2. migrate current alias rows to their `product-type` concepts without changing labels, normalized values, maker scope, or preference;
-3. add global terminology scope and the separate product-alias mapping;
-4. switch authoring, search, and display to the registered concept relationship and union matching; and
-5. remove the old product-type-only foreign key or compatibility shape only after row counts and behavior are verified.
+1. query existing rows by `(maker_id, canonical_namespace, normalized_value)` and report any group that maps to more than one canonical key; abort migration until each collision receives an explicit, audited resolution;
+2. add the registered concept target and seed existing supported product types;
+3. migrate the conflict-free current alias rows to their `product-type` concepts without changing labels, normalized values, maker scope, or preference;
+4. add global terminology scope, nulls-not-distinct scope uniqueness, and the separate product-alias mapping;
+5. switch catalog and collection authoring, search, and display to the registered concept relationship and union matching; and
+6. remove the old product-type-only foreign key or compatibility shape only after row counts and behavior are verified.
 
 No existing aliases are inferred from product names. Pens aliases and assignments arrive through reviewed seed/import data or audited admin authoring.
