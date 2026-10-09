@@ -59,8 +59,8 @@ The following matrices are the approved offering facts. Each listed colour appli
 | Pentel | `LRN3` 0.3 needle | Black, red, blue, blue-black, brown |
 | Pentel | `LRN4` 0.4 needle | Black, red, blue, blue-black, brown |
 | Pentel | `LRN5` 0.5 needle | Black, red, blue, green, orange, pink, sky blue, violet |
-| Pentel | `LR7` 0.7 metal/conical | Black, red, blue |
-| Pentel | `LR10` 1.0 metal/conical | Black, red, blue, violet |
+| Pentel | `LR7` 0.7 metal tip; geometry unknown | Black, red, blue |
+| Pentel | `LR10` 1.0 metal tip; geometry unknown | Black, red, blue, violet |
 | Pentel | `LRN5H` 0.5 needle | Black, red, blue |
 | Pentel | `ZRN3` 0.3, `ZRN4` 0.4, `ZRN5` 0.5 | Black, red, blue for each; geometry remains unknown |
 | Pentel | `YR8` 0.8 rollerball, `YR10` 1.0 rollerball | Black, red, blue for each |
@@ -91,22 +91,22 @@ The following matrices are the approved offering facts. Each listed colour appli
 | Schneider | `Express 735` Medium | Black, red, blue, green |
 | Schneider | `Express 735` Broad | Black, blue |
 | Schneider | `Eco 725` Fine or Medium | Black, blue for each grade |
-| Uni-ball | `SXR-38`, `SXR-5`, `SXR-7`, `SXR-10` at their numeric sizes | Black, red, blue for each model |
-| Uni-ball | `SXR-600-38`, `SXR-600-05`, `SXR-600-07` at their numeric sizes | Black for each model |
-| Uni-ball | `SXR-80-38`, `SXR-80-05`, `SXR-80-07` | Black, red, blue, green for each model |
-| Uni-ball | `SXR-80-10` | Black, red, blue |
-| Uni-ball | `SXR-200-05`, `SXR-200-07` | Black, red, blue for each model |
-| Uni-ball | `UMR-82` | Black, red, blue |
-| Uni-ball | `UMR-83` | Black, red, blue, blue-black |
-| Uni-ball | `UMR-83E` | Black, red, blue |
-| Uni-ball | `UMR-85N` | Black, red, blue, blue-black |
-| Uni-ball | `UMR-85E` | Black, red, blue; red and blue are historical/discontinued in Japan, not current |
-| Uni-ball | `UMR-87E` | Black, red, blue |
-| Uni-ball | `UMR-38S`, `UMR-05S` | Black, red, blue, orange, blue-black for each model |
-| Uni-ball | `SNP-5` | Black, red; do not seed blue as current in Japan |
-| Uni-ball | `SNP-7`, `SNP-10` | Black, red, blue for each model |
-| Uni-ball | `UBR-Z-38`, `UBR-Z-05`, `UBR-Z-07` | Black, red, blue for each model |
-| Uni-ball | `UBR-ZML-38`, `UBR-ZML-05` | Black, red, blue for each model |
+| Uni-ball | `SXR-38` 0.38, `SXR-5` 0.5, `SXR-7` 0.7, `SXR-10` 1.0 | Black, red, blue for each model |
+| Uni-ball | `SXR-600-38` 0.38, `SXR-600-05` 0.5, `SXR-600-07` 0.7 | Black for each model |
+| Uni-ball | `SXR-80-38` 0.38, `SXR-80-05` 0.5, `SXR-80-07` 0.7 | Black, red, blue, green for each model |
+| Uni-ball | `SXR-80-10` 1.0 | Black, red, blue |
+| Uni-ball | `SXR-200-05` 0.5, `SXR-200-07` 0.7 | Black, red, blue for each model |
+| Uni-ball | `UMR-82` 0.28 | Black, red, blue |
+| Uni-ball | `UMR-83` 0.38 | Black, red, blue, blue-black |
+| Uni-ball | `UMR-83E` 0.38 | Black, red, blue |
+| Uni-ball | `UMR-85N` 0.5 | Black, red, blue, blue-black |
+| Uni-ball | `UMR-85E` 0.5 | Black is current in Japan; red and blue are discontinued in Japan |
+| Uni-ball | `UMR-87E` 0.7 | Black, red, blue |
+| Uni-ball | `UMR-38S` 0.38, `UMR-05S` 0.5 | Black, red, blue, orange, blue-black for each model |
+| Uni-ball | `SNP-5` 0.5 | Black, red; do not seed blue as current in Japan |
+| Uni-ball | `SNP-7` 0.7, `SNP-10` 1.0 | Black, red, blue for each model |
+| Uni-ball | `UBR-Z-38` 0.38, `UBR-Z-05` 0.5, `UBR-Z-07` 0.7 | Black, red, blue for each model |
+| Uni-ball | `UBR-ZML-38` 0.38, `UBR-ZML-05` 0.5 | Black, red, blue for each model |
 | OHTO | `PG-105NP` 0.5 needle gel | Black, blue |
 
 Products without a row in this table remain product-only in the initial import. Add no offering until an approved source establishes its exact combination.
