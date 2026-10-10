@@ -409,9 +409,110 @@
             ],
             "fields": [
                   "id PK bigint",
+                  "kind text",
+                  "code text",
+                  "display_name text",
+                  "display_name_key text",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "catalog_market",
+            "name": "catalog_market",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "parent_market_id PK/FK bigint",
+                  "child_market_id PK/FK bigint"
+            ],
+            "id": "catalog_market_containment",
+            "name": "catalog_market_containment",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "listing_id? FK bigint",
+                  "publisher text",
+                  "source_kind text",
+                  "original_url text",
+                  "capture_date date",
+                  "publication_date? date",
+                  "catalog_edition? text",
+                  "preserved_source_identity? text",
+                  "preserved_source_checksum? text",
+                  "claim text",
+                  "market_id? FK bigint",
+                  "created_at timestamp with time zone"
+            ],
+            "id": "catalog_source_evidence",
+            "name": "catalog_source_evidence",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "listing_id FK bigint",
+                  "product_image_id FK bigint",
+                  "source_image_id text",
+                  "source_url text",
+                  "source_hash text",
+                  "position integer",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "catalog_source_image",
+            "name": "catalog_source_image",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
                   "maker_id FK bigint",
-                  "canonical_namespace text",
-                  "canonical_key FK text",
+                  "source_system text",
+                  "source_record_id text",
+                  "listing_url text",
+                  "source_handle? text",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "catalog_source_listing",
+            "name": "catalog_source_listing",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "listing_id PK/FK bigint",
+                  "choice_id PK/FK bigint"
+            ],
+            "id": "catalog_source_listing_choice",
+            "name": "catalog_source_listing_choice",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "maker_id? FK bigint",
+                  "concept_id FK bigint",
+                  "canonical_namespace FK text",
                   "label text",
                   "normalized_value text",
                   "is_preferred boolean",
@@ -420,6 +521,110 @@
             ],
             "id": "catalog_terminology_alias",
             "name": "catalog_terminology_alias",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "namespace text",
+                  "key text",
+                  "canonical_label_key text",
+                  "canonical_label_fallback text",
+                  "normalized_canonical_label text",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "catalog_terminology_concept",
+            "name": "catalog_terminology_concept",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "product_pen_id FK bigint",
+                  "installed_refill_product_id? FK bigint",
+                  "installed_refill_offering_id? FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "collection_detail_pen",
+            "name": "collection_detail_pen",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "product_pen_actuator_id FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "collection_detail_pen_actuator",
+            "name": "collection_detail_pen_actuator",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "product_pen_clip_id FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "collection_detail_pen_clip",
+            "name": "collection_detail_pen_clip",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "product_pen_mechanism_id FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "collection_detail_pen_mechanism",
+            "name": "collection_detail_pen_mechanism",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "product_pen_tip_id FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "collection_detail_pen_tip",
+            "name": "collection_detail_pen_tip",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "product_pen_top_cap_id FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "collection_detail_pen_top_cap",
+            "name": "collection_detail_pen_top_cap",
             "status": "existing"
       },
       {
@@ -518,6 +723,7 @@
                   "id PK bigint",
                   "owner_id FK bigint",
                   "collection_id FK bigint",
+                  "serial_number? text",
                   "display_name? text",
                   "description? text",
                   "material_specific_id? FK bigint",
@@ -541,6 +747,22 @@
             ],
             "id": "collection_item",
             "name": "collection_item",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "collection_item_id PK/FK bigint",
+                  "slot_id PK/FK bigint",
+                  "choice_id FK bigint",
+                  "installed_part_collection_item_id? FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "collection_item_configuration_selection",
+            "name": "collection_item_configuration_selection",
             "status": "existing"
       },
       {
@@ -597,6 +819,22 @@
             ],
             "id": "color_effect",
             "name": "color_effect",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "slug text",
+                  "label_key text",
+                  "label_fallback text",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "configuration_slot_kind",
+            "name": "configuration_slot_kind",
             "status": "existing"
       },
       {
@@ -914,6 +1152,32 @@
                   "full"
             ],
             "fields": [
+                  "product_id PK/FK bigint",
+                  "concept_id FK bigint",
+                  "namespace FK text"
+            ],
+            "id": "pen_nose_profile_assignment",
+            "name": "pen_nose_profile_assignment",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "part_product_id PK/FK bigint",
+                  "concept_id PK/FK bigint",
+                  "namespace FK text"
+            ],
+            "id": "pen_part_role_assignment",
+            "name": "pen_part_role_assignment",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
                   "id PK bigint",
                   "product_type_id FK bigint",
                   "maker_id FK bigint",
@@ -935,6 +1199,196 @@
             ],
             "id": "product",
             "name": "product",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "product_id FK bigint",
+                  "label text",
+                  "normalized_value text",
+                  "authored_by_clerk_id? text",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_alias",
+            "name": "product_alias",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "product_id FK bigint",
+                  "slot_id FK bigint",
+                  "position integer",
+                  "product_material_id? FK bigint",
+                  "finish_option_id? FK bigint",
+                  "part_product_id? FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_configuration_choice",
+            "name": "product_configuration_choice",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "rule_id PK/FK bigint",
+                  "product_id FK bigint",
+                  "required_choice_id PK/FK bigint"
+            ],
+            "id": "product_configuration_choice_requirement",
+            "name": "product_configuration_choice_requirement",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "product_id FK bigint",
+                  "target_choice_id FK bigint",
+                  "position integer",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_configuration_choice_rule",
+            "name": "product_configuration_choice_rule",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "product_id FK bigint",
+                  "slot_kind_id FK bigint",
+                  "position integer",
+                  "required boolean",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_configuration_slot",
+            "name": "product_configuration_slot",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_pen",
+            "name": "product_detail_pen",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_pen_actuator",
+            "name": "product_detail_pen_actuator",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_pen_clip",
+            "name": "product_detail_pen_clip",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "mechanism_id FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_pen_mechanism",
+            "name": "product_detail_pen_mechanism",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_pen_part",
+            "name": "product_detail_pen_part",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_pen_tip",
+            "name": "product_detail_pen_tip",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_pen_top_cap",
+            "name": "product_detail_pen_top_cap",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK/FK bigint",
+                  "maker_id FK bigint",
+                  "model text",
+                  "normalized_model text",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "product_detail_refill",
+            "name": "product_detail_refill",
             "status": "existing"
       },
       {
@@ -1083,9 +1537,22 @@
                   "full"
             ],
             "fields": [
+                  "product_id FK bigint",
+                  "listing_id PK/FK bigint"
+            ],
+            "id": "product_source_listing",
+            "name": "product_source_listing",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
                   "id PK bigint",
                   "name text",
                   "slug text",
+                  "is_part_or_accessory boolean",
                   "image_url? text",
                   "image_alt? text",
                   "created_at timestamp with time zone",
@@ -1093,6 +1560,245 @@
             ],
             "id": "product_types",
             "name": "product_types",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "pen_product_id FK bigint",
+                  "required_tip_product_id? FK bigint",
+                  "target_group_id? FK bigint",
+                  "target_refill_product_id? FK bigint",
+                  "outcome text",
+                  "explanation? text",
+                  "remedy? text",
+                  "warning? text",
+                  "approved_at? timestamp with time zone",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "refill_compatibility_assertion",
+            "name": "refill_compatibility_assertion",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "assertion_id PK/FK bigint",
+                  "evidence_id PK/FK bigint",
+                  "stance text"
+            ],
+            "id": "refill_compatibility_assertion_evidence",
+            "name": "refill_compatibility_assertion_evidence",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "kind text",
+                  "summary text",
+                  "notes? text",
+                  "source_url? text",
+                  "source_date? date",
+                  "catalog_edition? text",
+                  "first_measured_format_label? text",
+                  "second_measured_format_label? text",
+                  "first_source_url? text",
+                  "second_source_url? text",
+                  "pen_product_id? FK bigint",
+                  "required_tip_product_id? FK bigint",
+                  "refill_product_id? FK bigint",
+                  "test_date? date",
+                  "result? text",
+                  "procedure? text",
+                  "superseded_at? timestamp with time zone",
+                  "created_at timestamp with time zone"
+            ],
+            "id": "refill_compatibility_evidence",
+            "name": "refill_compatibility_evidence",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "concept_id FK bigint",
+                  "namespace FK text",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "refill_compatibility_group",
+            "name": "refill_compatibility_group",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "group_id FK bigint",
+                  "refill_product_id FK bigint",
+                  "approved_at? timestamp with time zone",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "refill_compatibility_group_membership",
+            "name": "refill_compatibility_group_membership",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "membership_id PK/FK bigint",
+                  "evidence_id PK/FK bigint",
+                  "stance text"
+            ],
+            "id": "refill_compatibility_group_membership_evidence",
+            "name": "refill_compatibility_group_membership_evidence",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "name text",
+                  "slug text",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "refill_ink_color",
+            "name": "refill_ink_color",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "refill_product_id FK bigint",
+                  "tip_style_id FK bigint",
+                  "tip_size text",
+                  "normalized_tip_size text",
+                  "ink_color_id FK bigint",
+                  "approved_at? timestamp with time zone",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "refill_offering",
+            "name": "refill_offering",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "offering_id PK/FK bigint",
+                  "evidence_id PK/FK bigint",
+                  "stance text"
+            ],
+            "id": "refill_offering_evidence",
+            "name": "refill_offering_evidence",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "offering_id FK bigint",
+                  "maker_id FK bigint",
+                  "kind text",
+                  "source_value text",
+                  "comparison_value text",
+                  "comparison_rule text",
+                  "market_id FK bigint",
+                  "effective_date? date",
+                  "approved_at? timestamp with time zone",
+                  "superseded_at? timestamp with time zone",
+                  "successor_id? FK bigint",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "refill_offering_identifier",
+            "name": "refill_offering_identifier",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "identifier_id PK/FK bigint",
+                  "evidence_id PK/FK bigint",
+                  "stance text"
+            ],
+            "id": "refill_offering_identifier_evidence",
+            "name": "refill_offering_identifier_evidence",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "offering_id FK bigint",
+                  "market_id FK bigint",
+                  "lifecycle text",
+                  "effective_date? date",
+                  "approved_at? timestamp with time zone",
+                  "superseded_at? timestamp with time zone",
+                  "successor_id? FK bigint",
+                  "created_at timestamp with time zone"
+            ],
+            "id": "refill_offering_market_status",
+            "name": "refill_offering_market_status",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "status_id PK/FK bigint",
+                  "evidence_id PK/FK bigint",
+                  "stance text"
+            ],
+            "id": "refill_offering_market_status_evidence",
+            "name": "refill_offering_market_status_evidence",
+            "status": "existing"
+      },
+      {
+            "areas": [
+                  "full"
+            ],
+            "fields": [
+                  "id PK bigint",
+                  "name text",
+                  "slug text",
+                  "created_at timestamp with time zone",
+                  "updated_at timestamp with time zone"
+            ],
+            "id": "refill_tip_style",
+            "name": "refill_tip_style",
             "status": "existing"
       },
       {
@@ -1771,14 +2477,129 @@
             "application_id → id"
       ],
       [
+            "catalog_market_containment",
+            "catalog_market",
+            "parent_market_id → id"
+      ],
+      [
+            "catalog_market_containment",
+            "catalog_market",
+            "child_market_id → id"
+      ],
+      [
+            "catalog_source_evidence",
+            "catalog_source_listing",
+            "listing_id → id"
+      ],
+      [
+            "catalog_source_evidence",
+            "catalog_market",
+            "market_id → id"
+      ],
+      [
+            "catalog_source_image",
+            "catalog_source_listing",
+            "listing_id → id"
+      ],
+      [
+            "catalog_source_image",
+            "product_image",
+            "product_image_id → id"
+      ],
+      [
+            "catalog_source_listing",
+            "makers",
+            "maker_id → id"
+      ],
+      [
+            "catalog_source_listing_choice",
+            "catalog_source_listing",
+            "listing_id → id"
+      ],
+      [
+            "catalog_source_listing_choice",
+            "product_configuration_choice",
+            "choice_id → id"
+      ],
+      [
             "catalog_terminology_alias",
             "makers",
             "maker_id → id"
       ],
       [
             "catalog_terminology_alias",
-            "product_types",
-            "canonical_key → slug"
+            "catalog_terminology_concept",
+            "concept_id, canonical_namespace → id, namespace"
+      ],
+      [
+            "collection_detail_pen",
+            "collection_item",
+            "id → id"
+      ],
+      [
+            "collection_detail_pen",
+            "product_detail_pen",
+            "product_pen_id → id"
+      ],
+      [
+            "collection_detail_pen",
+            "product_detail_refill",
+            "installed_refill_product_id → id"
+      ],
+      [
+            "collection_detail_pen",
+            "refill_offering",
+            "installed_refill_offering_id, installed_refill_product_id → id, refill_product_id"
+      ],
+      [
+            "collection_detail_pen_actuator",
+            "collection_item",
+            "id → id"
+      ],
+      [
+            "collection_detail_pen_actuator",
+            "product_detail_pen_actuator",
+            "product_pen_actuator_id → id"
+      ],
+      [
+            "collection_detail_pen_clip",
+            "collection_item",
+            "id → id"
+      ],
+      [
+            "collection_detail_pen_clip",
+            "product_detail_pen_clip",
+            "product_pen_clip_id → id"
+      ],
+      [
+            "collection_detail_pen_mechanism",
+            "collection_item",
+            "id → id"
+      ],
+      [
+            "collection_detail_pen_mechanism",
+            "product_detail_pen_mechanism",
+            "product_pen_mechanism_id → id"
+      ],
+      [
+            "collection_detail_pen_tip",
+            "collection_item",
+            "id → id"
+      ],
+      [
+            "collection_detail_pen_tip",
+            "product_detail_pen_tip",
+            "product_pen_tip_id → id"
+      ],
+      [
+            "collection_detail_pen_top_cap",
+            "collection_item",
+            "id → id"
+      ],
+      [
+            "collection_detail_pen_top_cap",
+            "product_detail_pen_top_cap",
+            "product_pen_top_cap_id → id"
       ],
       [
             "collection_detail_slider",
@@ -1881,6 +2702,21 @@
             "collection_id, owner_id → id, owner_id"
       ],
       [
+            "collection_item_configuration_selection",
+            "collection_item",
+            "collection_item_id → id"
+      ],
+      [
+            "collection_item_configuration_selection",
+            "collection_item",
+            "installed_part_collection_item_id → id"
+      ],
+      [
+            "collection_item_configuration_selection",
+            "product_configuration_choice",
+            "choice_id, slot_id → id, slot_id"
+      ],
+      [
             "collection_item_image",
             "collection_item",
             "collection_item_id → id"
@@ -1971,6 +2807,26 @@
             "material_id → id"
       ],
       [
+            "pen_nose_profile_assignment",
+            "product",
+            "product_id → id"
+      ],
+      [
+            "pen_nose_profile_assignment",
+            "catalog_terminology_concept",
+            "concept_id, namespace → id, namespace"
+      ],
+      [
+            "pen_part_role_assignment",
+            "product_detail_pen_part",
+            "part_product_id → id"
+      ],
+      [
+            "pen_part_role_assignment",
+            "catalog_terminology_concept",
+            "concept_id, namespace → id, namespace"
+      ],
+      [
             "product",
             "product_types",
             "product_type_id → id"
@@ -1979,6 +2835,131 @@
             "product",
             "makers",
             "maker_id → id"
+      ],
+      [
+            "product_alias",
+            "product",
+            "product_id → id"
+      ],
+      [
+            "product_configuration_choice",
+            "product_detail_pen_part",
+            "part_product_id → id"
+      ],
+      [
+            "product_configuration_choice",
+            "product_configuration_slot",
+            "slot_id, product_id → id, product_id"
+      ],
+      [
+            "product_configuration_choice",
+            "product_material",
+            "product_material_id, product_id → id, product_id"
+      ],
+      [
+            "product_configuration_choice",
+            "finish_option",
+            "finish_option_id, product_id → id, product_id"
+      ],
+      [
+            "product_configuration_choice_requirement",
+            "product_configuration_choice_rule",
+            "rule_id, product_id → id, product_id"
+      ],
+      [
+            "product_configuration_choice_requirement",
+            "product_configuration_choice",
+            "required_choice_id, product_id → id, product_id"
+      ],
+      [
+            "product_configuration_choice_rule",
+            "product_configuration_choice",
+            "target_choice_id, product_id → id, product_id"
+      ],
+      [
+            "product_configuration_slot",
+            "product",
+            "product_id → id"
+      ],
+      [
+            "product_configuration_slot",
+            "configuration_slot_kind",
+            "slot_kind_id → id"
+      ],
+      [
+            "product_detail_pen",
+            "product",
+            "id → id"
+      ],
+      [
+            "product_detail_pen_actuator",
+            "product",
+            "id → id"
+      ],
+      [
+            "product_detail_pen_actuator",
+            "product_detail_pen_part",
+            "id → id"
+      ],
+      [
+            "product_detail_pen_clip",
+            "product",
+            "id → id"
+      ],
+      [
+            "product_detail_pen_clip",
+            "product_detail_pen_part",
+            "id → id"
+      ],
+      [
+            "product_detail_pen_mechanism",
+            "product",
+            "id → id"
+      ],
+      [
+            "product_detail_pen_mechanism",
+            "product_detail_pen_part",
+            "id → id"
+      ],
+      [
+            "product_detail_pen_mechanism",
+            "mechanisms",
+            "mechanism_id → id"
+      ],
+      [
+            "product_detail_pen_part",
+            "product",
+            "id → id"
+      ],
+      [
+            "product_detail_pen_tip",
+            "product",
+            "id → id"
+      ],
+      [
+            "product_detail_pen_tip",
+            "product_detail_pen_part",
+            "id → id"
+      ],
+      [
+            "product_detail_pen_top_cap",
+            "product",
+            "id → id"
+      ],
+      [
+            "product_detail_pen_top_cap",
+            "product_detail_pen_part",
+            "id → id"
+      ],
+      [
+            "product_detail_refill",
+            "product",
+            "id → id"
+      ],
+      [
+            "product_detail_refill",
+            "product",
+            "id, maker_id → id, maker_id"
       ],
       [
             "product_detail_slider",
@@ -2039,6 +3020,166 @@
             "product_material",
             "material_specific",
             "material_id, material_specific_id → material_id, id"
+      ],
+      [
+            "product_source_listing",
+            "product",
+            "product_id → id"
+      ],
+      [
+            "product_source_listing",
+            "catalog_source_listing",
+            "listing_id → id"
+      ],
+      [
+            "refill_compatibility_assertion",
+            "product_detail_pen",
+            "pen_product_id → id"
+      ],
+      [
+            "refill_compatibility_assertion",
+            "product_detail_pen_tip",
+            "required_tip_product_id → id"
+      ],
+      [
+            "refill_compatibility_assertion",
+            "refill_compatibility_group",
+            "target_group_id → id"
+      ],
+      [
+            "refill_compatibility_assertion",
+            "product_detail_refill",
+            "target_refill_product_id → id"
+      ],
+      [
+            "refill_compatibility_assertion_evidence",
+            "refill_compatibility_assertion",
+            "assertion_id → id"
+      ],
+      [
+            "refill_compatibility_assertion_evidence",
+            "refill_compatibility_evidence",
+            "evidence_id → id"
+      ],
+      [
+            "refill_compatibility_evidence",
+            "product_detail_pen",
+            "pen_product_id → id"
+      ],
+      [
+            "refill_compatibility_evidence",
+            "product_detail_pen_tip",
+            "required_tip_product_id → id"
+      ],
+      [
+            "refill_compatibility_evidence",
+            "product_detail_refill",
+            "refill_product_id → id"
+      ],
+      [
+            "refill_compatibility_group",
+            "catalog_terminology_concept",
+            "concept_id, namespace → id, namespace"
+      ],
+      [
+            "refill_compatibility_group_membership",
+            "refill_compatibility_group",
+            "group_id → id"
+      ],
+      [
+            "refill_compatibility_group_membership",
+            "product_detail_refill",
+            "refill_product_id → id"
+      ],
+      [
+            "refill_compatibility_group_membership_evidence",
+            "refill_compatibility_group_membership",
+            "membership_id → id"
+      ],
+      [
+            "refill_compatibility_group_membership_evidence",
+            "refill_compatibility_evidence",
+            "evidence_id → id"
+      ],
+      [
+            "refill_offering",
+            "product_detail_refill",
+            "refill_product_id → id"
+      ],
+      [
+            "refill_offering",
+            "refill_tip_style",
+            "tip_style_id → id"
+      ],
+      [
+            "refill_offering",
+            "refill_ink_color",
+            "ink_color_id → id"
+      ],
+      [
+            "refill_offering_evidence",
+            "refill_offering",
+            "offering_id → id"
+      ],
+      [
+            "refill_offering_evidence",
+            "catalog_source_evidence",
+            "evidence_id → id"
+      ],
+      [
+            "refill_offering_identifier",
+            "refill_offering",
+            "offering_id → id"
+      ],
+      [
+            "refill_offering_identifier",
+            "makers",
+            "maker_id → id"
+      ],
+      [
+            "refill_offering_identifier",
+            "catalog_market",
+            "market_id → id"
+      ],
+      [
+            "refill_offering_identifier",
+            "refill_offering_identifier",
+            "successor_id → id"
+      ],
+      [
+            "refill_offering_identifier_evidence",
+            "refill_offering_identifier",
+            "identifier_id → id"
+      ],
+      [
+            "refill_offering_identifier_evidence",
+            "catalog_source_evidence",
+            "evidence_id → id"
+      ],
+      [
+            "refill_offering_market_status",
+            "refill_offering",
+            "offering_id → id"
+      ],
+      [
+            "refill_offering_market_status",
+            "catalog_market",
+            "market_id → id"
+      ],
+      [
+            "refill_offering_market_status",
+            "refill_offering_market_status",
+            "successor_id → id"
+      ],
+      [
+            "refill_offering_market_status_evidence",
+            "refill_offering_market_status",
+            "status_id → id"
+      ],
+      [
+            "refill_offering_market_status_evidence",
+            "catalog_source_evidence",
+            "evidence_id → id"
       ],
       [
             "resource_downloads",

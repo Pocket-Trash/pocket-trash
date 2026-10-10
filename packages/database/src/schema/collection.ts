@@ -16,6 +16,7 @@ import {
   unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { catalogTerminologyConcept } from "./pens.js";
 import { maker, material, materialSpecific, productType } from "./scraper.js";
 import { dimensionUnitEnum, weightUnitEnum } from "./user-settings.js";
 import { user } from "./users.js";
@@ -106,6 +107,8 @@ export const collectionItem = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     collectionId: bigint("collection_id", { mode: "number" }).notNull(),
+    /** Optional maker serial recorded for this owned item. */
+    serialNumber: text("serial_number"),
     /** Optional owner-defined name shown instead of the product name. */
     displayName: text("display_name"),
     /** Optional Markdown description shown instead of the product description. */
@@ -199,6 +202,10 @@ export const collectionItem = pgTable(
     check(
       "collection_item_description_length_valid",
       sql`${table.description} is null or char_length(${table.description}) <= 5000`,
+    ),
+    check(
+      "collection_item_serial_number_valid",
+      sql`${table.serialNumber} is null or char_length(trim(${table.serialNumber})) between 1 and 200`,
     ),
   ],
 );
@@ -358,6 +365,8 @@ export const product = pgTable(
       .notNull(),
   },
   (table) => [
+    unique("product_id_maker_unique").on(table.id, table.makerId),
+    index("product_maker_id_idx").on(table.makerId),
     uniqueIndex("product_type_slug_unique").on(table.productTypeId, table.slug),
     index("product_owner_clerk_id_idx").on(table.ownerClerkId),
     index("product_visibility_idx").on(table.approvalStatus, table.isPrivate),
@@ -550,6 +559,7 @@ export const productMaterial = pgTable(
       .references(() => material.id, { onDelete: "restrict" }),
   },
   (table) => [
+    unique("product_material_id_product_unique").on(table.id, table.productId),
     foreignKey({
       columns: [table.materialId, table.materialSpecificId],
       foreignColumns: [materialSpecific.materialId, materialSpecific.id],
@@ -570,13 +580,11 @@ export const catalogTerminologyAlias = pgTable(
     id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
-    makerId: bigint("maker_id", { mode: "number" })
-      .notNull()
-      .references(() => maker.id, { onDelete: "restrict" }),
+    makerId: bigint("maker_id", { mode: "number" }).references(() => maker.id, {
+      onDelete: "restrict",
+    }),
+    conceptId: bigint("concept_id", { mode: "number" }).notNull(),
     canonicalNamespace: text("canonical_namespace").notNull(),
-    canonicalKey: text("canonical_key")
-      .notNull()
-      .references(() => productType.slug, { onDelete: "restrict" }),
     label: text("label").notNull(),
     normalizedValue: text("normalized_value").notNull(),
     isPreferred: boolean("is_preferred").default(false).notNull(),
@@ -588,22 +596,29 @@ export const catalogTerminologyAlias = pgTable(
       .notNull(),
   },
   (table) => [
-    unique("catalog_terminology_alias_maker_concept_value_unique").on(
-      table.makerId,
-      table.canonicalNamespace,
-      table.canonicalKey,
-      table.normalizedValue,
-    ),
+    foreignKey({
+      columns: [table.conceptId, table.canonicalNamespace],
+      foreignColumns: [
+        catalogTerminologyConcept.id,
+        catalogTerminologyConcept.namespace,
+      ],
+      name: "catalog_terminology_alias_concept_namespace_fk",
+    }).onDelete("restrict"),
+    unique("catalog_terminology_alias_scope_value_unique")
+      .on(table.makerId, table.canonicalNamespace, table.normalizedValue)
+      .nullsNotDistinct(),
     uniqueIndex("catalog_terminology_alias_preferred_unique")
-      .on(table.makerId, table.canonicalNamespace, table.canonicalKey)
+      .on(table.makerId, table.conceptId)
       .where(sql`${table.isPreferred}`),
-    index("catalog_terminology_alias_concept_idx").on(
+    index("catalog_terminology_alias_concept_idx").on(table.conceptId),
+    index("catalog_terminology_alias_lookup_idx").on(
       table.canonicalNamespace,
-      table.canonicalKey,
+      table.normalizedValue,
+      table.makerId,
     ),
     check(
-      "catalog_terminology_alias_namespace_valid",
-      sql`${table.canonicalNamespace} = 'product-type'`,
+      "catalog_terminology_alias_preferred_scope_valid",
+      sql`not ${table.isPreferred} or ${table.makerId} is not null`,
     ),
     check(
       "catalog_terminology_alias_label_valid",
@@ -709,6 +724,7 @@ export const finishOption = pgTable(
       sql`(${table.productId} is not null) <> (${table.collectionItemId} is not null)`,
     ),
     check("finish_option_position_check", sql`${table.position} >= 0`),
+    unique("finish_option_id_product_unique").on(table.id, table.productId),
     uniqueIndex("finish_option_collection_item_unique").on(
       table.collectionItemId,
     ),

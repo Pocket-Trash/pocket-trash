@@ -174,7 +174,7 @@ const catalogNameConflictMessages: Record<string, string> = {
     "web.materials.validation.immutableParent",
   materials_name_case_insensitive_unique: "Material name already exists.",
   pattern_name_case_insensitive_unique: "Pattern name already exists.",
-  catalog_terminology_alias_maker_concept_value_unique:
+  catalog_terminology_alias_scope_value_unique:
     "Alias already exists for this maker and concept.",
   catalog_terminology_alias_preferred_unique:
     "A preferred alias already exists for this maker and concept.",
@@ -2442,11 +2442,26 @@ export function createCatalogService(
               .where(eq(schema.maker.id, input.makerId))
               .limit(1);
             if (!makerRow) throw new Error("Maker does not exist.");
+            const [concept] = await tx
+              .select({ id: schema.catalogTerminologyConcept.id })
+              .from(schema.catalogTerminologyConcept)
+              .where(
+                and(
+                  eq(
+                    schema.catalogTerminologyConcept.namespace,
+                    input.canonicalNamespace,
+                  ),
+                  eq(schema.catalogTerminologyConcept.key, canonicalKey),
+                ),
+              )
+              .limit(1);
+            if (!concept)
+              throw new Error("Catalog terminology concept does not exist.");
             const [row] = await tx
               .insert(schema.catalogTerminologyAlias)
               .values({
-                canonicalKey,
                 canonicalNamespace: input.canonicalNamespace,
+                conceptId: concept.id,
                 isPreferred: input.isPreferred,
                 label,
                 makerId: input.makerId,
@@ -2459,6 +2474,7 @@ export function createCatalogService(
               ...row,
               canonicalKey,
               canonicalNamespace: "product-type",
+              makerId: input.makerId,
               makerName: makerRow.name,
             };
             if (dependencies && actorUser) {
@@ -3561,7 +3577,7 @@ export function createCatalogService(
         async () => {
           const rows = await db
             .select({
-              canonicalKey: schema.catalogTerminologyAlias.canonicalKey,
+              canonicalKey: schema.catalogTerminologyConcept.key,
               canonicalNamespace:
                 schema.catalogTerminologyAlias.canonicalNamespace,
               createdAt: schema.catalogTerminologyAlias.createdAt,
@@ -3575,6 +3591,13 @@ export function createCatalogService(
             })
             .from(schema.catalogTerminologyAlias)
             .innerJoin(
+              schema.catalogTerminologyConcept,
+              eq(
+                schema.catalogTerminologyAlias.conceptId,
+                schema.catalogTerminologyConcept.id,
+              ),
+            )
+            .innerJoin(
               schema.maker,
               eq(schema.catalogTerminologyAlias.makerId, schema.maker.id),
             )
@@ -3582,11 +3605,16 @@ export function createCatalogService(
               asc(schema.catalogTerminologyAlias.label),
               asc(schema.maker.name),
             );
-          return rows.map((row) => ({
-            ...row,
-            canonicalKey: catalogProductType(row.canonicalKey),
-            canonicalNamespace: "product-type" as const,
-          }));
+          return rows.map((row) => {
+            if (row.makerId === null)
+              throw new Error("Maker-scoped terminology alias lost its maker.");
+            return {
+              ...row,
+              canonicalKey: catalogProductType(row.canonicalKey),
+              canonicalNamespace: "product-type" as const,
+              makerId: row.makerId,
+            };
+          });
         },
       );
     },

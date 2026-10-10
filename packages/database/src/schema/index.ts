@@ -5,6 +5,7 @@ export * from "./enums.js";
 export * from "./erasure.js";
 export * from "./feature-flags.js";
 export * from "./feedback.js";
+export * from "./pens.js";
 export * from "./relations.js";
 export * from "./resources.js";
 export * from "./scraper.js";
