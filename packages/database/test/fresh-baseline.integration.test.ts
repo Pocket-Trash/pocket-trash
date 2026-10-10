@@ -59,7 +59,8 @@ describe("fresh subtype baseline", () => {
     ).resolves.toMatchObject({ rows: [{ id: 1000 }] });
     await database.exec(`
       INSERT INTO product (product_type_id, maker_id, name, slug)
-        VALUES (1000, 1000, 'Writable spinner', 'writable-spinner');
+        SELECT id, 1000, 'Writable spinner', 'writable-spinner'
+        FROM product_types WHERE slug = 'rename-type';
       INSERT INTO product_detail_spinner (id, bearing) VALUES (1005, 'R188');
       UPDATE product_detail_spinner SET bearing = 'R188 hybrid' WHERE id = 1005;
     `);
@@ -204,12 +205,17 @@ async function seedSubtypeRows(database: PGlite) {
   await database.exec(`
     INSERT INTO makers (name, slug) VALUES ('Rename maker', 'rename-maker');
     INSERT INTO product_types (name, slug) VALUES ('Rename type', 'rename-type');
-    INSERT INTO product (product_type_id, maker_id, name, slug) VALUES
-      (1000, 1000, 'Spinner', 'rename-spinner'),
-      (1000, 1000, 'Spinner button', 'rename-spinner-button'),
-      (1000, 1000, 'Slider', 'rename-slider'),
-      (1000, 1000, 'Slider plate', 'rename-slider-plate'),
-      (1000, 1000, 'Slider insert', 'rename-slider-insert');
+    INSERT INTO product (product_type_id, maker_id, name, slug)
+    SELECT product_types.id, 1000, values.name, values.slug
+    FROM product_types
+    CROSS JOIN (VALUES
+      ('Spinner', 'rename-spinner'),
+      ('Spinner button', 'rename-spinner-button'),
+      ('Slider', 'rename-slider'),
+      ('Slider plate', 'rename-slider-plate'),
+      ('Slider insert', 'rename-slider-insert')
+    ) AS values(name, slug)
+    WHERE product_types.slug = 'rename-type';
     INSERT INTO product_detail_spinner (id) VALUES (1000);
     INSERT INTO product_detail_spinner_button (id) VALUES (1001);
     INSERT INTO product_detail_slider (id, uses_inserts, magnet_layout)

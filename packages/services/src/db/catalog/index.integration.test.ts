@@ -61,14 +61,16 @@ describe("catalog product persistence", () => {
         logger,
       ).catalog;
 
-      await expect(service.listProductTypes()).resolves.toEqual([
-        {
-          id: productType.id,
-          isPartOrAccessory: false,
-          name: "Spinner",
-          slug: "spinner",
-        },
-      ]);
+      await expect(service.listProductTypes()).resolves.toEqual(
+        expect.arrayContaining([
+          {
+            id: productType.id,
+            isPartOrAccessory: false,
+            name: "Spinner",
+            slug: "spinner",
+          },
+        ]),
+      );
       await expect(
         service.setProductTypePartOrAccessory({
           actor: { clerkId: "user-product-type", role: "user" },
@@ -104,12 +106,14 @@ describe("catalog product persistence", () => {
         }),
       ).rejects.toThrow("Product type does not exist.");
 
-      await expect(service.listProductTypes()).resolves.toEqual([
-        expect.objectContaining({
-          id: productType.id,
-          isPartOrAccessory: true,
-        }),
-      ]);
+      await expect(service.listProductTypes()).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: productType.id,
+            isPartOrAccessory: true,
+          }),
+        ]),
+      );
       await expect(db.select().from(schema.auditEvent)).resolves.toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -140,9 +144,18 @@ describe("catalog product persistence", () => {
         .insert(schema.maker)
         .values({ name: "Alias Maker", slug: "alias-maker" })
         .returning({ id: schema.maker.id });
-      await db
+      const [productType] = await db
         .insert(schema.productType)
-        .values({ name: "Slider Insert", slug: "slider-insert" });
+        .values({ name: "Slider Insert", slug: "slider-insert" })
+        .returning({ id: schema.productType.id });
+      if (!productType) throw new Error("Alias product type was not created.");
+      await db.insert(schema.catalogTerminologyConcept).values({
+        canonicalLabelFallback: "Slider Insert",
+        canonicalLabelKey: "catalog.productTypes.slider-insert",
+        key: "slider-insert",
+        namespace: "product-type",
+        normalizedCanonicalLabel: "slider insert",
+      });
       await db.insert(schema.user).values({ clerkId: "admin-alias" });
       if (!maker) throw new Error("Alias fixtures were not created.");
 

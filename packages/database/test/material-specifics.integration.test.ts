@@ -67,7 +67,8 @@ describe("material-specific constraints", () => {
       INSERT INTO makers (name, slug) VALUES ('KAP', 'kap');
       INSERT INTO product_types (name, slug) VALUES ('Spinner', 'spinner');
       INSERT INTO product (maker_id, product_type_id, name, slug)
-        VALUES (1000, 1000, 'Bar Cell Mini', 'bar-cell-mini');
+        SELECT 1000, id, 'Bar Cell Mini', 'bar-cell-mini'
+        FROM product_types WHERE slug = 'spinner';
       INSERT INTO product_material (product_id, material_id, material_specific_id)
         VALUES (1000, 1000, NULL), (1000, 1000, 1000);
     `);
