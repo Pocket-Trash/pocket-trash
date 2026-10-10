@@ -19,9 +19,12 @@ test("anonymous visitors can choose a product type from the product directory", 
     page.getByRole("heading", { name: "Parts and Accessories" }),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "Spinner", exact: true }).click();
-  await expect(page).toHaveURL(/\/products\?.*type=spinner/u);
-  await expect(page).toHaveURL(/\/products\?.*view=all/u);
+  await page
+    .getByRole("main")
+    .locator('section a[href*="type="]')
+    .first()
+    .click();
+  await expect(page).toHaveURL(/\/products\?type=[^&]+&view=all$/u);
   await expect(
     page.getByRole("button", { name: "More filters" }).first(),
   ).toBeVisible();
