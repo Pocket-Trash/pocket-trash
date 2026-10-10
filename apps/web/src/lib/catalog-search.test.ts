@@ -100,4 +100,23 @@ describe("catalog search", () => {
       matchCatalogSearch(item("slider"), "hidden description", aliases),
     ).toBeNull();
   });
+
+  it("matches product aliases on Pens catalog types", () => {
+    expect(
+      matchCatalogSearch(
+        item("refill", {
+          activeTypeLabel: "Refill",
+          aliases: ["Pilot Precise V5 RT"],
+          englishTypeLabel: "Refill",
+          name: "BXS-V5RT",
+        }),
+        "precise v5",
+        aliases,
+      ),
+    ).toEqual({
+      matchedAlias: "Pilot Precise V5 RT",
+      matchedOwner: null,
+      matchedType: null,
+    });
+  });
 });

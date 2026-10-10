@@ -170,6 +170,13 @@ function catalogFilterCopy(
 
 /** English canonical product-type labels retained as locale fallback search terms. */
 const englishProductTypeLabels: Record<CatalogProductType, string> = {
+  pen: "Pen",
+  "pen-actuator": "Pen actuator",
+  "pen-clip": "Pen clip",
+  "pen-mechanism": "Pen mechanism",
+  "pen-tip": "Pen tip",
+  "pen-top-cap": "Pen top cap",
+  refill: "Refill",
   slider: "Slider",
   "slider-insert": "Slider insert",
   "slider-plate": "Slider plate",
@@ -191,13 +198,20 @@ function localizedProductTypeLabel(
   fallback: string,
 ) {
   const key = {
+    pen: "web.pens.productType.pen",
+    "pen-actuator": "web.pens.productType.actuator",
+    "pen-clip": "web.pens.productType.clip",
+    "pen-mechanism": "web.pens.productType.mechanism",
+    "pen-tip": "web.pens.productType.tip",
+    "pen-top-cap": "web.pens.productType.topCap",
+    refill: "web.pens.productType.refill",
     slider: "web.slider.productType.slider",
     "slider-insert": "web.slider.productType.insert",
     "slider-plate": "web.slider.productType.plate",
     spinner: "web.slider.productType.spinner",
     "spinner-button": "web.slider.productType.spinnerButton",
   }[productType];
-  const label = t(key);
+  const label = t(key as TranslationKey);
   return label === key ? fallback : label;
 }
 
@@ -452,6 +466,7 @@ export function ProductsPage({
     const match = matchCatalogSearch(
       {
         activeTypeLabel,
+        aliases: product.aliases,
         englishTypeLabel: englishProductTypeLabels[product.productTypeSlug],
         makerId: product.makerId,
         makerName: product.makerName,
@@ -543,6 +558,32 @@ type ProductTypeNavigationSearch = {
 };
 
 /**
+ * Resolves a configuration choice to its public display label.
+ *
+ * @param product - Product containing the choice and finish options.
+ * @param choice - Configuration choice to label, or `undefined` for stale rule data.
+ * @param t - Active catalog translation formatter.
+ * @returns Material, part, or appearance label for the choice.
+ */
+function configurationChoiceLabel(
+  product: CatalogProduct,
+  choice:
+    | CatalogProduct["configurationSlots"][number]["choices"][number]
+    | undefined,
+  t: ReturnType<typeof useCatalogCopy>,
+) {
+  if (!choice)
+    return t("web.pens.configuration.unknownChoice" as TranslationKey);
+  if (choice.label) return choice.label;
+  const finish = product.finishOptions.find(
+    ({ id }) => id === choice.finishOptionId,
+  );
+  return finish
+    ? localizedFinishLabel(finish, t)
+    : t("web.pens.configuration.unknownChoice" as TranslationKey);
+}
+
+/**
  * Renders a catalog product and its matching collection items.
  *
  * @param props - Product detail data and related collection items.
@@ -562,7 +603,7 @@ export function ProductDetailPage({
   const t = useCatalogCopy();
   const { locale, measurementSystem } = useLocale();
   const navigate = useNavigate();
-  let specs: Array<[TranslationKey, Measurement | null]>;
+  let specs: Array<[TranslationKey, Measurement | null]> = [];
   switch (product.productTypeSlug) {
     case "spinner":
       specs = [
@@ -704,6 +745,16 @@ export function ProductDetailPage({
           <Detail label={t("web.catalog.field.maker")}>
             <MakerLink name={product.makerName} slug={product.makerSlug} />
           </Detail>
+          {product.aliases.length ? (
+            <Detail label={t("web.pens.field.aliases" as TranslationKey)}>
+              {product.aliases.join(", ")}
+            </Detail>
+          ) : null}
+          {product.refillModel ? (
+            <Detail label={t("web.pens.field.refillModel" as TranslationKey)}>
+              {product.refillModel}
+            </Detail>
+          ) : null}
           {product.makerProductUrl && product.makerProductUrlValid ? (
             <Detail label={t("web.catalog.field.makerProductUrl")}>
               <MakerLink
@@ -806,75 +857,196 @@ export function ProductDetailPage({
             ) : null,
           )}
         </dl>
-        <section className="grid gap-4">
-          <h2 className="text-lg font-semibold">
-            {t("web.catalog.collectionsWithProduct")}
-          </h2>
-          {collectionItems.length ? (
-            <ul className="grid gap-3 lg:grid-cols-2">
-              {collectionItems.map((item) => (
-                <li
-                  className="grid gap-3 rounded-xl border border-border bg-card p-4"
-                  key={item.collectionItemId}
-                >
-                  <div>
-                    <h3 className="font-semibold">{item.collectionName}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {item.displayName}
-                      {item.ownerUsername ? (
-                        <span className="inline-flex items-center gap-1">
-                          <span aria-hidden="true"> · </span>
-                          <PublicProfileAvatar
-                            imageUrl={item.ownerImageUrl}
-                            username={item.ownerUsername}
-                          />
-                          {item.ownerUsername}
+        {product.configurationSlots.length ? (
+          <section className="grid gap-4">
+            <h2 className="text-lg font-semibold">
+              {t("web.pens.configuration.heading" as TranslationKey)}
+            </h2>
+            <div className="grid gap-4 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
+              {product.configurationSlots.map((slot) => {
+                const slotLabel = t(slot.labelKey as TranslationKey);
+                return (
+                  <div className="grid content-start gap-2" key={slot.id}>
+                    <h3 className="font-semibold">
+                      {slotLabel === slot.labelKey
+                        ? slot.labelFallback
+                        : slotLabel}
+                      {slot.required ? (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          {t(
+                            "web.pens.configuration.required" as TranslationKey,
+                          )}
                         </span>
                       ) : null}
-                    </p>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Link
-                      className={buttonVariants({
-                        size: "sm",
-                        variant: "outline",
+                    </h3>
+                    <ul className="grid gap-2 text-sm">
+                      {slot.choices.map((choice) => {
+                        const label = configurationChoiceLabel(
+                          product,
+                          choice,
+                          t,
+                        );
+                        return (
+                          <li key={choice.id}>
+                            <span>{label}</span>
+                            {choice.availableWhen.length ? (
+                              <p className="text-muted-foreground">
+                                {t(
+                                  "web.pens.configuration.availableWhen" as TranslationKey,
+                                  {
+                                    requirements: choice.availableWhen
+                                      .map((branch) =>
+                                        branch
+                                          .map((requiredId) =>
+                                            configurationChoiceLabel(
+                                              product,
+                                              product.configurationSlots
+                                                .flatMap(
+                                                  ({ choices }) => choices,
+                                                )
+                                                .find(
+                                                  ({ id }) => id === requiredId,
+                                                ),
+                                              t,
+                                            ),
+                                          )
+                                          .join(" + "),
+                                      )
+                                      .join(" / "),
+                                  },
+                                )}
+                              </p>
+                            ) : null}
+                          </li>
+                        );
                       })}
-                      params={{
-                        collectionId: item.collectionId,
-                        collectionItemId: item.collectionItemId,
-                        userId: item.ownerUserId,
-                      }}
-                      to="/collections/$userId/$collectionId/$collectionItemId"
-                    >
-                      <span className="sm:hidden">{t("web.action.view")}</span>
-                      <span className="hidden sm:inline">
-                        {t("web.action.viewItem")}
-                      </span>
-                    </Link>
-                    <Link
-                      className={buttonVariants({
-                        size: "sm",
-                        variant: "outline",
-                      })}
-                      params={{
-                        collectionId: item.collectionId,
-                        userId: item.ownerUserId,
-                      }}
-                      to="/collections/$userId/$collectionId"
-                    >
-                      <span className="sm:hidden">
-                        {t("web.collections.field.collection")}
-                      </span>
-                      <span className="hidden sm:inline">
-                        {t("web.action.viewCollection")}
-                      </span>
-                    </Link>
+                    </ul>
                   </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+        {product.refillOfferings.length ? (
+          <section className="grid gap-4">
+            <h2 className="text-lg font-semibold">
+              {t("web.pens.refill.offerings" as TranslationKey)}
+            </h2>
+            <ul className="grid gap-2 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
+              {product.refillOfferings.map((offering) => (
+                <li key={offering.id}>
+                  {offering.tipSize} · {offering.tipStyle} · {offering.inkColor}
                 </li>
               ))}
             </ul>
-          ) : null}
-        </section>
+          </section>
+        ) : null}
+        {product.productTypeSlug === "refill" ? (
+          <section className="grid gap-4">
+            <h2 className="text-lg font-semibold">
+              {t("web.pens.refill.compatiblePens" as TranslationKey)}
+            </h2>
+            {product.compatiblePens.length ? (
+              <ul className="grid gap-2 rounded-xl border border-border bg-card p-6 sm:grid-cols-2">
+                {product.compatiblePens.map((pen) => (
+                  <li key={`${pen.id}:${pen.requiredTipName ?? ""}`}>
+                    <Link
+                      className="text-primary underline-offset-4 hover:underline"
+                      params={{ productSlug: pen.slug, productTypeSlug: "pen" }}
+                      to="/products/$productTypeSlug/$productSlug"
+                    >
+                      {pen.name}
+                    </Link>
+                    {pen.requiredTipName ? (
+                      <p className="text-sm text-muted-foreground">
+                        {t("web.pens.refill.requiresTip" as TranslationKey, {
+                          tip: pen.requiredTipName,
+                        })}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {t("web.pens.refill.noCompatiblePens" as TranslationKey)}
+              </p>
+            )}
+          </section>
+        ) : null}
+        {product.productTypeSlug !== "refill" ? (
+          <section className="grid gap-4">
+            <h2 className="text-lg font-semibold">
+              {t("web.catalog.collectionsWithProduct")}
+            </h2>
+            {collectionItems.length ? (
+              <ul className="grid gap-3 lg:grid-cols-2">
+                {collectionItems.map((item) => (
+                  <li
+                    className="grid gap-3 rounded-xl border border-border bg-card p-4"
+                    key={item.collectionItemId}
+                  >
+                    <div>
+                      <h3 className="font-semibold">{item.collectionName}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {item.displayName}
+                        {item.ownerUsername ? (
+                          <span className="inline-flex items-center gap-1">
+                            <span aria-hidden="true"> · </span>
+                            <PublicProfileAvatar
+                              imageUrl={item.ownerImageUrl}
+                              username={item.ownerUsername}
+                            />
+                            {item.ownerUsername}
+                          </span>
+                        ) : null}
+                      </p>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Link
+                        className={buttonVariants({
+                          size: "sm",
+                          variant: "outline",
+                        })}
+                        params={{
+                          collectionId: item.collectionId,
+                          collectionItemId: item.collectionItemId,
+                          userId: item.ownerUserId,
+                        }}
+                        to="/collections/$userId/$collectionId/$collectionItemId"
+                      >
+                        <span className="sm:hidden">
+                          {t("web.action.view")}
+                        </span>
+                        <span className="hidden sm:inline">
+                          {t("web.action.viewItem")}
+                        </span>
+                      </Link>
+                      <Link
+                        className={buttonVariants({
+                          size: "sm",
+                          variant: "outline",
+                        })}
+                        params={{
+                          collectionId: item.collectionId,
+                          userId: item.ownerUserId,
+                        }}
+                        to="/collections/$userId/$collectionId"
+                      >
+                        <span className="sm:hidden">
+                          {t("web.collections.field.collection")}
+                        </span>
+                        <span className="hidden sm:inline">
+                          {t("web.action.viewCollection")}
+                        </span>
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        ) : null}
       </main>
     </AppShell>
   );

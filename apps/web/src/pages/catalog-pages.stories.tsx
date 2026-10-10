@@ -38,6 +38,7 @@ const collectionImage = image(
 
 /** Catalog product shared by the stories. */
 const product: CatalogProduct = {
+  aliases: [],
   approvalStatus: "approved",
   bearing: "R188 hybrid ceramic",
   buttonDiameter: null,
@@ -46,6 +47,8 @@ const product: CatalogProduct = {
   canEdit: false,
   compatibleButtonId: null,
   compatibleButtonName: null,
+  compatiblePens: [],
+  configurationSlots: [],
   createdAt: new Date("2026-01-01"),
   description: "A **compact** spinner.",
   diameter: { unit: "mm", value: "50.8" },
@@ -84,6 +87,8 @@ const product: CatalogProduct = {
     },
   ],
   name: "Katla",
+  refillModel: null,
+  refillOfferings: [],
   ownerClerkId: "user_storybook",
   productTypeId: 1000,
   productTypeName: "Spinner",
@@ -124,6 +129,31 @@ const slider: CatalogProduct = {
   thickness: { unit: "mm", value: "12" },
   weight: { unit: "g", value: "96" },
   width: { unit: "mm", value: "24" },
+};
+
+/** Refill catalog fixture covering offerings and reverse compatibility. */
+const refill: CatalogProduct = {
+  ...product,
+  aliases: ["Pilot Precise V5 RT"],
+  compatiblePens: [
+    {
+      id: 3000,
+      name: "Example Pen",
+      outcome: "compatible",
+      requiredTipName: null,
+      slug: "example-pen",
+    },
+  ],
+  id: 3001,
+  name: "BXS-V5RT",
+  productTypeId: 3000,
+  productTypeName: "Refill",
+  productTypeSlug: "refill",
+  refillModel: "BXS-V5RT",
+  refillOfferings: [
+    { id: 3002, inkColor: "Blue", tipSize: "0.5 mm", tipStyle: "Needle" },
+  ],
+  slug: "bxs-v5rt",
 };
 
 /** User collection shared by the stories. */
@@ -401,6 +431,15 @@ export const SliderProductDetail: Story = {
    * @returns A slider catalog detail fixture.
    */
   render: () => <ProductDetailPage product={slider} />,
+};
+
+/** Refill detail with approved offerings and compatible Pens. */
+export const RefillProductDetail: Story = {
+  /**
+   * Renders the refill detail story.
+   * @returns A refill catalog detail fixture.
+   */
+  render: () => <ProductDetailPage product={refill} />,
 };
 
 /** Approval-decision spy returning the approved state for story interactions. */

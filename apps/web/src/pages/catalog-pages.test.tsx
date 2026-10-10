@@ -269,6 +269,7 @@ const owners = [
 
 /** Catalog product fixture used by page tests. */
 const product: CatalogProduct = {
+  aliases: [],
   approvalStatus: "approved",
   bearing: null,
   buttonDiameter: null,
@@ -277,6 +278,8 @@ const product: CatalogProduct = {
   canEdit: false,
   compatibleButtonId: null,
   compatibleButtonName: null,
+  compatiblePens: [],
+  configurationSlots: [],
   createdAt: new Date(0),
   description: null,
   diameter: null,
@@ -299,6 +302,8 @@ const product: CatalogProduct = {
   usesInserts: null,
   materials: [],
   name: "Catla",
+  refillModel: null,
+  refillOfferings: [],
   ownerClerkId: "user_1002",
   productTypeId: 1,
   productTypeName: "Spinner",
@@ -1052,6 +1057,46 @@ describe("ProductDetailPage", () => {
     expect(invalidHtml).not.toContain(
       'href="https://www.kapedc.com/products/catla"',
     );
+  });
+
+  it("shows refill offerings and compatible pens without collection usage", () => {
+    const html = renderToStaticMarkup(
+      <ProductDetailPage
+        collectionItems={owners[0]?.items ?? []}
+        product={{
+          ...product,
+          aliases: ["Pilot Precise V5 RT"],
+          compatiblePens: [
+            {
+              id: 2,
+              name: "Test Pen",
+              outcome: "conditional",
+              requiredTipName: "Needle Tip",
+              slug: "test-pen",
+            },
+          ],
+          name: "BXS-V5RT",
+          productTypeName: "Refill",
+          productTypeSlug: "refill",
+          refillModel: "BXS-V5RT",
+          refillOfferings: [
+            {
+              id: 3,
+              inkColor: "Blue",
+              tipSize: "0.5 mm",
+              tipStyle: "Needle",
+            },
+          ],
+          slug: "bxs-v5rt",
+        }}
+      />,
+    );
+
+    expect(html).toContain("Pilot Precise V5 RT");
+    expect(html).toContain("0.5 mm · Needle · Blue");
+    expect(html).toContain('href="/products/pen/test-pen"');
+    expect(html).toContain("web.pens.refill.requiresTip");
+    expect(html).not.toContain("web.catalog.collectionsWithProduct");
   });
 });
 

@@ -65,6 +65,7 @@ import {
   createCatalogTerminologyAlias,
   deleteCollectionItem,
   deleteUserCollection,
+  type EditableCatalogProductType,
   finishOptionSchema,
   type ProductFormInput,
   type ProductFormValue,
@@ -243,7 +244,7 @@ export function ProductEditor({
   /** Catalog lookup options. */
   options: CatalogOptions;
   /** Product type being edited. */
-  productTypeSlug: CatalogProductType;
+  productTypeSlug: EditableCatalogProductType;
   /** Hides fields outside the plate quick-create scope. */
   quickCreate?: boolean;
 }) {

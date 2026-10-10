@@ -369,6 +369,13 @@ export function hasCatalogFilters(filters: CatalogFilters): boolean {
  */
 function isCatalogProductType(value: unknown): value is CatalogProductType {
   return (
+    value === "pen" ||
+    value === "pen-actuator" ||
+    value === "pen-clip" ||
+    value === "pen-mechanism" ||
+    value === "pen-tip" ||
+    value === "pen-top-cap" ||
+    value === "refill" ||
     value === "slider" ||
     value === "slider-insert" ||
     value === "slider-plate" ||
