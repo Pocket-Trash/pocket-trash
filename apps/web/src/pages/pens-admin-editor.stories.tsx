@@ -161,7 +161,7 @@ export const AvailabilityRule: Story = {
    */
   play: async ({ canvas, userEvent }) => {
     await userEvent.selectOptions(
-      canvas.getByRole("combobox", { name: "web.pens.admin.action" }),
+      canvas.getByRole("combobox", { name: "web.pens.admin.actionLabel" }),
       "configuration-rule",
     );
     await userEvent.selectOptions(

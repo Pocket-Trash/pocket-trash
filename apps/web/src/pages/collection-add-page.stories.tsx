@@ -143,7 +143,7 @@ const products: CatalogProduct[] = [
         ],
         id: 4001,
         labelFallback: "Body material",
-        labelKey: "catalog.pen.configurationSlot.bodyMaterial",
+        labelKey: "catalog.configurationSlots.material",
         required: true,
       },
       {
@@ -158,7 +158,7 @@ const products: CatalogProduct[] = [
         ],
         id: 4004,
         labelFallback: "Tip",
-        labelKey: "catalog.pen.configurationSlot.tip",
+        labelKey: "catalog.configurationSlots.tip",
         required: true,
       },
     ],

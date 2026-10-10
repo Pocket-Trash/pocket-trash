@@ -540,7 +540,7 @@ export function PensAdminEditor({
         {t("web.pens.admin.heading" as TranslationKey)}
       </h2>
       {select(
-        t("web.pens.admin.action" as TranslationKey),
+        t("web.pens.admin.actionLabel" as TranslationKey),
         action,
         (value) => {
           setAction(value as PensAdminAction);
