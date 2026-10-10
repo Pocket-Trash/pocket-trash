@@ -1,12 +1,12 @@
 import type {
   CatalogProduct,
-  CatalogProductType,
   UserCollectionItem,
   UserCollectionSummary,
 } from "@package/services";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import type { EditableCatalogProductType } from "@/lib/catalog-api";
 import {
   CollectionAddPage,
   CollectionEditPage,
@@ -209,6 +209,7 @@ describe("finish option editor", () => {
 
   it("renders the owned material and product finish choices", () => {
     const product: CatalogProduct = {
+      aliases: [],
       approvalStatus: "approved",
       bearing: null,
       buttonDiameter: null,
@@ -217,6 +218,8 @@ describe("finish option editor", () => {
       canEdit: true,
       compatibleButtonId: null,
       compatibleButtonName: null,
+      compatiblePens: [],
+      configurationSlots: [],
       createdAt: new Date(0),
       description: null,
       diameter: null,
@@ -253,6 +256,8 @@ describe("finish option editor", () => {
         },
       ],
       name: "Spinner",
+      refillModel: null,
+      refillOfferings: [],
       ownerClerkId: "user_test",
       isAdminPrivate: false,
       isPrivate: false,
@@ -852,9 +857,10 @@ describe("collection add form", () => {
 function productFixture(
   id: number,
   name: string,
-  productTypeSlug: CatalogProductType,
+  productTypeSlug: EditableCatalogProductType,
 ): CatalogProduct {
   return {
+    aliases: [],
     approvalStatus: "approved",
     bearing: null,
     buttonDiameter: null,
@@ -863,6 +869,8 @@ function productFixture(
     canEdit: true,
     compatibleButtonId: null,
     compatibleButtonName: null,
+    compatiblePens: [],
+    configurationSlots: [],
     createdAt: new Date(0),
     description: null,
     diameter: null,
@@ -899,6 +907,8 @@ function productFixture(
       },
     ],
     name,
+    refillModel: null,
+    refillOfferings: [],
     ownerClerkId: "user_test",
     isAdminPrivate: false,
     isPrivate: false,

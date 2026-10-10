@@ -6,7 +6,6 @@ import type {
   CatalogLookup,
   CatalogMaker,
   CatalogProduct,
-  CatalogProductType,
   CatalogProductTypeSummary,
   CatalogTerminologyAlias,
   ProductWriteInput,
@@ -95,6 +94,21 @@ const urlMessage = "web.catalog.error.url";
 /**
  * Schema for supported catalog product-type slugs.
  */
+const catalogProductTypeSchema = z.enum([
+  "pen",
+  "pen-actuator",
+  "pen-clip",
+  "pen-mechanism",
+  "pen-tip",
+  "pen-top-cap",
+  "refill",
+  "slider",
+  "slider-insert",
+  "slider-plate",
+  "spinner",
+  "spinner-button",
+]);
+/** Product types currently supported by the catalog authoring form. */
 const productTypeSchema = z.enum([
   "slider",
   "slider-insert",
@@ -102,6 +116,8 @@ const productTypeSchema = z.enum([
   "spinner",
   "spinner-button",
 ]);
+/** Product types currently accepted by catalog authoring and collection forms. */
+export type EditableCatalogProductType = z.infer<typeof productTypeSchema>;
 /** Product types supported by the standalone collection-item editor. */
 const collectionProductTypeSchema = productTypeSchema;
 /**
@@ -165,7 +181,7 @@ const slugNameSchema = z
 const displayNameSchema = z.string().trim().min(1, requiredMessage);
 /** Schema for a maker-scoped alias of a registered product type. */
 const terminologyAliasSchema = z.object({
-  canonicalKey: productTypeSchema,
+  canonicalKey: catalogProductTypeSchema,
   canonicalNamespace: z.literal("product-type"),
   isPreferred: z.boolean(),
   label: z.string().trim().min(1, requiredMessage).max(80),
@@ -966,7 +982,7 @@ export const setProductTypePartOrAccessory = createServerFn({ method: "POST" })
 export const listCatalogProducts = createServerFn({ method: "GET" })
   .validator((input: unknown) =>
     z
-      .object({ productTypeSlug: productTypeSchema.optional() })
+      .object({ productTypeSlug: catalogProductTypeSchema.optional() })
       .optional()
       .parse(input),
   )
@@ -979,7 +995,7 @@ export const listCatalogProducts = createServerFn({ method: "GET" })
       );
     }
     const products = await Promise.all(
-      productTypeSchema.options.map((type) =>
+      catalogProductTypeSchema.options.map((type) =>
         s.db.catalog.listProducts(type, viewer),
       ),
     );
@@ -2750,7 +2766,7 @@ async function signCatalogImageUrls<T extends CatalogImage>(
  */
 export function productTypeIsSupported(
   value: string,
-): value is CatalogProductType {
+): value is EditableCatalogProductType {
   return productTypeSchema.safeParse(value).success;
 }
 
@@ -2762,7 +2778,7 @@ export function productTypeIsSupported(
  */
 export function collectionProductTypeIsSupported(
   value: string,
-): value is CatalogProductType {
+): value is EditableCatalogProductType {
   return collectionProductTypeSchema.safeParse(value).success;
 }
 

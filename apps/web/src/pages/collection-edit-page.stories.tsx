@@ -31,6 +31,7 @@ function product(
   productTypeSlug: "slider" | "slider-insert" | "slider-plate",
 ): CatalogProduct {
   return {
+    aliases: [],
     approvalStatus: "approved",
     bearing: null,
     buttonDiameter: null,
@@ -39,6 +40,8 @@ function product(
     canEdit: true,
     compatibleButtonId: null,
     compatibleButtonName: null,
+    compatiblePens: [],
+    configurationSlots: [],
     createdAt: new Date(0),
     description: null,
     diameter: null,
@@ -61,6 +64,8 @@ function product(
     magnetLayout: productTypeSlug === "slider" ? "2x4" : null,
     materials: [material],
     name,
+    refillModel: null,
+    refillOfferings: [],
     ownerClerkId: "user_storybook",
     productTypeId: id,
     productTypeName:

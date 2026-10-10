@@ -6,6 +6,7 @@ import { ProductCard } from "./product-card";
  * Catalog product fixture without images.
  */
 const product: CatalogProduct = {
+  aliases: [],
   approvalStatus: "approved",
   bearing: null,
   buttonDiameter: null,
@@ -14,6 +15,8 @@ const product: CatalogProduct = {
   canEdit: true,
   compatibleButtonId: null,
   compatibleButtonName: null,
+  compatiblePens: [],
+  configurationSlots: [],
   createdAt: new Date("2026-01-01"),
   description: null,
   diameter: { unit: "mm", value: "50.8" },
@@ -61,6 +64,8 @@ const product: CatalogProduct = {
     },
   ],
   name: "Katla",
+  refillModel: null,
+  refillOfferings: [],
   ownerClerkId: "user_storybook",
   productTypeId: 1000,
   productTypeName: "Spinner",

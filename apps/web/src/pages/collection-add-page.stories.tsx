@@ -6,6 +6,7 @@ import { CollectionAddPage } from "./catalog-form-pages";
 
 /** Catalog product used by the chooser interaction stories. */
 const product: CatalogProduct = {
+  aliases: [],
   approvalStatus: "approved",
   bearing: null,
   buttonDiameter: null,
@@ -14,6 +15,8 @@ const product: CatalogProduct = {
   canEdit: true,
   compatibleButtonId: null,
   compatibleButtonName: null,
+  compatiblePens: [],
+  configurationSlots: [],
   createdAt: new Date(0),
   description: null,
   diameter: null,
@@ -50,6 +53,8 @@ const product: CatalogProduct = {
     },
   ],
   name: "Product 1",
+  refillModel: null,
+  refillOfferings: [],
   ownerClerkId: "user_test",
   isAdminPrivate: false,
   isPrivate: false,

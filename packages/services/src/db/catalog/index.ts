@@ -197,11 +197,24 @@ function mapCatalogNameConflict(error: unknown): never {
  * Product category supported by the spinner catalog.
  */
 export type CatalogProductType =
+  | "pen"
+  | "pen-actuator"
+  | "pen-clip"
+  | "pen-mechanism"
+  | "pen-tip"
+  | "pen-top-cap"
+  | "refill"
   | "slider"
   | "slider-insert"
   | "slider-plate"
   | "spinner"
   | "spinner-button";
+
+/** Product types supported by the pre-Pens catalog editor. */
+export type WritableCatalogProductType = Extract<
+  CatalogProductType,
+  "slider" | "slider-insert" | "slider-plate" | "spinner" | "spinner-button"
+>;
 
 /** Product-type fields used by catalog forms, directories, and configuration. */
 export type CatalogProductTypeSummary = {
@@ -256,6 +269,13 @@ function catalogProductType(value: string): CatalogProductType {
     case "slider-plate":
     case "spinner":
     case "spinner-button":
+    case "pen":
+    case "pen-actuator":
+    case "pen-clip":
+    case "pen-mechanism":
+    case "pen-tip":
+    case "pen-top-cap":
+    case "refill":
       return value;
     default:
       throw new Error(`Unsupported catalog product type: ${value}`);
@@ -634,6 +654,8 @@ export function resolveEffectiveSliderSetup(input: {
  * Fully hydrated catalog product returned to callers.
  */
 export type CatalogProduct = {
+  /** Searchable alternate product names. */
+  aliases: string[];
   /**
    * Durable product review state.
    */
@@ -676,6 +698,10 @@ export type CatalogProduct = {
    * Configured finish choices with their colors and effects.
    */
   finishOptions: CatalogFinishOption[];
+  /** Ordered maker-supported configuration dimensions. */
+  configurationSlots: CatalogConfigurationSlot[];
+  /** Catalog Pens compatible with this refill model. */
+  compatiblePens: CatalogCompatiblePen[];
   /**
    * Number of attached images.
    */
@@ -730,6 +756,10 @@ export type CatalogProduct = {
    * Display name.
    */
   name: string;
+  /** Stable maker model for refill products. */
+  refillModel: string | null;
+  /** Approved tip-and-ink offerings for refill products. */
+  refillOfferings: CatalogRefillOffering[];
   /**
    * Owner Clerk user identifier.
    */
@@ -778,6 +808,58 @@ export type CatalogProduct = {
   width: DimensionMeasurement | null;
 };
 
+/** One approved refill offering shown on a public refill page. */
+export type CatalogRefillOffering = {
+  /** Database identifier. */
+  id: number;
+  /** Ink-color display name. */
+  inkColor: string;
+  /** Tip-size display value. */
+  tipSize: string;
+  /** Tip-style display name. */
+  tipStyle: string;
+};
+
+/** One public Pen known to accept a refill. */
+export type CatalogCompatiblePen = {
+  /** Pen product identifier. */
+  id: number;
+  /** Pen display name. */
+  name: string;
+  /** Compatibility outcome. */
+  outcome: "compatible" | "conditional";
+  /** Required tip display name, when compatibility depends on a tip. */
+  requiredTipName: string | null;
+  /** Pen route slug. */
+  slug: string;
+};
+
+/** One maker-supported choice in a product configuration slot. */
+export type CatalogConfigurationChoice = {
+  /** Alternative requirement sets; each inner list is an AND branch. */
+  availableWhen: number[][];
+  /** Finish option represented by this choice, when applicable. */
+  finishOptionId: number | null;
+  /** Database identifier. */
+  id: number;
+  /** Material or part display label, when applicable. */
+  label: string | null;
+};
+
+/** One ordered public product-configuration dimension. */
+export type CatalogConfigurationSlot = {
+  /** Choices ordered as authored. */
+  choices: CatalogConfigurationChoice[];
+  /** Database identifier. */
+  id: number;
+  /** English label used when localization is unavailable. */
+  labelFallback: string;
+  /** Localization key for the slot label. */
+  labelKey: string;
+  /** Whether the product requires a selection in this slot. */
+  required: boolean;
+};
+
 /**
  * Validated fields accepted when creating or updating a catalog product.
  */
@@ -821,7 +903,7 @@ export type ProductWriteInput = {
   /**
    * Product type slug.
    */
-  productTypeSlug: CatalogProductType;
+  productTypeSlug: WritableCatalogProductType;
   /**
    * Administrative reason for the operation.
    */
@@ -8127,7 +8209,7 @@ async function queryProducts(
       buttonDiameterUnit: schema.productDetailSpinner.buttonDiameterUnit,
       compatibleButtonId: schema.productDetailSpinner.compatibleButtonId,
       compatibleButtonName: compatibleButtonProduct.name,
-      createdAt: sql<Date>`coalesce(${schema.productDetailSpinner.createdAt}, ${schema.productDetailSpinnerButton.createdAt}, ${schema.productDetailSlider.createdAt}, ${schema.productDetailSliderPlate.createdAt}, ${schema.productDetailSliderInsert.createdAt})`,
+      createdAt: sql<Date>`coalesce(${schema.productDetailSpinner.createdAt}, ${schema.productDetailSpinnerButton.createdAt}, ${schema.productDetailSlider.createdAt}, ${schema.productDetailSliderPlate.createdAt}, ${schema.productDetailSliderInsert.createdAt}, ${schema.product.createdAt})`,
       description: schema.product.description,
       diameter: schema.productDetailSpinnerButton.diameter,
       diameterUnit: schema.productDetailSpinnerButton.diameterUnit,
@@ -8158,6 +8240,7 @@ async function queryProducts(
       productTypeId: schema.productType.id,
       productTypeName: schema.productType.name,
       productTypeSlug: schema.productType.slug,
+      refillModel: schema.productDetailRefill.model,
       slug: schema.product.slug,
       spinDiameter: schema.productDetailSpinner.spinDiameter,
       spinDiameterUnit: schema.productDetailSpinner.spinDiameterUnit,
@@ -8218,6 +8301,10 @@ async function queryProducts(
       eq(schema.product.id, schema.productDetailSliderInsert.id),
     )
     .leftJoin(
+      schema.productDetailRefill,
+      eq(schema.product.id, schema.productDetailRefill.id),
+    )
+    .leftJoin(
       compatibleButtonProduct,
       eq(
         schema.productDetailSpinner.compatibleButtonId,
@@ -8262,6 +8349,7 @@ async function queryProducts(
       continue;
     }
     products.set(row.id, {
+      aliases: [],
       approvalStatus: row.approvalStatus,
       bearing: row.bearing,
       buttonDiameter: dimensionMeasurement(
@@ -8279,6 +8367,8 @@ async function queryProducts(
       createdAt: row.createdAt,
       description: row.description,
       diameter: dimensionMeasurement(row.diameter, row.diameterUnit),
+      compatiblePens: [],
+      configurationSlots: [],
       finishOptions: [],
       imageCount: 0,
       images: [],
@@ -8316,6 +8406,8 @@ async function queryProducts(
             ]
           : [],
       name: row.name,
+      refillModel: row.refillModel,
+      refillOfferings: [],
       ownerClerkId: row.ownerClerkId,
       isPrivate: row.isPrivate,
       isAdminPrivate:
@@ -8345,6 +8437,7 @@ async function queryProducts(
   const result = [...products.values()];
   await Promise.all([
     loadFinishOptions(db, result),
+    loadPensCatalogDetails(db, result, viewer),
     loadProductImages(db, result, viewer),
     loadProductRelationships(db, result, viewer),
   ]);
@@ -8354,6 +8447,328 @@ async function queryProducts(
       : null;
   }
   return result;
+}
+
+/**
+ * Hydrates Pens aliases, configuration, refill offerings, and reverse compatibility.
+ *
+ * @param db - Database used for Pens catalog reads.
+ * @param products - Visible products receiving Pens-specific public details.
+ * @param viewer - Optional viewer controlling part-choice visibility.
+ * @rejects When any Pens catalog query fails.
+ */
+async function loadPensCatalogDetails(
+  db: Pick<Database, "select">,
+  products: CatalogProduct[],
+  viewer?: CatalogViewer,
+) {
+  if (!products.length) return;
+  const productIds = products.map(({ id }) => id);
+  const refillIds = products
+    .filter(({ productTypeSlug }) => productTypeSlug === "refill")
+    .map(({ id }) => id);
+  const slots = await db
+    .select({
+      id: schema.productConfigurationSlot.id,
+      labelFallback: schema.configurationSlotKind.labelFallback,
+      labelKey: schema.configurationSlotKind.labelKey,
+      productId: schema.productConfigurationSlot.productId,
+      required: schema.productConfigurationSlot.required,
+    })
+    .from(schema.productConfigurationSlot)
+    .innerJoin(
+      schema.configurationSlotKind,
+      eq(
+        schema.productConfigurationSlot.slotKindId,
+        schema.configurationSlotKind.id,
+      ),
+    )
+    .where(inArray(schema.productConfigurationSlot.productId, productIds))
+    .orderBy(
+      asc(schema.productConfigurationSlot.productId),
+      asc(schema.productConfigurationSlot.position),
+    );
+  const slotIds = slots.map(({ id }) => id);
+  const partProduct = alias(schema.product, "configuration_part_product");
+  const [aliases, choices, ruleRows, offerings, memberships] =
+    await Promise.all([
+      db
+        .select({
+          label: schema.productAlias.label,
+          productId: schema.productAlias.productId,
+        })
+        .from(schema.productAlias)
+        .where(inArray(schema.productAlias.productId, productIds))
+        .orderBy(asc(schema.productAlias.label)),
+      slotIds.length
+        ? db
+            .select({
+              finishOptionId: schema.productConfigurationChoice.finishOptionId,
+              id: schema.productConfigurationChoice.id,
+              materialName: schema.material.name,
+              materialSpecificName: schema.materialSpecific.name,
+              partApprovalStatus: partProduct.approvalStatus,
+              partIsPrivate: partProduct.isPrivate,
+              partName: partProduct.name,
+              partOwnerClerkId: partProduct.ownerClerkId,
+              slotId: schema.productConfigurationChoice.slotId,
+            })
+            .from(schema.productConfigurationChoice)
+            .leftJoin(
+              schema.productMaterial,
+              eq(
+                schema.productConfigurationChoice.productMaterialId,
+                schema.productMaterial.id,
+              ),
+            )
+            .leftJoin(
+              schema.material,
+              eq(schema.productMaterial.materialId, schema.material.id),
+            )
+            .leftJoin(
+              schema.materialSpecific,
+              eq(
+                schema.productMaterial.materialSpecificId,
+                schema.materialSpecific.id,
+              ),
+            )
+            .leftJoin(
+              partProduct,
+              eq(
+                schema.productConfigurationChoice.partProductId,
+                partProduct.id,
+              ),
+            )
+            .where(inArray(schema.productConfigurationChoice.slotId, slotIds))
+            .orderBy(
+              asc(schema.productConfigurationChoice.slotId),
+              asc(schema.productConfigurationChoice.position),
+            )
+        : Promise.resolve([]),
+      slotIds.length
+        ? db
+            .select({
+              requiredChoiceId:
+                schema.productConfigurationChoiceRequirement.requiredChoiceId,
+              ruleId: schema.productConfigurationChoiceRule.id,
+              targetChoiceId:
+                schema.productConfigurationChoiceRule.targetChoiceId,
+            })
+            .from(schema.productConfigurationChoiceRule)
+            .leftJoin(
+              schema.productConfigurationChoiceRequirement,
+              eq(
+                schema.productConfigurationChoiceRule.id,
+                schema.productConfigurationChoiceRequirement.ruleId,
+              ),
+            )
+            .where(
+              inArray(
+                schema.productConfigurationChoiceRule.productId,
+                productIds,
+              ),
+            )
+            .orderBy(
+              asc(schema.productConfigurationChoiceRule.targetChoiceId),
+              asc(schema.productConfigurationChoiceRule.position),
+            )
+        : Promise.resolve([]),
+      refillIds.length
+        ? db
+            .select({
+              id: schema.refillOffering.id,
+              inkColor: schema.refillInkColor.name,
+              refillProductId: schema.refillOffering.refillProductId,
+              tipSize: schema.refillOffering.tipSize,
+              tipStyle: schema.refillTipStyle.name,
+            })
+            .from(schema.refillOffering)
+            .innerJoin(
+              schema.refillInkColor,
+              eq(schema.refillOffering.inkColorId, schema.refillInkColor.id),
+            )
+            .innerJoin(
+              schema.refillTipStyle,
+              eq(schema.refillOffering.tipStyleId, schema.refillTipStyle.id),
+            )
+            .where(
+              and(
+                inArray(schema.refillOffering.refillProductId, refillIds),
+                isNotNull(schema.refillOffering.approvedAt),
+              ),
+            )
+            .orderBy(
+              asc(schema.refillOffering.tipSize),
+              asc(schema.refillInkColor.name),
+            )
+        : Promise.resolve([]),
+      refillIds.length
+        ? db
+            .select({
+              groupId: schema.refillCompatibilityGroupMembership.groupId,
+              refillProductId:
+                schema.refillCompatibilityGroupMembership.refillProductId,
+            })
+            .from(schema.refillCompatibilityGroupMembership)
+            .where(
+              and(
+                inArray(
+                  schema.refillCompatibilityGroupMembership.refillProductId,
+                  refillIds,
+                ),
+                isNotNull(schema.refillCompatibilityGroupMembership.approvedAt),
+              ),
+            )
+        : Promise.resolve([]),
+    ]);
+  const requirements = new Map<number, Map<number, number[]>>();
+  for (const row of ruleRows) {
+    const rules = requirements.get(row.targetChoiceId) ?? new Map();
+    const choicesForRule = rules.get(row.ruleId) ?? [];
+    if (row.requiredChoiceId !== null)
+      choicesForRule.push(row.requiredChoiceId);
+    rules.set(row.ruleId, choicesForRule);
+    requirements.set(row.targetChoiceId, rules);
+  }
+  const choicesBySlot = new Map<number, CatalogConfigurationChoice[]>();
+  for (const choice of choices) {
+    if (
+      choice.partName !== null &&
+      !hasPermission(viewer, "products.manage") &&
+      !(choice.partApprovalStatus === "approved" && !choice.partIsPrivate) &&
+      choice.partOwnerClerkId !== viewer?.clerkId
+    )
+      continue;
+    const slotChoices = choicesBySlot.get(choice.slotId) ?? [];
+    slotChoices.push({
+      availableWhen: [...(requirements.get(choice.id)?.values() ?? [])],
+      finishOptionId: choice.finishOptionId,
+      id: choice.id,
+      label:
+        choice.materialSpecificName ?? choice.materialName ?? choice.partName,
+    });
+    choicesBySlot.set(choice.slotId, slotChoices);
+  }
+  const productsById = new Map(
+    products.map((product) => [product.id, product]),
+  );
+  for (const row of aliases)
+    productsById.get(row.productId)?.aliases.push(row.label);
+  for (const slot of slots) {
+    productsById.get(slot.productId)?.configurationSlots.push({
+      choices: choicesBySlot.get(slot.id) ?? [],
+      id: slot.id,
+      labelFallback: slot.labelFallback,
+      labelKey: slot.labelKey,
+      required: slot.required,
+    });
+  }
+  for (const offering of offerings) {
+    productsById.get(offering.refillProductId)?.refillOfferings.push({
+      id: offering.id,
+      inkColor: offering.inkColor,
+      tipSize: offering.tipSize,
+      tipStyle: offering.tipStyle,
+    });
+  }
+  if (!refillIds.length) return;
+  const groupIds = [...new Set(memberships.map(({ groupId }) => groupId))];
+  const penProduct = alias(schema.product, "compatible_pen_product");
+  const requiredTip = alias(schema.product, "compatible_required_tip");
+  const assertions = await db
+    .select({
+      outcome: schema.refillCompatibilityAssertion.outcome,
+      penProductId: schema.refillCompatibilityAssertion.penProductId,
+      penName: penProduct.name,
+      penSlug: penProduct.slug,
+      requiredTipName: requiredTip.name,
+      requiredTipProductId:
+        schema.refillCompatibilityAssertion.requiredTipProductId,
+      targetGroupId: schema.refillCompatibilityAssertion.targetGroupId,
+      targetRefillProductId:
+        schema.refillCompatibilityAssertion.targetRefillProductId,
+    })
+    .from(schema.refillCompatibilityAssertion)
+    .innerJoin(
+      penProduct,
+      eq(schema.refillCompatibilityAssertion.penProductId, penProduct.id),
+    )
+    .leftJoin(
+      requiredTip,
+      eq(
+        schema.refillCompatibilityAssertion.requiredTipProductId,
+        requiredTip.id,
+      ),
+    )
+    .where(
+      and(
+        isNotNull(schema.refillCompatibilityAssertion.approvedAt),
+        inArray(schema.refillCompatibilityAssertion.outcome, [
+          "compatible",
+          "conditional",
+        ]),
+        or(
+          inArray(
+            schema.refillCompatibilityAssertion.targetRefillProductId,
+            refillIds,
+          ),
+          groupIds.length
+            ? inArray(
+                schema.refillCompatibilityAssertion.targetGroupId,
+                groupIds,
+              )
+            : undefined,
+        ),
+        eq(penProduct.approvalStatus, "approved"),
+        eq(penProduct.isPrivate, false),
+        or(
+          isNull(schema.refillCompatibilityAssertion.requiredTipProductId),
+          and(
+            eq(requiredTip.approvalStatus, "approved"),
+            eq(requiredTip.isPrivate, false),
+          ),
+        ),
+      ),
+    );
+  const groupsByRefill = new Map<number, Set<number>>();
+  for (const membership of memberships) {
+    const groups = groupsByRefill.get(membership.refillProductId) ?? new Set();
+    groups.add(membership.groupId);
+    groupsByRefill.set(membership.refillProductId, groups);
+  }
+  for (const refillId of refillIds) {
+    const compatible = new Map<string, CatalogCompatiblePen>();
+    const matching = assertions
+      .filter(
+        (assertion) =>
+          assertion.targetRefillProductId === refillId ||
+          (assertion.targetGroupId !== null &&
+            groupsByRefill.get(refillId)?.has(assertion.targetGroupId)),
+      )
+      .sort(
+        (a, b) =>
+          Number(b.targetRefillProductId === refillId) -
+          Number(a.targetRefillProductId === refillId),
+      );
+    for (const assertion of matching) {
+      const key = `${assertion.penProductId}:${assertion.requiredTipProductId ?? ""}`;
+      if (compatible.has(key)) continue;
+      compatible.set(key, {
+        id: assertion.penProductId,
+        name: assertion.penName,
+        outcome: assertion.outcome as "compatible" | "conditional",
+        requiredTipName: assertion.requiredTipName,
+        slug: assertion.penSlug,
+      });
+    }
+    productsById
+      .get(refillId)
+      ?.compatiblePens.push(
+        ...[...compatible.values()].sort((a, b) =>
+          a.name.localeCompare(b.name),
+        ),
+      );
+  }
 }
 
 /**

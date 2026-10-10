@@ -1,5 +1,12 @@
 /** Canonical product-type keys supported by shared search. */
 export type SearchableCatalogProductType =
+  | "pen"
+  | "pen-actuator"
+  | "pen-clip"
+  | "pen-mechanism"
+  | "pen-tip"
+  | "pen-top-cap"
+  | "refill"
   | "slider"
   | "slider-insert"
   | "slider-plate"
@@ -24,6 +31,8 @@ export type SearchableCatalogAlias = {
 
 /** Minimum catalog and collection fields used by shared client-side search. */
 export type SearchableCatalogItem = {
+  /** Searchable alternate product names. */
+  aliases?: string[];
   /** Localized canonical product-type label. */
   activeTypeLabel: string;
   /** English canonical product-type fallback. */
@@ -100,6 +109,16 @@ export function matchCatalogSearch(
   }
   if (normalizeCatalogSearch(item.name).includes(normalizedQuery)) {
     return { matchedAlias: null, matchedOwner: null, matchedType: null };
+  }
+  const productAlias = item.aliases?.find((candidate) =>
+    normalizeCatalogSearch(candidate).includes(normalizedQuery),
+  );
+  if (productAlias) {
+    return {
+      matchedAlias: productAlias,
+      matchedOwner: null,
+      matchedType: null,
+    };
   }
   if (normalizeCatalogSearch(item.makerName).includes(normalizedQuery)) {
     return { matchedAlias: null, matchedOwner: null, matchedType: null };
