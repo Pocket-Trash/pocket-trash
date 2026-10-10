@@ -126,6 +126,10 @@ export const productAudit = {
   patternCreated: definition("products.pattern.created", "products.pattern"),
   productCreated: definition("products.product.created", "products.product"),
   productDeleted: definition("products.product.deleted", "products.product"),
+  productTypeClassificationChanged: definition(
+    "products.product_type.classification_changed",
+    "products.product_type",
+  ),
   productUpdated: definition("products.product.updated", "products.product"),
   productVisibilityChanged: definition(
     "products.product.visibility_changed",

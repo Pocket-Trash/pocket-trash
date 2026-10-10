@@ -419,6 +419,7 @@ export const productType = pgTable(
       .generatedAlwaysAsIdentity({ startWith: 1000 }),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    isPartOrAccessory: boolean("is_part_or_accessory").default(false).notNull(),
     imageUrl: text("image_url"),
     imageAlt: text("image_alt"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })

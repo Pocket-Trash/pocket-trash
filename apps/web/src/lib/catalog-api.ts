@@ -7,6 +7,7 @@ import type {
   CatalogMaker,
   CatalogProduct,
   CatalogProductType,
+  CatalogProductTypeSummary,
   CatalogTerminologyAlias,
   ProductWriteInput,
   PublicMakerDetail,
@@ -75,6 +76,16 @@ export const isCatalogAdmin = createServerFn().handler(async () => {
  */
 export const canManageMaterials = createServerFn().handler(async () =>
   hasPermission(await getActor(), "products.manage"),
+);
+
+/**
+ * Reports whether the current actor may manage product configuration.
+ *
+ * @returns Whether the current actor has product-management permission.
+ * @rejects If actor lookup fails.
+ */
+export const canManageProductConfiguration = createServerFn().handler(
+  async () => hasPermission(await getActor(), "products.manage"),
 );
 /**
  * Localization key used for invalid catalog URLs.
@@ -922,6 +933,29 @@ export const listCatalogTerminologyAliases = createServerFn({
   const { s } = await import("@/lib/services");
   return await s.db.catalog.listTerminologyAliases();
 });
+
+/** Lists canonical product types for forms and directory navigation. */
+export const listCatalogProductTypes = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<CatalogProductTypeSummary[]> => {
+  return await listProductTypes();
+});
+
+/** Updates a product type's Parts and Accessories classification. */
+export const setProductTypePartOrAccessory = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z
+      .object({
+        isPartOrAccessory: z.boolean(),
+        productTypeId: idSchema,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }): Promise<CatalogProductTypeSummary> => {
+    const actor = await requirePermission("products.manage");
+    const { s } = await import("@/lib/services");
+    return await s.db.catalog.setProductTypePartOrAccessory({ actor, ...data });
+  });
 
 /**
  * Lists visible products, optionally limited to one product type.

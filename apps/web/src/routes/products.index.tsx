@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   listCatalogProducts,
+  listCatalogProductTypes,
   listCatalogTerminologyAliases,
 } from "@/lib/catalog-api";
-import { parseCatalogFilterSearch } from "@/lib/catalog-filters";
+import { parseCatalogProductsSearch } from "@/lib/catalog-filters";
 import { useCatalogFilters } from "@/lib/use-catalog-filters";
 import { ProductsPage } from "@/pages/catalog-pages";
 
@@ -11,7 +12,7 @@ import { ProductsPage } from "@/pages/catalog-pages";
  * Shows the filterable catalog product directory.
  */
 export const Route = createFileRoute("/products/")({
-  validateSearch: parseCatalogFilterSearch,
+  validateSearch: parseCatalogProductsSearch,
   /**
    * Loads the catalog product directory.
    *
@@ -19,11 +20,12 @@ export const Route = createFileRoute("/products/")({
    * @rejects When catalog products cannot be loaded.
    */
   loader: async () => {
-    const [products, aliases] = await Promise.all([
+    const [products, productTypes, aliases] = await Promise.all([
       listCatalogProducts(),
+      listCatalogProductTypes(),
       listCatalogTerminologyAliases(),
     ]);
-    return { aliases, products };
+    return { aliases, products, productTypes };
   },
   component: ProductsRoute,
 });
@@ -35,16 +37,24 @@ export const Route = createFileRoute("/products/")({
  */
 function ProductsRoute() {
   const navigate = useNavigate();
+  const { view, ...catalogSearch } = Route.useSearch();
   const [filters, setFilters] = useCatalogFilters(
-    Route.useSearch(),
-    (search) => void navigate({ replace: true, search, to: "/products" }),
+    catalogSearch,
+    (search) =>
+      void navigate({
+        replace: true,
+        search: { ...search, view: "all" },
+        to: "/products",
+      }),
   );
   return (
     <ProductsPage
       filters={filters}
       onFiltersChange={setFilters}
       aliases={Route.useLoaderData().aliases}
+      productTypes={Route.useLoaderData().productTypes}
       products={Route.useLoaderData().products}
+      view={view === "all" ? "products" : "directory"}
     />
   );
 }

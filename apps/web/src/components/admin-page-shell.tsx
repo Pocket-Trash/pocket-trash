@@ -11,6 +11,7 @@ import {
   Flag,
   MessageSquare,
   ScrollText,
+  Settings,
   SlidersHorizontal,
   Trash2,
   UsersRound,
@@ -27,6 +28,7 @@ import { useLocale } from "@/providers/locale-provider";
 /** Administrator navigation section identifiers. */
 type AdminSection =
   | "audit"
+  | "config"
   | "feedback"
   | "materials"
   | "makers"
@@ -90,12 +92,10 @@ function AdminSidebar({
   const { sessionClaims, userId } = useAuth();
   const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
   const canManageFeedback = hasPermission(actor, "feedback.manage");
-  const canManageMaterials = hasPermission(actor, "products.manage");
+  const canManageProducts = hasPermission(actor, "products.manage");
   const canManageResources = hasPermission(actor, "resources.manage");
-  const canManageMakers = hasPermission(actor, "products.manage");
   const canManageCatalog =
-    hasPermission(actor, "products.manage") ||
-    hasPermission(actor, "collections.manage");
+    canManageProducts || hasPermission(actor, "collections.manage");
   const canManageFlags = hasPermission(actor, "feature_flags.manage");
   const canReadAudit = hasPermission(actor, "audit.read");
   const canManageUsers = hasPermission(actor, "users.manage");
@@ -108,7 +108,7 @@ function AdminSidebar({
    */
   const t = (key: TranslationKey) => formatTranslation(key, {}, locale);
   const primaryLinks: SidebarLink[] = [
-    ...(canManageMakers
+    ...(canManageProducts
       ? [
           {
             icon: Factory,
@@ -138,7 +138,7 @@ function AdminSidebar({
           },
         ]
       : []),
-    ...(canManageMaterials
+    ...(canManageProducts
       ? [
           {
             icon: Boxes,
@@ -212,6 +212,16 @@ function AdminSidebar({
       : []),
   ];
   const utilityLinks: SidebarLink[] = [
+    ...(canManageProducts
+      ? [
+          {
+            icon: Settings,
+            active: section === "config",
+            label: t("web.admin.config.title"),
+            to: "/admin/config" as const,
+          },
+        ]
+      : []),
     ...(canManageFlags
       ? [
           {

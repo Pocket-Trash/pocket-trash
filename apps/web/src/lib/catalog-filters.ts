@@ -90,6 +90,12 @@ export type CatalogFilterSearch = {
   type?: CatalogProductType;
 };
 
+/** Products-route search with an explicit filterable-list view. */
+export type CatalogProductsSearch = CatalogFilterSearch & {
+  /** Explicitly opens the filterable product list. */
+  view?: "all";
+};
+
 /**
  * Product fields required for catalog facet construction and matching.
  */
@@ -265,6 +271,21 @@ export function parseCatalogFilterSearch(
     strict:
       search.strict === true || search.strict === "true" ? true : undefined,
     type,
+  };
+}
+
+/**
+ * Normalizes product filters and the explicit list view.
+ *
+ * @param search - Unknown route search values.
+ * @returns Sanitized products route search.
+ */
+export function parseCatalogProductsSearch(
+  search: Record<string, unknown>,
+): CatalogProductsSearch {
+  return {
+    ...parseCatalogFilterSearch(search),
+    view: search.view === "all" ? "all" : undefined,
   };
 }
 

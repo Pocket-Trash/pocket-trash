@@ -1,6 +1,7 @@
 import type {
   CatalogImage,
   CatalogProduct,
+  CatalogProductTypeSummary,
   PublicCollectionOwner,
   PublicMakerDetail,
   UserCollectionItem,
@@ -592,6 +593,70 @@ export const Products: Story = {
       }))}
     />
   ),
+};
+
+/** Product-type directory with primary and accessory groups. */
+export const ProductDirectory: Story = {
+  /**
+   * Verifies the directory destinations and group ordering.
+   *
+   * @param context - Story interaction context.
+   * @returns A promise that resolves after the assertions complete.
+   */
+  play: async ({ canvas }) => {
+    const links = within(canvas.getByRole("main")).getAllByRole("link");
+    await expect(links[0]).toHaveAttribute("href", "/products?view=all");
+    await expect(links[1]).toHaveAttribute(
+      "href",
+      "/products?type=slider&view=all",
+    );
+    await expect(links[3]).toHaveAttribute(
+      "href",
+      "/products?type=slider-plate&view=all",
+    );
+  },
+  /**
+   * Renders the product-type directory fixture.
+   *
+   * @returns The product-type directory fixture.
+   */
+  render: () => {
+    const productTypes: CatalogProductTypeSummary[] = [
+      {
+        id: 1,
+        isPartOrAccessory: false,
+        name: "Spinner",
+        slug: "spinner",
+      },
+      {
+        id: 2,
+        isPartOrAccessory: false,
+        name: "Slider",
+        slug: "slider",
+      },
+      {
+        id: 3,
+        isPartOrAccessory: true,
+        name: "Slider Plate",
+        slug: "slider-plate",
+      },
+    ];
+    return (
+      <ProductsPage
+        productTypes={productTypes}
+        products={productTypes.map((type, index) => ({
+          ...product,
+          id: index + 1,
+          name: type.name,
+          productTypeId: type.id,
+          productTypeName: type.name,
+          productTypeSlug: type.slug as CatalogProduct["productTypeSlug"],
+          slug: type.slug,
+        }))}
+        view="directory"
+      />
+    );
+  },
 };
 
 /** Public collection page story. */

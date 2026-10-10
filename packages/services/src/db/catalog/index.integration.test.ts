@@ -2,7 +2,12 @@ import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Database } from "@package/database";
 import { schema } from "@package/database";
-import { createLogger } from "@package/logger";
+import {
+  createLogger,
+  type LogEvent,
+  type LogTransport,
+  loggerMessages,
+} from "@package/logger";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
@@ -10,6 +15,116 @@ import { describe, expect, it } from "vitest";
 import { createDbServices } from "../index.js";
 
 describe("catalog product persistence", () => {
+  it("classifies product types through an audited administrator update", async () => {
+    const client = new PGlite();
+    const db = drizzle({ client: client, relations: schema.relations });
+
+    try {
+      const migrationsFolder = fileURLToPath(
+        new URL("../../../../database/drizzle", import.meta.url),
+      );
+      await migratePglite(drizzle({ client: client }), {
+        migrationsFolder: migrationsFolder,
+      });
+      const [productType] = await db
+        .insert(schema.productType)
+        .values({ name: "Spinner", slug: "spinner" })
+        .returning({ id: schema.productType.id });
+      await db
+        .insert(schema.user)
+        .values([
+          { clerkId: "admin-product-type" },
+          { clerkId: "user-product-type" },
+        ]);
+      if (!productType)
+        throw new Error("Product type fixture was not created.");
+
+      const logEvents: LogEvent[] = [];
+      const transport: LogTransport = {
+        /**
+         * Captures a structured log event.
+         *
+         * @param event - Event emitted by the catalog service.
+         * @returns Nothing.
+         */
+        log(event) {
+          logEvents.push(event);
+        },
+      };
+      const logger = createLogger({
+        app: "api",
+        environment: "test",
+        transports: [transport],
+      });
+      const service = createDbServices(
+        db as unknown as Database,
+        logger,
+      ).catalog;
+
+      await expect(service.listProductTypes()).resolves.toEqual([
+        {
+          id: productType.id,
+          isPartOrAccessory: false,
+          name: "Spinner",
+          slug: "spinner",
+        },
+      ]);
+      await expect(
+        service.setProductTypePartOrAccessory({
+          actor: { clerkId: "user-product-type", role: "user" },
+          isPartOrAccessory: true,
+          productTypeId: productType.id,
+        }),
+      ).rejects.toThrow("Product type does not exist.");
+      await expect(
+        service.setProductTypePartOrAccessory({
+          actor: { clerkId: "admin-product-type", role: "admin" },
+          isPartOrAccessory: true,
+          productTypeId: productType.id,
+        }),
+      ).resolves.toEqual({
+        id: productType.id,
+        isPartOrAccessory: true,
+        name: "Spinner",
+        slug: "spinner",
+      });
+      await logger.flush();
+      expect(logEvents).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            message: `${loggerMessages.database.catalog.setProductTypePartOrAccessory}.succeeded`,
+          }),
+        ]),
+      );
+      await expect(
+        service.setProductTypePartOrAccessory({
+          actor: { clerkId: "admin-product-type", role: "admin" },
+          isPartOrAccessory: true,
+          productTypeId: productType.id + 1,
+        }),
+      ).rejects.toThrow("Product type does not exist.");
+
+      await expect(service.listProductTypes()).resolves.toEqual([
+        expect.objectContaining({
+          id: productType.id,
+          isPartOrAccessory: true,
+        }),
+      ]);
+      await expect(db.select().from(schema.auditEvent)).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: "products.product_type.classification_changed",
+            afterState: { isPartOrAccessory: true },
+            beforeState: { isPartOrAccessory: false },
+            permission: "products.manage",
+          }),
+        ]),
+      );
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
   it("normalizes, constrains, lists, and audits maker-scoped terminology aliases", async () => {
     const client = new PGlite();
     const db = drizzle({ client: client, relations: schema.relations });

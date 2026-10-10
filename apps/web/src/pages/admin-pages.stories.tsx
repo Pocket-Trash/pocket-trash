@@ -89,6 +89,9 @@ export const Hub: Story = {
       "/admin/materials",
     );
     await expect(
+      main.getByRole("link", { name: "Config and Settings" }),
+    ).toHaveAttribute("href", "/admin/config");
+    await expect(
       main.getByRole("link", { name: "Notifications" }),
     ).toHaveAttribute("href", "/notifications");
     const sidebar = within(
@@ -98,6 +101,7 @@ export const Hub: Story = {
       ["Feedback", "/admin/feedback"],
       ["Audit log", "/admin/audit"],
       ["Materials", "/admin/materials"],
+      ["Config and Settings", "/admin/config"],
       ["Notifications", "/notifications"],
       ["Feature flags", "/admin/settings/feature-flags"],
       ["Trash", "/admin/trash"],

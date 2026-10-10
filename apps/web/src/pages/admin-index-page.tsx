@@ -11,6 +11,7 @@ import {
   Factory,
   MessageSquare,
   ScrollText,
+  Settings,
   ShieldCheck,
   SlidersHorizontal,
   UsersRound,
@@ -26,6 +27,7 @@ import { useLocale } from "@/providers/locale-provider";
 export function AdminIndexPage() {
   const { sessionClaims, userId } = useAuth();
   const actor = userId ? normalizeActor(userId, sessionClaims) : undefined;
+  const canManageProducts = hasPermission(actor, "products.manage");
   const { locale } = useLocale();
   /** Formats administrator copy for the active locale.
    *
@@ -68,12 +70,18 @@ export function AdminIndexPage() {
     label: t("web.slider.magnet.presets" as TranslationKey),
     to: "/admin/slider-magnet-presets" as const,
   };
+  const configLink = {
+    icon: Settings,
+    label: t("web.admin.config.title"),
+    to: "/admin/config" as const,
+  };
   const primaryLinks = [
-    ...(hasPermission(actor, "products.manage") ? [makersLink] : []),
-    ...(hasPermission(actor, "products.manage") ? [magnetPresetsLink] : []),
+    ...(canManageProducts ? [configLink] : []),
+    ...(canManageProducts ? [makersLink] : []),
+    ...(canManageProducts ? [magnetPresetsLink] : []),
     ...(hasPermission(actor, "users.manage") ? [usersLink] : []),
     ...(hasPermission(actor, "audit.read") ? [auditLink] : []),
-    ...(hasPermission(actor, "products.manage") ? [materialsLink] : []),
+    ...(canManageProducts ? [materialsLink] : []),
     ...(hasPermission(actor, "feedback.manage") ? [feedbackLink] : []),
     ...(hasPermission(actor, "feedback.manage") ||
     hasPermission(actor, "resources.manage")

@@ -4,6 +4,7 @@ import type {
   CatalogFinishOption,
   CatalogProduct,
   CatalogProductType,
+  CatalogProductTypeSummary,
   CatalogTerminologyAlias,
   EffectiveSliderSetup,
   PublicCollectionOwner,
@@ -47,6 +48,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserPageShell } from "@/components/user-page-shell";
+import { cardImageUrl } from "@/lib/card-image";
 import { finishOptionLabel } from "@/lib/catalog";
 import {
   decideCatalogProductApproval,
@@ -311,14 +313,18 @@ export function ResourcesPage() {
  * @param props - Product index properties.
  * @param props.filters - Active catalog filters.
  * @param props.onFiltersChange - Optional filter state updater.
+ * @param props.productTypes - Product types and their directory classification.
  * @param props.products - Catalog products to display.
+ * @param props.view - Directory or filtered product-list view.
  * @returns The product index page.
  */
 export function ProductsPage({
   aliases = [],
   filters = emptyCatalogFilters(),
   onFiltersChange,
+  productTypes = [],
   products,
+  view = "products",
 }: {
   /** Registered terminology aliases available to search and display. */
   aliases?: CatalogTerminologyAlias[];
@@ -326,10 +332,114 @@ export function ProductsPage({
   filters?: CatalogFilters;
   /** Optional filter state updater. */
   onFiltersChange?: React.Dispatch<React.SetStateAction<CatalogFilters>>;
+  /** Product types and their directory classification. */
+  productTypes?: CatalogProductTypeSummary[];
   /** Catalog products to display. */
   products: CatalogProduct[];
+  /** Directory or filtered product-list view. */
+  view?: "directory" | "products";
 }) {
   const t = useCatalogCopy();
+  const { locale } = useLocale();
+  const addProduct = onFiltersChange ? (
+    <Link className={buttonVariants({ size: "sm" })} to="/products/add">
+      {t("web.action.addProduct")}
+    </Link>
+  ) : undefined;
+  if (view === "directory") {
+    const typeMetadata = new Map(
+      productTypes.map((productType) => [productType.slug, productType]),
+    );
+    const visibleTypes = new Map<
+      CatalogProductType,
+      {
+        /** Optional representative product image. */
+        imageUrl: string | null;
+        /** Localized product-type label. */
+        label: string;
+        /** Product-type metadata. */
+        productType: CatalogProductTypeSummary;
+        /** Supported filter slug. */
+        slug: CatalogProductType;
+      }
+    >();
+    for (const product of products) {
+      const productType = typeMetadata.get(product.productTypeSlug);
+      if (!productType) continue;
+      const imageUrl =
+        product.images.find(({ deletedAt }) => !deletedAt)?.url ?? null;
+      const existing = visibleTypes.get(product.productTypeSlug);
+      if (existing) {
+        if (!existing.imageUrl && imageUrl) existing.imageUrl = imageUrl;
+        continue;
+      }
+      visibleTypes.set(product.productTypeSlug, {
+        imageUrl,
+        label: localizedProductTypeLabel(
+          t,
+          product.productTypeSlug,
+          productType.name,
+        ),
+        productType,
+        slug: product.productTypeSlug,
+      });
+    }
+    const sortedTypes = [...visibleTypes.values()].sort((left, right) =>
+      left.label.localeCompare(right.label, locale),
+    );
+    const primary = sortedTypes.filter(
+      ({ productType }) => !productType.isPartOrAccessory,
+    );
+    const partsAndAccessories = sortedTypes.filter(
+      ({ productType }) => productType.isPartOrAccessory,
+    );
+
+    return (
+      <AppShell headerActions={addProduct} title={t("web.navigation.products")}>
+        <main className="grid gap-8 p-4 md:p-[18px_22px_22px]">
+          <h2 className="sr-only">{t("web.navigation.products")}</h2>
+          <section className="grid gap-[18px] sm:grid-cols-2 xl:grid-cols-4">
+            <ProductTypeNavigationCard
+              imageUrl="https://cdn.pocket-trash.app/assets/static/hero-cards/products.webp"
+              label={t("web.catalog.allProducts")}
+              search={{ view: "all" }}
+            />
+            {primary.map(({ imageUrl, label, slug }) => (
+              <ProductTypeNavigationCard
+                imageUrl={imageUrl}
+                key={slug}
+                label={label}
+                search={{ type: slug, view: "all" }}
+              />
+            ))}
+          </section>
+          {partsAndAccessories.length ? (
+            <section
+              aria-labelledby="parts-and-accessories-title"
+              className="grid gap-4"
+            >
+              <h3
+                className="m-0 text-xl font-semibold"
+                id="parts-and-accessories-title"
+              >
+                {t("web.catalog.partsAndAccessories")}
+              </h3>
+              <div className="grid gap-[18px] sm:grid-cols-2 xl:grid-cols-4">
+                {partsAndAccessories.map(({ imageUrl, label, slug }) => (
+                  <ProductTypeNavigationCard
+                    imageUrl={imageUrl}
+                    key={slug}
+                    label={label}
+                    search={{ type: slug, view: "all" }}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </main>
+      </AppShell>
+    );
+  }
   const searchMatches = new Map<number, CatalogSearchMatch>();
   const filtered = products.filter((product) => {
     if (!matchesCatalogFilters(productFilterItem(product), filters))
@@ -364,14 +474,7 @@ export function ProductsPage({
       headerActions={
         onFiltersChange ? (
           <CatalogFilterBar
-            action={
-              <Link
-                className={buttonVariants({ size: "sm" })}
-                to="/products/add"
-              >
-                {t("web.action.addProduct")}
-              </Link>
-            }
+            action={addProduct}
             copy={catalogFilterCopy(t)}
             facets={facets}
             filters={filters}
@@ -390,6 +493,54 @@ export function ProductsPage({
     </AppShell>
   );
 }
+
+/**
+ * Renders one keyboard-accessible product-directory navigation card.
+ *
+ * @param props - Product-type navigation properties.
+ * @param props.imageUrl - Optional representative product image.
+ * @param props.label - Localized card label.
+ * @param props.search - Product-list search selected by the card.
+ * @returns Product-type navigation card.
+ */
+function ProductTypeNavigationCard({
+  imageUrl,
+  label,
+  search,
+}: {
+  /** Optional representative product image. */
+  imageUrl: string | null;
+  /** Localized card label. */
+  label: string;
+  /** Product-list search selected by the card. */
+  search: ProductTypeNavigationSearch;
+}) {
+  const fallbackImage =
+    "https://cdn.pocket-trash.app/assets/static/hero-cards/products.webp";
+  return (
+    <Link
+      className="group overflow-hidden rounded-xl border border-border bg-card text-card-foreground transition-[border-color,transform] hover:-translate-y-0.5 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      search={search}
+      to="/products"
+    >
+      <img
+        alt=""
+        className="aspect-4/3 w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+        loading="lazy"
+        src={imageUrl ? cardImageUrl(imageUrl) : `${fallbackImage}?width=640`}
+      />
+      <div className="p-5 text-xl font-semibold">{label}</div>
+    </Link>
+  );
+}
+
+/** Search state selected by a product-type navigation card. */
+type ProductTypeNavigationSearch = {
+  /** Optional product type selected by the card. */
+  type?: CatalogProductType;
+  /** Explicit product-list view. */
+  view: "all";
+};
 
 /**
  * Renders a catalog product and its matching collection items.
