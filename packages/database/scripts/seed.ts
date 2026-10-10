@@ -23,6 +23,8 @@ import {
   materialSpecific,
   pattern,
   product,
+  productDetailPen,
+  productDetailRefill,
   productDetailSlider,
   productDetailSliderInsert,
   productDetailSliderPlate,
@@ -83,6 +85,12 @@ export const seedUserSettings = [
  */
 export const seedProductTypes = [
   { isPartOrAccessory: false, name: "Pen", slug: "pen" },
+  { isPartOrAccessory: true, name: "Pen Actuator", slug: "pen-actuator" },
+  { isPartOrAccessory: true, name: "Pen Clip", slug: "pen-clip" },
+  { isPartOrAccessory: true, name: "Pen Mechanism", slug: "pen-mechanism" },
+  { isPartOrAccessory: true, name: "Pen Tip", slug: "pen-tip" },
+  { isPartOrAccessory: true, name: "Pen Top Cap", slug: "pen-top-cap" },
+  { isPartOrAccessory: true, name: "Refill", slug: "refill" },
   { isPartOrAccessory: false, name: "Spinner", slug: "spinner" },
   {
     isPartOrAccessory: true,
@@ -102,6 +110,11 @@ export const seedProductTypes = [
  */
 export const seedMakers = [
   { name: "Autmog", rootUrl: "https://www.autmog.com", slug: "autmog" },
+  {
+    name: "Pocket Trash Fixtures",
+    rootUrl: "https://pocket-trash.app",
+    slug: "pocket-trash-fixtures",
+  },
   {
     name: "Inventery",
     rootUrl: "https://www.inventery.co",
@@ -994,7 +1007,23 @@ export async function seedKapedcImages(
 const sliderFixturePngs = [
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZCwAAAABJRU5ErkJggg==",
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8zwAAAgEBAScY42YAAAAASUVORK5CYII=",
 ] as const;
+
+/** Deterministic development Pens fixture cardinalities. */
+export const pensFixtureCounts = { pens: 21, refills: 21 } as const;
+
+/**
+ * Returns the stable slug for one synthetic Pens fixture product.
+ *
+ * @param kind - Fixture catalog product type.
+ * @param ordinal - One-based fixture number.
+ * @returns Stable synthetic product slug.
+ */
+function pensFixtureSlug(kind: "pen" | "refill", ordinal: number): string {
+  return `pocket-trash-demo-${kind}-${String(ordinal).padStart(2, "0")}`;
+}
 
 /**
  * Returns stable, valid PNG bytes for one fixture gallery position.
@@ -1048,7 +1077,10 @@ async function seedSliderFixtureImages(
       },
       { entity: "products", entityId: productId },
     );
-    const matching = existing.find((candidate) => candidate.sha256 === sha256);
+    const matching = existing.find(
+      (candidate) =>
+        candidate.sha256 === sha256 && candidate.position === position,
+    );
     if (
       matching?.deletedAt === null &&
       matching.objectPath === target.objectPath
@@ -1087,6 +1119,107 @@ async function seedSliderFixtureImages(
         .where(eq(productImage.id, matching.id));
     } else {
       await db.insert(productImage).values({ ...values, productId });
+    }
+  }
+}
+
+/**
+ * Seeds the compact synthetic Pens catalog used only by development and preview.
+ *
+ * @param db - Database client receiving fixture records.
+ * @param storage - Environment-scoped storage receiving generated fixture images.
+ * @rejects When required lookups are absent or a fixture write fails.
+ */
+export async function seedPensFixtures(
+  db: ReturnType<typeof createDb>,
+  storage: UploadStorage,
+): Promise<void> {
+  const [fixtureMaker] = await db
+    .select({ id: maker.id })
+    .from(maker)
+    .where(eq(maker.slug, "pocket-trash-fixtures"))
+    .limit(1);
+  const types = await db
+    .select({ id: productType.id, slug: productType.slug })
+    .from(productType)
+    .where(inArray(productType.slug, ["pen", "refill"]));
+  const typeIds = new Map(types.map(({ id, slug }) => [slug, id]));
+  if (!fixtureMaker || !typeIds.get("pen") || !typeIds.get("refill"))
+    throw new Error("Pens fixture lookups are missing after catalog seeding.");
+
+  const updatedAt = catalogSeedTimestamp("2026-10-10T00:00:00.000Z");
+  for (const kind of ["pen", "refill"] as const) {
+    const count = pensFixtureCounts[`${kind}s`];
+    for (let index = 0; index < count; index += 1) {
+      const ordinal = index + 1;
+      const slug = pensFixtureSlug(kind, ordinal);
+      const productTypeId = typeIds.get(kind);
+      if (!productTypeId)
+        throw new Error(`Pens fixture product type ${kind} is missing.`);
+      const values = {
+        approvalStatus: "approved" as const,
+        description: `Synthetic ${kind} fixture for development and preview.`,
+        isPrivate: false,
+        makerId: fixtureMaker.id,
+        makerProductUrl: null,
+        makerProductUrlValid: false,
+        name: `Pocket Trash Demo ${kind === "pen" ? "Pen" : "Refill"} ${String(ordinal).padStart(2, "0")}`,
+        ownerClerkId: sliderFixtureOwnerClerkId,
+        productTypeId,
+        slug,
+        updatedAt,
+      };
+      const seeded = await db.transaction(async (transaction) => {
+        const [created] = await transaction
+          .insert(product)
+          .values(values)
+          .onConflictDoUpdate({
+            set: values,
+            target: [product.productTypeId, product.slug],
+          })
+          .returning({ id: product.id });
+        if (!created) throw new Error(`Failed to seed Pens fixture ${slug}.`);
+
+        if (kind === "pen") {
+          await transaction
+            .insert(productDetailPen)
+            .values({ id: created.id, updatedAt })
+            .onConflictDoUpdate({
+              set: { updatedAt },
+              target: productDetailPen.id,
+            });
+        } else {
+          await transaction
+            .insert(productDetailRefill)
+            .values({
+              id: created.id,
+              makerId: fixtureMaker.id,
+              model: `DEMO-${String(ordinal).padStart(2, "0")}`,
+              normalizedModel: `demo-${String(ordinal).padStart(2, "0")}`,
+              updatedAt,
+            })
+            .onConflictDoUpdate({
+              set: { updatedAt },
+              target: productDetailRefill.id,
+            });
+        }
+        return created;
+      });
+
+      const imageCount =
+        kind === "pen" && index === 0
+          ? 4
+          : kind === "refill" && index === 0
+            ? 2
+            : 1;
+      await seedSliderFixtureImages(
+        db,
+        storage,
+        seeded.id,
+        Array.from({ length: imageCount }, (_, position) => ({
+          key: `${slug}-${String(position + 1).padStart(2, "0")}`,
+        })),
+      );
     }
   }
 }
@@ -1433,6 +1566,17 @@ export async function seedDatabase(
   const products = await seedKapedcProducts(db, snapshot);
   await seedKapedcImages(db, bunnyConfig, products);
   await seedSliderFixtures(
+    db,
+    createUploadStorage({
+      accessKey: bunnyConfig.accessKey,
+      cdnBaseUrl: bunnyConfig.cdnBaseUrl,
+      endpoint: bunnyConfig.endpoint,
+      folderPrefix: bunnyConfig.resourceFolderPrefix,
+      imageFolderPrefix: bunnyConfig.imageFolderPrefix,
+      zoneName: bunnyConfig.zoneName,
+    }),
+  );
+  await seedPensFixtures(
     db,
     createUploadStorage({
       accessKey: bunnyConfig.accessKey,
