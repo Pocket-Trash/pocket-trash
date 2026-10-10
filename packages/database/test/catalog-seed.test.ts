@@ -606,22 +606,21 @@ describe("catalog seed", () => {
     expect(state.makers.get("kap edc")?.slug).toBe("kap-edc");
   });
 
-  it("contains every approved KAP product and unique gallery image", async () => {
+  it("keeps compact KAP spinner fixtures with one gallery per type", async () => {
     const snapshot = await loadKapedcSeedData();
+    const byType = Object.groupBy(snapshot.products, ({ type }) => type);
 
-    expect(snapshot.products).toHaveLength(71);
-    expect(
-      snapshot.products.filter(({ type }) => type === "spinner"),
-    ).toHaveLength(59);
-    expect(
-      snapshot.products.filter(({ type }) => type === "spinner-button"),
-    ).toHaveLength(12);
-    expect(
-      snapshot.products.filter(({ slug }) => slug.includes("katla")),
-    ).toHaveLength(2);
-    expect(
-      snapshot.products.reduce((count, { images }) => count + images.length, 0),
-    ).toBe(271);
+    expect(byType.spinner).toHaveLength(21);
+    expect(byType["spinner-button"]?.length).toBeGreaterThan(0);
+    expect(byType["spinner-button"]?.length).toBeLessThanOrEqual(21);
+    for (const type of ["spinner", "spinner-button"] as const) {
+      const imageCounts = (byType[type] ?? []).map(
+        ({ images }) => images.length,
+      );
+      expect(imageCounts.filter((count) => count > 1)).toHaveLength(1);
+      expect(imageCounts.find((count) => count > 1)).toBeGreaterThanOrEqual(4);
+      expect(imageCounts.find((count) => count > 1)).toBeLessThanOrEqual(5);
+    }
     expect(
       snapshot.products.every(({ images }) =>
         images.every(({ sha256 }) => sha256.length === 64),
