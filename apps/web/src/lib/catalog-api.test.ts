@@ -5,6 +5,7 @@ import {
   collectionItemDeletionSchema,
   collectionProductTypeIsSupported,
   collectionWriteSchema,
+  pensAdminWriteSchema,
   productApprovalSchema,
   productDeletionSchema,
   productFormSchema,
@@ -234,6 +235,94 @@ describe("product appearance options", () => {
         ],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("Pens catalog product validation", () => {
+  it("accepts typed Pens products and refills", () => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        aliases: ["Precise V5 RT"],
+        materialAssignments: [],
+        productTypeSlug: "refill",
+        refillModel: "PV5RRBLK",
+      }).success,
+    ).toBe(true);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        mechanismId: 1000,
+        productTypeSlug: "pen-mechanism",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects duplicate aliases, misplaced subtype fields, and legacy specs", () => {
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        aliases: ["Precise V5", " precise  v5 "],
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        mechanismId: 1000,
+      }).success,
+    ).toBe(false);
+    expect(
+      productFormSchema.safeParse({
+        ...base,
+        productTypeSlug: "pen",
+        weight: { unit: "g", value: "20" },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("Pens admin validation", () => {
+  it("requires one carrier and distinct availability requirements", () => {
+    expect(
+      pensAdminWriteSchema.safeParse({
+        kind: "configuration-choice",
+        productId: 1000,
+        slotId: 1001,
+      }).success,
+    ).toBe(false);
+    expect(
+      pensAdminWriteSchema.safeParse({
+        kind: "configuration-rule",
+        productId: 1000,
+        requiredChoiceIds: [1001, 1001],
+        targetChoiceId: 1002,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires supporting evidence for approvals and one compatibility target", () => {
+    const assertion = {
+      approved: true,
+      evidence: [],
+      kind: "compatibility-assertion" as const,
+      outcome: "compatible" as const,
+      penProductId: 1000,
+      targetRefillProductId: 1001,
+    };
+    expect(pensAdminWriteSchema.safeParse(assertion).success).toBe(false);
+    expect(
+      pensAdminWriteSchema.safeParse({
+        ...assertion,
+        evidence: [{ evidenceId: 1002, stance: "supports" }],
+        targetGroupId: 1003,
+      }).success,
+    ).toBe(false);
+    expect(
+      pensAdminWriteSchema.safeParse({
+        ...assertion,
+        evidence: [{ evidenceId: 1002, stance: "supports" }],
+      }).success,
+    ).toBe(true);
   });
 });
 

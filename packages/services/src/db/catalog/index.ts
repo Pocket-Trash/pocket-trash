@@ -213,7 +213,18 @@ export type CatalogProductType =
 /** Product types supported by the pre-Pens catalog editor. */
 export type WritableCatalogProductType = Extract<
   CatalogProductType,
-  "slider" | "slider-insert" | "slider-plate" | "spinner" | "spinner-button"
+  | "pen"
+  | "pen-actuator"
+  | "pen-clip"
+  | "pen-mechanism"
+  | "pen-tip"
+  | "pen-top-cap"
+  | "refill"
+  | "slider"
+  | "slider-insert"
+  | "slider-plate"
+  | "spinner"
+  | "spinner-button"
 >;
 
 /** Product-type fields used by catalog forms, directories, and configuration. */
@@ -730,6 +741,8 @@ export type CatalogProduct = {
   makerName: string;
   /** Stable public maker slug. */
   makerSlug: string;
+  /** Canonical mechanism taxonomy identifier for mechanism-part products. */
+  mechanismId?: number | null;
   /**
    * Maker product URL.
    */
@@ -844,6 +857,12 @@ export type CatalogConfigurationChoice = {
   id: number;
   /** Material or part display label, when applicable. */
   label: string | null;
+  /** Part carrier identifier exposed to catalog managers. */
+  partProductId?: number | null;
+  /** Stable position within the parent slot. */
+  position?: number;
+  /** Product material carrier identifier exposed to catalog managers. */
+  productMaterialId?: number | null;
 };
 
 /** One ordered public product-configuration dimension. */
@@ -858,12 +877,59 @@ export type CatalogConfigurationSlot = {
   labelKey: string;
   /** Whether the product requires a selection in this slot. */
   required: boolean;
+  /** Stable dependency-order position. */
+  position?: number;
+  /** Reusable slot-kind identifier. */
+  slotKindId?: number;
+  /** Reusable slot-kind slug. */
+  slotKindSlug?: string;
+};
+
+/** Lookup data required by the structured Pens catalog admin editor. */
+export type CatalogPensAdminOptions = {
+  /** Available compatibility evidence records. */
+  compatibilityEvidence: Array<{
+    /** Evidence identifier. */
+    id: number;
+    /** Evidence summary. */
+    name: string;
+  }>;
+  /** Canonical concepts available for new compatibility groups. */
+  compatibilityGroupConcepts: CatalogLookup[];
+  /** Existing compatibility groups. */
+  compatibilityGroups: CatalogLookup[];
+  /** Refill ink colors. */
+  inkColors: CatalogLookup[];
+  /** Catalog markets. */
+  markets: CatalogLookup[];
+  /** Existing refill offerings. */
+  offerings: Array<{
+    /** Offering identifier. */
+    id: number;
+    /** Offering label. */
+    name: string;
+    /** Refill product owning the offering. */
+    refillProductId: number;
+  }>;
+  /** Reusable product-configuration slot kinds. */
+  slotKinds: CatalogLookup[];
+  /** Available source evidence records. */
+  sourceEvidence: Array<{
+    /** Evidence identifier. */
+    id: number;
+    /** Evidence claim. */
+    name: string;
+  }>;
+  /** Refill tip styles. */
+  tipStyles: CatalogLookup[];
 };
 
 /**
  * Validated fields accepted when creating or updating a catalog product.
  */
 export type ProductWriteInput = {
+  /** Replacement searchable product aliases. */
+  aliases?: string[];
   /**
    * Authenticated actor.
    */
@@ -892,6 +958,8 @@ export type ProductWriteInput = {
   magnetLayout?: SliderMagnetLayout | null;
   /** Optional catalog-default magnet configuration. */
   magnetConfiguration?: SliderMagnetConfiguration | null;
+  /** Mechanism taxonomy identifier required by mechanism-part products. */
+  mechanismId?: number | null;
   /** Exact catalog insert supplied with a slider; null means unnamed included insert when inserts are used. */
   includedInsertProductId?: number | null;
   /** Exact catalog plate supplied with a slider; null means unnamed included plates. */
@@ -904,6 +972,8 @@ export type ProductWriteInput = {
    * Product type slug.
    */
   productTypeSlug: WritableCatalogProductType;
+  /** Stable maker model required by refill products. */
+  refillModel?: string | null;
   /**
    * Administrative reason for the operation.
    */
@@ -945,10 +1015,302 @@ export type ProductWriteInput = {
   };
 };
 
+/** One evidence link submitted with an approval-gated Pens claim. */
+export type PensEvidenceLink = {
+  /** Existing evidence row. */
+  evidenceId: number;
+  /** Whether the evidence supports or contradicts the claim. */
+  stance: "contradicts" | "supports";
+};
+
+/** Append-only administrative writes for structured Pens catalog data. */
+export type PensAdminWriteInput =
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Mutation discriminator. */
+      kind: "refill-tip-style";
+      /** Human-readable tip style name. */
+      name: string;
+      /** Stable tip style slug. */
+      slug: string;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Mutation discriminator. */
+      kind: "refill-ink-color";
+      /** Human-readable ink color name. */
+      name: string;
+      /** Stable ink color slug. */
+      slug: string;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Stable market code. */
+      code: string;
+      /** English market label fallback. */
+      displayName: string;
+      /** Localization key for the market label. */
+      displayNameKey: string;
+      /** Mutation discriminator. */
+      kind: "market";
+      /** Geographic market level. */
+      marketKind: "country" | "region";
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Canonical compatibility-group concept. */
+      conceptId: number;
+      /** Mutation discriminator. */
+      kind: "compatibility-group";
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Mutation discriminator. */
+      kind: "configuration-slot";
+      /** Product that owns the slot. */
+      productId: number;
+      /** Whether a choice is required. */
+      required: boolean;
+      /** Reusable slot kind. */
+      slotKindId: number;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Mutation discriminator. */
+      kind: "configuration-slot-required";
+      /** Product that owns the slot. */
+      productId: number;
+      /** Whether a choice is required. */
+      required: boolean;
+      /** Configuration slot to update. */
+      slotId: number;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Finish carrier, when the choice changes appearance. */
+      finishOptionId?: number | null;
+      /** Mutation discriminator. */
+      kind: "configuration-choice";
+      /** Part carrier, when the choice selects a component. */
+      partProductId?: number | null;
+      /** Product that owns the choice. */
+      productId: number;
+      /** Material carrier, when the choice selects a material. */
+      productMaterialId?: number | null;
+      /** Configuration slot that owns the choice. */
+      slotId: number;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Mutation discriminator. */
+      kind: "configuration-rule";
+      /** Product that owns the rule. */
+      productId: number;
+      /** Earlier choices required together. */
+      requiredChoiceIds: number[];
+      /** Choice made available by this rule. */
+      targetChoiceId: number;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Date when the evidence was captured. */
+      captureDate: string;
+      /** Optional catalog edition. */
+      catalogEdition?: string | null;
+      /** Preserved evidence claim. */
+      claim: string;
+      /** Mutation discriminator. */
+      kind: "source-evidence";
+      /** Optional source listing. */
+      listingId?: number | null;
+      /** Optional market scope. */
+      marketId?: number | null;
+      /** Original source URL. */
+      originalUrl: string;
+      /** Optional checksum of a preserved source. */
+      preservedSourceChecksum?: string | null;
+      /** Optional identity of a preserved source. */
+      preservedSourceIdentity?: string | null;
+      /** Optional source publication date. */
+      publicationDate?: string | null;
+      /** Source publisher. */
+      publisher: string;
+      /** Source classification. */
+      sourceKind: string;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Whether the offering is approved for public use. */
+      approved: boolean;
+      /** Evidence attached to the offering. */
+      evidence: PensEvidenceLink[];
+      /** Ink color lookup. */
+      inkColorId: number;
+      /** Mutation discriminator. */
+      kind: "refill-offering";
+      /** Refill product that owns the offering. */
+      refillProductId: number;
+      /** Maker-stated tip size. */
+      tipSize: string;
+      /** Tip style lookup. */
+      tipStyleId: number;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Whether the market status is approved for public use. */
+      approved: boolean;
+      /** Optional effective date. */
+      effectiveDate?: string | null;
+      /** Evidence attached to the market status. */
+      evidence: PensEvidenceLink[];
+      /** Mutation discriminator. */
+      kind: "offering-market-status";
+      /** Lifecycle state in the selected market. */
+      lifecycle: "current" | "discontinued" | "historical";
+      /** Market scope. */
+      marketId: number;
+      /** Refill offering. */
+      offeringId: number;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Whether the identifier is approved for public use. */
+      approved: boolean;
+      /** Optional value comparison rule. */
+      comparisonRule?: string;
+      /** Optional effective date. */
+      effectiveDate?: string | null;
+      /** Evidence attached to the identifier. */
+      evidence: PensEvidenceLink[];
+      /** Identifier classification. */
+      identifierKind: "maker-code" | "sku";
+      /** Mutation discriminator. */
+      kind: "offering-identifier";
+      /** Maker that owns the identifier. */
+      makerId: number;
+      /** Market scope. */
+      marketId: number;
+      /** Refill offering. */
+      offeringId: number;
+      /** Identifier as published by the source. */
+      sourceValue: string;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Optional manufacturer catalog edition. */
+      catalogEdition?: string | null;
+      /** Compatibility evidence classification. */
+      evidenceKind:
+        | "curated-observation"
+        | "dimensional-comparison"
+        | "manufacturer-statement"
+        | "physical-fit-test";
+      /** First measured refill format. */
+      firstMeasuredFormatLabel?: string | null;
+      /** Source URL for the first measured format. */
+      firstSourceUrl?: string | null;
+      /** Mutation discriminator. */
+      kind: "compatibility-evidence";
+      /** Optional evidence notes. */
+      notes?: string | null;
+      /** Pen used in a physical fit test. */
+      penProductId?: number | null;
+      /** Physical fit test procedure. */
+      procedure?: string | null;
+      /** Refill used in a physical fit test. */
+      refillProductId?: number | null;
+      /** Tip required by the compatibility evidence. */
+      requiredTipProductId?: number | null;
+      /** Physical fit test result. */
+      result?: string | null;
+      /** Second measured refill format. */
+      secondMeasuredFormatLabel?: string | null;
+      /** Source URL for the second measured format. */
+      secondSourceUrl?: string | null;
+      /** Optional source date. */
+      sourceDate?: string | null;
+      /** Manufacturer or observation source URL. */
+      sourceUrl?: string | null;
+      /** Evidence summary. */
+      summary: string;
+      /** Physical fit test date. */
+      testDate?: string | null;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Whether the membership is approved for public use. */
+      approved: boolean;
+      /** Evidence attached to the membership. */
+      evidence: PensEvidenceLink[];
+      /** Compatibility group. */
+      groupId: number;
+      /** Mutation discriminator. */
+      kind: "compatibility-membership";
+      /** Refill assigned to the group. */
+      refillProductId: number;
+    }
+  | {
+      /** Authenticated administrative actor. */
+      actor: Actor;
+      /** Whether the assertion is approved for public use. */
+      approved: boolean;
+      /** Evidence attached to the assertion. */
+      evidence: PensEvidenceLink[];
+      /** Explanation required for nuanced outcomes. */
+      explanation?: string | null;
+      /** Mutation discriminator. */
+      kind: "compatibility-assertion";
+      /** Compatibility outcome. */
+      outcome: "compatible" | "conditional" | "incompatible" | "variable";
+      /** Pen product receiving the assertion. */
+      penProductId: number;
+      /** Remedy required for conditional compatibility. */
+      remedy?: string | null;
+      /** Optional required Pen tip. */
+      requiredTipProductId?: number | null;
+      /** Target compatibility group. */
+      targetGroupId?: number | null;
+      /** Target refill product. */
+      targetRefillProductId?: number | null;
+      /** Optional reader warning. */
+      warning?: string | null;
+    };
+
 /**
  * Catalog reads and audited mutations exposed to application callers.
  */
 export type CatalogService = {
+  /**
+   * Appends one validated structured Pens catalog record.
+   *
+   * @param input - Structured Pens mutation and authenticated actor.
+   * @returns The created or updated record identifier.
+   */
+  authorPensCatalog(input: PensAdminWriteInput): Promise<{
+    /** Created or updated record identifier. */
+    id: number;
+  }>;
+  /**
+   * Lists lookups and evidence available to the Pens admin editor.
+   *
+   * @param actor - Authenticated catalog manager.
+   * @returns Pens administration lookups and evidence.
+   */
+  listPensAdminOptions(actor: Actor): Promise<CatalogPensAdminOptions>;
   /**
    * Creates an audited maker-scoped alias for a registered catalog concept.
    *
@@ -1454,6 +1816,13 @@ export type CatalogService = {
    * @rejects When the database query or operation logging fails.
    */
   listPatterns(): Promise<CatalogLookup[]>;
+  /**
+   * Lists canonical Pen mechanism types.
+   *
+   * @returns Matching mechanism lookups.
+   * @rejects When the database query or operation logging fails.
+   */
+  listMechanisms(): Promise<CatalogLookup[]>;
   /**
    * Lists maker-scoped terminology aliases ordered by label.
    *
@@ -2493,6 +2862,475 @@ export function createCatalogService(
 ): CatalogService {
   return {
     /**
+     * Appends one validated structured Pens catalog record.
+     *
+     * @param input - Structured Pens mutation and authenticated actor.
+     * @returns The created or updated record identifier.
+     * @rejects When authorization, ownership, ordering, or evidence is invalid.
+     */
+    async authorPensCatalog(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await loggedMutation(
+        logger,
+        loggerMessages.database.catalog.authorPensCatalog,
+        () =>
+          db.transaction(async (tx) => {
+            /**
+             * Audits and returns a completed Pens mutation.
+             *
+             * @param row - Created or updated row.
+             * @returns The supplied row after its audit record is queued.
+             */
+            const complete = async (row: {
+              /** Created or updated record identifier. */
+              id: number;
+            }) => {
+              if (dependencies && actorUser)
+                await writeProductAdminAudit(dependencies.audit, tx, {
+                  actor: input.actor,
+                  actorUser,
+                  after: { id: row.id, kind: input.kind },
+                  definition: productAudit.pensCatalogAuthored,
+                  targetId: row.id,
+                });
+              return row;
+            };
+            if (
+              input.kind === "refill-tip-style" ||
+              input.kind === "refill-ink-color"
+            ) {
+              const name = requireBoundedText(input.name, 80, "name");
+              const slug = requireBoundedText(input.slug, 80, "slug");
+              const table =
+                input.kind === "refill-tip-style"
+                  ? schema.refillTipStyle
+                  : schema.refillInkColor;
+              const [row] = await tx
+                .insert(table)
+                .values({ name, slug })
+                .returning({ id: table.id });
+              if (!row) throw new Error("Failed to create refill lookup.");
+              return await complete(row);
+            }
+            if (input.kind === "market") {
+              const code = requireBoundedText(input.code, 40, "market code");
+              const [row] = await tx
+                .insert(schema.catalogMarket)
+                .values({
+                  code,
+                  displayName: requireBoundedText(
+                    input.displayName,
+                    80,
+                    "market name",
+                  ),
+                  displayNameKey: requireBoundedText(
+                    input.displayNameKey,
+                    200,
+                    "market localization key",
+                  ),
+                  kind: input.marketKind,
+                })
+                .returning({ id: schema.catalogMarket.id });
+              if (!row) throw new Error("Failed to create catalog market.");
+              return await complete(row);
+            }
+            if (input.kind === "compatibility-group") {
+              const [concept] = await tx
+                .select({ id: schema.catalogTerminologyConcept.id })
+                .from(schema.catalogTerminologyConcept)
+                .where(
+                  and(
+                    eq(schema.catalogTerminologyConcept.id, input.conceptId),
+                    eq(
+                      schema.catalogTerminologyConcept.namespace,
+                      "refill-compatibility-group",
+                    ),
+                  ),
+                )
+                .limit(1);
+              if (!concept)
+                throw new Error("Compatibility group concept does not exist.");
+              const [row] = await tx
+                .insert(schema.refillCompatibilityGroup)
+                .values({ conceptId: concept.id })
+                .returning({ id: schema.refillCompatibilityGroup.id });
+              if (!row)
+                throw new Error("Failed to create compatibility group.");
+              return await complete(row);
+            }
+            if (input.kind === "configuration-slot") {
+              await assertProductHasType(tx, input.productId, ["pen"]);
+              const [last] = await tx
+                .select({ position: schema.productConfigurationSlot.position })
+                .from(schema.productConfigurationSlot)
+                .where(
+                  eq(
+                    schema.productConfigurationSlot.productId,
+                    input.productId,
+                  ),
+                )
+                .orderBy(desc(schema.productConfigurationSlot.position))
+                .limit(1);
+              const [row] = await tx
+                .insert(schema.productConfigurationSlot)
+                .values({
+                  position: (last?.position ?? -1) + 1,
+                  productId: input.productId,
+                  required: input.required,
+                  slotKindId: input.slotKindId,
+                })
+                .returning({ id: schema.productConfigurationSlot.id });
+              if (!row) throw new Error("Failed to create configuration slot.");
+              return await complete(row);
+            }
+            if (input.kind === "configuration-slot-required") {
+              await assertProductHasType(tx, input.productId, ["pen"]);
+              const [row] = await tx
+                .update(schema.productConfigurationSlot)
+                .set({ required: input.required, updatedAt: new Date() })
+                .where(
+                  and(
+                    eq(schema.productConfigurationSlot.id, input.slotId),
+                    eq(
+                      schema.productConfigurationSlot.productId,
+                      input.productId,
+                    ),
+                  ),
+                )
+                .returning({ id: schema.productConfigurationSlot.id });
+              if (!row) throw new Error("Configuration slot does not exist.");
+              return await complete(row);
+            }
+            if (input.kind === "configuration-choice") {
+              await assertProductHasType(tx, input.productId, ["pen"]);
+              if (
+                [
+                  input.productMaterialId,
+                  input.finishOptionId,
+                  input.partProductId,
+                ].filter((value) => value != null).length !== 1
+              )
+                throw new Error("A configuration choice needs one carrier.");
+              const [slot] = await tx
+                .select({ id: schema.productConfigurationSlot.id })
+                .from(schema.productConfigurationSlot)
+                .where(
+                  and(
+                    eq(schema.productConfigurationSlot.id, input.slotId),
+                    eq(
+                      schema.productConfigurationSlot.productId,
+                      input.productId,
+                    ),
+                  ),
+                )
+                .limit(1);
+              if (!slot) throw new Error("Configuration slot does not exist.");
+              const [last] = await tx
+                .select({
+                  position: schema.productConfigurationChoice.position,
+                })
+                .from(schema.productConfigurationChoice)
+                .where(
+                  eq(schema.productConfigurationChoice.slotId, input.slotId),
+                )
+                .orderBy(desc(schema.productConfigurationChoice.position))
+                .limit(1);
+              const [row] = await tx
+                .insert(schema.productConfigurationChoice)
+                .values({
+                  finishOptionId: input.finishOptionId ?? null,
+                  partProductId: input.partProductId ?? null,
+                  position: (last?.position ?? -1) + 1,
+                  productId: input.productId,
+                  productMaterialId: input.productMaterialId ?? null,
+                  slotId: input.slotId,
+                })
+                .returning({ id: schema.productConfigurationChoice.id });
+              if (!row)
+                throw new Error("Failed to create configuration choice.");
+              return await complete(row);
+            }
+            if (input.kind === "configuration-rule") {
+              if (
+                !input.requiredChoiceIds.length ||
+                new Set(input.requiredChoiceIds).size !==
+                  input.requiredChoiceIds.length
+              )
+                throw new Error(
+                  "Availability rules need distinct requirements.",
+                );
+              const choiceIds = [
+                input.targetChoiceId,
+                ...input.requiredChoiceIds,
+              ];
+              const choices = await tx
+                .select({
+                  id: schema.productConfigurationChoice.id,
+                  productId: schema.productConfigurationChoice.productId,
+                  slotPosition: schema.productConfigurationSlot.position,
+                })
+                .from(schema.productConfigurationChoice)
+                .innerJoin(
+                  schema.productConfigurationSlot,
+                  eq(
+                    schema.productConfigurationChoice.slotId,
+                    schema.productConfigurationSlot.id,
+                  ),
+                )
+                .where(
+                  inArray(schema.productConfigurationChoice.id, choiceIds),
+                );
+              const target = choices.find(
+                ({ id }) => id === input.targetChoiceId,
+              );
+              if (
+                !target ||
+                target.productId !== input.productId ||
+                input.requiredChoiceIds.some((id) => {
+                  const required = choices.find((choice) => choice.id === id);
+                  return (
+                    !required ||
+                    required.productId !== input.productId ||
+                    required.slotPosition >= target.slotPosition
+                  );
+                })
+              )
+                throw new Error(
+                  "Availability rules may require only earlier choices.",
+                );
+              const [last] = await tx
+                .select({
+                  position: schema.productConfigurationChoiceRule.position,
+                })
+                .from(schema.productConfigurationChoiceRule)
+                .where(
+                  eq(
+                    schema.productConfigurationChoiceRule.targetChoiceId,
+                    input.targetChoiceId,
+                  ),
+                )
+                .orderBy(desc(schema.productConfigurationChoiceRule.position))
+                .limit(1);
+              const [row] = await tx
+                .insert(schema.productConfigurationChoiceRule)
+                .values({
+                  position: (last?.position ?? -1) + 1,
+                  productId: input.productId,
+                  targetChoiceId: input.targetChoiceId,
+                })
+                .returning({ id: schema.productConfigurationChoiceRule.id });
+              if (!row) throw new Error("Failed to create availability rule.");
+              await tx
+                .insert(schema.productConfigurationChoiceRequirement)
+                .values(
+                  input.requiredChoiceIds.map((requiredChoiceId) => ({
+                    productId: input.productId,
+                    requiredChoiceId,
+                    ruleId: row.id,
+                  })),
+                );
+              return await complete(row);
+            }
+            if (input.kind === "source-evidence") {
+              const [row] = await tx
+                .insert(schema.catalogSourceEvidence)
+                .values({
+                  captureDate: input.captureDate,
+                  catalogEdition: cleanOptionalText(input.catalogEdition),
+                  claim: requireBoundedText(input.claim, 5000, "claim"),
+                  listingId: input.listingId ?? null,
+                  marketId: input.marketId ?? null,
+                  originalUrl: requireWebUrl(input.originalUrl),
+                  preservedSourceChecksum: cleanOptionalText(
+                    input.preservedSourceChecksum,
+                  ),
+                  preservedSourceIdentity: cleanOptionalText(
+                    input.preservedSourceIdentity,
+                  ),
+                  publicationDate: input.publicationDate ?? null,
+                  publisher: requireBoundedText(
+                    input.publisher,
+                    200,
+                    "publisher",
+                  ),
+                  sourceKind: requireBoundedText(
+                    input.sourceKind,
+                    200,
+                    "source kind",
+                  ),
+                })
+                .returning({ id: schema.catalogSourceEvidence.id });
+              if (!row) throw new Error("Failed to create source evidence.");
+              return await complete(row);
+            }
+            if (input.kind === "refill-offering") {
+              await assertProductHasType(tx, input.refillProductId, ["refill"]);
+              assertSupportingEvidence(input.approved, input.evidence);
+              const tipSize = requireBoundedText(input.tipSize, 80, "tip size");
+              const [row] = await tx
+                .insert(schema.refillOffering)
+                .values({
+                  approvedAt: input.approved ? new Date() : null,
+                  inkColorId: input.inkColorId,
+                  normalizedTipSize: normalizeCatalogSearch(tipSize),
+                  refillProductId: input.refillProductId,
+                  tipSize,
+                  tipStyleId: input.tipStyleId,
+                })
+                .returning({ id: schema.refillOffering.id });
+              if (!row) throw new Error("Failed to create refill offering.");
+              await insertPensEvidenceLinks(
+                tx,
+                "offering",
+                row.id,
+                input.evidence,
+              );
+              return await complete(row);
+            }
+            if (input.kind === "offering-market-status") {
+              assertSupportingEvidence(input.approved, input.evidence);
+              const [row] = await tx
+                .insert(schema.refillOfferingMarketStatus)
+                .values({
+                  approvedAt: input.approved ? new Date() : null,
+                  effectiveDate: input.effectiveDate ?? null,
+                  lifecycle: input.lifecycle,
+                  marketId: input.marketId,
+                  offeringId: input.offeringId,
+                })
+                .returning({ id: schema.refillOfferingMarketStatus.id });
+              if (!row) throw new Error("Failed to create market status.");
+              await insertPensEvidenceLinks(
+                tx,
+                "market-status",
+                row.id,
+                input.evidence,
+              );
+              return await complete(row);
+            }
+            if (input.kind === "offering-identifier") {
+              assertSupportingEvidence(input.approved, input.evidence);
+              const sourceValue = requireBoundedText(
+                input.sourceValue,
+                200,
+                "identifier",
+              );
+              const comparisonRule = input.comparisonRule?.trim() || "trim";
+              const [row] = await tx
+                .insert(schema.refillOfferingIdentifier)
+                .values({
+                  approvedAt: input.approved ? new Date() : null,
+                  comparisonRule,
+                  comparisonValue: sourceValue.trim(),
+                  effectiveDate: input.effectiveDate ?? null,
+                  kind: input.identifierKind,
+                  makerId: input.makerId,
+                  marketId: input.marketId,
+                  offeringId: input.offeringId,
+                  sourceValue,
+                })
+                .returning({ id: schema.refillOfferingIdentifier.id });
+              if (!row) throw new Error("Failed to create identifier.");
+              await insertPensEvidenceLinks(
+                tx,
+                "identifier",
+                row.id,
+                input.evidence,
+              );
+              return await complete(row);
+            }
+            if (input.kind === "compatibility-evidence") {
+              const [row] = await tx
+                .insert(schema.refillCompatibilityEvidence)
+                .values({
+                  catalogEdition: cleanOptionalText(input.catalogEdition),
+                  firstMeasuredFormatLabel: cleanOptionalText(
+                    input.firstMeasuredFormatLabel,
+                  ),
+                  firstSourceUrl: cleanOptionalUrl(input.firstSourceUrl),
+                  kind: input.evidenceKind,
+                  notes: cleanOptionalText(input.notes),
+                  penProductId: input.penProductId ?? null,
+                  procedure: cleanOptionalText(input.procedure),
+                  refillProductId: input.refillProductId ?? null,
+                  requiredTipProductId: input.requiredTipProductId ?? null,
+                  result: cleanOptionalText(input.result),
+                  secondMeasuredFormatLabel: cleanOptionalText(
+                    input.secondMeasuredFormatLabel,
+                  ),
+                  secondSourceUrl: cleanOptionalUrl(input.secondSourceUrl),
+                  sourceDate: input.sourceDate ?? null,
+                  sourceUrl: cleanOptionalUrl(input.sourceUrl),
+                  summary: requireBoundedText(input.summary, 2000, "summary"),
+                  testDate: input.testDate ?? null,
+                })
+                .returning({ id: schema.refillCompatibilityEvidence.id });
+              if (!row)
+                throw new Error("Failed to create compatibility evidence.");
+              return await complete(row);
+            }
+            if (input.kind === "compatibility-membership") {
+              await assertProductHasType(tx, input.refillProductId, ["refill"]);
+              assertSupportingEvidence(input.approved, input.evidence);
+              const [row] = await tx
+                .insert(schema.refillCompatibilityGroupMembership)
+                .values({
+                  approvedAt: input.approved ? new Date() : null,
+                  groupId: input.groupId,
+                  refillProductId: input.refillProductId,
+                })
+                .returning({
+                  id: schema.refillCompatibilityGroupMembership.id,
+                });
+              if (!row) throw new Error("Failed to create group membership.");
+              await insertPensEvidenceLinks(
+                tx,
+                "membership",
+                row.id,
+                input.evidence,
+              );
+              return await complete(row);
+            }
+            await assertProductHasType(tx, input.penProductId, ["pen"]);
+            if (
+              Number(input.targetGroupId != null) +
+                Number(input.targetRefillProductId != null) !==
+              1
+            )
+              throw new Error("Compatibility needs exactly one target.");
+            assertSupportingEvidence(input.approved, input.evidence);
+            const [row] = await tx
+              .insert(schema.refillCompatibilityAssertion)
+              .values({
+                approvedAt: input.approved ? new Date() : null,
+                explanation: cleanOptionalText(input.explanation),
+                outcome: input.outcome,
+                penProductId: input.penProductId,
+                remedy: cleanOptionalText(input.remedy),
+                requiredTipProductId: input.requiredTipProductId ?? null,
+                targetGroupId: input.targetGroupId ?? null,
+                targetRefillProductId: input.targetRefillProductId ?? null,
+                warning: cleanOptionalText(input.warning),
+              })
+              .returning({ id: schema.refillCompatibilityAssertion.id });
+            if (!row)
+              throw new Error("Failed to create compatibility assertion.");
+            await insertPensEvidenceLinks(
+              tx,
+              "assertion",
+              row.id,
+              input.evidence,
+            );
+            return await complete(row);
+          }),
+      );
+    },
+    /**
      * Creates an audited maker-scoped catalog terminology alias.
      *
      * @param input - Alias concept, label, maker, preference, and actor.
@@ -3072,6 +3910,7 @@ export function createCatalogService(
             .limit(1);
           if (!type) throw new Error("Product type does not exist.");
           assertProductMaterialsAndAppearance(input);
+          assertPensProductFields(input);
           await validateFinishOptions(db, input.finishOptions);
 
           const productId = await db.transaction(async (tx) => {
@@ -3115,6 +3954,12 @@ export function createCatalogService(
 
             await assertProductRelationships(tx, row.id, input);
             await insertProductSubtype(tx, row.id, input);
+            await replaceProductAliases(
+              tx,
+              row.id,
+              input.aliases ?? [],
+              input.actor.clerkId,
+            );
             if (dependencies && actorUser) {
               const [created] = await queryProducts(
                 tx as unknown as Database,
@@ -4156,6 +5001,175 @@ export function createCatalogService(
       );
     },
     /**
+     * Lists canonical Pen mechanism types.
+     *
+     * @returns Matching mechanism lookups.
+     * @rejects When the database query or operation logging fails.
+     */
+    async listMechanisms() {
+      return await logger.operation(
+        loggerMessages.database.catalog.listMechanisms,
+        async () =>
+          await db
+            .select({
+              id: schema.mechanism.id,
+              name: schema.mechanism.name,
+              slug: schema.mechanism.slug,
+            })
+            .from(schema.mechanism)
+            .orderBy(asc(schema.mechanism.name)),
+      );
+    },
+    /**
+     * Lists lookups and evidence available to the Pens admin editor.
+     *
+     * @param actor - Authenticated catalog manager.
+     * @returns Pens administration lookups and evidence.
+     * @rejects When the actor cannot manage products.
+     */
+    async listPensAdminOptions(actor) {
+      if (!hasPermission(actor, "products.manage"))
+        throw new Error("Product does not exist.");
+      return await logger.operation(
+        loggerMessages.database.catalog.listPensAdminOptions,
+        async () => {
+          const [
+            slotKinds,
+            tipStyles,
+            inkColors,
+            marketRows,
+            compatibilityGroups,
+            compatibilityGroupConcepts,
+            sourceEvidence,
+            compatibilityEvidence,
+            offeringRows,
+          ] = await Promise.all([
+            db
+              .select({
+                id: schema.configurationSlotKind.id,
+                name: schema.configurationSlotKind.labelFallback,
+                slug: schema.configurationSlotKind.slug,
+              })
+              .from(schema.configurationSlotKind)
+              .orderBy(asc(schema.configurationSlotKind.labelFallback)),
+            db
+              .select({
+                id: schema.refillTipStyle.id,
+                name: schema.refillTipStyle.name,
+                slug: schema.refillTipStyle.slug,
+              })
+              .from(schema.refillTipStyle)
+              .orderBy(asc(schema.refillTipStyle.name)),
+            db
+              .select({
+                id: schema.refillInkColor.id,
+                name: schema.refillInkColor.name,
+                slug: schema.refillInkColor.slug,
+              })
+              .from(schema.refillInkColor)
+              .orderBy(asc(schema.refillInkColor.name)),
+            db
+              .select({
+                id: schema.catalogMarket.id,
+                name: schema.catalogMarket.displayName,
+                slug: schema.catalogMarket.code,
+              })
+              .from(schema.catalogMarket)
+              .orderBy(asc(schema.catalogMarket.displayName)),
+            db
+              .select({
+                id: schema.refillCompatibilityGroup.id,
+                name: schema.catalogTerminologyConcept.canonicalLabelFallback,
+                slug: schema.catalogTerminologyConcept.key,
+              })
+              .from(schema.refillCompatibilityGroup)
+              .innerJoin(
+                schema.catalogTerminologyConcept,
+                eq(
+                  schema.refillCompatibilityGroup.conceptId,
+                  schema.catalogTerminologyConcept.id,
+                ),
+              )
+              .orderBy(
+                asc(schema.catalogTerminologyConcept.canonicalLabelFallback),
+              ),
+            db
+              .select({
+                id: schema.catalogTerminologyConcept.id,
+                name: schema.catalogTerminologyConcept.canonicalLabelFallback,
+                slug: schema.catalogTerminologyConcept.key,
+              })
+              .from(schema.catalogTerminologyConcept)
+              .where(
+                eq(
+                  schema.catalogTerminologyConcept.namespace,
+                  "refill-compatibility-group",
+                ),
+              )
+              .orderBy(
+                asc(schema.catalogTerminologyConcept.canonicalLabelFallback),
+              ),
+            db
+              .select({
+                id: schema.catalogSourceEvidence.id,
+                name: schema.catalogSourceEvidence.claim,
+              })
+              .from(schema.catalogSourceEvidence)
+              .orderBy(desc(schema.catalogSourceEvidence.createdAt)),
+            db
+              .select({
+                id: schema.refillCompatibilityEvidence.id,
+                name: schema.refillCompatibilityEvidence.summary,
+              })
+              .from(schema.refillCompatibilityEvidence)
+              .where(isNull(schema.refillCompatibilityEvidence.supersededAt))
+              .orderBy(desc(schema.refillCompatibilityEvidence.createdAt)),
+            db
+              .select({
+                id: schema.refillOffering.id,
+                inkColor: schema.refillInkColor.name,
+                refillModel: schema.productDetailRefill.model,
+                refillProductId: schema.refillOffering.refillProductId,
+                tipSize: schema.refillOffering.tipSize,
+                tipStyle: schema.refillTipStyle.name,
+              })
+              .from(schema.refillOffering)
+              .innerJoin(
+                schema.productDetailRefill,
+                eq(
+                  schema.refillOffering.refillProductId,
+                  schema.productDetailRefill.id,
+                ),
+              )
+              .innerJoin(
+                schema.refillInkColor,
+                eq(schema.refillOffering.inkColorId, schema.refillInkColor.id),
+              )
+              .innerJoin(
+                schema.refillTipStyle,
+                eq(schema.refillOffering.tipStyleId, schema.refillTipStyle.id),
+              )
+              .orderBy(asc(schema.productDetailRefill.model)),
+          ]);
+          return {
+            compatibilityEvidence,
+            compatibilityGroupConcepts,
+            compatibilityGroups,
+            inkColors,
+            markets: marketRows,
+            offerings: offeringRows.map((offering) => ({
+              id: offering.id,
+              name: `${offering.refillModel} · ${offering.tipSize} · ${offering.tipStyle} · ${offering.inkColor}`,
+              refillProductId: offering.refillProductId,
+            })),
+            slotKinds,
+            sourceEvidence,
+            tipStyles,
+          };
+        },
+      );
+    },
+    /**
      * Lists products.
      *
      * @param productTypeSlug - Product type slug.
@@ -4882,6 +5896,7 @@ export function createCatalogService(
         loggerMessages.database.catalog.updateProduct,
         async () => {
           assertProductMaterialsAndAppearance(input);
+          assertPensProductFields(input);
           await validateFinishOptions(db, input.finishOptions);
           await db.transaction(async (tx) => {
             const [existing] = await tx
@@ -5008,6 +6023,13 @@ export function createCatalogService(
 
             await assertProductRelationships(tx, input.productId, input);
             await updateProductSubtype(tx, input.productId, input);
+            if (input.aliases !== undefined)
+              await replaceProductAliases(
+                tx,
+                input.productId,
+                input.aliases,
+                input.actor.clerkId,
+              );
             if (dependencies && actorUser) {
               const [updated] = await queryProducts(
                 tx as unknown as Database,
@@ -7532,9 +8554,12 @@ function requireProductAudit(
  */
 function productAuditState(product: CatalogProduct): AuditJsonObject {
   return {
+    aliases: product.aliases,
     bearing: product.bearing,
     buttonDiameter: product.buttonDiameter,
     compatibleButtonId: product.compatibleButtonId,
+    compatiblePens: product.compatiblePens,
+    configurationSlots: product.configurationSlots,
     description: product.description,
     diameter: product.diameter,
     finishOptions: product.finishOptions.map((option) => ({
@@ -7553,6 +8578,7 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     makerId: product.makerId,
     makerProductUrl: product.makerProductUrl,
     makerProductUrlValid: product.makerProductUrlValid,
+    mechanismId: product.mechanismId ?? null,
     magnetConfiguration: product.magnetConfiguration ?? null,
     magnetLayout: product.magnetLayout,
     materialAssignments: product.materials.map(
@@ -7565,6 +8591,8 @@ function productAuditState(product: CatalogProduct): AuditJsonObject {
     name: product.name,
     productTypeId: product.productTypeId,
     productTypeSlug: product.productTypeSlug,
+    refillModel: product.refillModel,
+    refillOfferings: product.refillOfferings,
     slug: product.slug,
     spinDiameter: product.spinDiameter,
     thickness: product.thickness,
@@ -8228,6 +9256,7 @@ async function queryProducts(
       makerUrl: schema.maker.rootUrl,
       magnetConfiguration: schema.productDetailSlider.magnetConfiguration,
       magnetLayout: sql<SliderMagnetLayout | null>`coalesce(${schema.productDetailSlider.magnetLayout}, ${schema.productDetailSliderInsert.magnetLayout})`,
+      mechanismId: schema.productDetailPenMechanism.mechanismId,
       materialAssignmentId: schema.productMaterial.id,
       materialSpecificId: schema.materialSpecific.id,
       materialSpecificName: schema.materialSpecific.name,
@@ -8303,6 +9332,10 @@ async function queryProducts(
     .leftJoin(
       schema.productDetailRefill,
       eq(schema.product.id, schema.productDetailRefill.id),
+    )
+    .leftJoin(
+      schema.productDetailPenMechanism,
+      eq(schema.product.id, schema.productDetailPenMechanism.id),
     )
     .leftJoin(
       compatibleButtonProduct,
@@ -8382,6 +9415,7 @@ async function queryProducts(
       makerProductUrl: row.makerProductUrl,
       makerProductUrlValid: row.makerProductUrlValid,
       makerUrl: row.makerUrl,
+      mechanismId: row.mechanismId,
       magnetLayout: row.magnetLayout,
       magnetConfiguration: row.magnetConfiguration,
       materials:
@@ -8472,8 +9506,11 @@ async function loadPensCatalogDetails(
       id: schema.productConfigurationSlot.id,
       labelFallback: schema.configurationSlotKind.labelFallback,
       labelKey: schema.configurationSlotKind.labelKey,
+      position: schema.productConfigurationSlot.position,
       productId: schema.productConfigurationSlot.productId,
       required: schema.productConfigurationSlot.required,
+      slotKindId: schema.configurationSlotKind.id,
+      slotKindSlug: schema.configurationSlotKind.slug,
     })
     .from(schema.productConfigurationSlot)
     .innerJoin(
@@ -8511,6 +9548,10 @@ async function loadPensCatalogDetails(
               partIsPrivate: partProduct.isPrivate,
               partName: partProduct.name,
               partOwnerClerkId: partProduct.ownerClerkId,
+              partProductId: schema.productConfigurationChoice.partProductId,
+              position: schema.productConfigurationChoice.position,
+              productMaterialId:
+                schema.productConfigurationChoice.productMaterialId,
               slotId: schema.productConfigurationChoice.slotId,
             })
             .from(schema.productConfigurationChoice)
@@ -8646,6 +9687,9 @@ async function loadPensCatalogDetails(
       id: choice.id,
       label:
         choice.materialSpecificName ?? choice.materialName ?? choice.partName,
+      partProductId: choice.partProductId,
+      position: choice.position,
+      productMaterialId: choice.productMaterialId,
     });
     choicesBySlot.set(choice.slotId, slotChoices);
   }
@@ -8660,7 +9704,10 @@ async function loadPensCatalogDetails(
       id: slot.id,
       labelFallback: slot.labelFallback,
       labelKey: slot.labelKey,
+      position: slot.position,
       required: slot.required,
+      slotKindId: slot.slotKindId,
+      slotKindSlug: slot.slotKindSlug,
     });
   }
   for (const offering of offerings) {
@@ -10917,6 +11964,255 @@ async function touchProductUpdatedAt(
 }
 
 /**
+ * Confirms that an administrative target has one of the accepted product types.
+ *
+ * @param tx - Caller-owned catalog transaction.
+ * @param productId - Product to inspect.
+ * @param expected - Accepted canonical product types.
+ * @rejects When the target is absent or has another product type.
+ */
+async function assertProductHasType(
+  tx: CatalogTransaction,
+  productId: number,
+  expected: CatalogProductType[],
+) {
+  const [row] = await tx
+    .select({ slug: schema.productType.slug })
+    .from(schema.product)
+    .innerJoin(
+      schema.productType,
+      eq(schema.product.productTypeId, schema.productType.id),
+    )
+    .where(eq(schema.product.id, productId))
+    .limit(1);
+  if (!row || !expected.includes(catalogProductType(row.slug)))
+    throw new Error("Pens catalog target has the wrong product type.");
+}
+
+/**
+ * Trims optional administrative text without inventing empty values.
+ *
+ * @param value - Optional text to normalize.
+ * @returns Trimmed text, or null when empty.
+ */
+function cleanOptionalText(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * Requires bounded nonblank administrative text.
+ *
+ * @param value - Text to validate.
+ * @param maximum - Maximum accepted length.
+ * @param label - Field label used in errors.
+ * @returns Trimmed validated text.
+ * @throws When the text is empty or exceeds the maximum.
+ */
+function requireBoundedText(value: string, maximum: number, label: string) {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > maximum)
+    throw new Error(`${label} must be between 1 and ${maximum} characters.`);
+  return trimmed;
+}
+
+/**
+ * Requires an HTTP(S) source URL.
+ *
+ * @param value - URL to validate.
+ * @returns Trimmed HTTP or HTTPS URL.
+ * @throws When the URL is invalid or uses another protocol.
+ */
+function requireWebUrl(value: string) {
+  const trimmed = value.trim();
+  try {
+    if (!["http:", "https:"].includes(new URL(trimmed).protocol))
+      throw new Error();
+  } catch {
+    throw new Error("Source URL must use HTTP or HTTPS.");
+  }
+  return trimmed;
+}
+
+/**
+ * Normalizes an optional HTTP(S) source URL.
+ *
+ * @param value - Optional URL to normalize.
+ * @returns A validated URL, or null when empty.
+ */
+function cleanOptionalUrl(value: string | null | undefined) {
+  const trimmed = cleanOptionalText(value);
+  return trimmed === null ? null : requireWebUrl(trimmed);
+}
+
+/**
+ * Enforces evidence before an approval timestamp can be written.
+ *
+ * @param approved - Whether the claim should be approved.
+ * @param evidence - Evidence relationships attached to the claim.
+ * @throws When evidence repeats or an approved claim lacks support.
+ */
+function assertSupportingEvidence(
+  approved: boolean,
+  evidence: PensEvidenceLink[],
+) {
+  if (
+    new Set(evidence.map(({ evidenceId }) => evidenceId)).size !==
+    evidence.length
+  )
+    throw new Error("Evidence links must be distinct.");
+  if (approved && !evidence.some(({ stance }) => stance === "supports"))
+    throw new Error("Approved Pens claims need supporting evidence.");
+}
+
+/**
+ * Inserts evidence links for one newly authored Pens claim.
+ *
+ * @param tx - Caller-owned catalog transaction.
+ * @param target - Evidence relationship table to use.
+ * @param targetId - Claim receiving the evidence.
+ * @param evidence - Evidence relationships to insert.
+ * @returns A promise that resolves after links are inserted.
+ */
+async function insertPensEvidenceLinks(
+  tx: CatalogTransaction,
+  target:
+    | "assertion"
+    | "identifier"
+    | "market-status"
+    | "membership"
+    | "offering",
+  targetId: number,
+  evidence: PensEvidenceLink[],
+) {
+  if (!evidence.length) return;
+  if (target === "offering") {
+    await tx.insert(schema.refillOfferingEvidence).values(
+      evidence.map(({ evidenceId, stance }) => ({
+        evidenceId,
+        offeringId: targetId,
+        stance,
+      })),
+    );
+    return;
+  }
+  if (target === "market-status") {
+    await tx.insert(schema.refillOfferingMarketStatusEvidence).values(
+      evidence.map(({ evidenceId, stance }) => ({
+        evidenceId,
+        stance,
+        statusId: targetId,
+      })),
+    );
+    return;
+  }
+  if (target === "identifier") {
+    await tx.insert(schema.refillOfferingIdentifierEvidence).values(
+      evidence.map(({ evidenceId, stance }) => ({
+        evidenceId,
+        identifierId: targetId,
+        stance,
+      })),
+    );
+    return;
+  }
+  if (target === "membership") {
+    await tx.insert(schema.refillCompatibilityGroupMembershipEvidence).values(
+      evidence.map(({ evidenceId, stance }) => ({
+        evidenceId,
+        membershipId: targetId,
+        stance,
+      })),
+    );
+    return;
+  }
+  await tx.insert(schema.refillCompatibilityAssertionEvidence).values(
+    evidence.map(({ evidenceId, stance }) => ({
+      assertionId: targetId,
+      evidenceId,
+      stance,
+    })),
+  );
+}
+
+/**
+ * Validates the subtype-only fields accepted by Pen and refill product writes.
+ *
+ * @param input - Candidate product write.
+ * @throws When a subtype field is missing, misplaced, or malformed.
+ */
+function assertPensProductFields(input: ProductWriteInput) {
+  const mechanismId = input.mechanismId ?? null;
+  const refillModel = input.refillModel?.trim() ?? null;
+  if (input.productTypeSlug === "pen-mechanism") {
+    if (!mechanismId) throw new Error("A Pen mechanism type is required.");
+  } else if (mechanismId !== null) {
+    throw new Error("Only Pen mechanism products may select a mechanism type.");
+  }
+  if (input.productTypeSlug === "refill") {
+    if (!refillModel || refillModel.length > 200)
+      throw new Error("A refill model is required.");
+    if (input.materialAssignments.length || input.finishOptions.length)
+      throw new Error("Refills do not support material or appearance options.");
+  } else if (refillModel !== null) {
+    throw new Error("Only refill products may declare a refill model.");
+  }
+  if (
+    input.productTypeSlug === "pen" ||
+    input.productTypeSlug.startsWith("pen-") ||
+    input.productTypeSlug === "refill"
+  ) {
+    if (
+      Object.values(input.specs).some((value) => value != null) ||
+      input.magnetLayout != null ||
+      input.magnetConfiguration != null ||
+      input.includedInsertProductId != null ||
+      input.includedPlateProductId != null
+    )
+      throw new Error("Pens and refills do not support legacy product specs.");
+  }
+  const normalizedAliases = (input.aliases ?? []).map((label) => {
+    const normalized = normalizeCatalogSearch(label);
+    if (!label.trim() || label.trim().length > 80 || !normalized)
+      throw new Error("Product aliases must be between 1 and 80 characters.");
+    return normalized;
+  });
+  if (new Set(normalizedAliases).size !== normalizedAliases.length)
+    throw new Error("Duplicate product aliases are not allowed.");
+}
+
+/**
+ * Replaces one product's searchable aliases inside its caller transaction.
+ *
+ * @param tx - Caller-owned product transaction.
+ * @param productId - Product receiving the aliases.
+ * @param aliases - Complete replacement alias labels.
+ * @param authoredByClerkId - Actor authoring the replacement set.
+ */
+async function replaceProductAliases(
+  tx: CatalogTransaction,
+  productId: number,
+  aliases: string[],
+  authoredByClerkId: string,
+) {
+  await tx
+    .delete(schema.productAlias)
+    .where(eq(schema.productAlias.productId, productId));
+  if (!aliases.length) return;
+  await tx.insert(schema.productAlias).values(
+    aliases.map((value) => {
+      const label = value.trim();
+      return {
+        authoredByClerkId,
+        label,
+        normalizedValue: normalizeCatalogSearch(label),
+        productId,
+      };
+    }),
+  );
+}
+
+/**
  * Inserts the subtype row required by one canonical product type.
  *
  * @param tx - Caller-owned product transaction.
@@ -10931,6 +12227,61 @@ async function insertProductSubtype(
 ) {
   const { specs } = input;
   switch (input.productTypeSlug) {
+    case "pen":
+      await tx.insert(schema.productDetailPen).values({ id: productId });
+      return;
+    case "pen-actuator":
+    case "pen-clip":
+    case "pen-mechanism":
+    case "pen-tip":
+    case "pen-top-cap":
+      await tx.insert(schema.productDetailPenPart).values({ id: productId });
+      if (input.productTypeSlug === "pen-actuator")
+        await tx
+          .insert(schema.productDetailPenActuator)
+          .values({ id: productId });
+      if (input.productTypeSlug === "pen-clip")
+        await tx.insert(schema.productDetailPenClip).values({ id: productId });
+      if (input.productTypeSlug === "pen-mechanism")
+        await tx.insert(schema.productDetailPenMechanism).values({
+          id: productId,
+          mechanismId: input.mechanismId ?? 0,
+        });
+      if (input.productTypeSlug === "pen-tip")
+        await tx.insert(schema.productDetailPenTip).values({ id: productId });
+      if (input.productTypeSlug === "pen-top-cap")
+        await tx
+          .insert(schema.productDetailPenTopCap)
+          .values({ id: productId });
+      const [role] = await tx
+        .select({ id: schema.catalogTerminologyConcept.id })
+        .from(schema.catalogTerminologyConcept)
+        .where(
+          and(
+            eq(schema.catalogTerminologyConcept.namespace, "pen-part-role"),
+            eq(
+              schema.catalogTerminologyConcept.key,
+              input.productTypeSlug.slice(4),
+            ),
+          ),
+        )
+        .limit(1);
+      if (!role) throw new Error("Pen part role does not exist.");
+      await tx.insert(schema.penPartRoleAssignment).values({
+        conceptId: role.id,
+        partProductId: productId,
+      });
+      return;
+    case "refill": {
+      const model = input.refillModel?.trim() ?? "";
+      await tx.insert(schema.productDetailRefill).values({
+        id: productId,
+        makerId: input.makerId,
+        model,
+        normalizedModel: normalizeCatalogSearch(model),
+      });
+      return;
+    }
     case "spinner":
       assertNoSliderOnlySpecs(input);
       await tx
@@ -10980,6 +12331,31 @@ async function updateProductSubtype(
   const updatedAt = new Date();
   const { specs } = input;
   switch (input.productTypeSlug) {
+    case "pen":
+    case "pen-actuator":
+    case "pen-clip":
+    case "pen-tip":
+    case "pen-top-cap":
+      return;
+    case "pen-mechanism":
+      await tx
+        .update(schema.productDetailPenMechanism)
+        .set({ mechanismId: input.mechanismId ?? 0, updatedAt })
+        .where(eq(schema.productDetailPenMechanism.id, productId));
+      return;
+    case "refill": {
+      const model = input.refillModel?.trim() ?? "";
+      await tx
+        .update(schema.productDetailRefill)
+        .set({
+          makerId: input.makerId,
+          model,
+          normalizedModel: normalizeCatalogSearch(model),
+          updatedAt,
+        })
+        .where(eq(schema.productDetailRefill.id, productId));
+      return;
+    }
     case "spinner":
       assertNoSliderOnlySpecs(input);
       await tx
@@ -11461,7 +12837,7 @@ function assertNoSliderInsertBodySpecs(input: ProductWriteInput) {
  * @throws When required materials are missing or inserts carry unsupported appearance.
  */
 function assertProductMaterialsAndAppearance(input: ProductWriteInput) {
-  if (!input.materialAssignments.length)
+  if (!input.materialAssignments.length && input.productTypeSlug !== "refill")
     throw new Error("At least one material is required.");
   const pairs = input.materialAssignments.map(
     ({ materialId, materialSpecificId }) =>

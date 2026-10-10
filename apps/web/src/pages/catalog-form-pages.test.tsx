@@ -14,6 +14,7 @@ import {
   CollectionProductFields,
   collectionEditSubmissionMode,
   FinishOptionsEditor,
+  PensAdminEditor,
   ProductEditor,
 } from "./catalog-form-pages";
 
@@ -109,6 +110,7 @@ const emptyCatalogOptions = {
   colors: [],
   finishes: [],
   makers: [],
+  mechanisms: [],
   materials: [],
   patterns: [],
   productTypes: [],
@@ -175,6 +177,7 @@ describe("finish option editor", () => {
           ],
           finishes: [{ id: 1000, name: "Anodized", slug: "anodized" }],
           makers: [],
+          mechanisms: [],
           materials: [],
           patterns: [{ id: 1002, name: "Honeycomb", slug: "honeycomb" }],
           productTypes: [],
@@ -846,6 +849,51 @@ describe("collection add form", () => {
   });
 });
 
+describe("Pens catalog administration", () => {
+  it("renders typed product fields and structured admin actions", () => {
+    const refill = {
+      ...productFixture(2000, "Precise V5", "refill"),
+      aliases: ["Pilot Precise V5 RT"],
+      canAdminister: true,
+      materials: [],
+      refillModel: "BXS-V5RT",
+    };
+    const options = {
+      ...emptyCatalogOptions,
+      pensAdminOptions: {
+        compatibilityEvidence: [],
+        compatibilityGroupConcepts: [],
+        compatibilityGroups: [],
+        inkColors: [{ id: 1000, name: "Blue", slug: "blue" }],
+        markets: [{ id: 1001, name: "Global", slug: "GLOBAL" }],
+        offerings: [],
+        slotKinds: [{ id: 1002, name: "Material", slug: "material" }],
+        sourceEvidence: [],
+        tipStyles: [{ id: 1003, name: "Needle", slug: "needle" }],
+      },
+      relationshipProducts: [refill],
+    };
+    const productHtml = renderToStaticMarkup(
+      createElement(ProductEditor, {
+        initialProduct: refill,
+        options,
+        productTypeSlug: "refill",
+      }),
+    );
+    const adminHtml = renderToStaticMarkup(
+      createElement(PensAdminEditor, { options, product: refill }),
+    );
+
+    expect(productHtml).toContain("BXS-V5RT");
+    expect(productHtml).toContain("Pilot Precise V5 RT");
+    expect(productHtml).not.toContain("web.catalog.field.materials");
+    expect(adminHtml).toContain("refill-offering");
+    expect(adminHtml).toContain("compatibility-assertion");
+    expect(adminHtml).toContain("Needle");
+    expect(adminHtml).toContain("Blue");
+  });
+});
+
 /**
  * Creates a catalog product fixture.
  *
@@ -913,13 +961,7 @@ function productFixture(
     isAdminPrivate: false,
     isPrivate: false,
     productTypeId: 1,
-    productTypeName: {
-      slider: "Slider",
-      "slider-insert": "Slider Insert",
-      "slider-plate": "Slider Plate",
-      spinner: "Spinner",
-      "spinner-button": "Button",
-    }[productTypeSlug],
+    productTypeName: productTypeSlug,
     productTypeSlug,
     slug: name.toLowerCase(),
     spinDiameter: null,

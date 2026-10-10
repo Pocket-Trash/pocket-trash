@@ -55,6 +55,7 @@ import { UserPageShell } from "@/components/user-page-shell";
 import { filterButtonsByDiameter, finishOptionLabel } from "@/lib/catalog";
 import {
   addCollectionProduct,
+  authorCatalogPensData,
   type CatalogOptions,
   collectionProductTypeIsSupported,
   createCatalogColor,
@@ -142,17 +143,711 @@ export function ProductFormPage({
           </Field>
         ) : null}
         {productType && productTypeIsSupported(productType) ? (
-          <ProductEditor
-            initialProduct={initialProduct}
-            key={`${productType}-${initialProduct?.id ?? "new"}`}
-            options={initialOptions}
-            productTypeSlug={productType}
-          />
+          <>
+            <ProductEditor
+              initialProduct={initialProduct}
+              key={`${productType}-${initialProduct?.id ?? "new"}`}
+              options={initialOptions}
+              productTypeSlug={productType}
+            />
+            {initialProduct?.canAdminister &&
+            initialOptions.pensAdminOptions ? (
+              <PensAdminEditor
+                options={initialOptions}
+                product={initialProduct}
+              />
+            ) : null}
+          </>
         ) : productType ? (
           <Notice>{t("web.catalog.notImplemented")}</Notice>
         ) : null}
       </main>
     </AppShell>
+  );
+}
+
+/** Structured Pens administration actions exposed by the editor. */
+const pensAdminActions = [
+  "configuration-slot",
+  "configuration-slot-required",
+  "configuration-choice",
+  "configuration-rule",
+  "source-evidence",
+  "refill-offering",
+  "offering-market-status",
+  "offering-identifier",
+  "compatibility-evidence",
+  "compatibility-membership",
+  "compatibility-assertion",
+  "refill-tip-style",
+  "refill-ink-color",
+  "market",
+  "compatibility-group",
+] as const;
+/** One structured Pens administration action. */
+type PensAdminAction = (typeof pensAdminActions)[number];
+
+/**
+ * Renders structured append-only Pens administration for an existing product.
+ *
+ * @param root0 - Editor properties.
+ * @param root0.options - Available catalog lookups.
+ * @param root0.product - Product being administered.
+ * @returns The Pens administration editor, or nothing without admin options.
+ */
+export function PensAdminEditor({
+  options,
+  product,
+}: {
+  /** Available catalog lookups. */
+  options: CatalogOptions;
+  /** Product being administered. */
+  product: CatalogProduct;
+}) {
+  const t = useCatalogCopy();
+  /**
+   * Resolves one Pens administration translation.
+   *
+   * @param key - Key suffix within the Pens admin namespace.
+   * @returns Localized text or its fallback key.
+   */
+  const copy = (key: string) => t(`web.pens.admin.${key}` as TranslationKey);
+  const admin = options.pensAdminOptions;
+  const [action, setAction] = React.useState<PensAdminAction>(
+    product.productTypeSlug === "refill"
+      ? "refill-offering"
+      : "configuration-slot",
+  );
+  const [approved, setApproved] = React.useState(false);
+  const [primaryId, setPrimaryId] = React.useState("");
+  const [secondaryId, setSecondaryId] = React.useState("");
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const [text, setText] = React.useState("");
+  const [text2, setText2] = React.useState("");
+  const [text3, setText3] = React.useState("");
+  const [text4, setText4] = React.useState("");
+  const [date, setDate] = React.useState("");
+  const [choiceKind, setChoiceKind] = React.useState<
+    "finish" | "material" | "part"
+  >("material");
+  const [evidenceKind, setEvidenceKind] = React.useState("physical-fit-test");
+  const [outcome, setOutcome] = React.useState("compatible");
+  const [targetKind, setTargetKind] = React.useState<"group" | "refill">(
+    "refill",
+  );
+  const [message, setMessage] = React.useState<string | null>(null);
+  if (!admin) return null;
+
+  const slot = product.configurationSlots.find(
+    ({ id }) => id === Number(primaryId),
+  );
+  const choices = product.configurationSlots.flatMap((candidate) =>
+    candidate.choices.map((choice) => ({
+      ...choice,
+      slotLabel: candidate.labelFallback,
+      slotPosition: candidate.position ?? 0,
+    })),
+  );
+  const targetChoice = choices.find(({ id }) => id === Number(primaryId));
+  const earlierChoices = targetChoice
+    ? choices.filter(
+        ({ id, slotPosition }) =>
+          id !== targetChoice.id && slotPosition < targetChoice.slotPosition,
+      )
+    : [];
+  const evidenceOptions = action.startsWith("compatibility-")
+    ? admin.compatibilityEvidence
+    : admin.sourceEvidence;
+  const partType = slot?.slotKindSlug
+    ? (`pen-${slot.slotKindSlug}` as CatalogProductType)
+    : "pen-tip";
+  const carriers =
+    choiceKind === "material"
+      ? product.materials.map((material) => ({
+          id: material.assignmentId,
+          name: material.specific?.name ?? material.name,
+        }))
+      : choiceKind === "finish"
+        ? product.finishOptions.map((finish) => ({
+            id: finish.id,
+            name: finishOptionLabel(finish),
+          }))
+        : options.relationshipProducts
+            .filter(
+              (candidate) =>
+                candidate.id !== product.id &&
+                candidate.productTypeSlug === partType,
+            )
+            .map(({ id, name }) => ({ id, name }));
+
+  /**
+   * Renders a labeled single-value select.
+   *
+   * @param label - Accessible field label.
+   * @param value - Selected value.
+   * @param onChange - Selection callback.
+   * @param items - Available values.
+   * @returns The labeled select field.
+   */
+  const select = (
+    label: string,
+    value: string,
+    onChange: (value: string) => void,
+    items: ReadonlyArray<{
+      /** Submitted identifier. */
+      id: number | string;
+      /** Visible option name. */
+      name: string;
+    }>,
+  ) => (
+    <Field label={label}>
+      <select
+        aria-label={label}
+        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+        onChange={(event) => onChange(event.target.value)}
+        required
+        value={value}
+      >
+        <option value="" />
+        {items.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.name}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+
+  /**
+   * Renders a labeled text-like input.
+   *
+   * @param label - Accessible field label.
+   * @param value - Current value.
+   * @param onChange - Value callback.
+   * @param type - Native input type.
+   * @returns The labeled input field.
+   */
+  const input = (
+    label: string,
+    value: string,
+    onChange: (value: string) => void,
+    type = "text",
+  ) => (
+    <Field label={label}>
+      <Input
+        aria-label={label}
+        onChange={(event) => onChange(event.target.value)}
+        required
+        type={type}
+        value={value}
+      />
+    </Field>
+  );
+
+  /** Evidence multi-select shared by approval-gated actions. */
+  const evidencePicker = (
+    <Field label={t("web.pens.admin.evidence" as TranslationKey)}>
+      <select
+        aria-label={t("web.pens.admin.evidence" as TranslationKey)}
+        className="min-h-24 rounded-md border border-input bg-background px-3 text-sm"
+        multiple
+        onChange={(event) =>
+          setSelectedIds(
+            [...event.currentTarget.selectedOptions].map(({ value }) => value),
+          )
+        }
+        value={selectedIds}
+      >
+        {evidenceOptions.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.name}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+
+  /**
+   * Validates and submits the selected structured mutation.
+   *
+   * @returns A promise that resolves after the response is handled.
+   */
+  const submit = async () => {
+    const id = Number(primaryId);
+    const id2 = Number(secondaryId);
+    const evidence = selectedIds.map((evidenceId) => ({
+      evidenceId: Number(evidenceId),
+      stance: "supports" as const,
+    }));
+    const data: unknown =
+      action === "configuration-slot"
+        ? {
+            kind: action,
+            productId: product.id,
+            required: false,
+            slotKindId: id,
+          }
+        : action === "configuration-slot-required"
+          ? {
+              kind: action,
+              productId: product.id,
+              required: approved,
+              slotId: id,
+            }
+          : action === "configuration-choice"
+            ? {
+                finishOptionId: choiceKind === "finish" ? id2 : null,
+                kind: action,
+                partProductId: choiceKind === "part" ? id2 : null,
+                productId: product.id,
+                productMaterialId: choiceKind === "material" ? id2 : null,
+                slotId: id,
+              }
+            : action === "configuration-rule"
+              ? {
+                  kind: action,
+                  productId: product.id,
+                  requiredChoiceIds: selectedIds.map(Number),
+                  targetChoiceId: id,
+                }
+              : action === "source-evidence"
+                ? {
+                    captureDate: date,
+                    claim: text4,
+                    kind: action,
+                    marketId: id || null,
+                    originalUrl: text3,
+                    publisher: text,
+                    sourceKind: text2,
+                  }
+                : action === "refill-offering"
+                  ? {
+                      approved,
+                      evidence,
+                      inkColorId: id2,
+                      kind: action,
+                      refillProductId: product.id,
+                      tipSize: text,
+                      tipStyleId: id,
+                    }
+                  : action === "offering-market-status"
+                    ? {
+                        approved,
+                        effectiveDate: date || null,
+                        evidence,
+                        kind: action,
+                        lifecycle: text,
+                        marketId: id2,
+                        offeringId: id,
+                      }
+                    : action === "offering-identifier"
+                      ? {
+                          approved,
+                          effectiveDate: date || null,
+                          evidence,
+                          identifierKind: text2,
+                          kind: action,
+                          makerId: product.makerId,
+                          marketId: id2,
+                          offeringId: id,
+                          sourceValue: text,
+                        }
+                      : action === "compatibility-evidence"
+                        ? evidenceKind === "physical-fit-test"
+                          ? {
+                              evidenceKind,
+                              kind: action,
+                              penProductId:
+                                product.productTypeSlug === "pen"
+                                  ? product.id
+                                  : id,
+                              procedure: text3,
+                              refillProductId:
+                                product.productTypeSlug === "refill"
+                                  ? product.id
+                                  : id2,
+                              result: text2,
+                              summary: text,
+                              testDate: date,
+                            }
+                          : evidenceKind === "dimensional-comparison"
+                            ? {
+                                evidenceKind,
+                                firstMeasuredFormatLabel: text2,
+                                firstSourceUrl: text3,
+                                kind: action,
+                                secondMeasuredFormatLabel: text4,
+                                secondSourceUrl: secondaryId,
+                                summary: text,
+                              }
+                            : {
+                                catalogEdition: text4 || null,
+                                evidenceKind,
+                                kind: action,
+                                sourceDate: date || null,
+                                sourceUrl: text3,
+                                summary: text,
+                              }
+                        : action === "compatibility-membership"
+                          ? {
+                              approved,
+                              evidence,
+                              groupId: id,
+                              kind: action,
+                              refillProductId: product.id,
+                            }
+                          : action === "compatibility-assertion"
+                            ? {
+                                approved,
+                                evidence,
+                                explanation: text || null,
+                                kind: action,
+                                outcome,
+                                penProductId: product.id,
+                                remedy: text2 || null,
+                                targetGroupId:
+                                  targetKind === "group" ? id : null,
+                                targetRefillProductId:
+                                  targetKind === "refill" ? id : null,
+                                warning: text3 || null,
+                              }
+                            : action === "market"
+                              ? {
+                                  code: text2,
+                                  displayName: text,
+                                  displayNameKey: text3,
+                                  kind: action,
+                                  marketKind: text4 || "country",
+                                }
+                              : action === "compatibility-group"
+                                ? { conceptId: id, kind: action }
+                                : {
+                                    kind: action,
+                                    name: text,
+                                    slug: text2,
+                                  };
+    const result = await authorCatalogPensData({ data });
+    if (!result.ok) {
+      setMessage(result.formError);
+      return;
+    }
+    window.location.reload();
+  };
+
+  return (
+    <section className="grid gap-4 rounded-xl border border-border bg-card p-6">
+      <h2 className="text-xl font-semibold">
+        {t("web.pens.admin.heading" as TranslationKey)}
+      </h2>
+      {select(
+        t("web.pens.admin.action" as TranslationKey),
+        action,
+        (value) => {
+          setAction(value as PensAdminAction);
+          setPrimaryId("");
+          setSecondaryId("");
+          setSelectedIds([]);
+          setMessage(null);
+        },
+        pensAdminActions.map((id) => ({ id, name: copy(`action.${id}`) })),
+      )}
+      {action === "configuration-slot"
+        ? select(copy("slotKind"), primaryId, setPrimaryId, admin.slotKinds)
+        : null}
+      {action === "configuration-slot-required"
+        ? select(
+            copy("slot"),
+            primaryId,
+            setPrimaryId,
+            product.configurationSlots.map(({ id, labelFallback }) => ({
+              id,
+              name: labelFallback,
+            })),
+          )
+        : null}
+      {action === "configuration-choice" ? (
+        <>
+          {select(
+            copy("slot"),
+            primaryId,
+            (value) => {
+              setPrimaryId(value);
+              const selected = product.configurationSlots.find(
+                ({ id }) => id === Number(value),
+              );
+              setChoiceKind(
+                selected?.slotKindSlug === "material"
+                  ? "material"
+                  : selected?.slotKindSlug === "appearance"
+                    ? "finish"
+                    : "part",
+              );
+            },
+            product.configurationSlots.map(({ id, labelFallback }) => ({
+              id,
+              name: labelFallback,
+            })),
+          )}
+          {select(copy("choice"), secondaryId, setSecondaryId, carriers)}
+        </>
+      ) : null}
+      {action === "configuration-rule" ? (
+        <>
+          {select(
+            copy("targetChoice"),
+            primaryId,
+            setPrimaryId,
+            choices.map(({ id, label, slotLabel }) => ({
+              id,
+              name: `${slotLabel}: ${label ?? id}`,
+            })),
+          )}
+          <Field label={copy("availableWhenAnd")}>
+            <select
+              aria-label={copy("availableWhenAnd")}
+              className="min-h-24 rounded-md border border-input bg-background px-3 text-sm"
+              multiple
+              onChange={(event) =>
+                setSelectedIds(
+                  [...event.currentTarget.selectedOptions].map(
+                    ({ value }) => value,
+                  ),
+                )
+              }
+              value={selectedIds}
+            >
+              {earlierChoices.map(({ id, label, slotLabel }) => (
+                <option key={id} value={id}>
+                  {slotLabel}: {label ?? id}
+                </option>
+              ))}
+            </select>
+            {selectedIds.length ? (
+              <p className="text-sm text-muted-foreground">
+                {copy("availableWhen")}{" "}
+                {selectedIds
+                  .map((id) => {
+                    const choice = earlierChoices.find(
+                      (candidate) => candidate.id === Number(id),
+                    );
+                    return choice
+                      ? `${choice.slotLabel}: ${choice.label ?? choice.id}`
+                      : id;
+                  })
+                  .join(` ${copy("and")} `)}
+              </p>
+            ) : null}
+          </Field>
+        </>
+      ) : null}
+      {action === "source-evidence" ? (
+        <>
+          {input(copy("publisher"), text, setText)}
+          {input(copy("sourceKind"), text2, setText2)}
+          {input(copy("originalUrl"), text3, setText3, "url")}
+          {input(copy("captureDate"), date, setDate, "date")}
+          {input(copy("claim"), text4, setText4)}
+          {select(copy("market"), primaryId, setPrimaryId, admin.markets)}
+        </>
+      ) : null}
+      {action === "refill-offering" ? (
+        <>
+          {select(copy("tipStyle"), primaryId, setPrimaryId, admin.tipStyles)}
+          {select(
+            copy("inkColor"),
+            secondaryId,
+            setSecondaryId,
+            admin.inkColors,
+          )}
+          {input(copy("tipSize"), text, setText)}
+          {evidencePicker}
+        </>
+      ) : null}
+      {action === "offering-market-status" ||
+      action === "offering-identifier" ? (
+        <>
+          {select(copy("offering"), primaryId, setPrimaryId, admin.offerings)}
+          {select(copy("market"), secondaryId, setSecondaryId, admin.markets)}
+          {action === "offering-market-status" ? (
+            select(copy("lifecycle"), text, setText, [
+              { id: "current", name: copy("lifecycle.current") },
+              { id: "discontinued", name: copy("lifecycle.discontinued") },
+              { id: "historical", name: copy("lifecycle.historical") },
+            ])
+          ) : (
+            <>
+              {input(copy("identifier"), text, setText)}
+              {select(copy("identifierKind"), text2, setText2, [
+                { id: "maker-code", name: copy("identifierKind.makerCode") },
+                { id: "sku", name: copy("identifierKind.sku") },
+              ])}
+            </>
+          )}
+          {input(copy("effectiveDate"), date, setDate, "date")}
+          {evidencePicker}
+        </>
+      ) : null}
+      {action === "compatibility-evidence" ? (
+        <>
+          {select(copy("evidenceKind"), evidenceKind, setEvidenceKind, [
+            {
+              id: "manufacturer-statement",
+              name: copy("evidenceKind.manufacturerStatement"),
+            },
+            {
+              id: "dimensional-comparison",
+              name: copy("evidenceKind.dimensionalComparison"),
+            },
+            {
+              id: "physical-fit-test",
+              name: copy("evidenceKind.physicalFitTest"),
+            },
+            {
+              id: "curated-observation",
+              name: copy("evidenceKind.curatedObservation"),
+            },
+          ])}
+          {input(copy("summary"), text, setText)}
+          {evidenceKind === "physical-fit-test" ? (
+            <>
+              {select(
+                copy("pen"),
+                product.productTypeSlug === "pen"
+                  ? String(product.id)
+                  : primaryId,
+                setPrimaryId,
+                options.relationshipProducts.filter(
+                  ({ productTypeSlug }) => productTypeSlug === "pen",
+                ),
+              )}
+              {select(
+                copy("refill"),
+                product.productTypeSlug === "refill"
+                  ? String(product.id)
+                  : secondaryId,
+                setSecondaryId,
+                options.relationshipProducts.filter(
+                  ({ productTypeSlug }) => productTypeSlug === "refill",
+                ),
+              )}
+              {input(copy("testDate"), date, setDate, "date")}
+              {input(copy("result"), text2, setText2)}
+              {input(copy("procedure"), text3, setText3)}
+            </>
+          ) : evidenceKind === "dimensional-comparison" ? (
+            <>
+              {input(copy("firstFormat"), text2, setText2)}
+              {input(copy("firstSourceUrl"), text3, setText3, "url")}
+              {input(copy("secondFormat"), text4, setText4)}
+              {input(
+                copy("secondSourceUrl"),
+                secondaryId,
+                setSecondaryId,
+                "url",
+              )}
+            </>
+          ) : (
+            <>
+              {input(copy("sourceUrl"), text3, setText3, "url")}
+              {input(copy("sourceDate"), date, setDate, "date")}
+              {input(copy("catalogEdition"), text4, setText4)}
+            </>
+          )}
+        </>
+      ) : null}
+      {action === "compatibility-membership" ? (
+        <>
+          {select(
+            copy("compatibilityGroup"),
+            primaryId,
+            setPrimaryId,
+            admin.compatibilityGroups,
+          )}
+          {evidencePicker}
+        </>
+      ) : null}
+      {action === "compatibility-assertion" ? (
+        <>
+          {select(copy("outcome"), outcome, setOutcome, [
+            { id: "compatible", name: copy("outcome.compatible") },
+            { id: "incompatible", name: copy("outcome.incompatible") },
+            { id: "conditional", name: copy("outcome.conditional") },
+            { id: "variable", name: copy("outcome.variable") },
+          ])}
+          {select(
+            copy("targetType"),
+            targetKind,
+            (value) => setTargetKind(value as "group" | "refill"),
+            [
+              { id: "refill", name: copy("targetType.refill") },
+              { id: "group", name: copy("targetType.group") },
+            ],
+          )}
+          {select(
+            copy("target"),
+            primaryId,
+            setPrimaryId,
+            targetKind === "group"
+              ? admin.compatibilityGroups
+              : options.relationshipProducts.filter(
+                  ({ productTypeSlug }) => productTypeSlug === "refill",
+                ),
+          )}
+          {input(copy("explanation"), text, setText)}
+          {input(copy("remedy"), text2, setText2)}
+          {input(copy("warning"), text3, setText3)}
+          {evidencePicker}
+        </>
+      ) : null}
+      {action === "refill-tip-style" || action === "refill-ink-color" ? (
+        <>
+          {input(copy("name"), text, setText)}
+          {input(copy("slug"), text2, setText2)}
+        </>
+      ) : null}
+      {action === "market" ? (
+        <>
+          {input(copy("displayName"), text, setText)}
+          {input(copy("code"), text2, setText2)}
+          {input(copy("localizationKey"), text3, setText3)}
+          {select(copy("marketKind"), text4, setText4, [
+            { id: "country", name: copy("marketKind.country") },
+            { id: "region", name: copy("marketKind.region") },
+          ])}
+        </>
+      ) : null}
+      {action === "compatibility-group"
+        ? select(
+            copy("registeredGroup"),
+            primaryId,
+            setPrimaryId,
+            admin.compatibilityGroupConcepts,
+          )
+        : null}
+      {[
+        "refill-offering",
+        "offering-market-status",
+        "offering-identifier",
+        "compatibility-membership",
+        "compatibility-assertion",
+        "configuration-slot-required",
+      ].includes(action) ? (
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            checked={approved}
+            onChange={(event) => setApproved(event.target.checked)}
+            type="checkbox"
+          />
+          {action === "configuration-slot-required"
+            ? copy("required")
+            : copy("approved")}
+        </label>
+      ) : null}
+      {message ? <Notice>{t(message as TranslationKey)}</Notice> : null}
+      <Button onClick={() => void submit()} type="button">
+        {t("web.action.save")}
+      </Button>
+    </section>
   );
 }
 
@@ -276,6 +971,7 @@ export function ProductEditor({
   const insertDialogTitleId = React.useId();
   const [descriptionLoading, setDescriptionLoading] = React.useState(true);
   const defaultValues: ProductEditorValue = {
+    aliases: initialProduct?.aliases ?? [],
     bearing: initialProduct?.bearing ?? "",
     buttonDiameter: initialProduct?.buttonDiameter ?? { unit: "mm", value: "" },
     compatibleButtonId: initialProduct?.compatibleButtonId ?? null,
@@ -307,13 +1003,19 @@ export function ProductEditor({
         : productTypeSlug === "slider" && !initialProduct?.includedInsert
           ? (initialProduct?.magnetLayout ?? "2x4")
           : null,
-    materialAssignments: initialProduct?.materials.map(({ id, specific }) => ({
-      materialId: id,
-      materialSpecificId: specific?.id ?? null,
-    })) ?? [{ materialId: 0, materialSpecificId: null }],
+    mechanismId: initialProduct?.mechanismId ?? null,
+    materialAssignments:
+      initialProduct?.materials.map(({ id, specific }) => ({
+        materialId: id,
+        materialSpecificId: specific?.id ?? null,
+      })) ??
+      (productTypeSlug === "refill"
+        ? []
+        : [{ materialId: 0, materialSpecificId: null }]),
     name: initialProduct?.name ?? "",
     productId: initialProduct?.id ?? null,
     productTypeSlug,
+    refillModel: initialProduct?.refillModel ?? null,
     spinDiameter: initialProduct?.spinDiameter ?? { unit: "mm", value: "" },
     thickness: initialProduct?.thickness ?? { unit: "mm", value: "" },
     thicknessWithButton: initialProduct?.thicknessWithButton ?? {
@@ -576,126 +1278,190 @@ export function ProductEditor({
             )}
           </form.Field>
         ) : null}
-        <form.Field name="materialAssignments">
-          {(field) => (
-            <Field label={t("web.catalog.field.materials")}>
-              {field.state.value.map((selection, index) => (
-                <div
-                  className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
-                  key={index}
-                >
-                  <CatalogCombobox
-                    ariaLabel={t("web.catalog.field.materials")}
-                    items={options.materials}
-                    value={
-                      options.materials.find(
-                        ({ id }) => id === selection.materialId,
-                      ) ?? null
-                    }
-                    placeholder={t("web.catalog.selectMaterial")}
-                    onValueChange={(value) =>
-                      field.handleChange(
-                        field.state.value.map((row, i) =>
-                          i === index
-                            ? {
-                                materialId: Number(value?.id ?? 0),
-                                materialSpecificId: null,
-                              }
-                            : row,
-                        ),
-                      )
-                    }
-                  />
-                  <CatalogCombobox
-                    ariaLabel={t("web.materials.specific.optional")}
-                    items={(options.materialSpecifics ?? []).filter(
-                      ({ materialId }) => materialId === selection.materialId,
-                    )}
-                    value={
-                      (options.materialSpecifics ?? []).find(
-                        ({ id }) => id === selection.materialSpecificId,
-                      ) ?? null
-                    }
-                    placeholder={t("web.materials.specific.general")}
-                    removeLabel={t("web.action.close")}
-                    showSelectedPill
-                    onValueChange={(value) =>
-                      field.handleChange(
-                        field.state.value.map((row, i) =>
-                          i === index
-                            ? {
-                                ...row,
-                                materialSpecificId: value
-                                  ? Number(value.id)
-                                  : null,
-                              }
-                            : row,
-                        ),
-                      )
-                    }
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    aria-label={t("web.action.close")}
-                    onClick={() =>
-                      field.handleChange(
-                        field.state.value.filter((_, i) => i !== index),
-                      )
-                    }
+        {!quickCreate ? (
+          <form.Field name="aliases">
+            {(field) => (
+              <Field label={t("web.pens.admin.aliases" as TranslationKey)}>
+                <Input
+                  aria-label={t("web.pens.admin.aliases" as TranslationKey)}
+                  onChange={(event) =>
+                    field.handleChange(
+                      event.target.value
+                        .split(",")
+                        .map((value) => value.trim())
+                        .filter(Boolean),
+                    )
+                  }
+                  value={field.state.value.join(", ")}
+                />
+                <FieldError error={serverErrors.aliases?.[0]} t={t} />
+              </Field>
+            )}
+          </form.Field>
+        ) : null}
+        {productTypeSlug === "pen-mechanism" ? (
+          <form.Field name="mechanismId">
+            {(field) => (
+              <Field label={t("web.pens.admin.mechanism" as TranslationKey)}>
+                <CatalogCombobox
+                  ariaLabel={t("web.pens.admin.mechanism" as TranslationKey)}
+                  items={options.mechanisms}
+                  onValueChange={(value) =>
+                    field.handleChange(value ? Number(value.id) : null)
+                  }
+                  placeholder={t("web.pens.admin.mechanism" as TranslationKey)}
+                  value={
+                    options.mechanisms.find(
+                      ({ id }) => id === field.state.value,
+                    ) ?? null
+                  }
+                />
+                <FieldError error={serverErrors.mechanismId?.[0]} t={t} />
+              </Field>
+            )}
+          </form.Field>
+        ) : null}
+        {productTypeSlug === "refill" ? (
+          <form.Field name="refillModel">
+            {(field) => (
+              <Field label={t("web.pens.admin.refillModel" as TranslationKey)}>
+                <Input
+                  aria-label={t("web.pens.admin.refillModel" as TranslationKey)}
+                  maxLength={200}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  required
+                  value={field.state.value ?? ""}
+                />
+                <FieldError error={serverErrors.refillModel?.[0]} t={t} />
+              </Field>
+            )}
+          </form.Field>
+        ) : null}
+        {productTypeSlug !== "refill" ? (
+          <form.Field name="materialAssignments">
+            {(field) => (
+              <Field label={t("web.catalog.field.materials")}>
+                {field.state.value.map((selection, index) => (
+                  <div
+                    className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
+                    key={index}
                   >
-                    <X />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                disabled={
-                  productTypeSlug === "slider-insert" &&
-                  field.state.value.length > 0
-                }
-                onClick={() =>
-                  field.handleChange([
-                    ...field.state.value,
-                    { materialId: 0, materialSpecificId: null },
-                  ])
-                }
-              >
-                {t("web.catalog.selectMaterial")}
-              </Button>
-              <LookupDialog
-                kind="material"
-                t={t}
-                onCreated={(material) => {
-                  setOptions((current) => ({
-                    ...current,
-                    materials: [...current.materials, material].sort((a, b) =>
-                      a.name.localeCompare(b.name),
-                    ),
-                  }));
-                  const selection = {
-                    materialId: material.id,
-                    materialSpecificId: null,
-                  };
-                  field.handleChange(
-                    productTypeSlug === "slider-insert"
-                      ? [selection]
-                      : [
-                          ...field.state.value.filter(
-                            ({ materialId }) => materialId !== 0,
+                    <CatalogCombobox
+                      ariaLabel={t("web.catalog.field.materials")}
+                      items={options.materials}
+                      value={
+                        options.materials.find(
+                          ({ id }) => id === selection.materialId,
+                        ) ?? null
+                      }
+                      placeholder={t("web.catalog.selectMaterial")}
+                      onValueChange={(value) =>
+                        field.handleChange(
+                          field.state.value.map((row, i) =>
+                            i === index
+                              ? {
+                                  materialId: Number(value?.id ?? 0),
+                                  materialSpecificId: null,
+                                }
+                              : row,
                           ),
-                          selection,
-                        ],
-                  );
-                }}
-              />
-              <FieldError error={serverErrors.materialAssignments?.[0]} t={t} />
-            </Field>
-          )}
-        </form.Field>
+                        )
+                      }
+                    />
+                    <CatalogCombobox
+                      ariaLabel={t("web.materials.specific.optional")}
+                      items={(options.materialSpecifics ?? []).filter(
+                        ({ materialId }) => materialId === selection.materialId,
+                      )}
+                      value={
+                        (options.materialSpecifics ?? []).find(
+                          ({ id }) => id === selection.materialSpecificId,
+                        ) ?? null
+                      }
+                      placeholder={t("web.materials.specific.general")}
+                      removeLabel={t("web.action.close")}
+                      showSelectedPill
+                      onValueChange={(value) =>
+                        field.handleChange(
+                          field.state.value.map((row, i) =>
+                            i === index
+                              ? {
+                                  ...row,
+                                  materialSpecificId: value
+                                    ? Number(value.id)
+                                    : null,
+                                }
+                              : row,
+                          ),
+                        )
+                      }
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-label={t("web.action.close")}
+                      onClick={() =>
+                        field.handleChange(
+                          field.state.value.filter((_, i) => i !== index),
+                        )
+                      }
+                    >
+                      <X />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={
+                    productTypeSlug === "slider-insert" &&
+                    field.state.value.length > 0
+                  }
+                  onClick={() =>
+                    field.handleChange([
+                      ...field.state.value,
+                      { materialId: 0, materialSpecificId: null },
+                    ])
+                  }
+                >
+                  {t("web.catalog.selectMaterial")}
+                </Button>
+                <LookupDialog
+                  kind="material"
+                  t={t}
+                  onCreated={(material) => {
+                    setOptions((current) => ({
+                      ...current,
+                      materials: [...current.materials, material].sort((a, b) =>
+                        a.name.localeCompare(b.name),
+                      ),
+                    }));
+                    const selection = {
+                      materialId: material.id,
+                      materialSpecificId: null,
+                    };
+                    field.handleChange(
+                      productTypeSlug === "slider-insert"
+                        ? [selection]
+                        : [
+                            ...field.state.value.filter(
+                              ({ materialId }) => materialId !== 0,
+                            ),
+                            selection,
+                          ],
+                    );
+                  }}
+                />
+                <FieldError
+                  error={serverErrors.materialAssignments?.[0]}
+                  t={t}
+                />
+              </Field>
+            )}
+          </form.Field>
+        ) : null}
 
-        {productTypeSlug !== "slider-insert" ? (
+        {productTypeSlug !== "slider-insert" && productTypeSlug !== "refill" ? (
           <>
             <form.Field mode="array" name="finishOptions">
               {(field) => (
@@ -712,22 +1478,26 @@ export function ProductEditor({
           </>
         ) : null}
 
-        {(productTypeSlug === "spinner"
-          ? ([
-              "weight",
-              "length",
-              "width",
-              "thickness",
-              "thicknessWithButton",
-              "buttonDiameter",
-              "spinDiameter",
-            ] as const)
-          : productTypeSlug === "spinner-button"
-            ? (["weight", "diameter", "thickness"] as const)
-            : productTypeSlug === "slider-plate" ||
-                productTypeSlug === "slider-insert"
-              ? ([] as const)
-              : (["weight", "length", "width", "thickness"] as const)
+        {(productTypeSlug === "pen" ||
+        productTypeSlug.startsWith("pen-") ||
+        productTypeSlug === "refill"
+          ? ([] as const)
+          : productTypeSlug === "spinner"
+            ? ([
+                "weight",
+                "length",
+                "width",
+                "thickness",
+                "thicknessWithButton",
+                "buttonDiameter",
+                "spinDiameter",
+              ] as const)
+            : productTypeSlug === "spinner-button"
+              ? (["weight", "diameter", "thickness"] as const)
+              : productTypeSlug === "slider-plate" ||
+                  productTypeSlug === "slider-insert"
+                ? ([] as const)
+                : (["weight", "length", "width", "thickness"] as const)
         ).map((name) => {
           const labels = {
             buttonDiameter: "web.catalog.field.buttonDiameter",

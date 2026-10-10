@@ -63,6 +63,10 @@ function definition(action: string, targetType: string) {
 
 /** Audit event definitions for product mutations. */
 export const productAudit = {
+  pensCatalogAuthored: definition(
+    "products.pens_catalog.authored",
+    "products.pens_catalog",
+  ),
   terminologyAliasCreated: definition(
     "products.terminology_alias.created",
     "products.terminology_alias",
