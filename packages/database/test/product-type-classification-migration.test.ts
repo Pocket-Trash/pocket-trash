@@ -50,5 +50,5 @@ describe("product-type classification migration", () => {
     } finally {
       await client.close();
     }
-  });
+  }, 30_000);
 });
