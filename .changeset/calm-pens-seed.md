@@ -2,4 +2,4 @@
 "@package/database": minor
 ---
 
-Add deterministic Pens fixtures and reviewed import manifests.
+Add deterministic development and preview fixtures for Pens and refills.
