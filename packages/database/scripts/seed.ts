@@ -82,13 +82,17 @@ export const seedUserSettings = [
  * @internal
  */
 export const seedProductTypes = [
-  { name: "Pen", slug: "pen" },
-  { name: "Spinner", slug: "spinner" },
-  { name: "Spinner Button", slug: "spinner-button" },
-  { name: "Slider", slug: "slider" },
-  { name: "Slider Plate", slug: "slider-plate" },
-  { name: "Slider Insert", slug: "slider-insert" },
-  { name: "Fountain Pen", slug: "fountain-pen" },
+  { isPartOrAccessory: false, name: "Pen", slug: "pen" },
+  { isPartOrAccessory: false, name: "Spinner", slug: "spinner" },
+  {
+    isPartOrAccessory: true,
+    name: "Spinner Button",
+    slug: "spinner-button",
+  },
+  { isPartOrAccessory: false, name: "Slider", slug: "slider" },
+  { isPartOrAccessory: true, name: "Slider Plate", slug: "slider-plate" },
+  { isPartOrAccessory: true, name: "Slider Insert", slug: "slider-insert" },
+  { isPartOrAccessory: false, name: "Fountain Pen", slug: "fountain-pen" },
 ] as const;
 
 /**

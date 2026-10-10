@@ -94,6 +94,8 @@ function createSeedDb() {
   const productTypes = new Map<
     string,
     {
+      /** Whether the type belongs in Parts and Accessories. */
+      isPartOrAccessory: boolean;
       /** Product-type display name. */
       name: string;
       /** Stable product-type slug. */
@@ -108,6 +110,8 @@ function createSeedDb() {
         (value: {
           /** Optional hexadecimal value for colors. */
           hex?: string;
+          /** Optional Parts and Accessories classification. */
+          isPartOrAccessory?: boolean;
           /** Lookup display name. */
           name: string;
           /** Optional maker root URL. */
@@ -144,14 +148,37 @@ function createSeedDb() {
                 slug: value.slug,
               });
             } else if (table === productType && value.slug) {
-              productTypes.set(value.slug, {
-                name: value.name,
-                slug: value.slug,
-              });
+              if (!productTypes.has(value.slug))
+                productTypes.set(value.slug, {
+                  isPartOrAccessory: value.isPartOrAccessory ?? false,
+                  name: value.name,
+                  slug: value.slug,
+                });
             }
           };
           insert();
-          return { onConflictDoUpdate: vi.fn(async () => insert()) };
+          return {
+            onConflictDoUpdate: vi.fn(
+              async (config?: {
+                /** Values updated on conflict. */
+                set?: {
+                  /** Replacement display name. */
+                  name?: string;
+                };
+              }) => {
+                if (table === productType && value.slug) {
+                  const existing = productTypes.get(value.slug);
+                  if (existing && config?.set?.name)
+                    productTypes.set(value.slug, {
+                      ...existing,
+                      name: config.set.name,
+                    });
+                  return;
+                }
+                insert();
+              },
+            ),
+          };
         },
       ),
     })),
@@ -576,11 +603,21 @@ describe("catalog seed", () => {
     const state = createSeedDb();
 
     await seedCatalog(state.db);
+    const sliderPlate = state.productTypes.get("slider-plate");
+    if (!sliderPlate) throw new Error("Slider plate was not seeded.");
+    state.productTypes.set("slider-plate", {
+      ...sliderPlate,
+      isPartOrAccessory: false,
+    });
     await seedCatalog(state.db);
 
     expect(state.productTypes.size).toBe(seedProductTypes.length);
     expect([...state.productTypes.keys()]).toEqual(
       expect.arrayContaining(["slider", "slider-plate", "slider-insert"]),
+    );
+    expect(state.productTypes.get("slider")?.isPartOrAccessory).toBe(false);
+    expect(state.productTypes.get("slider-plate")?.isPartOrAccessory).toBe(
+      false,
     );
     expect(state.makers.size).toBe(seedMakers.length);
     expect(state.materials.size).toBe(seedMaterials.length);

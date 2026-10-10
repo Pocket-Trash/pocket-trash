@@ -25,6 +25,7 @@ export type AppShellProps = {
         /** Supported static destination for this breadcrumb. */
         to?:
           | "/admin"
+          | "/admin/config"
           | "/admin/feedback"
           | "/admin/materials"
           | "/admin/makers"

@@ -9,6 +9,7 @@ import {
   filtersToSearch,
   matchesCatalogFilters,
   parseCatalogFilterSearch,
+  parseCatalogProductsSearch,
   pruneCatalogFilters,
 } from "./catalog-filters";
 
@@ -99,6 +100,13 @@ function item(finishOptions: CatalogFinishOption[]): FilterableCatalogItem {
 }
 
 describe("catalog filters", () => {
+  it("accepts only the explicit products list view", () => {
+    expect(
+      parseCatalogProductsSearch({ type: "spinner", view: "all" }),
+    ).toEqual(expect.objectContaining({ type: "spinner", view: "all" }));
+    expect(parseCatalogProductsSearch({ view: "grid" }).view).toBeUndefined();
+  });
+
   it("does not create an empty fade search parameter", () => {
     expect(parseCatalogFilterSearch({}).fade).toBeUndefined();
   });

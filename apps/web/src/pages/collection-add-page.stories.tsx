@@ -134,9 +134,24 @@ const meta = {
       relationshipProducts: [],
       spinnerButtons: [],
       productTypes: [
-        { id: 1, name: "Spinner", slug: "spinner" },
-        { id: 2, name: "Spinner button", slug: "spinner-button" },
-        { id: 3, name: "Slider", slug: "slider" },
+        {
+          id: 1,
+          isPartOrAccessory: false,
+          name: "Spinner",
+          slug: "spinner",
+        },
+        {
+          id: 2,
+          isPartOrAccessory: true,
+          name: "Spinner button",
+          slug: "spinner-button",
+        },
+        {
+          id: 3,
+          isPartOrAccessory: false,
+          name: "Slider",
+          slug: "slider",
+        },
       ],
     },
     products,

@@ -56,6 +56,8 @@ import { Route as UserCollectionsRouteImport } from './routes/user.collections'
 import { Route as UserResourcesRouteImport } from './routes/user.resources'
 import { Route as UserSettingsRouteImport } from './routes/user.settings_'
 import { Route as AdminAuditExportRouteImport } from './routes/admin.audit.export'
+import { Route as AdminConfigIndexRouteImport } from './routes/admin.config.index'
+import { Route as AdminConfigProductsRouteImport } from './routes/admin.config.products'
 import { Route as AdminFeedbackIndexRouteImport } from './routes/admin.feedback.index'
 import { Route as AdminFeedbackArchiveRouteImport } from './routes/admin.feedback.archive'
 import { Route as AdminFeedbackPlannedRouteImport } from './routes/admin.feedback.planned'
@@ -323,6 +325,16 @@ const AdminAuditExportRoute = AdminAuditExportRouteImport.update({
   path: '/export',
   getParentRoute: () => AdminAuditRoute,
 } as any)
+const AdminConfigIndexRoute = AdminConfigIndexRouteImport.update({
+  id: '/config/',
+  path: '/config/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminConfigProductsRoute = AdminConfigProductsRouteImport.update({
+  id: '/config/products',
+  path: '/config/products',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminFeedbackIndexRoute = AdminFeedbackIndexRouteImport.update({
   id: '/feedback/',
   path: '/feedback/',
@@ -536,6 +548,7 @@ export interface FileRoutesByFullPath {
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
   '/admin/audit/export': typeof AdminAuditExportRoute
+  '/admin/config/products': typeof AdminConfigProductsRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
@@ -555,6 +568,7 @@ export interface FileRoutesByFullPath {
   '/user/collections/add': typeof UserCollectionsAddRoute
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/admin/config/': typeof AdminConfigIndexRoute
   '/admin/feedback/': typeof AdminFeedbackIndexRoute
   '/admin/makers/': typeof AdminMakersIndexRoute
   '/admin/materials/': typeof AdminMaterialsIndexRoute
@@ -611,6 +625,7 @@ export interface FileRoutesByTo {
   '/resources': typeof ResourcesIndexRoute
   '/user': typeof UserIndexRoute
   '/admin/audit/export': typeof AdminAuditExportRoute
+  '/admin/config/products': typeof AdminConfigProductsRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
@@ -630,6 +645,7 @@ export interface FileRoutesByTo {
   '/user/collections/add': typeof UserCollectionsAddRoute
   '/user/resources/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/admin/config': typeof AdminConfigIndexRoute
   '/admin/feedback': typeof AdminFeedbackIndexRoute
   '/admin/makers': typeof AdminMakersIndexRoute
   '/admin/materials': typeof AdminMaterialsIndexRoute
@@ -691,6 +707,7 @@ export interface FileRoutesById {
   '/resources/': typeof ResourcesIndexRoute
   '/user/': typeof UserIndexRoute
   '/admin/audit/export': typeof AdminAuditExportRoute
+  '/admin/config/products': typeof AdminConfigProductsRoute
   '/admin/feedback/archive': typeof AdminFeedbackArchiveRoute
   '/admin/feedback/planned': typeof AdminFeedbackPlannedRoute
   '/admin/feedback/requests': typeof AdminFeedbackRequestsRoute
@@ -710,6 +727,7 @@ export interface FileRoutesById {
   '/user/collections_/add': typeof UserCollectionsAddRoute
   '/user/resources_/trash': typeof UserResourcesTrashRoute
   '/user/settings/beta-features': typeof UserSettingsBetaFeaturesRoute
+  '/admin/config/': typeof AdminConfigIndexRoute
   '/admin/feedback/': typeof AdminFeedbackIndexRoute
   '/admin/makers/': typeof AdminMakersIndexRoute
   '/admin/materials/': typeof AdminMaterialsIndexRoute
@@ -772,6 +790,7 @@ export interface FileRouteTypes {
     | '/resources/'
     | '/user/'
     | '/admin/audit/export'
+    | '/admin/config/products'
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
@@ -791,6 +810,7 @@ export interface FileRouteTypes {
     | '/user/collections/add'
     | '/user/resources/trash'
     | '/user/settings/beta-features'
+    | '/admin/config/'
     | '/admin/feedback/'
     | '/admin/makers/'
     | '/admin/materials/'
@@ -847,6 +867,7 @@ export interface FileRouteTypes {
     | '/resources'
     | '/user'
     | '/admin/audit/export'
+    | '/admin/config/products'
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
@@ -866,6 +887,7 @@ export interface FileRouteTypes {
     | '/user/collections/add'
     | '/user/resources/trash'
     | '/user/settings/beta-features'
+    | '/admin/config'
     | '/admin/feedback'
     | '/admin/makers'
     | '/admin/materials'
@@ -926,6 +948,7 @@ export interface FileRouteTypes {
     | '/resources/'
     | '/user/'
     | '/admin/audit/export'
+    | '/admin/config/products'
     | '/admin/feedback/archive'
     | '/admin/feedback/planned'
     | '/admin/feedback/requests'
@@ -945,6 +968,7 @@ export interface FileRouteTypes {
     | '/user/collections_/add'
     | '/user/resources_/trash'
     | '/user/settings/beta-features'
+    | '/admin/config/'
     | '/admin/feedback/'
     | '/admin/makers/'
     | '/admin/materials/'
@@ -1326,6 +1350,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAuditExportRouteImport
       parentRoute: typeof AdminAuditRoute
     }
+    '/admin/config/': {
+      id: '/admin/config/'
+      path: '/config'
+      fullPath: '/admin/config/'
+      preLoaderRoute: typeof AdminConfigIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/config/products': {
+      id: '/admin/config/products'
+      path: '/config/products'
+      fullPath: '/admin/config/products'
+      preLoaderRoute: typeof AdminConfigProductsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/feedback/': {
       id: '/admin/feedback/'
       path: '/feedback'
@@ -1557,6 +1595,7 @@ interface AdminRouteChildren {
   AdminSliderMagnetPresetsRoute: typeof AdminSliderMagnetPresetsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminConfigProductsRoute: typeof AdminConfigProductsRoute
   AdminFeedbackArchiveRoute: typeof AdminFeedbackArchiveRoute
   AdminFeedbackPlannedRoute: typeof AdminFeedbackPlannedRoute
   AdminFeedbackRequestsRoute: typeof AdminFeedbackRequestsRoute
@@ -1567,6 +1606,7 @@ interface AdminRouteChildren {
   AdminSettingsFeatureFlagsRoute: typeof AdminSettingsFeatureFlagsRoute
   AdminTrashCatalogImagesRoute: typeof AdminTrashCatalogImagesRoute
   AdminTrashResourcesRoute: typeof AdminTrashResourcesRoute
+  AdminConfigIndexRoute: typeof AdminConfigIndexRoute
   AdminFeedbackIndexRoute: typeof AdminFeedbackIndexRoute
   AdminMakersIndexRoute: typeof AdminMakersIndexRoute
   AdminMaterialsIndexRoute: typeof AdminMaterialsIndexRoute
@@ -1582,6 +1622,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSliderMagnetPresetsRoute: AdminSliderMagnetPresetsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminConfigProductsRoute: AdminConfigProductsRoute,
   AdminFeedbackArchiveRoute: AdminFeedbackArchiveRoute,
   AdminFeedbackPlannedRoute: AdminFeedbackPlannedRoute,
   AdminFeedbackRequestsRoute: AdminFeedbackRequestsRoute,
@@ -1592,6 +1633,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSettingsFeatureFlagsRoute: AdminSettingsFeatureFlagsRoute,
   AdminTrashCatalogImagesRoute: AdminTrashCatalogImagesRoute,
   AdminTrashResourcesRoute: AdminTrashResourcesRoute,
+  AdminConfigIndexRoute: AdminConfigIndexRoute,
   AdminFeedbackIndexRoute: AdminFeedbackIndexRoute,
   AdminMakersIndexRoute: AdminMakersIndexRoute,
   AdminMaterialsIndexRoute: AdminMaterialsIndexRoute,

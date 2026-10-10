@@ -42,6 +42,50 @@ test("admins can open the admin route", async ({ page, signInAs }) => {
   ).toBeVisible();
 });
 
+test("@mutation admins can update product-type configuration", async ({
+  page,
+  signInAs,
+}) => {
+  await signInAs("admin");
+  await page.goto("/admin/config/products");
+  await waitForHydration(page);
+  await clerk.loaded({ page });
+
+  const search = page.getByRole("searchbox", { name: "Search product types" });
+  await search.fill("spinner-button");
+  const row = page.getByRole("row", { name: /Spinner Button/u });
+  await expect(row).toBeVisible();
+  const checkbox = row.getByRole("checkbox");
+  const initiallyChecked = await checkbox.isChecked();
+  await expect(page.getByRole("row")).toHaveCount(2);
+
+  try {
+    await checkbox.click();
+    await expect(page.getByText("Updated Spinner Button.")).toBeVisible();
+    await page.reload();
+    await waitForHydration(page);
+    await page
+      .getByRole("searchbox", { name: "Search product types" })
+      .fill("spinner-button");
+    await expect(
+      page.getByRole("row", { name: /Spinner Button/u }).getByRole("checkbox"),
+    ).toBeChecked({ checked: !initiallyChecked });
+  } finally {
+    await page.reload();
+    await waitForHydration(page);
+    await page
+      .getByRole("searchbox", { name: "Search product types" })
+      .fill("spinner-button");
+    const persistedCheckbox = page
+      .getByRole("row", { name: /Spinner Button/u })
+      .getByRole("checkbox");
+    if ((await persistedCheckbox.isChecked()) !== initiallyChecked) {
+      await persistedCheckbox.click();
+      await expect(page.getByText("Updated Spinner Button.")).toBeVisible();
+    }
+  }
+});
+
 test("@mutation regular user theme persists after reload", async ({
   page,
   signInAs,

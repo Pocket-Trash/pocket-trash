@@ -25,6 +25,8 @@ import { cn } from "@/lib/utils";
 type SidebarPath =
   | "/admin"
   | "/admin/audit"
+  | "/admin/config"
+  | "/admin/config/products"
   | "/admin/feedback"
   | "/admin/feedback/archive"
   | "/admin/feedback/planned"

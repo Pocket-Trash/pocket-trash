@@ -488,6 +488,7 @@ describe("product form conditional fields", () => {
         productTypes: [
           {
             id: product.productTypeId,
+            isPartOrAccessory: false,
             name: product.productTypeName,
             slug: productTypeSlug,
           },
@@ -544,6 +545,7 @@ describe("product form conditional fields", () => {
           productTypes: [
             {
               id: product.productTypeId,
+              isPartOrAccessory: productTypeSlug !== "slider",
               name: product.productTypeName,
               slug: productTypeSlug,
             },
@@ -701,7 +703,14 @@ describe("collection add form", () => {
         initialProductId: product.id,
         options: {
           ...emptyCatalogOptions,
-          productTypes: [{ id: 1, name: "Spinner", slug: "spinner" }],
+          productTypes: [
+            {
+              id: 1,
+              isPartOrAccessory: false,
+              name: "Spinner",
+              slug: "spinner",
+            },
+          ],
         },
         products: [product],
       }),
@@ -737,7 +746,12 @@ describe("collection add form", () => {
         options: {
           ...emptyCatalogOptions,
           productTypes: [
-            { id: 2, name: "Spinner button", slug: "spinner-button" },
+            {
+              id: 2,
+              isPartOrAccessory: true,
+              name: "Spinner button",
+              slug: "spinner-button",
+            },
           ],
         },
         products: [product],
@@ -766,6 +780,7 @@ describe("collection add form", () => {
           productTypes: [
             {
               id: product.productTypeId,
+              isPartOrAccessory: productTypeSlug !== "slider",
               name: product.productTypeName,
               slug: productTypeSlug,
             },
@@ -808,6 +823,7 @@ describe("collection add form", () => {
           productTypes: [
             {
               id: product.productTypeId,
+              isPartOrAccessory: false,
               name: product.productTypeName,
               slug: "slider",
             },

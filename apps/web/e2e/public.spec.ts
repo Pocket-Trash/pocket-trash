@@ -8,6 +8,28 @@ test("anonymous visitors can open the public directory", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Resources" })).toBeVisible();
 });
 
+test("anonymous visitors can choose a product type from the product directory", async ({
+  page,
+}) => {
+  await page.goto("/products");
+
+  const allProducts = page.getByRole("link", { name: "All Products" });
+  await expect(allProducts).toHaveAttribute("href", "/products?view=all");
+  await expect(
+    page.getByRole("heading", { name: "Parts and Accessories" }),
+  ).toBeVisible();
+
+  await page
+    .getByRole("main")
+    .locator('section a[href*="type="]')
+    .first()
+    .click();
+  await expect(page).toHaveURL(/\/products\?type=[^&]+&view=all$/u);
+  await expect(
+    page.getByRole("button", { name: "More filters" }).first(),
+  ).toBeVisible();
+});
+
 test("anonymous visitors are redirected from user routes", async ({ page }) => {
   await page.goto("/user/account");
 

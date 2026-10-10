@@ -203,6 +203,18 @@ export type CatalogProductType =
   | "spinner"
   | "spinner-button";
 
+/** Product-type fields used by catalog forms, directories, and configuration. */
+export type CatalogProductTypeSummary = {
+  /** Database identifier. */
+  id: number;
+  /** Whether the type belongs in Parts and Accessories. */
+  isPartOrAccessory: boolean;
+  /** Display name. */
+  name: string;
+  /** URL-safe identifier. */
+  slug: string;
+};
+
 /** Registered canonical namespace supported by catalog terminology. */
 export type CatalogTerminologyNamespace = "product-type";
 
@@ -1321,6 +1333,21 @@ export type CatalogService = {
     updateSlug?: boolean;
   }): Promise<AdminMaterial>;
   /**
+   * Changes whether a product type belongs in Parts and Accessories.
+   *
+   * @param input - Product type, desired classification, and administrator.
+   * @returns Updated product-type summary.
+   * @rejects When authorization, persistence, auditing, or logging fails.
+   */
+  setProductTypePartOrAccessory(input: {
+    /** Authenticated administrator. */
+    actor: Actor;
+    /** Desired Parts and Accessories classification. */
+    isPartOrAccessory: boolean;
+    /** Product-type identifier. */
+    productTypeId: number;
+  }): Promise<CatalogProductTypeSummary>;
+  /**
    * Updates a reusable slider magnet preset.
    *
    * @param input - Authorized replacement preset fields.
@@ -1375,22 +1402,7 @@ export type CatalogService = {
    * @returns Matching product types.
    * @rejects When the database query fails.
    */
-  listProductTypes(): Promise<
-    Array<{
-      /**
-       * Database identifier.
-       */
-      id: number;
-      /**
-       * Display name.
-       */
-      name: string;
-      /**
-       * URL-safe identifier.
-       */
-      slug: string;
-    }>
-  >;
+  listProductTypes(): Promise<CatalogProductTypeSummary[]>;
   /**
    * Lists slugs.
    *
@@ -4074,11 +4086,76 @@ export function createCatalogService(
       return await db
         .select({
           id: schema.productType.id,
+          isPartOrAccessory: schema.productType.isPartOrAccessory,
           name: schema.productType.name,
           slug: schema.productType.slug,
         })
         .from(schema.productType)
         .orderBy(asc(schema.productType.name));
+    },
+    /**
+     * Changes whether a product type belongs in Parts and Accessories.
+     *
+     * @param input - Product type, desired classification, and administrator.
+     * @returns Updated product-type summary.
+     * @rejects When authorization, persistence, auditing, or logging fails.
+     */
+    async setProductTypePartOrAccessory(input) {
+      if (!hasPermission(input.actor, "products.manage"))
+        throw new Error("Product type does not exist.");
+      const dependencies = requireProductAudit(users, audit);
+      const actorUser = dependencies
+        ? await dependencies.users.ensure({ clerkId: input.actor.clerkId })
+        : null;
+      return await loggedMutation(
+        logger,
+        loggerMessages.database.catalog.setProductTypePartOrAccessory,
+        () =>
+          db.transaction(async (tx) => {
+            const [before] = await tx
+              .select({
+                id: schema.productType.id,
+                isPartOrAccessory: schema.productType.isPartOrAccessory,
+                name: schema.productType.name,
+                slug: schema.productType.slug,
+              })
+              .from(schema.productType)
+              .where(eq(schema.productType.id, input.productTypeId))
+              .limit(1);
+            if (!before) throw new Error("Product type does not exist.");
+            const [after] = await tx
+              .update(schema.productType)
+              .set({
+                isPartOrAccessory: input.isPartOrAccessory,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.productType.id, input.productTypeId))
+              .returning({
+                id: schema.productType.id,
+                isPartOrAccessory: schema.productType.isPartOrAccessory,
+                name: schema.productType.name,
+                slug: schema.productType.slug,
+              });
+            if (!after) throw new Error("Product type does not exist.");
+            if (dependencies && actorUser)
+              await writeProductAdminAudit(dependencies.audit, tx, {
+                actor: input.actor,
+                actorUser,
+                after: {
+                  isPartOrAccessory: after.isPartOrAccessory,
+                },
+                before: {
+                  isPartOrAccessory: before.isPartOrAccessory,
+                },
+                definition: productAudit.productTypeClassificationChanged,
+                targetId: input.productTypeId,
+              });
+            return after;
+          }),
+        actorAttributes(input.actor.clerkId, {
+          productTypeId: input.productTypeId,
+        }),
+      );
     },
     /**
      * Lists slugs.

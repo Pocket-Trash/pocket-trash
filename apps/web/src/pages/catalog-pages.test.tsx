@@ -1,6 +1,7 @@
 import type {
   CatalogImage,
   CatalogProduct,
+  CatalogProductTypeSummary,
   PublicCollectionOwner,
 } from "@package/services";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -52,25 +53,35 @@ vi.mock("@tanstack/react-router", () => ({
    * @param props - Link properties.
    * @param props.children - Linked content.
    * @param props.params - Route parameter values.
+   * @param props.search - Route search values.
    * @param props.to - Route destination.
    * @returns A test anchor.
    */
   Link: ({
     children,
     params = {},
+    search = {},
     to,
   }: {
     /** Linked content. */
     children: React.ReactNode;
     /** Route parameter values. */
     params?: Record<string, number | string>;
+    /** Route search values. */
+    search?: Record<string, unknown>;
     /** Route destination. */
     to: string;
   }) => {
-    const href = Object.entries(params).reduce(
+    const path = Object.entries(params).reduce(
       (path, [key, value]) => path.replace(`$${key}`, String(value)),
       to,
     );
+    const query = new URLSearchParams(
+      Object.entries(search).flatMap(([key, value]) =>
+        value === undefined ? [] : [[key, String(value)] as [string, string]],
+      ),
+    ).toString();
+    const href = query ? `${path}?${query}` : path;
     return <a href={href}>{children}</a>;
   },
 }));
@@ -778,6 +789,76 @@ describe("ProductGrid", () => {
 });
 
 describe("ProductsPage", () => {
+  it("groups visible product types and links into the product list", () => {
+    const productTypes: CatalogProductTypeSummary[] = [
+      {
+        id: 1,
+        isPartOrAccessory: false,
+        name: "Spinner",
+        slug: "spinner",
+      },
+      {
+        id: 2,
+        isPartOrAccessory: false,
+        name: "Slider",
+        slug: "slider",
+      },
+      {
+        id: 3,
+        isPartOrAccessory: true,
+        name: "Slider Plate",
+        slug: "slider-plate",
+      },
+      {
+        id: 4,
+        isPartOrAccessory: true,
+        name: "Spinner Button",
+        slug: "spinner-button",
+      },
+      {
+        id: 5,
+        isPartOrAccessory: false,
+        name: "Empty type",
+        slug: "empty-type",
+      },
+    ];
+    const products = productTypes.slice(0, 4).map((type, index) => ({
+      ...product,
+      id: index + 1,
+      name: `${type.name} product`,
+      productTypeId: type.id,
+      productTypeName: type.name,
+      productTypeSlug: type.slug as CatalogProduct["productTypeSlug"],
+      slug: `${type.slug}-product`,
+    }));
+
+    const html = renderToStaticMarkup(
+      <ProductsPage
+        productTypes={productTypes}
+        products={products}
+        view="directory"
+      />,
+    );
+
+    const labels = [
+      "All Products",
+      "Slider",
+      "Spinner",
+      "Parts and Accessories",
+      "Slider plate",
+      "Spinner button",
+    ].map((label) => html.indexOf(label));
+    expect(labels.every((index) => index >= 0)).toBe(true);
+    expect(labels).toEqual([...labels].sort((left, right) => left - right));
+    expect(html).toContain('<h2 class="sr-only">Products</h2>');
+    expect(html).toContain(
+      '<h3 class="m-0 text-xl font-semibold" id="parts-and-accessories-title">Parts and Accessories</h3>',
+    );
+    expect(html).not.toContain("Empty type");
+    expect(html).toContain('href="/products?view=all"');
+    expect(html).toContain('href="/products?type=spinner&amp;view=all"');
+  });
+
   it("matches any offered pattern together with the included plate", () => {
     const ripple = { id: 201, name: "Ripple", slug: "ripple" };
     const qualifying = {

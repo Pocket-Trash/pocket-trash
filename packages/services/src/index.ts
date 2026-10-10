@@ -48,6 +48,7 @@ export type {
   CatalogMaker,
   CatalogProduct,
   CatalogProductType,
+  CatalogProductTypeSummary,
   CatalogService,
   CatalogTerminologyAlias,
   CatalogTerminologyNamespace,
