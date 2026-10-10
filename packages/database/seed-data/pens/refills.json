@@ -1,0 +1,646 @@
+{
+  "compatibilityGroups": [
+    {
+      "Group": "`EnerGel`",
+      "Members": "Pentel `LRN3`, `LRN4`, `LRN5`, `LR7`, `LR10`, plus every Floatune model: `ZRN3`, `ZRN4`, `ZRN5`, `YR8`, `YR10`"
+    },
+    {
+      "Group": "`Parker G2`",
+      "Members": "Monteverde `P11`, `P13`, `P15`, `P41`, `P42`, `P44`, `PP43`; Parker `QUINKflow Ballpoint`, `QUINK Gel`; Schmidt `P900`, `easyFLOW 9000`, `P900 Softline`, `MegaLine P950`; Schneider `Express 735`, `Eco 725`; Uni-ball `SXR-600-38`, `SXR-600-05`, `SXR-600-07`; OHTO `PG-105NP`"
+    },
+    {
+      "Group": "`Pilot G2 standard`",
+      "Members": "Pilot `BLS-G2-38`, `BLS-G2-5`, `BLS-G2-7`, `BLS-G2-10`"
+    },
+    {
+      "Group": "`Pilot Precise RT`",
+      "Members": "Pilot `BXS-V5-RT`, `BXS-V7-RT`"
+    },
+    {
+      "Group": "`Jetstream SXR full-size`",
+      "Members": "Uni-ball `SXR-38`, `SXR-5`, `SXR-7`, `SXR-10`, `SXR-L-5`, `SXR-L-7`"
+    },
+    {
+      "Group": "`Jetstream SXR-80 multi-pen`",
+      "Members": "Uni-ball `SXR-80-38`, `SXR-80-05`, `SXR-80-07`, `SXR-80-10`, `SXR-L80-05`"
+    },
+    {
+      "Group": "`Jetstream SXR-200 multi-pen`",
+      "Members": "Uni-ball `SXR-200-05`, `SXR-200-07`"
+    },
+    {
+      "Group": "`ZENTO standard`",
+      "Members": "Uni-ball `UBR-Z-38`, `UBR-Z-05`, `UBR-Z-07`"
+    },
+    {
+      "Group": "`ZENTO 3 Color`",
+      "Members": "Uni-ball `UBR-ZML-38`, `UBR-ZML-05`"
+    }
+  ],
+  "evidenceKeys": [
+    "production-refill-offering-provenance-manifest-008a1f2bed7d",
+    "ENG-413-domain-owner-approvals-2026-10-09"
+  ],
+  "offeringRows": [
+    {
+      "Maker": "Pentel",
+      "Product and tip": "`LRN3` 0.3 needle",
+      "Approved colours": "Black, red, blue, blue-black, brown"
+    },
+    {
+      "Maker": "Pentel",
+      "Product and tip": "`LRN4` 0.4 needle",
+      "Approved colours": "Black, red, blue, blue-black, brown"
+    },
+    {
+      "Maker": "Pentel",
+      "Product and tip": "`LRN5` 0.5 needle",
+      "Approved colours": "Black, red, blue, green, orange, pink, sky blue, violet"
+    },
+    {
+      "Maker": "Pentel",
+      "Product and tip": "`LR7` 0.7 metal tip; geometry unknown",
+      "Approved colours": "Black, red, blue"
+    },
+    {
+      "Maker": "Pentel",
+      "Product and tip": "`LR10` 1.0 metal tip; geometry unknown",
+      "Approved colours": "Black, red, blue, violet"
+    },
+    {
+      "Maker": "Pentel",
+      "Product and tip": "`LRN5H` 0.5 needle",
+      "Approved colours": "Black, red, blue"
+    },
+    {
+      "Maker": "Pentel",
+      "Product and tip": "`ZRN3` 0.3, `ZRN4` 0.4, `ZRN5` 0.5",
+      "Approved colours": "Black, red, blue for each; geometry remains unknown"
+    },
+    {
+      "Maker": "Pentel",
+      "Product and tip": "`YR8` 0.8 rollerball, `YR10` 1.0 rollerball",
+      "Approved colours": "Black, red, blue for each"
+    },
+    {
+      "Maker": "Pilot",
+      "Product and tip": "`BLS-G2-38` 0.38 conical",
+      "Approved colours": "Black, red, blue, green"
+    },
+    {
+      "Maker": "Pilot",
+      "Product and tip": "`BLS-G2-5` 0.5 conical",
+      "Approved colours": "Black, red, blue, green, blue-black"
+    },
+    {
+      "Maker": "Pilot",
+      "Product and tip": "`BLS-G2-7` 0.7 conical",
+      "Approved colours": "Black, red, blue, green, violet, pink, dark red, orange"
+    },
+    {
+      "Maker": "Pilot",
+      "Product and tip": "`BLS-G2-10` 1.0 conical",
+      "Approved colours": "Black, red, blue, green"
+    },
+    {
+      "Maker": "Pilot",
+      "Product and tip": "`LP3RF` 0.3 Synergy Tip",
+      "Approved colours": "Black, red, blue, blue-black"
+    },
+    {
+      "Maker": "Pilot",
+      "Product and tip": "`LP3RF` 0.4 Synergy Tip",
+      "Approved colours": "Black, red, blue, blue-black, orange"
+    },
+    {
+      "Maker": "Pilot",
+      "Product and tip": "`LP3RF` 0.5 Synergy Tip",
+      "Approved colours": "Black, red, blue, blue-black"
+    },
+    {
+      "Maker": "Pilot",
+      "Product and tip": "`LPTRF` 0.4 Synergy Tip, multi-pen format",
+      "Approved colours": "Black, red, blue, green"
+    },
+    {
+      "Maker": "Pilot",
+      "Product and tip": "`LP2RF` 0.38, 0.5, 0.7, or 1.0 regular Juice gel",
+      "Approved colours": "Black, red, blue for each size"
+    },
+    {
+      "Maker": "Pilot",
+      "Product and tip": "`BXS-V5-RT` 0.5 needle liquid rollerball",
+      "Approved colours": "Black, blue, red in EU; black and blue in MX"
+    },
+    {
+      "Maker": "Pilot",
+      "Product and tip": "`BXS-V7-RT` 0.7 needle liquid rollerball",
+      "Approved colours": "Black, blue in EU"
+    },
+    {
+      "Maker": "Monteverde",
+      "Product and tip": "`P11` Extra-fine",
+      "Approved colours": "Black, blue, blue-black"
+    },
+    {
+      "Maker": "Monteverde",
+      "Product and tip": "`P13` Medium",
+      "Approved colours": "Black, blue, blue-black, red, green, turquoise, purple, brown, pink"
+    },
+    {
+      "Maker": "Monteverde",
+      "Product and tip": "`P15` Super-broad",
+      "Approved colours": "Black, blue"
+    },
+    {
+      "Maker": "Monteverde",
+      "Product and tip": "`P41` 0.5 Extra-fine needle",
+      "Approved colours": "Black, blue"
+    },
+    {
+      "Maker": "Monteverde",
+      "Product and tip": "`P42` Fine",
+      "Approved colours": "Black, blue, red, purple, green, turquoise, blue-black"
+    },
+    {
+      "Maker": "Monteverde",
+      "Product and tip": "`P44` Broad",
+      "Approved colours": "Black, blue, blue-black"
+    },
+    {
+      "Maker": "Monteverde",
+      "Product and tip": "`PP43` Medium",
+      "Approved colours": "Black; published pack codes remain evidence-only until their market scope is established"
+    },
+    {
+      "Maker": "Parker",
+      "Product and tip": "`QUINKflow Ballpoint` Fine",
+      "Approved colours": "Black, blue"
+    },
+    {
+      "Maker": "Parker",
+      "Product and tip": "`QUINKflow Ballpoint` Medium",
+      "Approved colours": "Black, red, blue"
+    },
+    {
+      "Maker": "Parker",
+      "Product and tip": "`QUINKflow Ballpoint` Broad",
+      "Approved colours": "Black, blue"
+    },
+    {
+      "Maker": "Parker",
+      "Product and tip": "`QUINK Gel` Fine",
+      "Approved colours": "Black, blue"
+    },
+    {
+      "Maker": "Parker",
+      "Product and tip": "`QUINK Gel` Medium",
+      "Approved colours": "Black, blue"
+    },
+    {
+      "Maker": "Parker",
+      "Product and tip": "`QUINK Rollerball` Fine or Medium",
+      "Approved colours": "Black, blue for each grade"
+    },
+    {
+      "Maker": "Schmidt",
+      "Product and tip": "`P900` Fine",
+      "Approved colours": "Black, blue"
+    },
+    {
+      "Maker": "Schmidt",
+      "Product and tip": "`P900` Medium",
+      "Approved colours": "Black, blue, red, green, magenta, turquoise, violet"
+    },
+    {
+      "Maker": "Schmidt",
+      "Product and tip": "`P900` Broad",
+      "Approved colours": "Black, blue"
+    },
+    {
+      "Maker": "Schmidt",
+      "Product and tip": "`easyFLOW 9000` 0.8 or 1.0 TC ball",
+      "Approved colours": "Black, blue for each size"
+    },
+    {
+      "Maker": "Schmidt",
+      "Product and tip": "`P900 Softline`",
+      "Approved colours": "Black, blue; exact tip size remains unknown"
+    },
+    {
+      "Maker": "Schmidt",
+      "Product and tip": "`MegaLine P950` Medium",
+      "Approved colours": "Black, blue"
+    },
+    {
+      "Maker": "Schneider",
+      "Product and tip": "`Express 735` Fine",
+      "Approved colours": "Black, red, blue"
+    },
+    {
+      "Maker": "Schneider",
+      "Product and tip": "`Express 735` Medium",
+      "Approved colours": "Black, red, blue, green"
+    },
+    {
+      "Maker": "Schneider",
+      "Product and tip": "`Express 735` Broad",
+      "Approved colours": "Black, blue"
+    },
+    {
+      "Maker": "Schneider",
+      "Product and tip": "`Eco 725` Fine or Medium",
+      "Approved colours": "Black, blue for each grade"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`JF` 0.3",
+      "Approved colours": "Black, blue, red, blue-black, green-black, camel yellow, brown gray, cassis black"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`JF` 0.38",
+      "Approved colours": "Black, blue, red"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`JF` 0.4",
+      "Approved colours": "Black, blue, red, blue-black, orange"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`JF` 0.5",
+      "Approved colours": "Black, blue, red, blue-black, sepia black, blue gray, green black, dark gray, brown gray, red black, cassis black, bordeaux purple, camel yellow, orange"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`JF` 0.7 or 1.0",
+      "Approved colours": "Black, blue, red, blue-black for each size"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`JLV` 0.4, 0.5, or 0.7 fast-drying gel",
+      "Approved colours": "Black, blue, red for each size"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`MJF` 0.4 or 0.5 Mark On gel",
+      "Approved colours": "Black for each size"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`JRV` 0.4 vivid gel",
+      "Approved colours": "Black, blue, red, orange"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`JRV` 0.5 vivid gel",
+      "Approved colours": "Black, blue, red"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`NJK` 0.4 or 0.5 multi-pen format",
+      "Approved colours": "Black, blue, red, green for each size"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`JK` 0.4 multi-pen format",
+      "Approved colours": "Black, blue, red"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`JK` 0.5 multi-pen format",
+      "Approved colours": "Black, blue, red, green"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`BJF` 0.5 Study gel",
+      "Approved colours": "Black, blue, red"
+    },
+    {
+      "Maker": "Zebra",
+      "Product and tip": "`BioTube JF` 0.5",
+      "Approved colours": "Black, red"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`SXR-38` 0.38, `SXR-5` 0.5, `SXR-7` 0.7, `SXR-10` 1.0",
+      "Approved colours": "Black, red, blue for each model"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`SXR-L-5` 0.5, `SXR-L-7` 0.7 Lite Touch",
+      "Approved colours": "Black, red, blue, limited-quantity blue-black for each model"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`SXR-600-38` 0.38, `SXR-600-05` 0.5, `SXR-600-07` 0.7",
+      "Approved colours": "Black for each model"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`SXR-80-38` 0.38, `SXR-80-05` 0.5, `SXR-80-07` 0.7",
+      "Approved colours": "Black, red, blue, green for each model"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`SXR-80-10` 1.0",
+      "Approved colours": "Black, red, blue"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`SXR-L80-05` 0.5 Lite Touch multi-pen",
+      "Approved colours": "Black, red, blue, green, limited-quantity blue-black"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`SXR-200-05` 0.5, `SXR-200-07` 0.7",
+      "Approved colours": "Black, red, blue for each model"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`UMR-82` 0.28",
+      "Approved colours": "Black, red, blue"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`UMR-83` 0.38",
+      "Approved colours": "Black, red, blue, blue-black"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`UMR-83E` 0.38",
+      "Approved colours": "Black, red, blue"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`UMR-85N` 0.5",
+      "Approved colours": "Black, red, blue, blue-black"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`UMR-85E` 0.5",
+      "Approved colours": "Black is current in Japan; red and blue are discontinued in Japan"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`UMR-87E` 0.7",
+      "Approved colours": "Black, red, blue"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`UMR-38S` 0.38, `UMR-05S` 0.5",
+      "Approved colours": "Black, red, blue, orange, blue-black for each model"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`UBR-Z-38` 0.38, `UBR-Z-05` 0.5, `UBR-Z-07` 0.7",
+      "Approved colours": "Black, red, blue for each model"
+    },
+    {
+      "Maker": "Uni-ball",
+      "Product and tip": "`UBR-ZML-38` 0.38, `UBR-ZML-05` 0.5",
+      "Approved colours": "Black, red, blue for each model"
+    },
+    {
+      "Maker": "OHTO",
+      "Product and tip": "`PG-105NP` 0.5 needle gel",
+      "Approved colours": "Black, blue"
+    }
+  ],
+  "approvedAdditions": [
+    {
+      "maker": "Pentel",
+      "model": "LRP5",
+      "offerings": [
+        {
+          "colors": ["Black"],
+          "identifiers": ["LRP5-AX"],
+          "lifecycle": "current",
+          "tipSize": "0.5 mm"
+        },
+        {
+          "colors": ["Blue"],
+          "identifiers": ["LRP5-CX"],
+          "lifecycle": "historical",
+          "tipSize": "0.5 mm"
+        }
+      ]
+    },
+    {
+      "maker": "Pentel",
+      "model": "LRP7",
+      "offerings": [
+        {
+          "colors": ["Black"],
+          "identifiers": ["LRP7-AX"],
+          "lifecycle": "current",
+          "tipSize": "0.7 mm"
+        },
+        {
+          "colors": ["Blue"],
+          "identifiers": ["LRP7-CX"],
+          "lifecycle": "historical",
+          "tipSize": "0.7 mm"
+        }
+      ]
+    },
+    {
+      "maker": "Pentel",
+      "model": "LRN5TL",
+      "offerings": [
+        {
+          "colors": [
+            "Black",
+            "Red",
+            "Burgundy",
+            "Blue",
+            "Blue-black",
+            "Orange",
+            "Rough gray",
+            "Pink",
+            "Turquoise blue",
+            "Violet"
+          ],
+          "identifiers": [
+            "XLRN5TL-A",
+            "XLRN5TL-B",
+            "XLRN5TL-BG",
+            "XLRN5TL-C",
+            "XLRN5TL-CA",
+            "XLRN5TL-F",
+            "XLRN5TL-N2",
+            "XLRN5TL-P",
+            "XLRN5TL-S3",
+            "XLRN5TL-V"
+          ],
+          "lifecycle": "current",
+          "market": "JP",
+          "tipSize": "0.5 mm",
+          "tipStyle": "needle"
+        }
+      ]
+    },
+    {
+      "maker": "Monteverde",
+      "model": "G22",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "G23",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "G24",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "G42",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "G43",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "W22",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "W23",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "W24",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "M13",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "M14",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "M42",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "M43",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "M44",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Monteverde",
+      "model": "D13",
+      "offerings": [],
+      "disposition": "approved-product-existence; offering unknowns remain null"
+    },
+    {
+      "maker": "Uni-ball",
+      "model": "SNP-5",
+      "offerings": [
+        {
+          "colors": ["Black", "Red"],
+          "lifecycle": "historical",
+          "tipSize": "0.5 mm"
+        }
+      ]
+    },
+    {
+      "maker": "Uni-ball",
+      "model": "SNP-7",
+      "offerings": [
+        {
+          "colors": ["Black", "Red", "Blue"],
+          "lifecycle": "historical",
+          "tipSize": "0.7 mm"
+        }
+      ]
+    },
+    {
+      "maker": "Uni-ball",
+      "model": "SNP-10",
+      "offerings": [
+        {
+          "colors": ["Black", "Red", "Blue"],
+          "lifecycle": "historical",
+          "tipSize": "1.0 mm"
+        }
+      ]
+    },
+    {
+      "maker": "Pilot",
+      "model": "BXS-V5-RT",
+      "offerings": [
+        {
+          "colors": ["Black", "Blue", "Red"],
+          "identifiers": ["PV5RRBLK/77273", "PV5RRBLU/77274", "PV5RRRED/77275"],
+          "lifecycle": "historical",
+          "market": "North America",
+          "tipSize": "0.5 mm"
+        }
+      ]
+    },
+    {
+      "maker": "Pilot",
+      "model": "BXS-V7-RT",
+      "offerings": [
+        {
+          "colors": ["Black", "Blue", "Red"],
+          "identifiers": ["PV7RRBLK/77278", "PV7RRBLU/77279", "PV7RRRED/77280"],
+          "lifecycle": "historical",
+          "market": "North America",
+          "tipSize": "0.7 mm"
+        }
+      ]
+    },
+    {
+      "maker": "Pilot",
+      "model": "BXS-V10-RT",
+      "offerings": [
+        {
+          "colors": ["Black", "Blue"],
+          "identifiers": ["PV1RRBLK/13905", "PV1RRBLU/13908"],
+          "lifecycle": "historical",
+          "market": "North America",
+          "tipSize": "1.0 mm"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 1,
+  "source": {
+    "path": "decisions/data/eng-413-production-refill-seed.md",
+    "sha256": "e94f345513ae1214b51aefd77263199b28499793299b9622fcb53eba4376b6cb"
+  }
+}
