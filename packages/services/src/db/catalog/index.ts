@@ -6822,7 +6822,9 @@ export function createCollectionsService(
       if (!owner) return {};
       const mappedProductId = sql<
         number | null
-      >`collection_catalog_product(${schema.collectionItem.id})`;
+      >`collection_catalog_product(${schema.collectionItem.id})`.mapWith(
+        schema.product.id,
+      );
       const rows = await db
         .select({
           count: count(schema.collectionItem.id),
@@ -12139,7 +12141,9 @@ async function replaceCollectionConfigurationSelections(
           ownerId: schema.collectionItem.ownerId,
           productId: sql<
             number | null
-          >`collection_catalog_product(${schema.collectionItem.id})`,
+          >`collection_catalog_product(${schema.collectionItem.id})`.mapWith(
+            schema.product.id,
+          ),
         })
         .from(schema.collectionItem)
         .where(
