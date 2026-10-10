@@ -104,6 +104,7 @@ export const loggerMessages = {
       updateMaterial: "database.catalog.updateMaterial",
     },
     collections: {
+      addPenProduct: "database.collections.addPenProduct",
       addSpinner: "database.collections.addSpinner",
       addSpinnerButton: "database.collections.addSpinnerButton",
       addSliderProduct: "database.collections.addSliderProduct",

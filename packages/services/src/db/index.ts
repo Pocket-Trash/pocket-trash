@@ -128,6 +128,7 @@ export type {
   CatalogTerminologyAlias,
   CatalogTerminologyNamespace,
   CatalogViewer,
+  CollectionConfigurationSelection,
   CollectionsService,
   EffectiveSliderSetup,
   MaterialSelection,

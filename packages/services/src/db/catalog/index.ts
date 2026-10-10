@@ -843,6 +843,8 @@ export type CatalogCompatiblePen = {
   outcome: "compatible" | "conditional";
   /** Required tip display name, when compatibility depends on a tip. */
   requiredTipName: string | null;
+  /** Required tip product identifier, when compatibility depends on a tip. */
+  requiredTipProductId?: number | null;
   /** Pen route slug. */
   slug: string;
 };
@@ -863,6 +865,16 @@ export type CatalogConfigurationChoice = {
   position?: number;
   /** Product material carrier identifier exposed to catalog managers. */
   productMaterialId?: number | null;
+};
+
+/** Saved owned-product selection for one configuration slot. */
+export type CollectionConfigurationSelection = {
+  /** Selected catalog choice. */
+  choiceId: number;
+  /** Same-owner physical part installed for the selected choice, when used. */
+  installedPartCollectionItemId: number | null;
+  /** Product configuration slot. */
+  slotId: number;
 };
 
 /** One ordered public product-configuration dimension. */
@@ -2057,6 +2069,8 @@ export type UserCollectionItem = {
    * Collection item identifier.
    */
   collectionItemId: number;
+  /** Saved selections for this owned product's configuration slots. */
+  configurationSelections?: CollectionConfigurationSelection[];
   /**
    * Display name.
    */
@@ -2119,6 +2133,10 @@ export type UserCollectionItem = {
   installedPlateId: number | null;
   /** Whether an installed plate exists but is unavailable to this viewer. */
   installedPlateUnavailable?: boolean;
+  /** Installed refill offering, when a known offering is selected. */
+  installedRefillOfferingId?: number | null;
+  /** Installed refill model, when selected. */
+  installedRefillProductId?: number | null;
   /** Durable magnet snapshot recorded on an owned slider. */
   magnetConfiguration?: SliderMagnetConfiguration | null;
   /**
@@ -2178,6 +2196,8 @@ export type UserCollectionItem = {
    * Product type slug.
    */
   productTypeSlug: CatalogProductType;
+  /** Optional maker serial recorded for this owned item. */
+  serialNumber?: string | null;
   /**
    * Source product finish option identifier.
    */
@@ -2328,6 +2348,49 @@ export type CollectionsService = {
     reason: string;
   }): Promise<CatalogApprovalStatus>;
   /**
+   * Adds one Pen or Pen-part product with its owned configuration snapshot.
+   *
+   * @param input - Product, collection, serial, configuration, and optional installed refill.
+   * @returns Identifier of the created collection item.
+   * @rejects When the product type, configuration, ownership, persistence, auditing, or logging fails.
+   */
+  addPenProduct(input: {
+    /** Authenticated actor. */
+    actor: Actor;
+    /** Collection identifier. */
+    collectionId?: number | null;
+    /** Saved catalog choices and optional physical parts. */
+    configurationSelections: CollectionConfigurationSelection[];
+    /** Optional custom finish snapshot. */
+    customFinish: ProductWriteFinishOption | null;
+    /** Optional description override. */
+    description?: string | null;
+    /** Display name override. */
+    displayName: string;
+    /** Optional catalog finish option to snapshot. */
+    finishOptionId: number | null;
+    /** Optional installed refill offering. */
+    installedRefillOfferingId: number | null;
+    /** Optional installed refill model. */
+    installedRefillProductId: number | null;
+    /** Selected material assignment, when the product has one. */
+    materialAssignmentId: number | null;
+    /** Optional collection created with the item. */
+    newCollection?: CollectionWriteInput | null;
+    /** Exact catalog product identifier. */
+    productId: number;
+    /** Exact Pen or Pen-part subtype. */
+    productTypeSlug:
+      | "pen"
+      | "pen-actuator"
+      | "pen-clip"
+      | "pen-mechanism"
+      | "pen-tip"
+      | "pen-top-cap";
+    /** Optional maker serial. */
+    serialNumber?: string | null;
+  }): Promise<number>;
+  /**
    * Adds a spinner and optional button to a collection.
    *
    * @param input - Collection, spinner, optional button, overrides, and actor.
@@ -2391,6 +2454,8 @@ export type CollectionsService = {
      * New collection.
      */
     newCollection?: CollectionWriteInput | null;
+    /** Optional maker serial. */
+    serialNumber?: string | null;
   }): Promise<{
     /**
      * Button item identifier.
@@ -2445,6 +2510,8 @@ export type CollectionsService = {
      * New collection.
      */
     newCollection?: CollectionWriteInput | null;
+    /** Optional maker serial. */
+    serialNumber?: string | null;
   }): Promise<number>;
   /**
    * Adds one standalone slider, plate set, or insert set to a collection.
@@ -2474,6 +2541,8 @@ export type CollectionsService = {
     productId: number;
     /** Exact standalone slider product subtype. */
     productTypeSlug: "slider" | "slider-insert" | "slider-plate";
+    /** Optional maker serial. */
+    serialNumber?: string | null;
   }): Promise<number>;
   /**
    * Creates collection.
@@ -2766,6 +2835,8 @@ export type CollectionsService = {
      * Collection item identifier.
      */
     collectionItemId: number;
+    /** Replacement owned configuration, when editing a configurable product. */
+    configurationSelections?: CollectionConfigurationSelection[];
     /**
      * Custom finish.
      */
@@ -2808,6 +2879,10 @@ export type CollectionsService = {
       /** Owned slider insert collection-item identifier. */
       collectionItemId: number;
     } | null;
+    /** Installed refill offering, or `null` to clear it. */
+    installedRefillOfferingId?: number | null;
+    /** Installed refill model, or `null` to clear it. */
+    installedRefillProductId?: number | null;
     /** Slider plate to install, or `null` to detach the current plate. */
     installedPlate?: {
       /** Owned slider plate collection-item identifier. */
@@ -2823,6 +2898,8 @@ export type CollectionsService = {
      * Administrative reason for the operation.
      */
     reason?: string;
+    /** Optional maker serial. */
+    serialNumber?: string | null;
   }): Promise<void>;
   /**
    * Updates collection.
@@ -6208,6 +6285,142 @@ export function createCollectionsService(
       );
     },
     /**
+     * Adds one Pen or Pen-part product with its configuration snapshot.
+     *
+     * @param input - Product, collection, serial, configuration, and actor.
+     * @returns Identifier of the created collection item.
+     * @rejects When validation, authorization, persistence, auditing, or logging fails.
+     */
+    async addPenProduct(input) {
+      return await logger.operation(
+        loggerMessages.database.collections.addPenProduct,
+        async () => {
+          const owner = await users.ensure({ clerkId: input.actor.clerkId });
+          return await db.transaction(async (tx) => {
+            const resolvedCollection = await resolveCollectionForWrite(tx, {
+              collectionId: input.collectionId ?? null,
+              newCollection: input.newCollection ?? null,
+              ownerId: owner.id,
+            });
+            if (resolvedCollection.created) {
+              await writeCollectionAudit(audit, tx, {
+                actor: input.actor,
+                actorUser: owner,
+                after: {
+                  id: resolvedCollection.id,
+                  isPrivate: resolvedCollection.created.isPrivate,
+                  ...validatedCollectionValues(resolvedCollection.created),
+                },
+                definition: collectionAudit.collectionCreated,
+                ownerUserId: owner.id,
+                targetId: resolvedCollection.id,
+              });
+            }
+            const [product] = await tx
+              .select({ slug: schema.productType.slug })
+              .from(schema.product)
+              .innerJoin(
+                schema.productType,
+                eq(schema.product.productTypeId, schema.productType.id),
+              )
+              .where(eq(schema.product.id, input.productId))
+              .limit(1);
+            if (product?.slug !== input.productTypeSlug) {
+              throw new Error("Collection product type does not match.");
+            }
+            const materialSelection = input.materialAssignmentId
+              ? await resolveProductMaterial(
+                  tx,
+                  input.productId,
+                  input.materialAssignmentId,
+                )
+              : { materialId: null, materialSpecificId: null };
+            const [item] = await tx
+              .insert(schema.collectionItem)
+              .values({
+                collectionId: resolvedCollection.id,
+                description: normalizeOptionalDescription(input.description),
+                displayName: input.displayName.trim(),
+                ...materialSelection,
+                ownerId: owner.id,
+                serialNumber: normalizeOptionalText(input.serialNumber),
+              })
+              .returning({ id: schema.collectionItem.id });
+            if (!item) throw new Error("Failed to create collection item.");
+            if (input.productTypeSlug === "pen") {
+              await tx.insert(schema.collectionDetailPen).values({
+                id: item.id,
+                installedRefillOfferingId: input.installedRefillOfferingId,
+                installedRefillProductId: input.installedRefillProductId,
+                productPenId: input.productId,
+              });
+            } else if (input.productTypeSlug === "pen-clip") {
+              await tx.insert(schema.collectionDetailPenClip).values({
+                id: item.id,
+                productPenClipId: input.productId,
+              });
+            } else if (input.productTypeSlug === "pen-tip") {
+              await tx.insert(schema.collectionDetailPenTip).values({
+                id: item.id,
+                productPenTipId: input.productId,
+              });
+            } else if (input.productTypeSlug === "pen-top-cap") {
+              await tx.insert(schema.collectionDetailPenTopCap).values({
+                id: item.id,
+                productPenTopCapId: input.productId,
+              });
+            } else if (input.productTypeSlug === "pen-mechanism") {
+              await tx.insert(schema.collectionDetailPenMechanism).values({
+                id: item.id,
+                productPenMechanismId: input.productId,
+              });
+            } else {
+              await tx.insert(schema.collectionDetailPenActuator).values({
+                id: item.id,
+                productPenActuatorId: input.productId,
+              });
+            }
+            await replaceCollectionConfigurationSelections(tx, {
+              collectionId: resolvedCollection.id,
+              collectionItemId: item.id,
+              ownerId: owner.id,
+              productId: input.productId,
+              selections: input.configurationSelections,
+            });
+            await createCollectionFinishOption(tx, {
+              collectionItemId: item.id,
+              customFinish: input.customFinish,
+              productFinishOptionId: input.finishOptionId,
+              productId: input.productId,
+            });
+            await touchCollection(tx, resolvedCollection.id);
+            await writeCollectionAudit(audit, tx, {
+              actor: input.actor,
+              actorUser: owner,
+              after: {
+                collectionId: resolvedCollection.id,
+                configurationSelections: input.configurationSelections,
+                description: normalizeOptionalDescription(input.description),
+                displayName: input.displayName.trim(),
+                id: item.id,
+                installedRefillOfferingId: input.installedRefillOfferingId,
+                installedRefillProductId: input.installedRefillProductId,
+                materialAssignmentId: input.materialAssignmentId,
+                productId: input.productId,
+                productTypeSlug: input.productTypeSlug,
+                serialNumber: normalizeOptionalText(input.serialNumber),
+              },
+              definition: collectionAudit.itemCreated,
+              ownerUserId: owner.id,
+              targetId: item.id,
+            });
+            return item.id;
+          });
+        },
+        actorAttributes(input.actor.clerkId, { productId: input.productId }),
+      );
+    },
+    /**
      * Adds a spinner and optional button to a collection.
      *
      * @param input - Collection, spinner, optional button, overrides, and actor.
@@ -6316,6 +6529,9 @@ export function createCollectionsService(
                 displayName: input.displayName,
                 ...spinnerMaterial,
                 ownerId: owner.id,
+                ...(input.serialNumber !== undefined
+                  ? { serialNumber: normalizeOptionalText(input.serialNumber) }
+                  : {}),
               })
               .returning({ id: schema.collectionItem.id });
             if (!spinnerItem) throw new Error("Failed to create spinner item.");
@@ -6411,6 +6627,9 @@ export function createCollectionsService(
                 displayName: input.displayName,
                 ...materialSelection,
                 ownerId: owner.id,
+                ...(input.serialNumber !== undefined
+                  ? { serialNumber: normalizeOptionalText(input.serialNumber) }
+                  : {}),
               })
               .returning({ id: schema.collectionItem.id });
             if (!item) throw new Error("Failed to create collection item.");
@@ -6527,6 +6746,9 @@ export function createCollectionsService(
                 displayName: input.displayName,
                 ...materialSelection,
                 ownerId: owner.id,
+                ...(input.serialNumber !== undefined
+                  ? { serialNumber: normalizeOptionalText(input.serialNumber) }
+                  : {}),
               })
               .returning({ id: schema.collectionItem.id });
             if (!item) throw new Error("Failed to create collection item.");
@@ -6598,61 +6820,26 @@ export function createCollectionsService(
       if (!productIds.length) return {};
       const owner = await users.getByClerkId(actorClerkId);
       if (!owner) return {};
+      const mappedProductId = sql<
+        number | null
+      >`collection_catalog_product(${schema.collectionItem.id})`;
       const rows = await db
         .select({
           count: count(schema.collectionItem.id),
-          spinnerId: schema.collectionDetailSpinner.productSpinnerId,
-          buttonId: schema.collectionDetailSpinnerButton.productSpinnerButtonId,
-          sliderId: schema.collectionDetailSlider.productSliderId,
-          sliderInsertId:
-            schema.collectionDetailSliderInsert.productSliderInsertId,
-          sliderPlateId:
-            schema.collectionDetailSliderPlate.productSliderPlateId,
+          productId: mappedProductId,
         })
         .from(schema.collectionItem)
-        .leftJoin(
-          schema.collectionDetailSpinner,
-          eq(schema.collectionItem.id, schema.collectionDetailSpinner.id),
-        )
-        .leftJoin(
-          schema.collectionDetailSpinnerButton,
-          eq(schema.collectionItem.id, schema.collectionDetailSpinnerButton.id),
-        )
-        .leftJoin(
-          schema.collectionDetailSlider,
-          eq(schema.collectionItem.id, schema.collectionDetailSlider.id),
-        )
-        .leftJoin(
-          schema.collectionDetailSliderPlate,
-          eq(schema.collectionItem.id, schema.collectionDetailSliderPlate.id),
-        )
-        .leftJoin(
-          schema.collectionDetailSliderInsert,
-          eq(schema.collectionItem.id, schema.collectionDetailSliderInsert.id),
-        )
         .where(
           and(
             eq(schema.collectionItem.ownerId, owner.id),
             eq(schema.collectionItem.owned, true),
           ),
         )
-        .groupBy(
-          schema.collectionDetailSpinner.productSpinnerId,
-          schema.collectionDetailSpinnerButton.productSpinnerButtonId,
-          schema.collectionDetailSlider.productSliderId,
-          schema.collectionDetailSliderPlate.productSliderPlateId,
-          schema.collectionDetailSliderInsert.productSliderInsertId,
-        );
+        .groupBy(mappedProductId);
       const result: Record<number, number> = {};
       for (const row of rows) {
-        const productId =
-          row.spinnerId ??
-          row.buttonId ??
-          row.sliderId ??
-          row.sliderPlateId ??
-          row.sliderInsertId;
-        if (productId !== null && productIds.includes(productId)) {
-          result[productId] = Number(row.count);
+        if (row.productId !== null && productIds.includes(row.productId)) {
+          result[row.productId] = Number(row.count);
         }
       }
       return result;
@@ -7702,6 +7889,7 @@ export function createCollectionsService(
                 collectionId: schema.collectionItem.collectionId,
                 description: schema.collectionItem.description,
                 displayName: schema.collectionItem.displayName,
+                serialNumber: schema.collectionItem.serialNumber,
                 installedButtonId:
                   schema.collectionDetailSpinner.installedButtonId,
                 installedInsertId:
@@ -7717,6 +7905,20 @@ export function createCollectionsService(
                   schema.collectionDetailSlider.magnetConfiguration,
                 usesInserts: schema.productDetailSlider.usesInserts,
                 ownerId: schema.collectionItem.ownerId,
+                penProductId: schema.collectionDetailPen.productPenId,
+                penActuatorProductId:
+                  schema.collectionDetailPenActuator.productPenActuatorId,
+                penClipProductId:
+                  schema.collectionDetailPenClip.productPenClipId,
+                penMechanismProductId:
+                  schema.collectionDetailPenMechanism.productPenMechanismId,
+                penTipProductId: schema.collectionDetailPenTip.productPenTipId,
+                penTopCapProductId:
+                  schema.collectionDetailPenTopCap.productPenTopCapId,
+                installedRefillOfferingId:
+                  schema.collectionDetailPen.installedRefillOfferingId,
+                installedRefillProductId:
+                  schema.collectionDetailPen.installedRefillProductId,
                 sliderProductId: schema.collectionDetailSlider.productSliderId,
                 sliderInsertProductId:
                   schema.collectionDetailSliderInsert.productSliderInsertId,
@@ -7762,6 +7964,39 @@ export function createCollectionsService(
                   schema.collectionDetailSliderInsert.id,
                 ),
               )
+              .leftJoin(
+                schema.collectionDetailPen,
+                eq(schema.collectionItem.id, schema.collectionDetailPen.id),
+              )
+              .leftJoin(
+                schema.collectionDetailPenActuator,
+                eq(
+                  schema.collectionItem.id,
+                  schema.collectionDetailPenActuator.id,
+                ),
+              )
+              .leftJoin(
+                schema.collectionDetailPenClip,
+                eq(schema.collectionItem.id, schema.collectionDetailPenClip.id),
+              )
+              .leftJoin(
+                schema.collectionDetailPenMechanism,
+                eq(
+                  schema.collectionItem.id,
+                  schema.collectionDetailPenMechanism.id,
+                ),
+              )
+              .leftJoin(
+                schema.collectionDetailPenTip,
+                eq(schema.collectionItem.id, schema.collectionDetailPenTip.id),
+              )
+              .leftJoin(
+                schema.collectionDetailPenTopCap,
+                eq(
+                  schema.collectionItem.id,
+                  schema.collectionDetailPenTopCap.id,
+                ),
+              )
               .where(
                 and(
                   eq(schema.collectionItem.id, input.collectionItemId),
@@ -7780,6 +8015,12 @@ export function createCollectionsService(
               item?.sliderProductId ??
               item?.sliderPlateProductId ??
               item?.sliderInsertProductId ??
+              item?.penProductId ??
+              item?.penActuatorProductId ??
+              item?.penClipProductId ??
+              item?.penMechanismProductId ??
+              item?.penTipProductId ??
+              item?.penTopCapProductId ??
               null;
             if (!item || productId === null) {
               throw new Error("Collection item does not exist.");
@@ -7793,9 +8034,12 @@ export function createCollectionsService(
               installedInsertId: item.installedInsertId,
               installedPlateId: item.installedPlateId,
               magnetConfiguration: item.magnetConfiguration,
+              installedRefillOfferingId: item.installedRefillOfferingId,
+              installedRefillProductId: item.installedRefillProductId,
               isPrivate: item.isPrivate,
               materialId: item.materialId,
               materialSpecificId: item.materialSpecificId,
+              serialNumber: item.serialNumber,
             };
 
             const targetCollectionId = input.collectionId ?? item.collectionId;
@@ -7864,6 +8108,51 @@ export function createCollectionsService(
                 if (slider.installedInsertId !== null)
                   linkedItemIds.add(slider.installedInsertId);
               }
+              if (
+                item.penProductId != null ||
+                item.penActuatorProductId != null ||
+                item.penClipProductId != null ||
+                item.penMechanismProductId != null ||
+                item.penTipProductId != null ||
+                item.penTopCapProductId != null
+              ) {
+                const linkedPenParents = await tx
+                  .select({
+                    collectionItemId:
+                      schema.collectionItemConfigurationSelection
+                        .collectionItemId,
+                  })
+                  .from(schema.collectionItemConfigurationSelection)
+                  .where(
+                    eq(
+                      schema.collectionItemConfigurationSelection
+                        .installedPartCollectionItemId,
+                      input.collectionItemId,
+                    ),
+                  );
+                for (const selection of linkedPenParents) {
+                  linkedItemIds.add(selection.collectionItemId);
+                }
+                const linkedPenParts = await tx
+                  .select({
+                    installedPartCollectionItemId:
+                      schema.collectionItemConfigurationSelection
+                        .installedPartCollectionItemId,
+                  })
+                  .from(schema.collectionItemConfigurationSelection)
+                  .where(
+                    inArray(
+                      schema.collectionItemConfigurationSelection
+                        .collectionItemId,
+                      [...linkedItemIds],
+                    ),
+                  );
+                for (const selection of linkedPenParts) {
+                  if (selection.installedPartCollectionItemId !== null) {
+                    linkedItemIds.add(selection.installedPartCollectionItemId);
+                  }
+                }
+              }
               await tx
                 .update(schema.collectionItem)
                 .set({
@@ -7895,8 +8184,41 @@ export function createCollectionsService(
                     }
                   : {}),
                 displayName: input.displayName.trim(),
+                ...(input.serialNumber !== undefined
+                  ? { serialNumber: normalizeOptionalText(input.serialNumber) }
+                  : {}),
               })
               .where(eq(schema.collectionItem.id, input.collectionItemId));
+
+            if (input.configurationSelections !== undefined) {
+              await replaceCollectionConfigurationSelections(tx, {
+                collectionId: targetCollectionId,
+                collectionItemId: input.collectionItemId,
+                ownerId: item.ownerId,
+                productId,
+                selections: input.configurationSelections,
+              });
+            }
+
+            if (
+              input.installedRefillProductId !== undefined ||
+              input.installedRefillOfferingId !== undefined
+            ) {
+              if (item.penProductId === null) {
+                throw new Error("Collection item is not a Pen.");
+              }
+              await tx
+                .update(schema.collectionDetailPen)
+                .set({
+                  installedRefillOfferingId:
+                    input.installedRefillOfferingId ?? null,
+                  installedRefillProductId:
+                    input.installedRefillProductId ?? null,
+                })
+                .where(
+                  eq(schema.collectionDetailPen.id, input.collectionItemId),
+                );
+            }
 
             if (item.spinnerProductId !== null && input.bearing !== undefined) {
               await tx
@@ -8232,7 +8554,22 @@ export function createCollectionsService(
                   ? item.installedPlateId
                   : (input.installedPlate?.collectionItemId ?? null),
               magnetConfiguration: normalizedMagnetConfiguration,
+              ...(input.configurationSelections !== undefined
+                ? { configurationSelections: input.configurationSelections }
+                : {}),
+              installedRefillOfferingId:
+                input.installedRefillOfferingId === undefined
+                  ? item.installedRefillOfferingId
+                  : input.installedRefillOfferingId,
+              installedRefillProductId:
+                input.installedRefillProductId === undefined
+                  ? item.installedRefillProductId
+                  : input.installedRefillProductId,
               materialAssignmentId: input.materialAssignmentId ?? null,
+              serialNumber:
+                input.serialNumber === undefined
+                  ? item.serialNumber
+                  : normalizeOptionalText(input.serialNumber),
               ...selectedMaterial,
             };
             await writeCollectionAudit(audit, tx, {
@@ -8834,6 +9171,10 @@ function effectiveCollectionItemIsPrivate() {
          from collection_detail_slider assembly
          inner join collection_item parent on parent.id = assembly.id
         where assembly.installed_insert_id = ${schema.collectionItem.id}),
+      (select parent.is_private
+         from collection_item_configuration_selection selection
+         inner join collection_item parent on parent.id = selection.collection_item_id
+        where selection.installed_part_collection_item_id = ${schema.collectionItem.id}),
       ${schema.collectionItem.isPrivate}
     )
   end`;
@@ -9805,6 +10146,7 @@ async function loadPensCatalogDetails(
         name: assertion.penName,
         outcome: assertion.outcome as "compatible" | "conditional",
         requiredTipName: assertion.requiredTipName,
+        requiredTipProductId: assertion.requiredTipProductId,
         slug: assertion.penSlug,
       });
     }
@@ -10195,7 +10537,8 @@ async function queryOwnedItems(
   const privacyInheritedFromItemId = sql<number | null>`coalesce(
     (select id from collection_detail_spinner where installed_button_id = ${schema.collectionItem.id}),
     (select id from collection_detail_slider where installed_plate_id = ${schema.collectionItem.id}),
-    (select id from collection_detail_slider where installed_insert_id = ${schema.collectionItem.id})
+    (select id from collection_detail_slider where installed_insert_id = ${schema.collectionItem.id}),
+    (select collection_item_id from collection_item_configuration_selection where installed_part_collection_item_id = ${schema.collectionItem.id})
   )`;
   const effectiveItemIsPrivate = effectiveCollectionItemIsPrivate();
   const conditions = [
@@ -10247,6 +10590,7 @@ async function queryOwnedItems(
       productBearing: schema.productDetailSpinner.bearing,
       collectionId: schema.userCollection.id,
       collectionItemId: schema.collectionItem.id,
+      serialNumber: schema.collectionItem.serialNumber,
       collectionIsPrivate: schema.userCollection.isPrivate,
       collectionName: schema.userCollection.name,
       displayName: sql<string>`coalesce(${schema.collectionItem.displayName}, ${schema.product.name})`,
@@ -10320,6 +10664,10 @@ async function queryOwnedItems(
             )
         )
       end`,
+      installedRefillOfferingId:
+        schema.collectionDetailPen.installedRefillOfferingId,
+      installedRefillProductId:
+        schema.collectionDetailPen.installedRefillProductId,
       installedInsertProductId: sql<number | null>`(
         select product_slider_insert_id
         from collection_detail_slider_insert
@@ -10354,6 +10702,12 @@ async function queryOwnedItems(
         schema.finishOption.sourceProductFinishOptionId,
       spinnerId: schema.collectionDetailSpinner.id,
       buttonId: schema.collectionDetailSpinnerButton.id,
+      penId: schema.collectionDetailPen.id,
+      penActuatorId: schema.collectionDetailPenActuator.id,
+      penClipId: schema.collectionDetailPenClip.id,
+      penMechanismId: schema.collectionDetailPenMechanism.id,
+      penTipId: schema.collectionDetailPenTip.id,
+      penTopCapId: schema.collectionDetailPenTopCap.id,
       sliderId: schema.collectionDetailSlider.id,
       sliderInsertId: schema.collectionDetailSliderInsert.id,
       magnetConfiguration: schema.collectionDetailSlider.magnetConfiguration,
@@ -10407,11 +10761,35 @@ async function queryOwnedItems(
       schema.collectionDetailSliderInsert,
       eq(schema.collectionItem.id, schema.collectionDetailSliderInsert.id),
     )
+    .leftJoin(
+      schema.collectionDetailPen,
+      eq(schema.collectionItem.id, schema.collectionDetailPen.id),
+    )
+    .leftJoin(
+      schema.collectionDetailPenActuator,
+      eq(schema.collectionItem.id, schema.collectionDetailPenActuator.id),
+    )
+    .leftJoin(
+      schema.collectionDetailPenClip,
+      eq(schema.collectionItem.id, schema.collectionDetailPenClip.id),
+    )
+    .leftJoin(
+      schema.collectionDetailPenMechanism,
+      eq(schema.collectionItem.id, schema.collectionDetailPenMechanism.id),
+    )
+    .leftJoin(
+      schema.collectionDetailPenTip,
+      eq(schema.collectionItem.id, schema.collectionDetailPenTip.id),
+    )
+    .leftJoin(
+      schema.collectionDetailPenTopCap,
+      eq(schema.collectionItem.id, schema.collectionDetailPenTopCap.id),
+    )
     .innerJoin(
       schema.product,
       eq(
         schema.product.id,
-        sql`coalesce(${schema.collectionDetailSpinner.productSpinnerId}, ${schema.collectionDetailSpinnerButton.productSpinnerButtonId}, ${schema.collectionDetailSlider.productSliderId}, ${schema.collectionDetailSliderPlate.productSliderPlateId}, ${schema.collectionDetailSliderInsert.productSliderInsertId})`,
+        sql`coalesce(${schema.collectionDetailSpinner.productSpinnerId}, ${schema.collectionDetailSpinnerButton.productSpinnerButtonId}, ${schema.collectionDetailSlider.productSliderId}, ${schema.collectionDetailSliderPlate.productSliderPlateId}, ${schema.collectionDetailSliderInsert.productSliderInsertId}, ${schema.collectionDetailPen.productPenId}, ${schema.collectionDetailPenActuator.productPenActuatorId}, ${schema.collectionDetailPenClip.productPenClipId}, ${schema.collectionDetailPenMechanism.productPenMechanismId}, ${schema.collectionDetailPenTip.productPenTipId}, ${schema.collectionDetailPenTopCap.productPenTopCapId})`,
       ),
     )
     .innerJoin(schema.maker, eq(schema.product.makerId, schema.maker.id))
@@ -10482,6 +10860,7 @@ async function queryOwnedItems(
       collectionIsPrivate: row.collectionIsPrivate,
       collectionId: row.collectionId,
       collectionItemId: row.collectionItemId,
+      configurationSelections: [],
       collectionName: row.collectionName,
       displayName: row.displayName,
       description: row.descriptionOverride ?? row.productDescription,
@@ -10511,6 +10890,8 @@ async function queryOwnedItems(
       installedOnSliderId: row.installedOnSliderId,
       installedPlateId: installedPlateUnavailable ? null : row.installedPlateId,
       installedPlateUnavailable,
+      installedRefillOfferingId: row.installedRefillOfferingId,
+      installedRefillProductId: row.installedRefillProductId,
       privacyInheritedFromItemId: row.privacyInheritedFromItemId,
       magnetConfiguration: row.magnetConfiguration,
       isOwner: options.viewerClerkId === row.ownerClerkId,
@@ -10549,6 +10930,7 @@ async function queryOwnedItems(
         : row.spinnerId
           ? "spinner"
           : "spinner-button",
+      serialNumber: row.serialNumber,
       productImages: [],
       sourceProductFinishOptionId: row.sourceProductFinishOptionId,
     };
@@ -10560,6 +10942,33 @@ async function queryOwnedItems(
     options.includePrivate,
   );
   if (items.length) {
+    const selections = await db
+      .select({
+        choiceId: schema.collectionItemConfigurationSelection.choiceId,
+        collectionItemId:
+          schema.collectionItemConfigurationSelection.collectionItemId,
+        installedPartCollectionItemId:
+          schema.collectionItemConfigurationSelection
+            .installedPartCollectionItemId,
+        slotId: schema.collectionItemConfigurationSelection.slotId,
+      })
+      .from(schema.collectionItemConfigurationSelection)
+      .where(
+        inArray(
+          schema.collectionItemConfigurationSelection.collectionItemId,
+          items.map(({ collectionItemId }) => collectionItemId),
+        ),
+      );
+    const itemsById = new Map(
+      items.map((item) => [item.collectionItemId, item]),
+    );
+    for (const selection of selections) {
+      itemsById.get(selection.collectionItemId)?.configurationSelections?.push({
+        choiceId: selection.choiceId,
+        installedPartCollectionItemId: selection.installedPartCollectionItemId,
+        slotId: selection.slotId,
+      });
+    }
     const viewer = options.viewerClerkId
       ? {
           clerkId: options.viewerClerkId,
@@ -11662,6 +12071,122 @@ async function listCatalogImageTrash(
  * Caller-owned database transaction used for atomic catalog writes.
  */
 type CatalogTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+/**
+ * Replaces one owned product's configuration selections after validating catalog and ownership boundaries.
+ *
+ * @param tx - Active catalog transaction.
+ * @param input - Parent product, owner, destination collection, and replacement selections.
+ * @returns Completion after the replacement selections and installed-part moves are stored.
+ * @rejects When a required slot is missing or a choice or physical part does not belong to the parent configuration.
+ */
+async function replaceCollectionConfigurationSelections(
+  tx: CatalogTransaction,
+  input: {
+    /** Destination collection for any installed physical parts. */
+    collectionId: number;
+    /** Owned parent item receiving the configuration. */
+    collectionItemId: number;
+    /** Parent owner. */
+    ownerId: number;
+    /** Catalog product whose slots are being selected. */
+    productId: number;
+    /** Replacement selections. */
+    selections: CollectionConfigurationSelection[];
+  },
+): Promise<void> {
+  const slots = await tx
+    .select({
+      choiceId: schema.productConfigurationChoice.id,
+      partProductId: schema.productConfigurationChoice.partProductId,
+      required: schema.productConfigurationSlot.required,
+      slotId: schema.productConfigurationSlot.id,
+    })
+    .from(schema.productConfigurationSlot)
+    .leftJoin(
+      schema.productConfigurationChoice,
+      eq(
+        schema.productConfigurationSlot.id,
+        schema.productConfigurationChoice.slotId,
+      ),
+    )
+    .where(eq(schema.productConfigurationSlot.productId, input.productId));
+  const slotIds = new Set(slots.map(({ slotId }) => slotId));
+  const requiredSlotIds = new Set(
+    slots.filter(({ required }) => required).map(({ slotId }) => slotId),
+  );
+  const seenSlotIds = new Set<number>();
+  for (const selection of input.selections) {
+    if (seenSlotIds.has(selection.slotId)) {
+      throw new Error("A configuration slot may be selected only once.");
+    }
+    seenSlotIds.add(selection.slotId);
+    const choice = slots.find(
+      (candidate) =>
+        candidate.slotId === selection.slotId &&
+        candidate.choiceId === selection.choiceId,
+    );
+    if (!choice || !slotIds.has(selection.slotId)) {
+      throw new Error("Configuration choice does not belong to the product.");
+    }
+    if (selection.installedPartCollectionItemId !== null) {
+      if (choice.partProductId === null) {
+        throw new Error("Only Pen-part choices can use a physical item.");
+      }
+      const [part] = await tx
+        .select({
+          id: schema.collectionItem.id,
+          ownerId: schema.collectionItem.ownerId,
+          productId: sql<
+            number | null
+          >`collection_catalog_product(${schema.collectionItem.id})`,
+        })
+        .from(schema.collectionItem)
+        .where(
+          and(
+            eq(
+              schema.collectionItem.id,
+              selection.installedPartCollectionItemId,
+            ),
+            eq(schema.collectionItem.owned, true),
+          ),
+        )
+        .limit(1);
+      if (
+        !part ||
+        part.ownerId !== input.ownerId ||
+        part.productId !== choice.partProductId
+      ) {
+        throw new Error("Installed Pen part must match the choice and owner.");
+      }
+      await tx
+        .update(schema.collectionItem)
+        .set({ collectionId: input.collectionId, updatedAt: new Date() })
+        .where(eq(schema.collectionItem.id, part.id));
+    }
+  }
+  if ([...requiredSlotIds].some((slotId) => !seenSlotIds.has(slotId))) {
+    throw new Error("Every required configuration slot needs a selection.");
+  }
+  await tx
+    .delete(schema.collectionItemConfigurationSelection)
+    .where(
+      eq(
+        schema.collectionItemConfigurationSelection.collectionItemId,
+        input.collectionItemId,
+      ),
+    );
+  if (input.selections.length) {
+    await tx.insert(schema.collectionItemConfigurationSelection).values(
+      input.selections.map((selection) => ({
+        choiceId: selection.choiceId,
+        collectionItemId: input.collectionItemId,
+        installedPartCollectionItemId: selection.installedPartCollectionItemId,
+        slotId: selection.slotId,
+      })),
+    );
+  }
+}
 
 /**
  * Rejects a public assembly operation when an installed component is not

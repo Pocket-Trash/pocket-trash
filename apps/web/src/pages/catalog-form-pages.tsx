@@ -3168,6 +3168,7 @@ export function CollectionAddPage({
   initialProductId,
   syncIncomplete = false,
   options: initialOptions,
+  ownedItems = [],
   products,
 }: {
   /** Collections available as destinations. */
@@ -3178,6 +3179,8 @@ export function CollectionAddPage({
   initialProductId?: number;
   /** Catalog lookup options. */
   options: CatalogOptions;
+  /** Current owner's collection items available as physical Pen parts. */
+  ownedItems?: UserCollectionItem[];
   /** Products available to add. */
   products: CatalogProduct[];
   /** Whether catalog synchronization is incomplete. */
@@ -3235,6 +3238,14 @@ export function CollectionAddPage({
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
   const [descriptionLoading, setDescriptionLoading] = React.useState(true);
   const [bearing, setBearing] = React.useState("");
+  const [serialNumber, setSerialNumber] = React.useState<string | null>(null);
+  const [configurationSelections, setConfigurationSelections] = React.useState<
+    Record<number, OwnedConfigurationSelection>
+  >({});
+  const [installedRefillProductId, setInstalledRefillProductId] =
+    React.useState<number | null>(null);
+  const [installedRefillOfferingId, setInstalledRefillOfferingId] =
+    React.useState<number | null>(null);
   const [material, setMaterial] = React.useState<CatalogLookup | null>(null);
   const [finish, setFinish] = React.useState<ComboboxOption | null>(null);
   const [customFinish, setCustomFinish] = React.useState(emptyFinishOption);
@@ -3300,6 +3311,30 @@ export function CollectionAddPage({
         },
       ]
     : collections;
+  const selectedConfigurationChoices = product
+    ? product.configurationSlots.flatMap((slot) => {
+        const selection = configurationSelections[slot.id];
+        return selection
+          ? slot.choices.filter(({ id }) => id === selection.choiceId)
+          : [];
+      })
+    : [];
+  const configurationMaterialId =
+    selectedConfigurationChoices.find(
+      ({ productMaterialId }) => productMaterialId !== null,
+    )?.productMaterialId ?? null;
+  const configurationFinishId =
+    selectedConfigurationChoices.find(
+      ({ finishOptionId }) => finishOptionId !== null,
+    )?.finishOptionId ?? null;
+  const configurationIsValid = Boolean(
+    !product ||
+      product.configurationSlots.every(
+        (slot) => !slot.required || configurationSelections[slot.id],
+      ),
+  );
+  const serialNumberIsValid =
+    serialNumber === null || serialNumber.trim().length > 0;
 
   /**
    * Saves the current collection-item fields.
@@ -3317,8 +3352,12 @@ export function CollectionAddPage({
       !product ||
       !displayName.trim() ||
       selectedCollectionId === null ||
-      !material ||
-      (finish?.id === "custom" && !customFinishIsValid) ||
+      (!product.configurationSlots.length && !material) ||
+      !configurationIsValid ||
+      !serialNumberIsValid ||
+      (!product.configurationSlots.length &&
+        finish?.id === "custom" &&
+        !customFinishIsValid) ||
       !collectionProductTypeIsSupported(product.productTypeSlug) ||
       (selectedButton &&
         (!buttonMaterial ||
@@ -3387,12 +3426,27 @@ export function CollectionAddPage({
         buttonProductId: selectedButton?.id ?? null,
         collectionId: selectedCollectionId === -1 ? null : selectedCollectionId,
         confirmed,
-        customFinish: finish?.id === "custom" ? customFinish : null,
+        configurationSelections: Object.values(configurationSelections),
+        customFinish:
+          !product.configurationSlots.length && finish?.id === "custom"
+            ? customFinish
+            : null,
         displayName,
         description: currentDescription,
-        finishOptionId:
-          finish?.id === "custom" ? null : finish ? Number(finish.id) : null,
-        materialAssignmentId: material.id === -1 ? undefined : material.id,
+        finishOptionId: product.configurationSlots.length
+          ? configurationFinishId
+          : finish?.id === "custom"
+            ? null
+            : finish
+              ? Number(finish.id)
+              : null,
+        installedRefillOfferingId,
+        installedRefillProductId,
+        materialAssignmentId: product.configurationSlots.length
+          ? configurationMaterialId
+          : material?.id === -1
+            ? null
+            : (material?.id ?? null),
         newCollection:
           selectedCollectionId === -1 && newCollection
             ? {
@@ -3404,6 +3458,7 @@ export function CollectionAddPage({
             : null,
         productId: product.id,
         productTypeSlug: product.productTypeSlug,
+        serialNumber,
       },
     });
     if (!result.ok && result.requiresConfirmation) {
@@ -3516,6 +3571,14 @@ export function CollectionAddPage({
             />
           </Field>
         ) : null}
+        {product &&
+        collectionProductTypeSupportsSerial(product.productTypeSlug) ? (
+          <SerialNumberFields
+            onChange={setSerialNumber}
+            t={t}
+            value={serialNumber}
+          />
+        ) : null}
         {syncIncomplete ? (
           <Notice>{t("web.collections.error.syncIncomplete")}</Notice>
         ) : null}
@@ -3596,6 +3659,10 @@ export function CollectionAddPage({
                   setDisplayName("");
                   setDescription("");
                   setBearing("");
+                  setSerialNumber(null);
+                  setConfigurationSelections({});
+                  setInstalledRefillProductId(null);
+                  setInstalledRefillOfferingId(null);
                   setMaterial(null);
                   setFinish(null);
                   setCustomFinish(emptyFinishOption());
@@ -3610,7 +3677,7 @@ export function CollectionAddPage({
                 value={type}
               />
             </Field>
-            {slug && !productTypeIsSupported(slug) ? (
+            {slug && !collectionProductTypeIsSupported(slug) ? (
               <Notice>{t("web.catalog.notImplemented")}</Notice>
             ) : null}
             <Input
@@ -3638,6 +3705,10 @@ export function CollectionAddPage({
                       setDisplayName(candidate.name);
                       setDescription("");
                       setBearing("");
+                      setSerialNumber(null);
+                      setConfigurationSelections({});
+                      setInstalledRefillProductId(null);
+                      setInstalledRefillOfferingId(null);
                       setMaterial(null);
                       setFinish(null);
                       setCustomFinish(emptyFinishOption());
@@ -3699,7 +3770,7 @@ export function CollectionAddPage({
             </div>
           </div>
         </details>
-        {product ? (
+        {product && !product.configurationSlots.length ? (
           <CollectionProductFields
             customFinish={customFinish}
             finish={finish}
@@ -3710,6 +3781,20 @@ export function CollectionAddPage({
             onOptionsChange={setOptions}
             options={options}
             product={product}
+            t={t}
+          />
+        ) : null}
+        {product?.productTypeSlug === "pen" ? (
+          <PenCollectionFields
+            allProducts={products}
+            onRefillOfferingChange={setInstalledRefillOfferingId}
+            onRefillProductChange={setInstalledRefillProductId}
+            onSelectionsChange={setConfigurationSelections}
+            ownedItems={ownedItems}
+            product={product}
+            refillOfferingId={installedRefillOfferingId}
+            refillProductId={installedRefillProductId}
+            selections={configurationSelections}
             t={t}
           />
         ) : null}
@@ -3840,12 +3925,15 @@ export function CollectionAddPage({
         {product ? (
           <Button
             disabled={Boolean(
-              !material ||
+              (!product.configurationSlots.length && !material) ||
                 descriptionLoading ||
                 description.length > 5000 ||
                 !displayName.trim() ||
-                !finish ||
-                (finish.id === "custom" && !customFinishIsValid) ||
+                !configurationIsValid ||
+                !serialNumberIsValid ||
+                (!product.configurationSlots.length &&
+                  (!finish ||
+                    (finish.id === "custom" && !customFinishIsValid))) ||
                 (selectedButton &&
                   (!buttonMaterial ||
                     !buttonFinish ||
@@ -3862,6 +3950,343 @@ export function CollectionAddPage({
         ) : null}
       </main>
     </AppShell>
+  );
+}
+
+/** Selected virtual choice and optional physical part for one owned configuration slot. */
+type OwnedConfigurationSelection = {
+  /** Selected catalog choice. */
+  choiceId: number;
+  /** Same-owner physical part installed for the choice. */
+  installedPartCollectionItemId: number | null;
+  /** Product configuration slot. */
+  slotId: number;
+};
+
+/**
+ * Reports whether a product type exposes the optional serial-number control.
+ *
+ * @param productTypeSlug - Catalog product type.
+ * @returns Whether owned items of the type may record a maker serial.
+ */
+export function collectionProductTypeSupportsSerial(
+  productTypeSlug: CatalogProductType,
+): boolean {
+  return productTypeSlug !== "refill" && productTypeSlug !== "slider-insert";
+}
+
+/**
+ * Evaluates positive availability rules against the currently selected choices.
+ *
+ * @param availableWhen - Alternative requirement sets; each inner list is an AND branch.
+ * @param selectedChoiceIds - Choices selected in the current owned configuration.
+ * @returns Whether the choice is currently maker-supported.
+ */
+export function configurationChoiceIsAvailable(
+  availableWhen: number[][],
+  selectedChoiceIds: ReadonlySet<number>,
+): boolean {
+  return (
+    availableWhen.length === 0 ||
+    availableWhen.some((requirements) =>
+      requirements.every((choiceId) => selectedChoiceIds.has(choiceId)),
+    )
+  );
+}
+
+/**
+ * Renders the optional maker-serial toggle and value input.
+ *
+ * @param props - Controlled serial value, translator, and update callback.
+ * @returns Serial-number controls.
+ */
+function SerialNumberFields({
+  onChange,
+  t,
+  value,
+}: {
+  /**
+   * Updates the serial, using `null` when the product is not serialized.
+   *
+   * @param value - Next serial value.
+   */
+  onChange: (value: string | null) => void;
+  /** Catalog translator. */
+  t: ReturnType<typeof useCatalogCopy>;
+  /** Current optional serial value. */
+  value: string | null;
+}) {
+  const label = t("web.collections.serial.hasSerialNumber" as TranslationKey);
+  return (
+    <div className="grid gap-3">
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <input
+          checked={value !== null}
+          className="size-4 accent-primary"
+          onChange={(event) => onChange(event.target.checked ? "" : null)}
+          type="checkbox"
+        />
+        {label}
+      </label>
+      {value !== null ? (
+        <Field
+          label={t("web.collections.field.serialNumber" as TranslationKey)}
+        >
+          <Input
+            aria-label={t(
+              "web.collections.field.serialNumber" as TranslationKey,
+            )}
+            maxLength={200}
+            onChange={(event) => onChange(event.target.value)}
+            required
+            value={value}
+          />
+        </Field>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Renders owned-Pen configuration and installed-refill selectors.
+ *
+ * @param props - Catalog, owned parts, controlled selections, and translator.
+ * @returns Pen configuration fields with non-blocking availability warnings.
+ */
+function PenCollectionFields({
+  allProducts,
+  currentCollectionItemId,
+  onRefillOfferingChange,
+  onRefillProductChange,
+  onSelectionsChange,
+  ownedItems,
+  product,
+  refillOfferingId,
+  refillProductId,
+  selections,
+  t,
+}: {
+  /** Visible catalog products, including refill models. */
+  allProducts: CatalogProduct[];
+  /** Parent item being edited, when applicable. */
+  currentCollectionItemId?: number;
+  /**
+   * Updates the installed offering.
+   *
+   * @param value - Next offering identifier.
+   */
+  onRefillOfferingChange: (value: number | null) => void;
+  /**
+   * Updates the installed refill model.
+   *
+   * @param value - Next refill-product identifier.
+   */
+  onRefillProductChange: (value: number | null) => void;
+  /** Updates configuration selections by slot. */
+  onSelectionsChange: React.Dispatch<
+    React.SetStateAction<Record<number, OwnedConfigurationSelection>>
+  >;
+  /** Current owner's physical collection items. */
+  ownedItems: UserCollectionItem[];
+  /** Configurable Pen product. */
+  product: CatalogProduct;
+  /** Selected offering identifier. */
+  refillOfferingId: number | null;
+  /** Selected refill product identifier. */
+  refillProductId: number | null;
+  /** Current configuration selections keyed by slot. */
+  selections: Record<number, OwnedConfigurationSelection>;
+  /** Catalog translator. */
+  t: ReturnType<typeof useCatalogCopy>;
+}) {
+  const selectedChoiceIds = new Set(
+    Object.values(selections).map(({ choiceId }) => choiceId),
+  );
+  const selectedChoices = product.configurationSlots.flatMap((slot) =>
+    slot.choices.filter(({ id }) => selectedChoiceIds.has(id)),
+  );
+  const selectedPartProductIds = new Set(
+    selectedChoices.flatMap(({ partProductId }) =>
+      partProductId == null ? [] : [partProductId],
+    ),
+  );
+  const warning = t("web.pens.collection.notSupported" as TranslationKey);
+  const refills = allProducts
+    .filter(({ productTypeSlug }) => productTypeSlug === "refill")
+    .map((refill) => ({
+      compatible: refill.compatiblePens.some(
+        (pen) =>
+          pen.id === product.id &&
+          (pen.requiredTipProductId == null ||
+            selectedPartProductIds.has(pen.requiredTipProductId)),
+      ),
+      refill,
+    }))
+    .sort(
+      (left, right) =>
+        Number(right.compatible) - Number(left.compatible) ||
+        left.refill.name.localeCompare(right.refill.name),
+    );
+  const selectedRefill = refills.find(
+    ({ refill }) => refill.id === refillProductId,
+  );
+
+  return (
+    <div className="grid gap-5">
+      {product.configurationSlots.map((slot) => {
+        const current = selections[slot.id];
+        const options = slot.choices
+          .flatMap((choice) => {
+            const available = configurationChoiceIsAvailable(
+              choice.availableWhen,
+              selectedChoiceIds,
+            );
+            const virtual = {
+              id: `${choice.id}:virtual`,
+              name: choice.label ?? slot.labelFallback,
+              warning: available ? undefined : warning,
+            };
+            const physical = choice.partProductId
+              ? ownedItems
+                  .filter(
+                    (item) =>
+                      item.productId === choice.partProductId &&
+                      (item.privacyInheritedFromItemId === null ||
+                        item.privacyInheritedFromItemId ===
+                          currentCollectionItemId),
+                  )
+                  .map((item) => ({
+                    id: `${choice.id}:${item.collectionItemId}`,
+                    name: `${choice.label ?? slot.labelFallback} — ${item.displayName}`,
+                    warning: available ? undefined : warning,
+                  }))
+              : [];
+            return [virtual, ...physical];
+          })
+          .sort(
+            (left, right) =>
+              Number(Boolean(left.warning)) - Number(Boolean(right.warning)),
+          );
+        const value = current
+          ? (options.find(
+              ({ id }) =>
+                id ===
+                `${current.choiceId}:${current.installedPartCollectionItemId ?? "virtual"}`,
+            ) ?? null)
+          : null;
+        const label = t(slot.labelKey as TranslationKey);
+        return (
+          <Field key={slot.id} label={label}>
+            <CatalogCombobox
+              ariaLabel={label}
+              items={options}
+              onValueChange={(next) => {
+                onSelectionsChange((currentSelections) => {
+                  if (!next) {
+                    const remaining = { ...currentSelections };
+                    delete remaining[slot.id];
+                    return remaining;
+                  }
+                  const [choiceId, installedPartId] = String(next.id).split(
+                    ":",
+                  );
+                  return {
+                    ...currentSelections,
+                    [slot.id]: {
+                      choiceId: Number(choiceId),
+                      installedPartCollectionItemId:
+                        installedPartId === "virtual"
+                          ? null
+                          : Number(installedPartId),
+                      slotId: slot.id,
+                    },
+                  };
+                });
+              }}
+              placeholder={label}
+              removeLabel={t("web.action.close")}
+              showSelectedPill
+              value={value}
+            />
+            {value?.warning ? (
+              <p className="flex items-center gap-2 text-sm text-destructive">
+                <span
+                  aria-hidden="true"
+                  className="size-2 rounded-full bg-destructive"
+                />
+                {value.warning}
+              </p>
+            ) : null}
+          </Field>
+        );
+      })}
+      <Field label={t("web.pens.collection.refill" as TranslationKey)}>
+        <CatalogCombobox
+          ariaLabel={t("web.pens.collection.refill" as TranslationKey)}
+          items={refills.map(({ compatible, refill }) => ({
+            id: refill.id,
+            name: refill.name,
+            warning: compatible ? undefined : warning,
+          }))}
+          onValueChange={(next) => {
+            onRefillProductChange(next ? Number(next.id) : null);
+            onRefillOfferingChange(null);
+          }}
+          placeholder={t("web.pens.collection.noRefill" as TranslationKey)}
+          removeLabel={t("web.action.close")}
+          showSelectedPill
+          value={
+            selectedRefill
+              ? {
+                  id: selectedRefill.refill.id,
+                  name: selectedRefill.refill.name,
+                  warning: selectedRefill.compatible ? undefined : warning,
+                }
+              : null
+          }
+        />
+        {selectedRefill && !selectedRefill.compatible ? (
+          <p className="flex items-center gap-2 text-sm text-destructive">
+            <span
+              aria-hidden="true"
+              className="size-2 rounded-full bg-destructive"
+            />
+            {warning}
+          </p>
+        ) : null}
+      </Field>
+      {selectedRefill ? (
+        <Field
+          label={t("web.pens.collection.refillOffering" as TranslationKey)}
+        >
+          <CatalogCombobox
+            ariaLabel={t(
+              "web.pens.collection.refillOffering" as TranslationKey,
+            )}
+            items={selectedRefill.refill.refillOfferings.map((offering) => ({
+              id: offering.id,
+              name: `${offering.tipSize} · ${offering.tipStyle} · ${offering.inkColor}`,
+            }))}
+            onValueChange={(next) =>
+              onRefillOfferingChange(next ? Number(next.id) : null)
+            }
+            placeholder={t(
+              "web.pens.collection.noRefillOffering" as TranslationKey,
+            )}
+            removeLabel={t("web.action.close")}
+            showSelectedPill
+            value={
+              selectedRefill.refill.refillOfferings
+                .map((offering) => ({
+                  id: offering.id,
+                  name: `${offering.tipSize} · ${offering.tipStyle} · ${offering.inkColor}`,
+                }))
+                .find(({ id }) => id === refillOfferingId) ?? null
+            }
+          />
+        </Field>
+      ) : null}
+    </div>
   );
 }
 
@@ -4072,10 +4497,12 @@ function localizedFinishLabel(
 export function CollectionEditPage({
   assemblyMoveItemCount = 1,
   buttonProducts,
+  catalogProducts = [],
   collections,
   item,
   options: initialOptions,
   ownedButtons,
+  ownedItems = [],
   ownedSliderComponents = [],
   product,
 }: {
@@ -4083,6 +4510,8 @@ export function CollectionEditPage({
   assemblyMoveItemCount?: number;
   /** Catalog products for owned spinner buttons. */
   buttonProducts: CatalogProduct[];
+  /** Visible catalog products used for Pen refill selection. */
+  catalogProducts?: CatalogProduct[];
   /** Collections available as destinations. */
   collections: UserCollectionSummary[];
   /** Collection item being edited. */
@@ -4091,6 +4520,8 @@ export function CollectionEditPage({
   options: CatalogOptions;
   /** Owned spinner buttons available to install. */
   ownedButtons: UserCollectionItem[];
+  /** Current owner's collection items available as physical Pen parts. */
+  ownedItems?: UserCollectionItem[];
   /** Owned slider components available to install. */
   ownedSliderComponents?: UserCollectionItem[];
   /** Source catalog product. */
@@ -4112,6 +4543,23 @@ export function CollectionEditPage({
   const descriptionRef = React.useRef<MarkdownEditorHandle>(null);
   const [descriptionLoading, setDescriptionLoading] = React.useState(true);
   const [bearing, setBearing] = React.useState(item.bearingOverride ?? "");
+  const [serialNumber, setSerialNumber] = React.useState<string | null>(
+    item.serialNumber ?? null,
+  );
+  const [configurationSelections, setConfigurationSelections] = React.useState<
+    Record<number, OwnedConfigurationSelection>
+  >(() =>
+    Object.fromEntries(
+      (item.configurationSelections ?? []).map((selection) => [
+        selection.slotId,
+        selection,
+      ]),
+    ),
+  );
+  const [installedRefillProductId, setInstalledRefillProductId] =
+    React.useState(item.installedRefillProductId ?? null);
+  const [installedRefillOfferingId, setInstalledRefillOfferingId] =
+    React.useState(item.installedRefillOfferingId ?? null);
   const [options, setOptions] = React.useState(initialOptions);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [formErrorDetail, setFormErrorDetail] = React.useState<{
@@ -4214,10 +4662,33 @@ export function CollectionEditPage({
   const buttonFinishSelectionIsValid =
     buttonFinish?.id !== "custom" ||
     finishOptionSchema.safeParse(buttonCustomFinish).success;
+  const selectedConfigurationChoices = product.configurationSlots.flatMap(
+    (slot) => {
+      const selection = configurationSelections[slot.id];
+      return selection
+        ? slot.choices.filter(({ id }) => id === selection.choiceId)
+        : [];
+    },
+  );
+  const configurationMaterialId =
+    selectedConfigurationChoices.find(
+      ({ productMaterialId }) => productMaterialId !== null,
+    )?.productMaterialId ?? null;
+  const configurationFinishId =
+    selectedConfigurationChoices.find(
+      ({ finishOptionId }) => finishOptionId !== null,
+    )?.finishOptionId ?? null;
+  const configurationIsValid = product.configurationSlots.every(
+    (slot) => !slot.required || configurationSelections[slot.id],
+  );
+  const serialNumberIsValid =
+    serialNumber === null || serialNumber.trim().length > 0;
   const detailsAreValid = Boolean(
     displayName.trim() &&
       description.length <= 5000 &&
-      material &&
+      (product.configurationSlots.length || material) &&
+      configurationIsValid &&
+      serialNumberIsValid &&
       finishSelectionIsValid &&
       buttonSelectionIsValid &&
       sliderComponentSelectionIsValid &&
@@ -4264,6 +4735,13 @@ export function CollectionEditPage({
               />
             </Field>
           ) : null}
+          {collectionProductTypeSupportsSerial(item.productTypeSlug) ? (
+            <SerialNumberFields
+              onChange={setSerialNumber}
+              t={t}
+              value={serialNumber}
+            />
+          ) : null}
           <CollectionSelector
             addLabel={t("web.collections.select.addNew")}
             collections={collections}
@@ -4274,19 +4752,36 @@ export function CollectionEditPage({
             placeholder={t("web.collections.select.placeholder")}
             selectedId={collectionId}
           />
-          <CollectionProductFields
-            currentFinish={item.finishOption}
-            customFinish={customFinish}
-            finish={finish}
-            material={material}
-            onCustomFinishChange={setCustomFinish}
-            onFinishChange={setFinish}
-            onMaterialChange={setMaterial}
-            onOptionsChange={setOptions}
-            options={options}
-            product={product}
-            t={t}
-          />
+          {!product.configurationSlots.length ? (
+            <CollectionProductFields
+              currentFinish={item.finishOption}
+              customFinish={customFinish}
+              finish={finish}
+              material={material}
+              onCustomFinishChange={setCustomFinish}
+              onFinishChange={setFinish}
+              onMaterialChange={setMaterial}
+              onOptionsChange={setOptions}
+              options={options}
+              product={product}
+              t={t}
+            />
+          ) : null}
+          {item.productTypeSlug === "pen" ? (
+            <PenCollectionFields
+              allProducts={catalogProducts}
+              currentCollectionItemId={item.collectionItemId}
+              onRefillOfferingChange={setInstalledRefillOfferingId}
+              onRefillProductChange={setInstalledRefillProductId}
+              onSelectionsChange={setConfigurationSelections}
+              ownedItems={ownedItems}
+              product={product}
+              refillOfferingId={installedRefillOfferingId}
+              refillProductId={installedRefillProductId}
+              selections={configurationSelections}
+              t={t}
+            />
+          ) : null}
           {item.productTypeSlug === "spinner" ? (
             <Field label={t("web.catalog.field.button")}>
               <CatalogCombobox
@@ -4646,7 +5141,12 @@ export function CollectionEditPage({
                 });
                 return;
               }
-              if (!material || !finish) return;
+              if (
+                (!product.configurationSlots.length &&
+                  (!material || !finish)) ||
+                !configurationIsValid
+              )
+                return;
               let installedButton:
                 | {
                     /** Installed collection item identifier. */
@@ -4707,13 +5207,27 @@ export function CollectionEditPage({
                   bearing,
                   collectionId,
                   collectionItemId: item.collectionItemId,
-                  customFinish: finish.id === "custom" ? customFinish : null,
+                  configurationSelections: Object.values(
+                    configurationSelections,
+                  ),
+                  customFinish:
+                    !product.configurationSlots.length &&
+                    finish?.id === "custom"
+                      ? customFinish
+                      : null,
                   displayName,
                   description: currentDescription,
-                  finishOptionId:
-                    finish.id === "current" || finish.id === "custom"
+                  finishOptionId: product.configurationSlots.length
+                    ? configurationFinishId
+                    : finish?.id === "current" || finish?.id === "custom"
                       ? null
-                      : Number(finish.id),
+                      : Number(finish?.id),
+                  ...(item.productTypeSlug === "pen"
+                    ? {
+                        installedRefillOfferingId,
+                        installedRefillProductId,
+                      }
+                    : {}),
                   ...(item.productTypeSlug === "spinner"
                     ? { installedButton }
                     : {}),
@@ -4726,9 +5240,13 @@ export function CollectionEditPage({
                           : {}),
                       }
                     : {}),
-                  materialAssignmentId:
-                    material.id === -1 ? undefined : material.id,
+                  materialAssignmentId: product.configurationSlots.length
+                    ? configurationMaterialId
+                    : material?.id === -1
+                      ? undefined
+                      : material?.id,
                   reason,
+                  serialNumber,
                 },
               });
               if (result.ok) {

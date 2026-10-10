@@ -13,6 +13,8 @@ import {
   CollectionFormPage,
   CollectionProductFields,
   collectionEditSubmissionMode,
+  collectionProductTypeSupportsSerial,
+  configurationChoiceIsAvailable,
   FinishOptionsEditor,
   PensAdminEditor,
   ProductEditor,
@@ -86,6 +88,30 @@ vi.mock("@/providers/locale-provider", () => ({
    */
   useOptionalLocale: () => "en-US",
 }));
+
+describe("owned Pen collection rules", () => {
+  it("keeps unmet choices selectable while recomputing positive rules", () => {
+    expect(configurationChoiceIsAvailable([], new Set())).toBe(true);
+    expect(configurationChoiceIsAvailable([[1, 2], [3]], new Set([1]))).toBe(
+      false,
+    );
+    expect(configurationChoiceIsAvailable([[1, 2], [3]], new Set([1, 2]))).toBe(
+      true,
+    );
+    expect(configurationChoiceIsAvailable([[1, 2], [3]], new Set([3]))).toBe(
+      true,
+    );
+  });
+
+  it("offers serial numbers for approved serializable product types", () => {
+    expect(collectionProductTypeSupportsSerial("pen")).toBe(true);
+    expect(collectionProductTypeSupportsSerial("pen-tip")).toBe(true);
+    expect(collectionProductTypeSupportsSerial("spinner-button")).toBe(true);
+    expect(collectionProductTypeSupportsSerial("slider-plate")).toBe(true);
+    expect(collectionProductTypeSupportsSerial("slider-insert")).toBe(false);
+    expect(collectionProductTypeSupportsSerial("refill")).toBe(false);
+  });
+});
 
 /**
  * Formats stable test copy.

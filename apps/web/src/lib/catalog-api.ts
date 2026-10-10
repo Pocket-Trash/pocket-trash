@@ -115,14 +115,31 @@ const catalogProductTypeSchema = z.enum([
 const productTypeSchema = catalogProductTypeSchema;
 /** Product types currently accepted by catalog authoring and collection forms. */
 export type EditableCatalogProductType = z.infer<typeof productTypeSchema>;
+/** Pen product types supported by owned-item configuration. */
+const penCollectionProductTypeSchema = z.enum([
+  "pen",
+  "pen-actuator",
+  "pen-clip",
+  "pen-mechanism",
+  "pen-tip",
+  "pen-top-cap",
+]);
 /** Product types supported by the standalone collection-item editor. */
 const collectionProductTypeSchema = z.enum([
+  "pen",
+  "pen-actuator",
+  "pen-clip",
+  "pen-mechanism",
+  "pen-tip",
+  "pen-top-cap",
   "slider",
   "slider-insert",
   "slider-plate",
   "spinner",
   "spinner-button",
 ]);
+/** Product types supported by collection-item creation and editing. */
+export type CollectionProductType = z.infer<typeof collectionProductTypeSchema>;
 /**
  * Schema for positive integer identifiers.
  */
@@ -996,10 +1013,28 @@ const collectionAddSchema = z
     displayName: displayNameSchema,
     description: optionalDescriptionSchema,
     finishOptionId: idSchema.nullable(),
-    materialAssignmentId: idSchema,
+    materialAssignmentId: idSchema.nullable(),
     newCollection: collectionWriteSchema.nullable().optional().default(null),
     productId: idSchema,
     productTypeSlug: collectionProductTypeSchema,
+    configurationSelections: z
+      .array(
+        z.object({
+          choiceId: idSchema,
+          installedPartCollectionItemId: idSchema.nullable(),
+          slotId: idSchema,
+        }),
+      )
+      .default([]),
+    installedRefillOfferingId: idSchema.nullable().default(null),
+    installedRefillProductId: idSchema.nullable().default(null),
+    serialNumber: z
+      .string()
+      .trim()
+      .min(1, requiredMessage)
+      .max(200)
+      .nullable()
+      .default(null),
   })
   .superRefine((input, context) => {
     const finishCount = [input.finishOptionId, input.customFinish].filter(
@@ -1040,6 +1075,27 @@ const collectionAddSchema = z
         path: ["bearing"],
       });
     }
+    if (
+      !input.productTypeSlug.startsWith("pen") &&
+      input.materialAssignmentId === null
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: requiredMessage,
+        path: ["materialAssignmentId"],
+      });
+    }
+    if (
+      input.productTypeSlug !== "pen" &&
+      (input.installedRefillProductId !== null ||
+        input.installedRefillOfferingId !== null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["installedRefillProductId"],
+      });
+    }
   });
 
 /**
@@ -1050,6 +1106,15 @@ const collectionEditSchema = z
     bearing: optionalBearingSchema,
     collectionId: idSchema.optional(),
     collectionItemId: idSchema,
+    configurationSelections: z
+      .array(
+        z.object({
+          choiceId: idSchema,
+          installedPartCollectionItemId: idSchema.nullable(),
+          slotId: idSchema,
+        }),
+      )
+      .optional(),
     customFinish: finishOptionSchema.nullable(),
     displayName: displayNameSchema,
     description: optionalDescriptionSchema,
@@ -1071,9 +1136,18 @@ const collectionEditSchema = z
       .object({ collectionItemId: idSchema })
       .nullable()
       .optional(),
+    installedRefillOfferingId: idSchema.nullable().optional(),
+    installedRefillProductId: idSchema.nullable().optional(),
     magnetConfiguration: sliderMagnetConfigurationSchema.nullable().optional(),
     materialAssignmentId: idSchema.nullable().optional(),
     reason: z.string().trim().max(1000).optional(),
+    serialNumber: z
+      .string()
+      .trim()
+      .min(1, requiredMessage)
+      .max(200)
+      .nullable()
+      .optional(),
   })
   .superRefine((input, context) => {
     if (input.finishOptionId !== null && input.customFinish !== null) {
@@ -2062,58 +2136,93 @@ export const addCollectionProduct = createServerFn({ method: "POST" })
       }
 
       let collectionItemId: number;
-      if (parsed.data.productTypeSlug === "spinner") {
-        collectionItemId = (
-          await s.db.collections.addSpinner({
+      const penProductType = penCollectionProductTypeSchema.safeParse(
+        parsed.data.productTypeSlug,
+      );
+      const materialAssignmentId = parsed.data.materialAssignmentId;
+      if (penProductType.success) {
+        collectionItemId = await s.db.collections.addPenProduct({
+          actor,
+          collectionId: parsed.data.collectionId,
+          configurationSelections: parsed.data.configurationSelections,
+          customFinish: parsed.data.customFinish
+            ? toFinishWriteOption(parsed.data.customFinish)
+            : null,
+          description: parsed.data.description,
+          displayName: parsed.data.displayName,
+          finishOptionId: parsed.data.finishOptionId,
+          installedRefillOfferingId: parsed.data.installedRefillOfferingId,
+          installedRefillProductId: parsed.data.installedRefillProductId,
+          materialAssignmentId,
+          newCollection: parsed.data.newCollection,
+          productId: parsed.data.productId,
+          productTypeSlug: penProductType.data,
+          serialNumber: parsed.data.serialNumber,
+        });
+      } else {
+        if (materialAssignmentId === null) {
+          throw new Error("Collection product material is required.");
+        }
+        if (parsed.data.productTypeSlug === "spinner") {
+          collectionItemId = (
+            await s.db.collections.addSpinner({
+              actor,
+              bearing: parsed.data.bearing,
+              buttonCustomFinish: parsed.data.buttonCustomFinish
+                ? toFinishWriteOption(parsed.data.buttonCustomFinish)
+                : null,
+              buttonFinishOptionId: parsed.data.buttonFinishOptionId,
+              buttonMaterialAssignmentId:
+                parsed.data.buttonMaterialAssignmentId,
+              buttonProductId: parsed.data.buttonProductId,
+              spinnerFinishOptionId: parsed.data.finishOptionId,
+              spinnerCustomFinish: parsed.data.customFinish
+                ? toFinishWriteOption(parsed.data.customFinish)
+                : null,
+              spinnerMaterialAssignmentId: materialAssignmentId,
+              spinnerProductId: parsed.data.productId,
+              collectionId: parsed.data.collectionId,
+              displayName: parsed.data.displayName,
+              description: parsed.data.description,
+              newCollection: parsed.data.newCollection,
+              serialNumber: parsed.data.serialNumber,
+            })
+          ).spinnerItemId;
+        } else if (parsed.data.productTypeSlug === "spinner-button") {
+          collectionItemId = await s.db.collections.addSpinnerButton({
             actor,
-            bearing: parsed.data.bearing,
-            buttonCustomFinish: parsed.data.buttonCustomFinish
-              ? toFinishWriteOption(parsed.data.buttonCustomFinish)
-              : null,
-            buttonFinishOptionId: parsed.data.buttonFinishOptionId,
-            buttonMaterialAssignmentId: parsed.data.buttonMaterialAssignmentId,
-            buttonProductId: parsed.data.buttonProductId,
-            spinnerFinishOptionId: parsed.data.finishOptionId,
-            spinnerCustomFinish: parsed.data.customFinish
+            customFinish: parsed.data.customFinish
               ? toFinishWriteOption(parsed.data.customFinish)
               : null,
-            spinnerMaterialAssignmentId: parsed.data.materialAssignmentId,
-            spinnerProductId: parsed.data.productId,
+            finishOptionId: parsed.data.finishOptionId,
+            materialAssignmentId,
             collectionId: parsed.data.collectionId,
             displayName: parsed.data.displayName,
             description: parsed.data.description,
             newCollection: parsed.data.newCollection,
-          })
-        ).spinnerItemId;
-      } else if (parsed.data.productTypeSlug === "spinner-button") {
-        collectionItemId = await s.db.collections.addSpinnerButton({
-          actor,
-          customFinish: parsed.data.customFinish
-            ? toFinishWriteOption(parsed.data.customFinish)
-            : null,
-          finishOptionId: parsed.data.finishOptionId,
-          materialAssignmentId: parsed.data.materialAssignmentId,
-          collectionId: parsed.data.collectionId,
-          displayName: parsed.data.displayName,
-          description: parsed.data.description,
-          newCollection: parsed.data.newCollection,
-          productId: parsed.data.productId,
-        });
-      } else {
-        collectionItemId = await s.db.collections.addSliderProduct({
-          actor,
-          collectionId: parsed.data.collectionId,
-          customFinish: parsed.data.customFinish
-            ? toFinishWriteOption(parsed.data.customFinish)
-            : null,
-          description: parsed.data.description,
-          displayName: parsed.data.displayName,
-          finishOptionId: parsed.data.finishOptionId,
-          materialAssignmentId: parsed.data.materialAssignmentId,
-          newCollection: parsed.data.newCollection,
-          productId: parsed.data.productId,
-          productTypeSlug: parsed.data.productTypeSlug,
-        });
+            productId: parsed.data.productId,
+            serialNumber: parsed.data.serialNumber,
+          });
+        } else {
+          const productTypeSlug = z
+            .enum(["slider", "slider-insert", "slider-plate"])
+            .parse(parsed.data.productTypeSlug);
+          collectionItemId = await s.db.collections.addSliderProduct({
+            actor,
+            collectionId: parsed.data.collectionId,
+            customFinish: parsed.data.customFinish
+              ? toFinishWriteOption(parsed.data.customFinish)
+              : null,
+            description: parsed.data.description,
+            displayName: parsed.data.displayName,
+            finishOptionId: parsed.data.finishOptionId,
+            materialAssignmentId,
+            newCollection: parsed.data.newCollection,
+            productId: parsed.data.productId,
+            productTypeSlug,
+            serialNumber: parsed.data.serialNumber,
+          });
+        }
       }
       const item = await s.db.collections.getOwnedItem(actor, collectionItemId);
       if (!item) throw new Error("Failed to load collection item.");
@@ -2215,6 +2324,11 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
     const product = (
       await s.db.catalog.listProducts(item.productTypeSlug, viewer)
     ).find(({ id }) => id === item.productId);
+    const installedRefill = item.installedRefillProductId
+      ? ((await s.db.catalog.listProducts("refill", viewer)).find(
+          ({ id }) => id === item.installedRefillProductId,
+        ) ?? null)
+      : null;
     return {
       installedButton: installedButton
         ? await signCollectionItem(installedButton)
@@ -2224,6 +2338,9 @@ export const getPublicCollectionItem = createServerFn({ method: "GET" })
         : null,
       installedPlate: installedPlate
         ? await signCollectionItem(installedPlate)
+        : null,
+      installedRefill: installedRefill
+        ? ((await signCatalogProducts([installedRefill]))[0] ?? null)
         : null,
       item: await signCollectionItem(item),
       product: product
@@ -2275,7 +2392,10 @@ export const getCollectionAddContext = createServerFn({
 }).handler(async () => {
   const actor = await requireActor();
   const { s } = await import("@/lib/services");
-  const collections = await s.db.collections.listOwnedCollections(actor);
+  const [collections, ownedItems] = await Promise.all([
+    s.db.collections.listOwnedCollections(actor),
+    s.db.collections.listOwned(actor),
+  ]);
   let defaultCollectionName: string | null = null;
   let syncIncomplete = false;
   if (collections.length === 0) {
@@ -2290,6 +2410,7 @@ export const getCollectionAddContext = createServerFn({
   return {
     collections: await signCollectionSummaries(collections),
     defaultCollectionName,
+    ownedItems: await Promise.all(ownedItems.map(signCollectionItem)),
     syncIncomplete,
   };
 });
@@ -2511,22 +2632,26 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
     if (!item) {
       return {
         buttonProducts: [],
+        catalogProducts: [],
         assemblyMoveItemCount: 1,
         collections: [],
         item: null,
+        ownedItems: [],
         ownedButtons: [],
         ownedSliderComponents: [],
         product: null,
       };
     }
-    const [items, products, buttonProducts, collections] = await Promise.all([
-      s.db.collections.listOwned(actor),
-      s.db.catalog.listProducts(item.productTypeSlug, actor),
-      item.productTypeSlug === "spinner"
-        ? s.db.catalog.listProducts("spinner-button", actor)
-        : Promise.resolve([]),
-      s.db.collections.listOwnedCollections(actor),
-    ]);
+    const [items, products, catalogProducts, buttonProducts, collections] =
+      await Promise.all([
+        s.db.collections.listOwned(actor),
+        s.db.catalog.listProducts(item.productTypeSlug, actor),
+        s.db.catalog.listProducts(undefined, actor),
+        item.productTypeSlug === "spinner"
+          ? s.db.catalog.listProducts("spinner-button", actor)
+          : Promise.resolve([]),
+        s.db.collections.listOwnedCollections(actor),
+      ]);
     return {
       assemblyMoveItemCount: (() => {
         const parent =
@@ -2543,8 +2668,10 @@ export const getCollectionEditData = createServerFn({ method: "GET" })
           : 1;
       })(),
       buttonProducts,
+      catalogProducts: await signCatalogProducts(catalogProducts),
       collections: await signCollectionSummaries(collections),
       item: await signCollectionItem(item),
+      ownedItems: await Promise.all(items.map(signCollectionItem)),
       ownedButtons: items.filter(
         (candidate) => candidate.productTypeSlug === "spinner-button",
       ),
@@ -2580,6 +2707,7 @@ export const updateCollectionItem = createServerFn({ method: "POST" })
       await s.db.collections.updateItem({
         actor,
         ...parsed.data,
+        configurationSelections: parsed.data.configurationSelections,
         customFinish: parsed.data.customFinish
           ? toFinishWriteOption(parsed.data.customFinish)
           : null,
@@ -2591,6 +2719,9 @@ export const updateCollectionItem = createServerFn({ method: "POST" })
                 : null,
             }
           : parsed.data.installedButton,
+        installedRefillOfferingId: parsed.data.installedRefillOfferingId,
+        installedRefillProductId: parsed.data.installedRefillProductId,
+        serialNumber: parsed.data.serialNumber,
       });
       return { ok: true as const };
     } catch (error) {
@@ -3148,7 +3279,7 @@ export function productTypeIsSupported(
  */
 export function collectionProductTypeIsSupported(
   value: string,
-): value is EditableCatalogProductType {
+): value is CollectionProductType {
   return collectionProductTypeSchema.safeParse(value).success;
 }
 
