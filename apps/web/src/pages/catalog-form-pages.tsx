@@ -669,7 +669,7 @@ export function PensAdminEditor({
           {select(copy("offering"), primaryId, setPrimaryId, admin.offerings)}
           {select(copy("market"), secondaryId, setSecondaryId, admin.markets)}
           {action === "offering-market-status" ? (
-            select(copy("lifecycle"), text, setText, [
+            select(copy("lifecycleLabel"), text, setText, [
               { id: "current", name: copy("lifecycle.current") },
               { id: "discontinued", name: copy("lifecycle.discontinued") },
               { id: "historical", name: copy("lifecycle.historical") },
@@ -677,7 +677,7 @@ export function PensAdminEditor({
           ) : (
             <>
               {input(copy("identifier"), text, setText)}
-              {select(copy("identifierKind"), text2, setText2, [
+              {select(copy("identifierKindLabel"), text2, setText2, [
                 { id: "maker-code", name: copy("identifierKind.makerCode") },
                 { id: "sku", name: copy("identifierKind.sku") },
               ])}
@@ -689,7 +689,7 @@ export function PensAdminEditor({
       ) : null}
       {action === "compatibility-evidence" ? (
         <>
-          {select(copy("evidenceKind"), evidenceKind, setEvidenceKind, [
+          {select(copy("evidenceKindLabel"), evidenceKind, setEvidenceKind, [
             {
               id: "manufacturer-statement",
               name: copy("evidenceKind.manufacturerStatement"),
@@ -768,14 +768,14 @@ export function PensAdminEditor({
       ) : null}
       {action === "compatibility-assertion" ? (
         <>
-          {select(copy("outcome"), outcome, setOutcome, [
+          {select(copy("outcomeLabel"), outcome, setOutcome, [
             { id: "compatible", name: copy("outcome.compatible") },
             { id: "incompatible", name: copy("outcome.incompatible") },
             { id: "conditional", name: copy("outcome.conditional") },
             { id: "variable", name: copy("outcome.variable") },
           ])}
           {select(
-            copy("targetType"),
+            copy("targetTypeLabel"),
             targetKind,
             (value) => setTargetKind(value as "group" | "refill"),
             [
@@ -810,7 +810,7 @@ export function PensAdminEditor({
           {input(copy("displayName"), text, setText)}
           {input(copy("code"), text2, setText2)}
           {input(copy("localizationKey"), text3, setText3)}
-          {select(copy("marketKind"), text4, setText4, [
+          {select(copy("marketKindLabel"), text4, setText4, [
             { id: "country", name: copy("marketKind.country") },
             { id: "region", name: copy("marketKind.region") },
           ])}

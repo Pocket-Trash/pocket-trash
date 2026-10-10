@@ -392,7 +392,7 @@ export const ConfigurablePen: Story = {
     ).toBeVisible();
 
     const body = canvas.getByRole("combobox", {
-      name: /body material|configurationSlot\.bodyMaterial/iu,
+      name: /material|catalog\.configurationSlots\.material/iu,
     });
     await userEvent.click(body);
     await userEvent.click(
