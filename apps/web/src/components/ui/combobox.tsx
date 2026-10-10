@@ -15,6 +15,8 @@ export type ComboboxOption = {
    * Display label for the option.
    */
   name: string;
+  /** Accessible warning shown after the option label. */
+  warning?: string;
 };
 
 /**
@@ -321,7 +323,20 @@ function ComboboxOptions({
                 key={item.id}
                 value={item}
               >
-                {item.name}
+                <span className="flex min-w-0 items-center gap-2">
+                  {item.warning ? (
+                    <span
+                      aria-hidden="true"
+                      className="size-2 shrink-0 rounded-full bg-destructive"
+                    />
+                  ) : null}
+                  <span>{item.name}</span>
+                  {item.warning ? (
+                    <span className="text-xs text-destructive">
+                      {item.warning}
+                    </span>
+                  ) : null}
+                </span>
                 <ComboboxPrimitive.ItemIndicator>
                   <Check aria-hidden="true" className="size-4" />
                 </ComboboxPrimitive.ItemIndicator>

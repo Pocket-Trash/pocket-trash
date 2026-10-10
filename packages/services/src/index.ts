@@ -58,6 +58,7 @@ export type {
   CatalogTerminologyAlias,
   CatalogTerminologyNamespace,
   CatalogViewer,
+  CollectionConfigurationSelection,
   CollectionsService,
   CreateAuditExportInput,
   DeleteAuditExportInput,

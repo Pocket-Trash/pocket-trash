@@ -1920,6 +1920,7 @@ function approvalStatusLabel(
  * @param props.installedButton - Installed spinner button, when present.
  * @param props.installedInsert - Installed slider insert, when present.
  * @param props.installedPlate - Installed slider plate, when present.
+ * @param props.installedRefill - Installed Pen refill model, when present.
  * @param props.item - Collection item to display.
  * @param props.product - Live catalog facts for the exact owned product.
  * @returns The collection item detail page.
@@ -1928,6 +1929,7 @@ export function CollectionItemDetailPage({
   installedButton = null,
   installedInsert = null,
   installedPlate = null,
+  installedRefill = null,
   item,
   product = null,
 }: {
@@ -1937,6 +1939,8 @@ export function CollectionItemDetailPage({
   installedInsert?: UserCollectionItem | null;
   /** Installed slider plate, when present. */
   installedPlate?: UserCollectionItem | null;
+  /** Installed Pen refill model, when present. */
+  installedRefill?: CatalogProduct | null;
   /** Collection item to display. */
   item: UserCollectionItem;
   /** Live catalog facts for the exact owned product. */
@@ -1960,6 +1964,9 @@ export function CollectionItemDetailPage({
             }
           : null))
       : null;
+  const installedRefillOffering = installedRefill?.refillOfferings.find(
+    ({ id }) => id === item.installedRefillOfferingId,
+  );
   return (
     <AppShell
       breadcrumbItems={[
@@ -2053,6 +2060,13 @@ export function CollectionItemDetailPage({
           <Detail label={t("web.catalog.field.maker")}>
             <MakerLink name={item.makerName} slug={item.makerSlug} />
           </Detail>
+          {item.serialNumber ? (
+            <Detail
+              label={t("web.collections.field.serialNumber" as TranslationKey)}
+            >
+              {item.serialNumber}
+            </Detail>
+          ) : null}
           {item.material ? (
             <Detail label={t("web.catalog.field.materials")}>
               <MaterialLink material={item.material} />
@@ -2088,6 +2102,33 @@ export function CollectionItemDetailPage({
               )}
             </Detail>
           ) : null}
+          {item.productTypeSlug === "pen" && installedRefill ? (
+            <Detail label={t("web.pens.collection.refill" as TranslationKey)}>
+              <div className="grid gap-1">
+                <span>{installedRefill.name}</span>
+                {installedRefillOffering ? (
+                  <span className="text-sm text-muted-foreground">
+                    {installedRefillOffering.tipSize} ·{" "}
+                    {installedRefillOffering.tipStyle} ·{" "}
+                    {installedRefillOffering.inkColor}
+                  </span>
+                ) : null}
+              </div>
+            </Detail>
+          ) : null}
+          {product?.configurationSlots.map((slot) => {
+            const saved = item.configurationSelections?.find(
+              ({ slotId }) => slotId === slot.id,
+            );
+            const choice = slot.choices.find(
+              ({ id }) => id === saved?.choiceId,
+            );
+            return choice ? (
+              <Detail key={slot.id} label={t(slot.labelKey as TranslationKey)}>
+                {choice.label ?? slot.labelFallback}
+              </Detail>
+            ) : null;
+          })}
           {item.productTypeSlug === "slider" ? (
             <Detail label={t("web.slider.relationship.plates")}>
               {product?.includedPlate ? (
