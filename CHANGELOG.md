@@ -28,6 +28,24 @@
 
 
 
+
+## 0.9.0
+
+### Minor Changes
+
+* Add the normalized Pens, Pen parts, refill offerings, compatibility, provenance, market, evidence, and product-configuration schema. (@package/database, @package/services)
+
+### Patch Changes
+
+* Add configurable product-type grouping and product directory navigation. (@app/web, @package/database, @package/logger, @package/services)
+* Document the verified production refill seed selection and additional Pilot, Zebra, and Uni evidence. (@package/database)
+* Document the final Pens database schema contract. (@package/database)
+* Document the approved normalized Autmog and Saga target mapping. (@package/database)
+* Document the Saga appearance-model limitations. (@package/database)
+* Document the approved Pens production cutover and cleanup gates. (@package/database)
+* Reduce the development and preview KAP catalog fixtures to representative spinner and spinner-button image sets. (@package/database)
+* Document reusable product-configuration availability rules. (@package/database)
+
 ## 0.8.0
 
 ### Minor Changes
