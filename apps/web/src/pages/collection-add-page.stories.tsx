@@ -134,6 +134,7 @@ const meta = {
       colors: [],
       finishes: [],
       makers: [],
+      mechanisms: [],
       materials: [],
       patterns: [],
       relationshipProducts: [],

@@ -70,6 +70,7 @@ export const loggerMessages = {
     },
     catalog: {
       attachImages: "database.catalog.attachImages",
+      authorPensCatalog: "database.catalog.authorPensCatalog",
       selectCollectionCover: "database.catalog.selectCollectionCover",
       createTerminologyAlias: "database.catalog.createTerminologyAlias",
       createColor: "database.catalog.createColor",
@@ -91,6 +92,8 @@ export const loggerMessages = {
       listColors: "database.catalog.listColors",
       listFinishes: "database.catalog.listFinishes",
       listPatterns: "database.catalog.listPatterns",
+      listMechanisms: "database.catalog.listMechanisms",
+      listPensAdminOptions: "database.catalog.listPensAdminOptions",
       listSliderMagnetPresets: "database.catalog.listSliderMagnetPresets",
       setMakerProductUrlValidity: "database.catalog.setMakerProductUrlValidity",
       setProductTypePartOrAccessory:

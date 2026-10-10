@@ -13,6 +13,7 @@ const catalogOptions: CatalogOptions = {
   colors: [{ id: 1000, name: "Black", slug: "black" }],
   finishes: [{ id: 1000, name: "Stonewashed", slug: "stonewashed" }],
   makers: [],
+  mechanisms: [],
   materials: [],
   patterns: [{ id: 1000, name: "Honeycomb", slug: "honeycomb" }],
   productTypes: [],

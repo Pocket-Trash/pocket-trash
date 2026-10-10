@@ -5,9 +5,11 @@ import type {
   CatalogImage,
   CatalogLookup,
   CatalogMaker,
+  CatalogPensAdminOptions,
   CatalogProduct,
   CatalogProductTypeSummary,
   CatalogTerminologyAlias,
+  PensAdminWriteInput,
   ProductWriteInput,
   PublicMakerDetail,
   PublicMakerSummary,
@@ -21,6 +23,7 @@ import {
   CollectionItemPrivacyInheritedError,
 } from "@package/services";
 import { hasPermission } from "@package/services/authorization";
+import { normalizeCatalogSearch } from "@package/services/catalog-terminology";
 import {
   type SliderMagnetConfiguration,
   type SliderMagnetLayout,
@@ -109,17 +112,17 @@ const catalogProductTypeSchema = z.enum([
   "spinner-button",
 ]);
 /** Product types currently supported by the catalog authoring form. */
-const productTypeSchema = z.enum([
+const productTypeSchema = catalogProductTypeSchema;
+/** Product types currently accepted by catalog authoring and collection forms. */
+export type EditableCatalogProductType = z.infer<typeof productTypeSchema>;
+/** Product types supported by the standalone collection-item editor. */
+const collectionProductTypeSchema = z.enum([
   "slider",
   "slider-insert",
   "slider-plate",
   "spinner",
   "spinner-button",
 ]);
-/** Product types currently accepted by catalog authoring and collection forms. */
-export type EditableCatalogProductType = z.infer<typeof productTypeSchema>;
-/** Product types supported by the standalone collection-item editor. */
-const collectionProductTypeSchema = productTypeSchema;
 /**
  * Schema for positive integer identifiers.
  */
@@ -304,6 +307,7 @@ export const finishOptionSchema = z
  */
 export const productFormSchema = z
   .object({
+    aliases: z.array(z.string().trim().min(1).max(80)).default([]),
     bearing: optionalBearingSchema,
     buttonDiameter: dimensionMeasurementSchema,
     compatibleButtonId: idSchema.nullable(),
@@ -319,17 +323,17 @@ export const productFormSchema = z
       .nullable()
       .default(null),
     magnetLayout: z.enum(sliderMagnetLayouts).nullable(),
-    materialAssignments: z
-      .array(
-        z.object({
-          materialId: idSchema,
-          materialSpecificId: idSchema.nullable(),
-        }),
-      )
-      .min(1, requiredMessage),
+    mechanismId: idSchema.nullable().default(null),
+    materialAssignments: z.array(
+      z.object({
+        materialId: idSchema,
+        materialSpecificId: idSchema.nullable(),
+      }),
+    ),
     name: slugNameSchema,
     productId: idSchema.nullable(),
     productTypeSlug: productTypeSchema,
+    refillModel: z.string().trim().max(200).nullable().default(null),
     reason: z.string().trim().max(1000).optional(),
     spinDiameter: dimensionMeasurementSchema,
     thickness: dimensionMeasurementSchema,
@@ -342,7 +346,11 @@ export const productFormSchema = z
   .superRefine(
     (
       {
+        aliases,
         bearing,
+        buttonDiameter,
+        compatibleButtonId,
+        diameter,
         finishOptions,
         includedInsertProductId,
         includedPlateProductId,
@@ -350,15 +358,97 @@ export const productFormSchema = z
         materialAssignments,
         magnetConfiguration,
         magnetLayout,
+        mechanismId,
         productTypeSlug,
+        refillModel,
         spinDiameter,
         thickness,
+        thicknessWithButton,
         weight,
         width,
         usesInserts,
       },
       context,
     ) => {
+      const normalizedAliases = aliases.map(normalizeCatalogSearch);
+      if (new Set(normalizedAliases).size !== normalizedAliases.length) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["aliases"],
+        });
+      }
+      if (
+        (productTypeSlug === "pen" ||
+          productTypeSlug.startsWith("pen-") ||
+          productTypeSlug === "refill") &&
+        (bearing !== null ||
+          buttonDiameter !== null ||
+          compatibleButtonId !== null ||
+          diameter !== null ||
+          length !== null ||
+          spinDiameter !== null ||
+          thickness !== null ||
+          thicknessWithButton !== null ||
+          weight !== null ||
+          width !== null ||
+          usesInserts !== null ||
+          magnetLayout !== null ||
+          magnetConfiguration !== null ||
+          includedInsertProductId !== null ||
+          includedPlateProductId !== null)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["productTypeSlug"],
+        });
+      }
+      if (productTypeSlug === "refill" && !refillModel) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.required",
+          path: ["refillModel"],
+        });
+      }
+      if (productTypeSlug !== "refill" && refillModel !== null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["refillModel"],
+        });
+      }
+      if (productTypeSlug === "pen-mechanism" && mechanismId === null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.required",
+          path: ["mechanismId"],
+        });
+      }
+      if (productTypeSlug !== "pen-mechanism" && mechanismId !== null) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["mechanismId"],
+        });
+      }
+      if (productTypeSlug !== "refill" && !materialAssignments.length) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.required",
+          path: ["materialAssignments"],
+        });
+      }
+      if (
+        productTypeSlug === "refill" &&
+        (materialAssignments.length || finishOptions.length)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["materialAssignments"],
+        });
+      }
       if (
         productTypeSlug !== "spinner" &&
         (bearing !== null || spinDiameter !== null)
@@ -607,6 +697,251 @@ export const collectionDeletionSchema = productDeletionSchema
     destinationCollectionId: idSchema.nullable(),
   });
 
+/** Validates one evidence relationship submitted with a Pens claim. */
+const pensEvidenceLinkSchema = z.object({
+  evidenceId: idSchema,
+  stance: z.enum(["contradicts", "supports"]),
+});
+/** Validates evidence relationships submitted with a Pens claim. */
+const pensEvidenceLinksSchema = z.array(pensEvidenceLinkSchema);
+/** Validates nullable optional Pens text. */
+const optionalPensText = z.string().trim().nullable().optional();
+/** Validates an ISO calendar date. */
+const pensDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+/** Validates a nullable optional ISO calendar date. */
+const optionalPensDate = pensDate.nullable().optional();
+/** Validates a nullable optional HTTP or HTTPS URL. */
+const optionalPensUrl = z
+  .string()
+  .trim()
+  .refine((value) => !value || isWebUrl(value), "web.catalog.error.form")
+  .transform((value) => value || null)
+  .nullable()
+  .optional();
+
+/** Structured append-only Pens catalog mutation accepted from admin editors. */
+export const pensAdminWriteSchema = z
+  .discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("refill-tip-style"),
+      name: z.string().trim().min(1).max(80),
+      slug: z.string().trim().min(1).max(80),
+    }),
+    z.object({
+      kind: z.literal("refill-ink-color"),
+      name: z.string().trim().min(1).max(80),
+      slug: z.string().trim().min(1).max(80),
+    }),
+    z.object({
+      code: z.string().trim().min(2).max(40),
+      displayName: z.string().trim().min(1).max(80),
+      displayNameKey: z.string().trim().min(1).max(200),
+      kind: z.literal("market"),
+      marketKind: z.enum(["country", "region"]),
+    }),
+    z.object({
+      conceptId: idSchema,
+      kind: z.literal("compatibility-group"),
+    }),
+    z.object({
+      kind: z.literal("configuration-slot"),
+      productId: idSchema,
+      required: z.boolean(),
+      slotKindId: idSchema,
+    }),
+    z.object({
+      kind: z.literal("configuration-slot-required"),
+      productId: idSchema,
+      required: z.boolean(),
+      slotId: idSchema,
+    }),
+    z.object({
+      finishOptionId: idSchema.nullable().optional(),
+      kind: z.literal("configuration-choice"),
+      partProductId: idSchema.nullable().optional(),
+      productId: idSchema,
+      productMaterialId: idSchema.nullable().optional(),
+      slotId: idSchema,
+    }),
+    z.object({
+      kind: z.literal("configuration-rule"),
+      productId: idSchema,
+      requiredChoiceIds: z.array(idSchema).min(1),
+      targetChoiceId: idSchema,
+    }),
+    z.object({
+      captureDate: pensDate,
+      catalogEdition: optionalPensText,
+      claim: z.string().trim().min(1).max(5000),
+      kind: z.literal("source-evidence"),
+      listingId: idSchema.nullable().optional(),
+      marketId: idSchema.nullable().optional(),
+      originalUrl: z.string().trim().refine(isWebUrl),
+      preservedSourceChecksum: optionalPensText,
+      preservedSourceIdentity: optionalPensText,
+      publicationDate: optionalPensDate,
+      publisher: z.string().trim().min(1).max(200),
+      sourceKind: z.string().trim().min(1).max(200),
+    }),
+    z.object({
+      approved: z.boolean(),
+      evidence: pensEvidenceLinksSchema,
+      inkColorId: idSchema,
+      kind: z.literal("refill-offering"),
+      refillProductId: idSchema,
+      tipSize: z.string().trim().min(1).max(80),
+      tipStyleId: idSchema,
+    }),
+    z.object({
+      approved: z.boolean(),
+      effectiveDate: optionalPensDate,
+      evidence: pensEvidenceLinksSchema,
+      kind: z.literal("offering-market-status"),
+      lifecycle: z.enum(["current", "discontinued", "historical"]),
+      marketId: idSchema,
+      offeringId: idSchema,
+    }),
+    z.object({
+      approved: z.boolean(),
+      comparisonRule: z.string().trim().min(1).max(80).optional(),
+      effectiveDate: optionalPensDate,
+      evidence: pensEvidenceLinksSchema,
+      identifierKind: z.enum(["maker-code", "sku"]),
+      kind: z.literal("offering-identifier"),
+      makerId: idSchema,
+      marketId: idSchema,
+      offeringId: idSchema,
+      sourceValue: z.string().trim().min(1).max(200),
+    }),
+    z.object({
+      catalogEdition: optionalPensText,
+      evidenceKind: z.enum([
+        "curated-observation",
+        "dimensional-comparison",
+        "manufacturer-statement",
+        "physical-fit-test",
+      ]),
+      firstMeasuredFormatLabel: optionalPensText,
+      firstSourceUrl: optionalPensUrl,
+      kind: z.literal("compatibility-evidence"),
+      notes: optionalPensText,
+      penProductId: idSchema.nullable().optional(),
+      procedure: optionalPensText,
+      refillProductId: idSchema.nullable().optional(),
+      requiredTipProductId: idSchema.nullable().optional(),
+      result: optionalPensText,
+      secondMeasuredFormatLabel: optionalPensText,
+      secondSourceUrl: optionalPensUrl,
+      sourceDate: optionalPensDate,
+      sourceUrl: optionalPensUrl,
+      summary: z.string().trim().min(1).max(2000),
+      testDate: optionalPensDate,
+    }),
+    z.object({
+      approved: z.boolean(),
+      evidence: pensEvidenceLinksSchema,
+      groupId: idSchema,
+      kind: z.literal("compatibility-membership"),
+      refillProductId: idSchema,
+    }),
+    z.object({
+      approved: z.boolean(),
+      evidence: pensEvidenceLinksSchema,
+      explanation: optionalPensText,
+      kind: z.literal("compatibility-assertion"),
+      outcome: z.enum([
+        "compatible",
+        "conditional",
+        "incompatible",
+        "variable",
+      ]),
+      penProductId: idSchema,
+      remedy: optionalPensText,
+      requiredTipProductId: idSchema.nullable().optional(),
+      targetGroupId: idSchema.nullable().optional(),
+      targetRefillProductId: idSchema.nullable().optional(),
+      warning: optionalPensText,
+    }),
+  ])
+  .superRefine((input, context) => {
+    if (
+      "evidence" in input &&
+      input.approved &&
+      !input.evidence.some(({ stance }) => stance === "supports")
+    )
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["evidence"],
+      });
+    if (
+      input.kind === "configuration-choice" &&
+      [
+        input.finishOptionId,
+        input.partProductId,
+        input.productMaterialId,
+      ].filter((value) => value != null).length !== 1
+    )
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["slotId"],
+      });
+    if (
+      input.kind === "configuration-rule" &&
+      new Set(input.requiredChoiceIds).size !== input.requiredChoiceIds.length
+    )
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["requiredChoiceIds"],
+      });
+    if (
+      input.kind === "compatibility-assertion" &&
+      Number(input.targetGroupId != null) +
+        Number(input.targetRefillProductId != null) !==
+        1
+    )
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: ["targetRefillProductId"],
+      });
+    if (
+      input.kind === "compatibility-assertion" &&
+      ((input.outcome === "incompatible" || input.outcome === "variable") &&
+      !input.explanation
+        ? true
+        : input.outcome === "conditional" && !input.remedy)
+    )
+      context.addIssue({
+        code: "custom",
+        message: "web.catalog.error.form",
+        path: [input.outcome === "conditional" ? "remedy" : "explanation"],
+      });
+    if (input.kind === "compatibility-evidence") {
+      const invalid =
+        input.evidenceKind === "physical-fit-test"
+          ? !input.penProductId ||
+            !input.refillProductId ||
+            !input.testDate ||
+            !input.result ||
+            !input.procedure
+          : input.evidenceKind === "dimensional-comparison"
+            ? !input.firstMeasuredFormatLabel ||
+              !input.secondMeasuredFormatLabel ||
+              !input.firstSourceUrl ||
+              !input.secondSourceUrl
+            : !input.sourceUrl || (!input.sourceDate && !input.catalogEdition);
+      if (invalid)
+        context.addIssue({
+          code: "custom",
+          message: "web.catalog.error.form",
+          path: ["evidenceKind"],
+        });
+    }
+  });
+
 /** Validates explicit acknowledgement of permanent collection-item deletion. */
 export const collectionItemDeletionSchema = productDeletionSchema
   .omit({ productId: true })
@@ -791,6 +1126,10 @@ export type CatalogOptions = {
    * Available makers.
    */
   makers: Awaited<ReturnType<typeof listMakers>>;
+  /** Canonical Pen mechanism types. */
+  mechanisms: CatalogLookup[];
+  /** Structured Pens administration lookups, present only for managers. */
+  pensAdminOptions?: CatalogPensAdminOptions;
   /**
    * Available materials.
    */
@@ -825,11 +1164,14 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
   async (): Promise<CatalogOptions> => {
     const { s } = await import("@/lib/services");
     const viewer = await getResourceViewer();
+    const actor = await getActor();
     const [
       colorEffects,
       colors,
       finishes,
       makers,
+      mechanisms,
+      pensAdminOptions,
       magnetPresets,
       materials,
       materialSpecifics,
@@ -843,6 +1185,10 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       listColors(),
       listFinishes(),
       listMakers(),
+      s.db.catalog.listMechanisms(),
+      actor && hasPermission(actor, "products.manage")
+        ? s.db.catalog.listPensAdminOptions(actor)
+        : Promise.resolve(undefined),
       s.db.catalog.listSliderMagnetPresets(),
       listMaterials(),
       listMaterialSpecifics(),
@@ -857,6 +1203,8 @@ export const getCatalogOptions = createServerFn({ method: "GET" }).handler(
       colors,
       finishes,
       makers,
+      mechanisms,
+      pensAdminOptions,
       magnetPresets,
       materials,
       materialSpecifics,
@@ -1611,6 +1959,7 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
     const slug = nextAvailableSlug(parsed.data.name, slugs);
     const input: ProductWriteInput = {
       actor,
+      aliases: parsed.data.aliases,
       description: parsed.data.description,
       finishOptions: parsed.data.finishOptions.map(
         ({ colorEffectId, colorIds, finishIds, patternId }) => ({
@@ -1625,11 +1974,13 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
       magnetConfiguration: parsed.data
         .magnetConfiguration as SliderMagnetConfiguration | null,
       magnetLayout: parsed.data.magnetLayout as SliderMagnetLayout | null,
+      mechanismId: parsed.data.mechanismId,
       materialAssignments: parsed.data.materialAssignments,
       includedInsertProductId: parsed.data.includedInsertProductId,
       includedPlateProductId: parsed.data.includedPlateProductId,
       name: parsed.data.name,
       productTypeSlug: parsed.data.productTypeSlug,
+      refillModel: parsed.data.refillModel,
       reason: parsed.data.reason,
       slug,
       specs: {
@@ -1655,6 +2006,25 @@ export const saveCatalogProduct = createServerFn({ method: "POST" })
           })
         : await s.db.catalog.createProduct(input);
       return { ok: true as const, product };
+    } catch (error) {
+      return mutationFailure(error);
+    }
+  });
+
+/** Validates and appends one structured Pens catalog record. */
+export const authorCatalogPensData = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) => {
+    const actor = await requirePermission("products.manage");
+    const parsed = pensAdminWriteSchema.safeParse(data);
+    if (!parsed.success) return validationFailure(parsed.error);
+    const { s } = await import("@/lib/services");
+    try {
+      const row = await s.db.catalog.authorPensCatalog({
+        ...parsed.data,
+        actor,
+      } as PensAdminWriteInput);
+      return { ok: true as const, row };
     } catch (error) {
       return mutationFailure(error);
     }
