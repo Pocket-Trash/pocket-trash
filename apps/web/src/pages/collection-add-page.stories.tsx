@@ -399,7 +399,7 @@ export const ConfigurablePen: Story = {
       await page.findByRole("option", { name: "Aluminum body" }),
     );
     const tip = canvas.getByRole("combobox", {
-      name: /^tip$|configurationSlot\.tip/iu,
+      name: /^tip$|catalog\.configurationSlots\.tip/iu,
     });
     await userEvent.click(tip);
     await userEvent.click(
