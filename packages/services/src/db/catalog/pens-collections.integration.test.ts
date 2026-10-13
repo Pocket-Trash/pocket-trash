@@ -159,16 +159,6 @@ describe("owned Pens and Pen parts", () => {
         .returning();
       if (!tipStyle || !inkColor) throw new Error("Offering lookups missing.");
       const [offering] = await db.transaction(async (tx) => {
-        const [source] = await tx
-          .insert(schema.catalogSourceEvidence)
-          .values({
-            captureDate: "2026-10-10",
-            claim: "The refill is sold in 0.5 mm black.",
-            originalUrl: "https://example.com/refill",
-            publisher: "Pens maker",
-            sourceKind: "manufacturer-catalog",
-          })
-          .returning();
         const created = await tx
           .insert(schema.refillOffering)
           .values({
@@ -180,13 +170,7 @@ describe("owned Pens and Pen parts", () => {
             tipStyleId: tipStyle.id,
           })
           .returning();
-        if (!source || !created[0])
-          throw new Error("Offering fixtures missing.");
-        await tx.insert(schema.refillOfferingEvidence).values({
-          evidenceId: source.id,
-          offeringId: created[0].id,
-          stance: "supports",
-        });
+        if (!created[0]) throw new Error("Offering fixtures missing.");
         return created;
       });
       if (!offering) throw new Error("Offering missing.");

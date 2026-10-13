@@ -176,7 +176,6 @@ const products: CatalogProduct[] = [
       {
         id: 4000,
         name: "Configurable pen",
-        outcome: "conditional",
         requiredTipName: "Needle tip",
         requiredTipProductId: 4004,
         slug: "configurable-pen",

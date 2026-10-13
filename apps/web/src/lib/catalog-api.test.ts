@@ -300,27 +300,31 @@ describe("Pens admin validation", () => {
     ).toBe(false);
   });
 
-  it("requires supporting evidence for approvals and one compatibility target", () => {
+  it("accepts direct compatibility and requires exactly one target", () => {
     const assertion = {
-      approved: true,
-      evidence: [],
       kind: "compatibility-assertion" as const,
-      outcome: "compatible" as const,
       penProductId: 1000,
       targetRefillProductId: 1001,
     };
-    expect(pensAdminWriteSchema.safeParse(assertion).success).toBe(false);
+    expect(pensAdminWriteSchema.safeParse(assertion).success).toBe(true);
     expect(
       pensAdminWriteSchema.safeParse({
         ...assertion,
-        evidence: [{ evidenceId: 1002, stance: "supports" }],
         targetGroupId: 1003,
       }).success,
     ).toBe(false);
     expect(
       pensAdminWriteSchema.safeParse({
-        ...assertion,
-        evidence: [{ evidenceId: 1002, stance: "supports" }],
+        assertionId: 1004,
+        kind: "compatibility-assertion-remove",
+        penProductId: 1000,
+      }).success,
+    ).toBe(true);
+    expect(
+      pensAdminWriteSchema.safeParse({
+        kind: "compatibility-membership-remove",
+        membershipId: 1005,
+        refillProductId: 1001,
       }).success,
     ).toBe(true);
   });

@@ -887,14 +887,13 @@ describe("Pens catalog administration", () => {
     const options = {
       ...emptyCatalogOptions,
       pensAdminOptions: {
-        compatibilityEvidence: [],
+        compatibilityAssertions: [],
         compatibilityGroupConcepts: [],
         compatibilityGroups: [],
+        compatibilityMemberships: [],
         inkColors: [{ id: 1000, name: "Blue", slug: "blue" }],
-        markets: [{ id: 1001, name: "Global", slug: "GLOBAL" }],
         offerings: [],
         slotKinds: [{ id: 1002, name: "Material", slug: "material" }],
-        sourceEvidence: [],
         tipStyles: [{ id: 1003, name: "Needle", slug: "needle" }],
       },
       relationshipProducts: [refill],
@@ -915,6 +914,8 @@ describe("Pens catalog administration", () => {
     expect(productHtml).not.toContain("web.catalog.field.materials");
     expect(adminHtml).toContain("refill-offering");
     expect(adminHtml).toContain("compatibility-assertion");
+    expect(adminHtml).toContain("compatibility-assertion-remove");
+    expect(adminHtml).toContain("compatibility-membership-remove");
     expect(adminHtml).toContain("Needle");
     expect(adminHtml).toContain("Blue");
   });

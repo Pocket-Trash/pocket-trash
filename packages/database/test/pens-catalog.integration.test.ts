@@ -214,7 +214,7 @@ describe("Pens catalog constraints", () => {
     );
   });
 
-  it("rejects terminology collisions, invalid market graphs, and unsupported approved claims", async () => {
+  it("rejects terminology collisions and invalid market graphs", async () => {
     await expectRejectedTransaction(
       database,
       `INSERT INTO catalog_terminology_alias
@@ -250,37 +250,9 @@ describe("Pens catalog constraints", () => {
         SELECT id, maker_id, 'ER-1', 'er-1' FROM product WHERE slug = 'evidence-refill';
       `,
     );
-    await expectRejectedTransaction(
-      database,
-      `
-        INSERT INTO refill_tip_style (name, slug) VALUES ('Needle', 'needle');
-        INSERT INTO refill_ink_color (name, slug) VALUES ('Test Black', 'test-black');
-        INSERT INTO refill_offering
-          (refill_product_id, tip_style_id, tip_size, normalized_tip_size, ink_color_id, approved_at)
-        SELECT refill.id, style.id, '0.5 mm', '0.5 mm', color.id, now()
-        FROM product_detail_refill refill, refill_tip_style style, refill_ink_color color;
-      `,
-      /require supporting evidence/iu,
-    );
   });
 
-  it("keeps catalog evidence append-only and validates structured compatibility evidence", async () => {
-    await database.exec(`
-      INSERT INTO catalog_source_evidence
-        (publisher, source_kind, original_url, capture_date, claim)
-      VALUES ('Pilot', 'catalog', 'https://example.com/catalog', '2026-10-10', 'A refill exists.');
-    `);
-    await expect(
-      database.exec("UPDATE catalog_source_evidence SET claim = 'Changed';"),
-    ).rejects.toThrow(/append-only/iu);
-    await expect(
-      database.exec(`INSERT INTO refill_compatibility_evidence
-        (kind, summary, source_url)
-        VALUES ('manufacturer-statement', 'Incomplete evidence', 'https://example.com');`),
-    ).rejects.toThrow(/fields_valid/iu);
-  });
-
-  it("requires support for every approved refill claim and preserves successor scope", async () => {
+  it("stores direct refill facts without evidence and prevents duplicates", async () => {
     await database.exec(`
       INSERT INTO refill_tip_style (name, slug) VALUES ('Needle', 'needle');
       INSERT INTO refill_ink_color (name, slug) VALUES ('Test Black', 'test-black');
@@ -288,84 +260,38 @@ describe("Pens catalog constraints", () => {
         (refill_product_id, tip_style_id, tip_size, normalized_tip_size, ink_color_id)
       SELECT refill.id, style.id, '0.5 mm', '0.5 mm', color.id
       FROM product_detail_refill refill, refill_tip_style style, refill_ink_color color;
-    `);
-    await expectRejectedTransaction(
-      database,
-      `INSERT INTO refill_offering_market_status
-        (offering_id, market_id, lifecycle, approved_at)
-       SELECT offering.id, market.id, 'current', now()
-       FROM refill_offering offering, catalog_market market
-       WHERE market.code = 'GLOBAL';`,
-      /require supporting evidence/iu,
-    );
-    await expectRejectedTransaction(
-      database,
-      `INSERT INTO refill_offering_identifier
-        (offering_id, maker_id, kind, source_value, comparison_value, market_id, approved_at)
-       SELECT offering.id, maker.id, 'maker-code', 'ER-1', 'ER-1', market.id, now()
-       FROM refill_offering offering, makers maker, catalog_market market
-       WHERE maker.slug = 'pens-test-maker' AND market.code = 'GLOBAL';`,
-      /require supporting evidence/iu,
-    );
-    await database.exec(`
+      INSERT INTO refill_offering_identifier
+        (offering_id, maker_id, kind, source_value, comparison_value, market_id)
+      SELECT offering.id, maker.id, 'maker-code', 'ER-1', 'ER-1', market.id
+      FROM refill_offering offering, makers maker, catalog_market market
+      WHERE maker.slug = 'pens-test-maker' AND market.code = 'GLOBAL';
       INSERT INTO refill_compatibility_group (concept_id, namespace)
       SELECT id, namespace FROM catalog_terminology_concept
       WHERE namespace = 'refill-compatibility-group' AND key = 'energel';
+      INSERT INTO refill_compatibility_group_membership
+        (group_id, refill_product_id)
+      SELECT refill_compatibility_group.id, product_detail_refill.id
+      FROM refill_compatibility_group, product_detail_refill;
+      INSERT INTO refill_compatibility_assertion
+        (pen_product_id, target_group_id)
+      SELECT pen.id, refill_compatibility_group.id
+      FROM product_detail_pen pen, refill_compatibility_group;
     `);
     await expectRejectedTransaction(
       database,
       `INSERT INTO refill_compatibility_group_membership
-        (group_id, refill_product_id, approved_at)
-       SELECT refill_compatibility_group.id, product_detail_refill.id, now()
+        (group_id, refill_product_id)
+       SELECT refill_compatibility_group.id, product_detail_refill.id
        FROM refill_compatibility_group, product_detail_refill;`,
-      /require supporting evidence/iu,
+      /refill_compatibility_group_membership_unique/iu,
     );
     await expectRejectedTransaction(
       database,
       `INSERT INTO refill_compatibility_assertion
-        (pen_product_id, target_group_id, outcome, approved_at)
-       SELECT pen.id, refill_compatibility_group.id, 'compatible', now()
+        (pen_product_id, target_group_id)
+       SELECT pen.id, refill_compatibility_group.id
        FROM product_detail_pen pen, refill_compatibility_group;`,
-      /require supporting evidence/iu,
-    );
-    await database.exec(`
-      INSERT INTO refill_offering_market_status (offering_id, market_id, lifecycle)
-      SELECT offering.id, market.id, 'current'
-      FROM refill_offering offering, catalog_market market
-      WHERE market.code IN ('GLOBAL', 'TEST-REGION');
-    `);
-    await expectRejectedTransaction(
-      database,
-      `UPDATE refill_offering_market_status current
-       SET superseded_at = now(), successor_id = successor.id
-       FROM refill_offering_market_status successor, catalog_market current_market,
-         catalog_market successor_market
-       WHERE current.market_id = current_market.id
-         AND successor.market_id = successor_market.id
-         AND current_market.code = 'GLOBAL'
-         AND successor_market.code = 'TEST-REGION';`,
-      /must preserve offering and market/iu,
-    );
-  });
-
-  it("rejects overlapping incomparable market claims", async () => {
-    await database.exec(`
-      INSERT INTO catalog_market (kind, code, display_name, display_name_key) VALUES
-        ('region', 'TEST-A', 'Test A', 'test.a'),
-        ('region', 'TEST-B', 'Test B', 'test.b'),
-        ('country', 'XY', 'Overlap Country', 'test.xy');
-      INSERT INTO catalog_market_containment (parent_market_id, child_market_id)
-      SELECT parent.id, child.id FROM catalog_market parent, catalog_market child
-      WHERE parent.code IN ('TEST-A', 'TEST-B') AND child.code = 'XY';
-    `);
-    await expectRejectedTransaction(
-      database,
-      `INSERT INTO refill_offering_market_status (offering_id, market_id, lifecycle)
-       SELECT offering.id, market.id,
-         CASE WHEN market.code = 'TEST-A' THEN 'current' ELSE 'historical' END
-       FROM refill_offering offering, catalog_market market
-       WHERE market.code IN ('TEST-A', 'TEST-B');`,
-      /overlapping incomparable markets/iu,
+      /refill_compatibility_assertion_scope_unique/iu,
     );
   });
 });
