@@ -229,7 +229,8 @@ export function normalizeGrimsmoPenVariation(input: {
   const bullets = extractBullets(product.body_html ?? "");
   const bulletsByCategory = classifyBullets(bullets);
   const fullBodyText = bodyText ?? "";
-  const bodyTextForSearch = getCategoryText(bulletsByCategory, "body");
+  const bodyTextForSearch =
+    getCategoryText(bulletsByCategory, "body") || fullBodyText;
   const sliderText = getCategoryText(bulletsByCategory, "slider");
   const caseText = getCategoryText(bulletsByCategory, "case") || fullBodyText;
   const refillText =

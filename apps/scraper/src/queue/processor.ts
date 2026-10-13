@@ -9,10 +9,9 @@ import {
 } from "../db/autmog-catalog.js";
 import {
   reconcileGrimsmoKnifeVariationBatch,
-  reconcileGrimsmoPenVariationBatch,
   syncGrimsmoKnifeVariation,
-  syncGrimsmoPenVariation,
 } from "../db/grimsmo.js";
+import { syncCanonicalSagaMaterials } from "../db/grimsmo-catalog.js";
 import {
   getTmpImageForProcessing,
   markTmpImageDeleted,
@@ -21,7 +20,6 @@ import {
 } from "../db/images.js";
 import {
   type GrimsmoKnifeSourceName,
-  type GrimsmoPenSourceName,
   type ScraperImageJob,
   type ScraperItemJob,
   scraperQueueNames,
@@ -483,7 +481,7 @@ async function processItemJob({
    * Database used for scraper persistence.
    */
   db: Database;
-  /** Whether canonical Autmog catalog writes are disabled. */
+  /** Whether canonical catalog writes are disabled. */
   dryRun: boolean;
   /**
    * Accumulator for processor error counts and samples.
@@ -505,17 +503,38 @@ async function processItemJob({
   const startedAt = Date.now();
 
   try {
-    if (job.data.type === "grimsmo.penVariationBatch") {
-      const archivedCount = await reconcileGrimsmoPenVariationBatch(db, {
-        items: job.data.items,
-        source: job.data.source,
+    if (
+      job.data.type === "grimsmo.sagaMaterials" ||
+      job.data.type === "grimsmo.penVariation" ||
+      job.data.type === "grimsmo.penVariationBatch"
+    ) {
+      const materialNames =
+        job.data.type === "grimsmo.sagaMaterials"
+          ? job.data.materialNames
+          : job.data.type === "grimsmo.penVariation"
+            ? [...job.data.item.bodyMaterials, ...job.data.item.sliderMaterials]
+            : job.data.items.flatMap((item) => [
+                ...item.bodyMaterials,
+                ...item.sliderMaterials,
+              ]);
+      const result = await syncCanonicalSagaMaterials(db, materialNames, {
+        dryRun,
       });
-      logger.info(loggerMessages.scraper.database.archiveCompleted, {
+      logger.info(loggerMessages.scraper.database.mutationCompleted, {
         attributes: {
-          archivedCount,
+          created: false,
           durationMs: Date.now() - startedAt,
           jobId: job.id,
+          payload: {
+            dryRun,
+            existingMaterialNames: result.existingMaterialNames,
+            newMaterialNames: result.newMaterialNames,
+            productId: result.productId,
+            unresolvedMaterialNames: result.unresolvedMaterialNames,
+          },
           source: job.data.source,
+          updated: result.newMaterialNames.length > 0,
+          versioned: false,
         },
       });
       logger.info(loggerMessages.scraper.processor.itemJobCompleted, {
@@ -548,69 +567,6 @@ async function processItemJob({
           jobId: job.id,
           source: job.data.source,
           type: job.data.type,
-        },
-      });
-      return;
-    }
-
-    if (job.data.type === "grimsmo.penVariation") {
-      const data = job.data;
-      const source: GrimsmoPenSourceName = data.source;
-      const result = await syncGrimsmoPenVariation(db, data.item);
-      const imageJobs = [
-        ...result.uploadImageJobs.map((imageJob) => ({
-          data: {
-            imageId: imageJob.imageId,
-            source,
-            sourceHash: imageJob.sourceHash,
-            type: "tmp.image.upload" as const,
-          },
-          name: "tmp.image.upload",
-          opts: {
-            jobId: getTmpImageUploadJobId({
-              imageId: imageJob.imageId,
-              source,
-              sourceHash: imageJob.sourceHash,
-            }),
-          },
-        })),
-        ...result.deleteImageJobs.map((imageJob) => ({
-          data: {
-            imageId: imageJob.imageId,
-            source,
-            type: "tmp.image.delete" as const,
-          },
-          name: "tmp.image.delete",
-          opts: {
-            jobId: getTmpImageDeleteJobId({
-              imageId: imageJob.imageId,
-              source,
-            }),
-          },
-        })),
-      ];
-      const removedCompletedImageJobs = await enqueueImageJobs(
-        queues,
-        imageJobs,
-      );
-
-      logItemMutationCompleted({
-        durationMs: Date.now() - startedAt,
-        imageJobs: imageJobs.length,
-        jobId: job.id,
-        logger,
-        result,
-        source,
-        sourceProductId: data.item.sourceProductId,
-        removedCompletedImageJobs,
-      });
-      logger.info(loggerMessages.scraper.processor.itemJobCompleted, {
-        attributes: {
-          durationMs: Date.now() - startedAt,
-          jobId: job.id,
-          source,
-          sourceProductId: data.item.sourceProductId,
-          type: data.type,
         },
       });
       return;

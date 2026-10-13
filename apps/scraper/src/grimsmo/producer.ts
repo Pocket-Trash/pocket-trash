@@ -4,6 +4,7 @@ import { getGrimsmoVariationSyncState } from "../db/grimsmo.js";
 import {
   getGrimsmoKnifeVariationJobId,
   getGrimsmoPenVariationJobId,
+  getGrimsmoSagaMaterialsJobId,
   getGrimsmoVariationBatchJobId,
 } from "../queue/job-ids.js";
 import {
@@ -131,33 +132,72 @@ export async function runGrimsmoProducer({
     const archiveItems = items.filter(
       (item) => item.sourceCollection === "archive",
     );
-    const syncStateBySourceHandle = new Map(
-      (
-        await getGrimsmoVariationSyncState(
-          db,
-          source,
-          items.map((item) => item.sourceHandle),
-        )
-      ).map((state) => [state.sourceHandle, state]),
-    );
-    const changedItems = items.filter((item) => {
-      const state = syncStateBySourceHandle.get(item.sourceHandle);
+    let jobs: {
+      /** Queue payload processed by the item worker. */
+      data: ScraperItemJob;
+      /** Stable BullMQ job name. */
+      name: string;
+      /** Deterministic queue options. */
+      opts: {
+        /** Stable identifier used to replace a completed equivalent job. */
+        jobId: string;
+      };
+    }[];
+    let enqueuedItemJobs: number;
+    let skippedUnchangedItems: number;
 
-      return (
-        !state ||
-        Boolean(state.archivedAt) !== (item.sourceCollection === "archive") ||
-        state.detailsHash !== item.detailsHash ||
-        state.imageSetHash !== item.imageSetHash ||
-        state.parentDetailsHash !== item.product.detailsHash ||
-        state.sourceCollection !== item.sourceCollection
+    if (definition.kind === "pen") {
+      const materialNames = getSagaMaterialNames(
+        items as NormalizedGrimsmoPenVariation[],
       );
-    });
-    const jobs = createJobs({
-      changedItems,
-      items,
-      skipArchiveReconciliation,
-      source,
-    });
+      jobs = [
+        {
+          data: {
+            materialNames,
+            source: scraperSources.grimsmoSaga,
+            type: "grimsmo.sagaMaterials",
+          },
+          name: "grimsmo.sagaMaterials",
+          opts: {
+            jobId: getGrimsmoSagaMaterialsJobId(materialNames),
+          },
+        },
+      ];
+      enqueuedItemJobs = jobs.length;
+      skippedUnchangedItems = 0;
+    } else {
+      const syncStateBySourceHandle = new Map(
+        (
+          await getGrimsmoVariationSyncState(
+            db,
+            source,
+            items.map((item) => item.sourceHandle),
+          )
+        ).map((state) => [state.sourceHandle, state]),
+      );
+      const changedItems = items.filter((item) => {
+        const state = syncStateBySourceHandle.get(item.sourceHandle);
+
+        return (
+          !state ||
+          Boolean(state.archivedAt) !== (item.sourceCollection === "archive") ||
+          state.detailsHash !== item.detailsHash ||
+          state.imageSetHash !== item.imageSetHash ||
+          state.parentDetailsHash !== item.product.detailsHash ||
+          state.sourceCollection !== item.sourceCollection
+        );
+      });
+      jobs = createJobs({
+        changedItems,
+        items,
+        skipArchiveReconciliation,
+        source,
+      });
+      enqueuedItemJobs = changedItems.length;
+      skippedUnchangedItems = items.length - changedItems.length;
+    }
+    const archiveReconciliationJobs =
+      definition.kind === "pen" || skipArchiveReconciliation ? 0 : 1;
     const removedCompletedItemJobs = await removeCompletedJobsById(
       queues.items,
       jobs.map((job) => job.opts.jobId).filter(Boolean),
@@ -176,8 +216,8 @@ export async function runGrimsmoProducer({
     });
     logger.info(loggerMessages.scraper.queue.enqueueCompleted, {
       attributes: {
-        archiveReconciliationJobs: skipArchiveReconciliation ? 0 : 1,
-        enqueuedItemJobs: changedItems.length,
+        archiveReconciliationJobs,
+        enqueuedItemJobs,
         queue: "scraper-items",
         removedCompletedItemJobs,
         source,
@@ -186,21 +226,21 @@ export async function runGrimsmoProducer({
     logger.info(loggerMessages.scraper.grimsmo.producerCompleted, {
       attributes: {
         archivedFetchedCount: archiveItems.length,
-        archiveReconciliationJobs: skipArchiveReconciliation ? 0 : 1,
+        archiveReconciliationJobs,
         durationMs: Date.now() - startedAt,
-        enqueuedItemJobs: changedItems.length,
+        enqueuedItemJobs,
         fetchedCount: items.length,
         inventoryFetchedCount: inventoryItems.length,
         removedCompletedItemJobs,
         skipArchiveReconciliation,
         source,
-        skippedUnchangedItems: items.length - changedItems.length,
+        skippedUnchangedItems,
       },
     });
 
     return {
       archivedFetchedCount: archiveItems.length,
-      enqueuedCount: changedItems.length,
+      enqueuedCount: enqueuedItemJobs,
       fetchedCount: items.length,
       inventoryFetchedCount: inventoryItems.length,
       items,
@@ -222,6 +262,22 @@ export async function runGrimsmoProducer({
     });
     throw error;
   }
+}
+
+/**
+ * Collects the distinct normalized material labels observed across Saga listings.
+ *
+ * @param items - Normalized Saga listings from inventory and archive feeds.
+ * @returns Sorted unique body and slider material labels.
+ */
+function getSagaMaterialNames(
+  items: readonly NormalizedGrimsmoPenVariation[],
+): string[] {
+  return [
+    ...new Set(
+      items.flatMap((item) => [...item.bodyMaterials, ...item.sliderMaterials]),
+    ),
+  ].sort();
 }
 
 /**

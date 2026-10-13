@@ -3,6 +3,7 @@ import {
   getAutmogArchiveJobId,
   getGrimsmoKnifeVariationJobId,
   getGrimsmoPenVariationJobId,
+  getGrimsmoSagaMaterialsJobId,
   getGrimsmoVariationBatchJobId,
   getTmpImageDeleteJobId,
   getTmpImageUploadJobId,
@@ -12,6 +13,12 @@ describe("scraper job ids", () => {
   it("creates deterministic archive job ids independent of source id order", () => {
     expect(getAutmogArchiveJobId(["2", "1"])).toBe(
       getAutmogArchiveJobId(["1", "2"]),
+    );
+  });
+
+  it("creates deterministic Saga material job ids independent of source order", () => {
+    expect(getGrimsmoSagaMaterialsJobId(["Titanium", "Bronze"])).toBe(
+      getGrimsmoSagaMaterialsJobId(["Bronze", "Titanium"]),
     );
   });
 
@@ -50,6 +57,7 @@ describe("scraper job ids", () => {
         source: "grimsmo-saga",
         sourceHandles: ["c", "b", "a"],
       }),
+      getGrimsmoSagaMaterialsJobId(["Titanium", "Bronze"]),
       getTmpImageUploadJobId({
         imageId: 2000,
         source: "grimsmo-rask",
