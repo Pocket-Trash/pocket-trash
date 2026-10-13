@@ -409,58 +409,6 @@
             ],
             "fields": [
                   "id PK bigint",
-                  "kind text",
-                  "code text",
-                  "display_name text",
-                  "display_name_key text",
-                  "created_at timestamp with time zone",
-                  "updated_at timestamp with time zone"
-            ],
-            "id": "catalog_market",
-            "name": "catalog_market",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "parent_market_id PK/FK bigint",
-                  "child_market_id PK/FK bigint"
-            ],
-            "id": "catalog_market_containment",
-            "name": "catalog_market_containment",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK bigint",
-                  "listing_id? FK bigint",
-                  "publisher text",
-                  "source_kind text",
-                  "original_url text",
-                  "capture_date date",
-                  "publication_date? date",
-                  "catalog_edition? text",
-                  "preserved_source_identity? text",
-                  "preserved_source_checksum? text",
-                  "claim text",
-                  "market_id? FK bigint",
-                  "created_at timestamp with time zone"
-            ],
-            "id": "catalog_source_evidence",
-            "name": "catalog_source_evidence",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK bigint",
                   "listing_id FK bigint",
                   "product_image_id FK bigint",
                   "source_image_id text",
@@ -1572,58 +1520,11 @@
                   "required_tip_product_id? FK bigint",
                   "target_group_id? FK bigint",
                   "target_refill_product_id? FK bigint",
-                  "outcome text",
-                  "explanation? text",
-                  "remedy? text",
-                  "warning? text",
-                  "approved_at? timestamp with time zone",
                   "created_at timestamp with time zone",
                   "updated_at timestamp with time zone"
             ],
             "id": "refill_compatibility_assertion",
             "name": "refill_compatibility_assertion",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "assertion_id PK/FK bigint",
-                  "evidence_id PK/FK bigint",
-                  "stance text"
-            ],
-            "id": "refill_compatibility_assertion_evidence",
-            "name": "refill_compatibility_assertion_evidence",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK bigint",
-                  "kind text",
-                  "summary text",
-                  "notes? text",
-                  "source_url? text",
-                  "source_date? date",
-                  "catalog_edition? text",
-                  "first_measured_format_label? text",
-                  "second_measured_format_label? text",
-                  "first_source_url? text",
-                  "second_source_url? text",
-                  "pen_product_id? FK bigint",
-                  "required_tip_product_id? FK bigint",
-                  "refill_product_id? FK bigint",
-                  "test_date? date",
-                  "result? text",
-                  "procedure? text",
-                  "superseded_at? timestamp with time zone",
-                  "created_at timestamp with time zone"
-            ],
-            "id": "refill_compatibility_evidence",
-            "name": "refill_compatibility_evidence",
             "status": "existing"
       },
       {
@@ -1649,25 +1550,11 @@
                   "id PK bigint",
                   "group_id FK bigint",
                   "refill_product_id FK bigint",
-                  "approved_at? timestamp with time zone",
                   "created_at timestamp with time zone",
                   "updated_at timestamp with time zone"
             ],
             "id": "refill_compatibility_group_membership",
             "name": "refill_compatibility_group_membership",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "membership_id PK/FK bigint",
-                  "evidence_id PK/FK bigint",
-                  "stance text"
-            ],
-            "id": "refill_compatibility_group_membership_evidence",
-            "name": "refill_compatibility_group_membership_evidence",
             "status": "existing"
       },
       {
@@ -1696,25 +1583,11 @@
                   "tip_size text",
                   "normalized_tip_size text",
                   "ink_color_id FK bigint",
-                  "approved_at? timestamp with time zone",
                   "created_at timestamp with time zone",
                   "updated_at timestamp with time zone"
             ],
             "id": "refill_offering",
             "name": "refill_offering",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "offering_id PK/FK bigint",
-                  "evidence_id PK/FK bigint",
-                  "stance text"
-            ],
-            "id": "refill_offering_evidence",
-            "name": "refill_offering_evidence",
             "status": "existing"
       },
       {
@@ -1729,61 +1602,11 @@
                   "source_value text",
                   "comparison_value text",
                   "comparison_rule text",
-                  "market_id FK bigint",
-                  "effective_date? date",
-                  "approved_at? timestamp with time zone",
-                  "superseded_at? timestamp with time zone",
-                  "successor_id? FK bigint",
                   "created_at timestamp with time zone",
                   "updated_at timestamp with time zone"
             ],
             "id": "refill_offering_identifier",
             "name": "refill_offering_identifier",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "identifier_id PK/FK bigint",
-                  "evidence_id PK/FK bigint",
-                  "stance text"
-            ],
-            "id": "refill_offering_identifier_evidence",
-            "name": "refill_offering_identifier_evidence",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "id PK bigint",
-                  "offering_id FK bigint",
-                  "market_id FK bigint",
-                  "lifecycle text",
-                  "effective_date? date",
-                  "approved_at? timestamp with time zone",
-                  "superseded_at? timestamp with time zone",
-                  "successor_id? FK bigint",
-                  "created_at timestamp with time zone"
-            ],
-            "id": "refill_offering_market_status",
-            "name": "refill_offering_market_status",
-            "status": "existing"
-      },
-      {
-            "areas": [
-                  "full"
-            ],
-            "fields": [
-                  "status_id PK/FK bigint",
-                  "evidence_id PK/FK bigint",
-                  "stance text"
-            ],
-            "id": "refill_offering_market_status_evidence",
-            "name": "refill_offering_market_status_evidence",
             "status": "existing"
       },
       {
@@ -2477,26 +2300,6 @@
             "application_id → id"
       ],
       [
-            "catalog_market_containment",
-            "catalog_market",
-            "parent_market_id → id"
-      ],
-      [
-            "catalog_market_containment",
-            "catalog_market",
-            "child_market_id → id"
-      ],
-      [
-            "catalog_source_evidence",
-            "catalog_source_listing",
-            "listing_id → id"
-      ],
-      [
-            "catalog_source_evidence",
-            "catalog_market",
-            "market_id → id"
-      ],
-      [
             "catalog_source_image",
             "catalog_source_listing",
             "listing_id → id"
@@ -3052,31 +2855,6 @@
             "target_refill_product_id → id"
       ],
       [
-            "refill_compatibility_assertion_evidence",
-            "refill_compatibility_assertion",
-            "assertion_id → id"
-      ],
-      [
-            "refill_compatibility_assertion_evidence",
-            "refill_compatibility_evidence",
-            "evidence_id → id"
-      ],
-      [
-            "refill_compatibility_evidence",
-            "product_detail_pen",
-            "pen_product_id → id"
-      ],
-      [
-            "refill_compatibility_evidence",
-            "product_detail_pen_tip",
-            "required_tip_product_id → id"
-      ],
-      [
-            "refill_compatibility_evidence",
-            "product_detail_refill",
-            "refill_product_id → id"
-      ],
-      [
             "refill_compatibility_group",
             "catalog_terminology_concept",
             "concept_id, namespace → id, namespace"
@@ -3090,16 +2868,6 @@
             "refill_compatibility_group_membership",
             "product_detail_refill",
             "refill_product_id → id"
-      ],
-      [
-            "refill_compatibility_group_membership_evidence",
-            "refill_compatibility_group_membership",
-            "membership_id → id"
-      ],
-      [
-            "refill_compatibility_group_membership_evidence",
-            "refill_compatibility_evidence",
-            "evidence_id → id"
       ],
       [
             "refill_offering",
@@ -3117,16 +2885,6 @@
             "ink_color_id → id"
       ],
       [
-            "refill_offering_evidence",
-            "refill_offering",
-            "offering_id → id"
-      ],
-      [
-            "refill_offering_evidence",
-            "catalog_source_evidence",
-            "evidence_id → id"
-      ],
-      [
             "refill_offering_identifier",
             "refill_offering",
             "offering_id → id"
@@ -3135,51 +2893,6 @@
             "refill_offering_identifier",
             "makers",
             "maker_id → id"
-      ],
-      [
-            "refill_offering_identifier",
-            "catalog_market",
-            "market_id → id"
-      ],
-      [
-            "refill_offering_identifier",
-            "refill_offering_identifier",
-            "successor_id → id"
-      ],
-      [
-            "refill_offering_identifier_evidence",
-            "refill_offering_identifier",
-            "identifier_id → id"
-      ],
-      [
-            "refill_offering_identifier_evidence",
-            "catalog_source_evidence",
-            "evidence_id → id"
-      ],
-      [
-            "refill_offering_market_status",
-            "refill_offering",
-            "offering_id → id"
-      ],
-      [
-            "refill_offering_market_status",
-            "catalog_market",
-            "market_id → id"
-      ],
-      [
-            "refill_offering_market_status",
-            "refill_offering_market_status",
-            "successor_id → id"
-      ],
-      [
-            "refill_offering_market_status_evidence",
-            "refill_offering_market_status",
-            "status_id → id"
-      ],
-      [
-            "refill_offering_market_status_evidence",
-            "catalog_source_evidence",
-            "evidence_id → id"
       ],
       [
             "resource_downloads",

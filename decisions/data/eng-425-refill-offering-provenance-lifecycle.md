@@ -1,8 +1,8 @@
 # Decide refill-offering provenance and lifecycle representation
 
-Status: Superseded by ENG-459
+Status: Superseded by ENG-459 and removed by ENG-461
 
-ENG-459 keeps refill-offering identity independent of market and source, but removes market lifecycle, evidence, approval, versioning, and availability requirements from application behavior. A documented refill offering or exact maker identifier is a direct catalog fact; current availability is not required. Source-listing and source-image identities remain only for deterministic scraper and image behavior.
+ENG-459 keeps refill-offering identity independent of market and source while removing lifecycle, evidence, approval, versioning, and availability requirements from application behavior. ENG-461 removes the unused market, evidence, lifecycle, approval, and successor storage. A documented refill offering or exact maker identifier is a direct catalog fact; current availability is not required. Source-listing and source-image identities remain for deterministic scraper and image behavior.
 
 Sources:
 

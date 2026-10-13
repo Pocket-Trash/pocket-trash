@@ -582,13 +582,7 @@ async function loadExistingState(
       })
       .from(schema.refillCompatibilityAssertion)
       .where(
-        and(
-          eq(
-            schema.refillCompatibilityAssertion.penProductId,
-            listing.productId,
-          ),
-          eq(schema.refillCompatibilityAssertion.outcome, "compatible"),
-        ),
+        eq(schema.refillCompatibilityAssertion.penProductId, listing.productId),
       ),
   ]);
   if (appearances.length > 1 || noses.length > 1 || compatibility.length > 1)
@@ -745,7 +739,6 @@ async function replaceSourceOwnedFacts(
     });
   if (lookups.compatibility)
     await tx.insert(schema.refillCompatibilityAssertion).values({
-      outcome: "compatible",
       penProductId: productId,
       ...lookups.compatibility,
     });

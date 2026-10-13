@@ -162,7 +162,6 @@ describe("owned Pens and Pen parts", () => {
         const created = await tx
           .insert(schema.refillOffering)
           .values({
-            approvedAt: new Date("2026-10-10"),
             inkColorId: inkColor.id,
             normalizedTipSize: "0.5 mm",
             refillProductId: refillId,

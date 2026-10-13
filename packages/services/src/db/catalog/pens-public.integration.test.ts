@@ -547,7 +547,6 @@ describe("public Pens catalog reads", () => {
         const [assertion] = await transaction
           .insert(schema.refillCompatibilityAssertion)
           .values({
-            outcome: "compatible",
             penProductId: penId,
             targetRefillProductId: refillId,
           })

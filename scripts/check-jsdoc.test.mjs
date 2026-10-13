@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -84,6 +90,9 @@ test("pre-commit runs full JSDoc lint even with an empty staged diff", (context)
   const cwd = repository(context, {
     "legacy.ts": "function legacy() {}\n",
     "package.json": JSON.stringify({
+      packageManager: JSON.parse(
+        readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+      ).packageManager,
       scripts: {
         lint: `node "${fileURLToPath(new URL("./check-jsdoc.mjs", import.meta.url))}"`,
       },
