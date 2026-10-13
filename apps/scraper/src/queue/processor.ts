@@ -3,7 +3,10 @@ import { type Logger, loggerMessages } from "@package/logger";
 import type { ImagesService } from "@package/services";
 import { type Job, type Queue, Worker } from "bullmq";
 import type { Redis } from "ioredis";
-import { archiveMissingAutmogPens, syncAutmogPen } from "../db/autmog.js";
+import {
+  syncCanonicalAutmogImage,
+  syncCanonicalAutmogPen,
+} from "../db/autmog-catalog.js";
 import {
   reconcileGrimsmoKnifeVariationBatch,
   reconcileGrimsmoPenVariationBatch,
@@ -24,7 +27,11 @@ import {
   scraperQueueNames,
   scraperSources,
 } from "../scraper-types.js";
-import { getTmpImageDeleteJobId, getTmpImageUploadJobId } from "./job-ids.js";
+import {
+  getAutmogImageUploadJobId,
+  getTmpImageDeleteJobId,
+  getTmpImageUploadJobId,
+} from "./job-ids.js";
 import { removeCompletedJobsById, type ScraperQueues } from "./queues.js";
 
 /**
@@ -74,6 +81,8 @@ export type RunQueueProcessorOptions = {
    * Database used for scraper persistence.
    */
   db: Database;
+  /** Whether canonical catalog mutations and uploads are reported without writes. */
+  dryRun?: boolean;
   /**
    * Storage folder prefix for uploaded scraper images.
    */
@@ -270,6 +279,15 @@ type ProcessorErrorSampleInput = Omit<
  */
 type ImageJobResult = "completed" | "skipped";
 
+/** Temporary-table image jobs retained for non-Pens scraper sources. */
+type TmpScraperImageJob = Extract<
+  ScraperImageJob,
+  {
+    /** Temporary-table image operation discriminator. */
+    type: "tmp.image.delete" | "tmp.image.upload";
+  }
+>;
+
 /**
  * Drains bounded item and image queue batches in sequence.
  *
@@ -284,6 +302,7 @@ export async function runQueueProcessor({
   concurrency,
   connection,
   db,
+  dryRun = false,
   imageFolderPrefix,
   imageStorage,
   logger,
@@ -316,7 +335,7 @@ export async function runQueueProcessor({
        * @rejects When queue processing or a required dependency fails.
        */
       handler: (job) =>
-        processItemJob({ db, errorCounter, job, logger, queues }),
+        processItemJob({ db, dryRun, errorCounter, job, logger, queues }),
       logger,
       queueName: scraperQueueNames.items,
     });
@@ -337,6 +356,7 @@ export async function runQueueProcessor({
       handler: (job) =>
         processImageJob({
           db,
+          dryRun,
           errorCounter,
           imageFolderPrefix,
           imageStorage,
@@ -453,6 +473,7 @@ export async function runQueueDeadLetterProcessor({
  */
 async function processItemJob({
   db,
+  dryRun,
   errorCounter,
   job,
   logger,
@@ -462,6 +483,8 @@ async function processItemJob({
    * Database used for scraper persistence.
    */
   db: Database;
+  /** Whether canonical Autmog catalog writes are disabled. */
+  dryRun: boolean;
   /**
    * Accumulator for processor error counts and samples.
    */
@@ -482,30 +505,6 @@ async function processItemJob({
   const startedAt = Date.now();
 
   try {
-    if (job.data.type === "autmog.archiveMissing") {
-      const archivedCount = await archiveMissingAutmogPens(
-        db,
-        job.data.seenSourceProductIds,
-      );
-      logger.info(loggerMessages.scraper.database.archiveCompleted, {
-        attributes: {
-          archivedCount,
-          durationMs: Date.now() - startedAt,
-          jobId: job.id,
-          source: scraperSources.autmog,
-        },
-      });
-      logger.info(loggerMessages.scraper.processor.itemJobCompleted, {
-        attributes: {
-          durationMs: Date.now() - startedAt,
-          jobId: job.id,
-          source: scraperSources.autmog,
-          type: job.data.type,
-        },
-      });
-      return;
-    }
-
     if (job.data.type === "grimsmo.penVariationBatch") {
       const archivedCount = await reconcileGrimsmoPenVariationBatch(db, {
         items: job.data.items,
@@ -681,43 +680,30 @@ async function processItemJob({
     }
 
     const data = job.data;
-    const result = await syncAutmogPen(db, data.item);
-    const imageJobs = [
-      ...result.uploadImageJobs.map((imageJob) => ({
-        data: {
-          imageId: imageJob.imageId,
-          source: scraperSources.autmog,
-          sourceHash: imageJob.sourceHash,
-          type: "tmp.image.upload" as const,
-        },
-        name: "tmp.image.upload",
-        opts: {
-          jobId: getTmpImageUploadJobId({
-            imageId: imageJob.imageId,
-            source: scraperSources.autmog,
-            sourceHash: imageJob.sourceHash,
-          }),
-        },
-      })),
-      ...result.deleteImageJobs.map((imageJob) => ({
-        data: {
-          imageId: imageJob.imageId,
-          source: scraperSources.autmog,
-          type: "tmp.image.delete" as const,
-        },
-        name: "tmp.image.delete",
-        opts: {
-          jobId: getTmpImageDeleteJobId({
-            imageId: imageJob.imageId,
-            source: scraperSources.autmog,
-          }),
-        },
-      })),
-    ];
+    const result = await syncCanonicalAutmogPen(db, data.item, { dryRun });
+    const imageJobs = result.imageCandidates.map((image) => ({
+      data: {
+        listingId: image.listingId,
+        position: image.position,
+        productId: image.productId,
+        source: scraperSources.autmog,
+        sourceImageId: image.sourceImageId,
+        sourceUrl: image.sourceUrl,
+        type: "autmog.image.upload" as const,
+      },
+      name: "autmog.image.upload",
+      opts: {
+        jobId: getAutmogImageUploadJobId({
+          listingId: image.listingId,
+          sourceImageId: image.sourceImageId,
+          sourceUrl: image.sourceUrl,
+        }),
+      },
+    }));
 
     let removedCompletedImageJobs = 0;
 
-    if (imageJobs.length > 0) {
+    if (!dryRun && imageJobs.length > 0) {
       removedCompletedImageJobs = await removeCompletedJobsById(
         queues.images,
         imageJobs
@@ -730,26 +716,17 @@ async function processItemJob({
     logger.info(loggerMessages.scraper.database.mutationCompleted, {
       attributes: {
         created: result.created,
-        deleteImageJobs: result.deleteImageJobs.length,
+        deleteImageJobs: 0,
         durationMs: Date.now() - startedAt,
         enqueuedImageJobs: imageJobs.length,
         jobId: job.id,
-        payload: {
-          dbResponse: {
-            images: {
-              upserted: result.dbResponse.images.upserted,
-            },
-          },
-          mutationInput: {
-            images: result.mutationInput.images,
-          },
-        },
+        payload: { dryRun: result.dryRun },
         source: scraperSources.autmog,
         sourceProductId: data.item.sourceProductId,
         removedCompletedImageJobs,
         updated: result.updated,
-        uploadImageJobs: result.uploadImageJobs.length,
-        versioned: result.versioned,
+        uploadImageJobs: result.imageCandidates.length,
+        versioned: false,
       },
     });
     logger.info(loggerMessages.scraper.processor.itemJobCompleted, {
@@ -801,6 +778,7 @@ async function processItemJob({
  */
 async function processImageJob({
   db,
+  dryRun,
   errorCounter,
   imageFolderPrefix,
   imageStorage,
@@ -811,6 +789,8 @@ async function processImageJob({
    * Database used for scraper persistence.
    */
   db: Database;
+  /** Whether canonical uploads and database writes are disabled. */
+  dryRun: boolean;
   /**
    * Accumulator for processor error counts and samples.
    */
@@ -834,12 +814,61 @@ async function processImageJob({
 }): Promise<ImageJobResult> {
   const startedAt = Date.now();
 
+  if (job.data.type === "autmog.image.upload") {
+    if (dryRun) {
+      logger.info(loggerMessages.scraper.processor.imageJobCompleted, {
+        attributes: {
+          durationMs: Date.now() - startedAt,
+          jobId: job.id,
+          source: job.data.source,
+          type: job.data.type,
+        },
+      });
+      return "skipped";
+    }
+    const uploaded = await imageStorage.uploadRemoteImage({
+      entity: "products",
+      entityId: job.data.productId,
+      prefix: imageFolderPrefix,
+      sourceUrl: job.data.sourceUrl,
+    });
+    if (!uploaded)
+      throw new Error("Canonical Autmog image upload returned no result.");
+    const fileName = uploaded.filePath.split("/").at(-1);
+    if (!fileName)
+      throw new Error("Canonical Autmog image path has no file name.");
+    await syncCanonicalAutmogImage(db, {
+      listingId: job.data.listingId,
+      productId: job.data.productId,
+      uploaded: {
+        contentType: uploaded.contentType,
+        fileName,
+        objectPath: uploaded.filePath.replace(/^\//u, ""),
+        position: job.data.position,
+        sha256: uploaded.sha256,
+        size: uploaded.size,
+        sourceImageId: job.data.sourceImageId,
+        sourceUrl: job.data.sourceUrl,
+        url: uploaded.url,
+      },
+    });
+    logger.info(loggerMessages.scraper.processor.imageJobCompleted, {
+      attributes: {
+        durationMs: Date.now() - startedAt,
+        jobId: job.id,
+        source: job.data.source,
+        type: job.data.type,
+      },
+    });
+    return "completed";
+  }
+
   return processTmpImageJob({
     db,
     errorCounter,
     imageFolderPrefix,
     imageStorage,
-    job,
+    job: job as Job<TmpScraperImageJob>,
     logger,
     startedAt,
   });
@@ -1019,7 +1048,7 @@ async function processTmpImageJob({
   /**
    * BullMQ job being processed.
    */
-  job: Job<ScraperImageJob>;
+  job: Job<TmpScraperImageJob>;
   /**
    * Logger used for scraper lifecycle events.
    */
@@ -1172,7 +1201,7 @@ function logMissingImageRow({
   /**
    * BullMQ job being processed.
    */
-  job: Job<ScraperImageJob>;
+  job: Job<TmpScraperImageJob>;
   /**
    * Logger used for scraper lifecycle events.
    */
@@ -1218,7 +1247,7 @@ function logImageJobError({
   /**
    * BullMQ job being processed.
    */
-  job: Job<ScraperImageJob>;
+  job: Job<TmpScraperImageJob>;
   /**
    * Logger used for scraper lifecycle events.
    */

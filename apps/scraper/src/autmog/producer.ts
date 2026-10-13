@@ -1,7 +1,6 @@
 import type { Database } from "@package/database";
 import { type Logger, loggerMessages } from "@package/logger";
-import { getAutmogPenSyncState } from "../db/autmog.js";
-import { getAutmogArchiveJobId, getAutmogPenJobId } from "../queue/job-ids.js";
+import { getAutmogPenJobId } from "../queue/job-ids.js";
 import {
   removeCompletedJobsById,
   type ScraperQueues,
@@ -21,9 +20,7 @@ import {
  * Dependencies and fetch controls for an Autmog producer run.
  */
 export type RunAutmogProducerOptions = FetchAutmogProductsOptions & {
-  /**
-   * Database used to compare persisted synchronization state.
-   */
+  /** Database connection retained by the shared producer interface. */
   db: Database;
   /**
    * Logger used for producer lifecycle events.
@@ -33,9 +30,7 @@ export type RunAutmogProducerOptions = FetchAutmogProductsOptions & {
    * Scraper queues that receive normalized item jobs.
    */
   queues: ScraperQueues;
-  /**
-   * Whether to omit the batch job that reconciles archived listings.
-   */
+  /** Deprecated archive control retained for command compatibility. */
   skipArchiveReconciliation?: boolean;
 };
 
@@ -62,7 +57,7 @@ export type RunAutmogProducerResult = {
 };
 
 /**
- * Fetches Autmog products and enqueues changed items plus archive reconciliation.
+ * Fetches Autmog products and enqueues canonical pen items.
  *
  * @param options - Producer dependencies and fetch controls.
  *
@@ -77,6 +72,8 @@ export async function runAutmogProducer({
   skipArchiveReconciliation = false,
   ...fetchOptions
 }: RunAutmogProducerOptions): Promise<RunAutmogProducerResult> {
+  void db;
+  void skipArchiveReconciliation;
   const startedAt = Date.now();
   logger.info(loggerMessages.scraper.autmog.producerStarted, {
     attributes: {
@@ -94,24 +91,9 @@ export async function runAutmogProducer({
       },
     });
 
-    const items = products.map(normalizeAutmogProduct);
-    const seenSourceProductIds = items.map((item) => item.sourceProductId);
-    const syncStateBySourceProductId = new Map(
-      (await getAutmogPenSyncState(db, seenSourceProductIds)).map((state) => [
-        state.sourceProductId,
-        state,
-      ]),
-    );
-    const changedItems = items.filter((item) => {
-      const state = syncStateBySourceProductId.get(item.sourceProductId);
-
-      return (
-        !state ||
-        state.archivedAt !== null ||
-        state.detailsHash !== item.detailsHash ||
-        state.imageSetHash !== item.imageSetHash
-      );
-    });
+    const items = products
+      .map(normalizeAutmogProduct)
+      .filter((item) => item.productTypes.includes("pen"));
     const jobs: {
       /**
        * Queue payload for the scraper job.
@@ -125,7 +107,7 @@ export async function runAutmogProducer({
        * Queue job name consumed by the item worker.
        */
       name: string;
-    }[] = changedItems.map((item) => ({
+    }[] = items.map((item) => ({
       data: {
         item,
         source: scraperSources.autmog,
@@ -134,18 +116,6 @@ export async function runAutmogProducer({
       jobId: getAutmogPenJobId(item),
       name: "autmog.pen",
     }));
-    if (!skipArchiveReconciliation) {
-      jobs.push({
-        data: {
-          seenSourceProductIds,
-          source: scraperSources.autmog,
-          type: "autmog.archiveMissing",
-        },
-        jobId: getAutmogArchiveJobId(seenSourceProductIds),
-        name: "autmog.archiveMissing",
-      });
-    }
-
     const removedCompletedItemJobs = await removeCompletedJobsById(
       queues.items,
       jobs.map((job) => job.jobId),
@@ -163,8 +133,8 @@ export async function runAutmogProducer({
 
     logger.info(loggerMessages.scraper.queue.enqueueCompleted, {
       attributes: {
-        archiveReconciliationJobs: skipArchiveReconciliation ? 0 : 1,
-        enqueuedItemJobs: changedItems.length,
+        archiveReconciliationJobs: 0,
+        enqueuedItemJobs: items.length,
         queue: "scraper-items",
         removedCompletedItemJobs,
         source: scraperSources.autmog,
@@ -173,18 +143,18 @@ export async function runAutmogProducer({
     logger.info(loggerMessages.scraper.autmog.producerCompleted, {
       attributes: {
         durationMs: Date.now() - startedAt,
-        archiveReconciliationJobs: skipArchiveReconciliation ? 0 : 1,
-        enqueuedItemJobs: changedItems.length,
+        archiveReconciliationJobs: 0,
+        enqueuedItemJobs: items.length,
         fetchedCount: products.length,
         removedCompletedItemJobs,
-        skipArchiveReconciliation,
+        skipArchiveReconciliation: true,
         source: scraperSources.autmog,
-        skippedUnchangedItems: items.length - changedItems.length,
+        skippedUnchangedItems: 0,
       },
     });
 
     return {
-      enqueuedCount: changedItems.length,
+      enqueuedCount: items.length,
       fetchedCount: products.length,
       items,
       removedCompletedItemJobs,

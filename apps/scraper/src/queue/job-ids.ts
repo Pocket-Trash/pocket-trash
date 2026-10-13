@@ -21,6 +21,29 @@ export function getAutmogPenJobId(item: NormalizedAutmogPen): string {
 }
 
 /**
+ * Builds the deterministic upload job ID for a canonical Autmog source image.
+ *
+ * @param input - Canonical listing and mutable source-image identity.
+ * @returns Deterministic canonical image upload job ID.
+ */
+export function getAutmogImageUploadJobId(input: {
+  /** Canonical source-listing identifier. */
+  listingId: number;
+  /** Stable Shopify image identifier. */
+  sourceImageId: string;
+  /** Current Shopify image URL. */
+  sourceUrl: string;
+}): string {
+  return createJobId(
+    "autmog",
+    "catalog-image",
+    String(input.listingId),
+    input.sourceImageId,
+    hashObject(input.sourceUrl),
+  );
+}
+
+/**
  * Builds the archive reconciliation job ID for an Autmog snapshot.
  * Sorts source product IDs before hashing, so input ordering does not affect the ID.
  *

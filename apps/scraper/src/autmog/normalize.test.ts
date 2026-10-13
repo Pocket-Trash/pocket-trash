@@ -47,6 +47,17 @@ describe("normalizeAutmogProduct", () => {
     expect(item.grip).toBeNull();
     expect(item.bodyDetails).toEqual([]);
   });
+
+  it.each([
+    "Pen Tray",
+    "Clip Add-on for Pen",
+  ])("does not classify %s as a pen", (title) => {
+    const item = normalizeAutmogProduct(
+      createProduct({ body_html: `<p>${title}</p>`, title }),
+    );
+
+    expect(item.productTypes).not.toContain("pen");
+  });
 });
 
 /**
