@@ -62,6 +62,14 @@ export type ScraperItemJob =
       type: "autmog.pen";
     }
   | {
+      /** Normalized material labels observed across the Saga source feed. */
+      materialNames: string[];
+      /** Grimsmo Saga source discriminator. */
+      source: typeof scraperSources.grimsmoSaga;
+      /** Canonical Saga material reconciliation discriminator. */
+      type: "grimsmo.sagaMaterials";
+    }
+  | {
       /**
        * Normalized Grimsmo pen variation to persist.
        */

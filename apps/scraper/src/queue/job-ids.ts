@@ -8,6 +8,7 @@ import type {
   NormalizedGrimsmoPenVariation,
   ScraperSourceName,
 } from "../scraper-types.js";
+import { scraperSources } from "../scraper-types.js";
 
 /**
  * Builds the deterministic item job ID for an Autmog pen state.
@@ -127,6 +128,22 @@ export function getGrimsmoPenVariationJobId(
     "pen-variation",
     item.sourceHandle,
     item.detailsHash,
+  );
+}
+
+/**
+ * Builds the deterministic reconciliation job ID for Saga material discovery.
+ *
+ * @param materialNames - Normalized material names observed across the feed.
+ * @returns Deterministic Saga material job ID independent of source ordering.
+ */
+export function getGrimsmoSagaMaterialsJobId(
+  materialNames: readonly string[],
+): string {
+  return createJobId(
+    scraperSources.grimsmoSaga,
+    "materials",
+    hashObject([...materialNames].sort()),
   );
 }
 
