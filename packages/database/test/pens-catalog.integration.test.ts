@@ -88,6 +88,55 @@ describe("Pens catalog constraints", () => {
     ).toContain("product_detail_refill");
   });
 
+  it("removes dormant refill evidence and lifecycle storage", async () => {
+    const tables = await database.query<{
+      /** Dormant table that survived migration. */
+      table_name: string;
+    }>(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name IN (
+          'catalog_market',
+          'catalog_market_containment',
+          'catalog_source_evidence',
+          'refill_compatibility_assertion_evidence',
+          'refill_compatibility_evidence',
+          'refill_compatibility_group_membership_evidence',
+          'refill_offering_evidence',
+          'refill_offering_identifier_evidence',
+          'refill_offering_market_status',
+          'refill_offering_market_status_evidence'
+        )
+      ORDER BY table_name;
+    `);
+    expect(tables.rows).toEqual([]);
+
+    const columns = await database.query<{
+      /** Retired column that survived migration. */
+      column_name: string;
+      /** Table containing the retired column. */
+      table_name: string;
+    }>(`
+      SELECT table_name, column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND (
+          (table_name = 'refill_compatibility_assertion'
+            AND column_name IN ('outcome', 'explanation', 'remedy', 'warning', 'approved_at'))
+          OR (table_name = 'refill_compatibility_group_membership'
+            AND column_name = 'approved_at')
+          OR (table_name = 'refill_offering' AND column_name = 'approved_at')
+          OR (table_name = 'refill_offering_identifier'
+            AND column_name IN (
+              'market_id', 'effective_date', 'approved_at', 'superseded_at', 'successor_id'
+            ))
+        )
+      ORDER BY table_name, column_name;
+    `);
+    expect(columns.rows).toEqual([]);
+  });
+
   it("defers exact product and collection subtype validation until commit", async () => {
     await transaction(
       database,
@@ -214,7 +263,7 @@ describe("Pens catalog constraints", () => {
     );
   });
 
-  it("rejects terminology collisions and invalid market graphs", async () => {
+  it("rejects terminology collisions", async () => {
     await expectRejectedTransaction(
       database,
       `INSERT INTO catalog_terminology_alias
@@ -223,22 +272,6 @@ describe("Pens catalog constraints", () => {
        WHERE namespace = 'product-type' AND key = 'pen';`,
       /collides with a canonical term/iu,
     );
-    await database.exec(`
-      INSERT INTO catalog_market (kind, code, display_name, display_name_key) VALUES
-        ('region', 'TEST-REGION', 'Test Region', 'test.region'),
-        ('country', 'XZ', 'Test Country', 'test.country');
-      INSERT INTO catalog_market_containment (parent_market_id, child_market_id)
-      SELECT parent.id, child.id FROM catalog_market parent, catalog_market child
-      WHERE parent.code = 'TEST-REGION' AND child.code = 'XZ';
-    `);
-    await expectRejectedTransaction(
-      database,
-      `INSERT INTO catalog_market_containment (parent_market_id, child_market_id)
-       SELECT parent.id, child.id FROM catalog_market parent, catalog_market child
-       WHERE parent.code = 'XZ' AND child.code = 'TEST-REGION';`,
-      /country cannot contain|containment may not contain a cycle/iu,
-    );
-
     await transaction(
       database,
       `
@@ -261,10 +294,10 @@ describe("Pens catalog constraints", () => {
       SELECT refill.id, style.id, '0.5 mm', '0.5 mm', color.id
       FROM product_detail_refill refill, refill_tip_style style, refill_ink_color color;
       INSERT INTO refill_offering_identifier
-        (offering_id, maker_id, kind, source_value, comparison_value, market_id)
-      SELECT offering.id, maker.id, 'maker-code', 'ER-1', 'ER-1', market.id
-      FROM refill_offering offering, makers maker, catalog_market market
-      WHERE maker.slug = 'pens-test-maker' AND market.code = 'GLOBAL';
+        (offering_id, maker_id, kind, source_value, comparison_value)
+      SELECT offering.id, maker.id, 'maker-code', 'ER-1', 'ER-1'
+      FROM refill_offering offering, makers maker
+      WHERE maker.slug = 'pens-test-maker';
       INSERT INTO refill_compatibility_group (concept_id, namespace)
       SELECT id, namespace FROM catalog_terminology_concept
       WHERE namespace = 'refill-compatibility-group' AND key = 'energel';

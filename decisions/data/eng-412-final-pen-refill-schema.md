@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-The refill evidence, market lifecycle, approval, and multi-outcome portions of this decision are superseded by ENG-459. The active application model is a direct positive relationship: a Pen accepts an exact refill or compatibility group, optionally for one required Pen tip; absence is unknown. The retained physical columns and tables are deployment and import compatibility shims until a later cleanup migration can remove them safely. The remaining product, collection, configuration, terminology, source-listing, and source-image decisions stay accepted.
+ENG-459 supersedes this decision's refill evidence, market lifecycle, approval, and multi-outcome portions. ENG-461 removes those tables and columns. The active model stores a direct positive relationship: a Pen accepts an exact refill or compatibility group, optionally for one required Pen tip; absence is unknown. The remaining product, collection, configuration, terminology, source-listing, and source-image decisions stay accepted.
 
 Sources:
 
@@ -42,7 +42,7 @@ Active approved offerings, lifecycle statuses, identifiers, group memberships, a
 
 ### Provenance and images
 
-Use `catalog_source_listing`, `product_source_listing`, `catalog_source_evidence`, `catalog_source_listing_choice`, and `catalog_source_image` to preserve maker source IDs, URLs, captures, listing-to-choice mappings, and source image identities. Keep ownership and deletion behavior in the existing product image table.
+Use `catalog_source_listing`, `product_source_listing`, `catalog_source_listing_choice`, and `catalog_source_image` to preserve maker source IDs, URLs, listing-to-choice mappings, and source image identities. Keep ownership and deletion behavior in the existing product image table.
 
 Saga remains one product with many source listings and constrained choices. The planning baseline supplies the initial records; a future archive can append reviewed listings, choices, rules, and images without changing this schema.
 

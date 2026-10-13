@@ -3097,13 +3097,6 @@ export function createCatalogService(
                 200,
                 "identifier",
               );
-              const [globalMarket] = await tx
-                .select({ id: schema.catalogMarket.id })
-                .from(schema.catalogMarket)
-                .where(eq(schema.catalogMarket.code, "GLOBAL"))
-                .limit(1);
-              if (!globalMarket)
-                throw new Error("Global catalog market does not exist.");
               const [row] = await tx
                 .insert(schema.refillOfferingIdentifier)
                 .values({
@@ -3111,7 +3104,6 @@ export function createCatalogService(
                   comparisonValue: sourceValue.trim(),
                   kind: input.identifierKind,
                   makerId: input.makerId,
-                  marketId: globalMarket.id,
                   offeringId: input.offeringId,
                   sourceValue,
                 })
@@ -3185,7 +3177,6 @@ export function createCatalogService(
             const [row] = await tx
               .insert(schema.refillCompatibilityAssertion)
               .values({
-                outcome: "compatible",
                 penProductId: input.penProductId,
                 requiredTipProductId: input.requiredTipProductId ?? null,
                 targetGroupId: input.targetGroupId ?? null,

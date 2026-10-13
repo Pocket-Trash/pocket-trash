@@ -1,8 +1,8 @@
 # Decide the refill compatibility evidence and exception model
 
-Status: Superseded by ENG-459
+Status: Superseded by ENG-459 and removed by ENG-461
 
-ENG-459 replaces this evidence and outcome model with direct positive catalog relationships. A Pen accepts either an exact refill or a refill compatibility group, optionally with a required Pen tip. Presence means compatible and absence means unknown. The application no longer authors, validates, or resolves compatibility evidence, incompatible/conditional/variable outcomes, explanations, remedies, or warnings.
+ENG-459 replaces this evidence and outcome model with direct positive catalog relationships. A Pen accepts either an exact refill or a refill compatibility group, optionally with a required Pen tip. Presence means compatible and absence means unknown. ENG-461 removes the superseded evidence tables, joins, outcomes, explanations, remedies, warnings, and approval columns from the database.
 
 Sources:
 

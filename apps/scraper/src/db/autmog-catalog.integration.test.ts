@@ -97,9 +97,6 @@ describe("canonical Autmog catalog synchronization", () => {
       await expect(
         countRows(db, schema.refillCompatibilityAssertion),
       ).resolves.toBe(1);
-      await expect(
-        countRows(db, schema.refillCompatibilityEvidence),
-      ).resolves.toBe(0);
     } finally {
       await client.close();
     }

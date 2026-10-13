@@ -673,7 +673,6 @@ export const relations = defineRelations(tables, (r) => ({
   productDetailPen: {
     collectionItems: r.many.collectionDetailPen(),
     compatibilityAssertions: r.many.refillCompatibilityAssertion(),
-    compatibilityEvidence: r.many.refillCompatibilityEvidence(),
     product: r.one.product({
       from: [r.productDetailPen.id],
       to: [r.product.id],
@@ -701,7 +700,6 @@ export const relations = defineRelations(tables, (r) => ({
   productDetailPenTip: {
     assertions: r.many.refillCompatibilityAssertion(),
     collectionItems: r.many.collectionDetailPenTip(),
-    evidence: r.many.refillCompatibilityEvidence(),
     part: r.one.productDetailPenPart({
       from: [r.productDetailPenTip.id],
       to: [r.productDetailPenPart.id],
@@ -751,7 +749,6 @@ export const relations = defineRelations(tables, (r) => ({
   productDetailRefill: {
     collectionPens: r.many.collectionDetailPen(),
     compatibilityAssertions: r.many.refillCompatibilityAssertion(),
-    compatibilityEvidence: r.many.refillCompatibilityEvidence(),
     groupMemberships: r.many.refillCompatibilityGroupMembership(),
     offerings: r.many.refillOffering(),
     product: r.one.product({
@@ -915,14 +912,12 @@ export const relations = defineRelations(tables, (r) => ({
     offerings: r.many.refillOffering(),
   },
   refillOffering: {
-    evidence: r.many.refillOfferingEvidence(),
     identifiers: r.many.refillOfferingIdentifier(),
     inkColor: r.one.refillInkColor({
       from: [r.refillOffering.inkColorId],
       to: [r.refillInkColor.id],
     }),
     installedInPens: r.many.collectionDetailPen(),
-    marketStatuses: r.many.refillOfferingMarketStatus(),
     refill: r.one.productDetailRefill({
       from: [r.refillOffering.refillProductId],
       to: [r.productDetailRefill.id],
@@ -932,55 +927,14 @@ export const relations = defineRelations(tables, (r) => ({
       to: [r.refillTipStyle.id],
     }),
   },
-  catalogMarket: {
-    childEdges: r.many.catalogMarketContainment({
-      from: r.catalogMarket.id,
-      to: r.catalogMarketContainment.parentMarketId,
-      alias: "parentMarket",
-    }),
-    evidence: r.many.catalogSourceEvidence(),
-    identifiers: r.many.refillOfferingIdentifier(),
-    parentEdges: r.many.catalogMarketContainment({
-      from: r.catalogMarket.id,
-      to: r.catalogMarketContainment.childMarketId,
-      alias: "childMarket",
-    }),
-    statuses: r.many.refillOfferingMarketStatus(),
-  },
-  catalogMarketContainment: {
-    child: r.one.catalogMarket({
-      from: [r.catalogMarketContainment.childMarketId],
-      to: [r.catalogMarket.id],
-      alias: "childMarket",
-    }),
-    parent: r.one.catalogMarket({
-      from: [r.catalogMarketContainment.parentMarketId],
-      to: [r.catalogMarket.id],
-      alias: "parentMarket",
-    }),
-  },
   catalogSourceListing: {
     choices: r.many.catalogSourceListingChoice(),
-    evidence: r.many.catalogSourceEvidence(),
     images: r.many.catalogSourceImage(),
     maker: r.one.maker({
       from: [r.catalogSourceListing.makerId],
       to: [r.maker.id],
     }),
     product: r.one.productSourceListing(),
-  },
-  catalogSourceEvidence: {
-    listing: r.one.catalogSourceListing({
-      from: [r.catalogSourceEvidence.listingId],
-      to: [r.catalogSourceListing.id],
-    }),
-    market: r.one.catalogMarket({
-      from: [r.catalogSourceEvidence.marketId],
-      to: [r.catalogMarket.id],
-    }),
-    offeringLinks: r.many.refillOfferingEvidence(),
-    identifierLinks: r.many.refillOfferingIdentifierEvidence(),
-    statusLinks: r.many.refillOfferingMarketStatusEvidence(),
   },
   productSourceListing: {
     listing: r.one.catalogSourceListing({
@@ -1021,7 +975,6 @@ export const relations = defineRelations(tables, (r) => ({
     memberships: r.many.refillCompatibilityGroupMembership(),
   },
   refillCompatibilityGroupMembership: {
-    evidence: r.many.refillCompatibilityGroupMembershipEvidence(),
     group: r.one.refillCompatibilityGroup({
       from: [r.refillCompatibilityGroupMembership.groupId],
       to: [r.refillCompatibilityGroup.id],
@@ -1032,7 +985,6 @@ export const relations = defineRelations(tables, (r) => ({
     }),
   },
   refillCompatibilityAssertion: {
-    evidence: r.many.refillCompatibilityAssertionEvidence(),
     pen: r.one.productDetailPen({
       from: [r.refillCompatibilityAssertion.penProductId],
       to: [r.productDetailPen.id],
@@ -1050,112 +1002,14 @@ export const relations = defineRelations(tables, (r) => ({
       to: [r.productDetailRefill.id],
     }),
   },
-  refillCompatibilityEvidence: {
-    assertionLinks: r.many.refillCompatibilityAssertionEvidence(),
-    membershipLinks: r.many.refillCompatibilityGroupMembershipEvidence(),
-    pen: r.one.productDetailPen({
-      from: [r.refillCompatibilityEvidence.penProductId],
-      to: [r.productDetailPen.id],
-    }),
-    refill: r.one.productDetailRefill({
-      from: [r.refillCompatibilityEvidence.refillProductId],
-      to: [r.productDetailRefill.id],
-    }),
-    requiredTip: r.one.productDetailPenTip({
-      from: [r.refillCompatibilityEvidence.requiredTipProductId],
-      to: [r.productDetailPenTip.id],
-    }),
-  },
-  refillCompatibilityAssertionEvidence: {
-    assertion: r.one.refillCompatibilityAssertion({
-      from: [r.refillCompatibilityAssertionEvidence.assertionId],
-      to: [r.refillCompatibilityAssertion.id],
-    }),
-    evidence: r.one.refillCompatibilityEvidence({
-      from: [r.refillCompatibilityAssertionEvidence.evidenceId],
-      to: [r.refillCompatibilityEvidence.id],
-    }),
-  },
-  refillCompatibilityGroupMembershipEvidence: {
-    evidence: r.one.refillCompatibilityEvidence({
-      from: [r.refillCompatibilityGroupMembershipEvidence.evidenceId],
-      to: [r.refillCompatibilityEvidence.id],
-    }),
-    membership: r.one.refillCompatibilityGroupMembership({
-      from: [r.refillCompatibilityGroupMembershipEvidence.membershipId],
-      to: [r.refillCompatibilityGroupMembership.id],
-    }),
-  },
-  refillOfferingEvidence: {
-    evidence: r.one.catalogSourceEvidence({
-      from: [r.refillOfferingEvidence.evidenceId],
-      to: [r.catalogSourceEvidence.id],
-    }),
-    offering: r.one.refillOffering({
-      from: [r.refillOfferingEvidence.offeringId],
-      to: [r.refillOffering.id],
-    }),
-  },
-  refillOfferingMarketStatus: {
-    evidence: r.many.refillOfferingMarketStatusEvidence(),
-    market: r.one.catalogMarket({
-      from: [r.refillOfferingMarketStatus.marketId],
-      to: [r.catalogMarket.id],
-    }),
-    offering: r.one.refillOffering({
-      from: [r.refillOfferingMarketStatus.offeringId],
-      to: [r.refillOffering.id],
-    }),
-    successor: r.one.refillOfferingMarketStatus({
-      from: [r.refillOfferingMarketStatus.successorId],
-      to: [r.refillOfferingMarketStatus.id],
-      alias: "statusSuccessor",
-    }),
-    supersededRows: r.many.refillOfferingMarketStatus({
-      alias: "statusSuccessor",
-    }),
-  },
-  refillOfferingMarketStatusEvidence: {
-    evidence: r.one.catalogSourceEvidence({
-      from: [r.refillOfferingMarketStatusEvidence.evidenceId],
-      to: [r.catalogSourceEvidence.id],
-    }),
-    status: r.one.refillOfferingMarketStatus({
-      from: [r.refillOfferingMarketStatusEvidence.statusId],
-      to: [r.refillOfferingMarketStatus.id],
-    }),
-  },
   refillOfferingIdentifier: {
-    evidence: r.many.refillOfferingIdentifierEvidence(),
     maker: r.one.maker({
       from: [r.refillOfferingIdentifier.makerId],
       to: [r.maker.id],
     }),
-    market: r.one.catalogMarket({
-      from: [r.refillOfferingIdentifier.marketId],
-      to: [r.catalogMarket.id],
-    }),
     offering: r.one.refillOffering({
       from: [r.refillOfferingIdentifier.offeringId],
       to: [r.refillOffering.id],
-    }),
-    successor: r.one.refillOfferingIdentifier({
-      from: [r.refillOfferingIdentifier.successorId],
-      to: [r.refillOfferingIdentifier.id],
-      alias: "identifierSuccessor",
-    }),
-    supersededRows: r.many.refillOfferingIdentifier({
-      alias: "identifierSuccessor",
-    }),
-  },
-  refillOfferingIdentifierEvidence: {
-    evidence: r.one.catalogSourceEvidence({
-      from: [r.refillOfferingIdentifierEvidence.evidenceId],
-      to: [r.catalogSourceEvidence.id],
-    }),
-    identifier: r.one.refillOfferingIdentifier({
-      from: [r.refillOfferingIdentifierEvidence.identifierId],
-      to: [r.refillOfferingIdentifier.id],
     }),
   },
   uploadSession: {

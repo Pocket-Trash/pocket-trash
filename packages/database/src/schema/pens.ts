@@ -1,10 +1,8 @@
 import { sql } from "drizzle-orm";
 import {
-  type AnyPgColumn,
   bigint,
   boolean,
   check,
-  date,
   foreignKey,
   index,
   integer,
@@ -565,7 +563,6 @@ export const refillOffering = pgTable(
     inkColorId: bigint("ink_color_id", { mode: "number" })
       .notNull()
       .references(() => refillInkColor.id, { onDelete: "restrict" }),
-    approvedAt: timestamp("approved_at", { withTimezone: true }),
     ...entityTimestamps,
   },
   (table) => [
@@ -748,51 +745,6 @@ export const collectionItemConfigurationSelection = pgTable(
   ],
 );
 
-/** Geographic or global scope used by catalog claims. */
-export const catalogMarket = pgTable(
-  "catalog_market",
-  {
-    id: identity(),
-    kind: text("kind", { enum: ["global", "country", "region"] }).notNull(),
-    code: text("code").notNull(),
-    displayName: text("display_name").notNull(),
-    displayNameKey: text("display_name_key").notNull(),
-    ...entityTimestamps,
-  },
-  (table) => [
-    unique("catalog_market_code_unique").on(table.code),
-    check(
-      "catalog_market_kind_valid",
-      sql`${table.kind} in ('global', 'country', 'region')`,
-    ),
-    check(
-      "catalog_market_code_valid",
-      sql`(${table.kind} = 'global' and ${table.code} = 'GLOBAL') or (${table.kind} = 'country' and ${table.code} ~ '^[A-Z]{2}$') or (${table.kind} = 'region' and char_length(trim(${table.code})) between 2 and 40 and ${table.code} <> 'GLOBAL')`,
-    ),
-  ],
-);
-
-/** Directed containment edge between catalog markets. */
-export const catalogMarketContainment = pgTable(
-  "catalog_market_containment",
-  {
-    parentMarketId: bigint("parent_market_id", { mode: "number" })
-      .notNull()
-      .references(() => catalogMarket.id, { onDelete: "restrict" }),
-    childMarketId: bigint("child_market_id", { mode: "number" })
-      .notNull()
-      .references(() => catalogMarket.id, { onDelete: "restrict" }),
-  },
-  (table) => [
-    primaryKey({ columns: [table.parentMarketId, table.childMarketId] }),
-    index("catalog_market_containment_child_idx").on(table.childMarketId),
-    check(
-      "catalog_market_containment_distinct",
-      sql`${table.parentMarketId} <> ${table.childMarketId}`,
-    ),
-  ],
-);
-
 /** Stable maker-source listing identity. */
 export const catalogSourceListing = pgTable(
   "catalog_source_listing",
@@ -820,46 +772,6 @@ export const catalogSourceListing = pgTable(
       table.sourceRecordId,
     ),
     index("catalog_source_listing_url_idx").on(table.listingUrl),
-  ],
-);
-
-/** Append-only source evidence supporting a catalog claim. */
-export const catalogSourceEvidence = pgTable(
-  "catalog_source_evidence",
-  {
-    id: identity(),
-    listingId: bigint("listing_id", { mode: "number" }).references(
-      () => catalogSourceListing.id,
-      { onDelete: "restrict" },
-    ),
-    publisher: text("publisher").notNull(),
-    sourceKind: text("source_kind").notNull(),
-    originalUrl: text("original_url").notNull(),
-    captureDate: date("capture_date", { mode: "string" }).notNull(),
-    publicationDate: date("publication_date", { mode: "string" }),
-    catalogEdition: text("catalog_edition"),
-    preservedSourceIdentity: text("preserved_source_identity"),
-    preservedSourceChecksum: text("preserved_source_checksum"),
-    claim: text("claim").notNull(),
-    marketId: bigint("market_id", { mode: "number" }).references(
-      () => catalogMarket.id,
-      { onDelete: "restrict" },
-    ),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("catalog_source_evidence_listing_idx").on(table.listingId),
-    index("catalog_source_evidence_market_idx").on(table.marketId),
-    check(
-      "catalog_source_evidence_checksum_valid",
-      sql`${table.preservedSourceChecksum} is null or ${table.preservedSourceChecksum} ~ '^[0-9a-f]{64}$'`,
-    ),
-    check(
-      "catalog_source_evidence_claim_valid",
-      sql`char_length(trim(${table.claim})) between 1 and 5000`,
-    ),
   ],
 );
 
@@ -929,105 +841,7 @@ export const catalogSourceImage = pgTable(
   ],
 );
 
-/** Evidence link for the identity of an approved refill offering. */
-export const refillOfferingEvidence = pgTable(
-  "refill_offering_evidence",
-  {
-    offeringId: bigint("offering_id", { mode: "number" })
-      .notNull()
-      .references(() => refillOffering.id, { onDelete: "cascade" }),
-    evidenceId: bigint("evidence_id", { mode: "number" })
-      .notNull()
-      .references(() => catalogSourceEvidence.id, { onDelete: "restrict" }),
-    stance: text("stance", { enum: ["supports", "contradicts"] }).notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.offeringId, table.evidenceId] }),
-    index("refill_offering_evidence_evidence_idx").on(table.evidenceId),
-    check(
-      "refill_offering_evidence_stance_valid",
-      sql`${table.stance} in ('supports', 'contradicts')`,
-    ),
-  ],
-);
-
-/** Versioned refill-offering lifecycle claim in one market. */
-export const refillOfferingMarketStatus = pgTable(
-  "refill_offering_market_status",
-  {
-    id: identity(),
-    offeringId: bigint("offering_id", { mode: "number" })
-      .notNull()
-      .references(() => refillOffering.id, { onDelete: "restrict" }),
-    marketId: bigint("market_id", { mode: "number" })
-      .notNull()
-      .references(() => catalogMarket.id, { onDelete: "restrict" }),
-    lifecycle: text("lifecycle", {
-      enum: ["current", "discontinued", "historical"],
-    }).notNull(),
-    effectiveDate: date("effective_date", { mode: "string" }),
-    approvedAt: timestamp("approved_at", { withTimezone: true }),
-    supersededAt: timestamp("superseded_at", { withTimezone: true }),
-    successorId: bigint("successor_id", { mode: "number" }).references(
-      (): AnyPgColumn => refillOfferingMarketStatus.id,
-      { onDelete: "restrict" },
-    ),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    unique("refill_offering_market_status_id_scope_unique").on(
-      table.id,
-      table.offeringId,
-      table.marketId,
-    ),
-    uniqueIndex("refill_offering_market_status_active_unique")
-      .on(table.offeringId, table.marketId)
-      .where(sql`${table.supersededAt} is null`),
-    index("refill_offering_market_status_market_idx").on(table.marketId),
-    index("refill_offering_market_status_successor_idx").on(table.successorId),
-    index("refill_offering_market_status_active_lookup_idx").on(
-      table.offeringId,
-      table.marketId,
-      table.supersededAt,
-    ),
-    check(
-      "refill_offering_market_status_lifecycle_valid",
-      sql`${table.lifecycle} in ('current', 'discontinued', 'historical')`,
-    ),
-    check(
-      "refill_offering_market_status_successor_valid",
-      sql`(${table.supersededAt} is null and ${table.successorId} is null) or (${table.supersededAt} is not null and ${table.successorId} is not null and ${table.successorId} <> ${table.id})`,
-    ),
-  ],
-);
-
-/** Evidence link for a versioned offering-market status. */
-export const refillOfferingMarketStatusEvidence = pgTable(
-  "refill_offering_market_status_evidence",
-  {
-    statusId: bigint("status_id", { mode: "number" })
-      .notNull()
-      .references(() => refillOfferingMarketStatus.id, { onDelete: "cascade" }),
-    evidenceId: bigint("evidence_id", { mode: "number" })
-      .notNull()
-      .references(() => catalogSourceEvidence.id, { onDelete: "restrict" }),
-    stance: text("stance", { enum: ["supports", "contradicts"] }).notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.statusId, table.evidenceId] }),
-    index("refill_offering_market_status_evidence_evidence_idx").on(
-      table.evidenceId,
-    ),
-    check(
-      "refill_offering_market_status_evidence_stance_valid",
-      sql`${table.stance} in ('supports', 'contradicts')`,
-    ),
-  ],
-);
-
-/** Versioned maker code or SKU assigned to a refill offering. */
+/** Exact maker code or SKU assigned to a refill offering. */
 export const refillOfferingIdentifier = pgTable(
   "refill_offering_identifier",
   {
@@ -1042,34 +856,15 @@ export const refillOfferingIdentifier = pgTable(
     sourceValue: text("source_value").notNull(),
     comparisonValue: text("comparison_value").notNull(),
     comparisonRule: text("comparison_rule").default("trim").notNull(),
-    marketId: bigint("market_id", { mode: "number" })
-      .notNull()
-      .references(() => catalogMarket.id, { onDelete: "restrict" }),
-    effectiveDate: date("effective_date", { mode: "string" }),
-    approvedAt: timestamp("approved_at", { withTimezone: true }),
-    supersededAt: timestamp("superseded_at", { withTimezone: true }),
-    successorId: bigint("successor_id", { mode: "number" }).references(
-      (): AnyPgColumn => refillOfferingIdentifier.id,
-      { onDelete: "restrict" },
-    ),
     ...entityTimestamps,
   },
   (table) => [
-    unique("refill_offering_identifier_id_scope_unique").on(
-      table.id,
+    unique("refill_offering_identifier_value_unique").on(
       table.makerId,
       table.kind,
-      table.marketId,
-    ),
-    uniqueIndex("refill_offering_identifier_active_unique")
-      .on(table.makerId, table.kind, table.comparisonValue, table.marketId)
-      .where(sql`${table.supersededAt} is null`),
-    index("refill_offering_identifier_offering_idx").on(table.offeringId),
-    index("refill_offering_identifier_successor_idx").on(table.successorId),
-    index("refill_offering_identifier_market_value_idx").on(
-      table.marketId,
       table.comparisonValue,
     ),
+    index("refill_offering_identifier_offering_idx").on(table.offeringId),
     check(
       "refill_offering_identifier_kind_valid",
       sql`${table.kind} in ('maker-code', 'sku')`,
@@ -1082,38 +877,10 @@ export const refillOfferingIdentifier = pgTable(
       "refill_offering_identifier_default_comparison_valid",
       sql`${table.comparisonRule} <> 'trim' or ${table.comparisonValue} = trim(${table.sourceValue})`,
     ),
-    check(
-      "refill_offering_identifier_successor_valid",
-      sql`(${table.supersededAt} is null and ${table.successorId} is null) or (${table.supersededAt} is not null and ${table.successorId} is not null and ${table.successorId} <> ${table.id})`,
-    ),
   ],
 );
 
-/** Evidence link for a versioned offering identifier. */
-export const refillOfferingIdentifierEvidence = pgTable(
-  "refill_offering_identifier_evidence",
-  {
-    identifierId: bigint("identifier_id", { mode: "number" })
-      .notNull()
-      .references(() => refillOfferingIdentifier.id, { onDelete: "cascade" }),
-    evidenceId: bigint("evidence_id", { mode: "number" })
-      .notNull()
-      .references(() => catalogSourceEvidence.id, { onDelete: "restrict" }),
-    stance: text("stance", { enum: ["supports", "contradicts"] }).notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.identifierId, table.evidenceId] }),
-    index("refill_offering_identifier_evidence_evidence_idx").on(
-      table.evidenceId,
-    ),
-    check(
-      "refill_offering_identifier_evidence_stance_valid",
-      sql`${table.stance} in ('supports', 'contradicts')`,
-    ),
-  ],
-);
-
-/** Approved membership of a refill model in a physical compatibility group. */
+/** Membership of a refill model in a physical compatibility group. */
 export const refillCompatibilityGroupMembership = pgTable(
   "refill_compatibility_group_membership",
   {
@@ -1124,7 +891,6 @@ export const refillCompatibilityGroupMembership = pgTable(
     refillProductId: bigint("refill_product_id", { mode: "number" })
       .notNull()
       .references(() => productDetailRefill.id, { onDelete: "restrict" }),
-    approvedAt: timestamp("approved_at", { withTimezone: true }),
     ...entityTimestamps,
   },
   (table) => [
@@ -1156,15 +922,6 @@ export const refillCompatibilityAssertion = pgTable(
     targetRefillProductId: bigint("target_refill_product_id", {
       mode: "number",
     }).references(() => productDetailRefill.id, { onDelete: "restrict" }),
-    outcome: text("outcome", {
-      enum: ["compatible", "incompatible", "conditional", "variable"],
-    })
-      .notNull()
-      .default("compatible"),
-    explanation: text("explanation"),
-    remedy: text("remedy"),
-    warning: text("warning"),
-    approvedAt: timestamp("approved_at", { withTimezone: true }),
     ...entityTimestamps,
   },
   (table) => [
@@ -1199,153 +956,6 @@ export const refillCompatibilityAssertion = pgTable(
       "refill_compatibility_assertion_target_valid",
       sql`num_nonnulls(${table.targetGroupId}, ${table.targetRefillProductId}) = 1`,
     ),
-    check(
-      "refill_compatibility_assertion_outcome_valid",
-      sql`${table.outcome} in ('compatible', 'incompatible', 'conditional', 'variable')`,
-    ),
-    check(
-      "refill_compatibility_assertion_explanation_required",
-      sql`${table.outcome} not in ('incompatible', 'variable') or char_length(trim(${table.explanation})) between 1 and 2000`,
-    ),
-    check(
-      "refill_compatibility_assertion_remedy_required",
-      sql`${table.outcome} <> 'conditional' or char_length(trim(${table.remedy})) between 1 and 2000`,
-    ),
-    check(
-      "refill_compatibility_assertion_text_valid",
-      sql`(${table.explanation} is null or char_length(trim(${table.explanation})) between 1 and 2000) and (${table.remedy} is null or char_length(trim(${table.remedy})) between 1 and 2000) and (${table.warning} is null or char_length(trim(${table.warning})) between 1 and 2000)`,
-    ),
-  ],
-);
-
-/** Structured evidence supporting or contradicting refill compatibility. */
-export const refillCompatibilityEvidence = pgTable(
-  "refill_compatibility_evidence",
-  {
-    id: identity(),
-    kind: text("kind", {
-      enum: [
-        "manufacturer-statement",
-        "dimensional-comparison",
-        "physical-fit-test",
-        "curated-observation",
-      ],
-    }).notNull(),
-    summary: text("summary").notNull(),
-    notes: text("notes"),
-    sourceUrl: text("source_url"),
-    sourceDate: date("source_date", { mode: "string" }),
-    catalogEdition: text("catalog_edition"),
-    firstMeasuredFormatLabel: text("first_measured_format_label"),
-    secondMeasuredFormatLabel: text("second_measured_format_label"),
-    firstSourceUrl: text("first_source_url"),
-    secondSourceUrl: text("second_source_url"),
-    penProductId: bigint("pen_product_id", { mode: "number" }).references(
-      () => productDetailPen.id,
-      { onDelete: "restrict" },
-    ),
-    requiredTipProductId: bigint("required_tip_product_id", {
-      mode: "number",
-    }).references(() => productDetailPenTip.id, { onDelete: "restrict" }),
-    refillProductId: bigint("refill_product_id", { mode: "number" }).references(
-      () => productDetailRefill.id,
-      { onDelete: "restrict" },
-    ),
-    testDate: date("test_date", { mode: "string" }),
-    result: text("result"),
-    procedure: text("procedure"),
-    supersededAt: timestamp("superseded_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("refill_compatibility_evidence_pen_idx").on(table.penProductId),
-    index("refill_compatibility_evidence_tip_idx").on(
-      table.requiredTipProductId,
-    ),
-    index("refill_compatibility_evidence_refill_idx").on(table.refillProductId),
-    check(
-      "refill_compatibility_evidence_kind_valid",
-      sql`${table.kind} in ('manufacturer-statement', 'dimensional-comparison', 'physical-fit-test', 'curated-observation')`,
-    ),
-    check(
-      "refill_compatibility_evidence_summary_valid",
-      sql`char_length(trim(${table.summary})) between 1 and 2000`,
-    ),
-    check(
-      "refill_compatibility_evidence_fields_valid",
-      sql`(
-        ${table.kind} in ('manufacturer-statement', 'curated-observation')
-        and ${table.sourceUrl} is not null
-        and num_nonnulls(${table.sourceDate}, ${table.catalogEdition}) >= 1
-        and num_nonnulls(${table.firstMeasuredFormatLabel}, ${table.secondMeasuredFormatLabel}, ${table.firstSourceUrl}, ${table.secondSourceUrl}, ${table.penProductId}, ${table.requiredTipProductId}, ${table.refillProductId}, ${table.testDate}, ${table.result}, ${table.procedure}) = 0
-      ) or (
-        ${table.kind} = 'dimensional-comparison'
-        and num_nonnulls(${table.firstMeasuredFormatLabel}, ${table.secondMeasuredFormatLabel}, ${table.firstSourceUrl}, ${table.secondSourceUrl}) = 4
-        and num_nonnulls(${table.sourceUrl}, ${table.sourceDate}, ${table.catalogEdition}, ${table.penProductId}, ${table.requiredTipProductId}, ${table.refillProductId}, ${table.testDate}, ${table.result}, ${table.procedure}) = 0
-      ) or (
-        ${table.kind} = 'physical-fit-test'
-        and num_nonnulls(${table.penProductId}, ${table.refillProductId}, ${table.testDate}, ${table.result}, ${table.procedure}) = 5
-        and num_nonnulls(${table.sourceUrl}, ${table.sourceDate}, ${table.catalogEdition}, ${table.firstMeasuredFormatLabel}, ${table.secondMeasuredFormatLabel}, ${table.firstSourceUrl}, ${table.secondSourceUrl}) = 0
-      )`,
-    ),
-  ],
-);
-
-/** Evidence attached to a compatibility assertion. */
-export const refillCompatibilityAssertionEvidence = pgTable(
-  "refill_compatibility_assertion_evidence",
-  {
-    assertionId: bigint("assertion_id", { mode: "number" })
-      .notNull()
-      .references(() => refillCompatibilityAssertion.id, {
-        onDelete: "cascade",
-      }),
-    evidenceId: bigint("evidence_id", { mode: "number" })
-      .notNull()
-      .references(() => refillCompatibilityEvidence.id, {
-        onDelete: "restrict",
-      }),
-    stance: text("stance", { enum: ["supports", "contradicts"] }).notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.assertionId, table.evidenceId] }),
-    index("refill_compatibility_assertion_evidence_evidence_idx").on(
-      table.evidenceId,
-    ),
-    check(
-      "refill_compatibility_assertion_evidence_stance_valid",
-      sql`${table.stance} in ('supports', 'contradicts')`,
-    ),
-  ],
-);
-
-/** Evidence attached to a compatibility-group membership. */
-export const refillCompatibilityGroupMembershipEvidence = pgTable(
-  "refill_compatibility_group_membership_evidence",
-  {
-    membershipId: bigint("membership_id", { mode: "number" })
-      .notNull()
-      .references(() => refillCompatibilityGroupMembership.id, {
-        onDelete: "cascade",
-      }),
-    evidenceId: bigint("evidence_id", { mode: "number" })
-      .notNull()
-      .references(() => refillCompatibilityEvidence.id, {
-        onDelete: "restrict",
-      }),
-    stance: text("stance", { enum: ["supports", "contradicts"] }).notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.membershipId, table.evidenceId] }),
-    index("refill_compatibility_group_membership_evidence_evidence_idx").on(
-      table.evidenceId,
-    ),
-    check(
-      "refill_compatibility_group_membership_evidence_stance_valid",
-      sql`${table.stance} in ('supports', 'contradicts')`,
-    ),
   ],
 );
 
@@ -1361,9 +971,6 @@ export type NewPensSchemaRows = {
 
 /** Complete named Pens table registry used to expose inferred row types. */
 export const pensTables = {
-  catalogMarket,
-  catalogMarketContainment,
-  catalogSourceEvidence,
   catalogSourceImage,
   catalogSourceListing,
   catalogSourceListingChoice,
@@ -1393,17 +1000,10 @@ export const pensTables = {
   productDetailRefill,
   productSourceListing,
   refillCompatibilityAssertion,
-  refillCompatibilityAssertionEvidence,
-  refillCompatibilityEvidence,
   refillCompatibilityGroup,
   refillCompatibilityGroupMembership,
-  refillCompatibilityGroupMembershipEvidence,
   refillInkColor,
   refillOffering,
-  refillOfferingEvidence,
   refillOfferingIdentifier,
-  refillOfferingIdentifierEvidence,
-  refillOfferingMarketStatus,
-  refillOfferingMarketStatusEvidence,
   refillTipStyle,
 } as const;
