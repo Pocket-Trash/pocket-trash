@@ -127,13 +127,13 @@ describe("Railway scraper cron", () => {
     });
   });
 
-  it("runs every source once per hourly invocation", async () => {
+  it("runs every source at the shared hourly slot", async () => {
     expect(scraperSchedules).toEqual({
-      autmog: "0 * * * *",
+      autmog: "*/30 * * * *",
       "grimsmo-fjell": "0 * * * *",
       "grimsmo-norseman": "0 * * * *",
       "grimsmo-rask": "0 * * * *",
-      "grimsmo-saga": "0 * * * *",
+      "grimsmo-saga": "*/30 * * * *",
     });
     vi.mocked(runSourceProducerJob).mockResolvedValue(undefined);
     vi.mocked(runQueueProcessorJob).mockResolvedValue(undefined);
@@ -155,7 +155,26 @@ describe("Railway scraper cron", () => {
       "grimsmo-saga",
     ]);
   });
-  it("establishes an hourly baseline off the dispatcher tick and still processes the queue", async () => {
+
+  it("runs only Autmog and Saga at the half-hour slot", async () => {
+    const context = createContext();
+    vi.mocked(context.redis.get).mockResolvedValue("2026-07-16T12:00:00.000Z");
+    vi.mocked(runSourceProducerJob).mockResolvedValue(undefined);
+    vi.mocked(runQueueProcessorJob).mockResolvedValue(undefined);
+
+    await runRailwayCronJob({
+      context,
+      env: createEnv(),
+      logger: createNoopLogger(),
+      now: new Date("2026-07-16T12:30:00.000Z"),
+    });
+
+    expect(
+      vi.mocked(runSourceProducerJob).mock.calls.map(([input]) => input.source),
+    ).toEqual(["autmog", "grimsmo-saga"]);
+  });
+
+  it("establishes a baseline off the dispatcher tick and still processes the queue", async () => {
     const context = createContext();
     await runRailwayCronJob({
       context,
@@ -166,7 +185,7 @@ describe("Railway scraper cron", () => {
     expect(runSourceProducerJob).not.toHaveBeenCalled();
     expect(context.redis.set).toHaveBeenCalledWith(
       "scraper:cron:last-attempted-slot:autmog",
-      "2026-07-16T12:00:00.000Z",
+      "2026-07-16T12:30:00.000Z",
     );
     expect(runQueueProcessorJob).toHaveBeenCalledOnce();
   });
@@ -268,7 +287,7 @@ describe("Railway scraper cron", () => {
     expect(runSourceProducerJob).toHaveBeenCalledTimes(5);
     expect(context.redis.set).toHaveBeenCalledWith(
       "scraper:cron:last-attempted-slot:autmog",
-      "2026-07-16T12:00:00.000Z",
+      "2026-07-16T12:30:00.000Z",
     );
   });
 

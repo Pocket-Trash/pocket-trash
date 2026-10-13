@@ -122,8 +122,9 @@ them only for database-changing PRs with an isolated Neon branch; other previews
 share the preview database and keep cron disabled.
 
 Source schedules are a complete, reviewed registry of standard five-field UTC
-expressions in [`cron.ts`](../apps/scraper/src/cron.ts). All five current sources
-remain hourly (`0 * * * *`); Railway invokes the dispatcher with `*/5 * * * *`.
+expressions in [`cron.ts`](../apps/scraper/src/cron.ts). Autmog and Grimsmo Saga
+run every 30 minutes during Pens cutover verification; the three Grimsmo knife
+sources remain hourly. Railway invokes the dispatcher with `*/5 * * * *`.
 The complete registry is validated before any Redis or task side effects. One
 invocation-wide timestamp determines every source's latest scheduled occurrence.
 
