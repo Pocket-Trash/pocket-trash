@@ -418,6 +418,7 @@ export async function runQueueProcessorJob({
         concurrency: env.SCRAPER_QUEUE_CONCURRENCY,
         connection: context.redis,
         db: context.db,
+        dryRun: env.SCRAPER_DRY_RUN,
         imageFolderPrefix: context.imageFolderPrefix,
         imageStorage: context.imageStorage,
         logger,

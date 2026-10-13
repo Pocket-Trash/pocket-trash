@@ -63,20 +63,6 @@ export type ScraperItemJob =
     }
   | {
       /**
-       * Source product IDs observed in the completed Autmog scrape.
-       */
-      seenSourceProductIds: string[];
-      /**
-       * Autmog source discriminator.
-       */
-      source: typeof scraperSources.autmog;
-      /**
-       * Missing-product archive job discriminator.
-       */
-      type: "autmog.archiveMissing";
-    }
-  | {
-      /**
        * Normalized Grimsmo pen variation to persist.
        */
       item: NormalizedGrimsmoPenVariation;
@@ -142,6 +128,22 @@ export type ScraperItemJob =
  * Discriminated payload processed by the scraper image queue.
  */
 export type ScraperImageJob =
+  | {
+      /** Canonical source-listing identifier. */
+      listingId: number;
+      /** Canonical product identifier. */
+      productId: number;
+      /** Stable Shopify image identifier. */
+      sourceImageId: string;
+      /** Original Shopify image URL. */
+      sourceUrl: string;
+      /** Source image display position. */
+      position: number;
+      /** Autmog source discriminator. */
+      source: typeof scraperSources.autmog;
+      /** Canonical image-upload job discriminator. */
+      type: "autmog.image.upload";
+    }
   | {
       /**
        * Database identifier of the staged image to upload.

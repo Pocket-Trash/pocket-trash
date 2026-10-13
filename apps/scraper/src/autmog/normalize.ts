@@ -1,4 +1,3 @@
-import { htmlToMarkdown } from "@package/markdown";
 import { hashObject, hashString } from "../lib/hash.js";
 import { htmlToText, normalizeWhitespace } from "../lib/text.js";
 import type {
@@ -51,7 +50,7 @@ export function normalizeAutmogProduct(
 ): NormalizedAutmogPen {
   const bodyHtml = product.body_html ?? null;
   const bodyText = htmlToText(bodyHtml);
-  const description = htmlToMarkdown(bodyHtml);
+  const description = bodyText;
   const searchText = normalizeWhitespace(
     `${product.title} ${product.product_type ?? ""} ${product.tags.join(" ")} ${
       bodyText ?? ""
@@ -215,6 +214,10 @@ function getSize(value: string): string | null {
  * @returns The normalized category, or `null`.
  */
 function getCategory(value: string): string | null {
+  if (/\bpen\s+trays?\b|\bclip\s+add-on\b/i.test(value)) {
+    return null;
+  }
+
   if (/\bpen\b/i.test(value)) {
     return "pen";
   }

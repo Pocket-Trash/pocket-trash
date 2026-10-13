@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { ImageEntity } from "../constants.js";
 import {
   imageThumbnailWidth,
@@ -69,6 +70,8 @@ export type ImageUpdateInput = {
 
 /** Persisted image identity, dimensions, and delivery URLs. */
 export type ImageUploadResult = {
+  /** Normalized encoded image media type. */
+  contentType: string;
   /** Provider file identifier. */
   fileId: string;
   /** Provider-relative file path. */
@@ -77,6 +80,10 @@ export type ImageUploadResult = {
   height: number;
   /** Storage provider. */
   provider: ImageStorageProvider;
+  /** Exact encoded-byte SHA-256 digest. */
+  sha256: string;
+  /** Exact encoded byte count. */
+  size: number;
   /** Thumbnail delivery URL. */
   thumbnailUrl: string;
   /** Full-size delivery URL. */
@@ -403,13 +410,16 @@ function normalizeImageFilePath(filePath: string): string {
 function toImageUploadResult(
   config: RemoteBunnyConfig,
   filePath: string,
-  image: Pick<FetchedImage, "height" | "width">,
+  image: FetchedImage,
 ): ImageUploadResult {
   return {
+    contentType: image.contentType,
     fileId: filePath,
     filePath,
     height: image.height,
     provider: "bunny",
+    sha256: createHash("sha256").update(image.buffer).digest("hex"),
+    size: image.buffer.byteLength,
     thumbnailUrl: imageDeliveryUrl(
       buildCdnUrl(config.cdnBaseUrl, filePath),
       imageThumbnailWidth,

@@ -134,6 +134,7 @@ describe("createImageStorage", () => {
       ...bunnyConfig,
       fetch: fetchMock,
     });
+    const expectedSha256 = await sha256(sourceImage);
 
     await expect(
       storage.uploadRemoteImage({
@@ -142,10 +143,13 @@ describe("createImageStorage", () => {
         sourceUrl: "https://cdn.example.test/source-image.jpg",
       }),
     ).resolves.toEqual({
+      contentType: "image/jpeg",
       fileId: "/images/products/pens/123/source-image.jpg",
       filePath: "/images/products/pens/123/source-image.jpg",
       height: 300,
       provider: "bunny",
+      sha256: expectedSha256,
+      size: sourceImage.byteLength,
       thumbnailUrl:
         "https://cdn.pocket-trash.app/images/products/pens/123/source-image.jpg?format=webp&quality=85&width=500",
       url: "https://cdn.pocket-trash.app/images/products/pens/123/source-image.jpg?format=webp&quality=85",
@@ -205,6 +209,7 @@ describe("createImageStorage", () => {
       ...bunnyConfig,
       fetch: fetchMock,
     });
+    const expectedSha256 = await sha256(sourceImage);
 
     await expect(
       storage.uploadRemoteImage({
@@ -213,10 +218,13 @@ describe("createImageStorage", () => {
         sourceUrl: "https://cdn.example.test/source-image.jpg",
       }),
     ).resolves.toEqual({
+      contentType: "image/jpeg",
       fileId: "/images/products/pens/123/source-image.jpg",
       filePath: "/images/products/pens/123/source-image.jpg",
       height: 3000,
       provider: "bunny",
+      sha256: expectedSha256,
+      size: sourceImage.byteLength,
       thumbnailUrl:
         "https://cdn.pocket-trash.app/images/products/pens/123/source-image.jpg?format=webp&quality=85&width=500",
       url: "https://cdn.pocket-trash.app/images/products/pens/123/source-image.jpg?format=webp&quality=85",
