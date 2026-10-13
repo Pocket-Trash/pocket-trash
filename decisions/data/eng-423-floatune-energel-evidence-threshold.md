@@ -2,6 +2,8 @@
 
 Status: Accepted
 
+ENG-459 supersedes the evidence threshold and evidence-linking instructions in this record. The durable conclusion remains unchanged: every Pentel Floatune refill belongs to the EnerGel compatibility group. Store those memberships directly, without evidence or approval metadata.
+
 Sources:
 
 - [Decide the evidence required to group Floatune with EnerGel](https://linear.app/pocket-trash/issue/ENG-423/decide-the-evidence-required-to-group-floatune-with-energel)

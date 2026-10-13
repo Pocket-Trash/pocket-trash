@@ -2,6 +2,8 @@
 
 Status: Accepted
 
+ENG-459 supersedes the evidence-linking and exception-outcome instructions in this record. The durable conclusion remains unchanged: Monteverde PP43 belongs to the canonical `parker-g2` compatibility group. Store that membership directly, without evidence or approval metadata.
+
 Sources:
 
 - [Verify whether Monteverde PP43 belongs in Parker G2](https://linear.app/pocket-trash/issue/ENG-424/verify-whether-monteverde-pp43-belongs-in-parker-g2)
